@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,37 +30,31 @@ import logging
 
 syslog = logging.getLogger("system")
 
-class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
+class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
     """Widget associated with the action of switching to the previous mode."""
 
     def __init__(self, action_data, parent=None):
         self.action_data = action_data
         self.gate_widget = None
         super().__init__(action_data, parent=parent)
-  
-
-
 
     def _create_ui(self):
-
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
-        self.container_widget.setContentsMargins(0,0,0,0)
+        self.container_widget.setContentsMargins(0, 0, 0, 0)
 
-        self.gate_widget  = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
-                                                                show_configuration=False,
-                                                                parent=self
-                                                                )
-        #cache.register(self.action_data, widget)
+        self.gate_widget = gremlin.gated_handler.GatedAxisWidget(
+            action_data=self.action_data, show_configuration=False, parent=self
+        )
+        # cache.register(self.action_data, widget)
         self.main_layout.addWidget(self.gate_widget)
-        
 
     def _populate_ui(self):
         pass
 
     def _cleanup_ui(self):
-        ''' cleanup the UI and widget hooks '''
+        """cleanup the UI and widget hooks"""
 
         if self.gate_widget:
             self.gate_widget.unhook()
@@ -68,40 +62,33 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.gate_widget.deleteLater()
             self.gate_widget = None
 
-    
-
 
 class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
-        self.manual_callback = True # indicate this functor only uses manual callbacks
+        self.manual_callback = True  # indicate this functor only uses manual callbacks
 
     # def profile_start(self):
     #     ''' register the gated functor'''
     #     #self.action_data.gate_data.setActionId(self.action_data.id)
     #     pass
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         # all the work happens in the gate widget hook function - nothing to do
-        #self.action_data.gate_data.process_event(event, value)
-        #syslog.info("Gated Axis: trigger")
-        return True # prevent child from executing
+        # self.action_data.gate_data.process_event(event, value)
+        # syslog.info("Gated Axis: trigger")
+        return True  # prevent child from executing
+
 
 class GatedAxis(gremlin.base_profile.AbstractAction):
-
-    """ action data for the GatedAxis action """
+    """action data for the GatedAxis action"""
 
     name = "Gated Axis"
     tag = "gated-axis"
 
     default_button_activation = (True, False)
     # override default allowed input types here if not all
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.OpenSoundControl,
-        InputType.Midi
-    ]
+    input_types = [InputType.JoystickAxis, InputType.OpenSoundControl, InputType.Midi]
 
     functor = GatedAxisFunctor
     widget = GatedAxisWidget
@@ -109,15 +96,17 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.singleton = True # this action can only appear once per input
+        self.singleton = True  # this action can only appear once per input
 
         # gate data
-        gate_data = gremlin.gated_handler.GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
+        gate_data = gremlin.gated_handler.GateData(
+            profile_mode=gremlin.shared_state.current_mode, action_data=self
+        )
         self.gate_data = gate_data
         self.gates = [gate_data]
 
     def _cleanup(self):
-        ''' clean ourselves up '''
+        """clean ourselves up"""
         super()._cleanup()
         if self.gates:
             self.gates.clear()
@@ -125,27 +114,28 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
             self.gate_data.unhook()
             self.gate_data = None
 
-
     def icon(self):
         return "ph.sliders"
 
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         # load gate data
         import gremlin.util
-        
+
         gates = []
-        gate_node = gremlin.util.get_xml_child(node,"gates")
+        gate_node = gremlin.util.get_xml_child(node, "gates")
         profile_mode = gremlin.util.get_xml_mode(node)
         if not profile_mode:
             # paste operation
             profile_mode = gremlin.shared_state.current_mode
-        if not gate_node is None:
+        if gate_node is not None:
             for child in gate_node:
-                gate_data = gremlin.gated_handler.GateData(profile_mode, action_data = self)
-                
+                gate_data = gremlin.gated_handler.GateData(
+                    profile_mode, action_data=self
+                )
+
                 gate_data.from_xml(child, data)
                 gates.append(gate_data)
 
@@ -154,7 +144,7 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
             self.gate_data = gates[0]
 
     def _generate_xml(self):
-         # save gate data
+        # save gate data
         node = ElementTree.Element(GatedAxis.tag)
         if self.gates:
             node_gate = ElementTree.SubElement(node, "gates")

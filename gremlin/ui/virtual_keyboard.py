@@ -1,5 +1,3 @@
-import os
-from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
@@ -12,27 +10,27 @@ import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
-import enum
 
 from gremlin.keyboard import Key
 from gremlin.util import load_icon
 import logging
 import datetime
 import time
-      
+
 syslog = logging.getLogger("system")
 
-class QKeyWidget(QtWidgets.QPushButton):
 
+class QKeyWidget(QtWidgets.QPushButton):
     # indicates when the widget is hovered (true = on)
     hover = QtCore.Signal(object, bool)
 
     # fires when selection changes
     selected_changed = QtCore.Signal(object)
 
-    ''' custom key label '''
-    def __init__(self, text = None, parent = None) -> None:
-        super().__init__(text= text, parent = parent)
+    """ custom key label """
+
+    def __init__(self, text=None, parent=None) -> None:
+        super().__init__(text=text, parent=parent)
         self._key = None
         self._selected = False
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
@@ -52,33 +50,32 @@ class QKeyWidget(QtWidgets.QPushButton):
         self._key_size = 1
 
         self.setStyleSheet(self._default_style)
-        
-        self.normal_key = None # what to display normally
-        self.shifted_key = None # what to display when shifted
+
+        self.normal_key = None  # what to display normally
+        self.shifted_key = None  # what to display when shifted
         self.installEventFilter(self)
-        
 
     @property
     def key(self) -> Key:
-        ''' returns the associated key '''
+        """returns the associated key"""
         return self._key
-    
+
     @property
     def keySize(self) -> int:
         return self._key_size
+
     @keySize.setter
-    def keySize(self, value : int):
+    def keySize(self, value: int):
         self._key_size = value
         match value:
             case 1:
                 self.setStyleSheet(self._default_style)
             case 2:
                 self.setStyleSheet(self._x2_default_style)
-    
-    
+
     @key.setter
-    def key(self, value : Key):
-        ''' sets the associated key '''
+    def key(self, value: Key):
+        """sets the associated key"""
         self._key = value
 
     @property
@@ -88,7 +85,7 @@ class QKeyWidget(QtWidgets.QPushButton):
     @property
     def is_keypad(self):
         return self._is_keypad
-    
+
     @is_keypad.setter
     def is_keypad(self, value):
         self._is_keypad = value
@@ -96,16 +93,15 @@ class QKeyWidget(QtWidgets.QPushButton):
     @property
     def selected(self):
         return self._selected
-    
+
     @selected.setter
-    def selected(self,value):
+    def selected(self, value):
         if self._selected != value:
             self._selected = value
             self._update_state()
 
-
     def _update_state(self):
-        ''' updates the color of the button based on the selection state '''
+        """updates the color of the button based on the selection state"""
         match self._key_size:
             case 2:
                 plain = self._x2_default_style
@@ -113,13 +109,12 @@ class QKeyWidget(QtWidgets.QPushButton):
             case _:
                 plain = self._default_style
                 selected = self._selected_style
-    
+
         if self._selected:
             self.setStyleSheet(plain)
         else:
             self.setStyleSheet(selected)
 
-  
     def eventFilter(self, widget, event):
         t = event.type()
         if t == QtCore.QEvent.Type.HoverEnter:
@@ -127,30 +122,31 @@ class QKeyWidget(QtWidgets.QPushButton):
         elif t == QtCore.QEvent.Type.HoverLeave:
             self.hover.emit(self, False)
 
-        return False # super().eventFilter(widget, event)
-    
+        return False  # super().eventFilter(widget, event)
+
     @property
     def display_name(self):
-        ''' friendly key name'''
+        """friendly key name"""
         if self._key:
             return self._key.name + " " + self._key.latched_code
         return ""
-        
+
 
 class QKeyboardWidget(QtWidgets.QWidget):
-    ''' virtual keyboard widget '''
+    """virtual keyboard widget"""
 
-    keyEvent = QtCore.Signal() # called when the data has changed
+    keyEvent = QtCore.Signal()  # called when the data has changed
 
-    def __init__(self, parent = None):
-
-        ''' creates a full keyboard widget for manual data entry '''
+    def __init__(self, parent=None):
+        """creates a full keyboard widget for manual data entry"""
         super().__init__(parent)
 
-        self.installEventFilter(self)  # capture keys so the window doesn't go nuts when we hit special keys
+        self.installEventFilter(
+            self
+        )  # capture keys so the window doesn't go nuts when we hit special keys
 
         main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(0,0,0,0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout = QtWidgets.QGridLayout()
         grid_layout.setSpacing(2)
         main_layout.addLayout(grid_layout)
@@ -159,16 +155,15 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
         widget, layout = gremlin.ui.ui_common.getVContainer()
         self.repeater_container_widget = widget
-        self.repeater_container_layout= layout
-        
+        self.repeater_container_layout = layout
+
         main_layout.addWidget(self.repeater_container_widget)
         self._show_repeater = self.config.keyboard_repeater_show
-        self._repeater_lines = 30 # number of lines displayed in the repeater
+        self._repeater_lines = 30  # number of lines displayed in the repeater
         self._repeater_list = []
         self._repeater_timestamp = {}
         self._invert_display = self.config.keyboard_repeater_invert_display
         self._capture_mouse = self.config.keyboard_repeater_capture_mouse
-
 
         clear_widget = QtWidgets.QPushButton("Clear")
         clear_widget.setToolTip("Clears selection")
@@ -184,8 +179,9 @@ class QKeyboardWidget(QtWidgets.QWidget):
         invert_display_widget.setChecked(self._invert_display)
         invert_display_widget.clicked.connect(self._invert_display_changed)
 
-
-        self.options_widget, _= gremlin.ui.ui_common.getHContainer([clear_widget, capture_mouse_widget, invert_display_widget])
+        self.options_widget, _ = gremlin.ui.ui_common.getHContainer(
+            [clear_widget, capture_mouse_widget, invert_display_widget]
+        )
 
         self.repeater_container_layout.addWidget(self.options_widget)
         self.repeater_widget = QtWidgets.QPlainTextEdit()
@@ -193,36 +189,210 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self.repeater_container_layout.addWidget(self.repeater_widget)
 
         self.keyEvent.connect(self._update_repeater)
-        
-        
+
         # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
 
         # first row = QUERTY object
-        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","wheel_up","wheel_down"]
-        row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"],"","","","wheel_left","wheel_right"]
-        row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NmLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
-        row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
-        row_4 = [["CpsLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
-        row_5 = [["LShift","leftshift"],"Z","X","C","V","B","N","M",",",".","/",["RShift","rightshift"],"","","","","up","","",["1","np1"],["2","np2"],["3","np3"],["Enter","npenter",1,2]]
-        row_6 = [["LCtrl","leftcontrol"],["LWin","leftwin"],["LAlt","leftalt"],["Spacebar","space",6],["RAlt","rightalt2"],["RWin","rightwin"],["RCtrl","rightcontrol"],"","","","left","down","right","",["0/Ins","np0",2],["./Del","npdelete"]]
+        row_0 = [
+            "",
+            "",
+            "F13",
+            "F14",
+            "F15",
+            "F16",
+            "F17",
+            "F18",
+            "F19",
+            "F20",
+            "F21",
+            "F22",
+            "F23",
+            "F24",
+            "",
+            "mouse_1",
+            "mouse_2",
+            "mouse_3",
+            "",
+            "mouse_4",
+            "mouse_5",
+            "wheel_up",
+            "wheel_down",
+        ]
+        row_1 = [
+            "Esc",
+            "",
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "",
+            ["PrtSc", "printscreen"],
+            ["Scrlck", "scrolllock"],
+            ["Pause", "pause"],
+            "",
+            "",
+            "",
+            "wheel_left",
+            "wheel_right",
+        ]
+        row_2 = [
+            "`",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "0",
+            "-",
+            "=",
+            ["Back", "backspace"],
+            "",
+            ["Ins", "insert"],
+            ["Home", "home"],
+            ["PgUp", "pageup"],
+            "",
+            ["NmLck", "numlock"],
+            ["/", "npdivide"],
+            ["*", "npmultiply"],
+            ["-", "npminus"],
+        ]
+        row_3 = [
+            ["Tab", "tab"],
+            "Q",
+            "W",
+            "E",
+            "R",
+            "T",
+            "Y",
+            "U",
+            "I",
+            "O",
+            "P",
+            "[",
+            "]",
+            "\\",
+            "",
+            ["Del", "delete"],
+            "End",
+            ["PgDn", "pagedown"],
+            "",
+            ["7", "np7"],
+            ["8", "np8"],
+            ["9", "np9"],
+            ["+", "npplus", 1, 2],
+        ]
+        row_4 = [
+            ["CpsLck", "capslock"],
+            "A",
+            "S",
+            "D",
+            "F",
+            "G",
+            "H",
+            "J",
+            "K",
+            "L",
+            ";",
+            "'",
+            ["Enter", 2],
+            "",
+            "",
+            "",
+            "",
+            "",
+            ["4", "np4"],
+            ["5", "np5"],
+            ["6", "np6"],
+        ]
+        row_5 = [
+            ["LShift", "leftshift"],
+            "Z",
+            "X",
+            "C",
+            "V",
+            "B",
+            "N",
+            "M",
+            ",",
+            ".",
+            "/",
+            ["RShift", "rightshift"],
+            "",
+            "",
+            "",
+            "",
+            "up",
+            "",
+            "",
+            ["1", "np1"],
+            ["2", "np2"],
+            ["3", "np3"],
+            ["Enter", "npenter", 1, 2],
+        ]
+        row_6 = [
+            ["LCtrl", "leftcontrol"],
+            ["LWin", "leftwin"],
+            ["LAlt", "leftalt"],
+            ["Spacebar", "space", 6],
+            ["RAlt", "rightalt2"],
+            ["RWin", "rightwin"],
+            ["RCtrl", "rightcontrol"],
+            "",
+            "",
+            "",
+            "left",
+            "down",
+            "right",
+            "",
+            ["0/Ins", "np0", 2],
+            ["./Del", "npdelete"],
+        ]
 
         shifted_list = [
-            ("`","~"),("1","!"),("2","@"),("3","#"),("4","$"),("5","%"),("6","^"),
-            ("7","&&"),("8","*"),("9","("),("0",")"),("-","_"),("=","+"),
-            ("[","{"),("]","}"),("\\","|"),(";",":"),("'","\""),(",","<"),(".",">"),("/","?")
-            ]
-        
+            ("`", "~"),
+            ("1", "!"),
+            ("2", "@"),
+            ("3", "#"),
+            ("4", "$"),
+            ("5", "%"),
+            ("6", "^"),
+            ("7", "&&"),
+            ("8", "*"),
+            ("9", "("),
+            ("0", ")"),
+            ("-", "_"),
+            ("=", "+"),
+            ("[", "{"),
+            ("]", "}"),
+            ("\\", "|"),
+            (";", ":"),
+            ("'", '"'),
+            (",", "<"),
+            (".", ">"),
+            ("/", "?"),
+        ]
+
         shifted_map = {}
         for normal, shifted in shifted_list:
             shifted_map[normal] = shifted
 
-
-
-        rows = [row_0,row_1,row_2,row_3,row_4,row_5,row_6]
+        rows = [row_0, row_1, row_2, row_3, row_4, row_5, row_6]
 
         current_row = 0
-        self._key_map = {} # map of key (scancode, extended) to key name
-        self._key_widget_map = {} # map of key (scancode, extended) to widget
+        self._key_map = {}  # map of key (scancode, extended) to key name
+        self._key_widget_map = {}  # map of key (scancode, extended) to widget
         self._hooked = False
         self._read_only = False
 
@@ -241,7 +411,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     key = None
                     key_name = None
                     column_span = 1
-                    row_span= 1
+                    row_span = 1
                     for item in data:
                         if not found_key:
                             key = item
@@ -266,7 +436,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     key_name = key.lower()
                     key_complex = False
                     column_span = 1
-                    row_span= 1                    
+                    row_span = 1
 
                 if key:
                     if key in shifted_map.keys():
@@ -280,92 +450,98 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     if key == "mouse_1":
                         key = "M1"
                         icon = "mdi.mouse"
-                        toolltip = "Left Mouse Button"
+                        tooltip = "Left Mouse Button"
                     elif key == "mouse_2":
                         key = "M2"
                         icon = "mdi.mouse"
-                        toolltip = "Middle Mouse Button"
+                        tooltip = "Middle Mouse Button"
                     elif key == "mouse_3":
                         key = "M3"
                         icon = "mdi.mouse"
-                        toolltip = "Right Mouse Button"
+                        tooltip = "Right Mouse Button"
                     elif key == "mouse_4":
                         key = "M4"
                         icon = "mdi.mouse"
-                        toolltip = "Forward Mouse Button"
+                        tooltip = "Forward Mouse Button"
                     elif key == "mouse_5":
                         key = "M5"
                         icon = "mdi.mouse"
-                        toolltip = "Back Mouse Button"
+                        tooltip = "Back Mouse Button"
                     elif key == "wheel_up":
                         key = "MWU"
                         icon = "mdi.mouse"
-                        toolltip = "Wheel Up"
+                        tooltip = "Wheel Up"
                     elif key == "wheel_down":
                         key = "MWD"
                         icon = "mdi.mouse"
-                        toolltip = "Wheel Down"
+                        tooltip = "Wheel Down"
                     elif key == "wheel_left":
                         key = "MWL"
-                        icon = "mdi.mouse"    
-                        toolltip = "Tilt Left"  
+                        icon = "mdi.mouse"
+                        tooltip = "Tilt Left"
                     elif key == "wheel_right":
                         key = "MWR"
                         icon = "mdi.mouse"
-                        toolltip = "Tilt Right"   
-                    
+                        tooltip = "Tilt Right"
+
                     widget = QKeyWidget(key)
                     if icon:
                         widget.setIcon(load_icon(icon))
-                        widget.setIconSize(QtCore.QSize(14,14))
+                        widget.setIconSize(QtCore.QSize(14, 14))
 
                     action_key = gremlin.keyboard.key_from_name(key_name)
-                    widget.key = action_key # this name must be defined in keybpoard.py 
+                    widget.key = action_key  # this name must be defined in keybpoard.py
                     widget.normal_key = key
                     widget.shifted_key = shifted if shifted else widget.normal_key
-                    
+
                     widget.clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
-                    #syslog.info(f"{key_name}: {key} {shifted}")
-                    self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
-                    self._key_widget_map[(action_key.scan_code, action_key.is_extended)] = widget
+                    # syslog.info(f"{key_name}: {key} {shifted}")
+                    self._key_map[(action_key.scan_code, action_key.is_extended)] = (
+                        key_name
+                    )
+                    self._key_widget_map[
+                        (action_key.scan_code, action_key.is_extended)
+                    ] = widget
 
-                    assert key_name not in self._key_widget_map.keys(),f"duplicate key in keyboard map found: {key_name}"
+                    assert (
+                        key_name not in self._key_widget_map.keys()
+                    ), f"duplicate key in keyboard map found: {key_name}"
 
-                    
                     self._key_widget_map[key_name] = widget
                     key_widgets.append(widget)
 
                 else:
                     widget = QtWidgets.QLabel(" ")
-                grid_layout.addWidget(widget, current_row, current_column, row_span, column_span)
-                
-                
+                grid_layout.addWidget(
+                    widget, current_row, current_column, row_span, column_span
+                )
+
                 # bump column
                 current_column += column_span
             # bump next row
             current_column = 0
-            current_row +=1
-
+            current_row += 1
 
         self.key_description = QtWidgets.QLabel()
         main_layout.addWidget(self.key_description)
 
         # ensure widgets have a minimum size
-        widget : QtWidgets.QWidget
+        widget: QtWidgets.QWidget
 
-        min_w = max(widget.minimumSizeHint().width() for widget in key_widgets if len(widget.text()) <= 5)
+        min_w = max(
+            widget.minimumSizeHint().width()
+            for widget in key_widgets
+            if len(widget.text()) <= 5
+        )
         for widget in key_widgets:
             widget.setMinimumWidth(min_w)
-            
 
     def eventFilter(self, widget, event):
         t = event.type()
-        if t in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease): 
+        if t in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease):
             return True
         return super().eventFilter(widget, event)
-
-
 
     @QtCore.Slot()
     def _clear_repeater(self):
@@ -378,20 +554,21 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self.config.keyboard_repeater_capture_mouse = checked
         if not checked:
             # clear mouse widgets
-            mouse_names = ["mouse_1",
-                           "mouse_2",
-                           "mouse_3",
-                           "mouse_4",
-                           "mouse_5",
-                           "wheel_right",
-                           "wheel_left",
-                           "wheel_up",
-                           "wheel_down"]
+            mouse_names = [
+                "mouse_1",
+                "mouse_2",
+                "mouse_3",
+                "mouse_4",
+                "mouse_5",
+                "wheel_right",
+                "wheel_left",
+                "wheel_up",
+                "wheel_down",
+            ]
             for map_key in mouse_names:
                 widget = self._key_widget_map[map_key]
                 widget.selected = False
 
-    
     @QtCore.Slot(bool)
     def _invert_display_changed(self, checked):
         self._invert_display = checked
@@ -400,7 +577,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self._update_repeater()
 
     def setReadonly(self, value: bool):
-        ''' set readonly flag - when readonly - acts as a repeater only (cannot be interacted with)'''
+        """set readonly flag - when readonly - acts as a repeater only (cannot be interacted with)"""
         self._read_only = value
 
     def isReadonly(self) -> bool:
@@ -412,20 +589,19 @@ class QKeyboardWidget(QtWidgets.QWidget):
         else:
             self.key_description.setText("")
 
-    def setRepeaterVisible(self, value : bool):
-        ''' turns repeater on/off'''
+    def setRepeaterVisible(self, value: bool):
+        """turns repeater on/off"""
         self._show_repeater = value
         self.config.keyboard_repeater_show = value
         self.repeater_container_widget.setVisible(value)
 
-    def setRepeaterLineCount(self, value : int):
+    def setRepeaterLineCount(self, value: int):
         if value >= 1:
             self._repeater_lines = value
             self._update_repeater()
 
-
     def _widget_clicked_cb(self):
-        ''' occurs when the widget is selected'''
+        """occurs when the widget is selected"""
         if self._read_only:
             # no interaction
             return
@@ -437,19 +613,29 @@ class QKeyboardWidget(QtWidgets.QWidget):
         if self._select_single:
             # single select mode
             source_modifier = False
-            if self._allow_modifiers and current_widget.key.lookup_name in self._modifier_keys:
+            if (
+                self._allow_modifiers
+                and current_widget.key.lookup_name in self._modifier_keys
+            ):
                 source_modifier = True
             if not source_modifier:
-                selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+                selected_widgets = [
+                    widget
+                    for widget in self._key_widget_map.values()
+                    if widget.selected
+                ]
                 for widget in selected_widgets:
-                    if self._allow_modifiers and widget.key.lookup_name in self._modifier_keys:
+                    if (
+                        self._allow_modifiers
+                        and widget.key.lookup_name in self._modifier_keys
+                    ):
                         continue
-                    widget.selected = False # deselect
-
+                    widget.selected = False  # deselect
 
     def hook(self):
-        ''' hooks to keyboard / mouse events '''
+        """hooks to keyboard / mouse events"""
         import gremlin.windows_event_hook
+
         if not self._hooked:
             el = gremlin.event_handler.EventListener()
             el.keyboard_event.connect(self._keyboard_handler)
@@ -457,9 +643,8 @@ class QKeyboardWidget(QtWidgets.QWidget):
             self.mouse_hook.register(self._mouse_handler)
             self._hooked = True
 
-
     def unhook(self):
-        ''' unhooks keyboard / mouse events '''
+        """unhooks keyboard / mouse events"""
         if self._hooked:
             el = gremlin.event_handler.EventListener()
             el.keyboard_event.disconnect(self._keyboard_handler)
@@ -467,16 +652,14 @@ class QKeyboardWidget(QtWidgets.QWidget):
                 self.mouse_hook.unregister(self._mouse_handler)
             self._hooked = False
 
-
-
     @QtCore.Slot(object)
     def _keyboard_handler(self, event):
-        ''' handles an inbound API key '''
+        """handles an inbound API key"""
         key = gremlin.keyboard.KeyMap.from_event(event)
         if key is not None:
             map_key = key.key_id
             if map_key is not None:
-                if not map_key in self._key_widget_map:
+                if map_key not in self._key_widget_map:
                     # see if a translation is needed
                     map_key, vk = gremlin.keyboard.KeyMap.translate(map_key)
                 if map_key in self._key_widget_map:
@@ -486,7 +669,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     if self._show_repeater:
                         self._add_repeater(key, is_pressed)
                     return
-        
+
             # output error message
             now = datetime.datetime.now()
             timestamp = now.strftime("%H:%M:%S")
@@ -497,12 +680,9 @@ class QKeyboardWidget(QtWidgets.QWidget):
             except Exception as ex:
                 line = f"{timestamp}: [ERROR] {ex}"
             self._add_line(line)
-                
-
-
 
     def _mouse_handler(self, event):
-        ''' mouse handler '''
+        """mouse handler"""
         if not self._capture_mouse:
             return
         # mouse special case
@@ -511,11 +691,11 @@ class QKeyboardWidget(QtWidgets.QWidget):
                 map_key = "mouse_1"
             case gremlin.types.MouseButton.Right:
                 map_key = "mouse_2"
-            case gremlin.types.MouseButton.Middle: 
+            case gremlin.types.MouseButton.Middle:
                 map_key = "mouse_3"
-            case gremlin.types.MouseButton.Back: 
+            case gremlin.types.MouseButton.Back:
                 map_key = "mouse_5"
-            case gremlin.types.MouseButton.Forward: 
+            case gremlin.types.MouseButton.Forward:
                 map_key = "mouse_4"
             case gremlin.types.MouseButton.WheelRight:
                 map_key = "wheel_right"
@@ -527,7 +707,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
                 map_key = "wheel_down"
             case _:
                 return
-            
+
         if map_key is not None and map_key in self._key_widget_map:
             widget = self._key_widget_map[map_key]
             is_pressed = event.is_pressed
@@ -536,9 +716,9 @@ class QKeyboardWidget(QtWidgets.QWidget):
                 key = gremlin.keyboard.key_from_name(map_key)
                 self._add_repeater(key, is_pressed)
 
-    def _add_repeater(self, key, is_pressed : bool ):
-        ''' adds a key to the repeater '''
-        
+    def _add_repeater(self, key, is_pressed: bool):
+        """adds a key to the repeater"""
+
         now = datetime.datetime.now()
         timestamp = now.strftime("%H:%M:%S")
         interval = None
@@ -550,21 +730,19 @@ class QKeyboardWidget(QtWidgets.QWidget):
             if key_id in self._repeater_timestamp:
                 interval = time.time() - self._repeater_timestamp[key_id]
 
-
         line = f"{timestamp}: [{key.name}] 0x{key.scan_code:X} ({key.scan_code}) {'[EX]' if key.is_extended else ''} {'pressed' if is_pressed else 'released'}"
 
         if interval is not None:
             line += f" ({int(interval*1000)} ms)"
-        
-        self._add_line(line)
-        
 
-    def _add_line(self, line : str):
-        ''' adds a line to the display '''
+        self._add_line(line)
+
+    def _add_line(self, line: str):
+        """adds a line to the display"""
         count = len(self._repeater_list)
         if count > self._repeater_lines:
             if self._invert_display:
-                self._repeater_list.pop(-1)    
+                self._repeater_list.pop(-1)
             else:
                 self._repeater_list.pop(0)
 
@@ -575,50 +753,62 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self.keyEvent.emit()
 
     def _update_repeater(self):
-        text = ''.join(line + "\n" for line in self._repeater_list)
+        text = "".join(line + "\n" for line in self._repeater_list)
         self.repeater_widget.setPlainText(text)
         cursor = self.repeater_widget.textCursor()
-        
+
         if self._invert_display:
             # move cursor to top
-            cursor.movePosition(QtGui.QTextCursor.MoveOperation.Start, QtGui.QTextCursor.MoveMode.MoveAnchor)
+            cursor.movePosition(
+                QtGui.QTextCursor.MoveOperation.Start,
+                QtGui.QTextCursor.MoveMode.MoveAnchor,
+            )
         else:
-            cursor.movePosition(QtGui.QTextCursor.MoveOperation.End, QtGui.QTextCursor.MoveMode.MoveAnchor)
+            cursor.movePosition(
+                QtGui.QTextCursor.MoveOperation.End,
+                QtGui.QTextCursor.MoveMode.MoveAnchor,
+            )
         self.repeater_widget.setTextCursor(cursor)
 
 
-
-
 class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
-    ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
-    
-    closed = QtCore.Signal() # sent when the dialog closes
+    """dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse"""
 
-    def __init__(self, sequence = None, parent = None, select_single = False, allow_modifiers = True, index = None):
-        '''
+    closed = QtCore.Signal()  # sent when the dialog closes
+
+    def __init__(
+        self,
+        sequence=None,
+        parent=None,
+        select_single=False,
+        allow_modifiers=True,
+        index=None,
+    ):
+        """
         :param sequence - input keys to use
         :param select_single - if set, only can select a single key
         :param allow_modifiers - if set - modifier keys along with regular keys are allowed
-        '''
-        super().__init__(self.__class__.__name__,parent = parent)
+        """
+        super().__init__(self.__class__.__name__, parent=parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Keyboard & Mouse Input Mapper")
         self._select_single = select_single
         self._allow_modifiers = allow_modifiers
         self.index = index
-        self._latched_key = None # contains a single primary key latched to all the others
+        self._latched_key = (
+            None  # contains a single primary key latched to all the others
+        )
         self._display_shifted = False
         self._solo_select = False
-        
 
         self._modifier_keys = gremlin.keyboard.KeyMap._keyboard_modifiers
 
-        self._key_map = {} # map of (scancode, extended) to keys  (scancode, extended) -> key
-        self._key_widget_map = {} # map of keys to widgets  key -> widget
-        self.keyboard_widget = self._create_keyboard_widget() # populate the two maps 
-        self._keys = None # return data
-        self._display_shifted = False # true if displayed shifted
+        self._key_map = {}  # map of (scancode, extended) to keys  (scancode, extended) -> key
+        self._key_widget_map = {}  # map of keys to widgets  key -> widget
+        self.keyboard_widget = self._create_keyboard_widget()  # populate the two maps
+        self._keys = None  # return data
+        self._display_shifted = False  # true if displayed shifted
 
         self.button_widget = QtWidgets.QWidget()
         self.button_layout = QtWidgets.QHBoxLayout()
@@ -631,28 +821,29 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         self.listen_widget = QtWidgets.QPushButton("Listen")
         self.listen_widget.clicked.connect(self._listen_cb)
 
-        widgets = [gremlin.ui.ui_common.QDataRadioButton("Small",1),
-                   gremlin.ui.ui_common.QDataRadioButton("Large",2)
+        widgets = [
+            gremlin.ui.ui_common.QDataRadioButton("Small", 1),
+            gremlin.ui.ui_common.QDataRadioButton("Large", 2),
         ]
 
-        current  = gremlin.config.Configuration().keySize
+        current = gremlin.config.Configuration().keySize
         if current > len(widgets):
             current = 1
             gremlin.config.Configuration().keySize = 1
 
-        widgets[current-1].setChecked(True)
+        widgets[current - 1].setChecked(True)
         for widget in self._key_widget_map.values():
             widget.keySize = current
 
         for w in widgets:
             w.clicked.connect(self._size_changed)
 
-
         self.size_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
 
-
         self.numlock_widget = QtWidgets.QCheckBox("Force numlock Off")
-        self.numlock_widget.setChecked(gremlin.shared_state.current_profile.get_force_numlock())
+        self.numlock_widget.setChecked(
+            gremlin.shared_state.current_profile.get_force_numlock()
+        )
         self.numlock_widget.clicked.connect(self._force_numlock_cb)
 
         self.key_description = QtWidgets.QLabel()
@@ -672,15 +863,13 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         self.button_layout.addWidget(self.ok_widget)
         self.button_layout.addWidget(self.cancel_widget)
 
-
         main_layout.addWidget(self.keyboard_widget)
         main_layout.addWidget(gremlin.ui.ui_common.QHLine())
         main_layout.addWidget(self.button_widget)
 
-
         self.setLayout(main_layout)
 
-        self._set_sequence(sequence)      
+        self._set_sequence(sequence)
 
     def closeEvent(self, event):
         self.closed.emit()
@@ -688,18 +877,17 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @property
     def latched_key(self):
-        ''' contains a single key which represents the latched selection in the dialog '''
+        """contains a single key which represents the latched selection in the dialog"""
         return self._latched_key
-    
+
     @property
     def keys(self):
-        ''' list of raw selected keys '''
+        """list of raw selected keys"""
         return self._keys
 
-
     def _set_sequence(self, sequence):
-        ''' loads a given key sequence into the virtual keyboard '''
-        
+        """loads a given key sequence into the virtual keyboard"""
+
         if sequence:
             # the action keeps a list of keys in the format (scancode, extended_flag)
             # convert that to a key from it and selected it if the key is mapped
@@ -718,7 +906,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     #     lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
                     # if lookup in self._key_map:
                     key_name = self._key_map[lookup]
-                    #key_name = self._key_map[lookup]
+                    # key_name = self._key_map[lookup]
                     widget = self._key_widget_map[key_name]
                     widget.selected = True
                     # else:
@@ -726,14 +914,16 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                 elif isinstance(item, tuple):
                     # key id
                     lookup = item
-                    if not lookup in self._key_map:
+                    if lookup not in self._key_map:
                         lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
                     if lookup in self._key_map:
                         key_name = self._key_map[lookup]
                         widget = self._key_widget_map[key_name]
                         widget.selected = True
                     else:
-                        syslog.error(f"VIRTUAL KEYBOARD: key {lookup} not found in keyboard map ")
+                        syslog.error(
+                            f"VIRTUAL KEYBOARD: key {lookup} not found in keyboard map "
+                        )
                 elif isinstance(item, int):
                     # virtual code
                     key = gremlin.keyboard.KeyMap.find_virtual(item)
@@ -746,7 +936,9 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     widget.selected = True
                 else:
                     # log the fact we didn't find the key in the keyboard dialog
-                    syslog.warning(f"Keyboard: unable to find {item} in dialog keyboard")
+                    syslog.warning(
+                        f"Keyboard: unable to find {item} in dialog keyboard"
+                    )
 
     def _force_numlock_cb(self, checked):
         gremlin.shared_state.current_profile.set_force_numlock(checked)
@@ -758,13 +950,16 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         Asks the user to press the key they wish to add bindings for.
         """
         from gremlin.ui.ui_common import InputListenerWidget
+
         self.button_press_dialog = InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,
-            multi_keys=True # allow key combinations
+            multi_keys=True,  # allow key combinations
         )
 
-        self.button_press_dialog.item_selected.connect(self._add_keyboard_listener_key_cb)
+        self.button_press_dialog.item_selected.connect(
+            self._add_keyboard_listener_key_cb
+        )
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -776,7 +971,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
             int(geom.x() + geom.width() / 2 - 150),
             int(geom.y() + geom.height() / 2 - 75),
             300,
-            150
+            150,
         )
 
         self.button_press_dialog.show()
@@ -790,9 +985,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
             w.keySize = data
         # resize window to fit the new size
         QtCore.QTimer.singleShot(0, self.adjustSize)
-        
 
-        
     @QtCore.Slot()
     def _add_keyboard_listener_key_cb(self, keys):
         """Adds the provided key to the list of keys.
@@ -803,14 +996,13 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         # the new entry will be a new index
         self._set_sequence(keys)
 
-
     def keyPressEvent(self, event):
         key = event.key()
         if key == QtCore.Qt.Key.Key_Shift:
             self.display_shifted = True
         elif key == QtCore.Qt.Key.Key_Control:
             self.solo_select = True
-        
+
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
@@ -819,12 +1011,12 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
             self.display_shifted = False
         elif key == QtCore.Qt.Key.Key_Control:
             self.solo_select = False
-        super().keyReleaseEvent(event)        
+        super().keyReleaseEvent(event)
 
     @property
     def solo_select(self):
         return self._solo_select
-    
+
     @solo_select.setter
     def solo_select(self, value):
         self._solo_select = value
@@ -835,23 +1027,24 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @display_shifted.setter
     def display_shifted(self, value):
-        ''' changes the display mode of the keyboard to shifted/unshifted'''
+        """changes the display mode of the keyboard to shifted/unshifted"""
         if value != self._display_shifted:
             for widget in self._key_widget_map.values():
                 if widget.normal_key == "9":
-                        pass
+                    pass
                 if widget.shifted_key != widget.normal_key:
                     # only updates those that are different in shifted form
                     widget.setText(widget.shifted_key if value else widget.normal_key)
-                    #widget.update()
+                    # widget.update()
             self._display_shifted = value
-            
 
     def _ok_button_cb(self):
-        ''' ok button pressed '''
-        
+        """ok button pressed"""
+
         # keys = [Key(scan_code = widget.key.scan_code, is_extended = widget.key.is_extended, is_mouse=widget.key.is_mouse, virtual_code=widget.key.virtual_code) for widget in self._key_widget_map.values() if widget.selected]
-        selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+        selected_widgets = [
+            widget for widget in self._key_widget_map.values() if widget.selected
+        ]
         keys = []
         for widget in selected_widgets:
             key = widget.key.duplicate()
@@ -866,56 +1059,229 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         self._keys = keys
 
         return_key = gremlin.keyboard.KeyMap.get_latched_key(keys)
-        
+
         # print (f"Return key: {return_key}")
         self._latched_key = return_key
-        
 
         self.accept()
         self.close()
-        
 
     def _cancel_button_cb(self):
-        ''' cancel button pressed '''
+        """cancel button pressed"""
         self.reject()
         self.close()
 
     def _clear_button_cb(self):
-        ''' clear button pressed - clear all entries  '''
+        """clear button pressed - clear all entries"""
         for widget in self._key_widget_map.values():
             widget.selected = False
 
-    def _create_keyboard_widget(self, parent = None):
-        ''' creates a full keyboard widget for manual data entry '''
-        
+    def _create_keyboard_widget(self, parent=None):
+        """creates a full keyboard widget for manual data entry"""
+
         grid_layout = QtWidgets.QGridLayout()
         grid_layout.setSpacing(2)
         # grid_layout.setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetFixedSize)
-        
+
         # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
 
         # first row = QUERTY object
-        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","wheel_up","wheel_down"]
-        row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"],"","","","wheel_left","wheel_right"]
-        row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
-        row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
-        row_4 = [["CpLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
-        row_5 = [["LShift","leftshift"],"Z","X","C","V","B","N","M",",",".","/",["RShift","rightshift"],"","","","","up","","",["1","np1"],["2","np2"],["3","np3"],["Enter","npenter",1,2]]
-        row_6 = [["LCtrl","leftcontrol"],["LWin","leftwin"],["LAlt","leftalt"],["Spacebar","space",6],["RAlt","rightalt2"],["RWin","rightwin"],["RCtrl","rightcontrol"],"","","","left","down","right","",["0/Ins","np0",2],["./Del","npdelete"]]
+        row_0 = [
+            "",
+            "",
+            "F13",
+            "F14",
+            "F15",
+            "F16",
+            "F17",
+            "F18",
+            "F19",
+            "F20",
+            "F21",
+            "F22",
+            "F23",
+            "F24",
+            "",
+            "mouse_1",
+            "mouse_2",
+            "mouse_3",
+            "",
+            "mouse_4",
+            "mouse_5",
+            "wheel_up",
+            "wheel_down",
+        ]
+        row_1 = [
+            "Esc",
+            "",
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "",
+            ["PrtSc", "printscreen"],
+            ["Scrlck", "scrolllock"],
+            ["Pause", "pause"],
+            "",
+            "",
+            "",
+            "wheel_left",
+            "wheel_right",
+        ]
+        row_2 = [
+            "`",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "0",
+            "-",
+            "=",
+            ["Back", "backspace"],
+            "",
+            ["Ins", "insert"],
+            ["Home", "home"],
+            ["PgUp", "pageup"],
+            "",
+            ["NLck", "numlock"],
+            ["/", "npdivide"],
+            ["*", "npmultiply"],
+            ["-", "npminus"],
+        ]
+        row_3 = [
+            ["Tab", "tab"],
+            "Q",
+            "W",
+            "E",
+            "R",
+            "T",
+            "Y",
+            "U",
+            "I",
+            "O",
+            "P",
+            "[",
+            "]",
+            "\\",
+            "",
+            ["Del", "delete"],
+            "End",
+            ["PgDn", "pagedown"],
+            "",
+            ["7", "np7"],
+            ["8", "np8"],
+            ["9", "np9"],
+            ["+", "npplus", 1, 2],
+        ]
+        row_4 = [
+            ["CpLck", "capslock"],
+            "A",
+            "S",
+            "D",
+            "F",
+            "G",
+            "H",
+            "J",
+            "K",
+            "L",
+            ";",
+            "'",
+            ["Enter", 2],
+            "",
+            "",
+            "",
+            "",
+            "",
+            ["4", "np4"],
+            ["5", "np5"],
+            ["6", "np6"],
+        ]
+        row_5 = [
+            ["LShift", "leftshift"],
+            "Z",
+            "X",
+            "C",
+            "V",
+            "B",
+            "N",
+            "M",
+            ",",
+            ".",
+            "/",
+            ["RShift", "rightshift"],
+            "",
+            "",
+            "",
+            "",
+            "up",
+            "",
+            "",
+            ["1", "np1"],
+            ["2", "np2"],
+            ["3", "np3"],
+            ["Enter", "npenter", 1, 2],
+        ]
+        row_6 = [
+            ["LCtrl", "leftcontrol"],
+            ["LWin", "leftwin"],
+            ["LAlt", "leftalt"],
+            ["Spacebar", "space", 6],
+            ["RAlt", "rightalt2"],
+            ["RWin", "rightwin"],
+            ["RCtrl", "rightcontrol"],
+            "",
+            "",
+            "",
+            "left",
+            "down",
+            "right",
+            "",
+            ["0/Ins", "np0", 2],
+            ["./Del", "npdelete"],
+        ]
 
         shifted_list = [
-            ("`","~"),("1","!"),("2","@"),("3","#"),("4","$"),("5","%"),("6","^"),
-            ("7","&&"),("8","*"),("9","("),("0",")"),("-","_"),("=","+"),
-            ("[","{"),("]","}"),("\\","|"),(";",":"),("'","\""),(",","<"),(".",">"),("/","?")
-            ]
-        
+            ("`", "~"),
+            ("1", "!"),
+            ("2", "@"),
+            ("3", "#"),
+            ("4", "$"),
+            ("5", "%"),
+            ("6", "^"),
+            ("7", "&&"),
+            ("8", "*"),
+            ("9", "("),
+            ("0", ")"),
+            ("-", "_"),
+            ("=", "+"),
+            ("[", "{"),
+            ("]", "}"),
+            ("\\", "|"),
+            (";", ":"),
+            ("'", '"'),
+            (",", "<"),
+            (".", ">"),
+            ("/", "?"),
+        ]
+
         shifted_map = {}
         for normal, shifted in shifted_list:
             shifted_map[normal] = shifted
 
-
-
-        rows = [row_0,row_1,row_2,row_3,row_4,row_5,row_6]
+        rows = [row_0, row_1, row_2, row_3, row_4, row_5, row_6]
 
         current_row = 0
         self._key_map = {}
@@ -933,7 +1299,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     key = None
                     key_name = None
                     column_span = 1
-                    row_span= 1
+                    row_span = 1
                     for item in data:
                         if not found_key:
                             key = item
@@ -958,7 +1324,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     key_name = key.lower()
                     key_complex = False
                     column_span = 1
-                    row_span= 1                    
+                    row_span = 1
 
                 if key:
                     if key in shifted_map.keys():
@@ -972,86 +1338,92 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     if key == "mouse_1":
                         key = "M1"
                         icon = "mdi.mouse"
-                        toolltip = "Left Mouse Button"
+                        tooltip = "Left Mouse Button"
                     elif key == "mouse_2":
                         key = "M2"
                         icon = "mdi.mouse"
-                        toolltip = "Middle Mouse Button"
+                        tooltip = "Middle Mouse Button"
                     elif key == "mouse_3":
                         key = "M3"
                         icon = "mdi.mouse"
-                        toolltip = "Right Mouse Button"
+                        tooltip = "Right Mouse Button"
                     elif key == "mouse_4":
                         key = "M4"
                         icon = "mdi.mouse"
-                        toolltip = "Forward Mouse Button"
+                        tooltip = "Forward Mouse Button"
                     elif key == "mouse_5":
                         key = "M5"
                         icon = "mdi.mouse"
-                        toolltip = "Back Mouse Button"
+                        tooltip = "Back Mouse Button"
                     elif key == "wheel_up":
                         key = "MWU"
                         icon = "mdi.mouse"
-                        toolltip = "Wheel Up"
+                        tooltip = "Wheel Up"
                     elif key == "wheel_down":
                         key = "MWD"
                         icon = "mdi.mouse"
-                        toolltip = "Wheel Down"
+                        tooltip = "Wheel Down"
                     elif key == "wheel_left":
                         key = "MWL"
-                        icon = "mdi.mouse"    
-                        toolltip = "Tilt Left"  
+                        icon = "mdi.mouse"
+                        tooltip = "Tilt Left"
                     elif key == "wheel_right":
                         key = "MWR"
                         icon = "mdi.mouse"
-                        toolltip = "Tilt Right"   
-                    
+                        tooltip = "Tilt Right"
+
                     widget = QKeyWidget(key)
                     if icon:
                         widget.setIcon(load_icon(icon))
-                        widget.setIconSize(QtCore.QSize(14,14))
-
+                        widget.setIconSize(QtCore.QSize(14, 14))
+                        widget.setToolTip(tooltip)
 
                     action_key = gremlin.keyboard.key_from_name(key_name)
-                    widget.key = action_key # this name must be defined in keybpoard.py 
+                    widget.key = action_key  # this name must be defined in keybpoard.py
                     widget.normal_key = key
                     widget.shifted_key = shifted if shifted else widget.normal_key
-                    
+
                     widget.clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
-                    #syslog.info(f"{key_name}: {key} {shifted}")
-                    self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
-                    assert key_name not in self._key_widget_map.keys(),f"duplicate key in keyboard map found: {key_name}"
+                    # syslog.info(f"{key_name}: {key} {shifted}")
+                    self._key_map[(action_key.scan_code, action_key.is_extended)] = (
+                        key_name
+                    )
+                    assert (
+                        key_name not in self._key_widget_map.keys()
+                    ), f"duplicate key in keyboard map found: {key_name}"
 
-                    
                     self._key_widget_map[key_name] = widget
                     key_widgets.append(widget)
 
                 else:
                     widget = QtWidgets.QLabel(" ")
-                grid_layout.addWidget(widget, current_row, current_column, row_span, column_span)
-                
-                
+                grid_layout.addWidget(
+                    widget, current_row, current_column, row_span, column_span
+                )
+
                 # bump column
                 current_column += column_span
             # bump next row
             current_column = 0
-            current_row +=1
-
+            current_row += 1
 
         grid_widget = QtWidgets.QWidget(parent)
         grid_widget.setLayout(grid_layout)
 
         # ensure widgets have a minimum size
-        widget : QtWidgets.QWidget
+        widget: QtWidgets.QWidget
 
-        min_w = max(widget.minimumSizeHint().width() for widget in key_widgets if len(widget.text()) <= 5)
+        min_w = max(
+            widget.minimumSizeHint().width()
+            for widget in key_widgets
+            if len(widget.text()) <= 5
+        )
         for widget in key_widgets:
             widget.setMinimumWidth(min_w)
-            
 
         return grid_widget
-    
+
     def _key_hover_cb(self, widget, hover):
         if hover:
             self.key_description.setText(widget.display_name)
@@ -1059,14 +1431,15 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
             self.key_description.setText("")
 
     def deselect(self):
-        ''' deselects all keys '''
-        selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+        """deselects all keys"""
+        selected_widgets = [
+            widget for widget in self._key_widget_map.values() if widget.selected
+        ]
         for widget in selected_widgets:
             widget.selected = False
 
-
     def _widget_clicked_cb(self):
-        ''' occurs when the widget is selected'''
+        """occurs when the widget is selected"""
         current_widget = self.sender()
         if self.solo_select:
             # deselect all
@@ -1075,15 +1448,23 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         if self._select_single:
             # single select mode
             source_modifier = False
-            if self._allow_modifiers and current_widget.key.lookup_name in self._modifier_keys:
+            if (
+                self._allow_modifiers
+                and current_widget.key.lookup_name in self._modifier_keys
+            ):
                 source_modifier = True
             if not source_modifier:
-                selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+                selected_widgets = [
+                    widget
+                    for widget in self._key_widget_map.values()
+                    if widget.selected
+                ]
                 for widget in selected_widgets:
-                    if self._allow_modifiers and widget.key.lookup_name in self._modifier_keys:
+                    if (
+                        self._allow_modifiers
+                        and widget.key.lookup_name in self._modifier_keys
+                    ):
                         continue
-                    widget.selected = False # deselect
+                    widget.selected = False  # deselect
 
-        
-        current_widget.selected = not current_widget.selected # toggle
-        
+        current_widget.selected = not current_widget.selected  # toggle

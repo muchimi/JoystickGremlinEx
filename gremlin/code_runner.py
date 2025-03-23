@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,9 +21,7 @@ import os
 import random
 import string
 import sys
-import time
 
-import action_plugins.map_to_simconnect
 import dinput
 
 import gremlin
@@ -48,13 +46,12 @@ import gremlin.input_devices
 import gremlin.user_plugin
 import gremlin.sendinput as sendinput
 import gremlin.execution_graph
-import anytree
 import traceback
 
 syslog = logging.getLogger("system")
 
-class CodeRunner:
 
+class CodeRunner:
     """Runs the actual profile code."""
 
     def __init__(self):
@@ -66,20 +63,17 @@ class CodeRunner:
 
         eh = gremlin.event_handler.EventListener()
         eh.action_created.connect(self._action_created_cb)
-        
 
         self._inheritance_tree = None
-        #self._vjoy_curves = VJoyCurves()
+        # self._vjoy_curves = VJoyCurves()
         self._merge_axes = []
         self._startup_profile = None
         self._startup_mode = None
-        self._actions = [] # tracks functors in this profile
-
+        self._actions = []  # tracks functors in this profile
 
     def _action_created_cb(self, action):
-        if not action in self._actions:
+        if action not in self._actions:
             self._actions.append(action)
-        
 
     def is_running(self):
         """Returns whether or not the code runner is executing code.
@@ -87,7 +81,6 @@ class CodeRunner:
         :return True if code is being executed, False otherwise
         """
         return gremlin.shared_state.is_running
-    
 
     def setUIState(self, enabled):
         ui = gremlin.shared_state.ui.ui
@@ -102,24 +95,23 @@ class CodeRunner:
         ui.actionMergeAxis.setEnabled(enabled)
         ui.actionSwapDevices.setEnabled(enabled)
         ui.actionModifyProfile.setEnabled(enabled)
-        
-
-
-
-
 
     def disableUi(self):
-        ''' disables UI '''
+        """disables UI"""
         if not gremlin.config.Configuration().runtime_ui_active:
             self.setUIState(False)
-        
-        
 
     def enableUI(self):
-        ''' enables UI '''
+        """enables UI"""
         self.setUIState(True)
 
-    def start(self, inheritance_tree, settings, start_mode, profile : gremlin.base_profile.Profile):
+    def start(
+        self,
+        inheritance_tree,
+        settings,
+        start_mode,
+        profile: gremlin.base_profile.Profile,
+    ):
         """Starts listening to events and loads all existing callbacks.
 
         :param inheritance_tree tree encoding inheritance between the
@@ -133,12 +125,12 @@ class CodeRunner:
 
         config = gremlin.config.Configuration()
 
-        gremlin.shared_state.profile_state = True # assume profile start ok
-        gremlin.shared_state.profile_start_error = None # assume no error
+        gremlin.shared_state.profile_state = True  # assume profile start ok
+        gremlin.shared_state.profile_start_error = None  # assume no error
 
         self.disableUi()
 
-        # update hardware list for any missing devices 
+        # update hardware list for any missing devices
         gremlin.joystick_handling._scan_dinput()
 
         # indicate we're in run mode
@@ -158,8 +150,7 @@ class CodeRunner:
 
         config = gremlin.config.Configuration()
         verbose_detailed = config.verbose_mode_details
-        verbose =  config.verbose_mode_details
-
+        verbose = config.verbose_mode_details
 
         # store the startup mode in the UI so it can be restored later
         self._startup_profile = gremlin.shared_state.current_profile
@@ -170,7 +161,7 @@ class CodeRunner:
 
         start_mode = gremlin.shared_state.current_profile.get_start_mode()
         syslog.info(f"Startup mode: {start_mode}")
-        
+
         # Set default macro action delay
         gremlin.macro.MacroManager().default_delay = settings.default_delay
 
@@ -178,12 +169,11 @@ class CodeRunner:
         system_paths = [os.path.normcase(os.path.abspath(p)) for p in sys.path]
 
         ec = gremlin.execution_graph.ExecutionContext()
-        
 
         # Load the generated code
         try:
             # Populate custom module variable registry
-            var_reg =gremlin.user_plugin.variable_registry
+            var_reg = gremlin.user_plugin.variable_registry
             for plugin in profile.plugins:
                 # Perform system path mangling for import statements
                 path, _ = os.path.split(
@@ -196,7 +186,7 @@ class CodeRunner:
                 # instances if desired
                 spec = importlib.util.spec_from_file_location(
                     "".join(random.choices(string.ascii_lowercase, k=16)),
-                    plugin.file_name
+                    plugin.file_name,
                 )
 
                 _, plugin_basename = os.path.split(plugin.file_name)
@@ -205,16 +195,15 @@ class CodeRunner:
                 for instance in plugin.instances:
                     # Skip all instances that are not fully configured
                     if not instance.is_configured():
-                        syslog.warn(f"Warning: User plugin '{plugin_basename}': instance '{instance.name}' reports not configured - skipping runtime activation")
+                        syslog.warn(
+                            f"Warning: User plugin '{plugin_basename}': instance '{instance.name}' reports not configured - skipping runtime activation"
+                        )
                         continue
 
                     # Store variable values in the registry
                     for var in instance.variables.values():
                         var_reg.set(
-                            plugin.file_name,
-                            instance.name,
-                            var.name,
-                            var.value
+                            plugin.file_name, instance.name, var.name, var.value
                         )
 
                     # Load the modules
@@ -224,51 +213,45 @@ class CodeRunner:
                         spec.loader.exec_module(tmp)
                     else:
                         basename = os.path.basename(plugin.file_name)
-                        gremlin.ui.ui_common.MessageBox(prompt = f"Plugin {basename} was not found and will not be loaded.")
-           
-            
+                        gremlin.ui.ui_common.MessageBox(
+                            prompt=f"Plugin {basename} was not found and will not be loaded."
+                        )
 
             # Update system path list searched by Python
             sys.path = system_paths
 
             # Create callbacks fom the user code
             callback_count = 0
-            for dev_id, modes in gremlin.input_devices.callback_registry.registry.items():
+            for (
+                dev_id,
+                modes,
+            ) in gremlin.input_devices.callback_registry.registry.items():
                 for mode, events in modes.items():
                     for event, callback_list in events.items():
                         for callback in callback_list.values():
                             self.event_handler.add_callback(
-                                dev_id,
-                                mode,
-                                event,
-                                callback[0],
-                                callback[1]
+                                dev_id, mode, event, callback[0], callback[1]
                             )
                             callback_count += 1
 
             # Add a fake keyboard action which does nothing to the callbacks
             # in every mode in order to have empty modes be "present"
             for mode_name in gremlin.profile.mode_list():
-                self.event_handler.add_callback(
-                    0,
-                    mode_name,
-                    None,
-                    lambda x: x,
-                    False
-                )
-
+                self.event_handler.add_callback(0, mode_name, None, lambda x: x, False)
 
             # reset functor latching
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
             container_plugins.reset_functors()
 
             mode_source = gremlin.shared_state.current_profile.traverse_mode()
-            mode_source.sort(key = lambda x: x[0]) # sort parent to child
-            mode_list = [mode for (_,mode) in mode_source] # parent mode first
+            mode_source.sort(key=lambda x: x[0])  # sort parent to child
+            mode_list = [mode for (_, mode) in mode_source]  # parent mode first
 
             mode_nodes = {}
             for mode in mode_list:
-                mode_node = gremlin.execution_graph.ExecutionGraphNode(gremlin.execution_graph.ExecutionGraphNodeType.Mode)
+                mode_node = gremlin.execution_graph.ExecutionGraphNode(
+                    gremlin.execution_graph.ExecutionGraphNodeType.Mode
+                )
                 mode_node.parent = ec.root
                 mode_node.mode = mode
                 mode_nodes[mode] = mode_node
@@ -278,7 +261,9 @@ class CodeRunner:
             verbose = gremlin.config.Configuration().verbose_mode_exec
             for device in profile.devices.values():
                 if verbose:
-                    device_name = gremlin.joystick_handling.device_name_from_guid(device.device_guid)
+                    device_name = gremlin.joystick_handling.device_name_from_guid(
+                        device.device_guid
+                    )
                     syslog.info(f"CALLBACK: device: {device_name}")
                 for mode in device.modes.values():
                     mode_node = mode_nodes[mode.name]
@@ -286,59 +271,91 @@ class CodeRunner:
                         for input_item in input_items.values():
                             # Only add callbacks for input items that actually
                             # contain actions
-                            
+
                             if len(input_item.containers) == 0:
                                 # no containers = no actions = skip
-                                #if verbose: syslog.info(f"\t\tno containers")
+                                # if verbose: syslog.info(f"\t\tno containers")
                                 continue
 
-                            if verbose: syslog.info(f"\t{input_item.display_name}")
+                            if verbose:
+                                syslog.info(f"\t{input_item.display_name}")
 
                             self.event_handler.registerInputItem(mode.name, input_item)
 
                             event = gremlin.event_handler.Event(
                                 event_type=input_item.input_type,
                                 device_guid=device.device_guid,
-                                identifier=input_item.input_id
+                                identifier=input_item.input_id,
                             )
-
-                            
-
 
                             # Create possibly several callbacks depending
                             # on the input item's content
                             callbacks = []
                             for container in input_item.containers:
                                 if not container.is_valid():
-                                    #test = container.is_valid()
-                                    syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: Incomplete container ignored")
+                                    # test = container.is_valid()
+                                    syslog.warning(
+                                        f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: Incomplete container ignored"
+                                    )
                                     continue
-                                callbacks.extend(container.generate_callbacks(mode_node))
+                                callbacks.extend(
+                                    container.generate_callbacks(mode_node)
+                                )
 
                             for cb_data in callbacks:
                                 if cb_data.event is None:
-                                    if verbose: 
-                                        syslog.info(f"\t\tcallback: ")
-                                        for functor in cb_data.callback.execution_graph.functors:
-                                            if hasattr(functor,"action_set"):
-                                                for action in functor.action_set.functors:
-                                                    if isinstance(action, gremlin.actions.ActivationCondition):
-                                                        syslog.info(f"\t\t\tActivation Condition: target :{action.target.name}")
+                                    if verbose:
+                                        syslog.info("\t\tcallback: ")
+                                        for (
+                                            functor
+                                        ) in cb_data.callback.execution_graph.functors:
+                                            if hasattr(functor, "action_set"):
+                                                for (
+                                                    action
+                                                ) in functor.action_set.functors:
+                                                    if isinstance(
+                                                        action,
+                                                        gremlin.actions.ActivationCondition,
+                                                    ):
+                                                        syslog.info(
+                                                            f"\t\t\tActivation Condition: target :{action.target.name}"
+                                                        )
                                                     else:
                                                         import action_plugins.map_to_simconnect
-                                                        syslog.info(f"\t\t\tAction: {action._name}")
-                                                        if isinstance(action, action_plugins.map_to_simconnect.MapToSimConnectFunctor):
-                                                            syslog.info(f"\t\t\t\tCommand:: {action.command}")
-                                            elif hasattr(functor,"action_sets"):
+
+                                                        syslog.info(
+                                                            f"\t\t\tAction: {action._name}"
+                                                        )
+                                                        if isinstance(
+                                                            action,
+                                                            action_plugins.map_to_simconnect.MapToSimConnectFunctor,
+                                                        ):
+                                                            syslog.info(
+                                                                f"\t\t\t\tCommand:: {action.command}"
+                                                            )
+                                            elif hasattr(functor, "action_sets"):
                                                 for action_set in functor.action_sets:
                                                     for action in action_set.functors:
-                                                        if isinstance(action, gremlin.actions.ActivationCondition):
-                                                            syslog.info(f"\t\t\tActivation Condition: target :{action.target.name}")
+                                                        if isinstance(
+                                                            action,
+                                                            gremlin.actions.ActivationCondition,
+                                                        ):
+                                                            syslog.info(
+                                                                f"\t\t\tActivation Condition: target :{action.target.name}"
+                                                            )
                                                         else:
                                                             import action_plugins.map_to_simconnect
-                                                            syslog.info(f"\t\t\tAction: {action._name}")
-                                                            if isinstance(action, action_plugins.map_to_simconnect.MapToSimConnectFunctor):
-                                                                syslog.info(f"\t\t\t\tCommand:: {action.command}")                                                            
+
+                                                            syslog.info(
+                                                                f"\t\t\tAction: {action._name}"
+                                                            )
+                                                            if isinstance(
+                                                                action,
+                                                                action_plugins.map_to_simconnect.MapToSimConnectFunctor,
+                                                            ):
+                                                                syslog.info(
+                                                                    f"\t\t\t\tCommand:: {action.command}"
+                                                                )
                                             else:
                                                 syslog.info(f"\t\t\tFunctor: {functor}")
                                     self.event_handler.add_callback(
@@ -346,7 +363,7 @@ class CodeRunner:
                                         mode.name,
                                         event,
                                         cb_data.callback,
-                                        input_item.always_execute
+                                        input_item.always_execute,
                                     )
                                 else:
                                     self.event_handler.add_callback(
@@ -354,21 +371,18 @@ class CodeRunner:
                                         mode.name,
                                         cb_data.event,
                                         cb_data.callback,
-                                        input_item.always_execute
+                                        input_item.always_execute,
                                     )
 
-                            
             # if verbose_detailed:
             #     self.event_handler.dump_callbacks()
-
- 
 
             # Create merge axis callbacks
             for entry in profile.merge_axes:
                 merge_axis = MergeAxis(
                     entry["vjoy"]["vjoy_id"],
                     entry["vjoy"]["axis_id"],
-                    entry["operation"]
+                    entry["operation"],
                 )
                 self._merge_axes.append(merge_axis)
 
@@ -376,31 +390,29 @@ class CodeRunner:
                 event = gremlin.event_handler.Event(
                     event_type=InputType.JoystickAxis,
                     device_guid=entry["lower"]["device_guid"],
-                    identifier=entry["lower"]["axis_id"]
+                    identifier=entry["lower"]["axis_id"],
                 )
                 self.event_handler.add_callback(
                     event.device_guid,
                     entry["mode"],
                     event,
                     merge_axis.update_axis1,
-                    False
+                    False,
                 )
 
                 # Upper axis callback
                 event = gremlin.event_handler.Event(
                     event_type=InputType.JoystickAxis,
                     device_guid=entry["upper"]["device_guid"],
-                    identifier=entry["upper"]["axis_id"]
+                    identifier=entry["upper"]["axis_id"],
                 )
                 self.event_handler.add_callback(
                     event.device_guid,
                     entry["mode"],
                     event,
                     merge_axis.update_axis2,
-                    False
+                    False,
                 )
-
-
 
             # Use inheritance to build input action lookup table
             self.event_handler.build_event_lookup(inheritance_tree)
@@ -414,11 +426,9 @@ class CodeRunner:
             if verbose_detailed:
                 self.event_handler.dump_callbacks()
 
-
             # Connect signals
             evt_listener = gremlin.event_handler.EventListener()
 
-           
             # hook mouse events
             evt_listener.mouse_event.connect(self.event_handler.execute_event)
 
@@ -439,16 +449,15 @@ class CodeRunner:
 
             # set keyboard startup state for numlock - use global numlock or profile numlock
             numlock_off = numlock_off or profile.get_force_numlock()
-            
+
             if numlock_off:
                 state = gremlin.keyboard.KeyMap.numlock_state()
                 syslog.info(f"Numlock state: {state}")
                 if state:
                     # toggle numlock off
-                    syslog.info(f"Numlock state: Forcing Off")
+                    syslog.info("Numlock state: Forcing Off")
                     gremlin.keyboard.KeyMap.toggle_numlock()
-                
-            
+
             # monitor keyboard input state
             kb = gremlin.input_devices.Keyboard()
             evt_listener.keyboard_event.connect(kb.keyboard_event)
@@ -467,74 +476,71 @@ class CodeRunner:
             # listen to OSC
             if config.osc_enabled:
                 evt_listener.request_osc.emit(True)
-            
+
             # hook mode change callbacks
-            evt_listener.runtime_mode_changed.connect(gremlin.input_devices.mode_registry.runtime_mode_changed)
+            evt_listener.runtime_mode_changed.connect(
+                gremlin.input_devices.mode_registry.runtime_mode_changed
+            )
 
             # hook state change callbacks
-            evt_listener.broadcast_changed.connect(gremlin.input_devices.state_registry.state_changed)
+            evt_listener.broadcast_changed.connect(
+                gremlin.input_devices.state_registry.state_changed
+            )
 
             # call start functions
             gremlin.input_devices.start_registry.start()
             gremlin.input_devices.periodic_registry.start()
-
-
 
             gremlin.macro.MacroManager().start()
             verbose = gremlin.config.Configuration().verbose
 
             # determine the profile start mode
 
-    
             mode = start_mode
             if config.restore_profile_mode_on_start or profile.get_restore_mode():
                 # restore the profile mode
                 mode = profile.get_last_runtime_mode()
-                syslog.error(f"Start: Restoring the last active profile mode for this profile: '{mode}' - overriding profile start mode '{start_mode}' at user request")
-                
+                syslog.error(
+                    f"Start: Restoring the last active profile mode for this profile: '{mode}' - overriding profile start mode '{start_mode}' at user request"
+                )
 
                 if mode:
-                    if not mode in mode_list:
-                        syslog.error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
+                    if mode not in mode_list:
+                        syslog.error(
+                            f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead."
+                        )
                         mode = start_mode
             else:
-                syslog.error(f"Start: Using default Restoring the last active profile mode for this profile: '{mode}'")
-
+                syslog.error(
+                    f"Start: Using default Restoring the last active profile mode for this profile: '{mode}'"
+                )
 
             sendinput.MouseController().start()
 
-
-            if not mode in mode_list:
-                syslog.error(f"Unable to select startup mode: '{mode}' no longer exists")
+            if mode not in mode_list:
+                syslog.error(
+                    f"Unable to select startup mode: '{mode}' no longer exists"
+                )
             else:
                 if verbose:
                     syslog.info(f"Using profile start mode: '{mode}'")
                 self.event_handler.change_mode(mode)
 
-
-           
-
             # tell listener profiles are starting
             # start listen
             evt_listener.start()
 
-            
-            #print ("resume!")
+            # print ("resume!")
             self.event_handler.resume()
-
 
             # register callbacks with the execution tree
             eh = gremlin.event_handler.EventHandler()
-            ec.reset(force_rebuild = True) # rebuild the execution tree
+            ec.reset(force_rebuild=True)  # rebuild the execution tree
             ec.registerCallbacks(eh.callbacks)
-            
-                                
 
             # tell GremlinEx the profile started
             el.profile_start.emit()
             el.profile_started.emit()
-
-
 
         except Exception as e:
             tb_msg = traceback.format_exc()
@@ -544,36 +550,32 @@ class CodeRunner:
             syslog.error(f"Error: {e}")
             syslog.error(f"Traceback: {tb_msg}")
 
-            gremlin.util.display_error(f"Unable to launch profile due to an error: {tb_msg}")
-            
-            
-
-            
+            gremlin.util.display_error(
+                f"Unable to launch profile due to an error: {tb_msg}"
+            )
 
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
 
         if not gremlin.shared_state.is_running:
-            return # not running - nothing to do
+            return  # not running - nothing to do
 
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
-        
+
         # tell components we're stopping
         el.profile_stop.emit()
-
-
 
         # stop remote client
         gremlin.input_devices.remote_client.stop()
         gremlin.input_devices.remote_server.stop()
 
         # call stop function in plugins
-        #gremlin.input_devices.stop_registry.start()
+        # gremlin.input_devices.stop_registry.start()
         gremlin.input_devices.stop_registry.stop()
         gremlin.input_devices.stop_registry.clear()
         gremlin.input_devices.mode_registry.clear()
-        
+
         # reset functor latching
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_plugins.reset_functors()
@@ -592,7 +594,6 @@ class CodeRunner:
         # self.event_handler.runtime_mode_changed.disconnect(
         #     self._vjoy_curves.runtime_mode_changed
         # )
-        
 
         # Empty callback registry
         gremlin.input_devices.callback_registry.clear()
@@ -606,7 +607,6 @@ class CodeRunner:
         gremlin.input_devices.start_registry.stop()
         gremlin.input_devices.start_registry.clear()
 
-
         gremlin.macro.MacroManager().stop()
         sendinput.MouseController().stop()
 
@@ -615,32 +615,30 @@ class CodeRunner:
 
         # restore the startup mode and profile
         gremlin.shared_state.is_running = False
-        if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:
+        if (
+            self._startup_profile
+            and gremlin.shared_state.current_profile != self._startup_profile
+        ):
             eh.change_profile(self._startup_profile)
         # change back to edit mode
-        eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update = False)
-        
-      
+        eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update=False)
+
         # re-enable tabs
         self.enableUI()
 
         # check if devices changed at runtime
         if gremlin.shared_state.has_device_changes:
-            gremlin.shared_state.has_device_changes = False # mark as changes processed
+            gremlin.shared_state.has_device_changes = False  # mark as changes processed
             gremlin.joystick_handling.reset_devices()
-
 
     def _reset_state(self):
         """Resets all states to their default values."""
-        self.event_handler.active_mode =\
-            list(self._inheritance_tree.keys())[0]
-        self.event_handler.previous_mode =\
-            list(self._inheritance_tree.keys())[0]
+        self.event_handler.active_mode = list(self._inheritance_tree.keys())[0]
+        self.event_handler.previous_mode = list(self._inheritance_tree.keys())[0]
         gremlin.input_devices.callback_registry.clear()
 
 
 class VJoyCurves:
-
     """Handles setting response curves on vJoy devices."""
 
     def __init__(self):
@@ -658,30 +656,29 @@ class VJoyCurves:
         vjoy = gremlin.joystick_handling.VJoyProxy()
         for guid, device in self.profile_data.items():
             if mode_name in device.modes:
-                for aid, data in device.modes[mode_name].config[InputType.JoystickAxis].items():
+                for aid, data in (
+                    device.modes[mode_name].config[InputType.JoystickAxis].items()
+                ):
                     # Get integer axis id in case an axis enum was used
                     axis_id = vjoy_module.vjoy.VJoy.axis_equivalence.get(aid, aid)
                     vjoy_id = gremlin.joystick_handling.vjoy_id_from_guid(guid)
 
-                    if len(data.containers) > 0 and vjoy[vjoy_id].is_axis_valid(axis_id):
+                    if len(data.containers) > 0 and vjoy[vjoy_id].is_axis_valid(
+                        axis_id
+                    ):
                         action = data.containers[0].action_sets[0][0]
-                        if hasattr(action,"deadzone"):
+                        if hasattr(action, "deadzone"):
                             vjoy[vjoy_id].axis(aid).set_deadzone(*action.deadzone)
                         vjoy[vjoy_id].axis(aid).set_response_curve(
-                            action.mapping_type,
-                            action.control_points
+                            action.mapping_type, action.control_points
                         )
 
 
 class MergeAxis:
-
     """Merges inputs from two distinct axes into a single one."""
 
     def __init__(
-            self,
-            vjoy_id: int,
-            input_id: int,
-            operation: gremlin.types.MergeAxisOperation
+        self, vjoy_id: int, input_id: int, operation: gremlin.types.MergeAxisOperation
     ):
         self.axis_values = [0.0, 0.0]
         self.vjoy_id = vjoy_id
@@ -699,17 +696,16 @@ class MergeAxis:
             value = max(self.axis_values[0], self.axis_values[1])
         elif self.operation == gremlin.types.MergeAxisOperation.Sum:
             value = gremlin.util.clamp(
-                self.axis_values[0] + self.axis_values[1],
-                -1.0,
-                1.0
+                self.axis_values[0] + self.axis_values[1], -1.0, 1.0
             )
         else:
             raise gremlin.error.GremlinError(
-                f"Invalid merge axis operation detected, \"{str(self.operation)}\""
+                f'Invalid merge axis operation detected, "{str(self.operation)}"'
             )
 
-        gremlin.joystick_handling.VJoyProxy()[self.vjoy_id]\
-            .axis(self.input_id).value = value
+        gremlin.joystick_handling.VJoyProxy()[self.vjoy_id].axis(
+            self.input_id
+        ).value = value
 
     def update_axis1(self, event: gremlin.event_handler.Event):
         """Updates information for the first axis.

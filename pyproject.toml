@@ -22,3 +22,6 @@ dependencies = [
     "qtawesome>=1.4.0",
     "reportlab==4.1.0",
 ]
+
+[tool.ruff]
+exclude = ["test/"]

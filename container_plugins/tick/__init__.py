@@ -39,17 +39,17 @@ from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 from gremlin.util import safe_format, safe_read
 
+
 class TickContainerWidget(AbstractContainerWidget):
-
     """Container with two actions, one for input button is pressed, the other for when the input button is released
-    
-       While this can be duplicated with conditions - this is a helper container to simplify the profile setup.
 
-       Works with buttons or hats
-    
+    While this can be duplicated with conditions - this is a helper container to simplify the profile setup.
+
+    Works with buttons or hats
+
     """
 
-    def __init__(self, action_data : TickContainer, parent=None):
+    def __init__(self, action_data: TickContainer, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
@@ -63,7 +63,7 @@ class TickContainerWidget(AbstractContainerWidget):
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_handler)
 
-        self.action_data : TickContainer = self.profile_data
+        self.action_data: TickContainer = self.profile_data
         self.action_data.create_or_delete_virtual_button()
 
         self.interval_widget = gremlin.ui.ui_common.QFloatLineEdit()
@@ -72,12 +72,12 @@ class TickContainerWidget(AbstractContainerWidget):
         self.interval_widget.valueChanged.connect(self._interval_changed)
 
         self.tick_count_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self.tick_count_widget.setRange(0,100)
+        self.tick_count_widget.setRange(0, 100)
         self.tick_count_widget.setValue(self.action_data.getTickCount())
         self.tick_count_widget.valueChanged.connect(self._tick_count_changed)
 
         self.slider_widget = gremlin.ui.qsliderwidget.QSliderWidget()
-        self.slider_widget.setRange(-1,1)
+        self.slider_widget.setRange(-1, 1)
         self.slider_widget.setReadOnly(True)
         self.slider_widget.setDrawHandles(False)
 
@@ -86,18 +86,14 @@ class TickContainerWidget(AbstractContainerWidget):
         self.header_container = QtWidgets.QWidget()
         self.header_layout = QtWidgets.QHBoxLayout(self.header_container)
 
-        self.header_layout.addWidget(QtWidgets.QLabel("Interval:")) 
+        self.header_layout.addWidget(QtWidgets.QLabel("Interval:"))
         self.header_layout.addWidget(self.interval_widget)
-        self.header_layout.addWidget(QtWidgets.QLabel("Tick Count:")) 
+        self.header_layout.addWidget(QtWidgets.QLabel("Tick Count:"))
         self.header_layout.addWidget(self.tick_count_widget)
         self.header_layout.addWidget(self.slider_widget)
         self.header_layout.addStretch()
 
-                                                                       
-
-
         self.options_layout = QtWidgets.QHBoxLayout()
-
 
         self.action_layout.addWidget(self.header_container)
         self.action_layout.addLayout(self.options_layout)
@@ -113,7 +109,7 @@ class TickContainerWidget(AbstractContainerWidget):
                 0,
                 "Tick Up",
                 self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
 
         if self.profile_data.action_sets[1] is None:
@@ -127,33 +123,30 @@ class TickContainerWidget(AbstractContainerWidget):
                 1,
                 "Tick Down",
                 self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
 
     def _joystick_event_handler(self, event):
-        ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
+        """handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time"""
         if gremlin.shared_state.is_running:
-            return 
+            return
 
         if not event.is_axis:
-            return 
-        
+            return
+
         value = None
-        
+
         if event.device_guid != self.action_data.hardware_device_guid:
             return
         if event.identifier != self.action_data.hardware_input_id:
             return
-        
-        value = event.value
-        
-        
-        self._update_axis_widget(value)       
 
-    
-    def _update_axis_widget(self, value : float = None):
+        value = event.value
+
+        self._update_axis_widget(value)
+
+    def _update_axis_widget(self, value: float = None):
         self.slider_widget.setMarkerValue(value)
-        
 
     @QtCore.Slot()
     def _interval_changed(self):
@@ -177,7 +170,6 @@ class TickContainerWidget(AbstractContainerWidget):
         self.slider_widget.setTickCount(count)
         self.update()
 
-
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
             if self.profile_data.action_sets[0] is not None:
@@ -185,7 +177,7 @@ class TickContainerWidget(AbstractContainerWidget):
                     0,
                     "Axis Increase",
                     self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
 
             if self.profile_data.action_sets[1] is not None:
@@ -193,7 +185,7 @@ class TickContainerWidget(AbstractContainerWidget):
                     1,
                     "Axis Decrease",
                     self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
@@ -224,9 +216,7 @@ class TickContainerWidget(AbstractContainerWidget):
         :param label the name of the action to create
         """
         widget = self._create_action_set_widget(
-            self.profile_data.action_sets[index],
-            label,
-            view_type
+            self.profile_data.action_sets[index], label, view_type
         )
         layout.addWidget(widget)
         widget.redraw()
@@ -246,15 +236,13 @@ class TickContainerWidget(AbstractContainerWidget):
         self.container_modified.emit()
 
     def _paste_action(self, index, action):
-        ''' paste action'''
+        """paste action"""
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         if self.profile_data.action_sets[index] is None:
             self.profile_data.action_sets[index] = []
         self.profile_data.action_sets[index].append(action_item)
         self.profile_data.create_or_delete_virtual_button()
-
-
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -281,8 +269,7 @@ class TickContainerWidget(AbstractContainerWidget):
 
 
 class TickContainerFunctor(gremlin.base_conditions.AbstractFunctor):
-
-    def __init__(self, container : TickContainer, parent = None):
+    def __init__(self, container: TickContainer, parent=None):
         super().__init__(container, parent)
         self.increase_set = gremlin.execution_graph.ActionSetExecutionGraph(
             container.action_sets[0], parent
@@ -297,20 +284,19 @@ class TickContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         # current position
         count = self.action_data.getTickCount()
-        interval = 2 / (count-1)
+        interval = 2 / (count - 1)
         self.last_tick = self.action_data.currentTick()
 
         # build the ranges for each tick
         self._tick_map = [-1.0 + x * interval for x in range(count)]
         self._last_value = self.action_data._get_value()
-      
-    def process_event(self, event, value, extra_data = None):
-        
+
+    def process_event(self, event, value, extra_data=None):
         if not event.is_axis:
             return
-        
+
         last_tick = self.last_tick
-        
+
         value = event.value
         last_value = self._last_value
         index = 0
@@ -322,41 +308,37 @@ class TickContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             elif value == v:
                 trigger = True
                 break
-            index +=1
+            index += 1
 
         tick = index
         trigger = trigger or last_tick != tick
-        
 
         if trigger:
-            #print (f"Value: {value:0.3f}  last: {last_value:0.3f} index: {tick}   last tick: {last_tick}  map: {self._tick_map}  trigger: {trigger}")
-            
+            # print (f"Value: {value:0.3f}  last: {last_value:0.3f} index: {tick}   last tick: {last_tick}  map: {self._tick_map}  trigger: {trigger}")
+
             trigger_count = abs(last_tick - tick)
             event.is_axis = False
             event.is_button = True
-            event.is_pressed = True # tell each tick we're pressed
-            if  last_value < value:
-                # going up 
-                #print (f"increase set trigger  value: {value:0.3f} tick: {tick} last tick: {last_tick} count: {trigger_count}")
+            event.is_pressed = True  # tell each tick we're pressed
+            if last_value < value:
+                # going up
+                # print (f"increase set trigger  value: {value:0.3f} tick: {tick} last tick: {last_tick} count: {trigger_count}")
                 for _ in range(trigger_count):
-                    
                     self.increase_set.process_event(event, value)
             elif last_value > value:
                 # going down
-                #print (f"decrease set trigger  value: {value:0.3f} tick: {tick} count: {trigger_count}")
+                # print (f"decrease set trigger  value: {value:0.3f} tick: {tick} count: {trigger_count}")
                 for _ in range(trigger_count):
                     self.decrease_set.process_event(event, value)
 
             self.last_tick = tick
 
-
         self._last_value = value
-        
+
         return True
 
 
 class TickContainer(AbstractContainer):
-
     """A container with two actions which are triggered based on the duration
     of the activation.
 
@@ -376,31 +358,32 @@ class TickContainer(AbstractContainer):
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,
     ]
 
-    def getTick(self, value : float) -> int:
-        ''' gets the tick number for a given value -1 to +1 '''
-        value += 1 # range 0..2
+    def getTick(self, value: float) -> int:
+        """gets the tick number for a given value -1 to +1"""
+        value += 1  # range 0..2
         tick = int(2 / (value + 1))
-        print (f"value: {value:0.3f} tick: {tick}")
+        print(f"value: {value:0.3f} tick: {tick}")
         return tick
 
     def _get_value(self) -> float:
-        ''' current axis value '''
-        return gremlin.joystick_handling.get_axis(self.hardware_device_guid, self.hardware_input_id)
-    
+        """current axis value"""
+        return gremlin.joystick_handling.get_axis(
+            self.hardware_device_guid, self.hardware_input_id
+        )
+
     def currentTick(self) -> int:
         value = self._get_value()
         return self.getTick(value)
-    
+
     def getTickCount(self) -> int:
-        ''' gets the number of ticks in the container '''
+        """gets the number of ticks in the container"""
         if self.interval == 0:
             return 2
-        count = round(2/self.interval)+1
-        print (f"New count: {count}  interval: {self.interval}  {2/self.interval:0.3f}")
+        count = round(2 / self.interval) + 1
+        print(f"New count: {count}  interval: {self.interval}  {2/self.interval:0.3f}")
         return count
-        
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
@@ -409,19 +392,19 @@ class TickContainer(AbstractContainer):
         self.action_sets = [[], []]
         self.delay = 0.5
         self.activate_on = "release"
-        self.interval = 0.2 # interval between ticks
+        self.interval = 0.2  # interval between ticks
 
         # override the input type to a button
         self.override_input_id = 1
         self.override_input_type = InputType.JoystickButton
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
         self.action_sets = []
-        self.interval  = safe_read(node,"interval",float,0.2)
+        self.interval = safe_read(node, "interval", float, 0.2)
         super()._parse_xml(node, data)
 
     def _generate_xml(self):
@@ -444,7 +427,7 @@ class TickContainer(AbstractContainer):
 
         :return True if the container is configured properly, False otherwise
         """
-        return True #  len(self.action_sets) == 2 and None not in self.action_sets
+        return True  #  len(self.action_sets) == 2 and None not in self.action_sets
 
 
 # Plugin definitions

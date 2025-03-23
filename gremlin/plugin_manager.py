@@ -1,4 +1,4 @@
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@ from __future__ import annotations
 import importlib
 import logging
 import os
-import copy
 
 from . import common, error
 from gremlin.util import *
@@ -26,9 +25,9 @@ from gremlin.singleton_decorator import SingletonDecorator
 
 syslog = logging.getLogger("system")
 
+
 @SingletonDecorator
 class ContainerPlugins:
-
     """Handles discovery and handling of container plugins."""
 
     def __init__(self):
@@ -36,7 +35,7 @@ class ContainerPlugins:
         self.reset()
 
     def reset(self):
-        ''' resets the plugins '''
+        """resets the plugins"""
         self._plugins = {}
         self._discover_plugins()
 
@@ -47,17 +46,16 @@ class ContainerPlugins:
 
         self._create_maps()
 
-        self._parent_widget_map = {} # map of item data to QT widget main UI container widget
-        self._input_data_container_map = {} # map of item data to the actual containers created for it
-
+        self._parent_widget_map = {}  # map of item data to QT widget main UI container widget
+        self._input_data_container_map = {}  # map of item data to the actual containers created for it
 
     def reset_functors(self):
-        ''' clears functor tracking '''
+        """clears functor tracking"""
         self._functors = []
 
     def register_functor(self, functor):
-        ''' registers a functor for latching purposes'''
-        if not functor in self._functors:
+        """registers a functor for latching purposes"""
+        if functor not in self._functors:
             self._functors.append(functor)
 
     @property
@@ -73,35 +71,34 @@ class ContainerPlugins:
         return self._plugins
 
     def set_widget(self, item_data, widget):
-        ''' sets the associated parent widget of a container for the specific input type'''
+        """sets the associated parent widget of a container for the specific input type"""
         self._parent_widget_map[item_data] = widget
 
     def get_widget(self, item_data):
-        ''' gets the associated parent widget of a container for the specific input type '''
+        """gets the associated parent widget of a container for the specific input type"""
         if item_data in self._parent_widget_map.keys():
             return self._parent_widget_map[item_data]
         return None
 
     def set_container_data(self, item_data, container):
-        if not item_data in self._input_data_container_map.keys():
+        if item_data not in self._input_data_container_map.keys():
             self._input_data_container_map[item_data] = []
-        if not container in self._input_data_container_map[item_data]:
+        if container not in self._input_data_container_map[item_data]:
             self._input_data_container_map[item_data].append(container)
 
     def get_container(self, item_data):
-        if not item_data in self._input_data_container_map.keys():
+        if item_data not in self._input_data_container_map.keys():
             return []
         return self._input_data_container_map[item_data]
 
     def get_parent_widget(self, container):
-        ''' gets the parent widget of the given container '''
+        """gets the parent widget of the given container"""
         for item_data, containers in self._input_data_container_map.items():
             for container_item in containers:
                 if container == container_item:
                     return self.get_widget(item_data)
         # not found for this container
         return None
-
 
     @property
     def tag_map(self):
@@ -118,14 +115,13 @@ class ContainerPlugins:
         :return class object corresponding to the provided name
         """
         if name not in self._name_to_type_map:
-            raise error.GremlinError(
-                f"No container with name '{name}' exists"
-            )
+            raise error.GremlinError(f"No container with name '{name}' exists")
         return self._name_to_type_map[name]
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
         import gremlin.shared_state
+
         plugin_folder = "container_plugins"
         root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
@@ -134,7 +130,6 @@ class ContainerPlugins:
             raise error(f"Unable to find container plugins: {walk_path}")
 
         for root, dirs, files in os.walk(walk_path):
-
             for fname in [v for v in files if v == "__init__.py"]:
                 try:
                     folder, module = os.path.split(root)
@@ -144,13 +139,10 @@ class ContainerPlugins:
 
                     # Attempt to load the file and if it looks like a proper
                     # action_plugins store it in the registry
-                    plugin = importlib.import_module(
-                        f"container_plugins.{module}"
-                    )
+                    plugin = importlib.import_module(f"container_plugins.{module}")
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        log_sys(f"\tLoaded container plugin: {plugin.name}"
-                        )
+                        log_sys(f"\tLoaded container plugin: {plugin.name}")
                     else:
                         del plugin
                 except Exception as e:
@@ -166,14 +158,19 @@ class ContainerPlugins:
             self._tag_to_type_map[entry.tag] = entry
             self._name_to_type_map[entry.name] = entry
 
-    def duplicate(self, container, input_item = None):
-        ''' duplicates a container '''
+    def duplicate(self, container, input_item=None):
+        """duplicates a container"""
         # because containers can be quite complex - we'll just generate the xml and change IDs as needed and reload
         # into a new container of the same type
         from gremlin.base_profile import AbstractContainer, InputItem
         from gremlin.util import get_guid
-        assert isinstance(container, AbstractContainer),"Invalid container data for duplicate()"
-        assert isinstance(input_item, InputItem),"Invalid input item tyhpe for duplicate()"
+
+        assert isinstance(
+            container, AbstractContainer
+        ), "Invalid container data for duplicate()"
+        assert isinstance(
+            input_item, InputItem
+        ), "Invalid input item tyhpe for duplicate()"
 
         if input_item is None:
             input_item = container.parent
@@ -185,7 +182,7 @@ class ContainerPlugins:
         new_container = container_tag_map[container_type](input_item)
         new_container.from_xml(node, input_item)
 
-        #new_container = copy.deepcopy(container)
+        # new_container = copy.deepcopy(container)
 
         for action_set in new_container.get_action_sets():
             for action in action_set:
@@ -194,16 +191,8 @@ class ContainerPlugins:
         return new_container
 
 
-
-
-
-
-
-
-
 @SingletonDecorator
 class ActionPlugins:
-
     """Handles discovery and handling of action plugins."""
 
     def __init__(self):
@@ -211,7 +200,7 @@ class ActionPlugins:
         self.reset()
 
     def reset(self):
-        ''' resets the plugins '''
+        """resets the plugins"""
         self._plugins = {}
         self._type_to_action_map = {}
         self._type_to_name_map = {}
@@ -255,9 +244,7 @@ class ActionPlugins:
         :return class object corresponding to the provided name
         """
         if name not in self._name_to_type_map:
-            raise error.GremlinError(
-                f"No action with name '{name}' exists"
-            )
+            raise error.GremlinError(f"No action with name '{name}' exists")
         return self._name_to_type_map[name]
 
     def plugins_requiring_parameter(self, param_name):
@@ -287,6 +274,7 @@ class ActionPlugins:
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
         import gremlin.shared_state
+
         plugin_folder = "action_plugins"
         root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
@@ -306,9 +294,7 @@ class ActionPlugins:
 
                     # Attempt to load the file and if it looks like a proper
                     # action_plugins store it in the registry
-                    plugin = importlib.import_module(
-                        f"action_plugins.{module}"
-                    )
+                    plugin = importlib.import_module(f"action_plugins.{module}")
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
                         log_sys(f"\tLoaded action plugin: {plugin.name}")
@@ -326,9 +312,8 @@ class ActionPlugins:
         if error_count > 0:
             log_sys_error(f"{error_count} plugin(s) failed to load")
 
-
-    def duplicate(self, action, container, input_item = None):
-        ''' duplicates an action and gives it a unique ID '''
+    def duplicate(self, action, container, input_item=None):
+        """duplicates an action and gives it a unique ID"""
         from gremlin.util import get_guid
 
         if input_item is None:
@@ -343,10 +328,11 @@ class ActionPlugins:
         return new_action
 
     def fromClipboard(self, container):
-        ''' grabs an action from the clipboard '''
+        """grabs an action from the clipboard"""
         from lxml import etree
         from gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
         import gremlin.base_profile
+
         clipboard = Clipboard()
         if isinstance(clipboard.data, ObjectEncoder):
             item = clipboard.data
@@ -354,7 +340,9 @@ class ActionPlugins:
                 xml = item.data
                 if container is None:
                     # no container provided for the parent - can't duplicate
-                    syslog.error("FromClipboard: unable to instantiate action because no container is provided")
+                    syslog.error(
+                        "FromClipboard: unable to instantiate action because no container is provided"
+                    )
                     return None
                 if container is not None:
                     node = etree.fromstring(xml)
@@ -364,5 +352,3 @@ class ActionPlugins:
         elif isinstance(clipboard.data, gremlin.base_profile.AbstractAction):
             return action
         return None
-
-

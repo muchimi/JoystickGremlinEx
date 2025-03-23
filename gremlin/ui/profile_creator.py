@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@ from gremlin.input_types import InputType
 # TODO: Retire this entire bit here as the action library will replace it
 #       in it's entirety
 
-class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
 
+class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
     """Displays a dialog to create a new profile from an existing one.
 
     This dialog shows all actions present in an existing profile and allows
@@ -44,7 +44,7 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
         :param profile_data the data to use as the template
         :param parent the parent widget of this one
         """
-        super().__init__(self.__class__.__name__,  parent)
+        super().__init__(self.__class__.__name__, parent)
         self.profile_data = profile_data
         self.new_profile = self._create_empty_profile()
 
@@ -75,9 +75,10 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
         # Add a new binding
         else:
             # Get the input item to be mapped then modify it and set it again
-            item = self.new_profile.devices[event.device_guid].modes[mode].get_data(
-                event.event_type,
-                event.identifier
+            item = (
+                self.new_profile.devices[event.device_guid]
+                .modes[mode]
+                .get_data(event.event_type, event.identifier)
             )
 
             item.containers = copy.deepcopy(input_item.containers)
@@ -85,9 +86,7 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
             item.description = input_item.description
 
             self.new_profile.devices[event.device_guid].modes[mode].set_data(
-                item.input_type,
-                item.input_id,
-                item
+                item.input_type, item.input_id, item
             )
 
             self._binding_registry[input_item] = item
@@ -122,18 +121,17 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
                     self._binding_registry,
                     mode,
                     self.update_binding,
-                    self.toolbox
+                    self.toolbox,
                 ),
-                mode
+                mode,
             )
-
 
         # Create the help text indicating how to use the template tool
         self.help_text = QtWidgets.QLabel(
             "To map an input to an action, left click on the corresponding "
             "button and then moved or press the desired physical input."
             "To delete a mapping simply right click on the corresponding "
-            "button. When done click on the \"Save\" button to save a "
+            'button. When done click on the "Save" button to save a '
             "new profile."
         )
         self.help_text.setWordWrap(True)
@@ -154,10 +152,7 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
         stores it.
         """
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(
-            None,
-            "Save Profile",
-            util.userprofile_path(),
-            "XML files (*.xml)"
+            None, "Save Profile", util.userprofile_path(), "XML files (*.xml)"
         )
         if fname != "":
             self.new_profile.to_xml(fname)
@@ -184,17 +179,10 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
 
 
 class ModeBindings(QtWidgets.QWidget):
-
     """Allows binding of inputs to actions of a particular mode."""
 
     def __init__(
-            self,
-            profile_data,
-            new_profile,
-            bound_inputs,
-            mode,
-            update_cb,
-            parent=None
+        self, profile_data, new_profile, bound_inputs, mode, update_cb, parent=None
     ):
         """Creates a new instance.
 
@@ -223,14 +211,13 @@ class ModeBindings(QtWidgets.QWidget):
             common.InputType.Keyboard,
             common.InputType.JoystickAxis,
             common.InputType.JoystickButton,
-            common.InputType.JoystickHat
+            common.InputType.JoystickHat,
         ]
 
         # Find all input items associated with this mode and show them as
         # a bindable item in the UI
         sorted_devices = sorted(
-            self.profile_data.devices.values(),
-            key=lambda x: x.name
+            self.profile_data.devices.values(), key=lambda x: x.name
         )
         for device in sorted_devices:
             for input_type in all_input_types:
@@ -239,11 +226,13 @@ class ModeBindings(QtWidgets.QWidget):
                     if len(input_item.containers) == 0:
                         continue
 
-                    self._inputs.append(BindableAction(
-                        input_item,
-                        self._get_bound_to_string(input_item),
-                        self._create_input_cb(input_item)
-                    ))
+                    self._inputs.append(
+                        BindableAction(
+                            input_item,
+                            self._get_bound_to_string(input_item),
+                            self._create_input_cb(input_item),
+                        )
+                    )
                     self.main_layout.addWidget(self._inputs[-1])
 
         self.main_layout.addStretch(0)
@@ -262,8 +251,7 @@ class ModeBindings(QtWidgets.QWidget):
         # Special handling of keyboards
         if bound_input.parent.parent.device_guid == dinput.GUID_Keyboard:
             key_name = macro.key_from_code(
-                bound_input.input_id[0],
-                bound_input.input_id[1]
+                bound_input.input_id[0], bound_input.input_id[1]
             ).name
             return f"{self.device_names[bound_input.parent.parent.device_guid]} - {key_name}"
         else:
@@ -291,25 +279,20 @@ class ModeBindings(QtWidgets.QWidget):
 
 
 class BindableAction(QtWidgets.QWidget):
-
     """UI widget for a single action that can be bound to an input."""
 
     # Stores which input types are valid together
     valid_bind_types = {
-        common.InputType.JoystickAxis: [
-            common.InputType.JoystickAxis
-        ],
+        common.InputType.JoystickAxis: [common.InputType.JoystickAxis],
         common.InputType.JoystickButton: [
             common.InputType.JoystickButton,
-            common.InputType.Keyboard
+            common.InputType.Keyboard,
         ],
-        common.InputType.JoystickHat: [
-            common.InputType.JoystickHat
-        ],
+        common.InputType.JoystickHat: [common.InputType.JoystickHat],
         common.InputType.Keyboard: [
             common.InputType.JoystickButton,
-            common.InputType.Keyboard
-        ]
+            common.InputType.Keyboard,
+        ],
     }
 
     def __init__(self, input_item, label, input_cb, parent=None):
@@ -353,8 +336,7 @@ class BindableAction(QtWidgets.QWidget):
     def _bind_action(self):
         """Prompts the user for the input to bind to this item."""
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            BindableAction.valid_bind_types[self.input_type],
-            return_kb_event=True
+            BindableAction.valid_bind_types[self.input_type], return_kb_event=True
         )
         self.button_press_dialog.item_selected.connect(self.input_cb)
 
@@ -365,6 +347,6 @@ class BindableAction(QtWidgets.QWidget):
             int(geom.x() + geom.width() / 2 - 150),
             int(geom.y() + geom.height() / 2 - 75),
             300,
-            150
+            150,
         )
         self.button_press_dialog.show()

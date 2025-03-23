@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtGui
@@ -29,8 +28,8 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.keyboard import key_from_code
 
-class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
+class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
     """UI widget for mapping inputs to keyboard key combinations."""
 
     def __init__(self, action_data, parent=None):
@@ -52,8 +51,16 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.record_button)
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality", use_wrap=False)
-        warning_container, warning_layout = gremlin.ui.ui_common.getHContainer(warning_widget)
+        warning_widget = gremlin.ui.ui_common.QIconLabel(
+            "ph.shield-warning-fill",
+            use_qta=True,
+            icon_color=QtGui.QColor(warning_color),
+            text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality",
+            use_wrap=False,
+        )
+        warning_container, warning_layout = gremlin.ui.ui_common.getHContainer(
+            warning_widget
+        )
         self.main_layout.addWidget(warning_container)
 
     def _populate_ui(self):
@@ -61,7 +68,7 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         text = "<b>Current key combination:</b> "
         names = []
         for key in self.action_data.keys:
-            names.append(key_from_code(key[0],key[1]).name)
+            names.append(key_from_code(key[0], key[1]).name)
         text += " + ".join(names)
 
         self.key_combination.setText(text)
@@ -71,20 +78,14 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         :param keys the keys to use in the key combination
         """
-        self.action_data.keys = [
-            (key.scan_code, key.is_extended) for key in keys
-        ]
+        self.action_data.keys = [(key.scan_code, key.is_extended) for key in keys]
         self.action_modified.emit()
 
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
 
-
-        
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            [InputType.Keyboard],
-            return_kb_event=False,
-            multi_keys=True
+            [InputType.Keyboard], return_kb_event=False, multi_keys=True
         )
 
         self.button_press_dialog.item_selected.connect(self._update_keys)
@@ -99,14 +100,13 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
             int(geom.x() + geom.width() / 2 - 150),
             int(geom.y() + geom.height() / 2 - 75),
             300,
-            150
+            150,
         )
         self.button_press_dialog.show()
 
 
 class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
         self.press = gremlin.macro.Macro()
         self.needs_auto_release = action.input_is_axis()
@@ -118,18 +118,18 @@ class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
         for key in reversed(action.keys):
             self.release.release(key_from_code(key[0], key[1]))
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if value.current:
             gremlin.macro.MacroManager().queue_macro(self.press)
             # print("press")
 
             if self.needs_auto_release:
                 # print ("auto release event ")
-                event_release = event.clone()               
+                event_release = event.clone()
                 event_release.is_pressed = False
                 ButtonReleaseActions().register_callback(
                     lambda: gremlin.macro.MacroManager().queue_macro(self.release),
-                    event_release
+                    event_release,
                 )
         else:
             if not self.needs_auto_release:
@@ -139,7 +139,6 @@ class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
 
 
 class MapToKeyboard(gremlin.base_profile.AbstractAction):
-
     """Action data for the map to keyboard action.
 
     Map to keyboard presses and releases a set of keys in sync with another
@@ -176,7 +175,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         :return icon representing this action
         """
         return "fa6s.keyboard"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
@@ -184,12 +183,9 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         :return True if an activation condition is required for this particular
             action instance, False otherwise
         """
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Reads the contents of an XML node to populate this instance.
 
         :param node the node whose content should be used to populate this
@@ -198,10 +194,12 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         self.keys = []
 
         for child in node.findall("key"):
-            self.keys.append((
-                int(child.get("scan-code")),
-                gremlin.profile.parse_bool(child.get("extended"))
-            ))
+            self.keys.append(
+                (
+                    int(child.get("scan-code")),
+                    gremlin.profile.parse_bool(child.get("extended")),
+                )
+            )
 
         pass
 
@@ -224,15 +222,16 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         return len(self.keys) > 0
-    
+
     def display_name(self):
-        ''' friendly display name '''
+        """friendly display name"""
         names = []
         text = ""
         for key in self.keys:
-            names.append(key_from_code(key[0],key[1]).name)
+            names.append(key_from_code(key[0], key[1]).name)
         text += " + ".join(names)
         return text
+
 
 version = 1
 name = "map-to-keyboard"

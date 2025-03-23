@@ -25,27 +25,28 @@ from typing import Tuple, Union
 import gremlin.error
 
 import logging
+
 syslog = logging.getLogger("system")
 
-class VisualizationType(IntEnum):
 
+class VisualizationType(IntEnum):
     """Enumeration of possible visualization types."""
 
     AxisTemporal = 1
     AxisCurrent = 2
     ButtonHat = 3
-    Keyboard = 4 
+    Keyboard = 4
+
 
 class KeyboardOutputMode(Enum):
-    Both = 0 # keyboard make and break (press/release) (pulse mode)
-    Press = 1 # keyboard make only
-    Release = 2 # keyboard release only
-    Hold = 3 # press while held (default GremlinEx behavior)
-    AutoRepeat = 4 # repeated pulse mode - key pulses while the input is held
+    Both = 0  # keyboard make and break (press/release) (pulse mode)
+    Press = 1  # keyboard make only
+    Release = 2  # keyboard release only
+    Hold = 3  # press while held (default GremlinEx behavior)
+    AutoRepeat = 4  # repeated pulse mode - key pulses while the input is held
 
-    
+
 class ActivationRule(Enum):
-
     """Activation rules for collections of conditions.
 
     All requires all the conditions in a collection to evaluate to True while
@@ -56,9 +57,7 @@ class ActivationRule(Enum):
     Any = 2
 
 
-
 class AxisNames(Enum):
-
     """Names associated with axis indices."""
 
     X = 1
@@ -75,7 +74,9 @@ class AxisNames(Enum):
         try:
             return _AxisNames_to_string_lookup[value]
         except KeyError:
-            syslog.error(f"AxisNames: Don't know how to convert axis to string: '{value}' to a string - defaulting to X (1)")
+            syslog.error(
+                f"AxisNames: Don't know how to convert axis to string: '{value}' to a string - defaulting to X (1)"
+            )
             return "X"
 
     @staticmethod
@@ -83,9 +84,11 @@ class AxisNames(Enum):
         try:
             return _AxisNames_to_enum_lookup[value]
         except KeyError:
-            syslog.error(f"AxisNames: Don't know how to convert axis to enum: '{value}' to a string - defaulting to X (1)")
+            syslog.error(
+                f"AxisNames: Don't know how to convert axis to enum: '{value}' to a string - defaulting to X (1)"
+            )
             return AxisNames.X
-        
+
     @staticmethod
     def to_list():
         return [axis for axis in AxisNames]
@@ -99,7 +102,7 @@ _AxisNames_to_string_lookup = {
     AxisNames.RY: "Y Rotation (5)",
     AxisNames.RZ: "Z Rotation (6)",
     AxisNames.SLIDER: "Slider (7)",
-    AxisNames.DIAL: "Dial (8)"
+    AxisNames.DIAL: "Dial (8)",
 }
 _AxisNames_to_enum_lookup = {
     "X Axis (1)": AxisNames.X,
@@ -109,18 +112,17 @@ _AxisNames_to_enum_lookup = {
     "Y Rotation (5)": AxisNames.RY,
     "Z Rotation (6)": AxisNames.RZ,
     "Slider (7)": AxisNames.SLIDER,
-    "Dial (8)": AxisNames.DIAL
+    "Dial (8)": AxisNames.DIAL,
 }
 
 
 class AxisButtonDirection(Enum):
-
     """Possible activation directions for axis button instances."""
 
     Anywhere = 1
     Below = 2
-    Above = 3,
-    
+    Above = (3,)
+
     @staticmethod
     def to_string(value: AxisButtonDirection) -> str:
         try:
@@ -144,8 +146,6 @@ _AxisButtonDirection_to_string_lookup = {
     AxisButtonDirection.Anywhere: "anywhere",
     AxisButtonDirection.Above: "above",
     AxisButtonDirection.Below: "below",
-    
-
 }
 _AxisButtonDirection_to_enum_lookup = {
     "anywhere": AxisButtonDirection.Anywhere,
@@ -155,7 +155,6 @@ _AxisButtonDirection_to_enum_lookup = {
 
 
 class MouseButton(Enum):
-
     """Enumeration of all possible mouse buttons."""
 
     Left = 1
@@ -200,6 +199,7 @@ _MouseButton_to_enum_lookup = {
     "Wheel Down": MouseButton.WheelDown,
 }
 
+
 class xIntEnum(IntEnum):
     def __eq__(self, other):
         if type(self).__name__ == type(other).__name__:
@@ -207,21 +207,21 @@ class xIntEnum(IntEnum):
         if other is int:
             return self.value == other
         return False
-    
+
     def __hash__(self) -> int:
         return hash(self.value)
-        
+
 
 class DeviceType(IntEnum):
-
     """Enumeration of the different possible input types."""
-    NotSet = 0 # not set
-    Keyboard = 1 # keyboard
-    Joystick = 2 # game controller
-    VJoy = 3 # vjoy (virtual)
-    Midi = 4 # midi
-    Osc = 5 # open source control
-    ModeControl = 6 # mode control
+
+    NotSet = 0  # not set
+    Keyboard = 1  # keyboard
+    Joystick = 2  # game controller
+    VJoy = 3  # vjoy (virtual)
+    Midi = 4  # midi
+    Osc = 5  # open source control
+    ModeControl = 6  # mode control
 
     @staticmethod
     def to_string(value):
@@ -236,12 +236,11 @@ class DeviceType(IntEnum):
             return _DeviceType_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
-        
+
     @staticmethod
     def to_display_name(value):
         return _DeviceType_to_display_name[value]
-    
-  
+
 
 _DeviceType_to_display_name = {
     DeviceType.NotSet: "(invalid)",
@@ -250,7 +249,7 @@ _DeviceType_to_display_name = {
     DeviceType.VJoy: "VJoy",
     DeviceType.Midi: "MIDI",
     DeviceType.Osc: "OSC",
-    DeviceType.ModeControl: "Mode Control"
+    DeviceType.ModeControl: "Mode Control",
 }
 
 _DeviceType_to_string_lookup = {
@@ -272,12 +271,10 @@ _DeviceType_to_enum_lookup = {
     "midi": DeviceType.Midi,
     "osc": DeviceType.Osc,
     "mode": DeviceType.ModeControl,
-
 }
 
 
 class PluginVariableType(xIntEnum):
-
     """Enumeration of all supported variable types."""
 
     Int = 1
@@ -293,23 +290,17 @@ class PluginVariableType(xIntEnum):
     def to_string(value: PluginVariableType) -> str:
         try:
             v = value.value
-            data = next((item for item in PluginVariableType if item.value == v),None)
+            data = next((item for item in PluginVariableType if item.value == v), None)
             return _PluginVariableType_to_string_lookup[data]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PluginVariableType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
     @staticmethod
     def to_enum(value: str) -> PluginVariableType:
         try:
             return _PluginVariableType_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PluginVariableType in lookup"
-            )
-        
-    
+            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
 
 _PluginVariableType_to_string_lookup = {
@@ -320,7 +311,7 @@ _PluginVariableType_to_string_lookup = {
     PluginVariableType.PhysicalInput: "PhysicalInput",
     PluginVariableType.VirtualInput: "VirtualInput",
     PluginVariableType.Mode: "Mode",
-    PluginVariableType.Selection: "Selection"
+    PluginVariableType.Selection: "Selection",
 }
 _PluginVariableType_to_enum_lookup = {
     "Int": PluginVariableType.Int,
@@ -330,12 +321,11 @@ _PluginVariableType_to_enum_lookup = {
     "PhysicalInput": PluginVariableType.PhysicalInput,
     "VirtualInput": PluginVariableType.VirtualInput,
     "Mode": PluginVariableType.Mode,
-    "Selection": PluginVariableType.Selection
+    "Selection": PluginVariableType.Selection,
 }
 
 
 class MergeAxisOperation(Enum):
-
     """Possible merge axis operation modes."""
 
     Average = 1
@@ -348,36 +338,31 @@ class MergeAxisOperation(Enum):
         try:
             return _MergeAxisOperation_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid MergeAxisOperation in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid MergeAxisOperation in lookup")
 
     @staticmethod
     def to_enum(value: str) -> MergeAxisOperation:
         try:
             return _MergeAxisOperation_to_enum_lookup[value.lower()]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid MergeAxisOperation in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid MergeAxisOperation in lookup")
 
 
 _MergeAxisOperation_to_string_lookup = {
     MergeAxisOperation.Average: "average",
     MergeAxisOperation.Minimum: "minimum",
     MergeAxisOperation.Maximum: "maximum",
-    MergeAxisOperation.Sum: "sum"
+    MergeAxisOperation.Sum: "sum",
 }
 _MergeAxisOperation_to_enum_lookup = {
     "average": MergeAxisOperation.Average,
     "minimum": MergeAxisOperation.Minimum,
     "maximum": MergeAxisOperation.Maximum,
-    "sum": MergeAxisOperation.Sum
+    "sum": MergeAxisOperation.Sum,
 }
 
 
 class PropertyType(Enum):
-
     """Enumeration of all known property types."""
 
     String = 1
@@ -402,18 +387,15 @@ class PropertyType(Enum):
         try:
             return _PropertyType_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PropertyType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PropertyType in lookup")
 
     @staticmethod
     def to_enum(value: str) -> PropertyType:
         try:
             return _PropertyType_to_enum_lookup[value.lower()]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PropertyType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PropertyType in lookup")
+
 
 _PropertyType_to_string_lookup = {
     PropertyType.String: "string",
@@ -449,12 +431,11 @@ _PropertyType_to_enum_lookup = {
     "uuid": PropertyType.UUID,
     "axis_mode": PropertyType.AxisMode,
     "hat_direction": PropertyType.HatDirection,
-    "list": PropertyType.List
+    "list": PropertyType.List,
 }
 
 
 class AxisMode(Enum):
-
     Absolute = 1
     Relative = 2
 
@@ -463,31 +444,27 @@ class AxisMode(Enum):
         try:
             return _AxisMode_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid AxisMode in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid AxisMode in lookup")
 
     @staticmethod
     def to_enum(value: str) -> AxisMode:
         try:
             return _AxisMode_to_enum_lookup[value.lower()]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid AxisMode in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid AxisMode in lookup")
+
 
 _AxisMode_to_string_lookup = {
     AxisMode.Absolute: "absolute",
-    AxisMode.Relative: "relative"
+    AxisMode.Relative: "relative",
 }
 _AxisMode_to_enum_lookup = {
     "absolute": AxisMode.Absolute,
-    "relative": AxisMode.Relative
+    "relative": AxisMode.Relative,
 }
 
 
 class HatDirection(Enum):
-
     """Represents the possible directions a hat can take on."""
 
     Center = (0, 0)
@@ -505,9 +482,7 @@ class HatDirection(Enum):
         try:
             return _HatDirection_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid HatDirection in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid HatDirection in lookup")
 
     @staticmethod
     def to_enum(value: Union[str, Tuple[int, int]]) -> HatDirection:
@@ -519,13 +494,12 @@ class HatDirection(Enum):
             else:
                 return _HatDirection_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid HatDirection in lookup"
-            )
-        
+            raise gremlin.error.GremlinError("Invalid HatDirection in lookup")
+
     @staticmethod
     def to_display_name(value: HatDirection) -> str:
         return value.name
+
 
 _HatDirection_to_string_lookup = {
     HatDirection.Center: "center",
@@ -563,9 +537,7 @@ _HatDirection_to_enum_lookup = {
 }
 
 
-
 class LogicalOperator(Enum):
-
     """Enumeration of possible condition combinations."""
 
     Any = 1
@@ -573,10 +545,7 @@ class LogicalOperator(Enum):
 
     @staticmethod
     def to_display(instance: LogicalOperator) -> str:
-        lookup = {
-            LogicalOperator.Any: "Any",
-            LogicalOperator.All: "All"
-        }
+        lookup = {LogicalOperator.Any: "Any", LogicalOperator.All: "All"}
         value = lookup.get(instance, None)
         if value is None:
             raise gremlin.error.GremlinError(
@@ -586,10 +555,7 @@ class LogicalOperator(Enum):
 
     @staticmethod
     def to_string(instance: LogicalOperator) -> str:
-        lookup = {
-            LogicalOperator.Any: "any",
-            LogicalOperator.All: "all"
-        }
+        lookup = {LogicalOperator.Any: "any", LogicalOperator.All: "all"}
         value = lookup.get(instance, None)
         if value is None:
             raise gremlin.error.GremlinError(
@@ -599,10 +565,7 @@ class LogicalOperator(Enum):
 
     @staticmethod
     def to_enum(string: str) -> LogicalOperator:
-        lookup = {
-            "any": LogicalOperator.Any,
-            "all": LogicalOperator.All
-        }
+        lookup = {"any": LogicalOperator.Any, "all": LogicalOperator.All}
         value = lookup.get(string, None)
         if value is None:
             raise gremlin.error.GremlinError(
@@ -612,7 +575,6 @@ class LogicalOperator(Enum):
 
 
 class ConditionType(Enum):
-
     """Enumeration of possible condition types."""
 
     Joystick = 1
@@ -662,30 +624,29 @@ class ConditionType(Enum):
         return value
 
 
-
 class MouseClickMode(Enum):
-    Normal = 0 # click on/off
-    Press = 1 # press only
-    Release = 2 # release only
-    DoubleClick = 3 # double click
+    Normal = 0  # click on/off
+    Press = 1  # press only
+    Release = 2  # release only
+    DoubleClick = 3  # double click
 
     @staticmethod
     def to_string(mode):
         return mode.name
-    
+
     def __str__(self):
         return str(self.value)
-    
+
     @classmethod
     def _missing_(cls, name):
         for item in cls:
             if item.name.lower() == name.lower():
                 return item
             return cls.Normal
-        
+
     @staticmethod
     def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        """converts from a string representation (text or numeric) to the enum, not case sensitive"""
         str = str.casefold().strip()
         if str.isnumeric():
             mode = int(str)
@@ -695,10 +656,10 @@ class MouseClickMode(Enum):
                 return item
 
         return None
-    
+
     @staticmethod
     def to_description(action):
-        ''' returns a descriptive string for the action '''
+        """returns a descriptive string for the action"""
         if action == MouseClickMode.Normal:
             return "Normal Click"
         elif action == MouseClickMode.Press:
@@ -708,11 +669,10 @@ class MouseClickMode(Enum):
         elif action == MouseClickMode.DoubleClick:
             return "Double Click"
         return f"Unknown {action}"
-    
-    
+
     @staticmethod
     def to_name(action):
-        ''' returns the name from the action '''
+        """returns the name from the action"""
         if action == MouseClickMode.Normal:
             return "Normal Click"
         elif action == MouseClickMode.Press:
@@ -722,32 +682,33 @@ class MouseClickMode(Enum):
         elif action == MouseClickMode.DoubleClick:
             return "Double click"
         return f"Unknown {action}"
-    
+
+
 class MouseAction(Enum):
-    MouseButton = 0 # output a mouse button
-    MouseMotion = 1 # output a mouse motion
-    MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
-    MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
-    MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
-    MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
+    MouseButton = 0  # output a mouse button
+    MouseMotion = 1  # output a mouse motion
+    MouseWiggleOnLocal = 2  # enable mouse wiggle - local machine only
+    MouseWiggleOffLocal = 3  # disable mouse wiggle - locla machine only
+    MouseWiggleOnRemote = 4  # enable mouse wiggle - remote machines only
+    MouseWiggleOffRemote = 5  # disable mouse wiggle - remote machines only
 
     @staticmethod
     def to_string(mode):
         return mode.name
-    
+
     def __str__(self):
         return str(self.value)
-    
+
     @classmethod
     def _missing_(cls, name):
         for item in cls:
             if item.name.lower() == name.lower():
                 return item
             return cls.MouseButton
-        
+
     @staticmethod
     def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        """converts from a string representation (text or numeric) to the enum, not case sensitive"""
         str = str.lower().strip()
         if str.isnumeric():
             mode = int(str)
@@ -757,10 +718,10 @@ class MouseAction(Enum):
                 return item
 
         return None
-    
+
     @staticmethod
     def to_description(action):
-        ''' returns a descriptive string for the action '''
+        """returns a descriptive string for the action"""
         if action == MouseAction.MouseButton:
             return "Maps a mouse button"
         elif action == MouseAction.MouseMotion:
@@ -775,10 +736,10 @@ class MouseAction(Enum):
             return "Turns wiggle mode on (remote only)"
 
         return f"Unknown {action}"
-    
+
     @staticmethod
     def to_name(action):
-        ''' returns the name from the action '''
+        """returns the name from the action"""
         if action == MouseAction.MouseButton:
             return "Mouse button"
         elif action == MouseAction.MouseMotion:
@@ -792,11 +753,10 @@ class MouseAction(Enum):
         elif action == MouseAction.MouseWiggleOnRemote:
             return "Wiggle Enable (remote)"
 
-                
         return f"Unknown {action}"
-    
-class MouseButton(Enum):
 
+
+class MouseButton(Enum):
     """Enumeration of all possible mouse buttons."""
 
     Left = 1
@@ -824,15 +784,15 @@ class MouseButton(Enum):
             return _MouseButton_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
-        
+
     @staticmethod
     def to_lookup_string(value):
-        ''' mouse button to key lookup name'''
+        """mouse button to key lookup name"""
         try:
             return _MouseButton_to_lookup_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
-        
+
     @staticmethod
     def lookup_to_enum(value):
         if isinstance(value, int):
@@ -841,7 +801,6 @@ class MouseButton(Enum):
             return _MouseButton_lookup_to_button_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
-
 
 
 _MouseButton_to_string_lookup = {
@@ -853,7 +812,7 @@ _MouseButton_to_string_lookup = {
     MouseButton.WheelUp: "Wheel Up",
     MouseButton.WheelDown: "Wheel Down",
     MouseButton.WheelLeft: "Wheel Left",
-    MouseButton.WheelRight: "Wheel Right"
+    MouseButton.WheelRight: "Wheel Right",
 }
 
 _MouseButton_to_lookup_string_lookup = {
@@ -865,9 +824,8 @@ _MouseButton_to_lookup_string_lookup = {
     MouseButton.WheelUp: "wheel_up",
     MouseButton.WheelDown: "wheel_down",
     MouseButton.WheelLeft: "wheel_left",
-    MouseButton.WheelRight: "wheel_right"
+    MouseButton.WheelRight: "wheel_right",
 }
-
 
 
 _MouseButton_to_enum_lookup = {
@@ -886,7 +844,7 @@ _MouseButton_to_enum_lookup = {
     "Wheel Up": MouseButton.WheelUp,
     "Wheel Down": MouseButton.WheelDown,
     "Wheel Left": MouseButton.WheelLeft,
-    "Wheel Right": MouseButton.WheelRight
+    "Wheel Right": MouseButton.WheelRight,
 }
 
 _MouseButton_lookup_to_button_lookup = {
@@ -898,39 +856,56 @@ _MouseButton_lookup_to_button_lookup = {
     "wheel_up": MouseButton.WheelUp,
     "wheel_down": MouseButton.WheelDown,
     "wheel_left": MouseButton.WheelLeft,
-    "wheel_right": MouseButton.WheelRight
+    "wheel_right": MouseButton.WheelRight,
 }
 
 
 @unique
 class VerboseMode(IntFlag):
     NotSet = 0
-    Keyboard = auto() # keyboard input only
-    Joystick = auto() # joystick input
-    Inputs = auto() # list inputs
-    Mouse = auto() # mouse input
-    SimConnect = auto() # simconnect interface
-    Details = auto() # user interface details
-    Condition = auto() # conditions diagnostics / execution graph
-    OSC = auto() # OSC data 
-    Process = auto() # process changes
-    Exec = auto() # execution trees
-    Midi = auto() # midi mode
-    Device = auto() # device change modes
-    Macro = auto() # macro 
-    Gate = auto() # auto
-    Outputs = auto() # list outputs
-    UI = auto() # UI mode
-    
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI
+    Keyboard = auto()  # keyboard input only
+    Joystick = auto()  # joystick input
+    Inputs = auto()  # list inputs
+    Mouse = auto()  # mouse input
+    SimConnect = auto()  # simconnect interface
+    Details = auto()  # user interface details
+    Condition = auto()  # conditions diagnostics / execution graph
+    OSC = auto()  # OSC data
+    Process = auto()  # process changes
+    Exec = auto()  # execution trees
+    Midi = auto()  # midi mode
+    Device = auto()  # device change modes
+    Macro = auto()  # macro
+    Gate = auto()  # auto
+    Outputs = auto()  # list outputs
+    UI = auto()  # UI mode
+
+    All = (
+        Keyboard
+        | Joystick
+        | Inputs
+        | Mouse
+        | Details
+        | SimConnect
+        | Condition
+        | Process
+        | Exec
+        | Midi
+        | Device
+        | Macro
+        | Gate
+        | Outputs
+        | UI
+    )
 
     def __contains__(self, item):
-        return  (self.value & item.value) == item.value
+        return (self.value & item.value) == item.value
 
 
 @unique
 class TabDeviceType(int, Enum):
-    ''' types of devices shown on device tabs '''
+    """types of devices shown on device tabs"""
+
     NotSet = 0
     Joystick = 1
     Keyboard = 2
@@ -944,7 +919,8 @@ class TabDeviceType(int, Enum):
 
 
 class GamePadOutput(Enum):
-    ''' outputs for gamepads '''
+    """outputs for gamepads"""
+
     NotSet = auto()
     LeftStickX = auto()
     LeftStickY = auto()
@@ -971,17 +947,18 @@ class GamePadOutput(Enum):
     @staticmethod
     def to_string(value):
         return _gamepad_output_to_string[value]
-    
+
     @staticmethod
     def to_enum(value):
         return _gamepad_output_to_enum[value]
-    
+
     @staticmethod
     def to_display_name(value):
         return _gamepad_output_to_display_name[value]
-    
+
+
 _gamepad_output_to_string = {
-    GamePadOutput.NotSet : "none",
+    GamePadOutput.NotSet: "none",
     GamePadOutput.LeftStickX: "left_x",
     GamePadOutput.LeftStickY: "left_y",
     GamePadOutput.RightStickX: "right_x",
@@ -989,24 +966,24 @@ _gamepad_output_to_string = {
     GamePadOutput.LeftTrigger: "left_trigger",
     GamePadOutput.RightTrigger: "right_trigger",
     GamePadOutput.ButtonA: "button_a",
-    GamePadOutput.ButtonB:"button_b",
+    GamePadOutput.ButtonB: "button_b",
     GamePadOutput.ButtonX: "button_x",
-    GamePadOutput.ButtonY:"button_y",
-    GamePadOutput.ButtonStart:"button_start",
-    GamePadOutput.ButtonBack:"button_back",
-    GamePadOutput.ButtonThumbLeft:"button_thumb_left",
-    GamePadOutput.ButtonThumbRight:"button_thumb_right",
-    GamePadOutput.ButtonGuide:"button_guide",
-    GamePadOutput.ButtonShoulderLeft:"button_shoulder_left",
-    GamePadOutput.ButtonShoulderRight:"button_shoulder_right",
-    GamePadOutput.ButtonDpadUp:"button_dpad_up",
-    GamePadOutput.ButtonDpadDown:"button_dpad_down",
-    GamePadOutput.ButtonDpadLeft:"button_dpad_left",
-    GamePadOutput.ButtonDpadRight:"button_dpad_right",
+    GamePadOutput.ButtonY: "button_y",
+    GamePadOutput.ButtonStart: "button_start",
+    GamePadOutput.ButtonBack: "button_back",
+    GamePadOutput.ButtonThumbLeft: "button_thumb_left",
+    GamePadOutput.ButtonThumbRight: "button_thumb_right",
+    GamePadOutput.ButtonGuide: "button_guide",
+    GamePadOutput.ButtonShoulderLeft: "button_shoulder_left",
+    GamePadOutput.ButtonShoulderRight: "button_shoulder_right",
+    GamePadOutput.ButtonDpadUp: "button_dpad_up",
+    GamePadOutput.ButtonDpadDown: "button_dpad_down",
+    GamePadOutput.ButtonDpadLeft: "button_dpad_left",
+    GamePadOutput.ButtonDpadRight: "button_dpad_right",
 }
 
 _gamepad_output_to_display_name = {
-    GamePadOutput.NotSet : "N/A",
+    GamePadOutput.NotSet: "N/A",
     GamePadOutput.LeftStickX: "Left Stick X",
     GamePadOutput.LeftStickY: "Left Stick Y",
     GamePadOutput.RightStickX: "Right Stick X",
@@ -1014,27 +991,27 @@ _gamepad_output_to_display_name = {
     GamePadOutput.LeftTrigger: "Left Trigger",
     GamePadOutput.RightTrigger: "Right Trigger",
     GamePadOutput.ButtonA: "A",
-    GamePadOutput.ButtonB:"B",
+    GamePadOutput.ButtonB: "B",
     GamePadOutput.ButtonX: "X",
-    GamePadOutput.ButtonY:"Y",
-    GamePadOutput.ButtonStart:"Start",
-    GamePadOutput.ButtonBack:"Back",
-    GamePadOutput.ButtonThumbLeft:"Thumb Left",
-    GamePadOutput.ButtonThumbRight:"Thumb Right",
-    GamePadOutput.ButtonGuide:"Guide",
-    GamePadOutput.ButtonShoulderLeft:"Shoulder Left",
-    GamePadOutput.ButtonShoulderRight:"Shoulder Right",
-    GamePadOutput.ButtonDpadUp:"Dpad Up",
-    GamePadOutput.ButtonDpadDown:"Dpad Down",
-    GamePadOutput.ButtonDpadLeft:"Dpad Left",
-    GamePadOutput.ButtonDpadRight:"Dpad Right",
+    GamePadOutput.ButtonY: "Y",
+    GamePadOutput.ButtonStart: "Start",
+    GamePadOutput.ButtonBack: "Back",
+    GamePadOutput.ButtonThumbLeft: "Thumb Left",
+    GamePadOutput.ButtonThumbRight: "Thumb Right",
+    GamePadOutput.ButtonGuide: "Guide",
+    GamePadOutput.ButtonShoulderLeft: "Shoulder Left",
+    GamePadOutput.ButtonShoulderRight: "Shoulder Right",
+    GamePadOutput.ButtonDpadUp: "Dpad Up",
+    GamePadOutput.ButtonDpadDown: "Dpad Down",
+    GamePadOutput.ButtonDpadLeft: "Dpad Left",
+    GamePadOutput.ButtonDpadRight: "Dpad Right",
 }
 
 _gamepad_output_to_enum = {
-    "none": GamePadOutput.NotSet ,
-    "left_x" : GamePadOutput.LeftStickX,
-    "left_y": GamePadOutput.LeftStickY ,
-    "right_x" : GamePadOutput.RightStickX,
+    "none": GamePadOutput.NotSet,
+    "left_x": GamePadOutput.LeftStickX,
+    "left_y": GamePadOutput.LeftStickY,
+    "right_x": GamePadOutput.RightStickX,
     "right_y": GamePadOutput.RightStickY,
     "left_trigger": GamePadOutput.LeftTrigger,
     "right_trigger": GamePadOutput.RightTrigger,
@@ -1057,7 +1034,6 @@ _gamepad_output_to_enum = {
 
 
 class ActivationRule(Enum):
-
     """Activation rules for collections of conditions.
 
     All requires all the conditions in a collection to evaluate to True while

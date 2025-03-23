@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,8 +29,8 @@ import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_conditions import AbstractFunctor
 
-class BasicContainerWidget(AbstractContainerWidget):
 
+class BasicContainerWidget(AbstractContainerWidget):
     """Basic container which holds a single action."""
 
     def __init__(self, profile_data, parent=None):
@@ -50,7 +50,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
                 "Basic",
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
             self.action_layout.addWidget(widget)
             widget.redraw()
@@ -76,7 +76,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
                 "Basic",
-                gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                gremlin.ui.ui_common.ContainerViewTypes.Conditions,
             )
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
@@ -90,6 +90,7 @@ class BasicContainerWidget(AbstractContainerWidget):
         :param action_name the name of the action to add
         """
         from gremlin.clipboard import Clipboard
+
         if action_data is None:
             return
         if isinstance(action_data, str):
@@ -101,13 +102,15 @@ class BasicContainerWidget(AbstractContainerWidget):
             if action_data.is_action:
                 # verify the action in the clipboard is appropriate for this input
 
-                action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
+                action_item = plugin_manager.duplicate(
+                    action_data.data, self.profile_data
+                )
 
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
 
     def _paste_action(self, action, container):
-        ''' paste action'''
+        """paste action"""
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.add_action(action_item)
@@ -133,17 +136,15 @@ class BasicContainerWidget(AbstractContainerWidget):
 
 
 class BasicContainerFunctor(AbstractFunctor):
-
     """Executes the contents of the associated basic container."""
 
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         super().__init__(container, parent)
         self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0],
-            parent
+            container.action_sets[0], parent
         )
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         """Executes the content with the provided data.
 
         :param event the event to process
@@ -154,7 +155,6 @@ class BasicContainerFunctor(AbstractFunctor):
 
 
 class BasicContainer(AbstractContainer):
-
     """Represents a container which holds exactly one action."""
 
     name = "Basic"
@@ -166,19 +166,19 @@ class BasicContainer(AbstractContainer):
     #     InputType.JoystickHat,
     #     InputType.Keyboard
     # ]
-    
+
     interaction_types = []
 
     functor = BasicContainerFunctor
     widget = BasicContainerWidget
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-    
+
     def add_action(self, action, index=-1):
         assert isinstance(action, gremlin.base_profile.AbstractAction)
 
@@ -190,16 +190,18 @@ class BasicContainer(AbstractContainer):
             for container in self.parent.containers:
                 for action_set in container.action_sets:
                     for t_action in action_set:
-                        if gremlin.base_profile._is_curve_tag(t_action.tag): 
+                        if gremlin.base_profile._is_curve_tag(t_action.tag):
                             curve_sets.append(action_set)
                         elif t_action.tag == "remap":
                             remap_sets.append(action_set)
 
-            if action.tag == "remap" and len(curve_sets) == 1 and \
-                    len(remap_sets) == 0:
+            if action.tag == "remap" and len(curve_sets) == 1 and len(remap_sets) == 0:
                 curve_sets[0].append(action)
-            elif gremlin.base_profile._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
-                    len(curve_sets) == 0:
+            elif (
+                gremlin.base_profile._is_curve_tag(action.tag)
+                and len(remap_sets) == 1
+                and len(curve_sets) == 0
+            ):
                 remap_sets[0].append(action)
             else:
                 if index == -1:
@@ -212,11 +214,11 @@ class BasicContainer(AbstractContainer):
                 index = len(self.action_sets) - 1
             self.action_sets[index].append(action)
 
-        #self.refresh_conditions()
+        # self.refresh_conditions()
 
         self.create_or_delete_virtual_button()
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container

@@ -5,10 +5,13 @@ import os
 import uuid
 import sys
 import pickle
-#from xml.dom import minidom
+
+# from xml.dom import minidom
 from lxml import etree as ElementTree
 import logging
+
 syslog = logging.getLogger("system")
+
 
 def generate_file_list(root_folder):
     """Returns a list of file paths in the given folder.
@@ -19,9 +22,7 @@ def generate_file_list(root_folder):
     file_list = []
     for root, _, files in os.walk(root_folder):
         for fname in files:
-            file_list.append(
-                    os.path.relpath(os.path.join(root, fname), root_folder)
-            )
+            file_list.append(os.path.relpath(os.path.join(root, fname), root_folder))
     return file_list
 
 
@@ -34,9 +35,7 @@ def generate_folder_list(root_folder):
     folder_list = []
     for root, dirs, _ in os.walk(root_folder):
         for folder in dirs:
-            folder_list.append(
-                os.path.relpath(os.path.join(root, folder), root_folder)
-            )
+            folder_list.append(os.path.relpath(os.path.join(root, folder), root_folder))
     return folder_list
 
 
@@ -59,7 +58,7 @@ def create_data_for_file(path):
         "component_guid": uuid.uuid4(),
         "component_id": f"component_{sanitize_path(path)}",
         "file_id": f"file_{sanitize_path(path)}",
-        "file_source": path
+        "file_source": path,
     }
 
 
@@ -86,20 +85,14 @@ def create_folder_structure(folder_list):
 
     # Create the basic structure for where to place the actual files
     structure["root"] = create_node(
-        "Directory",
-        {"Id": "TARGETDIR", "Name": "SourceDir"}
+        "Directory", {"Id": "TARGETDIR", "Name": "SourceDir"}
     )
     structure["pfiles"] = create_node(
-        "Directory",
-        {"Id": "ProgramFilesFolder", "Name": "PFiles"}
+        "Directory", {"Id": "ProgramFilesFolder", "Name": "PFiles"}
     )
-    structure["h2ik"] = create_node(
-        "Directory",
-        {"Id": "H2ik", "Name": "H2ik"}
-    )
+    structure["h2ik"] = create_node("Directory", {"Id": "H2ik", "Name": "H2ik"})
     structure["jg"] = create_node(
-        "Directory",
-        {"Id": "INSTALLDIR", "Name": "Joystick Gremlin"}
+        "Directory", {"Id": "INSTALLDIR", "Name": "Joystick Gremlin"}
     )
     structure["root"].append(structure["pfiles"])
     structure["pfiles"].append(structure["h2ik"])
@@ -110,12 +103,11 @@ def create_folder_structure(folder_list):
         "Component",
         {
             "Guid": "cec7a9a7-d686-4355-8d9d-e1d211d3edb8",
-            "Id": "H2ikProgramFilesFolder"
-        }
+            "Id": "H2ikProgramFilesFolder",
+        },
     )
-    node.append(create_node(
-        "RemoveFolder",
-        {"Id": "RemoveH2iKFolder", "On": "uninstall"})
+    node.append(
+        create_node("RemoveFolder", {"Id": "RemoveH2iKFolder", "On": "uninstall"})
     )
     structure["h2ik"].append(node)
 
@@ -123,11 +115,10 @@ def create_folder_structure(folder_list):
     for folder in folder_list:
         dirs = folder.split("\\")
         for i in range(len(dirs)):
-            path = "__".join(dirs[:i+1])
+            path = "__".join(dirs[: i + 1])
             if path not in structure:
                 structure[path] = create_node(
-                    "Directory",
-                    {"Id": path, "Name": dirs[i]}
+                    "Directory", {"Id": path, "Name": dirs[i]}
                 )
                 if i > 0:
                     parent_path = "__".join(dirs[:i])
@@ -155,10 +146,7 @@ def add_file_nodes(structure, data):
         f_node = ElementTree.Element("File")
         f_node.set("Id", entry["file_id"])
         f_node.set("KeyPath", "yes")
-        f_node.set(
-            "Source",
-            os.path.join("joystick_gremlin", entry["file_source"])
-        )
+        f_node.set("Source", os.path.join("joystick_gremlin", entry["file_source"]))
 
         c_node.append(f_node)
 
@@ -176,26 +164,20 @@ def create_feature(data):
     :return feature node
     """
     node = create_node(
-            "Feature",
-            {
-                "Id": "Complete",
-                "Level": 1,
-                "Title": "Joystick Gremlin Ex",
-                "Description": "The main program",
-                "Display": "expand",
-                "ConfigurableDirectory": "INSTALLDIR"
-            })
-    node.append(create_node(
-        "ComponentRef", {"Id": "ProgramMenuDir"}
-    ))
-    node.append(create_node(
-        "ComponentRef", {"Id": "H2ikProgramFilesFolder"}
-    ))
+        "Feature",
+        {
+            "Id": "Complete",
+            "Level": 1,
+            "Title": "Joystick Gremlin Ex",
+            "Description": "The main program",
+            "Display": "expand",
+            "ConfigurableDirectory": "INSTALLDIR",
+        },
+    )
+    node.append(create_node("ComponentRef", {"Id": "ProgramMenuDir"}))
+    node.append(create_node("ComponentRef", {"Id": "H2ikProgramFilesFolder"}))
     for entry in data.values():
-        node.append(create_node(
-            "ComponentRef",
-            {"Id": entry["component_id"]}
-        ))
+        node.append(create_node("ComponentRef", {"Id": entry["component_id"]}))
     return node
 
 
@@ -229,28 +211,29 @@ def create_document():
             # "Id": "290a3110-0745-48d6-93d2-d954cb584b6f", # 12.0.0
             # "Id": "6019660b-26bd-430b-9b95-ca6a55201060",  # 13.0.0
             # "Id": "0dad4221-c8cf-4424-8dcd-3886274e89ef", # 13.1.0
-            #"Id": "6472cca8-d352-4186-8a98-ca6ba33d083c", # 13.40.6ex
-            #"Id": "7cdb8375-66a1-4114-be79-b17027e8c0df", # 13.40.7ex
-            #"Id": "739095a7-19cc-4154-ac9c-c51f5f516527", # 13.40.8ex
-            #"Id": "654c694d-753c-4ec1-8a8d-8a0f2f3133d8", # 13.40.9ex
-            #"Id": "2f6ff870-cfd7-4810-95ae-387c4a3f9007", # 13.40.10ex
-            #"Id": "2f6ff870-cfd7-4810-95ae-387c4a3f9007", # 13.40.11ex
-            #"Id": "ee7ed4b7-f969-477e-a0cc-90a555c535aa", # 13.40.12ex
-            #"Id": "ee7ed4b7-f969-477e-a0cc-90a555c535aa", # 13.40.13ex
-            "Id": "851832d3-6508-410c-a3e1-d8ae437fe32a", # 13.40.14ex
+            # "Id": "6472cca8-d352-4186-8a98-ca6ba33d083c", # 13.40.6ex
+            # "Id": "7cdb8375-66a1-4114-be79-b17027e8c0df", # 13.40.7ex
+            # "Id": "739095a7-19cc-4154-ac9c-c51f5f516527", # 13.40.8ex
+            # "Id": "654c694d-753c-4ec1-8a8d-8a0f2f3133d8", # 13.40.9ex
+            # "Id": "2f6ff870-cfd7-4810-95ae-387c4a3f9007", # 13.40.10ex
+            # "Id": "2f6ff870-cfd7-4810-95ae-387c4a3f9007", # 13.40.11ex
+            # "Id": "ee7ed4b7-f969-477e-a0cc-90a555c535aa", # 13.40.12ex
+            # "Id": "ee7ed4b7-f969-477e-a0cc-90a555c535aa", # 13.40.13ex
+            "Id": "851832d3-6508-410c-a3e1-d8ae437fe32a",  # 13.40.14ex
             "UpgradeCode": "e5ee68fe-ada4-46a7-b4f3-798bfe8de6cf",
             "Language": "1033",
             "Codepage": "1252",
-            "Version": "13.40.14ex"
-        })
-    
+            "Version": "13.40.14ex",
+        },
+    )
+
     # also change version number in joystick_gremlin.py line 60 APPLICATION_VERSION
-    
-    mug = create_node("MajorUpgrade",
+
+    mug = create_node(
+        "MajorUpgrade",
         {
-            "DowngradeErrorMessage":
-                "Cannot directly downgrade, uninstall current version first."
-        }
+            "DowngradeErrorMessage": "Cannot directly downgrade, uninstall current version first."
+        },
     )
     pkg = create_node(
         "Package",
@@ -262,32 +245,25 @@ def create_document():
             "InstallerVersion": "100",
             "Languages": "1033",
             "SummaryCodepage": "1252",
-            "Compressed": "yes"
-        }
+            "Compressed": "yes",
+        },
     )
 
     # Package needs to be added before media
     prod.append(pkg)
     prod.append(mug)
-    prod.append(create_node(
-        "Media",
-        {
-            "Id": "1",
-            "Cabinet": "joystick_gremlin.cab",
-            "EmbedCab": "yes"
-        }
-    ))
+    prod.append(
+        create_node(
+            "Media", {"Id": "1", "Cabinet": "joystick_gremlin.cab", "EmbedCab": "yes"}
+        )
+    )
 
     # Add the icon to the software center
-    prod.append(create_node(
-        "Property",
-        {"Id": "ARPPRODUCTICON", "Value": "icon.ico"}
-    ))
+    prod.append(create_node("Property", {"Id": "ARPPRODUCTICON", "Value": "icon.ico"}))
     # Remvoe the repair option from the installer
-    prod.append(create_node(
-        "Property",
-        {"Id": "ARPNOREPAIR", "Value": "yes", "Secure": "yes"}
-    ))
+    prod.append(
+        create_node("Property", {"Id": "ARPNOREPAIR", "Value": "yes", "Secure": "yes"})
+    )
 
     doc.append(prod)
 
@@ -302,10 +278,9 @@ def create_ui_node(parent):
     ui = create_node("UI", {})
     ui.append(create_node("UIRef", {"Id": "WixUI_InstallDir"}))
     ui.append(create_node("UIRef", {"Id": "WixUI_ErrorProgressText"}))
-    ui.append(create_node(
-        "Property",
-        {"Id": "WIXUI_INSTALLDIR", "Value": "INSTALLDIR"}
-    ))
+    ui.append(
+        create_node("Property", {"Id": "WIXUI_INSTALLDIR", "Value": "INSTALLDIR"})
+    )
 
     # Skip the license screen
     n1 = create_node(
@@ -315,8 +290,8 @@ def create_ui_node(parent):
             "Control": "Next",
             "Event": "NewDialog",
             "Value": "InstallDirDlg",
-            "Order": "2"
-        }
+            "Order": "2",
+        },
     )
     n1.text = "1"
     n2 = create_node(
@@ -326,8 +301,8 @@ def create_ui_node(parent):
             "Control": "Back",
             "Event": "NewDialog",
             "Value": "WelcomeDlg",
-            "Order": 2
-        }
+            "Order": 2,
+        },
     )
     n2.text = "1"
     ui.append(n1)
@@ -345,71 +320,68 @@ def create_shortcuts(doc, root):
     # Find the executable node and add shortcut entries
     for node in doc.iter("File"):
         if node.get("Id") == "file_joystick_gremlin.exe":
-            node.append(create_node(
-                "Shortcut",
-                {
-                    "Id": "startmenu_joystick_gremlin",
-                    "Directory": "ProgramMenuDir",
-                    "Name": "Joystick Gremlin Ex",
-                    "WorkingDirectory": "INSTALLDIR",
-                    "Advertise": "yes",
-                    "Icon": "icon.ico"
-                }
-            ))
-            node.append(create_node(
-                "Shortcut",
-                {
-                    "Id": "desktop_joystick_gremlin",
-                    "Directory": "DesktopFolder",
-                    "Name": "Joystick Gremlin Ex",
-                    "WorkingDirectory": "INSTALLDIR",
-                    "Advertise": "yes",
-                    "Icon": "icon.ico"
-                }
-            ))
+            node.append(
+                create_node(
+                    "Shortcut",
+                    {
+                        "Id": "startmenu_joystick_gremlin",
+                        "Directory": "ProgramMenuDir",
+                        "Name": "Joystick Gremlin Ex",
+                        "WorkingDirectory": "INSTALLDIR",
+                        "Advertise": "yes",
+                        "Icon": "icon.ico",
+                    },
+                )
+            )
+            node.append(
+                create_node(
+                    "Shortcut",
+                    {
+                        "Id": "desktop_joystick_gremlin",
+                        "Directory": "DesktopFolder",
+                        "Name": "Joystick Gremlin Ex",
+                        "WorkingDirectory": "INSTALLDIR",
+                        "Advertise": "yes",
+                        "Icon": "icon.ico",
+                    },
+                )
+            )
 
     # Create folder names used for the shortcuts
-    n1 = create_node(
-        "Directory",
-        {"Id": "ProgramMenuFolder", "Name": "Programs"}
-    )
+    n1 = create_node("Directory", {"Id": "ProgramMenuFolder", "Name": "Programs"})
     n2 = create_node(
-        "Directory",
-        {"Id": "ProgramMenuDir", "Name": "Joystick Gremlin Ex"}
+        "Directory", {"Id": "ProgramMenuDir", "Name": "Joystick Gremlin Ex"}
     )
     n3 = create_node(
         "Component",
-        {"Id": "ProgramMenuDir", "Guid": "11ab7593-4b4e-470d-8a56-4791b40c0838"}
+        {"Id": "ProgramMenuDir", "Guid": "11ab7593-4b4e-470d-8a56-4791b40c0838"},
     )
-    n3.append(create_node(
-        "RemoveFolder",
-        {"Id": "ProgramMenuDir", "On": "uninstall"}
-    ))
-    n3.append(create_node(
-        "RegistryValue",
-        {
-            "Root": "HKCU",
-            "Key": "Software\H2ik\Joystick Gremlin",
-            "Type": "string",
-            "Value": "",
-            "KeyPath": "yes"
-        }
-    ))
+    n3.append(create_node("RemoveFolder", {"Id": "ProgramMenuDir", "On": "uninstall"}))
+    n3.append(
+        create_node(
+            "RegistryValue",
+            {
+                "Root": "HKCU",
+                "Key": "Software\H2ik\Joystick Gremlin",
+                "Type": "string",
+                "Value": "",
+                "KeyPath": "yes",
+            },
+        )
+    )
     n2.append(n3)
     n1.append(n2)
     root.append(n1)
 
-    root.append(create_node(
-        "Directory",
-        {"Id": "DesktopFolder", "Name": "Desktop"}
-    ))
+    root.append(create_node("Directory", {"Id": "DesktopFolder", "Name": "Desktop"}))
 
     # Create the used icon
     product = doc.find("Product")
-    product.append(create_node(
-        "Icon",
-        {"Id": "icon.ico", "SourceFile": "joystick_gremlin\gfx\icon.ico"}
-    ))
+    product.append(
+        create_node(
+            "Icon", {"Id": "icon.ico", "SourceFile": "joystick_gremlin\gfx\icon.ico"}
+        )
+    )
 
 
 def write_xml(node, fname):
@@ -424,17 +396,15 @@ def write_xml(node, fname):
     # with open(fname, "w") as out:
     #     out.write(dom_xml.toprettyxml(indent="    "))
 
-    
     tree = ElementTree.ElementTree(node)
-    tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+    tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
+
 
 def main():
     # Command line arguments
     parser = argparse.ArgumentParser("Generate WIX component data")
     parser.add_argument(
-        "--folder",
-        default="dist/joystick_gremlin",
-        help="Folder to parse"
+        "--folder", default="dist/joystick_gremlin", help="Folder to parse"
     )
     args = parser.parse_args()
 

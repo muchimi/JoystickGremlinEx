@@ -6,38 +6,30 @@ from vjoy.vjoy import AxisName
 
 # Create joystick decorator for the CH Fighterstick in global mode
 chfs = gremlin.input_devices.JoystickDecorator(
-    "CH Fighterstick USB",
-    2382820288,
-    "Global"
+    "CH Fighterstick USB", 2382820288, "Global"
 )
 chfs_roll = gremlin.input_devices.JoystickDecorator(
-    "CH Fighterstick USB",
-    2382820288,
-    "roll"
+    "CH Fighterstick USB", 2382820288, "roll"
 )
 chpp = gremlin.input_devices.JoystickDecorator(
-    "CH Pro Pedals USB",
-    2382820032,
-    "Global"
+    "CH Pro Pedals USB", 2382820032, "Global"
 )
 
 # Sensitivity curve setup
-default_curve = CubicSpline([
-    (-1.00, -1.00),
-    (-0.75, -0.65),
-    (-0.25, -0.15),
-    ( 0.00,  0.00),
-    ( 0.25,  0.15),
-    ( 0.75,  0.65),
-    ( 1.00,  1.00),
-])
-sniper_curve = CubicSpline([
-    (-1.00, -0.50),
-    (-0.50, -0.175),
-    ( 0.00,  0.00),
-    ( 0.50,  0.175),
-    ( 1.00,  0.50)
-])
+default_curve = CubicSpline(
+    [
+        (-1.00, -1.00),
+        (-0.75, -0.65),
+        (-0.25, -0.15),
+        (0.00, 0.00),
+        (0.25, 0.15),
+        (0.75, 0.65),
+        (1.00, 1.00),
+    ]
+)
+sniper_curve = CubicSpline(
+    [(-1.00, -0.50), (-0.50, -0.175), (0.00, 0.00), (0.50, 0.175), (1.00, 0.50)]
+)
 
 left_pedal = 0
 right_pedal = 0
@@ -49,7 +41,7 @@ shield_macros = {
     "front": macro.Macro(),
     "rear": macro.Macro(),
     "left": macro.Macro(),
-    "right": macro.Macro()
+    "right": macro.Macro(),
 }
 shield_macros["reset"].tap("KP5")
 shield_macros["front"].press("KP8")
@@ -166,6 +158,7 @@ def reset_roll(event, vjoy):
     if not event.is_pressed:
         vjoy[1].axis[AxisName.RX].value = 0.0
         import gremlin.control_action
+
         gremlin.control_action.switch_mode("Global")
 
 

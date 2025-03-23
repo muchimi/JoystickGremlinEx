@@ -17,6 +17,7 @@
 
 
 import sys
+
 sys.path.append(".")
 
 import pytest
@@ -75,7 +76,7 @@ def test_add_child():
     assert n1.children == [n2, n3, n4]
     assert n4.parent == n1
     assert n4.depth == 1
-    assert n2.node_count ==4
+    assert n2.node_count == 4
 
 
 def test_add_sibling():

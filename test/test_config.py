@@ -16,9 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
 import sys
+
 sys.path.append(".")
 
-import os
 import tempfile
 import pytest
 
@@ -43,7 +43,14 @@ def test_simple(modify_config):
 
     c.register("test", "case", "1", PropertyType.Int, 42, "")
     c.register("test", "case", "2", PropertyType.Bool, False, "")
-    c.register("test", "case", "3", PropertyType.HatDirection, gremlin.types.HatDirection.NorthEast, "")
+    c.register(
+        "test",
+        "case",
+        "3",
+        PropertyType.HatDirection,
+        gremlin.types.HatDirection.NorthEast,
+        "",
+    )
     assert c.value("test", "case", "1") == 42
     assert c.value("test", "case", "2") == False
     assert c.value("test", "case", "3") == gremlin.types.HatDirection.NorthEast
@@ -55,13 +62,21 @@ def test_simple(modify_config):
     assert c.value("test", "case", "2") == True
     assert c.value("test", "case", "3") == gremlin.types.HatDirection.SouthWest
 
+
 def test_load_save(modify_config):
     c = gremlin.config.Configuration()
 
     c.register("test", "case", "1", PropertyType.Int, 42, "one")
     c.register("test", "case", "2", PropertyType.Bool, False, "two", True)
-    c.register("test", "case", "3", PropertyType.HatDirection, gremlin.types.HatDirection.NorthEast, "")
-    c.register("test", "case", "4", PropertyType.List, [1,2,3,4,5], "")
+    c.register(
+        "test",
+        "case",
+        "3",
+        PropertyType.HatDirection,
+        gremlin.types.HatDirection.NorthEast,
+        "",
+    )
+    c.register("test", "case", "4", PropertyType.List, [1, 2, 3, 4, 5], "")
     assert c.value("test", "case", "1") == 42
     assert c.description("test", "case", "1") == "one"
     assert c.expose("test", "case", "1") == False
@@ -74,7 +89,7 @@ def test_load_save(modify_config):
     assert c.description("test", "case", "3") == ""
     assert c.expose("test", "case", "3") == False
 
-    assert c.value("test", "case", "4") == [1,2,3,4,5]
+    assert c.value("test", "case", "4") == [1, 2, 3, 4, 5]
     assert c.description("test", "case", "4") == ""
     assert c.expose("test", "case", "4") == False
 
@@ -93,9 +108,10 @@ def test_load_save(modify_config):
     assert c.description("test", "case", "3") == ""
     assert c.expose("test", "case", "3") == False
 
-    assert c.value("test", "case", "4") == [1,2,3,4,5]
+    assert c.value("test", "case", "4") == [1, 2, 3, 4, 5]
     assert c.description("test", "case", "4") == ""
     assert c.expose("test", "case", "4") == False
+
 
 def test_exceptions():
     c = gremlin.config.Configuration()

@@ -1,7 +1,6 @@
-
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,8 +18,8 @@
 from __future__ import annotations
 import enum
 
-class InputType(enum.IntEnum):
 
+class InputType(enum.IntEnum):
     """Enumeration of possible input types."""
 
     NotSet = 0
@@ -30,11 +29,10 @@ class InputType(enum.IntEnum):
     JoystickHat = 4
     Mouse = 5
     VirtualButton = 6
-    KeyboardLatched = 7 # latched keyboard input
-    OpenSoundControl = 8 # open sound control button input
-    Midi = 9 # midi input
-    ModeControl = 10 # mode actions
-
+    KeyboardLatched = 7  # latched keyboard input
+    OpenSoundControl = 8  # open sound control button input
+    Midi = 9  # midi input
+    ModeControl = 10  # mode actions
 
     @staticmethod
     def to_string(value):
@@ -56,9 +54,11 @@ class InputType(enum.IntEnum):
                 return _InputType_to_enum_lookup[value]
         except KeyError:
             raise ValueError("Invalid type in lookup")
-        
+
     @staticmethod
-    def to_list(include_notset = False, include_mouse = False, include_virtualbutton = False) -> list:
+    def to_list(
+        include_notset=False, include_mouse=False, include_virtualbutton=False
+    ) -> list:
         data = [it for it in InputType]
         if not include_notset:
             data.remove(InputType.NotSet)
@@ -67,13 +67,13 @@ class InputType(enum.IntEnum):
         if not include_virtualbutton:
             data.remove(InputType.VirtualButton)
         return data
-    
+
     @staticmethod
     def to_display_name(value) -> str:
         if value in _InputType_to_display_lookup.keys():
             return _InputType_to_string_lookup[value]
         return f"Unknown type: {value}"
-    
+
     @staticmethod
     def convert(value) -> InputType:
         try:
@@ -83,11 +83,11 @@ class InputType(enum.IntEnum):
             if value in _InputType_to_string_lookup.keys():
                 input_type = InputType(value)
                 return input_type
-                
+
         except:
             pass
         return None
-    
+
     # JSON serializer
 
 
@@ -100,7 +100,7 @@ _InputType_to_string_lookup = {
     InputType.KeyboardLatched: "keylatched",
     InputType.OpenSoundControl: "osc",
     InputType.Midi: "midi",
-    InputType.ModeControl : "modecontrol"
+    InputType.ModeControl: "modecontrol",
 }
 
 _InputType_to_display_lookup = {
@@ -111,7 +111,7 @@ _InputType_to_display_lookup = {
     InputType.KeyboardLatched: "Latched Key",
     InputType.OpenSoundControl: "OSC Button",
     InputType.Midi: "MIDI",
-    InputType.ModeControl: "Mode Control"
+    InputType.ModeControl: "Mode Control",
 }
 
 
@@ -124,6 +124,5 @@ _InputType_to_enum_lookup = {
     "keylatched": InputType.KeyboardLatched,
     "osc": InputType.OpenSoundControl,
     "midi": InputType.Midi,
-    "modecontrol" : InputType.ModeControl
+    "modecontrol": InputType.ModeControl,
 }
-

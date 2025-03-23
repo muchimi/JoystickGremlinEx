@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,11 +17,11 @@
 
 
 import logging
+
 syslog = logging.getLogger("system")
 
 
 class GremlinError(Exception):
-
     """Generic exception raised for gremlin related errors.
 
     This class also functions as the base class for all other
@@ -37,7 +37,6 @@ class GremlinError(Exception):
 
 
 class ProfileError(GremlinError):
-
     """Exception raised when an error occurs with a profile related
     operation.
     """
@@ -47,7 +46,6 @@ class ProfileError(GremlinError):
 
 
 class KeyboardError(GremlinError):
-
     """Exception raised when an error occurs related to keyboard inputs."""
 
     def __init__(self, value):
@@ -55,7 +53,6 @@ class KeyboardError(GremlinError):
 
 
 class MouseError(GremlinError):
-
     """Exception raised when an error occurs related to mouse inputs."""
 
     def __init__(self, value):
@@ -63,7 +60,6 @@ class MouseError(GremlinError):
 
 
 class MissingImplementationError(GremlinError):
-
     """Exception raised when a method is not implemented."""
 
     def __init__(self, value):
@@ -71,7 +67,6 @@ class MissingImplementationError(GremlinError):
 
 
 class VJoyError(GremlinError):
-
     """Exception raised when an error occurs within the vJoy module."""
 
     def __init__(self, value):
@@ -79,7 +74,6 @@ class VJoyError(GremlinError):
 
 
 class HidGuardianError(GremlinError):
-
     """Exception raised when an error related to HidGuardian."""
 
     def __init__(self, value):
@@ -87,7 +81,6 @@ class HidGuardianError(GremlinError):
 
 
 class PluginError(GremlinError):
-
     """Exception raised when an error occurs withing a user plugin."""
 
     def __init__(self, value):

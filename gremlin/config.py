@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,17 +35,18 @@ import gremlin.util
 syslog = logging.getLogger("system")
 
 import gremlin.singleton_decorator
+
+
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration:
-
     """Responsible for loading and saving configuration data."""
 
     def get_config(sef):
         fname = os.path.join(gremlin.util.userprofile_path(), "config.json")
         return fname
-    
+
     def get_profile_config(self):
-        ''' profile specific config file '''
+        """profile specific config file"""
         if self._profile_fname:
             fname, ext = os.path.splitext(self._profile_fname)
             return fname + ".json"
@@ -54,13 +55,11 @@ class Configuration:
     def __init__(self):
         """Creates a new instance, loading the current configuration."""
 
-        self._data = {} # gremlin items 
-        self._profile_data = {}  # profile specific options 
+        self._data = {}  # gremlin items
+        self._profile_data = {}  # profile specific options
         self._profile_loaded = False
-        self._profile_fname = None # current profile to use for the conig
-        self._profile_config_fname = None # config file specific to the profile
-
-
+        self._profile_fname = None  # current profile to use for the conig
+        self._profile_config_fname = None  # config file specific to the profile
 
         self._midi_enabled = None
         self._osc_enabled = None
@@ -70,38 +69,26 @@ class Configuration:
             # create a stub - first time run
             self.save()
 
-            
-        gettrace = getattr(sys, 'gettrace', None)
-        frozen = getattr(sys, 'frozen', False)
+        gettrace = getattr(sys, "gettrace", None)
+        frozen = getattr(sys, "frozen", False)
         if frozen:
             self._is_debug = False
         else:
             self._is_debug = gettrace is not None
 
-        
         self._last_reload = None
         self._last_profile_reload = None
         self.reload()
 
+        self.watcher = QtCore.QFileSystemWatcher(
+            [os.path.join(gremlin.util.userprofile_path(), "config.json")]
+        )
 
-
-        self.watcher = QtCore.QFileSystemWatcher([
-            os.path.join(gremlin.util.userprofile_path(), "config.json")
-        ])
-        
         self.watcher.fileChanged.connect(self.reload)
-        
-
-    
-  
-        
-    
-
 
     def reload(self):
         """Loads the configuration file's content."""
-        if self._last_reload is not None and \
-                time.time() - self._last_reload < 1:
+        if self._last_reload is not None and time.time() - self._last_reload < 1:
             return
 
         fname = self.get_config()
@@ -117,11 +104,7 @@ class Configuration:
                 except ValueError:
                     pass
         if not load_successful:
-            self._data = {
-                "calibration": {},
-                "profiles": {},
-                "last_mode": {}
-            }
+            self._data = {"calibration": {}, "profiles": {}, "last_mode": {}}
 
         # Ensure required fields are present and if they are missing
         # add empty ones.
@@ -135,18 +118,18 @@ class Configuration:
 
     def reload_profile(self):
         """Loads the profile's configuration file's content."""
-        if self._last_profile_reload is not None and \
-                time.time() - self._last_profile_reload < 1:
+        if (
+            self._last_profile_reload is not None
+            and time.time() - self._last_profile_reload < 1
+        ):
             return
-        
+
         self._profile_data = {}
 
         fname = self._profile_config_fname
         if not fname:
-            return # nothing to load
-        
+            return  # nothing to load
 
-        
         # Attempt to load the configuration file if this fails set
         # default empty values.
         if os.path.isfile(fname):
@@ -162,34 +145,25 @@ class Configuration:
         self._last_profile_reload = time.time()
         self.save_profile()
 
-
     def save(self):
         """Writes the configuration file to disk."""
         fname = self.get_config()
         with open(fname, "w") as hdl:
-            encoder = json.JSONEncoder(
-                sort_keys=True,
-                indent=4
-            )
+            encoder = json.JSONEncoder(sort_keys=True, indent=4)
             hdl.write(encoder.encode(self._data))
 
-
     def save_profile(self):
-        ''' saves to the profile specific config file '''
+        """saves to the profile specific config file"""
         fname = self._profile_config_fname
         if fname:
             with open(fname, "w") as hdl:
-                encoder = json.JSONEncoder(
-                    sort_keys=True,
-                    indent=4
-                )
+                encoder = json.JSONEncoder(sort_keys=True, indent=4)
                 hdl.write(encoder.encode(self._profile_data))
 
-    
     @property
     def is_debug(self):
         return self._is_debug
-    
+
     def set_last_runtime_mode(self, profile_path, mode_name):
         """Stores the last active mode of the given profile.
 
@@ -198,14 +172,16 @@ class Configuration:
         """
         if profile_path is None or mode_name is None:
             return
-        
+
         profile_path = os.path.normpath(profile_path).casefold()
         item = self._data.get("last_mode", None)
         if not item:
             self._data["last_mode"] = {}
         self._data["last_mode"][profile_path] = mode_name
         # syslog = logging.getLogger("system")
-        syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
+        syslog.info(
+            f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]"
+        )
         self.save()
 
     def get_last_runtime_mode(self, profile_path):
@@ -221,7 +197,6 @@ class Configuration:
         if profile_path in item:
             return item[profile_path]
         return None
-    
 
     def set_last_edit_mode(self, profile_path, mode_name):
         """Stores the last active mode of the given profile.
@@ -231,7 +206,7 @@ class Configuration:
         """
         if profile_path is None or mode_name is None:
             return
-        
+
         profile_path = os.path.normpath(profile_path).casefold()
         item = self._data.get("last_edit_mode", None)
         if not item:
@@ -245,7 +220,7 @@ class Configuration:
         :param profile_path profile path for which to return the mode
         :return name of the mode if present, None otherwise
         """
-        
+
         profile_path = os.path.normpath(profile_path).casefold()
         item = self._data.get("last_edit_mode", None)
         if not item:
@@ -255,69 +230,66 @@ class Configuration:
         return None
 
     def set_profile_last_runtime_mode(self, mode_name):
-        ''' sets the profile's last used mode '''
+        """sets the profile's last used mode"""
         fname = self.last_profile
         if fname:
             self.set_last_runtime_mode(fname, mode_name)
 
     def get_profile_last_runtime_mode(self):
-        ''' gets the save last used profile mode '''
+        """gets the save last used profile mode"""
         fname = self.last_profile
         if fname:
             return self.get_last_runtime_mode(fname)
         return None
-    
+
     def set_profile_last_edit_mode(self, mode_name):
-        ''' sets the profile's last used mode '''
+        """sets the profile's last used mode"""
         fname = self.last_profile
         if fname:
             self.set_last_edit_mode(fname, mode_name)
 
     def get_profile_last_edit_mode(self):
-        ''' gets the save last used profile mode '''
+        """gets the save last used profile mode"""
         fname = self.last_profile
         if fname:
             return self.get_last_edit_mode(fname)
         return None
-    
-    
+
     @property
     def initial_load_mode_tts(self):
-        ''' if set, JGEX outputs a verbal readout of the current mode on profile load '''
+        """if set, JGEX outputs a verbal readout of the current mode on profile load"""
         return self._data.get("initial_load_mode_tts", True)
-    
+
     @initial_load_mode_tts.setter
     def initial_load_mode_tts(self, value):
         self._data["initial_load_mode_tts"] = value
         self.save()
 
-
     @property
     def initial_load_rate_tts(self):
-        ''' if set, JGEX outputs a verbal readout of the current playback rate on profile load '''
+        """if set, JGEX outputs a verbal readout of the current playback rate on profile load"""
         return self._data.get("initial_load_rate_tts", 100)
-    
+
     @initial_load_rate_tts.setter
     def initial_load_rate_tts(self, value):
         self._data["initial_load_rate_tts"] = value
-        self.save()        
+        self.save()
 
     @property
     def runtime_ui_update(self):
-        ''' if set, JGEX will update the UI when a profile is activated '''
+        """if set, JGEX will update the UI when a profile is activated"""
         return self._data.get("runtime_ui_update", False)
-    
+
     @runtime_ui_update.setter
     def runtime_ui_update(self, value):
         self._data["runtime_ui_update"] = value
         self.save()
 
-
     @property
     def reset_mode_on_process_activate(self):
-        ''' if set, the mode is reset when the process is reactivated to the default mode '''
+        """if set, the mode is reset when the process is reactivated to the default mode"""
         return self._data.get("reset_mode_on_process_activate", False)
-    
+
     @reset_mode_on_process_activate.setter
     def reset_mode_on_process_activate(self, value):
         self._data["reset_mode_on_process_activate"] = value
@@ -339,7 +311,9 @@ class Configuration:
                 continue
             axis_name = f"axis_{i+1}"
             self._data["calibration"][identifier][axis_name] = [
-                limit[0], limit[1], limit[2]
+                limit[0],
+                limit[1],
+                limit[2],
             ]
         self.save()
 
@@ -358,42 +332,36 @@ class Configuration:
             return [-32768, 0, 32767]
 
         return self._data["calibration"][identifier][axis_name]
-    
+
     # @property
     # def legacy_calibration_imported(self)->bool:
     #     return self._data.get("legacy_calibration_imported",False)
-    
+
     # @legacy_calibration_imported.setter
     # def legacy_calibration_imported(self, value : bool):
     #     self._data["legacy_calibration_imported"] = value
-    
 
     @property
     def last_options_tab(self):
-        ''' index of the last option tab selected'''
+        """index of the last option tab selected"""
         key = "last_options_tab"
         if key in self._data.keys():
             index = self._data[key]
         else:
             index = 0
         return index
-    
+
     @last_options_tab.setter
     def last_options_tab(self, value):
         self._data["last_options_tab"] = value
         self.save()
-    
-
 
     def get_executable_list(self):
         """Returns a list of all executables with associated profiles.
 
         :return list of executable paths
         """
-        return list(sorted(
-            self._data["profiles"].keys(),
-            key=lambda x: x.lower())
-        )
+        return list(sorted(self._data["profiles"].keys(), key=lambda x: x.lower()))
 
     def remove_profile(self, exec_path):
         """Removes the executable from the configuration.
@@ -427,16 +395,13 @@ class Configuration:
         # Handle the normal case where the path matches directly
         profile_path = self.get_profile(exec_path)
         if profile_path is not None:
-            syslog.info(
-                f"Found exact match for {exec_path}, returning {profile_path}"
-            )
+            syslog.info(f"Found exact match for {exec_path}, returning {profile_path}")
             return profile_path
 
         # Handle non files by treating them as regular expressions, returning
         # the first successful match.
         for key, value in sorted(
-                self._data["profiles"].items(),
-                key=lambda x: x[0].lower()
+            self._data["profiles"].items(), key=lambda x: x[0].lower()
         ):
             # Ignore valid files
             if os.path.exists(key):
@@ -459,7 +424,6 @@ class Configuration:
         self._data["profiles"][exec_path] = profile_path
         self.save()
 
-    
     def set_start_mode(self, profile_path, mode_name):
         """Stores the last active mode of the given profile.
 
@@ -478,7 +442,6 @@ class Configuration:
         :return name of the mode if present, None otherwise
         """
         return self._data["start_mode"].get(profile_path, None)
-
 
     def _has_profile(self, exec_path):
         """Returns whether or not a profile exists for a given executable.
@@ -506,7 +469,7 @@ class Configuration:
 
         # Update recent profiles
         if value is not None:
-            value = os.path.normpath(value.casefold()) # normalize the profile path
+            value = os.path.normpath(value.casefold())  # normalize the profile path
             current = self.recent_profiles
 
             if value in current:
@@ -514,9 +477,8 @@ class Configuration:
             current.insert(0, value)
             # normalize and remove duplicates
             current = list(set([os.path.normpath(item.casefold()) for item in current]))
-            current = current[0:19] # limit
+            current = current[0:19]  # limit
 
-            
             self._data["recent_profiles"] = current
         self.save()
 
@@ -527,13 +489,6 @@ class Configuration:
         :return list of recently used profiles
         """
         return self._data.get("recent_profiles", [])
-    
-
-
-        
-
-
-
 
     @property
     def autoload_profiles(self):
@@ -558,11 +513,12 @@ class Configuration:
             self._data["autoload_profiles"] = value
             self.save()
             el = gremlin.event_handler.EventListener()
-            el.process_monitor_changed.emit() # tell the UI the parameter changed
+            el.process_monitor_changed.emit()  # tell the UI the parameter changed
 
     @property
     def keep_profile_active_on_focus_loss(self):
-        return self._data.get("keep_active_on_focus_loss",True)
+        return self._data.get("keep_active_on_focus_loss", True)
+
     @keep_profile_active_on_focus_loss.setter
     def keep_profile_active_on_focus_loss(self, value):
         self._data["keep_active_on_focus_loss"] = value
@@ -593,12 +549,11 @@ class Configuration:
         self._data["keep_last_autoload"] = value
         self.save()
 
-    
     @property
     def restore_profile_mode_on_start(self):
-        ''' determines if a profile mode, if it exists is restored when the profile is activated '''
+        """determines if a profile mode, if it exists is restored when the profile is activated"""
         return self._data.get("restore_mode_on_start", False)
-    
+
     @restore_profile_mode_on_start.setter
     def restore_profile_mode_on_start(self, value):
         self._data["restore_mode_on_start"] = value
@@ -606,16 +561,14 @@ class Configuration:
 
     @property
     def highlight_autoswitch(self):
-        ''' true if in design mode and tab switching is allowed on input detect change '''
+        """true if in design mode and tab switching is allowed on input detect change"""
         return self._data.get("highlight_switch", False)
-    
+
     @highlight_autoswitch.setter
     def highlight_autoswitch(self, value):
-
         if value != self.highlight_autoswitch:
             self._data["highlight_switch"] = value
             self.save()
-
 
     @property
     def highlight_input_axis(self):
@@ -642,7 +595,6 @@ class Configuration:
             self._data["highlight_input_axis"] = value
             self.save()
 
-
     @property
     def highlight_input_buttons(self):
         """Returns whether or not to highlight inputs for a button
@@ -656,7 +608,7 @@ class Configuration:
 
     @highlight_input_buttons.setter
     def highlight_input_buttons(self, value):
-        """Sets whether or not to highlight inputs for a button 
+        """Sets whether or not to highlight inputs for a button
 
         This enables / disables the feature where using a physical input
         automatically selects it in the UI.
@@ -667,9 +619,6 @@ class Configuration:
         if value != self.highlight_input_buttons:
             self._data["highlight_input_buttons"] = value
             self.save()
-
-
-
 
     @property
     def highlight_enabled(self):
@@ -698,26 +647,23 @@ class Configuration:
             el = gremlin.event_handler.EventListener()
             el.config_option_changed.emit()
 
-
-
     @property
     def highlight_hotkey_autoswitch(self):
-        ''' when enabled - pressing the control or shift hotkeys to toggle axis / button highlight also allows tab switch '''
+        """when enabled - pressing the control or shift hotkeys to toggle axis / button highlight also allows tab switch"""
         return self._data.get("highlight_hotkey_autoswitch", False)
-    
+
     @highlight_hotkey_autoswitch.setter
-    def highlight_hotkey_autoswitch(self, value : bool):
+    def highlight_hotkey_autoswitch(self, value: bool):
         self._data["highlight_hotkey_autoswitch"] = value
 
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
 
-
     @property
     def enable_remote_control(self):
-        ''' enables or disables remote control from another gremlin instance on the network '''
-        return self._data.get("allow_remote_control",False)
-    
+        """enables or disables remote control from another gremlin instance on the network"""
+        return self._data.get("allow_remote_control", False)
+
     @enable_remote_control.setter
     def enable_remote_control(self, value):
         if type(value) == bool:
@@ -726,14 +672,18 @@ class Configuration:
 
     @property
     def enable_remote_broadcast(self):
-        ''' enables gremlin to broadcast control changes over UDP multicast '''
-        return self._data.get("enable_remote_broadcast",False)
+        """enables gremlin to broadcast control changes over UDP multicast"""
+        return self._data.get("enable_remote_broadcast", False)
 
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
-        ''' remote broadcast master switch enable '''
+        """remote broadcast master switch enable"""
         import gremlin.event_handler
-        if type(value) == bool and self._data.get("enable_remote_broadcast",False)!= value:
+
+        if (
+            type(value) == bool
+            and self._data.get("enable_remote_broadcast", False) != value
+        ):
             self._data["enable_remote_broadcast"] = value
             self.save()
 
@@ -742,24 +692,20 @@ class Configuration:
 
     @property
     def enable_broadcast_speech(self):
-        ''' speech on broadcast change mode enable'''
-        return self._data.get("enable_broadcast_speech",True)
-    
+        """speech on broadcast change mode enable"""
+        return self._data.get("enable_broadcast_speech", True)
+
     @enable_broadcast_speech.setter
     def enable_broadcast_speech(self, value):
-
         if self.enable_broadcast_speech != value:
             self._data["enable_broadcast_speech"] = value
             self.save()
 
-
-
-
     @property
     def server_port(self):
-        ''' port number to use for the gremlin server '''
-        return self._data.get("server_port",6012)
-    
+        """port number to use for the gremlin server"""
+        return self._data.get("server_port", 6012)
+
     @server_port.setter
     def server_port(self, value):
         if type(value) == float:
@@ -805,7 +751,6 @@ class Configuration:
         self._data["activate_on_launch"] = bool(value)
         self.save()
 
-
     @property
     def activate_on_process_focus(self):
         """Returns whether or not to activate the profile on process focus."""
@@ -817,9 +762,7 @@ class Configuration:
         self._data["activate_on_process_focus"] = bool(value)
         self.save()
         el = gremlin.event_handler.EventListener()
-        el.process_monitor_changed.emit() # tell the UI the process options changed
-
-
+        el.process_monitor_changed.emit()  # tell the UI the process options changed
 
     @property
     def close_to_tray(self):
@@ -879,7 +822,7 @@ class Configuration:
         :return default action to show in action selection drop downs
         """
         return self._data.get("last_action", Configuration().default_action)
-    
+
     @last_action.setter
     def last_action(self, value):
         """Sets the default action to show in action drop downs.
@@ -893,7 +836,7 @@ class Configuration:
     def last_container(self):
         """Returns the last container to show in container drop downs."""
         return self._data.get("last_container", "basic")
-    
+
     @last_container.setter
     def last_container(self, value):
         """Sets the last container to show in container drop downs.
@@ -902,7 +845,6 @@ class Configuration:
         """
         self._data["last_container"] = str(value)
         self.save()
-
 
     @property
     def macro_axis_polling_rate(self):
@@ -920,6 +862,7 @@ class Configuration:
     @property
     def macro_key_delay(self) -> int:
         return self._data.get("macro_key_delay", 250)
+
     @macro_key_delay.setter
     def macro_key_delay(self, value: int):
         self._data["macro_key_delay"] = value
@@ -1017,12 +960,11 @@ class Configuration:
         self._data["window_location"] = value
         self.save()
 
-
     @property
     def persist_clipboard(self):
-        ''' true if clipboard data is persisted from one session to the next '''
+        """true if clipboard data is persisted from one session to the next"""
         return self._data.get("persist_clipboard", False)
-    
+
     @persist_clipboard.setter
     def persist_clipboard(self, value):
         self._data["persist_clipboard"] = value
@@ -1031,12 +973,13 @@ class Configuration:
         if not value:
             # remove from disk any old data
             from gremlin.clipboard import Clipboard
+
             clipboard = Clipboard()
             clipboard.clear_persisted()
 
     @property
     def verbose(self):
-        ''' determines loging level '''
+        """determines loging level"""
         value = self._data.get("verbose", None)
         if value is None:
             # not set - set other defaults
@@ -1052,26 +995,26 @@ class Configuration:
 
     @property
     def verbose_mode(self):
-        ''' sub logging level '''
-        if not "verbose_mode" in self._data:
+        """sub logging level"""
+        if "verbose_mode" not in self._data:
             self._data["verbose_mode"] = VerboseMode.All
             self.save()
         return VerboseMode(self._data["verbose_mode"])
-    
+
     def is_verbose_mode(self, mode):
         value = self.verbose_mode
         result = mode in value
         return result
-    
+
     @verbose_mode.setter
     def verbose_mode(self, value):
         self._data["verbose_mode"] = value
         self.save()
 
     def verbose_set_mode(self, mode, enabled):
-        ''' enables the specified verbose mode '''
-        if not "verbose_mode" in self._data:
-            self._data["verbose_mode"] = 0 # none
+        """enables the specified verbose mode"""
+        if "verbose_mode" not in self._data:
+            self._data["verbose_mode"] = 0  # none
         value = self._data["verbose_mode"]
         if enabled:
             value |= mode
@@ -1081,116 +1024,113 @@ class Configuration:
 
     @property
     def verbose_mode_keyboard(self):
-        ''' true if verbose mode is in keyboard mode '''
+        """true if verbose mode is in keyboard mode"""
         return self.verbose and VerboseMode.Keyboard in self.verbose_mode
-    
 
     @property
     def verbose_mode_ui(self):
-        ''' true if verbose mode is in UI mode '''
+        """true if verbose mode is in UI mode"""
         return self.verbose and VerboseMode.UI in self.verbose_mode
-        
-    
+
     @property
     def verbose_mode_joystick(self):
-        ''' true if verbose mode is in joystick mode '''
+        """true if verbose mode is in joystick mode"""
         return self.verbose and VerboseMode.Joystick in self.verbose_mode
-    
+
     @property
     def verbose_mode_inputs(self):
-        ''' true if verbose mode is in inputs mode '''
+        """true if verbose mode is in inputs mode"""
         return self.verbose and VerboseMode.Inputs in self.verbose_mode
 
     @property
     def verbose_mode_mouse(self):
-        ''' true if verbose mode is in mouse mode '''
+        """true if verbose mode is in mouse mode"""
         return self.verbose and VerboseMode.Mouse in self.verbose_mode
-    
+
     @property
     def verbose_mode_details(self):
-        ''' true if verbose mode is in detail mode '''
+        """true if verbose mode is in detail mode"""
         return self.verbose and VerboseMode.Details in self.verbose_mode
-    
+
     @property
     def verbose_mode_detailed(self):
-        ''' true if verbose mode is in detail mode '''
+        """true if verbose mode is in detail mode"""
         return self.verbose and VerboseMode.Details in self.verbose_mode
-    
+
     @property
     def verbose_mode_device(self):
-        ''' true if verbose mode is in device mode '''
+        """true if verbose mode is in device mode"""
         return self.verbose and VerboseMode.Device in self.verbose_mode
 
     @property
     def verbose_mode_simconnect(self):
-        ''' true if verbose mode is in simconnect mode '''
+        """true if verbose mode is in simconnect mode"""
         return self.verbose and VerboseMode.SimConnect in self.verbose_mode
-    
+
     @property
     def verbose_mode_condition(self):
-        ''' true if verbose mode is in condition/execution mode '''
+        """true if verbose mode is in condition/execution mode"""
         return self.verbose and VerboseMode.Condition in self.verbose_mode
-    
+
     @property
     def verbose_mode_execution(self):
-        ''' true if verbose mode is in condition/execution mode '''
+        """true if verbose mode is in condition/execution mode"""
         return self.verbose and VerboseMode.Condition in self.verbose_mode
-    
+
     @property
     def verbose_mode_osc(self):
-        ''' true if verbose mode is in OSC mode '''
+        """true if verbose mode is in OSC mode"""
         return self.verbose and VerboseMode.OSC in self.verbose_mode
-    
+
     @property
     def verbose_mode_midi(self):
-        ''' true if verbose mode is in MIDI mode '''
+        """true if verbose mode is in MIDI mode"""
         return self.verbose and VerboseMode.Midi in self.verbose_mode
-    
+
     @property
     def verbose_mode_process(self):
-        ''' true if verbose mode is in process mode '''
+        """true if verbose mode is in process mode"""
         return self.verbose and VerboseMode.Process in self.verbose_mode
-    
+
     @property
     def verbose_mode_exec(self):
-        ''' true if verbose mode is in Exec(ute) mode '''
+        """true if verbose mode is in Exec(ute) mode"""
         return self.verbose and VerboseMode.Exec in self.verbose_mode
-    
+
     @property
     def verbose_mode_macro(self):
-        ''' true if verbose mode is in macro mode '''
+        """true if verbose mode is in macro mode"""
         return self.verbose and VerboseMode.Macro in self.verbose_mode
-    
+
     @property
     def verbose_mode_gate(self):
-        ''' true if verbose mode is in gated axis mode '''
+        """true if verbose mode is in gated axis mode"""
         return self.verbose and VerboseMode.Gate in self.verbose_mode
-    
+
     @property
     def verbose_mode_outputs(self):
-        ''' true if verbose mode is in output mode '''
+        """true if verbose mode is in output mode"""
         return self.verbose and VerboseMode.Outputs in self.verbose_mode
-    
+
     @property
     def verbose_mode_output(self):
         return self.verbose_mode_outputs
-    
+
     @property
     def midi_enabled(self):
-        ''' true if MIDI module is enabled '''
+        """true if MIDI module is enabled"""
         return self._data.get("midi_enabled", True)
-    
+
     @midi_enabled.setter
     def midi_enabled(self, value):
         self._data["midi_enabled"] = value
         self.save()
 
-
     @property
     def osc_enabled(self):
-        ''' true if osc module is enabled '''
+        """true if osc module is enabled"""
         return self._data.get("osc_enabled", True)
-    
+
     @osc_enabled.setter
     def osc_enabled(self, value):
         self._data["osc_enabled"] = value
@@ -1198,9 +1138,10 @@ class Configuration:
 
     @property
     def osc_input_port(self):
-        ''' OSC listen port '''
+        """OSC listen port"""
         port = self._data.get("osc_port", 8000)
         return port
+
     @osc_input_port.setter
     def osc_input_port(self, value):
         self._data["osc_port"] = value
@@ -1208,30 +1149,31 @@ class Configuration:
 
     @property
     def osc_output_port(self):
-        ''' OSC listen port '''
+        """OSC listen port"""
         port = self._data.get("osc_output_port", 8001)
         return port
+
     @osc_output_port.setter
     def osc_output_port(self, value):
         self._data["osc_output_port"] = value
         self.save()
-    
+
     @property
     def osc_host(self):
-        ''' OSC client host (this is the IP the machine GremlinEx sends OSC data to)'''
+        """OSC client host (this is the IP the machine GremlinEx sends OSC data to)"""
         host = self._data.get("osc_host", "127.0.0.1")
         return host
-    
+
     @osc_host.setter
-    def osc_host(self, value : str):
+    def osc_host(self, value: str):
         self._data["osc_host"] = value
         self.save()
 
     @property
     def show_scancodes(self):
-        ''' hide/show scan codes for keyboard related inputs '''
+        """hide/show scan codes for keyboard related inputs"""
         return self._data.get("show_scancodes", False)
-    
+
     @show_scancodes.setter
     def show_scancodes(self, value):
         self._data["show_scancodes"] = value
@@ -1239,21 +1181,19 @@ class Configuration:
 
     @property
     def show_input_axis(self):
-        ''' shows input axis values for axis inputs '''
-        return self._data.get("show_input_axis",True)
-    
+        """shows input axis values for axis inputs"""
+        return self._data.get("show_input_axis", True)
+
     @show_input_axis.setter
     def show_input_axis(self, value):
         self._data["show_input_axis"] = value
         self.save()
 
-
-
-
     @property
     def tab_list(self):
-        ''' tab order for the UI devices as set by the user '''
+        """tab order for the UI devices as set by the user"""
         return self._data.get("tab_order", None)
+
     @tab_list.setter
     def tab_list(self, value):
         self._data["tab_order"] = value
@@ -1261,8 +1201,9 @@ class Configuration:
 
     @property
     def show_output_vjoy(self):
-        ''' determines if VJOY output devices are displayed on the device tabs '''
+        """determines if VJOY output devices are displayed on the device tabs"""
         return self._data.get("show_vjoy_ouput", False)
+
     @show_output_vjoy.setter
     def show_output_vjoy(self, value):
         self._data["show_vjoy_output"] = value
@@ -1270,38 +1211,39 @@ class Configuration:
 
     @property
     def last_plugin_folder(self):
-        ''' last folder used for plugins '''
-        return self._data.get("last_plugin_folder",None)
+        """last folder used for plugins"""
+        return self._data.get("last_plugin_folder", None)
+
     @last_plugin_folder.setter
     def last_plugin_folder(self, value):
-        self._data["last_plugin_folder"]=value
+        self._data["last_plugin_folder"] = value
         self.save()
 
     @property
     def last_sound_folder(self):
-        ''' last folder used for sounds '''
-        return self._data.get("last_sound_folder",None)
+        """last folder used for sounds"""
+        return self._data.get("last_sound_folder", None)
+
     @last_sound_folder.setter
     def last_sound_folder(self, value):
         self._data["last_sound_folder"] = value
         self.save()
-           
+
     @property
     def partial_plugin_save(self):
-        ''' true if partial plugin configuration saving is ok = false nothing will be saved - true partial values will be saved '''
-        return self._data.get("partial_plugin_init_ok",True)
-    
+        """true if partial plugin configuration saving is ok = false nothing will be saved - true partial values will be saved"""
+        return self._data.get("partial_plugin_init_ok", True)
+
     @partial_plugin_save.setter
     def partial_plugin_save(self, value):
         self._data["partial_plugin_init_ok"] = value
         self.save()
 
-
     @property
     def runtime_ui_active(self):
-        ''' keep UI enabled at runtime '''
-        return self._data.get("runtime_ui_active",False)
-    
+        """keep UI enabled at runtime"""
+        return self._data.get("runtime_ui_active", False)
+
     @runtime_ui_active.setter
     def runtime_ui_active(self, value):
         self._data["runtime_ui_active"] = value
@@ -1309,27 +1251,27 @@ class Configuration:
 
     @property
     def sync_last_selection(self):
-        ''' synchronizes the actions and container drop downs when enabled '''
-        return self._data.get("sync_last_selection",True)
-    
+        """synchronizes the actions and container drop downs when enabled"""
+        return self._data.get("sync_last_selection", True)
+
     @sync_last_selection.setter
     def sync_last_selection(self, value):
         self._data["sync_last_selection"] = value
         self.save()
-        
 
     @property
     def last_keyboard_mapper_pulse_value(self):
         return self._data.get("last_keyboard_mapper_pulse_value", 250)
+
     @last_keyboard_mapper_pulse_value.setter
     def last_keyboard_mapper_pulse_value(self, value):
         self._data["last_keyboard_mapper_pulse_value"] = value
         self.save()
 
-
     @property
     def last_keyboard_mapper_interval_value(self):
         return self._data.get("last_keyboard_mapper_interval_value", 250)
+
     @last_keyboard_mapper_interval_value.setter
     def last_keyboard_mapper_interval_value(self, value):
         self._data["last_keyboard_mapper_interval_value"] = value
@@ -1337,18 +1279,19 @@ class Configuration:
 
     @property
     def runtime_ignore_device_change(self):
-        ''' ignore device changes at runtime '''
+        """ignore device changes at runtime"""
         return self._data.get("runtime_ignore_device_change", True)
+
     @runtime_ignore_device_change.setter
     def runtime_ignore_device_change(self, value):
         self._data["runtime_ignore_device_change"] = value
         self.save()
 
-
     @property
     def vigem_device_count(self):
-        ''' count of gamepads to create for VIGEM - default is 1 '''
-        return self._data.get("vigem_device_count",1)
+        """count of gamepads to create for VIGEM - default is 1"""
+        return self._data.get("vigem_device_count", 1)
+
     @vigem_device_count.setter
     def vigem_device_count(self, value):
         if value < 0:
@@ -1360,73 +1303,75 @@ class Configuration:
 
     @property
     def import_level(self):
-        ''' import mapping expansion level 0 to 4 '''
-        return self._data.get("import_level",1)
+        """import mapping expansion level 0 to 4"""
+        return self._data.get("import_level", 1)
 
     @import_level.setter
     def import_level(self, value):
         self._data["import_level"] = value
         self.save()
 
-
     @property
     def import_window_location(self):
-        """Returns the position of the import profile """
+        """Returns the position of the import profile"""
         return self._data.get("import_window_location", None)
 
     @import_window_location.setter
     def import_window_location(self, value):
-        """Sets the position of the import profile window """
+        """Sets the position of the import profile window"""
         self._data["import_window_location"] = value
         self.save()
 
     @property
     def last_device_guid(self):
-        ''' gets the last selected device guid'''
-        device_guid = self._profile_data.get("last_device_guid", None)  # try the profile specific config first
+        """gets the last selected device guid"""
+        device_guid = self._profile_data.get(
+            "last_device_guid", None
+        )  # try the profile specific config first
         if not device_guid:
             device_guid = self._data.get("last_device_guid", None)
         return device_guid
-    
+
     @property
     def last_dinput_device_guid(self):
-        ''' last device guid as a dinput GUID instead of a string '''
+        """last device guid as a dinput GUID instead of a string"""
         guid = self.last_device_guid
         if guid:
             return gremlin.util.parse_guid(guid)
         return None
-    
+
     @last_device_guid.setter
     def last_device_guid(self, device_guid):
-        ''' stores the last device GUID '''
+        """stores the last device GUID"""
         device_guid = str(device_guid)
-        self._data["last_device_guid"] = device_guid # general config 
-        self._profile_data["last_device_guid"] = device_guid # profile specific config
+        self._data["last_device_guid"] = device_guid  # general config
+        self._profile_data["last_device_guid"] = device_guid  # profile specific config
         self.save()
         self.save_profile()
 
-    def set_last_input(self, device_guid, input_type : gremlin.input_types.InputType, input_id ):
-        ''' stores the last input '''
+    def set_last_input(
+        self, device_guid, input_type: gremlin.input_types.InputType, input_id
+    ):
+        """stores the last input"""
         if gremlin.shared_state.is_tab_loading:
             # don't save while tabs are loading
-            return 
-        
+            return
+
         el = gremlin.event_handler.EventListener()
         if el.input_selection_suspended:
             # ignore selection requests if selection is suspended
             return
 
-        
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
 
-        
+        data: dict = self._profile_data.get("last_input", {})
 
-        data : dict = self._profile_data.get("last_input", {})
-        
         verbose = self.verbose
-        
-        if input_type != gremlin.input_types.InputType.ModeControl and isinstance(input_id, gremlin.base_classes.AbstractInputItem):
+
+        if input_type != gremlin.input_types.InputType.ModeControl and isinstance(
+            input_id, gremlin.base_classes.AbstractInputItem
+        ):
             # convert to an ID we can use
             input_id = input_id.guid
         elif input_id is None:
@@ -1442,10 +1387,14 @@ class Configuration:
                 if guid is not None:
                     input_id = str(guid)
                 else:
-                    syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+                    syslog.warning(
+                        f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
+                    )
                     input_id = None
         else:
-            syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+            syslog.warning(
+                f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
+            )
             input_id = None
 
         input_type = gremlin.input_types.InputType.convert(input_type)
@@ -1456,52 +1405,55 @@ class Configuration:
             self._profile_data["last_device_guid"] = device_guid
 
             self._data["last_device_guid"] = device_guid
-            self._data["last_input_type"] = gremlin.input_types.InputType.to_string(input_type)
+            self._data["last_input_type"] = gremlin.input_types.InputType.to_string(
+                input_type
+            )
             self._data["last_input_id"] = input_id
 
-            if verbose: 
-                device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                syslog.info(f"CONFIG: save last input {device_name} {gremlin.input_types.InputType.to_string(input_type)} {input_id}") 
-        
+            if verbose:
+                device_name = gremlin.joystick_handling.device_name_from_guid(
+                    device_guid
+                )
+                syslog.info(
+                    f"CONFIG: save last input {device_name} {gremlin.input_types.InputType.to_string(input_type)} {input_id}"
+                )
+
             self.save_profile()
             self.save()
 
-          
-
-        
-
-
-
     def get_last_device_guid(self):
-        ''' gets the last selected device in the profile '''
-        device_guid = self._profile_data.get("last_device_guid",None)
+        """gets the last selected device in the profile"""
+        device_guid = self._profile_data.get("last_device_guid", None)
         if device_guid is None:
-            device_guid = self._data.get("last_device_guid",None)
+            device_guid = self._data.get("last_device_guid", None)
         return device_guid
-        
 
-    def _get_input_id(self, dinput_device_guid, input_id) -> tuple: 
-        ''' converts input ID from the storage data to the actual input ID that isn't stored in the config 
+    def _get_input_id(self, dinput_device_guid, input_id) -> tuple:
+        """converts input ID from the storage data to the actual input ID that isn't stored in the config
         :returns:
         (input_type, save_input_id, input_id)  # input type, the save input ID is a configuration "save" value for saving data, input_id is the object
-        
-        '''
+
+        """
         save_input_id = input_id
         input_type = None
         # syslog = logging.getLogger("system")
-        device_name = gremlin.joystick_handling.device_name_from_guid(dinput_device_guid)
-        if not dinput_device_guid in gremlin.shared_state.device_type_map:
+        device_name = gremlin.joystick_handling.device_name_from_guid(
+            dinput_device_guid
+        )
+        if dinput_device_guid not in gremlin.shared_state.device_type_map:
             # input is missing
-            #syslog.warning(f"Config: get last input: Unable to determine input type:  Unable to find device {dinput_device_guid} {device_name} in device map")
+            # syslog.warning(f"Config: get last input: Unable to determine input type:  Unable to find device {dinput_device_guid} {device_name} in device map")
             return (None, None, None)
-        
+
         # if input_id is None:
         #     syslog.warning(f"Config: get last input: Unable to determine input type: NULL input id")
         #     return (None, None, None)
 
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         if device_type == gremlin.types.DeviceType.Joystick:
-            device_info = gremlin.joystick_handling.device_info_from_guid(dinput_device_guid)
+            device_info = gremlin.joystick_handling.device_info_from_guid(
+                dinput_device_guid
+            )
             if device_info:
                 if device_info.axis_count > 0:
                     input_type = gremlin.input_types.InputType.JoystickAxis
@@ -1516,7 +1468,11 @@ class Configuration:
                     if input_id is None or input_id > device_info.hat_count:
                         input_id = 1
 
-        elif device_type in (gremlin.types.DeviceType.Keyboard, gremlin.types.DeviceType.Midi, gremlin.types.DeviceType.Osc):
+        elif device_type in (
+            gremlin.types.DeviceType.Keyboard,
+            gremlin.types.DeviceType.Midi,
+            gremlin.types.DeviceType.Osc,
+        ):
             # grab the tab widget
             if device_type == gremlin.types.DeviceType.Keyboard:
                 input_type = gremlin.input_types.InputType.KeyboardLatched
@@ -1556,28 +1512,29 @@ class Configuration:
             input_type = gremlin.input_types.InputType.NotSet
             save_input_id = None
             input_id = None
-        
-                    
+
         else:
             assert False, f"Config: GetInputId() Don't know how to handle device type: {device_type}  {device_name}"
 
         if input_type is None or input_id is None:
-            syslog.warning(f"Config: get last input: Unable to determine input type for device {dinput_device_guid} {device_name}")
+            syslog.warning(
+                f"Config: get last input: Unable to determine input type for device {dinput_device_guid} {device_name}"
+            )
             return (None, None, None)
 
         return (input_type, save_input_id, input_id)
 
+    def get_last_input(
+        self, device_guid=None
+    ) -> tuple:  # (device_guid, input_type, input_id)
+        """gets the last input for a given device
 
-    def get_last_input(self, device_guid = None) -> tuple: # (device_guid, input_type, input_id)
-        ''' gets the last input for a given device
-         
         :param device_guid: (optional) the device to look for - if None - uses the last known device
         :returns tuple: (device_guid, input_type, input_id)
-           
-        '''
+
+        """
 
         # syslog = logging.getLogger("system")
-
 
         if device_guid is None:
             # get the last profile device guid saved to config
@@ -1588,7 +1545,11 @@ class Configuration:
                 input_type = gremlin.input_types.InputType.to_enum(input_type)
             input_id = self._data.get("last_input_id", None)
 
-            if device_guid is not None and input_type is not None and input_id is not None:
+            if (
+                device_guid is not None
+                and input_type is not None
+                and input_id is not None
+            ):
                 return (device_guid, input_type, input_id)
 
             if device_guid is None:
@@ -1608,82 +1569,89 @@ class Configuration:
             device_guid = str(device_guid)
         else:
             dinput_device_guid = gremlin.util.parse_guid(device_guid)
-        data : dict = self._profile_data.get("last_input", {})
+        data: dict = self._profile_data.get("last_input", {})
         if device_guid in data:
             input_type, input_id = data[device_guid]
             try:
                 input_type = gremlin.input_types.InputType.to_enum(input_type)
             except:
-                syslog.error(f"GetLastInput(): unable to convert input type {input_type} to a known type")
+                syslog.error(
+                    f"GetLastInput(): unable to convert input type {input_type} to a known type"
+                )
                 input_type = gremlin.input_types.InputType.NotSet
 
             if input_id is not None and isinstance(input_id, int):
                 return (device_guid, input_type, input_id)
-            
+
             if input_id is not None:
-                input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
+                input_type, save_input_id, input_id = self._get_input_id(
+                    dinput_device_guid, input_id
+                )
                 if input_type is None:
                     if verbose:
-                        syslog.info(f"Loading input selection: nothing found for {device_guid} {device_name}")
+                        syslog.info(
+                            f"Loading input selection: nothing found for {device_guid} {device_name}"
+                        )
                     return (None, None, None)
                 if verbose:
-                    syslog.info(f"Loading saved input selection: {device_guid} {device_name} {input_type} {input_id}")
+                    syslog.info(
+                        f"Loading saved input selection: {device_guid} {device_name} {input_type} {input_id}"
+                    )
 
                 try:
                     input_type = gremlin.input_types.InputType.to_enum(input_type)
                 except:
-                    syslog.error(f"GetLastInput(): unable to convert input type {input_type} to a known type")
+                    syslog.error(
+                        f"GetLastInput(): unable to convert input type {input_type} to a known type"
+                    )
                     input_type = gremlin.input_types.InputType.NotSet
                 return (device_guid, input_type, input_id)
         # provide a suitable default for the input
         input_id = None
         if dinput_device_guid in gremlin.shared_state.device_type_map:
-            input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid,  input_id)             
+            input_type, save_input_id, input_id = self._get_input_id(
+                dinput_device_guid, input_id
+            )
             if input_type is not None and input_id is not None:
                 # save the new defaults
                 data[device_guid] = (input_type, save_input_id)
                 self._profile_data["last_input"] = data
                 self.save_profile()
                 if verbose:
-                    syslog.info(f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}")
+                    syslog.info(
+                        f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}"
+                    )
                 return (device_guid, input_type, input_id)
-            
 
         if verbose:
-            syslog.info(f"Loading input selection: nothing found for {device_guid} {device_name}")
+            syslog.info(
+                f"Loading input selection: nothing found for {device_guid} {device_name}"
+            )
         return (None, None, None)
-        
-
-
-        
 
     def ensure_profile(self, profile):
-        ''' called when a new profile is created '''
+        """called when a new profile is created"""
 
         if not profile or not profile.profile_file:
-            return # nothing to do - no profile
-        
+            return  # nothing to do - no profile
+
         if self._profile_fname == profile.profile_file:
-            return # nothing to do - same profile        
-        
+            return  # nothing to do - same profile
+
         self._profile_fname = profile.profile_file
         fname = self.get_profile_config()
-        
-        
-        
+
         self._profile_config_fname = fname
-        self.reload_profile()            
+        self.reload_profile()
 
         # hook profile load
         if not self._profile_loaded:
             eh = gremlin.event_handler.EventListener()
             eh.profile_changed.connect(self._profile_changed_cb)
             self._profile_loaded = True
-        
 
         if self._profile_fname and not os.path.isfile(self._profile_fname):
             self.save_profile()
-
 
     @QtCore.Slot()
     def _profile_changed_cb(self):
@@ -1692,7 +1660,8 @@ class Configuration:
 
     @property
     def debug_ui(self):
-        return self._data.get("debug_ui",False)
+        return self._data.get("debug_ui", False)
+
     @debug_ui.setter
     def debug_ui(self, value):
         self._data["debug_ui"] = value
@@ -1700,94 +1669,93 @@ class Configuration:
 
     @property
     def button_grid_visible(self) -> bool:
-        ''' default state of the button grid in vjoy remap '''
+        """default state of the button grid in vjoy remap"""
         return self._data.get("button_grid_visible", True)
+
     @button_grid_visible.setter
-    def button_grid_visible(self, value : bool):
+    def button_grid_visible(self, value: bool):
         self._data["button_grid_visible"] = value
         self.save()
 
     @property
     def midi_enabled(self) -> bool:
-        ''' true if MIDI support is enabled '''
+        """true if MIDI support is enabled"""
         if self._midi_enabled is None:
             from gremlin.ui.midi_device import MidiInterface
-            midi = MidiInterface()
-            self._midi_enabled = midi.midi_enabled and self._data.get("midi_enabled", True)
-        return self._midi_enabled
-    
-    @midi_enabled.setter
-    def midi_enabled(self, value : bool):
-        self._data["midi_enabled"] = value
-        self._midi_enabled = None # force a re-read 
-        
 
+            midi = MidiInterface()
+            self._midi_enabled = midi.midi_enabled and self._data.get(
+                "midi_enabled", True
+            )
+        return self._midi_enabled
+
+    @midi_enabled.setter
+    def midi_enabled(self, value: bool):
+        self._data["midi_enabled"] = value
+        self._midi_enabled = None  # force a re-read
 
     @property
     def osc_enabled(self) -> bool:
-        ''' True if OSC support is enabled'''
+        """True if OSC support is enabled"""
         if self._osc_enabled is None:
             self._osc_enabled = self._data.get("osc_enabled", True)
         return self._osc_enabled
-    
-        
-    @osc_enabled.setter
-    def osc_enabled(self, value : bool):
-        self._data["osc_enabled"] = value
-        self._osc_enabled = None # force a re-read 
 
+    @osc_enabled.setter
+    def osc_enabled(self, value: bool):
+        self._data["osc_enabled"] = value
+        self._osc_enabled = None  # force a re-read
 
     # @property
     # def splitter_pos(self) -> int:
     #     ''' splitter config  '''
     #     return self._data.get("splitter_config", 250)
-    
+
     # @splitter_pos.setter
     # def splitter_pos(self, data : int):
     #     self._data["splitter_config"] = data
 
-    @property 
+    @property
     def mapping_rollover_mode(self):
-        return self._data.get("mapping_rollover_mode",1)
-    
+        return self._data.get("mapping_rollover_mode", 1)
+
     @mapping_rollover_mode.setter
-    def mapping_rollover_mode(self, mode : int):
+    def mapping_rollover_mode(self, mode: int):
         self._data["mapping_rollover_mode"] = mode
         self.save()
 
-    @property 
+    @property
     def mapping_vjoy_id(self):
-        return self._data.get("mapping_vjoy_id",1)
+        return self._data.get("mapping_vjoy_id", 1)
 
     @mapping_vjoy_id.setter
-    def mapping_vjoy_id(self, id : int):
+    def mapping_vjoy_id(self, id: int):
         self._data["mapping_vjoy_id"] = id
-        self.save()        
+        self.save()
 
-    @property 
+    @property
     def convert_response_curve(self):
         return self._data.get("convert_response_curve", True)
 
     @convert_response_curve.setter
-    def convert_response_curve(self, value : bool):
+    def convert_response_curve(self, value: bool):
         self._data["convert_response_curve"] = value
-        self.save()   
+        self.save()
 
-    @property 
+    @property
     def convert_vjoy_remap(self):
         return self._data.get("convert_vjoy_remap", False)
 
     @convert_vjoy_remap.setter
     def convert_vjoy_remap(self, value: bool):
         self._data["convert_vjoy_remap"] = value
-        self.save()   
-
+        self.save()
 
     @property
     def numlock_off(self) -> bool:
-        ''' force numlock off - global setting '''
+        """force numlock off - global setting"""
         return self._data.get("numlock_off", True)
-    
+
     @numlock_off.setter
     def numlock_off(self, value: bool):
         self._data["numlock_off"] = value
@@ -1795,20 +1763,19 @@ class Configuration:
 
     @property
     def condition_selector(self) -> str:
-        ''' last selected condition selector '''
-        return self._data.get("condition_selector","Joystick Condition")
-    
+        """last selected condition selector"""
+        return self._data.get("condition_selector", "Joystick Condition")
+
     @condition_selector.setter
     def condition_selector(self, value: str):
         self._data["condition_selector"] = value
         self.save()
 
-
     @property
     def experimental(self) -> bool:
-        ''' true if internal dev mode '''
-        return self._data.get("experimental",False)
-    
+        """true if internal dev mode"""
+        return self._data.get("experimental", False)
+
     @experimental.setter
     def experimental(self, value: bool):
         self._data["experimental"] = value
@@ -1816,116 +1783,114 @@ class Configuration:
 
     @property
     def show_input_enable(self) -> bool:
-        return self._data.get("show_input_enable",False)
+        return self._data.get("show_input_enable", False)
+
     @show_input_enable.setter
     def show_input_enable(self, value: bool):
         self._data["show_input_enable"] = value
         self.save()
 
-
-
-    def getWindowSize(self, key : str):
-        ''' gets window geometry size'''
-        data = self._data.get("window_geo_size",{})
+    def getWindowSize(self, key: str):
+        """gets window geometry size"""
+        data = self._data.get("window_geo_size", {})
         if key in data:
             return data[key]
-        return None 
+        return None
 
-    def setWindowSize(self, key : str, width : int, height : int):
-        ''' sets window geometry size '''
-        data = self._data.get("window_geo_size",{})
+    def setWindowSize(self, key: str, width: int, height: int):
+        """sets window geometry size"""
+        data = self._data.get("window_geo_size", {})
         data[key] = [width, height]
         self._data["window_geo_size"] = data
         self.save()
 
-
-    def getWindowLocation(self, key : str):
-        ''' gets window geometry location '''
-        data = self._data.get("window_geo_loc",{})
+    def getWindowLocation(self, key: str):
+        """gets window geometry location"""
+        data = self._data.get("window_geo_loc", {})
         if key in data:
             return data[key]
-        return None 
+        return None
 
-    def setWindowLocation(self, key : str, x : int, y : int):
-        ''' sets window geometry location '''
-        data = self._data.get("window_geo_loc",{})
+    def setWindowLocation(self, key: str, x: int, y: int):
+        """sets window geometry location"""
+        data = self._data.get("window_geo_loc", {})
         data[key] = [x, y]
         self._data["window_geo_loc"] = data
         self.save()
 
-
     def clearWindowData(self):
-        ''' resets saved window data '''
+        """resets saved window data"""
         self._data["window_geo_loc"] = {}
         self._data["window_geo_size"] = {}
         self.save()
 
-    
-    @property 
+    @property
     def backup_count(self) -> int:
-         return self._data.get("backup_count", 5)
+        return self._data.get("backup_count", 5)
+
     @backup_count.setter
     def backup_count(self, value: int):
         if value < 0:
             value = 0
         elif value > 50:
             value = 50
-        self._data["backup_count"]= value
+        self._data["backup_count"] = value
         self.save()
-
 
     @property
     def start_on_f5(self) -> bool:
         return self._data.get("start_on_f5", False)
+
     @start_on_f5.setter
-    def start_on_f5(self, value:bool):
+    def start_on_f5(self, value: bool):
         self._data["start_on_f5"] = value
         self.save()
-
 
     @property
     def keyboard_repeater_invert_display(self) -> bool:
         return self._data.get("keyboard_repeater_invert_display", False)
-    
+
     @keyboard_repeater_invert_display.setter
-    def keyboard_repeater_invert_display(self, value : bool):
+    def keyboard_repeater_invert_display(self, value: bool):
         self._data["keyboard_repeater_invert_display"] = value
         self.save()
 
     @property
     def keyboard_repeater_capture_mouse(self) -> bool:
         return self._data.get("keyboard_repeater_capture_mouse", False)
-    
+
     @keyboard_repeater_capture_mouse.setter
-    def keyboard_repeater_capture_mouse(self, value : bool):
+    def keyboard_repeater_capture_mouse(self, value: bool):
         self._data["keyboard_repeater_capture_mouse"] = value
         self.save()
 
     @property
     def keyboard_repeater_show(self) -> bool:
         return self._data.get("keyboard_repeater_show", True)
-    
+
     @keyboard_repeater_show.setter
-    def keyboard_repeater_show(self, value : bool):
+    def keyboard_repeater_show(self, value: bool):
         self._data["keyboard_repeater_show"] = value
         self.save()
 
     @property
     def theme(self) -> str:
-        return self._data.get("theme","auto")
+        return self._data.get("theme", "auto")
+
     @theme.setter
-    def theme(self, value :str):
+    def theme(self, value: str):
         if value:
             value = value.casefold()
-            if value in ("auto","light","dark"):
+            if value in ("auto", "light", "dark"):
                 self._data["theme"] = value
                 self.save()
 
     @property
     def keySize(self) -> int:
-        ''' size of keys for the virtual keyboard'''
-        return self._data.get("keySize",1)
+        """size of keys for the virtual keyboard"""
+        return self._data.get("keySize", 1)
+
     @keySize.setter
-    def keySize(self, value : int):
-         self._data["keySize"] = value
-         self.save()
+    def keySize(self, value: int):
+        self._data["keySize"] = value
+        self.save()

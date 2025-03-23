@@ -16,15 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
 import sys
+
 sys.path.append(".")
 
-import pytest
 import uuid
 from lxml import etree as ElementTree
 
-import dinput
-import gremlin.error as error
-import gremlin.joystick_handling
 import gremlin.types as types
 import gremlin.profile_library as profile_library
 
@@ -80,8 +77,7 @@ xml_axis = """
 
 def test_ctor(joystick_init):
     r = map_to_vjoy.MapToVjoyModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
+        profile_library.ActionTree(), types.InputType.JoystickButton
     )
 
     assert r.vjoy_device_id == 1
@@ -93,8 +89,7 @@ def test_ctor(joystick_init):
 
 def test_from_xml():
     r = map_to_vjoy.MapToVjoyModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
+        profile_library.ActionTree(), types.InputType.JoystickButton
     )
     r.from_xml(ElementTree.fromstring(xml_button))
     assert r.vjoy_device_id == 1
@@ -114,8 +109,7 @@ def test_from_xml():
 
 def test_to_xml():
     r = map_to_vjoy.MapToVjoyModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
+        profile_library.ActionTree(), types.InputType.JoystickButton
     )
 
     r._id = uuid.UUID("ac905a47-9ad3-4b65-b702-fbae1d133609")
@@ -124,15 +118,9 @@ def test_to_xml():
     r.vjoy_input_type = types.InputType.JoystickButton
 
     node = r.to_xml()
-    assert node.find(
-            "./property/name[.='vjoy-device-id']/../value"
-        ).text == "2"
-    assert node.find(
-            "./property/name[.='vjoy-input-id']/../value"
-        ).text == "14"
-    assert node.find(
-            "./property/name[.='vjoy-input-type']/../value"
-        ).text == "button"
+    assert node.find("./property/name[.='vjoy-device-id']/../value").text == "2"
+    assert node.find("./property/name[.='vjoy-input-id']/../value").text == "14"
+    assert node.find("./property/name[.='vjoy-input-type']/../value").text == "button"
     assert node.find("./property/name[.='axis-mode']") == None
     assert node.find("./property/name[.='axis-scaling']") == None
 
@@ -141,18 +129,8 @@ def test_to_xml():
     r.axis_scaling = 0.75
 
     node = r.to_xml()
-    assert node.find(
-        "./property/name[.='vjoy-device-id']/../value"
-    ).text == "2"
-    assert node.find(
-        "./property/name[.='vjoy-input-id']/../value"
-    ).text == "14"
-    assert node.find(
-        "./property/name[.='vjoy-input-type']/../value"
-    ).text == "axis"
-    assert node.find(
-        "./property/name[.='axis-mode']/../value"
-    ).text == "absolute"
-    assert node.find(
-        "./property/name[.='axis-scaling']/../value"
-    ).text == "0.75"
+    assert node.find("./property/name[.='vjoy-device-id']/../value").text == "2"
+    assert node.find("./property/name[.='vjoy-input-id']/../value").text == "14"
+    assert node.find("./property/name[.='vjoy-input-type']/../value").text == "axis"
+    assert node.find("./property/name[.='axis-mode']/../value").text == "absolute"
+    assert node.find("./property/name[.='axis-scaling']/../value").text == "0.75"

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,9 +35,9 @@ PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 syslog = logging.getLogger("system")
 
+
 @SingletonDecorator
 class ProcessMonitor(QtCore.QObject):
-
     """Monitors the currently active window process.
 
     This class continuously monitors the active window and whenever
@@ -47,9 +47,6 @@ class ProcessMonitor(QtCore.QObject):
 
     # Signal emitted when the active window changes
     process_changed = QtCore.Signal(str)
-
-
-
 
     def __init__(self):
         """Creates a new instance."""
@@ -65,23 +62,22 @@ class ProcessMonitor(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.stop)
         el.profile_start.connect(self.start)
-        #el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
+        # el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
         el.process_monitor_changed.connect(self._check_monitor)
-
 
     @property
     def enabled(self) -> bool:
         return self._enabled
-    
+
     @enabled.setter
-    def enabled(self, value : bool):
+    def enabled(self, value: bool):
         self._enabled = value
         if not value and self._running:
-            # stop the profile auto 
+            # stop the profile auto
             self.stop()
 
     def _check_monitor(self):
-        ''' executes when process monitoring related actions change '''
+        """executes when process monitoring related actions change"""
         config = gremlin.config.Configuration()
         option_auto_load = config.autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
@@ -90,8 +86,6 @@ class ProcessMonitor(QtCore.QObject):
         if option_auto_load_on_focus:
             # start monitoring processes if auto activating based on processes
             self.start()
-        
-
 
     def start(self):
         """Starts monitoring the current process."""
@@ -99,7 +93,7 @@ class ProcessMonitor(QtCore.QObject):
         option_auto_load = config.autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
         syslog = logging.getLogger("system")
-        
+
         if option_auto_load or option_auto_load_on_focus:
             self._enabled = True
             if not self._running:
@@ -108,13 +102,12 @@ class ProcessMonitor(QtCore.QObject):
                 self._running = True
                 self._update_thread = threading.Thread(target=self._update, daemon=True)
                 self._update_thread.start()
-            
 
     def stop(self):
         """Stops monitoring the current process."""
         if not self._running:
-            return # nothing to do
-            
+            return  # nothing to do
+
         self._running = False
         # verbose = gremlin.config.Configuration().verbose_mode_process
         syslog = logging.getLogger("system")
@@ -128,22 +121,19 @@ class ProcessMonitor(QtCore.QObject):
         """Monitors the active process for changes."""
         while self._running:
             if self._enabled:
-                _, pid = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
+                _, pid = win32process.GetWindowThreadProcessId(
+                    win32gui.GetForegroundWindow()
+                )
 
                 if pid != self._current_pid:
                     self._current_pid = pid
                     handle = self.kernel32.OpenProcess(
-                        PROCESS_QUERY_LIMITED_INFORMATION,
-                        False,
-                        pid
+                        PROCESS_QUERY_LIMITED_INFORMATION, False, pid
                     )
 
                     self._buffer_size = ctypes.wintypes.DWORD(1024)
                     self.kernel32.QueryFullProcessImageNameA(
-                        handle,
-                        0,
-                        self._buffer,
-                        ctypes.byref(self._buffer_size)
+                        handle, 0, self._buffer, ctypes.byref(self._buffer_size)
                     )
                     self.kernel32.CloseHandle(handle)
 
@@ -169,7 +159,8 @@ def list_current_processes():
     :return list of active process executable paths
     """
     from win32com.client import GetObject
-    wmi = GetObject('winmgmts:')
+
+    wmi = GetObject("winmgmts:")
     processes = wmi.InstancesOf("Win32_Process")
     process_list = []
     for entry in processes:

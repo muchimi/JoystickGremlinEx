@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,31 +20,27 @@ import threading
 
 
 class AbortableThread(threading.Thread):
-    ''' killable thread '''
+    """killable thread"""
 
     def __init__(self, *args, **kwargs):
-
         super().__init__(*args, **kwargs)
-        
+
         import gremlin.event_handler
 
         eh = gremlin.event_handler.EventListener()
         eh.shutdown.connect(self.stop)
-        
-        #self._stop_event = threading.Event()
+
+        # self._stop_event = threading.Event()
         self._shutdown_requested = False
 
-
     def reset(self):
-        ''' reset the thread'''
+        """reset the thread"""
         self._shutdown_requested = False
 
     def stop(self):
-        #self._stop_event.set()
+        # self._stop_event.set()
         self._shutdown_requested = True
 
     def stopped(self):
         return self._shutdown_requested
-        #return self._stop_event.is_set()
-
-
+        # return self._stop_event.is_set()

@@ -42,7 +42,6 @@ QML_IMPORT_MAJOR_VERSION = 1
 
 @QtQml.QmlElement
 class InputItemModel(QtCore.QObject):
-
     """QML model class representing a LibraryItem instance."""
 
     bindingsChanged = Signal()
@@ -54,10 +53,7 @@ class InputItemModel(QtCore.QObject):
 
     @Property(QtCore.QObject, notify=bindingsChanged)
     def inputItemBindings(self) -> InputItemBindingListModel:
-        return InputItemBindingListModel(
-            self._input_item.action_configurations,
-            self
-        )
+        return InputItemBindingListModel(self._input_item.action_configurations, self)
 
     @Slot(str, str, str)
     def dropAction(self, source: str, target: str, method: str) -> None:
@@ -85,14 +81,13 @@ class InputItemModel(QtCore.QObject):
             for idx, entry in enumerate(self._input_item.action_configurations):
                 entry_id = entry.library_reference.action_tree.root.value.id
                 if entry_id == target_id:
-                    self._input_item.action_configurations.insert(idx+1, source_entry)
+                    self._input_item.action_configurations.insert(idx + 1, source_entry)
 
         self.bindingsChanged.emit()
 
 
 @QtQml.QmlElement
 class InputItemBindingListModel(QtCore.QAbstractListModel):
-
     """List model of all InputItemBinding instances of a single input item."""
 
     # This fake single role and the roleName function are needed to have the
@@ -106,13 +101,12 @@ class InputItemBindingListModel(QtCore.QAbstractListModel):
 
         self._action_configurations = items
 
-    def rowCount(self, parent: QtCore.QModelIndex=...) -> int:
+    def rowCount(self, parent: QtCore.QModelIndex = ...) -> int:
         return len(self._action_configurations)
 
-    def data(self, index: QtCore.QModelIndex, role: int=...) -> typing.Any:
+    def data(self, index: QtCore.QModelIndex, role: int = ...) -> typing.Any:
         return InputItemBindingModel(
-            self._action_configurations[index.row()],
-            parent=self
+            self._action_configurations[index.row()], parent=self
         )
 
     def roleNames(self) -> typing.Dict:
@@ -121,7 +115,6 @@ class InputItemBindingListModel(QtCore.QAbstractListModel):
 
 @QtQml.QmlElement
 class VirtualButtonModel(QtCore.QObject):
-
     """Represents both axis and hat virtual buttons."""
 
     lowerLimitChanged = Signal()
@@ -133,7 +126,7 @@ class VirtualButtonModel(QtCore.QObject):
     def __init__(
         self,
         virtual_button: profile.AbstractVirtualButton,
-        parent: Optional[QtCore.QObject]=None
+        parent: Optional[QtCore.QObject] = None,
     ):
         """Creates a new instance.
 
@@ -193,92 +186,93 @@ class VirtualButtonModel(QtCore.QObject):
                 self.hatDirectionChanged.emit()
 
     lowerLimit = Property(
-        float,
-        fget=_get_lower_limit,
-        fset=_set_lower_limit,
-        notify=lowerLimitChanged
+        float, fget=_get_lower_limit, fset=_set_lower_limit, notify=lowerLimitChanged
     )
     upperLimit = Property(
-        float,
-        fget=_get_upper_limit,
-        fset=_set_upper_limit,
-        notify=upperLimitChanged
+        float, fget=_get_upper_limit, fset=_set_upper_limit, notify=upperLimitChanged
     )
     direction = Property(
-        str,
-        fget=_get_direction,
-        fset=_set_direction,
-        notify=directionChanged
+        str, fget=_get_direction, fset=_set_direction, notify=directionChanged
     )
 
     enabled = Property(
-        bool,
-        fget=_get_enabled,
-        fset=_set_enabled,
-        notify=enabledChanged
+        bool, fget=_get_enabled, fset=_set_enabled, notify=enabledChanged
     )
 
     hatNorth = Property(
         bool,
         fget=lambda cls: VirtualButtonModel._get_hat_state(cls, HatDirection.North),
-        fset=lambda cls, x: VirtualButtonModel._set_hat_state(cls, HatDirection.North, x),
-        notify=hatDirectionChanged
+        fset=lambda cls, x: VirtualButtonModel._set_hat_state(
+            cls, HatDirection.North, x
+        ),
+        notify=hatDirectionChanged,
     )
     hatNorthEast = Property(
         bool,
         fget=lambda cls: VirtualButtonModel._get_hat_state(cls, HatDirection.NorthEast),
-        fset=lambda cls, x: VirtualButtonModel._set_hat_state(cls, HatDirection.NorthEast, x),
-        notify=hatDirectionChanged
+        fset=lambda cls, x: VirtualButtonModel._set_hat_state(
+            cls, HatDirection.NorthEast, x
+        ),
+        notify=hatDirectionChanged,
     )
     hatEast = Property(
         bool,
         fget=lambda cls: VirtualButtonModel._get_hat_state(cls, HatDirection.East),
-        fset=lambda cls, x: VirtualButtonModel._set_hat_state(cls, HatDirection.East, x),
-        notify=hatDirectionChanged
+        fset=lambda cls, x: VirtualButtonModel._set_hat_state(
+            cls, HatDirection.East, x
+        ),
+        notify=hatDirectionChanged,
     )
     hatSouthEast = Property(
         bool,
         fget=lambda cls: VirtualButtonModel._get_hat_state(cls, HatDirection.SouthEast),
-        fset=lambda cls, x: VirtualButtonModel._set_hat_state(cls, HatDirection.SouthEast, x),
-        notify=hatDirectionChanged
+        fset=lambda cls, x: VirtualButtonModel._set_hat_state(
+            cls, HatDirection.SouthEast, x
+        ),
+        notify=hatDirectionChanged,
     )
     hatSouth = Property(
         bool,
         fget=lambda cls: VirtualButtonModel._get_hat_state(cls, HatDirection.South),
-        fset=lambda cls, x: VirtualButtonModel._set_hat_state(cls, HatDirection.South, x),
-        notify=hatDirectionChanged
+        fset=lambda cls, x: VirtualButtonModel._set_hat_state(
+            cls, HatDirection.South, x
+        ),
+        notify=hatDirectionChanged,
     )
     hatSouthWest = Property(
         bool,
         fget=lambda cls: VirtualButtonModel._get_hat_state(cls, HatDirection.SouthWest),
-        fset=lambda cls, x: VirtualButtonModel._set_hat_state(cls, HatDirection.SouthWest, x),
-        notify=hatDirectionChanged
+        fset=lambda cls, x: VirtualButtonModel._set_hat_state(
+            cls, HatDirection.SouthWest, x
+        ),
+        notify=hatDirectionChanged,
     )
     hatWest = Property(
         bool,
         fget=lambda cls: VirtualButtonModel._get_hat_state(cls, HatDirection.West),
-        fset=lambda cls, x: VirtualButtonModel._set_hat_state(cls, HatDirection.West, x),
-        notify=hatDirectionChanged
+        fset=lambda cls, x: VirtualButtonModel._set_hat_state(
+            cls, HatDirection.West, x
+        ),
+        notify=hatDirectionChanged,
     )
     hatNorthWest = Property(
         bool,
         fget=lambda cls: VirtualButtonModel._get_hat_state(cls, HatDirection.NorthWest),
-        fset=lambda cls, x: VirtualButtonModel._set_hat_state(cls, HatDirection.NorthWest, x),
-        notify=hatDirectionChanged
+        fset=lambda cls, x: VirtualButtonModel._set_hat_state(
+            cls, HatDirection.NorthWest, x
+        ),
+        notify=hatDirectionChanged,
     )
 
 
 @QtQml.QmlElement
 class HatDirectionModel(QtCore.QObject):
-
     """QML model representing the directions of a hat."""
 
     directionsChanged = Signal()
 
     def __init__(
-        self,
-        directions: List[HatDirection],
-        parent: Optional[QtCore.QObject]=None
+        self, directions: List[HatDirection], parent: Optional[QtCore.QObject] = None
     ):
         super().__init__(parent)
 
@@ -301,66 +295,77 @@ class HatDirectionModel(QtCore.QObject):
     hatNorth = Property(
         bool,
         fget=lambda cls: HatDirectionModel._get_hat_state(cls, HatDirection.North),
-        fset=lambda cls, x: HatDirectionModel._set_hat_state(cls, HatDirection.North, x),
-        notify=directionsChanged
+        fset=lambda cls, x: HatDirectionModel._set_hat_state(
+            cls, HatDirection.North, x
+        ),
+        notify=directionsChanged,
     )
     hatNorthEast = Property(
         bool,
         fget=lambda cls: HatDirectionModel._get_hat_state(cls, HatDirection.NorthEast),
-        fset=lambda cls, x: HatDirectionModel._set_hat_state(cls, HatDirection.NorthEast, x),
-        notify=directionsChanged
+        fset=lambda cls, x: HatDirectionModel._set_hat_state(
+            cls, HatDirection.NorthEast, x
+        ),
+        notify=directionsChanged,
     )
     hatEast = Property(
         bool,
         fget=lambda cls: HatDirectionModel._get_hat_state(cls, HatDirection.East),
         fset=lambda cls, x: HatDirectionModel._set_hat_state(cls, HatDirection.East, x),
-        notify=directionsChanged
+        notify=directionsChanged,
     )
     hatSouthEast = Property(
         bool,
         fget=lambda cls: HatDirectionModel._get_hat_state(cls, HatDirection.SouthEast),
-        fset=lambda cls, x: HatDirectionModel._set_hat_state(cls, HatDirection.SouthEast, x),
-        notify=directionsChanged
+        fset=lambda cls, x: HatDirectionModel._set_hat_state(
+            cls, HatDirection.SouthEast, x
+        ),
+        notify=directionsChanged,
     )
     hatSouth = Property(
         bool,
         fget=lambda cls: HatDirectionModel._get_hat_state(cls, HatDirection.South),
-        fset=lambda cls, x: HatDirectionModel._set_hat_state(cls, HatDirection.South, x),
-        notify=directionsChanged
+        fset=lambda cls, x: HatDirectionModel._set_hat_state(
+            cls, HatDirection.South, x
+        ),
+        notify=directionsChanged,
     )
     hatSouthWest = Property(
         bool,
         fget=lambda cls: HatDirectionModel._get_hat_state(cls, HatDirection.SouthWest),
-        fset=lambda cls, x: HatDirectionModel._set_hat_state(cls, HatDirection.SouthWest, x),
-        notify=directionsChanged
+        fset=lambda cls, x: HatDirectionModel._set_hat_state(
+            cls, HatDirection.SouthWest, x
+        ),
+        notify=directionsChanged,
     )
     hatWest = Property(
         bool,
         fget=lambda cls: HatDirectionModel._get_hat_state(cls, HatDirection.West),
         fset=lambda cls, x: HatDirectionModel._set_hat_state(cls, HatDirection.West, x),
-        notify=directionsChanged
+        notify=directionsChanged,
     )
     hatNorthWest = Property(
         bool,
         fget=lambda cls: HatDirectionModel._get_hat_state(cls, HatDirection.NorthWest),
-        fset=lambda cls, x: HatDirectionModel._set_hat_state(cls, HatDirection.NorthWest, x),
-        notify=directionsChanged
+        fset=lambda cls, x: HatDirectionModel._set_hat_state(
+            cls, HatDirection.NorthWest, x
+        ),
+        notify=directionsChanged,
     )
 
 
 @QtQml.QmlElement
 class ActionNodeModel(QtCore.QObject):
-
     """QML model representing a single action instance."""
 
     actionChanged = Signal()
 
     def __init__(
-            self,
-            node: tree.TreeNode,
-            input_type: InputType,
-            action_tree: ActionTree,
-            parent=None
+        self,
+        node: tree.TreeNode,
+        input_type: InputType,
+        action_tree: ActionTree,
+        parent=None,
     ):
         super().__init__(parent)
 
@@ -381,6 +386,7 @@ class ActionNodeModel(QtCore.QObject):
         return self._action_tree
 
     Property(type=InputType, notify=actionChanged)
+
     def inputType(self) -> InputType:
         return self._input_type
 
@@ -468,8 +474,7 @@ class ActionNodeModel(QtCore.QObject):
                 # Perform reordering on the parent node level if needed
                 source_node.parent.value.remove_action(source_node.value)
                 target_node.parent.value.add_action_after(
-                    target_node.value,
-                    source_node.value
+                    target_node.value, source_node.value
                 )
 
                 # Perform reordering on the logical tree level
@@ -489,8 +494,7 @@ class ActionNodeModel(QtCore.QObject):
             action_name: name of the action to add
         """
         action = plugin_manager.ActionPlugins().get_class(action_name)(
-            self._action_tree,
-            self._input_type
+            self._action_tree, self._input_type
         )
         if self._node.parent is None:
             TreeNode(action, self._node)
@@ -552,7 +556,10 @@ class ActionNodeModel(QtCore.QObject):
         Returns:
             The TreeNode corresponding to the given uuid
         """
-        predicate = lambda x: True if x.value and x.value.id == uuid else False
+        def predicate(x):
+            return True if x.value and x.value.id == uuid else False
+
+        predicate = predicate(uuid)
         nodes = self._action_tree.root.nodes_matching(predicate)
 
         if len(nodes) != 1:
@@ -562,7 +569,6 @@ class ActionNodeModel(QtCore.QObject):
 
 @QtQml.QmlElement
 class InputItemBindingModel(QtCore.QObject):
-
     """Model representing an ActionTree instance."""
 
     behaviorChanged = Signal()
@@ -572,11 +578,7 @@ class InputItemBindingModel(QtCore.QObject):
     rootActionChanged = Signal()
     inputTypeChanged = Signal()
 
-    def __init__(
-            self,
-            input_item_binding: profile.InputItemBinding,
-            parent=None
-    ):
+    def __init__(self, input_item_binding: profile.InputItemBinding, parent=None):
         super().__init__(parent)
 
         self._input_item_binding = input_item_binding
@@ -591,7 +593,7 @@ class InputItemBindingModel(QtCore.QObject):
             self._action_tree.root,
             self._input_item_binding.behavior,
             self._action_tree,
-            parent=self
+            parent=self,
         )
 
     @Property(type=list, notify=rootActionChanged)
@@ -599,19 +601,19 @@ class InputItemBindingModel(QtCore.QObject):
         nodes = []
         for node in self._action_tree.root.children:
             node.value.setParent(self)
-            nodes.append(ActionNodeModel(
-                node,
-                self._input_item_binding.behavior,
-                self._action_tree,
-                parent=self
-            ))
+            nodes.append(
+                ActionNodeModel(
+                    node,
+                    self._input_item_binding.behavior,
+                    self._action_tree,
+                    parent=self,
+                )
+            )
         return nodes
 
     @Property(type=str, notify=inputTypeChanged)
     def inputType(self) -> str:
-        return InputType.to_string(
-            self._input_item_binding.input_item.input_type
-        )
+        return InputType.to_string(self._input_item_binding.input_item.input_type)
 
     @Property(type=VirtualButtonModel, notify=virtualButtonChanged)
     def virtualButton(self) -> VirtualButtonModel:
@@ -641,25 +643,27 @@ class InputItemBindingModel(QtCore.QObject):
             # Ensure a virtual button instance exists of the correct type
             # if one is needed
             input_type = self._input_item_binding.input_item.input_type
-            if input_type == InputType.JoystickAxis and \
-                    behavior == InputType.JoystickButton:
+            if (
+                input_type == InputType.JoystickAxis
+                and behavior == InputType.JoystickButton
+            ):
                 if not isinstance(
-                        self._input_item_binding.virtual_button,
-                        profile.VirtualAxisButton
+                    self._input_item_binding.virtual_button, profile.VirtualAxisButton
                 ):
-                    self._input_item_binding.virtual_button = \
+                    self._input_item_binding.virtual_button = (
                         profile.VirtualAxisButton()
+                    )
                     self._virtual_button_model = VirtualButtonModel(
                         self._input_item_binding.virtual_button
                     )
-            elif input_type == InputType.JoystickHat and \
-                    behavior == InputType.JoystickButton:
+            elif (
+                input_type == InputType.JoystickHat
+                and behavior == InputType.JoystickButton
+            ):
                 if not isinstance(
-                        self._input_item_binding.virtual_button,
-                        profile.VirtualHatButton
+                    self._input_item_binding.virtual_button, profile.VirtualHatButton
                 ):
-                    self._input_item_binding.virtual_button = \
-                        profile.VirtualHatButton()
+                    self._input_item_binding.virtual_button = profile.VirtualHatButton()
                     self._virtual_button_model = VirtualButtonModel(
                         self._input_item_binding.virtual_button
                     )
@@ -692,15 +696,9 @@ class InputItemBindingModel(QtCore.QObject):
         return self._action_tree
 
     behavior = Property(
-        str,
-        fget=_get_behavior,
-        fset=_set_behavior,
-        notify=behaviorChanged
+        str, fget=_get_behavior, fset=_set_behavior, notify=behaviorChanged
     )
 
     description = Property(
-        str,
-        fget=_get_description,
-        fset=_set_description,
-        notify=descriptionChanged
+        str, fget=_get_description, fset=_set_description, notify=descriptionChanged
     )

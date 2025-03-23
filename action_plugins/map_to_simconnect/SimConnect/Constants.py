@@ -15,25 +15,35 @@ SIMCONNECT_OBJECT_ID_USER = DWORD(0)  # proxy value for User vehicle ObjectID
 SIMCONNECT_UNUSED = DWORD_MAX  # special value to indicate unused event, ID
 
 SIMCONNECT_CAMERA_IGNORE_FIELD = c_float(
-	-1
+    -1
 )  # Used to tell the Camera API to NOT modify the value in this part of the argument.
 
 SIMCONNECT_CLIENTDATA_MAX_SIZE = DWORD(
-	8192
+    8192
 )  # maximum value for SimConnect_CreateClientData dwSize parameter
 
 
 # Notification Group priority values
 SIMCONNECT_GROUP_PRIORITY_HIGHEST = DWORD(1)  # highest priority
-SIMCONNECT_GROUP_PRIORITY_HIGHEST_MASKABLE = DWORD(10000000)  # highest priority that allows events to be masked
+SIMCONNECT_GROUP_PRIORITY_HIGHEST_MASKABLE = DWORD(
+    10000000
+)  # highest priority that allows events to be masked
 SIMCONNECT_GROUP_PRIORITY_STANDARD = DWORD(1900000000)  # standard priority
 SIMCONNECT_GROUP_PRIORITY_DEFAULT = DWORD(2000000000)  # default priority
-SIMCONNECT_GROUP_PRIORITY_LOWEST = DWORD(4000000000)  # priorities lower than this will be ignored
+SIMCONNECT_GROUP_PRIORITY_LOWEST = DWORD(
+    4000000000
+)  # priorities lower than this will be ignored
 
-SIMCONNECT_EVENT_FLAG_DEFAULT                  = DWORD(0x00000000)
-SIMCONNECT_EVENT_FLAG_FAST_REPEAT_TIMER        = DWORD(0x00000001)  # set event repeat timer to simulate fast repeat
-SIMCONNECT_EVENT_FLAG_SLOW_REPEAT_TIMER        = DWORD(0x00000002)  # set event repeat timer to simulate slow repeat
-SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY      = DWORD(0x00000010)  # interpret GroupID parameter as priority value
+SIMCONNECT_EVENT_FLAG_DEFAULT = DWORD(0x00000000)
+SIMCONNECT_EVENT_FLAG_FAST_REPEAT_TIMER = DWORD(
+    0x00000001
+)  # set event repeat timer to simulate fast repeat
+SIMCONNECT_EVENT_FLAG_SLOW_REPEAT_TIMER = DWORD(
+    0x00000002
+)  # set event repeat timer to simulate slow repeat
+SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY = DWORD(
+    0x00000010
+)  # interpret GroupID parameter as priority value
 
 # Weather observations Metar strings
 MAX_METAR_LENGTH = DWORD(2000)
@@ -56,11 +66,11 @@ SIMCONNECT_CLIENTDATATYPE_FLOAT64 = DWORD(-6)  # 64-bit floating-point number (d
 
 # AddToClientDataDefinition dwOffset parameter special values
 SIMCONNECT_CLIENTDATAOFFSET_AUTO = DWORD(
-	-1
+    -1
 )  # automatically compute offset of the ClientData variable
 
 # Open ConfigIndex parameter special value
 SIMCONNECT_OPEN_CONFIGINDEX_LOCAL = DWORD(
-	-1
+    -1
 )  # ignore SimConnect.cfg settings, and force local connection
 SIMCONNECT_OBJECT_ID = DWORD

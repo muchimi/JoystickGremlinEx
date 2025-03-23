@@ -7,29 +7,38 @@ import collections
 import logging
 import re
 import time
-from typing import overload, List, Union, Any, Generator, Tuple, Callable, Optional, DefaultDict, Iterator, Union, cast, Coroutine, NamedTuple
-import logging
-from typing import Any, Iterator, List, Union
+from typing import (
+    overload,
+    List,
+    Any,
+    Generator,
+    Tuple,
+    Callable,
+    Optional,
+    Iterator,
+    Union,
+    cast,
+    Coroutine,
+    NamedTuple,
+)
 import asyncio
 from asyncio import BaseEventLoop
 
 import socketserver
 import socket
 from socket import socket as _socket
-import sys
 import os
 from collections.abc import Iterable
 import struct
-from datetime import datetime, timedelta, date
-from typing import NamedTuple
+from datetime import datetime, timedelta
 
 
-### gremlin start ------------------------------------------------------- 
+### gremlin start -------------------------------------------------------
 
 
 import gremlin
 import threading
-from gremlin.macro import Macro, key_from_name, MacroManager, Key, PauseAction
+from gremlin.macro import Macro, key_from_name, MacroManager
 
 
 from util import fire_event
@@ -45,62 +54,64 @@ PERIODIC = 0.25
 osc = None
 
 
-
-
-
 def GetVjoy():
-	''' get the vjoy device (virtual hardware input)'''
-	return gremlin.joystick_handling.VJoyProxy()
+    """get the vjoy device (virtual hardware input)"""
+    return gremlin.joystick_handling.VJoyProxy()
+
 
 def log(msg):
-    ''' displays a log message in Gremlin and in the console '''
+    """displays a log message in Gremlin and in the console"""
     gremlin.util.log(msg)
-    #print(msg)
+    # print(msg)
+
 
 # async routine to pulse a button
-def _fire_pulse(vjoy, unit, button, repeat = 1, duration = 0.2):
-	if repeat < 0:
-		repeat = -repeat
-		for i in range(repeat):
-			# gremlin.util.log("Pulsing vjoy %s button %s on" % (unit, button) )    
-			vjoy[unit].button(button).is_pressed = True
-			time.sleep(duration)
-			vjoy[unit].button(button).is_pressed = False
-			time.sleep(duration)
-	else:
-		if repeat <= 1: 
-			gremlin.util.log(f"Pulsing vjoy {unit} button {button} on")  
-			vjoy[unit].button(button).is_pressed = True
-			time.sleep(duration)
-			vjoy[unit].button(button).is_pressed = False
-		else:
-			vjoy[unit].button(button).is_pressed = True
-			time.sleep(duration*repeat)
-			vjoy[unit].button(button).is_pressed = False        
-		
-	# gremlin.util.log("Pulsing vjoy %s button %s off" % (unit, button) )
+def _fire_pulse(vjoy, unit, button, repeat=1, duration=0.2):
+    if repeat < 0:
+        repeat = -repeat
+        for i in range(repeat):
+            # gremlin.util.log("Pulsing vjoy %s button %s on" % (unit, button) )
+            vjoy[unit].button(button).is_pressed = True
+            time.sleep(duration)
+            vjoy[unit].button(button).is_pressed = False
+            time.sleep(duration)
+    else:
+        if repeat <= 1:
+            gremlin.util.log(f"Pulsing vjoy {unit} button {button} on")
+            vjoy[unit].button(button).is_pressed = True
+            time.sleep(duration)
+            vjoy[unit].button(button).is_pressed = False
+        else:
+            vjoy[unit].button(button).is_pressed = True
+            time.sleep(duration * repeat)
+            vjoy[unit].button(button).is_pressed = False
+
+    # gremlin.util.log("Pulsing vjoy %s button %s off" % (unit, button) )
+
 
 # pulses a button - unit is the vjoy output device number, button is the number of the button on the device to pulse
-def pulse(vjoy, unit, button, duration = 0.2, repeat = 1):
-	gremlin.util.log(f"pulsing: unit {unit} button {button}")
-	threading.Timer(0.01, _fire_pulse, [vjoy, unit, button, repeat, duration]).start()
+def pulse(vjoy, unit, button, duration=0.2, repeat=1):
+    gremlin.util.log(f"pulsing: unit {unit} button {button}")
+    threading.Timer(0.01, _fire_pulse, [vjoy, unit, button, repeat, duration]).start()
 
 
-class Speech():
-	''' tts interface '''
-	def __init__(self):
-		import win32com.client
-		self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
+class Speech:
+    """tts interface"""
 
-	def speak(self, text):
-		try:
-			self.speaker.speak(text)
-		except:
-			pass
+    def __init__(self):
+        import win32com.client
+
+        self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
+
+    def speak(self, text):
+        try:
+            self.speaker.speak(text)
+        except Exception as e:
+            gremlin.util.log(f"Error: {e}")
 
 
 def speech_handler(address, x):
-    ''' handles sending text to speech '''
+    """handles sending text to speech"""
     splits = address.split("/")
     if len(splits) < 3:
         # not enough data
@@ -109,17 +120,17 @@ def speech_handler(address, x):
     Speech().speak(speech)
 
 
-
 def keyboard_handler(address, x):
-    ''' handles keyboard commands - address is already in lowercase '''
+    """handles keyboard commands - address is already in lowercase"""
     import re
     import itertools
+
     log(f"KEYBOARD: received {address} {x}")
     splits = address.split("/")
     if len(splits) < 3:
         # not enough data
         return
-    
+
     # remove the command
     splits = splits[2:]
     pattern = re.compile(r"([+|-])|([^[\]\[]+)|(\[[0-9]+\])")
@@ -131,7 +142,6 @@ def keyboard_handler(address, x):
         # further split each section in keyboard commands
         commands = list(itertools.chain.from_iterable(pattern.findall(section)))
         for token in commands:
-            
             if token == "+":
                 key_down = True
                 continue
@@ -145,53 +155,53 @@ def keyboard_handler(address, x):
                 token = token[1:][:-1]
                 if token.isnumeric():
                     delay_ms = int(token)
-                    macro.pause(delay_ms/1000)
+                    macro.pause(delay_ms / 1000)
                 continue
 
             key = None
 
-            if token in ("ctr", "lctr", "ctrl","lctrl","leftcontrol"):
+            if token in ("ctr", "lctr", "ctrl", "lctrl", "leftcontrol"):
                 key = "leftcontrol"
             elif token in ("rctr", "rctrl", "rightcontrol"):
                 key = "rightcontrol"
-            elif token in ("shft","lshft","shift","lshift","leftshift"):
+            elif token in ("shft", "lshft", "shift", "lshift", "leftshift"):
                 key = "leftshift"
-            elif token in ("rshft", "rshift","rightshift"):
+            elif token in ("rshft", "rshift", "rightshift"):
                 key = "rightshift2"
-            elif token in ("alt", "lalt","leftalt"):
+            elif token in ("alt", "lalt", "leftalt"):
                 key = "leftalt"
             elif token == "ralt":
-                key = "rightalt2" # 0x38 TRUE
-            elif token in ("win","lwin","leftwin"):
+                key = "rightalt2"  # 0x38 TRUE
+            elif token in ("win", "lwin", "leftwin"):
                 key = "leftwin"
-            elif token in ("rwin","rightwin"):
+            elif token in ("rwin", "rightwin"):
                 key = "rightwin"
-            elif token in ("pgdn","pagedown"):
+            elif token in ("pgdn", "pagedown"):
                 key = "pagedown"
-            elif token in ("pgup","pageup"):
+            elif token in ("pgup", "pageup"):
                 key = "pageup"
             elif token == "slash":
                 key = "/"
             else:
                 # regular key - output by character
                 key = token
-            
+
             if not key:
                 # don't know how to handle
                 continue
-            
+
             a_list = []
-            
-            action_key = key_from_name(key, validate = True)
+
+            action_key = key_from_name(key, validate=True)
             if not action_key:
                 # check for text sequence that are press only without spacers - so wasd would pres w a s d separately
                 for c in key:
-                    action_key = key_from_name(c, validate = True)
+                    action_key = key_from_name(c, validate=True)
                     if action_key:
                         a_list.append(action_key)
             else:
                 a_list = [action_key]
-                    
+
             if a_list:
                 for action_key in a_list:
                     if key_down:
@@ -228,15 +238,15 @@ def keyboard_handler(address, x):
     # execute the macro if it contains anything
     if macro.sequence:
         MacroManager().queue_macro(macro)
-    
+
 
 def vjoy_handler(address, args):
-    ''' handles vjoy output '''
+    """handles vjoy output"""
     # format is /vjoy/command
     #
     # command:
     #   D[device_number]B[R][button_number][R]P[duration]A[axis_number]v[axis_value]
-    #  
+    #
     #  number: vjoy device number (1 based) so the first device is 1
     #  button_number: button 1 to 128
     #  axis_number: 1 to 8
@@ -248,17 +258,16 @@ def vjoy_handler(address, args):
     y = 0
     arg_count = len(args)
     if arg_count == 2:
-        (x,y) = args
+        (x, y) = args
     elif arg_count == 1:
         x = args[0]
-    valid = False
     splits = address.split("/")
     if len(splits) == 3:
         # get the last arg
         command = splits.pop()
-            
-        regex = r'([d]|b[r|p]?|[a]|[v])\s*([+|-]?[0-9]*[.]?[0-9]*[r]?)'
-        matches =re.findall(regex, command)
+
+        regex = r"([d]|b[r|p]?|[a]|[v])\s*([+|-]?[0-9]*[.]?[0-9]*[r]?)"
+        matches = re.findall(regex, command)
 
         vjoy_device = 0
 
@@ -269,36 +278,34 @@ def vjoy_handler(address, args):
         # current action
         action = None
 
-        for (item, data) in matches:
+        for item, data in matches:
             # something got extracted - makes sense of i
             try:
-                
                 item = item.lower()
-                
+
                 release = False
-                if  "r" in data:
-                    data = data.replace("r","")
+                if "r" in data:
+                    data = data.replace("r", "")
                     release = True
                 if "r" in item:
-                    item = item.replace("r","")
+                    item = item.replace("r", "")
                     release = True
-                
+
                 try:
                     value = int(data)
-                except:
-                    gremlin.util.log(f"Bad number format: {data} - check OSC sequence")
+                except Exception as ex:
+                    gremlin.util.log(f"Bad number format: {data} - check OSC sequence\n{ex}")
                     # ignore bad data
                     continue
-                
-                
+
                 if item == "d":
                     vjoy_device = value
-                elif item in ("b","bp","br"):
+                elif item in ("b", "bp", "br"):
                     # press action
                     action = [vjoy_device, value, not release, False, 0]
                     actions.append(action)
 
-                elif item in ("t","tb"):
+                elif item in ("t", "tb"):
                     # toggle button
                     state = vjoy[vjoy_device].button(value).is_pressed
                     action = [vjoy_device, value, not state, False, 0]
@@ -310,60 +317,60 @@ def vjoy_handler(address, args):
                         if value <= 0:
                             # make sure it's at least 200 ms to even register
                             value = 200
-                        action[4] = value/1000
+                        action[4] = value / 1000
 
                 elif item == "a":
-                    # store the value that comes in at 0 to 1 to range -1 to +1 
-                    axis_action = [vjoy_device, value, x*2 - 1]
+                    # store the value that comes in at 0 to 1 to range -1 to +1
+                    axis_action = [vjoy_device, value, x * 2 - 1]
                     axis_actions.append(axis_action)
                 elif item == "v":
                     # sets the axis to a known value -1000 to +1000
                     if axis_action:
                         # current axis action from setup
-                        v = float(data)/1000
-                        if v > 1.0: 
+                        v = float(data) / 1000
+                        if v > 1.0:
                             v = 1.0
-                        elif v < -1.0: 
+                        elif v < -1.0:
                             v = -1.0
 
-                        axis_action[2]= v
+                        axis_action[2] = v
 
-                
-            except:
-                log(f"Unable to parse command: {command}")
-                
-        
+            except Exception as ex:
+                log(f"Unable to parse command: {command} with error: {ex}")
+
         # process the command
-        for (vjoy_device, vjoy_button, is_pressed, is_pulse, duration) in actions:
+        for vjoy_device, vjoy_button, is_pressed, is_pulse, duration in actions:
             if 0 < vjoy_device <= 8 and 0 < vjoy_button <= 128:
                 # valid
                 if is_pulse:
                     pulse(vjoy, vjoy_device, vjoy_button, duration)
-                    log(f"VJOY[{vjoy_device}] button({vjoy_button}): pulse   duration: {duration:0.4f})")
+                    log(
+                        f"VJOY[{vjoy_device}] button({vjoy_button}): pulse   duration: {duration:0.4f})"
+                    )
                 else:
                     vjoy[vjoy_device].button(vjoy_button).is_pressed = is_pressed
-                    log(f"VJOY[{vjoy_device}] button({vjoy_button}): {'press' if is_pressed else 'release'}")
+                    log(
+                        f"VJOY[{vjoy_device}] button({vjoy_button}): {'press' if is_pressed else 'release'}"
+                    )
 
-        for (vjoy_device, vjoy_axis, value) in axis_actions:
+        for vjoy_device, vjoy_axis, value in axis_actions:
             if 0 < vjoy_device <= 8 and 0 < vjoy_axis <= 8 and -1.0 <= value <= 1.0:
                 vjoy[vjoy_device].axis(vjoy_axis).value = value
-                log(f"VJOY[{vjoy_device}] axis({vjoy_axis} value: {value:0.4f})")    
+                log(f"VJOY[{vjoy_device}] axis({vjoy_axis} value: {value:0.4f})")
 
 
 def osc_message_handler(address, *args):
-    #log(f"OSC: {address}: {args}")
+    # log(f"OSC: {address}: {args}")
     address = address.lower()
-    ESC = "!ESC!"
     try:
         commands = []
-        keywords = ["say","key","kbd","knob","vjoy","cmd"]
-
+        keywords = ["say", "key", "kbd", "knob", "vjoy", "cmd"]
 
         if args[0] == 0.0:
             # RELEASE - ignore OSC releases
             return
-        
-        # check for special characters 
+
+        # check for special characters
         splits = address.split("/")
         while splits:
             split = splits.pop(0)
@@ -371,10 +378,9 @@ def osc_message_handler(address, *args):
                 # blank
                 continue
             if splits and split in keywords:
-                commands.append("/"+split+"/"+splits.pop(0))
+                commands.append("/" + split + "/" + splits.pop(0))
 
         for cmd in commands:
-            
             if cmd.startswith("/key") or cmd.startswith("/kbd"):
                 # send to keyboard macro handler
                 keyboard_handler(cmd, args[0])
@@ -382,8 +388,8 @@ def osc_message_handler(address, *args):
                 # send to text to speech handler
                 speech_handler(cmd, args[0])
             elif cmd.startswith("/cmd"):
-            # call the handler 
-                # OSC PRESS 
+                # call the handler
+                # OSC PRESS
                 commands = address.split("/")
                 commands.pop(0)
                 for arg in commands:
@@ -395,9 +401,9 @@ def osc_message_handler(address, *args):
                 SLOW_C = 0.6
                 FAST_CC = 0.25
                 SLOW_CC = 0.4
-                
+
                 if cmd == "/knob":
-                    (x,y) = args
+                    (x, y) = args
 
                     # fast clockwise
                     if x > FAST_C:
@@ -406,7 +412,7 @@ def osc_message_handler(address, *args):
                     elif x > SLOW_C:
                         vjoy[3].button(1).is_pressed = True
                         vjoy[3].button(2).is_pressed = False
-                    if x < FAST_CC:            
+                    if x < FAST_CC:
                         vjoy[3].button(3).is_pressed = False
                         vjoy[3].button(4).is_pressed = True
                     elif x < SLOW_CC:
@@ -424,27 +430,24 @@ def osc_message_handler(address, *args):
                 elif cmd.startswith("/vjoy"):
                     vjoy_handler(cmd, args)
 
-                    
-
     except Exception as ex:
-        log(F"Command parse error: {ex}")
+        log(f"Command parse error: {ex}")
 
 
-### OSC handler start ------------------------------------------------------- 
-# Adapted from: Python-OSC  https://github.com/attwad/python-osc 
+### OSC handler start -------------------------------------------------------
+# Adapted from: Python-OSC  https://github.com/attwad/python-osc
 # Credits go to AttWad
 # ####
 
+
 class Osc:
-
-
     def thread_loop(self):
-        ''' main threading loop '''
+        """main threading loop"""
         log("OSC: server starting")
         self._dispatcher = Dispatcher()
         self._dispatcher.set_default_handler(osc_message_handler)
         self._server = BlockingOSCUDPServer((host_ip, in_port), self._dispatcher)
-        
+
         # this blocks until the server is shutdown
         log("OSC: server running")
 
@@ -452,8 +455,6 @@ class Osc:
         self._server.serve_forever()  # Blocks forever
         log("OSC: server shutdown")
         self._server = None
-
-
 
     def __init__(self):
         log("OSC: init")
@@ -468,15 +469,15 @@ class Osc:
 
     @property
     def started(self):
-        ''' true if server is started or in the process of starting '''
+        """true if server is started or in the process of starting"""
         if self._lock.locked():
             log("OSC: server locked")
             return True
-        
+
         return self._running
 
     def start(self):
-        ''' starts the server '''
+        """starts the server"""
 
         with self._lock:
             # everything here is now locked until the server start is completed
@@ -484,16 +485,17 @@ class Osc:
             log("OSC: start requested")
             if self._running:
                 return
-            
+
             self._stop = False
             if not self._server_thread.is_alive():
-                self._server_thread = threading.Thread(target=self.thread_loop, daemon=True)
+                self._server_thread = threading.Thread(
+                    target=self.thread_loop, daemon=True
+                )
                 self._server_thread.start()
             self._running = True
 
-
     def stop(self):
-        ''' stops the server '''
+        """stops the server"""
         if not self._running or self._start_requested:
             return
         log("OSC: stop requested")
@@ -508,6 +510,7 @@ class Osc:
     def __del__(self):
         log("OSC stopping...")
         self.stop()
+
 
 @gremlin.input_devices.gremlin_start()
 def start():
@@ -524,18 +527,16 @@ def stop():
     if osc:
         osc.stop()
 
+
 @gremlin.input_devices.gremlin_mode()
 def mode_changed(mode):
     log(f"Gremlin mode change!: {mode}")
 
 
-
 ### ----------------------------------------------------------- OSC server stuff ----------------------------------------------------------
 
 
-
 ### PARSING ###
-
 
 
 """Parsing and conversion of NTP dates contained in datagrams."""
@@ -543,11 +544,11 @@ def mode_changed(mode):
 
 # 63 zero bits followed by a one in the least signifigant bit is a special
 # case meaning "immediately."
-IMMEDIATELY = struct.pack('>Q', 1)
+IMMEDIATELY = struct.pack(">Q", 1)
 
 # timetag * (1 / 2 ** 32) == l32bits + (r32bits / 1 ** 32)
-_NTP_TIMESTAMP_TO_SECONDS = 1. / 2. ** 32.
-_SECONDS_TO_NTP_TIMESTAMP = 2. ** 32.
+_NTP_TIMESTAMP_TO_SECONDS = 1.0 / 2.0**32.0
+_SECONDS_TO_NTP_TIMESTAMP = 2.0**32.0
 
 # From NTP lib.
 _SYSTEM_EPOCH = datetime(*time.gmtime(0)[0:3])
@@ -556,59 +557,55 @@ _NTP_EPOCH = datetime(1900, 1, 1)
 _NTP_DELTA = (_SYSTEM_EPOCH - _NTP_EPOCH).days * 24 * 3600
 
 
-Timestamp = NamedTuple('Timestamp', [
-    ('seconds', int),
-    ('fraction', int),
-])
+Timestamp = NamedTuple(
+    "Timestamp",
+    [
+        ("seconds", int),
+        ("fraction", int),
+    ],
+)
 
 
 class NtpError(Exception):
-  """Base class for ntp module errors."""
+    """Base class for ntp module errors."""
 
 
 def parse_timestamp(timestamp: int) -> Timestamp:
-    """Parse NTP timestamp as Timetag.
-    """
+    """Parse NTP timestamp as Timetag."""
     seconds = timestamp >> 32
     fraction = timestamp & 0xFFFFFFFF
     return Timestamp(seconds, fraction)
 
 
 def ntp_to_system_time(timestamp: bytes) -> float:
-    """Convert a NTP timestamp to system time in seconds.
-    """
+    """Convert a NTP timestamp to system time in seconds."""
     try:
-        timestamp = struct.unpack('>Q', timestamp)[0]
+        timestamp = struct.unpack(">Q", timestamp)[0]
     except Exception as e:
         raise NtpError(e)
     return timestamp * _NTP_TIMESTAMP_TO_SECONDS - _NTP_DELTA
 
 
 def system_time_to_ntp(seconds: float) -> bytes:
-    """Convert a system time in seconds to NTP timestamp.
-    """
+    """Convert a system time in seconds to NTP timestamp."""
     try:
-      seconds = seconds + _NTP_DELTA
+        seconds = seconds + _NTP_DELTA
     except TypeError as e:
-      raise NtpError(e)
-    return struct.pack('>Q', int(seconds * _SECONDS_TO_NTP_TIMESTAMP))
+        raise NtpError(e)
+    return struct.pack(">Q", int(seconds * _SECONDS_TO_NTP_TIMESTAMP))
 
 
 def ntp_time_to_system_epoch(seconds: float) -> float:
-    """Convert a NTP time in seconds to system time in seconds.
-    """
+    """Convert a NTP time in seconds to system time in seconds."""
     return seconds - _NTP_DELTA
 
 
 def system_time_to_ntp_epoch(seconds: float) -> float:
-    """Convert a system time in seconds to NTP time in seconds.
-    """
+    """Convert a system time in seconds to NTP time in seconds."""
     return seconds + _NTP_DELTA
 
 
-
 """Functions to get OSC types from datagrams and vice versa"""
-
 
 
 MidiPacket = Tuple[int, int, int, int]
@@ -635,7 +632,7 @@ _TIMETAG_DGRAM_LEN = 8
 # Strings and blob dgram length is always a multiple of 4 bytes.
 _STRING_DGRAM_PAD = 4
 _BLOB_DGRAM_PAD = 4
-_EMPTY_STR_DGRAM = b'\x00\x00\x00\x00'
+_EMPTY_STR_DGRAM = b"\x00\x00\x00\x00"
 
 
 def write_string(val: str) -> bytes:
@@ -645,11 +642,11 @@ def write_string(val: str) -> bytes:
       - BuildError if the string could not be encoded.
     """
     try:
-        dgram = val.encode('utf-8')  # Default, but better be explicit.
+        dgram = val.encode("utf-8")  # Default, but better be explicit.
     except (UnicodeEncodeError, AttributeError) as e:
-        raise BuildError(f'Incorrect string, could not encode {e}')
+        raise BuildError(f"Incorrect string, could not encode {e}")
     diff = _STRING_DGRAM_PAD - (len(dgram) % _STRING_DGRAM_PAD)
-    dgram += (b'\x00' * diff)
+    dgram += b"\x00" * diff
     return dgram
 
 
@@ -672,29 +669,31 @@ def get_string(dgram: bytes, start_index: int) -> Tuple[str, int]:
       ParseError if the datagram could not be parsed.
     """
     if start_index < 0:
-        raise ParseError('start_index < 0')
+        raise ParseError("start_index < 0")
     offset = 0
     try:
-        if (len(dgram) > start_index + _STRING_DGRAM_PAD
-                and dgram[start_index + _STRING_DGRAM_PAD] == _EMPTY_STR_DGRAM):
-            return '', start_index + _STRING_DGRAM_PAD
+        if (
+            len(dgram) > start_index + _STRING_DGRAM_PAD
+            and dgram[start_index + _STRING_DGRAM_PAD] == _EMPTY_STR_DGRAM
+        ):
+            return "", start_index + _STRING_DGRAM_PAD
         while dgram[start_index + offset] != 0:
             offset += 1
         # Align to a byte word.
         if (offset) % _STRING_DGRAM_PAD == 0:
             offset += _STRING_DGRAM_PAD
         else:
-            offset += (-offset % _STRING_DGRAM_PAD)
+            offset += -offset % _STRING_DGRAM_PAD
         # Python slices do not raise an IndexError past the last index,
         # do it ourselves.
         if offset > len(dgram[start_index:]):
-            raise ParseError('Datagram is too short')
-        data_str = dgram[start_index:start_index + offset]
-        return data_str.replace(b'\x00', b'').decode('utf-8'), start_index + offset
+            raise ParseError("Datagram is too short")
+        data_str = dgram[start_index : start_index + offset]
+        return data_str.replace(b"\x00", b"").decode("utf-8"), start_index + offset
     except IndexError as ie:
-        raise ParseError(f'Could not parse datagram {ie}')
+        raise ParseError(f"Could not parse datagram {ie}")
     except TypeError as te:
-        raise ParseError(f'Could not parse datagram {te}')
+        raise ParseError(f"Could not parse datagram {te}")
 
 
 def write_int(val: int) -> bytes:
@@ -704,9 +703,9 @@ def write_int(val: int) -> bytes:
       - BuildError if the int could not be converted.
     """
     try:
-        return struct.pack('>i', val)
+        return struct.pack(">i", val)
     except struct.error as e:
-        raise BuildError(f'Wrong argument value passed: {e}')
+        raise BuildError(f"Wrong argument value passed: {e}")
 
 
 def get_int(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -724,13 +723,13 @@ def get_int(dgram: bytes, start_index: int) -> Tuple[int, int]:
     """
     try:
         if len(dgram[start_index:]) < _INT_DGRAM_LEN:
-            raise ParseError('Datagram is too short')
+            raise ParseError("Datagram is too short")
         return (
-            struct.unpack('>i',
-                          dgram[start_index:start_index + _INT_DGRAM_LEN])[0],
-            start_index + _INT_DGRAM_LEN)
+            struct.unpack(">i", dgram[start_index : start_index + _INT_DGRAM_LEN])[0],
+            start_index + _INT_DGRAM_LEN,
+        )
     except (struct.error, TypeError) as e:
-        raise ParseError(f'Could not parse datagram {e}')
+        raise ParseError(f"Could not parse datagram {e}")
 
 
 def write_int64(val: int) -> bytes:
@@ -740,9 +739,9 @@ def write_int64(val: int) -> bytes:
       - BuildError if the int64 could not be converted.
     """
     try:
-        return struct.pack('>q', val)
+        return struct.pack(">q", val)
     except struct.error as e:
-        raise BuildError(f'Wrong argument value passed: {e}')
+        raise BuildError(f"Wrong argument value passed: {e}")
 
 
 def get_int64(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -760,13 +759,13 @@ def get_int64(dgram: bytes, start_index: int) -> Tuple[int, int]:
     """
     try:
         if len(dgram[start_index:]) < _INT64_DGRAM_LEN:
-            raise ParseError('Datagram is too short')
+            raise ParseError("Datagram is too short")
         return (
-            struct.unpack('>q',
-                          dgram[start_index:start_index + _INT64_DGRAM_LEN])[0],
-            start_index + _INT64_DGRAM_LEN)
+            struct.unpack(">q", dgram[start_index : start_index + _INT64_DGRAM_LEN])[0],
+            start_index + _INT64_DGRAM_LEN,
+        )
     except (struct.error, TypeError) as e:
-        raise ParseError(f'Could not parse datagram {e}')
+        raise ParseError(f"Could not parse datagram {e}")
 
 
 def get_uint64(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -784,13 +783,15 @@ def get_uint64(dgram: bytes, start_index: int) -> Tuple[int, int]:
     """
     try:
         if len(dgram[start_index:]) < _UINT64_DGRAM_LEN:
-            raise ParseError('Datagram is too short')
+            raise ParseError("Datagram is too short")
         return (
-            struct.unpack('>Q',
-                          dgram[start_index:start_index + _UINT64_DGRAM_LEN])[0],
-            start_index + _UINT64_DGRAM_LEN)
+            struct.unpack(">Q", dgram[start_index : start_index + _UINT64_DGRAM_LEN])[
+                0
+            ],
+            start_index + _UINT64_DGRAM_LEN,
+        )
     except (struct.error, TypeError) as e:
-        raise ParseError(f'Could not parse datagram {e}')
+        raise ParseError(f"Could not parse datagram {e}")
 
 
 def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], int]:
@@ -809,7 +810,7 @@ def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], i
     """
     try:
         if len(dgram[start_index:]) < _TIMETAG_DGRAM_LEN:
-            raise ParseError('Datagram is too short')
+            raise ParseError("Datagram is too short")
 
         timetag, _ = get_uint64(dgram, start_index)
         seconds, fraction = parse_timestamp(timetag)
@@ -817,12 +818,13 @@ def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], i
         hours, seconds = seconds // 3600, seconds % 3600
         minutes, seconds = seconds // 60, seconds % 60
 
-        utc = (datetime.combine(_NTP_EPOCH, datetime.min.time()) +
-               timedelta(hours=hours, minutes=minutes, seconds=seconds))
+        utc = datetime.combine(_NTP_EPOCH, datetime.min.time()) + timedelta(
+            hours=hours, minutes=minutes, seconds=seconds
+        )
 
         return (utc, fraction), start_index + _TIMETAG_DGRAM_LEN
     except (struct.error, TypeError) as e:
-        raise ParseError(f'Could not parse datagram {e}')
+        raise ParseError(f"Could not parse datagram {e}")
 
 
 def write_float(val: float) -> bytes:
@@ -832,9 +834,9 @@ def write_float(val: float) -> bytes:
       - BuildError if the float could not be converted.
     """
     try:
-        return struct.pack('>f', val)
+        return struct.pack(">f", val)
     except struct.error as e:
-        raise BuildError(f'Wrong argument value passed: {e}')
+        raise BuildError(f"Wrong argument value passed: {e}")
 
 
 def get_float(dgram: bytes, start_index: int) -> Tuple[float, int]:
@@ -855,13 +857,13 @@ def get_float(dgram: bytes, start_index: int) -> Tuple[float, int]:
             # Noticed that Reaktor doesn't send the last bunch of \x00 needed to make
             # the float representation complete in some cases, thus we pad here to
             # account for that.
-            dgram = dgram + b'\x00' * (_FLOAT_DGRAM_LEN - len(dgram[start_index:]))
+            dgram = dgram + b"\x00" * (_FLOAT_DGRAM_LEN - len(dgram[start_index:]))
         return (
-            struct.unpack('>f',
-                          dgram[start_index:start_index + _FLOAT_DGRAM_LEN])[0],
-            start_index + _FLOAT_DGRAM_LEN)
+            struct.unpack(">f", dgram[start_index : start_index + _FLOAT_DGRAM_LEN])[0],
+            start_index + _FLOAT_DGRAM_LEN,
+        )
     except (struct.error, TypeError) as e:
-        raise ParseError(f'Could not parse datagram {e}')
+        raise ParseError(f"Could not parse datagram {e}")
 
 
 def write_double(val: float) -> bytes:
@@ -871,9 +873,9 @@ def write_double(val: float) -> bytes:
       - BuildError if the double could not be converted.
     """
     try:
-        return struct.pack('>d', val)
+        return struct.pack(">d", val)
     except struct.error as e:
-        raise BuildError(f'Wrong argument value passed: {e}')
+        raise BuildError(f"Wrong argument value passed: {e}")
 
 
 def get_double(dgram: bytes, start_index: int) -> Tuple[float, int]:
@@ -891,17 +893,19 @@ def get_double(dgram: bytes, start_index: int) -> Tuple[float, int]:
     """
     try:
         if len(dgram[start_index:]) < _DOUBLE_DGRAM_LEN:
-            raise ParseError('Datagram is too short')
+            raise ParseError("Datagram is too short")
         return (
-            struct.unpack('>d',
-                          dgram[start_index:start_index + _DOUBLE_DGRAM_LEN])[0],
-            start_index + _DOUBLE_DGRAM_LEN)
+            struct.unpack(">d", dgram[start_index : start_index + _DOUBLE_DGRAM_LEN])[
+                0
+            ],
+            start_index + _DOUBLE_DGRAM_LEN,
+        )
     except (struct.error, TypeError) as e:
-        raise ParseError(f'Could not parse datagram {e}')
+        raise ParseError(f"Could not parse datagram {e}")
 
 
 def get_blob(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
-    """ Get a blob from the datagram.
+    """Get a blob from the datagram.
 
     According to the specifications, a blob is made of
     "an int32 size count, followed by that many 8-bit bytes of arbitrary
@@ -923,8 +927,8 @@ def get_blob(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
     total_size = size + (-size % _BLOB_DGRAM_PAD)
     end_index = int_offset + size
     if end_index - start_index > len(dgram[start_index:]):
-        raise ParseError('Datagram is too short.')
-    return dgram[int_offset:int_offset + size], int_offset + total_size
+        raise ParseError("Datagram is too short.")
+    return dgram[int_offset : int_offset + size], int_offset + total_size
 
 
 def write_blob(val: bytes) -> bytes:
@@ -934,11 +938,11 @@ def write_blob(val: bytes) -> bytes:
       - BuildError if the value was empty or if its size didn't fit an OSC int.
     """
     if not val:
-        raise BuildError('Blob value cannot be empty')
+        raise BuildError("Blob value cannot be empty")
     dgram = write_int(len(val))
     dgram += val
     while len(dgram) % _BLOB_DGRAM_PAD != 0:
-        dgram += b'\x00'
+        dgram += b"\x00"
     return dgram
 
 
@@ -962,10 +966,10 @@ def get_date(dgram: bytes, start_index: int) -> Tuple[float, int]:
       ParseError if the datagram could not be parsed.
     """
     # Check for the special case first.
-    if dgram[start_index:start_index + _TIMETAG_DGRAM_LEN] == IMMEDIATELY:
+    if dgram[start_index : start_index + _TIMETAG_DGRAM_LEN] == IMMEDIATELY:
         return IMMEDIATELY, start_index + _TIMETAG_DGRAM_LEN
     if len(dgram[start_index:]) < _TIMETAG_DGRAM_LEN:
-        raise ParseError('Datagram is too short')
+        raise ParseError("Datagram is too short")
     timetag, start_index = get_uint64(dgram, start_index)
     seconds = timetag * _NTP_TIMESTAMP_TO_SECONDS
     return ntp_time_to_system_epoch(seconds), start_index
@@ -988,9 +992,9 @@ def write_rgba(val: bytes) -> bytes:
       - BuildError if the int could not be converted.
     """
     try:
-        return struct.pack('>I', val)
+        return struct.pack(">I", val)
     except struct.error as e:
-        raise BuildError(f'Wrong argument value passed: {e}')
+        raise BuildError(f"Wrong argument value passed: {e}")
 
 
 def get_rgba(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
@@ -1008,13 +1012,13 @@ def get_rgba(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
     """
     try:
         if len(dgram[start_index:]) < _INT_DGRAM_LEN:
-            raise ParseError('Datagram is too short')
+            raise ParseError("Datagram is too short")
         return (
-            struct.unpack('>I',
-                          dgram[start_index:start_index + _INT_DGRAM_LEN])[0],
-            start_index + _INT_DGRAM_LEN)
+            struct.unpack(">I", dgram[start_index : start_index + _INT_DGRAM_LEN])[0],
+            start_index + _INT_DGRAM_LEN,
+        )
     except (struct.error, TypeError) as e:
-        raise ParseError(f'Could not parse datagram {e}')
+        raise ParseError(f"Could not parse datagram {e}")
 
 
 def write_midi(val: MidiPacket) -> bytes:
@@ -1027,12 +1031,12 @@ def write_midi(val: MidiPacket) -> bytes:
 
     """
     if len(val) != 4:
-        raise BuildError('MIDI message length is invalid')
+        raise BuildError("MIDI message length is invalid")
     try:
         value = sum((value & 0xFF) << 8 * (3 - pos) for pos, value in enumerate(val))
-        return struct.pack('>I', value)
+        return struct.pack(">I", value)
     except struct.error as e:
-        raise BuildError(f'Wrong argument value passed: {e}')
+        raise BuildError(f"Wrong argument value passed: {e}")
 
 
 def get_midi(dgram: bytes, start_index: int) -> Tuple[MidiPacket, int]:
@@ -1050,26 +1054,19 @@ def get_midi(dgram: bytes, start_index: int) -> Tuple[MidiPacket, int]:
     """
     try:
         if len(dgram[start_index:]) < _INT_DGRAM_LEN:
-            raise ParseError('Datagram is too short')
-        val = struct.unpack('>I',
-                            dgram[start_index:start_index + _INT_DGRAM_LEN])[0]
+            raise ParseError("Datagram is too short")
+        val = struct.unpack(">I", dgram[start_index : start_index + _INT_DGRAM_LEN])[0]
         midi_msg = cast(
-            MidiPacket,
-            tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1)))
+            MidiPacket, tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1))
+        )
         return (midi_msg, start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise ParseError(f'Could not parse datagram {e}')
-
-
-
+        raise ParseError(f"Could not parse datagram {e}")
 
 
 ### OSCE MESSAGE ###
 
 """Representation of an OSC message in a pythonesque way."""
-
-
-
 
 
 class OscMessage(object):
@@ -1093,7 +1090,7 @@ class OscMessage(object):
 
             # Get the parameters types.
             type_tag, index = get_string(self._dgram, index)
-            if type_tag.startswith(','):
+            if type_tag.startswith(","):
                 type_tag = type_tag[1:]
 
             params = []  # type: List[Any]
@@ -1131,19 +1128,21 @@ class OscMessage(object):
                     param_stack.append(array)
                 elif param == "]":  # Array stop.
                     if len(param_stack) < 2:
-                        raise ParseError(f'Unexpected closing bracket in type tag: {type_tag}')
+                        raise ParseError(
+                            f"Unexpected closing bracket in type tag: {type_tag}"
+                        )
                     param_stack.pop()
                 # TODO: Support more exotic types as described in the specification.
                 else:
-                    logging.warning(f'Unhandled parameter type: {param}')
+                    logging.warning(f"Unhandled parameter type: {param}")
                     continue
                 if param not in "[]":
                     param_stack[-1].append(val)
             if len(param_stack) != 1:
-                raise ParseError(f'Missing closing bracket in type tag: {type_tag}')
+                raise ParseError(f"Missing closing bracket in type tag: {type_tag}")
             self._parameters = params
         except ParseError as pe:
-            raise ParseError('Found incorrect datagram, ignoring it', pe)
+            raise ParseError("Found incorrect datagram, ignoring it", pe)
 
     @property
     def address(self) -> str:
@@ -1153,7 +1152,7 @@ class OscMessage(object):
     @staticmethod
     def dgram_is_message(dgram: bytes) -> bool:
         """Returns whether this datagram starts as an OSC message."""
-        return dgram.startswith(b'/')
+        return dgram.startswith(b"/")
 
     @property
     def size(self) -> int:
@@ -1175,7 +1174,6 @@ class OscMessage(object):
         return iter(self._parameters)
 
 
-
 ### OSC PACKET ###
 
 """Use OSC packets to parse incoming UDP packets into messages or bundles.
@@ -1188,10 +1186,13 @@ It lets you access easily to OscMessage and OscBundle instances in the packet.
 # 1) the system time at which the message should be executed
 #    in seconds since the epoch.
 # 2) the actual message.
-TimedMessage = NamedTuple('TimedMessage', [
-    ('time', float),
-    ('message', OscMessage),
-])
+TimedMessage = NamedTuple(
+    "TimedMessage",
+    [
+        ("time", float),
+        ("message", OscMessage),
+    ],
+)
 
 
 def _timed_msg_of_bundle(bundle, now: float) -> List[TimedMessage]:
@@ -1199,14 +1200,13 @@ def _timed_msg_of_bundle(bundle, now: float) -> List[TimedMessage]:
     msgs = []
     for content in bundle:
         if type(content) is OscMessage:
-            if (bundle.timestamp == IMMEDIATELY or bundle.timestamp < now):
+            if bundle.timestamp == IMMEDIATELY or bundle.timestamp < now:
                 msgs.append(TimedMessage(now, content))
             else:
                 msgs.append(TimedMessage(bundle.timestamp, content))
         else:
             msgs.extend(_timed_msg_of_bundle(content, now))
     return msgs
-
 
 
 class OscPacket(object):
@@ -1229,17 +1229,17 @@ class OscPacket(object):
         try:
             if OscBundle.dgram_is_bundle(dgram):
                 self._messages = sorted(
-                    _timed_msg_of_bundle(OscBundle(dgram), now),
-                    key=lambda x: x.time)
+                    _timed_msg_of_bundle(OscBundle(dgram), now), key=lambda x: x.time
+                )
             elif OscMessage.dgram_is_message(dgram):
                 self._messages = [TimedMessage(now, OscMessage(dgram))]
             else:
                 # Empty packet, should not happen as per the spec but heh, UDP...
                 raise ParseError(
-                    'OSC Packet should at least contain an OscMessage or an '
-                    'OscBundle.')
+                    "OSC Packet should at least contain an OscMessage or an OscBundle."
+                )
         except (ParseError, ParseError) as e:
-            raise ParseError(f'Could not parse datagram {e}')
+            raise ParseError(f"Could not parse datagram {e}")
 
     @property
     def messages(self) -> List[TimedMessage]:
@@ -1247,12 +1247,10 @@ class OscPacket(object):
         return self._messages
 
 
-
 ### OSC BUNDLE ###
 
 
 _BUNDLE_PREFIX = b"#bundle\x00"
-
 
 
 class OscBundle(object):
@@ -1276,11 +1274,11 @@ class OscBundle(object):
         try:
             self._timestamp, index = get_date(self._dgram, index)
         except ParseError as e:
-            raise ParseError(f'Could not parse datagram {e}')
+            raise ParseError(f"Could not parse datagram {e}")
         # Get the contents as a list of OscBundle and OscMessage.
         self._contents = self._parse_contents(index)
 
-    def _parse_contents(self, index: int) -> List[Union['OscBundle', OscMessage]]:
+    def _parse_contents(self, index: int) -> List[Union["OscBundle", OscMessage]]:
         contents = []  # type: List[Union[OscBundle, OscMessage]]
 
         try:
@@ -1292,7 +1290,7 @@ class OscBundle(object):
                 # Get the sub content size.
                 content_size, index = get_int(self._dgram, index)
                 # Get the datagram for the sub content.
-                content_dgram = self._dgram[index:index + content_size]
+                content_dgram = self._dgram[index : index + content_size]
                 # Increment our position index up to the next possible content.
                 index += content_size
                 # Parse the content into an OSC message or bundle.
@@ -1301,9 +1299,11 @@ class OscBundle(object):
                 elif OscMessage.dgram_is_message(content_dgram):
                     contents.append(OscMessage(content_dgram))
                 else:
-                    logging.warning(f"Could not identify content type of dgram {content_dgram}")
+                    logging.warning(
+                        f"Could not identify content type of dgram {content_dgram}"
+                    )
         except (ParseError, ParseError, IndexError) as e:
-            raise ParseError(f'Could not parse datagram {e}')
+            raise ParseError(f"Could not parse datagram {e}")
 
         return contents
 
@@ -1341,13 +1341,9 @@ class OscBundle(object):
         return iter(self._contents)
 
 
-
-
-
 ### OSC BUNDLE BUILDER ###
 
 """Build OSC bundles for client applications."""
-
 
 
 # Shortcut to specify an immediate execution of messages in the bundle.
@@ -1384,24 +1380,22 @@ class OscBundleBuilder(object):
         Raises:
           - BuildError: if we could not build the bundle.
         """
-        dgram = b'#bundle\x00'
+        dgram = b"#bundle\x00"
         try:
             dgram += write_date(self._timestamp)
             for content in self._contents:
-                if (type(content) == OscMessage
-                        or type(content) == OscBundle):
+                if isinstance(content, (OscMessage, OscBundle)):
                     size = content.size
                     dgram += write_int(size)
                     dgram += content.dgram
                 else:
                     raise BuildError(
                         "Content must be either OscBundle or OscMessage"
-                        f"found {type(content)}")
+                        f"found {type(content)}"
+                    )
             return OscBundle(dgram)
         except BuildError as be:
-            raise BuildError(f'Could not build the bundle {be}')
-
-
+            raise BuildError(f"Could not build the bundle {be}")
 
 
 ### OSC MESSAGE BUILDER ###
@@ -1411,8 +1405,10 @@ class OscBundleBuilder(object):
 
 ArgValue = Union[str, bytes, bool, int, float, MidiPacket, list]
 
+
 class BuildError(Exception):
     """Error raised when an incomplete message is trying to be built."""
+
 
 class OscMessageBuilder(object):
     """Builds arbitrary OscMessage instances."""
@@ -1433,8 +1429,18 @@ class OscMessageBuilder(object):
     ARG_TYPE_ARRAY_STOP = "]"
 
     _SUPPORTED_ARG_TYPES = (
-        ARG_TYPE_FLOAT, ARG_TYPE_DOUBLE, ARG_TYPE_INT, ARG_TYPE_INT64, ARG_TYPE_BLOB, ARG_TYPE_STRING,
-        ARG_TYPE_RGBA, ARG_TYPE_MIDI, ARG_TYPE_TRUE, ARG_TYPE_FALSE, ARG_TYPE_NIL)
+        ARG_TYPE_FLOAT,
+        ARG_TYPE_DOUBLE,
+        ARG_TYPE_INT,
+        ARG_TYPE_INT64,
+        ARG_TYPE_BLOB,
+        ARG_TYPE_STRING,
+        ARG_TYPE_RGBA,
+        ARG_TYPE_MIDI,
+        ARG_TYPE_TRUE,
+        ARG_TYPE_FALSE,
+        ARG_TYPE_NIL,
+    )
 
     def __init__(self, address: Optional[str] = None) -> None:
         """Initialize a new builder for a message.
@@ -1482,8 +1488,8 @@ class OscMessageBuilder(object):
         """
         if arg_type and not self._valid_type(arg_type):
             raise ValueError(
-                f'arg_type must be one of {self._SUPPORTED_ARG_TYPES}, or an array of valid types'
-                )
+                f"arg_type must be one of {self._SUPPORTED_ARG_TYPES}, or an array of valid types"
+            )
         if not arg_type:
             arg_type = self._get_arg_type(arg_value)
         if isinstance(arg_type, list):
@@ -1526,7 +1532,7 @@ class OscMessageBuilder(object):
         elif arg_value is None:
             arg_type = self.ARG_TYPE_NIL
         else:
-            raise ValueError('Infered arg_value type is not supported')
+            raise ValueError("Infered arg_value type is not supported")
         return arg_type
 
     def build(self) -> OscMessage:
@@ -1540,18 +1546,18 @@ class OscMessageBuilder(object):
           - an OscMessage instance.
         """
         if not self._address:
-            raise BuildError('OSC addresses cannot be empty')
-        dgram = b''
+            raise BuildError("OSC addresses cannot be empty")
+        dgram = b""
         try:
             # Write the address.
             dgram += write_string(self._address)
             if not self._args:
-                dgram += write_string(',')
+                dgram += write_string(",")
                 return OscMessage(dgram)
 
             # Write the parameters.
             arg_types = "".join([arg[0] for arg in self._args])
-            dgram += write_string(',' + arg_types)
+            dgram += write_string("," + arg_types)
             for arg_type, value in self._args:
                 if arg_type == self.ARG_TYPE_STRING:
                     dgram += write_string(value)  # type: ignore[arg-type]
@@ -1569,28 +1575,25 @@ class OscMessageBuilder(object):
                     dgram += write_rgba(value)  # type: ignore[arg-type]
                 elif arg_type == self.ARG_TYPE_MIDI:
                     dgram += write_midi(value)  # type: ignore[arg-type]
-                elif arg_type in (self.ARG_TYPE_TRUE,
-                                  self.ARG_TYPE_FALSE,
-                                  self.ARG_TYPE_ARRAY_START,
-                                  self.ARG_TYPE_ARRAY_STOP,
-                                  self.ARG_TYPE_NIL):
+                elif arg_type in (
+                    self.ARG_TYPE_TRUE,
+                    self.ARG_TYPE_FALSE,
+                    self.ARG_TYPE_ARRAY_START,
+                    self.ARG_TYPE_ARRAY_STOP,
+                    self.ARG_TYPE_NIL,
+                ):
                     continue
                 else:
-                    raise BuildError(f'Incorrect parameter type found {arg_type}')
+                    raise BuildError(f"Incorrect parameter type found {arg_type}")
 
             return OscMessage(dgram)
         except BuildError as be:
-            raise BuildError(f'Could not build the message: {be}')
-
-
-
+            raise BuildError(f"Could not build the message: {be}")
 
 
 ### DISPATCHER ###
 """Maps OSC addresses to handler functions
 """
-
-
 
 
 class Handler(object):
@@ -1601,24 +1604,30 @@ class Handler(object):
     message if any were passed.
     """
 
-    def __init__(self, _callback: Callable, _args: Union[Any, List[Any]],
-                 _needs_reply_address: bool = False) -> None:
+    def __init__(
+        self,
+        _callback: Callable,
+        _args: Union[Any, List[Any]],
+        _needs_reply_address: bool = False,
+    ) -> None:
         """
         Args:
             _callback Function that is called when handler is invoked
             _args: Message causing invocation
             _needs_reply_address Whether the client's ip address shall be passed as an argument or not
-       """
+        """
         self.callback = _callback
         self.args = _args
         self.needs_reply_address = _needs_reply_address
 
     # needed for test module
     def __eq__(self, other: Any) -> bool:
-        return (type(self) == type(other) and
-                self.callback == other.callback and
-                self.args == other.args and
-                self.needs_reply_address == other.needs_reply_address)
+        return (
+            type(self) is type(other)
+            and self.callback == other.callback
+            and self.args == other.args
+            and self.needs_reply_address == other.needs_reply_address
+        )
 
     def invoke(self, client_address: Tuple[str, int], message: OscMessage) -> None:
         """Invokes the associated callback function
@@ -1626,7 +1635,7 @@ class Handler(object):
         Args:
             client_address: Address match that causes the invocation
             message: Message causing invocation
-       """
+        """
         if self.needs_reply_address:
             if self.args:
                 self.callback(client_address, message.address, self.args, *message)
@@ -1649,8 +1658,13 @@ class Dispatcher(object):
         self._map = collections.defaultdict(list)  # type: DefaultDict[str, List[Handler]]
         self._default_handler = None  # type: Optional[Handler]
 
-    def map(self, address: str, handler: Callable, *args: Union[Any, List[Any]],
-            needs_reply_address: bool = False) -> Handler:
+    def map(
+        self,
+        address: str,
+        handler: Callable,
+        *args: Union[Any, List[Any]],
+        needs_reply_address: bool = False,
+    ) -> Handler:
         """Map an address to a handler
 
         The callback function must have one of the following signatures:
@@ -1690,8 +1704,13 @@ class Dispatcher(object):
         pass
 
     @overload
-    def unmap(self, address: str, handler: Callable, *args: Union[Any, List[Any]],
-              needs_reply_address: bool = False) -> None:
+    def unmap(
+        self,
+        address: str,
+        handler: Callable,
+        *args: Union[Any, List[Any]],
+        needs_reply_address: bool = False,
+    ) -> None:
         """Remove an already mapped handler from an address
 
         Args:
@@ -1710,12 +1729,19 @@ class Dispatcher(object):
             if isinstance(handler, Handler):
                 self._map[address].remove(handler)
             else:
-                self._map[address].remove(Handler(handler, list(args), needs_reply_address))
+                self._map[address].remove(
+                    Handler(handler, list(args), needs_reply_address)
+                )
         except ValueError as e:
             if str(e) == "list.remove(x): x not in list":
-                raise ValueError("Address '%s' doesn't have handler '%s' mapped to it" % (address, handler)) from e
+                raise ValueError(
+                    "Address '%s' doesn't have handler '%s' mapped to it"
+                    % (address, handler)
+                ) from e
 
-    def handlers_for_address(self, address_pattern: str) -> Generator[Handler, None, None]:
+    def handlers_for_address(
+        self, address_pattern: str
+    ) -> Generator[Handler, None, None]:
         """Yields handlers matching an address
 
 
@@ -1730,27 +1756,31 @@ class Dispatcher(object):
         # Let's consider numbers and _ "characters" too here, it's not said
         # explicitly in the specification but it sounds good.
         escaped_address_pattern = re.escape(address_pattern)
-        pattern = escaped_address_pattern.replace('\\?', '\\w?')
+        pattern = escaped_address_pattern.replace("\\?", "\\w?")
         # '*' in the OSC Address Pattern matches any sequence of zero or more
         # characters.
-        pattern = pattern.replace('\\*', '[\w|\+]*')
+        pattern = pattern.replace("\\*", "[\w|\+]*")
         # The rest of the syntax in the specification is like the re module so
         # we're fine.
-        pattern = pattern + '$'
+        pattern = pattern + "$"
         patterncompiled = re.compile(pattern)
         matched = False
 
         for addr, handlers in self._map.items():
-            if (patterncompiled.match(addr)
-                    or (('*' in addr) and re.match(addr.replace('*', '[^/]*?/*'), address_pattern))):
+            if patterncompiled.match(addr) or (
+                ("*" in addr)
+                and re.match(addr.replace("*", "[^/]*?/*"), address_pattern)
+            ):
                 yield from handlers
                 matched = True
 
         if not matched and self._default_handler:
-            logging.debug('No handler matched but default handler present, added it.')
+            logging.debug("No handler matched but default handler present, added it.")
             yield self._default_handler
 
-    def call_handlers_for_packet(self, data: bytes, client_address: Tuple[str, int]) -> None:
+    def call_handlers_for_packet(
+        self, data: bytes, client_address: Tuple[str, int]
+    ) -> None:
         """Invoke handlers for all messages in OSC packet
 
         The incoming OSC Packet is decoded and the handlers for each included message is found and invoked.
@@ -1765,8 +1795,7 @@ class Dispatcher(object):
             packet = OscPacket(data)
             for timed_msg in packet.messages:
                 now = time.time()
-                handlers = self.handlers_for_address(
-                    timed_msg.message.address)
+                handlers = self.handlers_for_address(timed_msg.message.address)
                 if not handlers:
                     continue
                 # If the message is to be handled later, then so be it.
@@ -1777,7 +1806,9 @@ class Dispatcher(object):
         except ParseError:
             pass
 
-    def set_default_handler(self, handler: Callable, needs_reply_address: bool = False) -> None:
+    def set_default_handler(
+        self, handler: Callable, needs_reply_address: bool = False
+    ) -> None:
         """Sets the default handler
 
         The default handler is invoked every time no other handler is mapped to an address.
@@ -1786,17 +1817,15 @@ class Dispatcher(object):
             handler: Callback function to handle unmapped requests
             needs_reply_address: Whether the callback shall be passed the client address
         """
-        self._default_handler = None if (handler is None) else Handler(handler, [], needs_reply_address)
-
-
-
+        self._default_handler = (
+            None if (handler is None) else Handler(handler, [], needs_reply_address)
+        )
 
 
 ### OSC SERVER ###
 
 """OSC Servers that receive UDP packets and invoke handlers accordingly.
 """
-
 
 
 _RequestType = Union[_socket, Tuple[bytes, _socket]]
@@ -1824,28 +1853,35 @@ def _is_valid_request(request: _RequestType) -> bool:
     Returns:
         True if request is OSC bundle or OSC message
     """
-    assert isinstance(request, tuple)  # TODO: handle requests which are passed just as a socket?
+    assert isinstance(
+        request, tuple
+    )  # TODO: handle requests which are passed just as a socket?
     data = request[0]
-    return (
-            OscBundle.dgram_is_bundle(data)
-            or OscMessage.dgram_is_message(data))
+    return OscBundle.dgram_is_bundle(data) or OscMessage.dgram_is_message(data)
 
 
 class OSCUDPServer(socketserver.UDPServer):
     """Superclass for different flavors of OSC UDP servers"""
 
-    def __init__(self, server_address: Tuple[str, int], dispatcher: Dispatcher, bind_and_activate: bool = True) -> None:
+    def __init__(
+        self,
+        server_address: Tuple[str, int],
+        dispatcher: Dispatcher,
+        bind_and_activate: bool = True,
+    ) -> None:
         """Initialize
 
         Args:
             server_address: IP and port of server
             dispatcher: Dispatcher this server will use
-            (optional) bind_and_activate: default=True defines if the server has to start on call of constructor  
+            (optional) bind_and_activate: default=True defines if the server has to start on call of constructor
         """
         super().__init__(server_address, _UDPHandler, bind_and_activate)
         self._dispatcher = dispatcher
 
-    def verify_request(self, request: _RequestType, client_address: _AddressType) -> bool:
+    def verify_request(
+        self, request: _RequestType, client_address: _AddressType
+    ) -> bool:
         """Returns true if the data looks like a valid OSC UDP datagram
 
         Args:
@@ -1880,6 +1916,7 @@ class ThreadingOSCUDPServer(socketserver.ThreadingMixIn, OSCUDPServer):
 
 
 if hasattr(os, "fork"):
+
     class ForkingOSCUDPServer(socketserver.ForkingMixIn, OSCUDPServer):
         """Forking version of the OSC UDP server.
 
@@ -1889,13 +1926,18 @@ if hasattr(os, "fork"):
         """
 
 
-class AsyncIOOSCUDPServer():
+class AsyncIOOSCUDPServer:
     """Asynchronous OSC Server
 
     An asynchronous OSC Server using UDP. It creates a datagram endpoint that runs in an event loop.
     """
 
-    def __init__(self, server_address: Tuple[str, int], dispatcher: Dispatcher, loop: BaseEventLoop) -> None:
+    def __init__(
+        self,
+        server_address: Tuple[str, int],
+        dispatcher: Dispatcher,
+        loop: BaseEventLoop,
+    ) -> None:
         """Initialize
 
         Args:
@@ -1915,7 +1957,9 @@ class AsyncIOOSCUDPServer():
         def __init__(self, dispatcher: Dispatcher) -> None:
             self.dispatcher = dispatcher
 
-        def datagram_received(self, data: bytes, client_address: Tuple[str, int]) -> None:
+        def datagram_received(
+            self, data: bytes, client_address: Tuple[str, int]
+        ) -> None:
             self.dispatcher.call_handlers_for_packet(data, client_address)
 
     def serve(self) -> None:
@@ -1926,7 +1970,11 @@ class AsyncIOOSCUDPServer():
         """
         self._loop.run_until_complete(self.create_serve_endpoint())
 
-    def create_serve_endpoint(self) -> Coroutine[Any, Any, Tuple[asyncio.transports.BaseTransport, asyncio.DatagramProtocol]]:
+    def create_serve_endpoint(
+        self,
+    ) -> Coroutine[
+        Any, Any, Tuple[asyncio.transports.BaseTransport, asyncio.DatagramProtocol]
+    ]:
         """Creates a datagram endpoint and registers it with event loop as coroutine.
 
         Returns:
@@ -1934,7 +1982,8 @@ class AsyncIOOSCUDPServer():
         """
         return self._loop.create_datagram_endpoint(
             lambda: self._OSCProtocolFactory(self.dispatcher),
-            local_addr=self._server_address)
+            local_addr=self._server_address,
+        )
 
     @property
     def dispatcher(self) -> Dispatcher:
@@ -1946,12 +1995,16 @@ class AsyncIOOSCUDPServer():
 """UDP Clients for sending OSC messages to an OSC server"""
 
 
-from typing import Union
-
 class UDPClient(object):
     """OSC client to send :class:`OscMessage` or :class:`OscBundle` via UDP"""
 
-    def __init__(self, address: str, port: int, allow_broadcast: bool = False, family: socket.AddressFamily = socket.AF_UNSPEC) -> None:
+    def __init__(
+        self,
+        address: str,
+        port: int,
+        allow_broadcast: bool = False,
+        family: socket.AddressFamily = socket.AF_UNSPEC,
+    ) -> None:
         """Initialize client
 
         As this is UDP it will not actually make any attempt to connect to the
@@ -1964,7 +2017,9 @@ class UDPClient(object):
             family: address family parameter (passed to socket.getaddrinfo)
         """
 
-        for addr in socket.getaddrinfo(address, port, type=socket.SOCK_DGRAM, family=family):
+        for addr in socket.getaddrinfo(
+            address, port, type=socket.SOCK_DGRAM, family=family
+        ):
             af, socktype, protocol, canonname, sa = addr
 
             try:

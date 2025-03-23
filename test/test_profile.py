@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
 import sys
+
 sys.path.append(".")
 
 import os
@@ -186,7 +187,6 @@ def _store_in_tmpfile(text: str) -> str:
     return fpath
 
 
-
 def test_constructor_invalid():
     fpath = _store_in_tmpfile(xml_invalid)
 
@@ -221,7 +221,9 @@ def test_simple_action():
     assert actions[2].value.tag == "map-to-vjoy"
     assert actions[2].value.vjoy_device_id == 2
     assert actions[2].value.vjoy_input_id == 6
-    assert actions[2].value.vjoy_input_type == gremlin.input_types.InputType.JoystickAxis
+    assert (
+        actions[2].value.vjoy_input_type == gremlin.input_types.InputType.JoystickAxis
+    )
     assert actions[2].value.axis_mode == gremlin.types.AxisMode.Relative
     assert actions[2].value.axis_scaling == 1.5
     assert actions[2].value.id == uuid.UUID("d67cbad2-da3f-4b59-b434-2d493e7e6185")
@@ -274,7 +276,6 @@ def test_mode_hierarchy():
 
     tree = ElementTree.parse(fpath)
     root = tree.getroot()
-
 
     mh = gremlin.profile.ModeHierarchy()
     mh.from_xml(root)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,17 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import enum
-import logging
 import gremlin.error
-import os
-import sys
 
-from PySide6 import QtGui
 
 from gremlin.input_types import InputType
 import gremlin.types
 import gremlin.keyboard
-
 
 
 def input_to_ui_string(input_type, input_id):
@@ -36,7 +31,7 @@ def input_to_ui_string(input_type, input_id):
     :param input_id the corresponding id
     :return string for UI usage of the given data
     """
-    
+
     from gremlin.keyboard import key_from_code
 
     if hasattr(input_id, "display_name"):
@@ -53,12 +48,11 @@ def input_to_ui_string(input_type, input_id):
         return input_id.name
     elif input_type in (InputType.Keyboard, InputType.KeyboardLatched):
         if isinstance(input_id, gremlin.keyboard.Key):
-            return  key_from_code(input_id.scan_code, input_id.is_extended).name
-        
-        return key_from_code(input_id[0],input_id[1]).name
+            return key_from_code(input_id.scan_code, input_id.is_extended).name
+
+        return key_from_code(input_id[0], input_id[1]).name
     else:
         return f"{InputType.to_string(input_type).capitalize()} {input_id}"
-
 
 
 def index_to_direction(direction):
@@ -75,7 +69,7 @@ def index_to_direction(direction):
         5: "Down",
         6: "Down & Left",
         7: "Left",
-        8: "Up & Left"
+        8: "Up & Left",
     }
     return lookup[int(direction)]
 
@@ -99,13 +93,11 @@ direction_tuple_lookup = {
     "South": (0, -1),
     "South West": (-1, -1),
     "West": (-1, 0),
-    "North West": (-1, 1)
+    "North West": (-1, 1),
 }
 
 
-
 class PluginVariableType(enum.Enum):
-
     """Enumeration of all supported variable types."""
 
     Int = 1
@@ -122,19 +114,14 @@ class PluginVariableType(enum.Enum):
         try:
             return _PluginVariableType_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PluginVariableType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
     @staticmethod
     def to_enum(value):
         try:
             return _PluginVariableType_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PluginVariableType in lookup"
-            )
-
+            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
 
 _PluginVariableType_to_string_lookup = {
@@ -145,7 +132,7 @@ _PluginVariableType_to_string_lookup = {
     PluginVariableType.PhysicalInput: "PhysicalInput",
     PluginVariableType.VirtualInput: "VirtualInput",
     PluginVariableType.Mode: "Mode",
-    PluginVariableType.Selection: "Selection"
+    PluginVariableType.Selection: "Selection",
 }
 
 _PluginVariableType_to_enum_lookup = {
@@ -156,5 +143,5 @@ _PluginVariableType_to_enum_lookup = {
     "PhysicalInput": PluginVariableType.PhysicalInput,
     "VirtualInput": PluginVariableType.VirtualInput,
     "Mode": PluginVariableType.Mode,
-    "Selection": PluginVariableType.Selection
+    "Selection": PluginVariableType.Selection,
 }

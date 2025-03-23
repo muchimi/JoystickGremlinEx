@@ -16,13 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
 import sys
+
 sys.path.append(".")
 
 import pytest
-import uuid
-from lxml import etree as ElementTree
 
-import gremlin.error
 # import gremlin.plugin_manager
 # from gremlin.profile import Profile
 # import gremlin.types
@@ -44,9 +42,8 @@ xml = """
 @pytest.fixture(scope="session", autouse=True)
 def terminate_event_listener(request):
     import gremlin.event_handler
-    request.addfinalizer(
-        lambda: gremlin.event_handler.EventListener().terminate()
-    )
+
+    request.addfinalizer(lambda: gremlin.event_handler.EventListener().terminate())
 
 
 def test_model_ctor():

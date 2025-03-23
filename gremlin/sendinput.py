@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -63,18 +63,18 @@ INPUT_MOUSE = 0
 INPUT_KEYBOARD = 1
 
 import logging
+
 syslog = logging.getLogger("system")
 
-class MotionType(enum.Enum):
 
+class MotionType(enum.Enum):
     """Mouse motion types available."""
 
-    Fixed = 1,
+    Fixed = (1,)
     Accelerated = 2
 
 
 class MouseMotion:
-
     """Base class of all mouse motion behaviours."""
 
     # Time step between calls
@@ -133,7 +133,6 @@ class MouseMotion:
 
 
 class FixedMouseMotion(MouseMotion):
-
     """Motion generation with fixed speed."""
 
     def __init__(self, dx, dy):
@@ -162,7 +161,6 @@ class FixedMouseMotion(MouseMotion):
 
 
 class AcceleratedMouseMotion(MouseMotion):
-
     """Motion generation with acceleration over time."""
 
     def __init__(self, direction, min_speed, max_speed, time_to_max_speed):
@@ -185,8 +183,7 @@ class AcceleratedMouseMotion(MouseMotion):
             self.acceleration = (max_speed - min_speed) / time_to_max_speed
 
         self.current_velocity = self.min_velocity
-        self.dx, self.dy = \
-            self._decompose_xy(self.direction, self.current_velocity)
+        self.dx, self.dy = self._decompose_xy(self.direction, self.current_velocity)
         self._tick_dx_value, self._tick_dx_time = self._compute_values(self.dx)
         self._tick_dy_value, self._tick_dy_time = self._compute_values(self.dy)
 
@@ -196,8 +193,7 @@ class AcceleratedMouseMotion(MouseMotion):
         :param direction new direction of travel
         """
         self.direction = direction - 90.0
-        self.dx, self.dy = \
-            self._decompose_xy(self.direction, self.current_velocity)
+        self.dx, self.dy = self._decompose_xy(self.direction, self.current_velocity)
         self._tick_dx_value, self._tick_dx_time = self._compute_values(self.dx)
         self._tick_dy_value, self._tick_dy_time = self._compute_values(self.dy)
 
@@ -208,8 +204,9 @@ class AcceleratedMouseMotion(MouseMotion):
             positive y
         :param value the length of the direction vector
         """
-        return value * math.cos(deg2rad(direction)),\
-            value * math.sin(deg2rad(direction))
+        return value * math.cos(deg2rad(direction)), value * math.sin(
+            deg2rad(direction)
+        )
 
     def __call__(self):
         """Returns the change in x and y for this point in time.
@@ -222,10 +219,9 @@ class AcceleratedMouseMotion(MouseMotion):
         # Apply acceleration to obtain next integration step values
         self.current_velocity = min(
             self.max_velocity,
-            self.current_velocity + self.acceleration * MouseMotion.delta_t
+            self.current_velocity + self.acceleration * MouseMotion.delta_t,
         )
-        self.dx, self.dy = \
-            self._decompose_xy(self.direction, self.current_velocity)
+        self.dx, self.dy = self._decompose_xy(self.direction, self.current_velocity)
         self._tick_dx_value, self._tick_dx_time = self._compute_values(self.dx)
         self._tick_dy_value, self._tick_dy_time = self._compute_values(self.dy)
 
@@ -235,7 +231,6 @@ class AcceleratedMouseMotion(MouseMotion):
 
 @SingletonDecorator
 class MouseController:
-
     """Centralizes sending mouse events in a organized manner."""
 
     def __init__(self):
@@ -262,16 +257,11 @@ class MouseController:
         else:
             self._motion_type = MotionType.Fixed
             self._delta_generator = FixedMouseMotion(
-                dx if dx is not None else 0,
-                dy if dy is not None else 0
+                dx if dx is not None else 0, dy if dy is not None else 0
             )
 
     def set_accelerated_motion(
-            self,
-            direction,
-            min_speed,
-            max_speed,
-            time_to_max_speed
+        self, direction, min_speed, max_speed, time_to_max_speed
     ):
         """Configures a motion using acceleration.
 
@@ -284,10 +274,7 @@ class MouseController:
             self._delta_generator.set_direction(direction)
         else:
             self._delta_generator = AcceleratedMouseMotion(
-                direction,
-                min_speed,
-                max_speed,
-                time_to_max_speed
+                direction, min_speed, max_speed, time_to_max_speed
             )
             self._motion_type = MotionType.Accelerated
 
@@ -315,7 +302,6 @@ class MouseController:
 
 
 class _MOUSEINPUT(ctypes.Structure):
-
     """Defines the MOUSEINPUT structure.
 
     https://msdn.microsoft.com/en-us/library/ms646273(v=VS.85).aspx
@@ -332,7 +318,6 @@ class _MOUSEINPUT(ctypes.Structure):
 
 
 class _KEYBDINPUT(ctypes.Structure):
-
     """Defines the KEYBDINPUT structure.
 
     https://msdn.microsoft.com/en-us/library/ms646271(v=vs.85).aspx
@@ -343,51 +328,43 @@ class _KEYBDINPUT(ctypes.Structure):
         ("wScan", ctypes.wintypes.WORD),
         ("dwFlags", ctypes.wintypes.DWORD),
         ("time", ctypes.wintypes.DWORD),
-        ("wExtraInfo", ctypes.POINTER(ctypes.wintypes.ULONG))
+        ("wExtraInfo", ctypes.POINTER(ctypes.wintypes.ULONG)),
     )
 
 
 def _keyboard_input(virtual_key, scan_code, flags):
     return _INPUT(
         INPUT_KEYBOARD,
-        _INPUTunion(ki=_KEYBDINPUT(virtual_key, scan_code, flags, 0, None))
+        _INPUTunion(ki=_KEYBDINPUT(virtual_key, scan_code, flags, 0, None)),
     )
 
-class _INPUTunion(ctypes.Union):
 
+class _INPUTunion(ctypes.Union):
     """Defines the INPUT union type.
 
     https://msdn.microsoft.com/en-us/library/ms646270(v=vs.85).aspx
     """
 
-    _fields_ = (
-        ("mi", _MOUSEINPUT),
-        ("ki", _KEYBDINPUT)
-    )
+    _fields_ = (("mi", _MOUSEINPUT), ("ki", _KEYBDINPUT))
 
 
 class _INPUT(ctypes.Structure):
-
     """Defines the INPUT structure.
 
     https://msdn.microsoft.com/en-us/library/ms646270(v=vs.85).aspx
     """
 
-    _fields_ = (
-        ("type", ctypes.wintypes.DWORD),
-        ("union", _INPUTunion)
-    )
+    _fields_ = (("type", ctypes.wintypes.DWORD), ("union", _INPUTunion))
 
 
 def mouse_relative_motion(dx, dy):
-    _send_input(
-        _mouse_input(MOUSEEVENTF_MOVE, dx, dy)
-    )
+    _send_input(_mouse_input(MOUSEEVENTF_MOVE, dx, dy))
 
 
 def mouse_press(button):
-    ''' sends a single click'''
+    """sends a single click"""
     from gremlin.types import MouseButton
+
     if button == MouseButton.Left:
         _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
     elif button == MouseButton.Right:
@@ -399,9 +376,11 @@ def mouse_press(button):
     elif button == MouseButton.Forward:
         _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
 
-def mouse_press_double_click(button, delay = 0.05):
-    ''' sends a double click (also releases the mouse) '''
+
+def mouse_press_double_click(button, delay=0.05):
+    """sends a double click (also releases the mouse)"""
     from gremlin.types import MouseButton
+
     if button == MouseButton.Left:
         _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
         time.sleep(delay)
@@ -434,7 +413,7 @@ def mouse_press_double_click(button, delay = 0.05):
         _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1))
         time.sleep(delay)
         _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON1))
-        
+
     elif button == MouseButton.Forward:
         _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
         time.sleep(delay)
@@ -443,11 +422,11 @@ def mouse_press_double_click(button, delay = 0.05):
         _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
         time.sleep(delay)
         _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON2))
-
 
 
 def mouse_release(button):
     from gremlin.types import MouseButton
+
     if button == MouseButton.Left:
         _send_input(_mouse_input(MOUSEEVENTF_LEFTUP))
     elif button == MouseButton.Right:
@@ -462,29 +441,25 @@ def mouse_release(button):
 
 def mouse_wheel(motion):
     # vertical mouse wheel
-    _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data=-motion*WHEEL_DELTA))
+    _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data=-motion * WHEEL_DELTA))
+
 
 def mouse_h_wheel(motion):
     # horizontal mouse wheel
-    import logging
-    syslog.info(f"send h wheel direction {motion}")
-    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data=-motion*WHEEL_DELTA))
 
+    syslog.info(f"send h wheel direction {motion}")
+    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data=-motion * WHEEL_DELTA))
 
 
 def _mouse_input(flags, dx=0, dy=0, data=0):
     return _INPUT(
-        INPUT_MOUSE,
-        _INPUTunion(mi=_MOUSEINPUT(dx, dy, data, flags, 0, None))
+        INPUT_MOUSE, _INPUTunion(mi=_MOUSEINPUT(dx, dy, data, flags, 0, None))
     )
 
 
-
-
 def send_key(virtual_code, scan_code, flags):
-    ''' sends a key message via send input '''
+    """sends a key message via send input"""
     _send_input(_keyboard_input(virtual_code, scan_code, flags))
-
 
 
 def _send_input(*inputs):

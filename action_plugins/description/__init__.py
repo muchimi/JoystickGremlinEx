@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,24 +20,23 @@ import os
 from PySide6 import QtWidgets
 from lxml import etree as ElementTree
 
-import gremlin.base_classes 
+import gremlin.base_classes
 from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
 
 class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
-
     """Widget for the description action."""
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, DescriptionAction))
+        assert isinstance(action_data, DescriptionAction)
 
     def _create_ui(self):
         self.inner_layout = QtWidgets.QHBoxLayout()
         self.label = QtWidgets.QLabel("<b>Action description</b>")
         self.description = QtWidgets.QLineEdit()
-        #self.description.setReadOnly(self.action_data.descriptionReadOnly)
+        # self.description.setReadOnly(self.action_data.descriptionReadOnly)
         self.description.textChanged.connect(self._update_description)
         self.inner_layout.addWidget(self.label)
         self.inner_layout.addWidget(self.description)
@@ -45,30 +44,28 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         self.description.setText(self.action_data.description)
-        #self.description.setReadOnly(self.action_data.)
+        # self.description.setReadOnly(self.action_data.)
 
     def _update_description(self, value):
         self.action_data.description = value
 
 
 class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         return True
 
 
 class DescriptionAction(gremlin.base_profile.AbstractAction):
-
     """Action for adding a description to a set of actions."""
 
     name = "Description"
     tag = "description"
 
     default_button_activation = (True, False)
-    
+
     # override allowed input types if different from default
     # input_types = [
     #     InputType.JoystickAxis,
@@ -91,10 +88,8 @@ class DescriptionAction(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node, data = None):
-        self.description = gremlin.profile.safe_read(
-            node, "description", str, ""
-        )
+    def _parse_xml(self, node, data=None):
+        self.description = gremlin.profile.safe_read(node, "description", str, "")
 
     def _generate_xml(self):
         node = ElementTree.Element("description")

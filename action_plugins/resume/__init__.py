@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,6 @@ import gremlin.ui.input_item
 
 
 class ResumeActionWidget(gremlin.ui.input_item.AbstractActionWidget):
-
     """Widget for the resume action."""
 
     def __init__(self, action_data, parent=None):
@@ -42,18 +41,17 @@ class ResumeActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 class ResumeActionFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         import gremlin.control_action
+
         gremlin.control_action.resume()
         return True
 
 
 class ResumeAction(gremlin.base_profile.AbstractAction):
-
     """Action to resume callback execution."""
 
     name = "Resume"
@@ -73,23 +71,20 @@ class ResumeAction(gremlin.base_profile.AbstractAction):
 
     def icon(self):
         return "ei.play-circle"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return "Resume"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         pass
 
     def _generate_xml(self):
