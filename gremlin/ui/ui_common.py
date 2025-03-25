@@ -7142,25 +7142,25 @@ class QPaginator(QtWidgets.QWidget):
     def init_ui(self):
 
         self._first_button_widget = QtWidgets.QPushButton()
-        icon = load_icon("fa.angle-double-left")
+        icon = load_icon("fa5s.angle-double-left")
         self._first_button_widget.setIcon(icon)
         self._first_button_widget.setToolTip("Previous")
         self._first_button_widget.clicked.connect(self._first_page)
 
         self._prev_button_widget = QtWidgets.QPushButton()
-        icon = load_icon("fa.angle-left")
+        icon = load_icon("fa5s.angle-left")
         self._prev_button_widget.setIcon(icon)
         self._prev_button_widget.setToolTip("Previous")
         self._prev_button_widget.clicked.connect(self._prev_page)
 
         self._next_button_widget = QtWidgets.QPushButton()
-        icon = load_icon("fa.angle-right")
+        icon = load_icon("fa5s.angle-right")
         self._next_button_widget.setIcon(icon)
         self._next_button_widget.setToolTip("Next")
         self._next_button_widget.clicked.connect(self._next_page)
 
         self._last_button_widget = QtWidgets.QPushButton()
-        icon = load_icon("fa.angle-double-right")
+        icon = load_icon("fa5s.angle-double-right")
         self._last_button_widget.setIcon(icon)
         self._last_button_widget.setToolTip("Next")
         self._last_button_widget.clicked.connect(self._last_page)

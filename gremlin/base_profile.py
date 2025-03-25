@@ -2034,6 +2034,7 @@ class Profile():
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
         self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
         
+        self._substitution_map = {} # map of device GUID to any new device GUID for the load process
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
@@ -2636,8 +2637,7 @@ class Profile():
         modes = self.get_root_modes()
         if modes:
             return modes[0]
-        
-    
+
 
     def from_xml(self, fname, data = None):
         """Parses the profile XML document into the profile data structure.
@@ -2675,6 +2675,13 @@ class Profile():
 
         # read mode information (m73 and later profiles only)
         mode_tree = ModeNode("")
+
+        
+
+
+
+            
+
         
         # profile mode definitions
         

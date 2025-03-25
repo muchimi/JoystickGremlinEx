@@ -2949,11 +2949,38 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
 
 
 
+# class SubstituteDialogEx(gremlin.ui.ui_common.QRememberDialog):
+#     def __init__(self, parent = None):
+#         super().__init__(self.__class__.__name__, parent = parent)
+
+
+#     def substitute_xml(self, fname):
+#         # device substitutions if they don't exist
+#         if not os.path.isfile(fname):
+#             return 
+#         tree = etree.parse(fname)
+#         root = tree.getroot()
+#         device_nodes = root.xpath("//device")
+#         for node in device_nodes:
+#             device_name = node.get("name")
+#             device_id = node.get("device-guid")
+#             device_guid = gremlin.util.parse_guid(device_id)
+#             info = gremlin.joystick_handling.device_info_from_guid(device_guid)
+#             if not info:
+#                 # device not found
+#                 if not device_id in self._substitution_map:
+#                     # prompt for a device to substitute
+#                     dialog = gremlin.ui.dialogs.SubstituteDialog(device_guid=device_guid, device_name=device_name, self._substitution_map)
+#                     dialog.setModal(True)
+#                     dialog.accepted.connect(self._substitute_complete_cb)
+#                     gremlin.util.centerDialog(dialog)
+#                     dialog.show(    
+
 
 class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' device substitution - allows the swap of one device_guid for another '''
 
-    def __init__(self, device_guid, device_name, parent = None):
+    def __init__(self, device_guid, device_name, substitution_map :dict, parent = None):
         super().__init__(self.__class__.__name__, parent = parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)

@@ -471,7 +471,7 @@ class SimConnectManager(QtCore.QObject):
         el.shutdown.connect(self._shutdown) # trap application shutdown
         el.abort.connect(self._abort) # trap abort
         el.profile_stop.connect(self._profile_stop) # trap profile stop
-        el.profile_start.connect(self.activate) # trap profile start
+        el.profile_start.connect(self._profile_start) # trap profile start
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
@@ -579,6 +579,12 @@ class SimConnectManager(QtCore.QObject):
     @QtCore.Slot()
     def _profile_stop(self):
         self._stop()
+
+    @QtCore.Slot()
+    def _profile_start(self):
+        ''' occurs on profile start '''
+        self.activate()
+        
         
 
     @QtCore.Slot()
@@ -1002,10 +1008,10 @@ class SimConnectManager(QtCore.QObject):
     
     def request_loaded_aircraft(self):
         ''' gets the current player aircraft in the sim '''
-        if self._aircraft_name and self._aircraft_title:
-            self._dump_current_aircraft()
-            self.sim_aircraft_loaded.emit(self._aircraft_folder, self._aircraft_name, self._aircraft_title)
-            return
+        # if self._aircraft_name and self._aircraft_title:
+        #     self._dump_current_aircraft()
+        #     self.sim_aircraft_loaded.emit(self._aircraft_folder, self._aircraft_name, self._aircraft_title)
+        #     return
 
         try:
             if self._sm.ok:

@@ -1977,7 +1977,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 display_sort_up_widget.setToolTip("Sort aircraft ascending")
 
                 display_sort_down_widget = QtWidgets.QPushButton()
-                display_sort_down_widget.setIcon(gremlin.util.load_icon("fa.sort-desc", qta_color=icon_color))
+                display_sort_down_widget.setIcon(gremlin.util.load_icon("mdi.sort-descending", qta_color=icon_color))
                 display_sort_down_widget.setMaximumWidth(20)
                 display_sort_down_widget.clicked.connect(self._sort_display_down_cb)
                 display_sort_down_widget.setStyleSheet("border: none;")
