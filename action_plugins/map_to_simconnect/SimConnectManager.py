@@ -905,6 +905,7 @@ class SimConnectManager(QtCore.QObject):
         if name:
             folder = self._aircraft_folder
             title = self._aircraft_title
+            self._dump_current_aircraft()
             self.sim_aircraft_loaded.emit(folder, name, title)
             
             
@@ -1002,6 +1003,7 @@ class SimConnectManager(QtCore.QObject):
     def request_loaded_aircraft(self):
         ''' gets the current player aircraft in the sim '''
         if self._aircraft_name and self._aircraft_title:
+            self._dump_current_aircraft()
             self.sim_aircraft_loaded.emit(self._aircraft_folder, self._aircraft_name, self._aircraft_title)
             return
 
@@ -1026,16 +1028,18 @@ class SimConnectManager(QtCore.QObject):
     def _aircraft_loaded_internal_cb(self, folder : str, name : str):
         # decode the data into useful bits
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_simconnect
         title = self.get_aircraft_title(True)
         self._aircraft_title = title
         self._aircraft_folder = folder
         self._aircraft_name = name
-        if verbose: syslog.info(f"SIMCONNECT MGR: sim aircraft loaded event: folder: [{folder}] title: [{title}] name: [{name}]")
+        self._dump_current_aircraft()
         self.sim_aircraft_loaded.emit(folder, name, title)
 
 
-
+    def _dump_current_aircraft(self):
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        if verbose:
+            syslog.info(f"SIMCONNECT: current aircraft: folder: [{self._aircraft_folder}] name: [{self._aircraft_name}] title: [{self._aircraft_title}]")
 
     def reset(self):
         ''' resets the connection '''

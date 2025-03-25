@@ -1354,6 +1354,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         # display name to mode pair list
         self.mode_pair_list = gremlin.ui.ui_common.get_mode_list(self.profile)
 
+        is_dark = gremlin.shared_state.is_dark_theme   
+        prefix = "dark_" if is_dark else ""
+
         self.setWindowTitle("Simconnect Options")
         self.installEventFilter(self) # trap some events
 
@@ -1384,76 +1387,111 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         self.edit_mode_widget = QtWidgets.QPushButton()
-        self.edit_mode_widget.setIcon(gremlin.util.load_icon("manage_modes.svg"))
+        
+        manage_modes_icon = "gfx/dark_manage_modes.svg" if is_dark else "gfx/manage_modes.svg"
+        self.edit_mode_widget.setIcon(ui_common.load_icon(manage_modes_icon))
         self.edit_mode_widget.clicked.connect(self._manage_modes_cb)
         self.edit_mode_widget.setToolTip("Manage Modes")
 
         
-        self.scan_aircraft_widget = QtWidgets.QPushButton("Scan Aircraft")
-        self.scan_aircraft_widget.setIcon(gremlin.util.load_icon("mdi.magnify-scan"))
-        self.scan_aircraft_widget.clicked.connect(self._scan_aircraft_cb)
-        self.scan_aircraft_widget.setToolTip("Scan MSFS aicraft folders for aircraft names")
+        # self.scan_aircraft_widget = QtWidgets.QPushButton("Scan Aircraft")
+        # self.scan_aircraft_widget.setIcon(gremlin.util.load_icon("mdi.magnify-scan"))
+        # self.scan_aircraft_widget.clicked.connect(self._scan_aircraft_cb)
+        # self.scan_aircraft_widget.setToolTip("Scan MSFS aicraft folders for aircraft names")
+
+        line_entry_width = 250
 
         self.current_aircraft_widget = ui_common.QDataLineEdit()
         self.current_aircraft_widget.setReadOnly(True)
+        self.current_aircraft_widget.setMinimumWidth(line_entry_width)
 
 
-        self.current_aircraft_folder = None # holds the active aircraft data folder
+        self.current_aircraft_folder = None # holds the active aircraft data folder (from the sim)
+        self.current_aircraft_title = None # holds the active aicraft title (from the sim)
+        self.current_aircraft_name = None # holds the active aicraft name (from the sim)
 
-        self.refresh_aircraft_widget = QtWidgets.QPushButton()
-        self.refresh_aircraft_widget.clicked.connect(self._refresh_aircraft_cb)
-        self.refresh_aircraft_widget.setIcon(gremlin.util.load_icon("fa.refresh"))
-        self.refresh_aircraft_widget.setToolTip("Queries the current aircraft loaded in the sim")
-        self.refresh_aircraft_widget.setMaximumWidth(24)
+        self.refresh_current_aircraft_widget = QtWidgets.QPushButton("Get Current Aircraft")
+        self.refresh_current_aircraft_widget.clicked.connect(self._refresh_aircraft_cb)
+        #self.refresh_current_aircraft_widget.setIcon(gremlin.util.load_icon("fa.refresh"))
+        self.refresh_current_aircraft_widget.setToolTip("Queries the current aircraft loaded in the sim")
+        #self.refresh_current_aircraft_widget.setMaximumWidth(24)
 
 
         self.add_current_aircraft_widget = QtWidgets.QPushButton("Add Current Aircraft")
         self.add_current_aircraft_widget.clicked.connect(self._add_current_aircraft_cb)
         self.add_current_aircraft_widget.setToolTip("Adds the aircraft to the manual list if it doesn't exist")
 
-        self.add_manual_entry_widget = QtWidgets.QPushButton("Add Manual Entry")
-        self.add_manual_entry_widget.setToolTip("Adds a manual entry")
-        self.add_manual_entry_widget.clicked.connect(self.add_entry_cb)
+        # self.add_manual_entry_widget = QtWidgets.QPushButton("Add Manual Entry")
+        # self.add_manual_entry_widget.setToolTip("Adds a manual entry")
+        # self.add_manual_entry_widget.clicked.connect(self.add_entry_cb)
 
-        self.paginator_widget = gremlin.ui.ui_common.QPaginator()
+        self.paginator_widget = gremlin.ui.ui_common.QPaginator(page_size = self._page_size)
         self.paginator_widget.pageChanged.connect(self._handle_paginator)
 
         
-        self.container_bar_layout.addWidget(self.edit_mode_widget)
-        self.container_bar_layout.addWidget(self.scan_aircraft_widget)
-        self.container_bar_layout.addWidget(QtWidgets.QLabel("Current Aircraft:"))
-        self.container_bar_layout.addWidget(self.current_aircraft_widget)
-        self.container_bar_layout.addWidget(self.refresh_aircraft_widget)
-        self.container_bar_layout.addWidget(self.add_current_aircraft_widget)
-        self.container_bar_layout.addWidget(self.add_manual_entry_widget)
-        
-        self.container_bar_layout.addStretch()
+        row_widgets = [QtWidgets.QLabel("Current Aircraft:"),
+                       self.current_aircraft_widget,
+                       self.add_current_aircraft_widget,
+                       #self.add_manual_entry_widget,
+                       #QtWidgets.QLabel(" "),
+                       self.refresh_current_aircraft_widget,
+                       self.edit_mode_widget
+        ]
+
+        widget, layout = gremlin.ui.ui_common.getGridContainer(row_widgets)
+        self.container_bar_widget = widget
+        self.container_bar_layout = layout
+
+
 
         self.filter_widget = QtWidgets.QLineEdit()
         self.filter_widget.returnPressed.connect(self._handle_search) # on enter, do the search
+        self.filter_widget.setMinimumWidth(line_entry_width)
         
         self.apply_filter_widget = QtWidgets.QPushButton("Search")
         self.apply_filter_widget.clicked.connect(self._handle_search)
+        self.apply_filter_widget.setToolTip("Search aicraft using the current filter")
 
         self.clear_filter_widget = QtWidgets.QPushButton("Clear Search")
         self.clear_filter_widget.clicked.connect(self._handle_clear_search)
+        self.clear_filter_widget.setToolTip("Clears the search filter")
 
-        self.refresh_aircraft_list_widget = QtWidgets.QPushButton()
+        self.filter_current_widget  = QtWidgets.QPushButton("Search Current")
+        self.filter_current_widget.clicked.connect(self._handle_current_search)
+        self.filter_current_widget.setToolTip("Search for current aircraft")
+
+
+        self.refresh_aircraft_list_widget = QtWidgets.QPushButton("Refresh All")
         self.refresh_aircraft_list_widget.setToolTip("Refresh the available aircraft list from MSFS")
         self.refresh_aircraft_list_widget.setIcon(gremlin.util.load_icon("fa.refresh"))
         self.refresh_aircraft_list_widget.clicked.connect(self._handle_refresh_aircraft_list)
         
-        widget, layout = gremlin.ui.ui_common.getHContainer()
+
+        row_widgets = [QtWidgets.QLabel("Filter:"), 
+                        self.filter_widget,
+                        self.apply_filter_widget,
+                        self.clear_filter_widget,
+                        self.filter_current_widget,
+                        self.refresh_aircraft_list_widget,
+                       ]
+        
+        widget, layout = gremlin.ui.ui_common.getGridContainer(row_widgets)
         self.container_navigation_widget = widget
         self.container_navigation_layout = layout
 
-        self.container_navigation_layout.addWidget(QtWidgets.QLabel("Filter:"))
-        self.container_navigation_layout.addWidget(self.filter_widget)
-        self.container_navigation_layout.addWidget(self.apply_filter_widget)
-        self.container_navigation_layout.addWidget(self.clear_filter_widget)
-        self.container_navigation_layout.addWidget(self.refresh_aircraft_list_widget)
-        self.container_navigation_layout.addStretch()
-        self.container_navigation_layout.addWidget(self.paginator_widget)
+        self.grid_sync_widgets = [self.container_navigation_widget, self.container_bar_widget]
+
+        page_sizes = [10, 25, 50, 100]
+        widgets = [self.paginator_widget]
+        for size in page_sizes:
+            widget = ui_common.QDataPushButton(str(size),size)
+            widget.clicked.connect(self._handle_page_size)
+            widgets.append(widget)
+
+        widget, layout = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True)
+        self.container_paginator_widget = widget
+        self.container_paginator_layout = layout
+        
         
 
         # start scrolling container widget definition
@@ -1462,9 +1500,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.container_map_layout = QtWidgets.QVBoxLayout(self.container_map_widget)
         self.container_map_layout.setContentsMargins(0,0,0,0)
 
-        self.manual_container_map_widget = QtWidgets.QWidget()
-        self.manual_container_map_layout = QtWidgets.QVBoxLayout(self.manual_container_map_widget)
-        self.manual_container_map_layout.setContentsMargins(0,0,0,0)
+        # self.manual_container_map_widget = QtWidgets.QWidget()
+        # self.manual_container_map_layout = QtWidgets.QVBoxLayout(self.manual_container_map_widget)
+        # self.manual_container_map_layout.setContentsMargins(0,0,0,0)
 
         # add aircraft map items
         self.scroll_area = QtWidgets.QScrollArea()
@@ -1473,9 +1511,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         # add manual aircraft map items
-        self.manual_scroll_area = QtWidgets.QScrollArea()
-        self.manual_scroll_widget = QtWidgets.QWidget()
-        self.manual_scroll_layout = QtWidgets.QVBoxLayout()
+        # self.manual_scroll_area = QtWidgets.QScrollArea()
+        # self.manual_scroll_widget = QtWidgets.QWidget()
+        # self.manual_scroll_layout = QtWidgets.QVBoxLayout()
 
         # Configure the widget holding the layout with all the buttons
         self.scroll_widget.setLayout(self.scroll_layout)
@@ -1494,18 +1532,18 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         # Configure the widget holding the layout with all the buttons
-        self.manual_scroll_widget.setLayout(self.manual_scroll_layout)
-        self.manual_scroll_widget.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.Expanding
-        )
-        self.manual_scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        self.manual_scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        # self.manual_scroll_widget.setLayout(self.manual_scroll_layout)
+        # self.manual_scroll_widget.setSizePolicy(
+        #     QtWidgets.QSizePolicy.Expanding,
+        #     QtWidgets.QSizePolicy.Expanding
+        # )
+        # self.manual_scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        # self.manual_scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         # Configure the scroll area
         #self.scroll_area.setMinimumWidth(300)
-        self.manual_scroll_area.setWidgetResizable(True)
-        self.manual_scroll_area.setWidget(self.manual_scroll_widget)
+        # self.manual_scroll_area.setWidgetResizable(True)
+        # self.manual_scroll_area.setWidget(self.manual_scroll_widget)
 
 
 
@@ -1525,14 +1563,14 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         self.container_map_layout.addWidget(self.scroll_area)
-        self.manual_container_map_layout.addWidget(self.manual_scroll_area)
+        #self.manual_container_map_layout.addWidget(self.manual_scroll_area)
 
 
         
-        self.manual_scroll_layout.addWidget(self.manual_map_widget)
-        self.manual_scroll_layout.setContentsMargins(6,0,6,0)
-        self.manual_scroll_layout.addStretch()
-        self.manual_container_map_layout.addWidget(self.manual_scroll_area)
+        # self.manual_scroll_layout.addWidget(self.manual_map_widget)
+        # self.manual_scroll_layout.setContentsMargins(6,0,6,0)
+        # self.manual_scroll_layout.addStretch()
+        # self.manual_container_map_layout.addWidget(self.manual_scroll_area)
 
 
 
@@ -1571,7 +1609,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout.addWidget(self.container_bar_widget)
         self.main_layout.addWidget(self.container_navigation_widget)
         self._top_panel_layout.addWidget(self.container_map_widget)
-        self._bottom_panel_layout.addWidget(self.manual_container_map_widget)
+        self._top_panel_layout.addWidget(self.container_paginator_widget)
+        #self._bottom_panel_layout.addWidget(self.manual_container_map_widget)
 
 
         warning_container = QtWidgets.QWidget()
@@ -1752,11 +1791,14 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         else:
             self._set_warning()
 
-    @QtCore.Slot(str,str)
-    def _aircraft_loaded(self, folder, title):
+    @QtCore.Slot(str,str,str)
+    def _aircraft_loaded(self, folder, name, title):
         ''' triggered when simconnect sends aircraft data '''
         self.current_aircraft_widget.setText(title)
+        self.current_aircraft_widget.setToolTip(title)
         self.current_aircraft_folder = folder
+        self.current_aircraft_title = title
+        self.current_aircraft_name = name
         add_enabled = bool(title)
         self.add_current_aircraft_widget.setEnabled(add_enabled)
 
@@ -1764,6 +1806,13 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     def _aircraft_list_loaded(self):
         ''' triggered when simconnect sends aircraft data '''
         self._update_data()        
+
+    @QtCore.Slot()
+    def _handle_page_size(self):
+        widget = self.sender()
+        count = widget.data
+        self.paginator_widget.setPageSize(count)
+
 
     def _update_data(self):
         ''' re-index the data '''
@@ -1827,15 +1876,19 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._update_aircraft_list()
 
     @QtCore.Slot()
-    def _handle_search(self):
-        ''' handles a search '''
-        definitions = self.options.definitions
-        filter = self.filter_widget.text()
+    def _handle_current_search(self):
+        ''' search on current aircraft entry '''
+        filter = self.current_aircraft_widget.text()
+        self.filter_widget.setText(filter)
+        self._search(filter)
+
+    def _search(self, filter : str):
+        ''' handles the search '''
         if not filter:
             self._update_data()
         else:
             pattern = re.compile(filter,re.IGNORECASE)
-
+            definitions = self.options.definitions
             data = [item for item in definitions.values() if pattern.search(item.sim_name)]
             data.sort(key = lambda x: x.sim_name)
             item_count = len(data)
@@ -1845,6 +1898,13 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self._data = data
             self._populate_ui()
 
+
+    @QtCore.Slot()
+    def _handle_search(self):
+        ''' handles a search '''
+        filter = self.filter_widget.text()
+        self._search(filter)
+        
 
 
 
@@ -1904,7 +1964,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 aircraft_header_widget = QtWidgets.QWidget()
                 aircraft_header_layout = QtWidgets.QHBoxLayout(aircraft_header_widget)
 
-                sim_name_widget = QtWidgets.QLabel("Sim Name")
+                # sim_name_widget = QtWidgets.QLabel("Sim Name")
 
                 self.display_header_widget = QtWidgets.QLabel("Aircraft")
                 aircraft_header_layout.addWidget(self.display_header_widget)
@@ -1947,10 +2007,10 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
 
-                manufacturer_widget = QtWidgets.QLabel("Manufacturer")
+                # manufacturer_widget = QtWidgets.QLabel("Manufacturer")
 
-                type_widget = QtWidgets.QLabel("Type")
-                model_widget = QtWidgets.QLabel("Model")
+                # type_widget = QtWidgets.QLabel("Type")
+                # model_widget = QtWidgets.QLabel("Model")
                 # community_widget = QtWidgets.QLabel("Community Folder")
                 # aircraft_widget = QtWidgets.QLabel("Aircraft Folder")
 
@@ -1967,17 +2027,17 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 self.map_layout.addWidget(select_widget, 0, col)
                 col+=1
                 self.map_layout.addWidget(aircraft_header_widget, 0, col)
-                col+=1
-                self.map_layout.addWidget(sim_name_widget, 0, col)
+                # col+=1
+                # self.map_layout.addWidget(sim_name_widget, 0, col)
                 col+=2
                 self.map_layout.addWidget(mode_header_widget, 0, col)
-                col+=1
-                self.map_layout.addWidget(manufacturer_widget, 0, col)
-                col+=1
-                self.map_layout.addWidget(model_widget, 0, col)
-                col+=1
-                self.map_layout.addWidget(type_widget, 0, col)
-                col+=1
+                # col+=1
+                # self.map_layout.addWidget(manufacturer_widget, 0, col)
+                # col+=1
+                # self.map_layout.addWidget(model_widget, 0, col)
+                # col+=1
+                # self.map_layout.addWidget(type_widget, 0, col)
+                # col+=1
                 # self.map_layout.addWidget(community_widget, 0, col)
                 # col+=1
                 # self.map_layout.addWidget(aircraft_widget, 0, col)
@@ -2000,6 +2060,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self.display_header_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
             self.display_header_widget.setReadOnly(True)
             self.display_header_widget.setText(item.display_name)
+            self.display_header_widget.setToolTip(item.display_name)
             self.display_header_widget.installEventFilter(self)
             w = len(item.display_name)* self._char_width
             if w > display_width:
@@ -2012,27 +2073,27 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 name_widget.setText(item.sim_name)
             name_widget.installEventFilter(self)    
 
-            # manufacturer
-            manufacturer_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            manufacturer_widget.setReadOnly(True)
-            manufacturer_widget.setText(item.icao_manufacturer if item.icao_manufacturer else "n/a")
-            manufacturer_widget.installEventFilter(self)
+            # # manufacturer
+            # manufacturer_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+            # manufacturer_widget.setReadOnly(True)
+            # manufacturer_widget.setText(item.icao_manufacturer if item.icao_manufacturer else "n/a")
+            # manufacturer_widget.installEventFilter(self)
 
-            # model
-            model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            model_widget.setReadOnly(True)
-            model_widget.setText(item.icao_model if item.icao_model else "n/a")
-            model_widget.installEventFilter(self)
+            # # model
+            # model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+            # model_widget.setReadOnly(True)
+            # model_widget.setText(item.icao_model if item.icao_model else "n/a")
+            # model_widget.installEventFilter(self)
 
-            # type
-            type_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            type_widget.setReadOnly(True)
-            type_widget.setText(item.icao_type if item.icao_type else "n/a")
-            type_widget.installEventFilter(self)
+            # # type
+            # type_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+            # type_widget.setReadOnly(True)
+            # type_widget.setText(item.icao_type if item.icao_type else "n/a")
+            # type_widget.installEventFilter(self)
 
 
             # mode drop down
-            mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget))
+            mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget), wheel_enabled=False)
 
    
 
@@ -2073,17 +2134,17 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             col +=1
             self.map_layout.addWidget(self.display_header_widget, row, col)
             col +=1
-            self.map_layout.addWidget(name_widget, row, col)
-            col +=1
+            # self.map_layout.addWidget(name_widget, row, col)
+            # col +=1
             self.map_layout.addWidget(create_mode_widget, row, col)
             col +=1
             self.map_layout.addWidget(mode_selector, row, col)
-            col +=1
-            self.map_layout.addWidget(manufacturer_widget,row, col)
-            col +=1
-            self.map_layout.addWidget(model_widget,row, col)
-            col +=1
-            self.map_layout.addWidget(type_widget,row, col)
+            # col +=1
+            # self.map_layout.addWidget(manufacturer_widget,row, col)
+            # col +=1
+            # self.map_layout.addWidget(model_widget,row, col)
+            # col +=1
+            # self.map_layout.addWidget(type_widget,row, col)
             col +=1
             # self.map_layout.addWidget(community_widget,row, col)
             # col +=1
@@ -2100,6 +2161,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         self.map_layout.setColumnStretch(3,2)
+        display_width = min(display_width, 250)
         self.map_layout.setColumnMinimumWidth(3, display_width)
 
 
@@ -2166,11 +2228,11 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             selected_widget.checkStateChanged.connect(self._selected_changed_cb)
             row_selector.data = ((item, selected_widget))
 
-            name_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            if item.sim_name:
-                name_widget.setText(item.sim_name)
-            name_widget.valueChanged.connect(self._name_changed_cb)
-            name_widget.installEventFilter(self) 
+            # name_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+            # if item.sim_name:
+            #     name_widget.setText(item.sim_name)
+            # name_widget.valueChanged.connect(self._name_changed_cb)
+            # name_widget.installEventFilter(self) 
 
             delete_widget = gremlin.ui.ui_common.QDataPushButton()
             delete_widget.setIcon(delete_icon)
@@ -2218,8 +2280,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             col +=1
             self.manual_map_layout.addWidget(selected_widget, row, col)
             col +=1
-            self.manual_map_layout.addWidget(name_widget, row, col)
-            col +=1
+            # self.manual_map_layout.addWidget(name_widget, row, col)
+            # col +=1
             self.manual_map_layout.addWidget(create_mode_widget, row, col)
             col +=1
             self.manual_map_layout.addWidget(mode_selector, row, col)
@@ -2252,13 +2314,14 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         gremlin.util.pushCursor()
 
         self._update_scanned_list()
-        self._update_manual_list()
+        # self._update_manual_list()
 
 
         # mode locking is only enabled if auto mode change enabled
         self._auto_mode_lock.setEnabled(self._auto_mode_switch.isChecked())
 
-
+        # sync the grids
+        gremlin.ui.ui_common.synchronize_grids(self.grid_sync_widgets)
 
         gremlin.util.popCursor(True)
 

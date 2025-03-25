@@ -109,7 +109,7 @@ def button_input_devices() -> list[DeviceSummary]:
     return devices
 
 
-def is_hardware_device(device_guid) -> bool:
+def  is_hardware_device(device_guid) -> bool:
     ''' true if the device is a hardware device '''
     info = device_info_from_guid(device_guid)
     if info:

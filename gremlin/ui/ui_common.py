@@ -2953,9 +2953,24 @@ class QDataIPLineEdit(QDataLineEdit):
 
 class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
-    def __init__(self, data = None, parent = None):
+    def __init__(self, data = None, parent = None, wheel_enabled = True):
         super().__init__(parent)
         self._data = data
+        self._wheel_enabled = wheel_enabled
+        self.installEventFilter(self)
+
+    
+    def eventFilter(self, widget, event):
+        if not self._wheel_enabled:
+            t = event.type()
+            if t == QtCore.QEvent.Type.Wheel:
+                return True # skip the event
+        return super().eventFilter(widget, event)
+        
+    def setWheelEnabled(self, value : bool):
+        ''' enables/disables the wheel function to change'''
+        self._wheel_enabled = value
+    
 
     @property
     def data(self):
@@ -5996,13 +6011,20 @@ def getRadioContainer(label_data_pairs, callback, default = None, horizontal = T
     return (widget, layout)
 
    
-def getHContainer(widget_or_list = None, label = None, parent = None):
-    ''' gets a qt H container widget '''
+def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False):
+    ''' gets a qt H container widget 
+    
+    :param widget_or_list: list of widgets, or a single widget to add to the container
+    :param label: label to add to the container (appears first if provided)
+    :param parent: parent widget if any
+    :param left_stretch: adds the stretch at the start of the container to right align it on the row
+    
+    '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QHBoxLayout(widget)
     widget.setContentsMargins(0,0,0,0)
     layout.setContentsMargins(0,0,0,0)
-    stretch = False
+    stretch = left_stretch
     if label:
         layout.addWidget(QtWidgets.QLabel(label))
         stretch = True
@@ -6014,7 +6036,10 @@ def getHContainer(widget_or_list = None, label = None, parent = None):
             layout.addWidget(widget_or_list)
         stretch = True
     if stretch:
-        layout.addStretch()
+        if left_stretch:
+            layout.insertStretch(0)
+        else:
+            layout.addStretch()
     return (widget, layout)
     
 
@@ -6042,7 +6067,7 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, parent 
         layout.addStretch()
     return (widget, layout)
 
-def getGridContainer(widget_or_list = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None):
+def getGridContainer(widget_or_list = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None ):
     ''' gets a qt grid container widget
      
     :param widget_or_list: the widget or widgets to add to the next row
@@ -6090,27 +6115,43 @@ def getGridContainer(widget_or_list = None, alignment = QtCore.Qt.AlignmentFlag.
     return (widget, layout)
 
 
-def synchronize_grids(widget_list : list):
-    ''' synchronizes cell widths between multiple grid layouts '''
-    if len(widget_list) < 2:
+def synchronize_grids(grid_widget_list : list, fill_buttons = True):
+    ''' synchronizes cell widths between multiple grid layouts 
+    :param widget_or_list: the widget or widgets to add to the next row
+    :param fill_buttons: if set, button widgets fill the column width
+    
+    '''
+    if len(grid_widget_list) < 2:
         return # nothing to do
     
     g: QtWidgets.QGridLayout
     max_cols = 0
-    layouts = [g.layout() for g in widget_list]
+    layouts = [g.layout() for g in grid_widget_list]
     max_cols = max(g.columnCount() for g in layouts)
     
     for col in range(max_cols):
-        width = 0    
+        width = 0   
+        widgets = [] 
         for g in layouts:
             rows = g.rowCount()
             if col < g.columnCount():
                 for row in range(rows):
-                    width = max(width, g.itemAtPosition(row, col).minimumSize().width())
+                    widget_item = g.itemAtPosition(row, col)
+                    if widget_item is not None:
+                        widget = widget_item.wid
+                        if fill_buttons:
+                            if isinstance(widget, QtWidgets.QPushButton) and widget.text():
+                                # push button with text
+                                widgets.append(widget)
+                        width = max(width, widget_item.minimumSize().width())
 
         for g in layouts:
             g.setColumnMinimumWidth(col, width)
+            widget : QtWidgets.QWidget
+            for widget in widgets:
+                widget.setMinimumWidth(width)
     
+
 
     
 class QJoystickRangeWidget(QtWidgets.QWidget):
@@ -7078,7 +7119,7 @@ class QPaginator(QtWidgets.QWidget):
         return self._item_count
 
     def _update_data(self, emit = True):
-        self.total_pages = (self._item_count + self._page_size - 1) // self._page_size
+        self._total_pages = (self._item_count + self._page_size - 1) // self._page_size
         self._update_data_view(emit)
 
     def setItemCount(self, count, emit = True):
@@ -7086,8 +7127,9 @@ class QPaginator(QtWidgets.QWidget):
         self._update_data(emit)
     
     def setPageSize(self, page_size: int, emit = True):
-        self._page_size = page_size
-        self._update_data(emit)
+        if self._page_size != page_size:
+            self._page_size = page_size
+            self._update_data(emit)
 
     def setPageNumber(self, page_number: int, emit = True):
         ''' set page 1 to n'''
@@ -7098,51 +7140,108 @@ class QPaginator(QtWidgets.QWidget):
 
 
     def init_ui(self):
-        self._prev_button_widget = QtWidgets.QPushButton("Previous")
+
+        self._first_button_widget = QtWidgets.QPushButton()
+        icon = load_icon("fa.angle-double-left")
+        self._first_button_widget.setIcon(icon)
+        self._first_button_widget.setToolTip("Previous")
+        self._first_button_widget.clicked.connect(self._first_page)
+
+        self._prev_button_widget = QtWidgets.QPushButton()
+        icon = load_icon("fa.angle-left")
+        self._prev_button_widget.setIcon(icon)
+        self._prev_button_widget.setToolTip("Previous")
         self._prev_button_widget.clicked.connect(self._prev_page)
-        self._next_button_widget = QtWidgets.QPushButton("Next")
+
+        self._next_button_widget = QtWidgets.QPushButton()
+        icon = load_icon("fa.angle-right")
+        self._next_button_widget.setIcon(icon)
+        self._next_button_widget.setToolTip("Next")
         self._next_button_widget.clicked.connect(self._next_page)
 
-        self._page_label_widget = QtWidgets.QLabel(f"Page {self._current_page} of {self._total_pages}")
+        self._last_button_widget = QtWidgets.QPushButton()
+        icon = load_icon("fa.angle-double-right")
+        self._last_button_widget.setIcon(icon)
+        self._last_button_widget.setToolTip("Next")
+        self._last_button_widget.clicked.connect(self._last_page)
+
+
+        self._page_label_widget = QtWidgets.QLabel()
         self._page_input_widget = QtWidgets.QLineEdit()
         self._page_input_widget.returnPressed.connect(self._go_to_page)
 
-        hbox = QtWidgets.QHBoxLayout()
-        hbox.addWidget(self._prev_button_widget)
-        hbox.addWidget(self._page_label_widget)
-        hbox.addWidget(self._page_input_widget)
-        hbox.addWidget(self._next_button_widget)
+        widgets = [ 
+                self._page_label_widget,
+                self._first_button_widget,
+                self._prev_button_widget,
+                self._page_input_widget,
+                self._next_button_widget,
+                self._last_button_widget
+                ]
 
-        vbox = QtWidgets.QVBoxLayout()
-        vbox.addLayout(hbox)
+        _, layout = getHContainer(widgets)
+        self.setLayout(layout)
+        self._update_data()
+        self._update_display()
 
-        self.setLayout(vbox)
+    def _update_display(self):
+        ''' updates the display items '''
+        enabled = self._item_count > 0
+        if enabled:
+            self._page_label_widget.setText(f"Page {self._current_page} of {self._total_pages} ({self._start_index+1}-{self._end_index+1})")
+            with QtCore.QSignalBlocker(self._page_input_widget):
+                self._page_input_widget.setText(f"{self._current_page}")
+        else:
+            # no data
+            self._page_label_widget.setText("No items")
+            self._page_input_widget.setText("")
+
+        self.setEnabled(enabled)
+
+            
+
 
     def _update_data_view(self, emit = True):
-
-        self._page_label_widget.setText(f"Page {self._current_page} of {self.total_pages}")
+        ''' updates the widget when pagination changes '''
         if self._item_count:
             self._start_index = (self._current_page - 1) * self._page_size
             self._end_index = min(self._start_index + self._page_size,  self._item_count)
             if emit:
                 self.pageChanged.emit(self._current_page, self._start_index, self._end_index)
+        self._update_display()
             
 
+    @QtCore.Slot()
     def _prev_page(self):
         if self._current_page > 1:
             self._current_page -= 1
             self._update_data_view()
 
+    @QtCore.Slot()
     def _next_page(self):
-        if self._current_page < self.total_pages:
+        if self._current_page < self._total_pages:
             self._current_page += 1
             self._update_data_view()
     
+   
+    @QtCore.Slot()
+    def _first_page(self):
+        if self._current_page > 1:
+            self._current_page = 1
+            self._update_data_view()
+
+    @QtCore.Slot()
+    def _last_page(self):
+        last_page = self._total_pages
+        if self._current_page != last_page:
+            self._current_page = last_page
+            self._update_data_view()
+
     def _go_to_page(self):
         text = self._page_input_widget.text()
         if text and text.isnumeric():
             page_num = int(text)
-            if 1 <= page_num <= self.total_pages:
+            if 1 <= page_num <= self._total_pages:
                 self._current_page = page_num
                 self._update_data_view()
             else:

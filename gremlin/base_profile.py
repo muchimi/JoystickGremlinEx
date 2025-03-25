@@ -2191,7 +2191,14 @@ class Profile():
 
     def modeTree(self) -> Node:
         ''' returns an anytree node - nodes contain the name of the mode '''
+        self._ensure_mode_tree()
         return self._mode_tree
+    
+    def _ensure_mode_tree(self):
+        if not self._mode_tree:
+            self._mode_tree = ModeNode()
+            default_mode = ModeNode("Default")
+            default_mode.parent = self._mode_tree
     
     def dumpModeTree(self):
         ''' dumps the current mode tree '''
@@ -2201,10 +2208,22 @@ class Profile():
 
     def build_inheritance_tree(self, as_tree = False):
         ''' returns the mode tree (new in m73)'''
+        self._ensure_mode_tree()
         return self._mode_tree
     
 
         
+    def getModeHierarchy(self, mode: str):
+        ''' gets the mode hierarchy for a given mode'''
+        self._ensure_mode_tree()
+        if mode:
+            node = anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
+            if node:
+                mode_list = [node.name]
+                mode_list.extend([n.name for n in node.ancestors if n.name])
+                return mode_list
+        return []
+            
 
 
 
@@ -2519,37 +2538,26 @@ class Profile():
 
     def is_mode(self, mode) -> bool:
         ''' true if the mode exists in the current profile '''
-        node = anytree.find(self._mode_tree, lambda node: node.name == mode)
+        node = anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
         return node is not None
     
-        # modes = self.get_modes(True)
-        # mode = mode.casefold()
-        # return mode in modes
+
+    def _compare_mode(self, node, mode : str):
+        ''' comparator for modes in the mode tree '''
+        
+        if mode and node.name:
+            mode_text = mode.casefold().strip()
+            return node.name.casefold() == mode_text
+        return False
+
     
 
-    def find_mode(self, mode_text) -> str:
+    def find_mode(self, mode) -> str:
         ''' finds a mode by name or value '''
-        if not mode_text:
-            return None
-        mode_text = mode_text.casefold().strip()
-        
-        node = anytree.find(self._mode_tree, lambda node: node.name.casefold() == mode_text)
-        if node:
-            return node.name
-        
-        # for device in self.devices.values():
-        #     if device.type != DeviceType.Keyboard:
-        #         continue
-            
-        #     for mode_name, mode in device.modes.items():
-        #         if mode_text == mode.name:
-        #             return mode.name
-        #         if mode_text.casefold() == mode.name.casefold():
-        #             return mode.name
-        #         if mode_text == mode_name:
-        #             return mode.name
-        #         if mode_text.strip().casefold() == mode_name.strip().casefold():
-        #             return mode.name
+        if self._mode_tree is not None:
+            node = anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
+            if node:
+                return node.name
         return None # not found
 
 

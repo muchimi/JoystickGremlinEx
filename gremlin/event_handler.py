@@ -1345,6 +1345,10 @@ class EventHandler(QtCore.QObject):
 		if not key in self.latched_functors[device_guid][mode]:
 			self.latched_functors[device_guid][mode][key] = []
 		self.latched_functors[device_guid][mode][key].append(functor)
+		verbose = gremlin.config.Configuration().verbose
+		if verbose:
+			device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+			syslog.info(f"Added latched functor: {device_name} mode: {mode} type: {event.event_type.name} input: {event.identifier}  key: {key}")
 
 	def _matching_input_item(self, mode, event):
 		''' gets the matching input item from the event '''
@@ -1970,6 +1974,8 @@ class EventHandler(QtCore.QObject):
 				
 			
 		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+			if event.identifier == 2:
+				pass
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
 			if verbose and not m_list: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
@@ -2088,9 +2094,7 @@ class EventHandler(QtCore.QObject):
 		functors_list = []
 		device_guid = event.device_guid
 		if device_guid in self.latched_functors:
-			import gremlin.execution_graph
-			ec = gremlin.execution_graph.ExecutionContext() # current execution context
-			modes = ec.getModeHierarchy(self.runtime_mode)
+			modes = gremlin.shared_state.current_profile.getModeHierarchy(self.runtime_mode)
 			for mode in modes:
 				if mode in self.latched_functors[device_guid].keys():
 					key = event.callbackKey
@@ -2101,14 +2105,7 @@ class EventHandler(QtCore.QObject):
 		return functors_list
 				
 
-		# device_guid = event.device_guid
-		# if device_guid in self.latched_functors:
-		# 	mode = self.runtime_mode
-		# 	if mode in self.latched_functors[device_guid].keys():
-		# 		if event in self.latched_functors[device_guid][mode].keys():
-		# 			functors_list = self.latched_functors[device_guid][mode][event]
 
-		# return functors_list
 
 
 	def _matching_callbacks(self, event):

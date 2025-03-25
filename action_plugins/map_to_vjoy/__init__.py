@@ -3544,13 +3544,12 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         ''' computes the output value for the current configuration  '''
 
         if value is None:
-
-            if self.input_is_hardware():
-                value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
-            else:
-                value = self.hardware_input_id.axis_value
-                # print (value)
-                
+            value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+            # if self.input_is_hardware():
+            #     value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+            # else:
+            if value is None:
+                return 0
 
             if curves:
                 for curve_data in curves:
@@ -3562,18 +3561,16 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 v1 = None
                 v2 = None
                 if gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid):
-                    v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid,
-                                                            self.hardware_input_id)
-                else: 
+                    v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+                else:
                     v1 = self.hardware_input_id.axis_value
+
                 if gremlin.joystick_handling.is_hardware_device(self.merge_device_guid):
-                    v2 = gremlin.joystick_handling.get_curved_axis(self.merge_device_guid,
-                                                    self.merge_input_id)
+                    v2 = gremlin.joystick_handling.get_curved_axis(self.merge_device_guid, self.merge_input_id)
                 else:
                     # find the merged device
                     ec = gremlin.execution_graph.ExecutionContext()
-                    input_item = ec.findInputItem(self.merge_device_guid,
-                                                    self.merge_input_id)
+                    input_item = ec.findInputItem(self.merge_device_guid, self.merge_input_id)
                     if input_item:
                         v2 = input_item.axis_value
 
@@ -3802,11 +3799,11 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         """
         import gremlin.shared_state
         is_dark = gremlin.shared_state.is_dark_theme
+        prefix = "dark_" if is_dark else ""
 
-        fallback = "joystick.svg"
+        fallback = f"{prefix}joystick.png"
         if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis):
             input_string = "axis"
-            fallback = "joystick.svg"
         elif self.action_mode == VjoyAction.VJoyHat:
             input_string = "hat"
             fallback = "mdi.axis-arrow"
@@ -3817,8 +3814,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             input_string = None
             #log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
 
-        dark_stub = "dark_" if is_dark else ""
-        icon_path = f"{dark_stub}icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else "joystick.png"
+        
+        icon_path = f"{prefix}icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else fallback
         icon_file = get_icon_path(icon_path)
         if icon_file and os.path.isfile(icon_file):
             return icon_file
@@ -4192,6 +4189,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             input_string = "hat"
         elif self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
             input_string = "button"
+        elif self.action_mode == VjoyAction.VJoyMergeAxis:
+            input_string = "merge axis"
         else:
             input_string = f"unhandled: [{self.action_mode}]"
         return f"VjoyRemap: VJOY device: {self.vjoy_device_id} {input_string}: {self.vjoy_input_id}"
