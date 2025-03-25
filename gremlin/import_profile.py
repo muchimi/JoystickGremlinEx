@@ -692,7 +692,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_mode_layout.addWidget(self.import_mode_selector)
         # self.container_mode_layout.addWidget(self.import_mode_list_widget)
 
-        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("orange"),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
+        warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor("orange"),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
         self.main_layout.addWidget(warning_widget)
         self.main_layout.addWidget(self.container_path_widget)
         self.main_layout.addWidget(self.container_command_header_widget)

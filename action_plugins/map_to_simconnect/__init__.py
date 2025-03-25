@@ -1412,7 +1412,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.refresh_current_aircraft_widget = QtWidgets.QPushButton("Get Current Aircraft")
         self.refresh_current_aircraft_widget.clicked.connect(self._refresh_aircraft_cb)
-        #self.refresh_current_aircraft_widget.setIcon(gremlin.util.load_icon("fa.refresh"))
+        #self.refresh_current_aircraft_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
         self.refresh_current_aircraft_widget.setToolTip("Queries the current aircraft loaded in the sim")
         #self.refresh_current_aircraft_widget.setMaximumWidth(24)
 
@@ -1463,7 +1463,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.refresh_aircraft_list_widget = QtWidgets.QPushButton("Refresh All")
         self.refresh_aircraft_list_widget.setToolTip("Refresh the available aircraft list from MSFS")
-        self.refresh_aircraft_list_widget.setIcon(gremlin.util.load_icon("fa.refresh"))
+        self.refresh_aircraft_list_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
         self.refresh_aircraft_list_widget.clicked.connect(self._handle_refresh_aircraft_list)
         
 
@@ -1616,7 +1616,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         warning_container = QtWidgets.QWidget()
         warning_layout = QtWidgets.QHBoxLayout(warning_container)
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self.warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Error goes here", use_wrap=False)
+        self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Error goes here", use_wrap=False)
         self.warning_widget.setVisible(False)
         warning_layout.addWidget(self.warning_widget)
         warning_layout.addStretch()
@@ -1948,7 +1948,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         icon_color = gremlin.ui.ui_common.Color.normalColor()
         
-        create_mode_icon = gremlin.util.load_icon("fa.plus-square", qta_color=icon_color)
+        create_mode_icon = gremlin.util.load_icon("fa5.plus-square", qta_color=icon_color)
         
         start_index = self.paginator_widget.startIndex
         end_index = self.paginator_widget.endIndex
@@ -1970,7 +1970,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 aircraft_header_layout.addWidget(self.display_header_widget)
                 display_sort_up_widget = QtWidgets.QPushButton()
 
-                display_sort_up_widget.setIcon(gremlin.util.load_icon("fa.sort-asc", qta_color=icon_color))
+                display_sort_up_widget.setIcon(gremlin.util.load_icon("mdi.sort-ascending", qta_color=icon_color))
                 display_sort_up_widget.setMaximumWidth(20)
                 display_sort_up_widget.clicked.connect(self._sort_display_up_cb)
                 display_sort_up_widget.setStyleSheet("border: none;")
@@ -1991,7 +1991,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 mode_header_layout = QtWidgets.QHBoxLayout(mode_header_widget)
 
                 mode_sort_up_widget = QtWidgets.QPushButton()
-                mode_sort_up_widget.setIcon(gremlin.util.load_icon("fa.sort-asc", qta_color=icon_color))
+                mode_sort_up_widget.setIcon(gremlin.util.load_icon("mdi.sort-ascending", qta_color=icon_color))
                 mode_sort_up_widget.setMaximumWidth(20)
                 mode_sort_up_widget.clicked.connect(self._sort_mode_up_cb)
                 mode_sort_up_widget.setStyleSheet("border: none;")
@@ -2178,14 +2178,14 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self.manual_map_layout.addWidget(missing)
             return
         
-        create_mode_icon = gremlin.util.load_icon("fa.plus-square")
+        create_mode_icon = gremlin.util.load_icon("fa5.plus-square")
 
         profile = gremlin.shared_state.current_profile
         default_mode = profile.get_default_mode()
 
         # headers
 
-        delete_icon = gremlin.util.load_icon("fa.trash-o")
+        delete_icon = gremlin.util.load_icon("fa6.trash-can")
         row = 0
         for item in self.options._aircraft_manual_definitions:
 
@@ -2521,14 +2521,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             syslog.info(f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}")
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self._warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Parameter Calculation requires a {#} marker in the expression where the output value goes.", use_wrap=False)
+        self._warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Parameter Calculation requires a {#} marker in the expression where the output value goes.", use_wrap=False)
 
         # if the input is chained 
         self.chained_input = self.action_data.input_item.is_action
 
         # mode from aircraft button - grabs the aicraft name as a mode
         self._options_button_widget = QtWidgets.QPushButton("Simconnect Options")
-        self._options_button_widget.setIcon(gremlin.util.load_icon("fa.gear"))
+        self._options_button_widget.setIcon(gremlin.util.load_icon("fa6s.gear"))
         self._options_button_widget.clicked.connect(self._show_options_dialog_cb)
 
 
@@ -2635,7 +2635,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._lvar_lookup_container_layout.setContentsMargins(0,0,0,0)
 
         self._refresh_lvar_widget = QtWidgets.QPushButton("Lvars")
-        self._refresh_lvar_widget.setIcon(gremlin.util.load_icon("fa.refresh"))
+        self._refresh_lvar_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
         self._refresh_lvar_widget.clicked.connect(self._refresh_lvar_cb)
 
 
@@ -3004,7 +3004,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         #self.main_layout.addWidget(self._toolbar_container_widget)
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
+        warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
         self.main_layout.addWidget(warning_widget)
 
         self.main_layout.addWidget(self._mode_container_widget)

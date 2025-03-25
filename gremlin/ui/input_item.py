@@ -1143,8 +1143,8 @@ class InputItemWidget(QBoxFrame):
         normal_color = gremlin.ui.ui_common.Color.normalColor()
         self._curve_icon_inactive = load_icon("mdi.chart-bell-curve",qta_color=normal_color)
         self._curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color=active_color)
-        self._input_icon_inactive = load_icon("fa.power-off",qta_color=normal_color)
-        self._input_icon_active = load_icon("fa.power-off",qta_color=active_color)
+        self._input_icon_inactive = load_icon("fa6s.power-off",qta_color=normal_color)
+        self._input_icon_active = load_icon("fa6s.power-off",qta_color=active_color)
         self._calibration_icon_active = load_icon("mdi.arrow-expand-horizontal",qta_color=active_color)
         self._calibration_icon_inactive = load_icon("mdi.arrow-expand-horizontal",qta_color=normal_color)
 
@@ -1157,7 +1157,7 @@ class InputItemWidget(QBoxFrame):
                 
 
         # action buttons
-        self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa.gear",color=normal_color),"") 
+        self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa6s.gear",color=normal_color),"") 
         self._edit_button_widget.setToolTip("Configure")
         self._edit_button_widget.setFixedSize(24,16)
         self._edit_button_widget.clicked.connect(self._edit_button_cb)
@@ -1919,7 +1919,7 @@ class ContainerSelector(QtWidgets.QWidget):
 
 
         self.load_template_widget =  QtWidgets.QPushButton()
-        icon = gremlin.ui.ui_common.load_icon("fa.folder-open-o")
+        icon = gremlin.ui.ui_common.load_icon("fa6s.folder-open")
         self.load_template_widget.setIcon(icon)
         self.load_template_widget.setToolTip("Load from template")
         self.load_template_widget.clicked.connect(self._load_container_from_template)
@@ -1951,7 +1951,7 @@ class ContainerSelector(QtWidgets.QWidget):
 
         # delete all containers
         self.delete_button =  QtWidgets.QPushButton()
-        icon = gremlin.util.load_icon("fa.trash-o")
+        icon = gremlin.util.load_icon("fa6.trash-can")
         self.delete_button.setIcon(icon)
         self.delete_button.clicked.connect(self._delete_container)
         self.delete_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
@@ -2245,13 +2245,13 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # templates
         # open_widget = QtWidgets.QPushButton("Load")
         # open_widget.setToolTip("Load Template")
-        # icon = gremlin.ui.ui_common.load_icon("fa.folder-open-o")
+        # icon = gremlin.ui.ui_common.load_icon("fa6s.folder-open")
         # open_widget.setIcon(icon)
         # open_widget.clicked.connect(self._open_template)
 
         save_widget = QtWidgets.QPushButton("Save") # TitleBarButton()
         save_widget.setToolTip("Save Template")
-        icon = gremlin.ui.ui_common.load_icon("fa.save")
+        icon = gremlin.ui.ui_common.load_icon("mdi.content-save")
         save_widget.setIcon(icon)
         save_widget.clicked.connect(self._save_template)
 
@@ -2867,7 +2867,7 @@ class TitleBar(QtWidgets.QFrame):
 
         # close button
         self.close_button = TitleBarButton()
-        close_icon = load_icon("fa.close")
+        close_icon = load_icon("mdi.close")
 
         
 

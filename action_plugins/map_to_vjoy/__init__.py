@@ -1314,7 +1314,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         row += 1
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self.warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="", use_wrap=False)
+        self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="", use_wrap=False)
         warning_container, warning_layout = gremlin.ui.ui_common.getHContainer(self.warning_widget)
         grid.addWidget(warning_container, row,1,1,-1)
 

@@ -514,7 +514,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
 
         self.range_status_widget = ui_common.QIconLabel()
-        self.range_status_widget.setIcon("fa.check", color = gremlin.ui.ui_common.Color.activeColor())
+        self.range_status_widget.setIcon("mdi.checkbox-marked-outline", color = gremlin.ui.ui_common.Color.activeColor())
         
 
         range_layout = QtWidgets.QHBoxLayout()

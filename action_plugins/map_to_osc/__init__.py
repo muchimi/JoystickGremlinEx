@@ -534,7 +534,7 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._value_container_layout.addStretch()
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self._warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="", use_wrap=False)
+        self._warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="", use_wrap=False)
         self.main_layout.addWidget(QtWidgets.QLabel("Send OSC command:"))
         self.main_layout.addWidget(self._container_widget)
         self.main_layout.addWidget(self._value_container_widget)

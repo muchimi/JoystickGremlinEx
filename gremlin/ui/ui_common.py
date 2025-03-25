@@ -2203,7 +2203,7 @@ class ModeWidget(QtWidgets.QWidget):
         )
 
         self.profile_options_button_widget = QtWidgets.QPushButton()
-        self.profile_options_button_widget.setIcon(load_icon("fa.gear"))
+        self.profile_options_button_widget.setIcon(load_icon("fa6s.gear"))
         self.profile_options_button_widget.setToolTip("Profile Options")
         self.profile_options_button_widget.clicked.connect(self._profile_options_cb)
 
@@ -3179,9 +3179,9 @@ class QPathLineItem(QtWidgets.QWidget):
 
         valid = os.path.isdir(fname) if self._dir_mode else os.path.isfile(fname)
         if valid:
-            self._setIcon("fa.check", color= Color.activeColor())
+            self._setIcon("mdi.checkbox-marked-outline", color= Color.activeColor())
         else:
-            self._setIcon("fa.exclamation-circle", color = Color.warningColor())
+            self._setIcon("fa6s.circle-exclamation", color = Color.warningColor())
         self._text = fname
         self.pathChanged.emit(self, self._text)
 

@@ -3159,13 +3159,13 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         ''' updates the icon on the setup button depending on the container state '''
 
         if self.gate.hasAnyContainers():
-            self.setup_widget.setIcon(load_icon("fa.gear",qta_color= gremlin.ui.ui_common.Color().activeContentColor()))
+            self.setup_widget.setIcon(load_icon("fa6s.gear",qta_color= gremlin.ui.ui_common.Color().activeContentColor()))
         else:
-            self.setup_widget.setIcon(load_icon("fa.gear",qta_color= gremlin.ui.ui_common.Color().inactiveColor()))
+            self.setup_widget.setIcon(load_icon("fa6s.gear",qta_color= gremlin.ui.ui_common.Color().inactiveColor()))
 
         if self.gate.isError:
             warning_color = gremlin.ui.ui_common.Color.warningColor()
-            self.setIcon("fa.warning", color = QtGui.QColor(warning_color))
+            self.setIcon("ph.shield-warning-fill", color = QtGui.QColor(warning_color))
         else:
             self.setIcon(None)
 
@@ -3398,9 +3398,9 @@ class RangeWidgetInfo(QtWidgets.QWidget):
     def _update_icon(self):
         has_containers = self._rng.hasAnyContainers()
         if has_containers:
-            self.setup_widget.setIcon(load_icon("fa.gear",qta_color=gremlin.ui.ui_common.Color.activeContentColor()))
+            self.setup_widget.setIcon(load_icon("fa6s.gear",qta_color=gremlin.ui.ui_common.Color.activeContentColor()))
         else:
-            self.setup_widget.setIcon(load_icon("fa.gear",qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
+            self.setup_widget.setIcon(load_icon("fa6s.gear",qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
 
     def cleanup(self):
         eh = GateEventHandler()
@@ -3556,8 +3556,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
             return
 
         self._grab_icon = load_icon("mdi.checkbox-blank-circle", qta_color = gremlin.ui.ui_common.Color.recordColor())
-        self._setup_icon = load_icon("fa.gear", qta_color = gremlin.ui.ui_common.Color.inactiveColor())
-        self._setup_container_icon = load_icon("fa.gear",qta_color = gremlin.ui.ui_common.Color.activeContentColor())
+        self._setup_icon = load_icon("fa6s.gear", qta_color = gremlin.ui.ui_common.Color.inactiveColor())
+        self._setup_container_icon = load_icon("fa6s.gear",qta_color = gremlin.ui.ui_common.Color.activeContentColor())
         
         # get the curent axis normalized value -1 to +1
         if  action_data.input_is_hardware():
@@ -3586,7 +3586,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._slider.handleDragStart.connect(self._slider_drag_start_cb)
         
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self.warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
+        self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
         self.warning_widget.setVisible(False)
 
         self.slider_frame_layout.addWidget(self._slider)
@@ -4722,9 +4722,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
         if gate is None:
             self._slider.setHandleIcon(index, None)
         elif gate.hasAnyContainers():
-            self._slider.setHandleIcon(index, 'fa.gear', True, gremlin.ui.ui_common.Color.activeContentColor())
+            self._slider.setHandleIcon(index, 'fa6s.gear', True, gremlin.ui.ui_common.Color.activeContentColor())
         else:
-            self._slider.setHandleIcon(index, "fa.gear",True,gremlin.ui.ui_common.Color.inactiveColor() )
+            self._slider.setHandleIcon(index, "fa6s.gear",True,gremlin.ui.ui_common.Color.inactiveColor() )
 
         # find the widgets for the gate
         if gate in self._gwi_map:

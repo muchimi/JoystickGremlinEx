@@ -386,14 +386,14 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # key clear button
         
         clear_keyboard_button = ui_common.ConfirmPushButton("Clear Keys", show_callback = self._show_clear_cb)
-        icon = gremlin.util.load_icon("fa.trash-o")
+        icon = gremlin.util.load_icon("fa6.trash-can")
         clear_keyboard_button.setIcon(icon)
         clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
 
         virtual_keyboard_button = QtWidgets.QPushButton("Add Key")
-        icon = gremlin.util.load_icon("fa.keyboard-o")
+        icon = gremlin.util.load_icon("fa6s.keyboard")
         virtual_keyboard_button.setIcon(icon)
         virtual_keyboard_button.clicked.connect(self._add_key_dialog_cb)
         button_container_layout.addWidget(virtual_keyboard_button)
@@ -659,7 +659,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.create_action_icons(data)
         widget.setDescription(data.description)
 
-        widget.setIcon("fa.keyboard-o")
+        widget.setIcon("fa6s.keyboard")
         widget.enable_close()
         widget.enable_edit()
 
@@ -695,7 +695,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if is_warning:
             warning_color = gremlin.ui.ui_common.Color.warningColor()
             icon_color= QtGui.QColor(warning_color)
-            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color=QtGui.QColor(warning_color))
+            icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=QtGui.QColor(warning_color))
                 
         input_widget.setStatus(status_text, icon)
 
