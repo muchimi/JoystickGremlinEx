@@ -137,7 +137,6 @@ class Configuration:
                 try:
                     decoder = json.JSONDecoder()
                     self._profile_data = decoder.decode(hdl.read())
-                    load_successful = True
                 except ValueError:
                     pass
 

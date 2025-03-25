@@ -22,7 +22,7 @@ class FacilitiesHelper:
             < SIMCONNECT_FACILITY_LIST_TYPE.SIMCONNECT_FACILITY_LIST_TYPE_COUNT
         ):
             self.cb = _cbfunc
-            hr = self.sm.dll.SubscribeToFacilities(
+            self.sm.dll.SubscribeToFacilities(
                 self.sm.hSimConnect,
                 SIMCONNECT_FACILITY_LIST_TYPE(self.item),
                 self.REQUEST_ID.value,
@@ -30,7 +30,7 @@ class FacilitiesHelper:
 
     def unsubscribe(self):
         self.cb = None
-        hr = self.sm.dll.UnsubscribeToFacilities(
+        self.sm.dll.UnsubscribeToFacilities(
             self.sm.hSimConnect, SIMCONNECT_FACILITY_LIST_TYPE(self.item)
         )
 
@@ -40,7 +40,7 @@ class FacilitiesHelper:
             self.item
             < SIMCONNECT_FACILITY_LIST_TYPE.SIMCONNECT_FACILITY_LIST_TYPE_COUNT
         ):
-            hr = self.sm.dll.RequestFacilitiesList(
+            self.sm.dll.RequestFacilitiesList(
                 self.sm.hSimConnect,
                 SIMCONNECT_FACILITY_LIST_TYPE(self.item),
                 self.REQUEST_ID.value,

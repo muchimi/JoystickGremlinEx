@@ -446,43 +446,33 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
                     icon = None
                     # handle special key names
-                    tooltip = ""
                     if key == "mouse_1":
                         key = "M1"
                         icon = "mdi.mouse"
-                        tooltip = "Left Mouse Button"
                     elif key == "mouse_2":
                         key = "M2"
                         icon = "mdi.mouse"
-                        tooltip = "Middle Mouse Button"
                     elif key == "mouse_3":
                         key = "M3"
                         icon = "mdi.mouse"
-                        tooltip = "Right Mouse Button"
                     elif key == "mouse_4":
                         key = "M4"
                         icon = "mdi.mouse"
-                        tooltip = "Forward Mouse Button"
                     elif key == "mouse_5":
                         key = "M5"
                         icon = "mdi.mouse"
-                        tooltip = "Back Mouse Button"
                     elif key == "wheel_up":
                         key = "MWU"
                         icon = "mdi.mouse"
-                        tooltip = "Wheel Up"
                     elif key == "wheel_down":
                         key = "MWD"
                         icon = "mdi.mouse"
-                        tooltip = "Wheel Down"
                     elif key == "wheel_left":
                         key = "MWL"
                         icon = "mdi.mouse"
-                        tooltip = "Tilt Left"
                     elif key == "wheel_right":
                         key = "MWR"
                         icon = "mdi.mouse"
-                        tooltip = "Tilt Right"
 
                     widget = QKeyWidget(key)
                     if icon:

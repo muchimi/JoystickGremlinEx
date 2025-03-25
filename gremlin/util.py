@@ -739,7 +739,7 @@ def _find_file(file_path, root_folder=None):
     file_path = file_path.lower().replace("/", os.sep)
     sub_folders = None
     folders = []
-
+    circuit_breaker = 0
     if not root_folder:
         root_folder = gremlin.shared_state.root_path
     if not os.path.isdir(root_folder):
@@ -874,6 +874,9 @@ def load_icon(*paths, use_qta=False, qta_color=None):
     is_dark = gremlin.shared_state.is_dark_theme
 
     (the_path,) = paths
+    if the_path is None:
+        syslog.error("load_icon(): the_path is None")
+        return None
     _, ext = os.path.splitext(the_path.casefold())
 
     if ext == ".svg":

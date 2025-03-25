@@ -3529,13 +3529,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.description_text_widget.setText("No description found")
 
         output_mode = self.action_data.mode
-        min_range = self.action_data.output_min_range
-        max_range = self.action_data.output_max_range
-        min_command_range = self.action_data.command_min_range
-        max_command_range = self.action_data.command_max_range
 
         value = self.action_data.value
-        inverted = self.action_data.inverted
         trigger_mode = self.action_data.trigger_mode
 
         # calculator mode

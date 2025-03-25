@@ -3746,7 +3746,7 @@ class InputOscClient(QtCore.QObject):
         from gremlin.input_types import InputType
 
         # get the input items behind this message
-        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+        gremlin.ui.ui_common.DeviceWidgetTracker()
         current_mode = gremlin.shared_state.current_mode
 
         command = OscInputItem.CommandMode.Message

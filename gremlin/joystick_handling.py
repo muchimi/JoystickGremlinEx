@@ -440,7 +440,7 @@ def joystick_devices_initialization():
 
     _joystick_initialized = False
 
-    verbose = gremlin.config.Configuration().verbose_mode_inputs
+    gremlin.config.Configuration().verbose_mode_inputs
 
     _joystick_init_lock.acquire()
 
@@ -601,7 +601,7 @@ def joystick_devices_initialization():
         if hash_value in vjoy_lookup:
             try:
                 # register the vjoy device with the proxy
-                vjoy_dev = vjoy_proxy[vjoy_index]
+                vjoy_proxy[vjoy_index]
             except error.VJoyError:
                 syslog.debug(f"vJoy id {vjoy_index:} can't be acquired")
 

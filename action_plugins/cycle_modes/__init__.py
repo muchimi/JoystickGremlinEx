@@ -16,16 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtWidgets
 from lxml import etree as ElementTree
-
-from PySide6.QtGui import QIcon
 from PySide6.QtCore import QModelIndex
-
-
 import gremlin.base_profile
 import gremlin.event_handler
+from gremlin.execution_graph import ExecutionContext
 from gremlin.input_types import InputType
 import gremlin.shared_state
 import gremlin.ui.input_item
@@ -52,11 +48,11 @@ class CycleModeModel(QtCore.QAbstractItemModel):
         self._data[count] = (mode, display)
         self.endInsertRows()
 
-    def data(self, index: QModelIndex, role=QtCore.Qt.DisplayRole):
+    def data(self, index: QModelIndex, role=QtCore.Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
 
-        if role == QtCore.Qt.DisplayRole:
+        if role == QtCore.Qt.ItemDataRole.DisplayRole:
             row = index.row()
             return self._data[row][1]
         return None
@@ -117,12 +113,12 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         from gremlin.util import load_icon
 
-        self.ec = gremlin.execution_graph.ExecutionContext()
+        self.ec = ExecutionContext()
         self.model = CycleModeModel()
         self.view = QtWidgets.QListView()
         self.view.setModel(self.model)
 
-        self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.view.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
 
         # Add widgets which allow modifying the mode list
         self.mode_list_widget = gremlin.ui.ui_common.NoWheelComboBox()
@@ -242,7 +238,8 @@ class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):
                 index = 0
             next_mode = mode_list[index]
 
-            current_mode = gremlin.shared_state.current_mode
+            # noinspection PyProtectedMember
+            current_mode = gremlin.shared_state._current_mode
             if current_mode in mode_list and current_mode == next_mode:
                 # find the next mode as the current mode is alredy the mode to cycle to so pick the next one
                 index = mode_list.index(current_mode)

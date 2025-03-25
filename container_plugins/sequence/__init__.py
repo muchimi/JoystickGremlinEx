@@ -221,7 +221,6 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             # ignore events while the sequence is still running
             return True
 
-        auto_release = False
 
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0, 0)
@@ -240,7 +239,6 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                     syslog.info("SEQUENCE: execute - ignore pressed event")
                 return True
             is_pressed = True  # flip it for containers
-            auto_release = True
             value.is_pressed = is_pressed
             value.current = is_pressed
             event.is_pressed = is_pressed

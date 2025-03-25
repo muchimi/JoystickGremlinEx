@@ -3066,7 +3066,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
     def profile_start(self):
         # setup initial state
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_outputs
+        gremlin.config.Configuration().verbose_mode_outputs
         if self.input_type in VJoyWidget.input_type_buttons:
             # set start button state
             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(
