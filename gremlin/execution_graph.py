@@ -105,7 +105,8 @@ class ExecutionGraphNode(anytree.NodeMixin):
         self.priority : int = 0 # execution priority of nodes at the same tree level
         self.nodeType : ExecutionGraphNodeType = node_type
         self.action_set: list[gremlin.base_profile.AbstractAction] = [] # list of actions
-        self.mode : str = None
+        self.mode : str = None # mode the node is defined in
+        self.exec_modes = [] # list of mode this node can execute in
         self.input_type : InputType = InputType.NotSet
         self.device = None # mapped device if a device node
         self.input_item = None
@@ -840,9 +841,22 @@ class ExecutionContext():
                 syslog.error("Execution Tree: error: found a blank mode.")
                 continue
             mode_item = ExecutionModeNode()
-            mode_item.parent = self._mode_tree
             mode_item.mode = mode
             mode_nodes[mode] = mode_item
+        
+        mode_tree = gremlin.shared_state.current_profile.modeTree()
+        gremlin.shared_state.current_profile.dumpModeTree()
+        for node in anytree.PreOrderIter(mode_tree):
+            mode = node.name
+            if mode and node.parent and node.parent.name:
+                parent_mode = node.parent.name
+                mode_nodes[mode].parent = mode_nodes[parent_mode]
+            
+
+
+
+            
+
 
 
 
@@ -859,7 +873,7 @@ class ExecutionContext():
                     continue
                 mode_item = mode_nodes[mode.name]
                 mode_node = ExecutionGraphNode(ExecutionGraphNodeType.Mode)
-                
+             
                 mode_node.mode = mode.name
                 mode_node.parent = device_node
                 for input_items in mode.config.values():
@@ -1014,13 +1028,23 @@ class ExecutionContext():
 
 
 
-        # post processing, tell parent nodes if they have an action down each branch so only nodes with mappings get executed
+        # execution tree post processing
+
+        # tell parent nodes if they have an action down each branch so only nodes with mappings get executed
         action_nodes = anytree.findall_by_attr(self.root, value = ExecutionGraphNodeType.Action, name= "nodeType")
         for action_node in action_nodes:
             # mark ancestors as having actions
             action_node.has_actions = True # action itself
             for node in action_node.ancestors:
                 node.has_actions = True # parent branch
+
+        # build execution mode list 
+        # input_nodes = anytree.findall_by_attr(self.root, value = ExecutionGraphNodeType.InputItem, name= "nodeType")
+        # for input_node in input_nodes:
+        #     mode = input_node.mode
+        #     parent_mode = mode_nodes[mode]
+            
+        
 
         self.dump()
         
@@ -1050,8 +1074,6 @@ class ExecutionContext():
 
 
         for node in anytree.PreOrderIter(self.root):
-            if node.container and node.container.comment and node.container.comment.startswith("left throttle") and node.nodeType == ExecutionGraphNodeType.Container:
-                pass
             if node.id in self._functor_map:
                 continue # already processed
             if node.nodeType in (ExecutionGraphNodeType.Container,ExecutionGraphNodeType.Action):
@@ -1154,7 +1176,7 @@ class ExecutionContext():
 
         if not node.has_actions:
             return True # nodes with no actions return PASS
-        
+              
         result = True
         verbose_id = gremlin.config.Configuration().verbose_mode_condition
         gremlin.shared_state.pushLog()
@@ -1179,8 +1201,6 @@ class ExecutionContext():
                 
                 case _:
                     # any other node - execute the functor list - first one that fails fails the complete branch to this point
-                    # if node.nodeType == ExecutionGraphNodeType.GatedAxisCondition:
-                    #     pass
                     functor_list = [] if node.functors is None else (node.functors if  isinstance(node.functors, list) else [node.functors])
                     for functor in functor_list:
                         result = self.process_functor(functor, event, value, manual, extra_data)

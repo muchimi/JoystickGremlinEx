@@ -795,7 +795,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         # Create mode name labels visualizing the tree structure
         inheritance_tree = profile.build_inheritance_tree()
         labels = []
-        self._inheritance_tree_to_labels(labels, inheritance_tree, 0)
+        gremlin.ui.ui_common._inheritance_tree_to_labels(labels, inheritance_tree, 0)
 
         # Filter the mode names such that they only occur once below
         # their correct parent
@@ -820,18 +820,6 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             self.mode_list.append(mode_name)
             index += 1
 
-
-    def _inheritance_tree_to_labels(self, labels, tree, level):
-        """Generates labels to use in the dropdown menu indicating inheritance.
-
-        :param labels the list containing all the labels
-        :param tree the part of the tree to be processed
-        :param level the indentation level of this tree
-        """
-        for mode, children in sorted(tree.items()):
-            labels.append((mode,
-                f"{"  " * level}{"" if level == 0 else " "}{mode}"))
-            self._inheritance_tree_to_labels(labels, children, level+1)
 
     def _get_input_name(self, input_type: InputType, input_id):
         if input_id == 0:

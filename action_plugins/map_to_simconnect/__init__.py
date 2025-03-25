@@ -1214,8 +1214,8 @@ class SimconnectMonitor():
 
         self._manager = None
 
-    @QtCore.Slot(str, str)
-    def _sim_aircraft_loaded(self, name = None):
+    @QtCore.Slot(str, str, str)
+    def _sim_aircraft_loaded(self, folder : str, name : str, title : str):
         ''' called when a new aicraft has been detected '''
         # syslog = logging.getLogger("system")
         if self._verbose: syslog.info(f"SCMONITOR: Aircraft loaded: [{name}]")
@@ -2368,14 +2368,15 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         mode_index = None
         for item in items:
             key = item.key
-            selector = self._mode_selector_map[item]
-            with QtCore.QSignalBlocker(selector):
-                if mode_index is None:
-                    mode_index = selector.findData(mode)
-                selector.setCurrentIndex(mode_index)
-            item.mode = mode
-            profile.setSimconnectMode(key, mode)
-            print (f"set mode {mode} for {item.sim_name}")
+            if item in self._mode_selector_map:
+                selector = self._mode_selector_map[item]
+                with QtCore.QSignalBlocker(selector):
+                    if mode_index is None:
+                        mode_index = selector.findData(mode)
+                    selector.setCurrentIndex(mode_index)
+                item.mode = mode
+                profile.setSimconnectMode(key, mode)
+                print (f"set mode {mode} for {item.sim_name}")
 
 
 
@@ -3945,7 +3946,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 if process_input:
 
 
-
+                    command = self.action_data.command
+          
                     filtered_value = self.action_data.get_filtered_axis_value(action_value.current)
                     action_value = gremlin.actions.Value(filtered_value)
 
@@ -3955,22 +3957,22 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     # apply local curve to the range -1 to + 1
                     curved = self.action_data.get_local_curve_value(normalized)
 
+
                     # compute the output value based on the range setup
+                    
                     min_range = self.action_data.command_min_range
                     max_range = self.action_data.command_max_range
                     output_value = gremlin.util.scale_to_range(curved, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
                     
+  
+                    if verbose: 
+                        syslog.info(f"SIMCONNECT: send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
 
                     if command_type == SimConnectCommandType.LVar:
-                        # send as LVAR
-                        
-                        command = self.action_data.command
-                        if verbose: syslog.info(f"SIMCONNECT: send lvar (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                         request = manager.registerRequest(command, "number", settable = True)
                         request.value = output_value
                         request.transmit()
                     else:
-                        if verbose: syslog.info(f"SIMCONNECT: send simvar (axis): {block.command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                         block.execute(output_value)
 
             elif output_mode == SimConnectActionMode.Trigger:

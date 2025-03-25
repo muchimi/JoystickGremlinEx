@@ -2401,6 +2401,17 @@ The setting can be overriden by the global mode reload option set in Options for
         return lambda: self._delete_mode(mode)
 
 
+    def _profile_modes(self) -> dict:
+        ''' returns the list of modes defined in the profile '''
+        mode_map = {}
+        for device in self._profile.devices:
+            for mode in self._profile.devices[device].modes:
+                if not mode in mode_map:
+                    mode_map[mode] = self._profile.devices[device].modes[mode]
+        return mode_map
+
+
+
 
     def _change_mode_inheritance(self, mode, inherit):
         """Updates the inheritance information of a given mode.
@@ -2412,7 +2423,7 @@ The setting can be overriden by the global mode reload option set in Options for
         # tree structure into a graph
         has_inheritance_cycle = False
         if inherit != "None":
-            all_modes = list(self._profile.devices.values())[0].modes
+            all_modes = self._profile_modes() # list(self._profile.devices.values())[0].modes
             cur_mode = inherit
             while all_modes[cur_mode].inherit is not None:
                 if all_modes[cur_mode].inherit == mode:

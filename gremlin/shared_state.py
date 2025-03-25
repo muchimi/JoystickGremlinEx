@@ -188,7 +188,7 @@ def getSimConnectEnabled():
     if _simconnect_enabled is None:
         from action_plugins.map_to_simconnect import MapToSimConnect
         ec = gremlin.execution_graph.ExecutionContext()
-        enabled = ec.findActionPlugin(MapToSimConnect.name)
+        enabled = len(ec.findActionPlugin(MapToSimConnect.name)) > 0
         syslog = logging.getLogger("system")
         syslog.info(f"State: SimConnect usage {'is' if enabled else 'not'} detected.  SimConnect is {'enabled' if enabled else 'disabled'}.")
         _simconnect_enabled = enabled

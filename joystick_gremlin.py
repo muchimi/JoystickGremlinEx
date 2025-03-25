@@ -123,7 +123,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t16"
+APPLICATION_BASE = "m73t17"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -386,9 +386,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _clear_tabs(self):
          # remove all tab headers
-        with QtCore.QSignalBlocker(self.ui.devices):
-            while self.ui.devices.count():
-                self.ui.devices.removeTab(0)
+        if self.ui.devices:
+            with QtCore.QSignalBlocker(self.ui.devices):
+                while self.ui.devices.count():
+                    self.ui.devices.removeTab(0)
         
 
     def _add_tab(self, device_guid, tab_type, index = None) -> int: 

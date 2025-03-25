@@ -19,6 +19,7 @@ from __future__ import annotations
 import enum
 import time
 import threading
+import anytree
 import os
 from typing import Optional
 import logging
@@ -1976,6 +1977,11 @@ class ActionSelector(QtWidgets.QWidget):
         else:
             self.paste_button.setToolTip(f"Paste action (not available)")
 
+class ModeStyle(anytree.AbstractStyle):
+    """ style for anytree mode rendering """
+
+    def __init__(self):
+        super().__init__("\u2502 ", "\u251c\u2500 ", "\u2514\u2500 ")
 
 
 def _inheritance_tree_to_labels(labels, tree, level):
@@ -1985,10 +1991,10 @@ def _inheritance_tree_to_labels(labels, tree, level):
     :param tree the part of the tree to be processed
     :param level the indentation level of this tree
     """
-    for mode, children in sorted(tree.items()):
-        labels.append((mode,
-            f"{"  " * level}{"" if level == 0 else "└"}{mode}"))
-        _inheritance_tree_to_labels(labels, children, level+1)
+    # skip the root node
+    for child in tree.children:
+        for pre, _, node in anytree.RenderTree(child, style=ModeStyle()):
+            labels.append((node.name,f"{pre}{node.name}"))
 
 def get_mode_list(profile_data):
     ''' gets a pairs (display_name, mode) '''
@@ -1998,6 +2004,8 @@ def get_mode_list(profile_data):
     # Create mode name labels visualizing the tree structure
     inheritance_tree = profile.build_inheritance_tree()
     labels = []
+
+
     _inheritance_tree_to_labels(labels, inheritance_tree, 0)
 
     # Filter the mode names such that they only occur once below

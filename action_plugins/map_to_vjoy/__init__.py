@@ -2144,7 +2144,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 count = dev.hat_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Hat {id}",id)
-                    input_id = self.action_data.vjoy_input_id
+                input_id = self.action_data.vjoy_input_id
                 if input_id < 1 or input_id > count:
                     self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}")
                     return
@@ -4192,6 +4192,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             input_string = "hat"
         elif self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
             input_string = "button"
+        else:
+            input_string = f"unhandled: [{self.action_mode}]"
         return f"VjoyRemap: VJOY device: {self.vjoy_device_id} {input_string}: {self.vjoy_input_id}"
 version = 1
 name = "Vjoy Remap"

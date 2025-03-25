@@ -21,6 +21,7 @@ import logging
 import time
 import queue
 import threading
+import anytree
 from threading import Thread, Timer
 from typing import Callable
 
@@ -1578,8 +1579,13 @@ class EventHandler(QtCore.QObject):
 		# Propagate events from parent to children if the children lack
 		# handlers for the available events
 		callbacks_list = [self.callbacks, self.latched_callbacks, self.latched_events]
-		
-		for parent, children in inheritance_tree.items():
+
+		# build the inheritance modes
+		node = inheritance_tree
+		if node.name:
+			parent = node.name
+			children = [n.name for n in node.children]
+			
 			# Each device is treated separately
 			for callback_items in callbacks_list:
 				for device_guid in callback_items:
@@ -1601,8 +1607,9 @@ class EventHandler(QtCore.QObject):
 								if key not in device_cb[child]:
 									device_cb[child][key] = callbacks
 
-			# Recurse until we've dealt with all modes
-			self.build_event_lookup(children)
+		# Recurse until we've dealt with all modes
+		for child in node.children:
+			self.build_event_lookup(child)
 
 	def change_profile(self, new_profile):
 		''' requests a profile load '''
