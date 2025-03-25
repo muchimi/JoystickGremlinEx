@@ -21,6 +21,7 @@ import logging
 import time
 import queue
 import threading
+import anytree
 from threading import Thread, Timer
 
 
@@ -1552,8 +1553,7 @@ class EventHandler(QtCore.QObject):
                 verbose = gremlin.config.Configuration().verbose
                 osc_input = event.identifier
                 key = osc_input.message_key
-                if device_guid not in self.osc_callbacks.keys():
-                    self.osc_callbacks[device_guid] = {}
+                if device_                    self.osc_callbacks[device_guid] = {}
                 if mode not in self.osc_callbacks[device_guid].keys():
                     self.osc_callbacks[device_guid][mode] = {}
                 if key not in self.osc_callbacks[device_guid][mode]:
@@ -1596,7 +1596,7 @@ class EventHandler(QtCore.QObject):
             mouse_button = event.identifier
             # convert the mouse button to the virtual scan code we use for mouse events
             index = (mouse_button.value + 0x1000, False)
-            verbose = gremlin.config.Configuration().verbose_mode_mouse
+            verbose = gremlin.config.Configuration().v
             if verbose:
                 syslog.info(
                     f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}"
@@ -2296,6 +2296,1045 @@ class EventHandler(QtCore.QObject):
             if keyword in signature:
                 callback = plugin.install(callback, functools.partial)
         return callback
+
+	"""Listens to the inputs from multiple different input devices."""
+
+
+	mode_status_update = QtCore.Signal() # tell the UI to update the mode status bar
+
+	# signal emitted when the profile is changed
+	profile_changed = QtCore.Signal(str)
+
+	# Signal emitted when the application is pause / resumed
+	is_active = QtCore.Signal(bool)
+
+	last_action_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name)
+	last_container_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name)
+
+	
+
+
+	def __init__(self):
+		"""Initializes the EventHandler instance."""
+		QtCore.QObject.__init__(self)
+		self.plugins = {}
+		self._mode_validator_callbacks = {}  # list of validators (callbacks) that return a boolean True if the mode change can occur - signature must be callable(str)->bool
+		self._last_tts_data = TTSNotifyData() # last mode that triggered a TTS verbal notice
+		el = gremlin.event_handler.EventListener()
+		el.profile_start.connect(self._profile_start)
+		el.profile_stop.connect(self._profile_stop)
+		el.runtime_mode_changed.connect(self._update_mode_change)
+
+		
+		self.reset()
+
+	@QtCore.Slot()
+	def _profile_start(self):
+		self._update_mode_change(gremlin.shared_state.runtime_mode)
+
+	@QtCore.Slot()
+	def _profile_stop(self):
+		self._last_tts_notify = None
+		self._last_tts_notify_time = None
+
+	def registerModeValidator(self, callback):
+		assert callable(callback)
+		self._mode_validator_callbacks[callback] = callback
+
+	def unregisterModeValidator(self, callback):
+		if callback in self._mode_validator_callbacks:
+			del self._mode_validator_callbacks[callback]
+
+	def clearModeValidator(self):
+		self._mode_validator_callbacks.clear()
+
+	def runModeValidator(self, mode):
+		''' runs through all current validators to see if a mode change can occur '''
+		result = True # assume we can
+		for callback in self._mode_validator_callbacks:
+			result = result and callback(mode)
+			if not result: 
+				break
+
+		return result
+
+		
+
+	def reset(self):
+		config =  gremlin.config.Configuration()
+		verbose = config.verbose
+		if verbose:
+			syslog.info("EventHandler: reset()")
+			
+		self.process_callbacks = True
+		self.callbacks = {}
+		self.callback_key_map = {} # map of event callbackKey to event
+		self.input_item_map = {} # map of input items keyed by device_guid, mode, input_type, input_id
+		self.latched_events = {}
+		self.latched_callbacks = {}
+		self.midi_callbacks = {}
+		self.osc_callbacks = {}
+		self._event_lookup = {}
+		self.latched_functors = {}
+		self.experimental = config.experimental
+		
+		
+
+	@property
+	def runtime_mode(self):
+		"""Returns the currently active mode.
+
+		:return name of the currently active mode
+		"""
+		return gremlin.shared_state.runtime_mode
+	
+	@runtime_mode.setter
+	def runtime_mode(self, value):
+		gremlin.shared_state.runtime_mode = value
+
+	@property
+	def edit_mode(self):
+		return gremlin.shared_state.edit_mode
+	
+	@edit_mode.setter
+	def edit_mode(self, value):
+		gremlin.shared_state.edit_mode = value
+
+	@property
+	def current_mode(self):
+		''' gets the current mode based on state '''
+		return gremlin.shared_state.current_mode
+
+	@property
+	def previous_runtime_mode(self):
+		''' returns the previous mode '''
+		return gremlin.shared_state.previous_runtime_mode
+	
+	@previous_runtime_mode.setter
+	def previous_runtime_mode(self, value):
+		''' sets the active mode '''
+		gremlin.shared_state.previous_runtime_mode = value
+
+
+	def add_plugin(self, plugin):
+		"""Adds a new plugin to be attached to event callbacks.
+
+		:param plugin the plugin to add
+		"""
+		# Do not add the same type of plugin multiple times
+		if plugin.keyword not in self.plugins:
+			self.plugins[plugin.keyword] = plugin
+
+	def dump_exectree(self, device_guid, mode, event):
+		''' outputs the execution tree to the log '''
+		from types import FunctionType, MethodType
+
+		verbose = gremlin.config.Configuration().verbose
+		if not verbose:
+			return
+		
+		get_device_name = gremlin.shared_state.get_device_name
+		device_name = gremlin.shared_state.get_device_name(device_guid)
+		
+		for callbacks in self.callbacks[device_guid][mode][event.callbackKey]:
+			for callback in callbacks:
+				if not hasattr(callback,"execution_graph"):
+					syslog.debug(f"\tDevice ID: {device_name}  mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
+					continue
+				
+				for callback_functor in callback.execution_graph.functors:
+					if hasattr(callback_functor,"action_set"):
+						for functor in callback_functor.action_set.functors:
+							action_data = functor.action_data if hasattr(functor, "action_data") else None
+							syslog.debug(f"\tDevice ID: {device_name} mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
+							if action_data:
+								# dump member variables only
+								syslog.debug("\t\tData block:")
+								for attr in dir(action_data):
+									if not attr.startswith("_"):
+										item = getattr(action_data,attr)
+										
+										if not (isinstance(item, FunctionType) or isinstance(item, MethodType) or inspect.isabstract(item) or inspect.isclass(item)):
+											syslog.debug(f"\t\t\t{attr}: {item}")
+					else:
+						syslog.debug(f"\tFunctor '{type(callback_functor).__name__} does not define an action set")
+					
+								
+
+
+
+
+	def dump_callbacks(self):
+		# dump latched events
+		import gremlin.ui.keyboard_device
+		import gremlin.shared_state
+
+		
+		get_device_name = gremlin.shared_state.get_device_name
+		
+		syslog.debug("------------ Latched Events ----------------")
+		for device_guid in self.latched_events.keys():
+			device_name = gremlin.shared_state.get_device_name(device_guid)
+			for mode in self.latched_events[device_guid].keys():
+				for key_pair in self.latched_events[device_guid][mode]:
+					identifier = self.latched_events[device_guid][mode][key_pair]
+					if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
+						if isinstance(key_pair, tuple):
+							scan_code, is_extended = key_pair
+							key_data = f"scan code: 0x{scan_code:X}  extended: {is_extended}"
+						else:
+							key_data = str(key_pair)
+						syslog.debug(f"\tDevice ID: {device_name} mode: {mode} pair: {key_data} data: {identifier.to_string()}")
+
+		syslog.debug("------------ Execution callbacks ----------------")
+		for device_guid in self.callbacks.keys():
+			for mode in self.callbacks[device_guid].keys():
+				for key in self.callbacks[device_guid][mode]:
+					event = self.callback_key_map[key]
+					self.dump_exectree(device_guid, mode, event)
+
+
+	def add_latched_functor(self, device_guid, mode, event, functor):
+		''' registers an extra latched functor on inputs if a functor uses multiple inputs '''
+		# regular event
+		if device_guid not in self.latched_functors:
+			self.latched_functors[device_guid] = {}
+		if mode not in self.latched_functors[device_guid]:
+			self.latched_functors[device_guid][mode] = {}
+		key = event.callbackKey
+		if not key in self.latched_functors[device_guid][mode]:
+			self.latched_functors[device_guid][mode][key] = []
+		self.latched_functors[device_guid][mode][key].append(functor)
+
+	def _matching_input_item(self, mode, event):
+		''' gets the matching input item from the event '''
+		
+		device_guid = event.device_guid
+		input_type = event.event_type
+		if input_type == InputType.Keyboard:
+			input_type = InputType.KeyboardLatched
+		if input_type == InputType.KeyboardLatched:
+			magic = json.dumps(event.identifier)
+		else:
+			magic = event.identifier
+		
+		if not device_guid in self.input_item_map:
+			return None
+		if not mode in self.input_item_map[device_guid]:
+			return None
+		if not input_type in self.input_item_map[device_guid][mode]:
+			return None
+		if  magic in self.input_item_map[device_guid][mode][input_type]:
+			return self.input_item_map[device_guid][mode][input_type][magic]
+		
+		# syslog.info(f"No match: {input_type} {magic}")
+		# for key in self.input_item_map[device_guid][mode][input_type].keys():
+		# 	syslog.info(f"\t{key}")
+		return None
+
+		
+	def registerInputItem(self, mode : str, input_item):
+		''' registers an input item with the event handler '''
+		item: gremlin.base_profile.InputItem = input_item
+		device_guid = item.device_guid
+		input_type = item.input_type
+		if input_type == InputType.Keyboard:
+			input_type = InputType.KeyboardLatched
+
+		if input_type == InputType.KeyboardLatched:
+			# use the key sequence as the magic key
+			magic = json.dumps(input_item.input_id.key_tuple)
+		else:
+			magic = item.input_id
+		
+		if not device_guid in self.input_item_map:
+			self.input_item_map[device_guid] = {}
+		if not mode in self.input_item_map[device_guid]:
+			self.input_item_map[device_guid][mode] = {}
+		if not input_type in self.input_item_map[device_guid][mode]:
+			self.input_item_map[device_guid][mode][input_type] = {}
+		self.input_item_map[device_guid][mode][input_type][magic] = input_item
+
+		verbose = gremlin.config.Configuration().verbose_mode_inputs
+		if verbose: syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
+			
+
+	def add_callback(self, device_guid, mode, event, callback, permanent=False, node = None):
+		"""Installs the provided callback for the given event.
+
+		:param device_guid the GUID of the device the callback is
+			associated with
+		:param mode the mode the callback belongs to
+		:param event the event for which to install the callback
+		:param callback the callback function to link to the provided
+			event
+		:param permanent if True the callback is always active even
+			if the system is paused
+		:node: the execution tree node
+		"""
+		import gremlin.config
+		import gremlin.ui.keyboard_device
+		import gremlin.keyboard
+
+		assert callable(callback)
+		
+		if event:
+			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
+				verbose = gremlin.config.Configuration().verbose_mode_keyboard
+				# keyboard latched event
+				identifier = event.identifier
+				primary_key = identifier.key
+				
+
+
+
+				# verbose = True
+				
+				# if the key can latch with multiple primary keys, build the table of all combinations
+				key_list = [primary_key]
+				if primary_key.is_latched:
+					# multiple keys
+					key_list.extend(primary_key._latched_keys)
+
+				for key in key_list:
+ 					# the events will arrive as keyboard events - in any order - this makes sure latching is checked regardless of the order of key presses
+					 
+					
+					virtual_code = key.virtual_code
+					keyid_source = key.index_tuple() # use the scan code for now
+					#index = virtual_code if virtual_code > 0 else keyid
+					keyid, _ = gremlin.keyboard.KeyMap.translate(keyid_source)
+						
+					if device_guid not in self.latched_events.keys():
+						self.latched_events[device_guid] = {}
+				
+					if mode not in self.latched_events[device_guid].keys():
+						self.latched_events[device_guid][mode] = {}
+					if keyid not in self.latched_events[device_guid][mode].keys():
+						self.latched_events[device_guid][mode][keyid] = []
+					self.latched_events[device_guid][mode][keyid].append(identifier)
+					if verbose:
+						syslog.info(f"Key latch registered by guid {device_guid}  mode: {mode} vk: {virtual_code} (0x{virtual_code:X}) source keyid: {gremlin.keyboard.KeyMap.keyid_tostring(keyid_source)} -> translated keyId: {gremlin.keyboard.KeyMap.keyid_tostring(keyid)} name: {key.name} -> {identifier.display_name}")
+					
+
+				if device_guid not in self.latched_callbacks.keys():
+					self.latched_callbacks[device_guid] = {}
+				if mode not in self.latched_callbacks[device_guid].keys():
+					self.latched_callbacks[device_guid][mode] = {}
+				if not key in self.latched_callbacks[device_guid][mode]:
+					self.latched_callbacks[device_guid][mode][primary_key] = []
+				data = self.latched_callbacks[device_guid][mode][primary_key]
+				data.append((self._install_plugins(callback),permanent))
+				return
+								
+				
+			elif event.event_type == InputType.Midi:
+				# MIDI event
+				verbose = gremlin.config.Configuration().verbose_mode_midi
+				midi_input = event.identifier
+				key = midi_input.message_key
+				if device_guid not in self.midi_callbacks.keys():
+					self.midi_callbacks[device_guid] = {}
+				if mode not in self.midi_callbacks[device_guid].keys():
+					self.midi_callbacks[device_guid][mode] = {}
+				if not key in self.midi_callbacks[device_guid][mode]:
+					self.midi_callbacks[device_guid][mode][key] = []
+				data = self.midi_callbacks[device_guid][mode][key]
+				data.append((self._install_plugins(callback),permanent))
+				if verbose: syslog.info(f"MIDI: register callback {mode} {key}")
+
+			elif event.event_type == InputType.OpenSoundControl:
+				# OSC event
+				verbose = gremlin.config.Configuration().verbose
+				osc_input = event.identifier
+				key = osc_input.message_key
+				if device_guid not in self.osc_callbacks.keys():
+					self.osc_callbacks[device_guid] = {}
+				if mode not in self.osc_callbacks[device_guid].keys():
+					self.osc_callbacks[device_guid][mode] = {}
+				if not key in self.osc_callbacks[device_guid][mode]:
+					self.osc_callbacks[device_guid][mode][key] = []
+				data = self.osc_callbacks[device_guid][mode][key]
+				data.append((self._install_plugins(callback),permanent))
+
+			else:
+				# regular event - events are stored by the event key
+				if device_guid not in self.callbacks:
+					self.callbacks[device_guid] = {}
+				if mode not in self.callbacks[device_guid]:
+					self.callbacks[device_guid][mode] = {}
+				key = event.callbackKey
+				if key not in self.callbacks[device_guid][mode]:
+					self.callbacks[device_guid][mode][key] = []
+					self.callback_key_map[key] = event
+				self.callbacks[device_guid][mode][key].append((
+					self._install_plugins(callback),
+					permanent
+				))
+
+	def _matching_event_keys(self, event):
+		''' gets the list of latched keys for this event '''
+		if not event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+			# not a keyboard event
+			return []
+		import gremlin.config
+		import gremlin.keyboard
+
+		# convert mouse events to keyboard event
+		if event.event_type == InputType.Mouse:
+			from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
+			device_guid = KeyboardDeviceTabWidget.device_guid
+			
+			mouse_button = event.identifier
+			# convert the mouse button to the virtual scan code we use for mouse events
+			index = (mouse_button.value + 0x1000, False)
+			verbose = gremlin.config.Configuration().verbose_mode_mouse
+			if verbose:
+				syslog.info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
+		else:
+			verbose = gremlin.config.Configuration().verbose_mode_keyboard
+			device_guid = event.device_guid
+			# index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
+			index, _ = gremlin.keyboard.KeyMap.translate(event.identifier)
+			if verbose: syslog.info(f"matching key event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
+
+		#event_key = Key(scan_code = identifier[0], is_extended = identifier[1], is_mouse = is_mouse, virtual_code= virtual_code)
+		input_items = []
+
+		
+	
+		if device_guid in self.latched_events:
+			
+			#print (f"found guid: {device_guid}")
+			data = self.latched_events[event.device_guid]
+			if self.runtime_mode in data.keys():
+				data = data[self.runtime_mode]
+				matching_keys = []
+				if index in data.keys():
+					#print ("found identifier")
+					matching_keys = data[index]
+				if not matching_keys:
+					index_ex = (index[0], not index[1])
+					if index_ex in data.keys():
+						matching_keys = data[index_ex]
+
+				for input_item in matching_keys:
+					# key = input_item.key
+					input_items.append(input_item)
+
+				if verbose: syslog.info(f"KEY: found {len(input_items)} matching items")
+				return input_items
+		
+		return []
+	
+
+	def build_event_lookup(self, inheritance_tree):
+		"""Builds the lookup table linking event to callback.
+
+		This takes mode inheritance into account.
+
+		:param inheritance_tree the tree of parent and children in the
+			inheritance structure
+		"""
+		# Propagate events from parent to children if the children lack
+		# handlers for the available events
+		callbacks_list = [self.callbacks, self.latched_callbacks, self.latched_events]
+
+		# build the inheritance modes
+		node = inheritance_tree
+		if node.name:
+			parent = node.name
+			children = [n.name for n in node.children]
+			
+			# Each device is treated separately
+			for callback_items in callbacks_list:
+				for device_guid in callback_items:
+					# Only attempt to copy handlers if we have any available in
+					# the parent mode
+					if parent in callback_items[device_guid]:
+						device_cb = callback_items[device_guid]
+						parent_cb = device_cb[parent]
+						# Copy the handlers into each child mode, unless they
+						# have their own handlers already defined
+						for child in children:
+							if child not in device_cb:
+								device_cb[child] = {}
+							for event, callbacks in parent_cb.items():
+								if isinstance(event, gremlin.event_handler.Event):
+									key = event.callbackKey
+								else:
+									key = event
+								if key not in device_cb[child]:
+									device_cb[child][key] = callbacks
+
+		# Recurse until we've dealt with all modes
+		for child in node.children:
+			self.build_event_lookup(child)
+
+	def change_profile(self, new_profile):
+		''' requests a profile load '''
+		if new_profile != gremlin.shared_state.current_profile:
+			self.profile_change.emit(new_profile)
+
+
+	def set_mode(self, new_mode):
+		''' sets the edit or runtime mode based on the state  '''
+		assert new_mode,"Mode cannot be blank"
+		if gremlin.shared_state.is_running:
+			gremlin.shared_state.runtime_mode = new_mode
+		else:
+			gremlin.shared_state.edit_mode = new_mode
+
+	def set_runtime_mode(self, new_mode):
+		''' sets the active runtime mode '''
+		assert new_mode,"Mode cannot be blank"
+		gremlin.shared_state.runtime_mode = new_mode
+
+	def set_edit_mode(self, new_mode):
+		''' sets the active edit mode '''
+		assert new_mode,"Mode cannot be blank"
+		gremlin.shared_state.edit_mode = new_mode
+
+	@QtCore.Slot(str)
+	def _update_mode_change(self, mode):
+		if gremlin.config.Configuration().initial_load_mode_tts:
+			# output verbal notification if requested
+			data = self._last_tts_data
+			profile = gremlin.shared_state.current_profile
+			if data.mode is None or data.profile is None or data.mode != mode or data.profile != profile:
+				self._last_tts_data.mode = mode
+				self._last_tts_data.profile = profile
+				tts = gremlin.tts.TextToSpeech()
+				rate = gremlin.config.Configuration().initial_load_rate_tts
+				tts.speak(f"Mode change to {mode}", rate) # default rate is 100
+
+	def TTSNotify(self, text):
+			''' outputs a notification only if TTS notifications are enabled and the profile/mode is different from the last message issued'''
+			config = gremlin.config.Configuration()
+			if config.initial_load_mode_tts:
+				data = self._last_tts_data
+				profile = gremlin.shared_state.current_profile
+				mode = gremlin.shared_state.current_mode
+				if data.mode is None or data.profile is None or data.mode != mode or data.profile != profile:
+					self._last_tts_data.mode = mode
+					self._last_tts_data.profile = profile
+					rate = config.initial_load_rate_tts
+					tts = gremlin.tts.TextToSpeech()
+					tts.speak(text, rate) # default rate is 100
+	
+
+	def change_mode(self, new_mode, emit = True, force_update = False, tts = True):
+		"""Changes the GremlinEx currently active mode.
+
+		:param new_mode the new mode to use
+		"""
+
+		import gremlin.ui.mode_device
+
+
+		el = EventListener()
+		try:
+		
+
+			gremlin.util.pushCursor()
+
+			config = gremlin.config.Configuration()
+			verbose = config.verbose
+			current_profile = gremlin.shared_state.current_profile
+			is_running = gremlin.shared_state.is_running
+			
+
+			if verbose:
+				if is_running:
+					syslog.debug(f"CHANGE MODE: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
+				else:
+					syslog.debug(f"CHANGE MODE: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+			
+
+
+			if new_mode == self.current_mode and not force_update:
+				# already in this mode
+				return
+			
+			el.push_input_selection()
+			
+			profile_modes = current_profile.get_modes()
+			mode_exists = new_mode in profile_modes
+			
+			if not mode_exists:
+				for device in self.callbacks.values():
+					if new_mode in device:
+						mode_exists = True
+
+			if not mode_exists:
+				for device in self.osc_callbacks.values():
+					if new_mode in device:
+						mode_exists = True
+
+			if not mode_exists:
+				for device in self.midi_callbacks.values():
+					if new_mode in device:
+						mode_exists = True
+
+			if not mode_exists:
+				for device in self.latched_callbacks.values():
+					if new_mode in device:
+						mode_exists = True
+				
+			if not mode_exists:
+				# import gremlin.config
+				# verbose = gremlin.config.Configuration().verbose
+				# if verbose:
+				syslog.warning(
+					f"CHANGE MODE: Mode Change Error: The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
+				)
+				return
+
+			if is_running:
+				# runtime event (prevents UI from reloading)
+				# if verbose:
+				# 	syslog.debug(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+
+
+				if self.runtime_mode != new_mode or force_update:
+					import gremlin.shared_state
+					device_guid = gremlin.shared_state.mode_tab_guid
+					mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
+					mode_exit = gremlin.ui.mode_device.ModeInputModeType.ModeExit
+					delay = 0.250 # delay in seconds between press/release events for mode control change
+
+					# fire off any mode changes
+					event_exit_pressed = Event(InputType.ModeControl, 
+								identifier = mode_exit,
+								device_guid= device_guid,
+								is_pressed=True,
+								mode = self.runtime_mode)
+					event_exit_released = Event(InputType.ModeControl, 
+								identifier = mode_exit,
+								device_guid= device_guid,
+								is_pressed=False,
+								mode = self.runtime_mode)
+					
+					event_enter_pressed = Event(InputType.ModeControl, 
+								identifier = mode_enter,
+								device_guid= device_guid,
+								is_pressed=True,
+								mode = new_mode)
+					event_enter_released = Event(InputType.ModeControl, 
+								identifier = mode_enter,
+								device_guid= device_guid,
+								is_pressed=False,
+								mode = new_mode)
+					
+					# fire mode change control for mode exit (press + release)
+					m1_list, f1_list = self.execute_event(event_exit_pressed)
+					exit_release = Timer(delay, lambda : self._execute_callbacks(event_exit_released, m1_list, f1_list))
+					exit_release.start()
+					
+					result = self.runModeValidator(new_mode)
+					if not result:
+						syslog.warning(f"CHANGE MODE: {current_profile.name} - mode change request to {new_mode} not authorized by a module - request ignored")
+						return
+
+
+					self.previous_runtime_mode = self.runtime_mode
+					gremlin.shared_state.runtime_mode = new_mode
+					# remember the last mode for this profile
+					
+					current_profile.set_last_runtime_mode(self.runtime_mode)
+					self.previous_runtime_mode = self.runtime_mode
+					self.runtime_mode = new_mode
+					if verbose: syslog.info(f"CHANGE MODE: [{current_profile.name}] - Runtime Mode switch to: {new_mode}")
+					if emit:
+						el.runtime_mode_changed.emit(new_mode)
+
+					# tell other internal components the mode is changing (runtime only)
+					
+					el.runtime_mode_changed.emit(new_mode)
+					
+				
+
+
+
+					# fire mode change for mode enter (press + release)
+					m2_list, f2_list = self.execute_event(event_enter_pressed)
+					enter_release = Timer(delay, lambda : self._execute_callbacks(event_enter_released, m2_list, f2_list))
+					enter_release.start()
+
+			else:
+				# non-runtime
+				assert new_mode,"new mode cannot be blank"
+				if self.edit_mode != new_mode or force_update:
+					gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
+					gremlin.shared_state.edit_mode = new_mode
+					self.edit_mode = new_mode
+					syslog.debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
+					if emit:
+						el.edit_mode_changed.emit(self.edit_mode)
+						
+			el.pop_input_selection()
+
+			# update the status bar
+			self.mode_status_update.emit()
+
+			# update the selection
+			device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
+			if input_type and input_id:
+				el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+
+			# fire the UI update on change mode      
+			el.update_input_state.emit(device_guid)  # force a UI widget status update	
+		finally:	
+			gremlin.util.popCursor()
+
+		
+
+
+
+	
+
+	def resume(self):
+		"""Resumes the processing of callbacks."""
+		self.process_callbacks = True
+		self.is_active.emit(self.process_callbacks)
+
+	def pause(self):
+		"""Stops the processing of callbacks."""
+		self.process_callbacks = False
+		self.is_active.emit(self.process_callbacks)
+
+	def toggle_active(self):
+		"""Toggles the processing of callbacks on or off."""
+		self.process_callbacks = not self.process_callbacks
+		self.is_active.emit(self.process_callbacks)
+
+	def clear(self):
+		"""Removes all attached callbacks."""
+		self.callbacks = {}
+		self.callback_key_map.clear()
+		self.latched_callbacks = {}
+		self.midi_callbacks = {}
+		self.osc_callbacks = {}
+		
+
+	def execute_event(self, event : Event):
+		"""Processes a single event by passing it to all callbacks registered for this event.
+
+		:param event the event to process
+		"""
+		
+		import gremlin.config
+		import gremlin.keyboard
+
+		# list of callbacks
+		m_list = []
+		f_list = []
+
+		# mode to act on
+		mode = event.mode if event.mode else self.runtime_mode  
+
+		
+		verbose = gremlin.config.Configuration().verbose_mode_inputs
+		#verbose = True
+
+		if verbose and event.event_type != InputType.JoystickAxis:
+			syslog.info(f"process event - mode [{mode}] event: {str(event)}")
+
+
+
+		input_item = self._matching_input_item(mode, event)
+		if input_item is not None and not input_item.enabled:
+			# input item registered but not enabled - ignore inputs that aren't registered or could not be found (latched keys for example)
+			if verbose: syslog.info(f"Event: input disabled {str(event)}")
+			return
+
+		# filter latched keyboard or mouse events
+		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+			verbose = gremlin.config.Configuration().verbose_mode_detailed
+			data = event.data # holds keyboard state info
+			if event.event_type == InputType.Mouse:
+				verbose = gremlin.config.Configuration().verbose_mode_mouse
+			if verbose:
+				syslog.info(f"process keyboard event: {event}")
+				syslog.info(f"\tKeyboard state data:")
+				keys = list(data.keys())
+				for key in keys:
+					syslog.info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
+
+			items = self._matching_event_keys(event)  # returns list of primary keys
+			if items:
+				if verbose:
+					syslog.info(f"Matched keys for mode: [{mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
+					for index, input_item in enumerate(items):
+						syslog.info(f"\t[{index}]: {input_item.name}")
+				
+				for input_item in items:
+					if verbose:
+						syslog.info("-"*50)
+					is_latched = True
+					latch_key = None
+					# print (data)
+					latched_keys = [input_item.key]
+					latched_keys.extend(input_item.latched_keys)
+					if verbose: syslog.info(f"KEY: Checking latching: {len(latched_keys)} key(s)")
+					for k in latched_keys:
+						index = k.index_tuple()
+						found = index in data.keys()
+						if not found:
+							# try the reverse translate
+							r_index = gremlin.keyboard.KeyMap.reverse_translate(index)
+							if r_index is not None:
+								found = r_index in data.keys()
+								if found:
+									index = r_index
+
+						state = data[index] if found else False
+						if verbose:
+							syslog.info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
+							if not found:
+								syslog.info(f"\t\t* Key not found *")
+						is_latched = is_latched and state
+
+					if verbose:
+						syslog.info(f"\tLatched state: {is_latched}")
+					
+					if is_latched:
+						latch_key = input_item.key
+
+					if latch_key:
+						#print (f"Found latched key: {latch_key}")
+						m_list = self._matching_latched_callbacks(event, latch_key)
+						if m_list:
+							if verbose:
+								trigger_line = "***** TRIGGER " + "*"*30
+								syslog.info(trigger_line)
+								syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+								syslog.info(trigger_line)
+							self._trigger_callbacks(m_list, event)
+							return
+						# else:
+						# 	print (f"No callbacks found for: {latch_key}")
+				verbose = gremlin.config.Configuration().verbose_mode_inputs
+			else:
+				if verbose:
+					syslog.info("No matching events")
+			return
+						
+		elif event.event_type ==InputType.Midi:
+			m_list = self._matching_midi_callbacks(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [MIDI] no matching inputs for {str(event.identifier.message_key)} mode: {self.runtime_mode}")
+					
+		elif event.event_type == InputType.OpenSoundControl:
+			m_list = self._matching_osc_callbacks(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
+				
+			
+		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+			m_list = self._matching_callbacks(event)
+			f_list = self._matching_functors(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+		else:
+			# other inputs including control inputs
+			verbose = gremlin.config.Configuration().verbose_mode_inputs
+			m_list = self._matching_callbacks(event)
+			f_list = self._matching_functors(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+
+		
+		self._execute_callbacks(event, m_list, f_list)
+
+		# if m_list:
+		# 	if verbose:
+		# 		syslog.info(f"TRIGGER: mode: [{mode}] callbacks: {len(m_list)} event: {event}")
+		# 	self._trigger_callbacks(m_list, event)
+
+		# if f_list:
+		# 	if verbose:
+		# 		syslog.info(f"TRIGGER: mode: [{mode}] functors: {len(f_list)} event: {event}")
+		# 	self._trigger_functor_callbacks(f_list, event)
+
+		# returns what was executed if they need to be retriggered
+		return m_list, f_list
+
+
+
+
+	def _trigger_callbacks(self, callbacks, event):
+		''' trigger regular callbacks '''
+		#verbose = gremlin.config.Configuration().verbose'
+		for cb in callbacks:
+			try:
+				# if verbose:
+				# 	syslog.info(f"CALLBACK: execute start")
+				cb(event)
+				# if verbose:
+				# 	syslog.info(f"CALLBACK: execute done")
+			except Exception as ex:
+				syslog.error(f"CALLBACK: error {ex}")
+
+
+	def _trigger_functor_callbacks(self, functors, event : Event):
+		''' trigger functor callbacks '''
+		#verbose = gremlin.config.Configuration().verbose'
+		import gremlin.actions
+		for functor in functors:
+			try:
+				functor.process_event(event, gremlin.actions.Value(event.value))
+			except Exception as ex:
+				syslog.error(f"FUNCTOR CALLBACK: error {ex}")				
+
+
+	def _execute_callbacks(self, event, m_list, f_list):
+		''' triggers callbacks '''
+		if m_list:
+			self._trigger_callbacks(m_list, event)
+
+		if f_list:
+			self._trigger_functor_callbacks(f_list, event)
+
+
+
+	def _matching_midi_callbacks(self, event):
+		''' returns list of callbacks matching the event '''
+		callback_list = []
+		if event.event_type == InputType.Midi:
+			key = event.identifier.message_key
+			import gremlin.ui.midi_device
+			if event.identifier.command == gremlin.ui.midi_device.MidiCommandType.SysEx:
+					pass
+			if event.device_guid in self.midi_callbacks:
+				import gremlin.execution_graph
+				ec = gremlin.execution_graph.ExecutionContext() # current execution context
+				# search callbacks for mode hierarchy
+				callback_list = ec.getCallbacks(self.midi_callbacks[event.device_guid], key, self.runtime_mode)
+				# callback_list = self.midi_callbacks[event.device_guid].get(
+				# 	self.runtime_mode, {}
+				# ).get(key, [])
+
+		# Filter events when the system is paused
+		if not self.process_callbacks:
+			return [c[0] for c in callback_list if c[1]]
+		else:
+			return [c[0] for c in callback_list]
+		
+
+		
+	def _matching_osc_callbacks(self, event):
+		''' returns list of callbacks matching the event '''
+		callback_list = []
+		if event.event_type == InputType.OpenSoundControl:
+			key = event.identifier.message_key
+			if event.device_guid in self.osc_callbacks:
+				import gremlin.execution_graph
+				ec = gremlin.execution_graph.ExecutionContext() # current execution context
+				# search callbacks for mode hierarchy
+				callback_list = ec.getCallbacks(self.osc_callbacks[event.device_guid], key, self.runtime_mode)
+
+			verbose = config.Configuration().verbose_mode_osc
+			if verbose and not callback_list:
+				# syslog = logging.getLogger("system")
+				syslog.info(f"OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
+
+		# Filter events when the system is paused
+		if not self.process_callbacks:
+			return [c[0] for c in callback_list if c[1]]
+		else:
+			return [c[0] for c in callback_list]
+
+
+
+	def _matching_functors(self, event) -> list:
+		''' gets the list of matching functors to call when an event occurs '''	
+		functors_list = []
+		device_guid = event.device_guid
+		if device_guid in self.latched_functors:
+			import gremlin.execution_graph
+			ec = gremlin.execution_graph.ExecutionContext() # current execution context
+			modes = ec.getModeHierarchy(self.runtime_mode)
+			for mode in modes:
+				if mode in self.latched_functors[device_guid].keys():
+					key = event.callbackKey
+					if key in self.latched_functors[device_guid][mode].keys():
+						functors_list = self.latched_functors[device_guid][mode][key]
+						if functors_list:
+							break
+		return functors_list
+				
+
+		# device_guid = event.device_guid
+		# if device_guid in self.latched_functors:
+		# 	mode = self.runtime_mode
+		# 	if mode in self.latched_functors[device_guid].keys():
+		# 		if event in self.latched_functors[device_guid][mode].keys():
+		# 			functors_list = self.latched_functors[device_guid][mode][event]
+
+		# return functors_list
+
+
+	def _matching_callbacks(self, event):
+		"""Returns the list of callbacks to execute in response to
+		the provided event.
+
+		:param event the event for which to search the matching
+			callbacks
+		:return a list of all callbacks registered and valid for the
+			given event
+		"""
+
+		config =  gremlin.config.Configuration()
+		verbose = config.verbose_mode_details # or config.verbose_mode_condition
+
+		# Obtain callbacks matching the event
+		callback_list = []
+		key = event.callbackKey
+		device_guid = event.device_guid
+		if device_guid in self.callbacks:
+			mode = self.runtime_mode
+			if mode in self.callbacks[device_guid]:
+				if key in self.callbacks[device_guid][mode]:
+					callback_list = self.callbacks[device_guid][mode][key]
+					if verbose:
+						event = self.callback_key_map[key]
+						self.dump_exectree(device_guid, mode, event)
+
+		if verbose:
+			syslog.debug(f"CALLBACK: device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
+
+
+		# Filter events when the system is paused
+		if callback_list:
+			if not self.process_callbacks:
+				return [c[0] for c in callback_list if c[1]]
+			else:
+				return [c[0] for c in callback_list]
+		
+
+	def _matching_latched_callbacks(self, event, key):
+		callback_list = []
+		if event.event_type in (InputType.KeyboardLatched, InputType.Keyboard):
+			if event.device_guid in self.latched_callbacks:
+				import gremlin.execution_graph
+				ec = gremlin.execution_graph.ExecutionContext() # current execution context
+				# search callbacks for mode hierarchy
+				callback_list = ec.getCallbacks(self.latched_callbacks[event.device_guid], key, self.runtime_mode)
+
+		# Filter events when the system is paused
+		if not self.process_callbacks:
+			return [c[0] for c in callback_list if c[1]]
+		else:
+			return [c[0] for c in callback_list]
+
+	def _install_plugins(self, callback):
+		"""Installs the current plugins into the given callback.
+
+		:param callback the callback function to install the plugins into
+		:return new callback with plugins installed
+		"""
+		signature = inspect.signature(callback).parameters
+		for keyword, plugin in self.plugins.items():
+			if keyword in signature:
+				callback = plugin.install(callback, functools.partial)
+		return callback
 
 
 @gremlin.singleton_decorator.SingletonDecorator

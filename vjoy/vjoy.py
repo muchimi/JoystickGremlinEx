@@ -644,7 +644,7 @@ class VJoy:
         """
         if not self.is_axis_valid(linear_index=linear_index):
             raise VJoyError(
-                f"Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, "")}"
+                f"Invalid linear index for axis lookup provided - ensure VJOY settings are correct and reflected in the profile mapping:  {_error_string(self.vjoy_id, linear_index, "")}"
             )
 
         return self._axis_lookup[linear_index]
@@ -660,13 +660,13 @@ class VJoy:
             axis_id = VJoy.axis_equivalence.get(axis_id, axis_id)
             if not self.is_axis_valid(axis_id=axis_id):
                 raise VJoyError(
-                    f"Invalid axis index requested - {_error_string(self.vjoy_id, axis_id, "")}"
+                    f"Invalid axis index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, axis_id, "")}"
                 )
             return self._axis[axis_id]
         elif linear_index is not None:
             if not self.is_axis_valid(linear_index=linear_index):
                 raise VJoyError(
-                    f"Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, "")}"
+                    f"Invalid linear index for axis lookup provided - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, linear_index, "")}"
                 )
             return self._axis[self._axis_lookup[linear_index]]
         else:
@@ -680,7 +680,7 @@ class VJoy:
         """
         if index not in self._button:
             raise VJoyError(
-                f"Invalid button index requested - {_error_string(self.vjoy_id, index, "")}"
+                f"Invalid button index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, index, "")}"
             )
         return self._button[index]
 
@@ -692,7 +692,7 @@ class VJoy:
         """
         if index not in self._hat:
             raise VJoyError(
-                f"Invalid hat index requested - {_error_string(self.vjoy_id, index, "")}"
+                f"Invalid hat index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, index, "")}"
             )
         return self._hat[index]
 

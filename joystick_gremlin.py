@@ -118,7 +118,7 @@ os.chdir(install_path)
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t16"
+APPLICATION_BASE = "m73t17"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -384,10 +384,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._clear_tabs()
 
     def _clear_tabs(self):
+
         # remove all tab headers
         with QtCore.QSignalBlocker(self.ui.devices):
             while self.ui.devices.count():
-                self.ui.devices.removeTab(0)
+                self.ui.devices.removeTab(0)       
+
 
     def _add_tab(self, device_guid, tab_type, index=None) -> int:
         """adds a tab to the tab header

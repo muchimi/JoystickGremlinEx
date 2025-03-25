@@ -529,6 +529,26 @@ class VJoyCondition(AbstractCondition):
 
     def __str__(self):
         return self.condition_name()
+    
+class ModeCondition(AbstractCondition):
+    ''' condition verifying the runtime mode '''
+    def __init__(self, mode):
+        """Creates a new instance.
+
+        :param comparison the comparison operation to perform when evaluated
+        """
+        super().__init__(mode)
+
+    def __call__(self, event, value, extra_data = None):
+        # default call
+        return self.process_event(event, value, extra_data)
+    
+    def process_event(self, event, value, extra_data = None):
+        return self.comparison == gremlin.shared_state.runtime_mode
+
+    def condition_name(self)->str:
+        return f"ModeCondition: mode: [{self.comparison}]"
+        
 
 
 class InputActionCondition(AbstractCondition):
@@ -558,6 +578,8 @@ class InputActionCondition(AbstractCondition):
         """
 
         verbose = gremlin.config.Configuration().verbose_mode_condition
+
+        
 
         syslog = logging.getLogger("system")
         retval = False

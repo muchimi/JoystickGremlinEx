@@ -906,9 +906,22 @@ class ExecutionContext:
                 syslog.error("Execution Tree: error: found a blank mode.")
                 continue
             mode_item = ExecutionModeNode()
-            mode_item.parent = self._mode_tree
             mode_item.mode = mode
             mode_nodes[mode] = mode_item
+        
+        mode_tree = gremlin.shared_state.current_profile.modeTree()
+        gremlin.shared_state.current_profile.dumpModeTree()
+        for node in anytree.PreOrderIter(mode_tree):
+            mode = node.name
+            if mode and node.parent and node.parent.name:
+                parent_mode = node.parent.name
+                mode_nodes[mode].parent = mode_nodes[parent_mode]
+            
+
+
+
+            
+
 
         # build the execution tree
         self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root)  # root node
@@ -925,7 +938,6 @@ class ExecutionContext:
                     continue
                 mode_item = mode_nodes[mode.name]
                 mode_node = ExecutionGraphNode(ExecutionGraphNodeType.Mode)
-
                 mode_node.mode = mode.name
                 mode_node.parent = device_node
                 for input_items in mode.config.values():
@@ -1179,6 +1191,14 @@ class ExecutionContext:
             for node in action_node.ancestors:
                 node.has_actions = True  # parent branch
 
+        # build execution mode list 
+        # input_nodes = anytree.findall_by_attr(self.root, value = ExecutionGraphNodeType.InputItem, name= "nodeType")
+        # for input_node in input_nodes:
+        #     mode = input_node.mode
+        #     parent_mode = mode_nodes[mode]
+            
+        
+
         self.dump()
 
     def registerCallbacks(self, callbacks):
@@ -1216,13 +1236,6 @@ class ExecutionContext:
                                 self.registerNode(node)
 
         for node in anytree.PreOrderIter(self.root):
-            if (
-                node.container
-                and node.container.comment
-                and node.container.comment.startswith("left throttle")
-                and node.nodeType == ExecutionGraphNodeType.Container
-            ):
-                pass
             if node.id in self._functor_map:
                 continue  # already processed
             if node.nodeType in (
@@ -1323,7 +1336,7 @@ class ExecutionContext:
         """executes a single node"""
 
         if not node.has_actions:
-            return True  # nodes with no actions return PASS
+          return True # nodes with no actions return PASS
 
         result = True
         verbose_id = gremlin.config.Configuration().verbose_mode_condition
@@ -1366,6 +1379,7 @@ class ExecutionContext:
                             else [node.functors]
                         )
                     )
+
                     for functor in functor_list:
                         result = self.process_functor(
                             functor, event, value, manual, extra_data
