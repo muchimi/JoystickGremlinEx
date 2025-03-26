@@ -1667,10 +1667,13 @@ class EventHandler(QtCore.QObject):
 					tts.speak(text, rate) # default rate is 100
 	
 
-	def change_mode(self, new_mode, emit = True, force_update = False, tts = True):
+	def change_mode(self, new_mode, emit = True, force_update = False, tts = True, validate = True):
 		"""Changes the GremlinEx currently active mode.
 
-		:param new_mode the new mode to use
+		:param new_mode: the new mode to use
+		:param emit: enables signal 
+		:param force_update: forces a mode change even if already in the mode
+		:param validate: validates change mode, set to false to remove validation
 		"""
 
 		import gremlin.ui.mode_device
@@ -1775,10 +1778,11 @@ class EventHandler(QtCore.QObject):
 					exit_release = Timer(delay, lambda : self._execute_callbacks(event_exit_released, m1_list, f1_list))
 					exit_release.start()
 					
-					result = self.runModeValidator(new_mode)
-					if not result:
-						syslog.warning(f"CHANGE MODE: {current_profile.name} - mode change request to {new_mode} not authorized by a module - request ignored")
-						return
+					if validate:
+						result = self.runModeValidator(new_mode)
+						if not result:
+							syslog.warning(f"CHANGE MODE: {current_profile.name} - mode change request to {new_mode} not authorized by a module - request ignored")
+							return
 
 
 					self.previous_runtime_mode = self.runtime_mode

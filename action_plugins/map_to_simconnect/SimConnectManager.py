@@ -482,7 +482,7 @@ class SimConnectManager(QtCore.QObject):
 
         handler = SimConnectEventHandler()
 
-
+   
         self._connect_warning_issued = False
         sm = SimConnect(handler, auto_connect = False)
         self._sm : SimConnect = sm
@@ -973,9 +973,6 @@ class SimConnectManager(QtCore.QObject):
 
     def _aicraft_loaded_cb(self, folder, name):
         ''' called when a new aircraft is loaded '''
-        if self._aircraft_name != name or self._aircraft_folder != folder:
-            self._aircraft_folder = folder
-            self._aircraft_name = name
         self._aircraft_loaded_internal.emit(folder, name)  # fires self.sim_aircraft_loaded.emit(name)
             
 
@@ -992,7 +989,7 @@ class SimConnectManager(QtCore.QObject):
 
     def get_loaded_aircraft(self):
         ''' gets the loaded aircraft '''
-        return self._aircraft_name
+        return self._aircraft_title # use title as the name is meaningless in MSFS 2024 due to streaming AC
     
 
     def get_aircraft_title(self, force_update = False):
@@ -1008,11 +1005,6 @@ class SimConnectManager(QtCore.QObject):
     
     def request_loaded_aircraft(self):
         ''' gets the current player aircraft in the sim '''
-        # if self._aircraft_name and self._aircraft_title:
-        #     self._dump_current_aircraft()
-        #     self.sim_aircraft_loaded.emit(self._aircraft_folder, self._aircraft_name, self._aircraft_title)
-        #     return
-
         try:
             if self._sm.ok:
                 self._sm.requestAircraftLoaded()

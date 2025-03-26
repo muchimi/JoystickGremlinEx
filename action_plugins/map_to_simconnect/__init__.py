@@ -1132,8 +1132,11 @@ class SimconnectMonitor():
         if enabled:
             syslog.info(f"SCMONITOR: Start")
 
-            eh = gremlin.event_handler.EventHandler()
-            eh.registerModeValidator(self._mode_change_validator) # filter mode change requests and discard them if needed to avoid interrupting Simconnect activities
+            # change to the correct mode
+            self._manager.request_loaded_aircraft()
+
+            # eh = gremlin.event_handler.EventHandler()
+            # eh.registerModeValidator(self._mode_change_validator) # filter mode change requests and discard them if needed to avoid interrupting Simconnect activities
             
             self.start()
         else:
@@ -1218,13 +1221,13 @@ class SimconnectMonitor():
     def _sim_aircraft_loaded(self, folder : str, name : str, title : str):
         ''' called when a new aicraft has been detected '''
         # syslog = logging.getLogger("system")
-        if self._verbose: syslog.info(f"SCMONITOR: Aircraft loaded: [{name}]")
-        self.changeModeForAicraft(name)
+        if self._verbose: syslog.info(f"SCMONITOR: Aircraft loaded: [{title}]")
+        self.changeModeForAicraft(title)
         
 
-    def changeModeForAicraft(self, name : str):
+    def changeModeForAicraft(self, title : str):
         ''' changes the mode for the current aircraft '''
-        mode = self.getStartupMode(name) # get the mode to use for this profile
+        mode = self.getStartupMode(title) # get the mode to use for this profile
         if mode and gremlin.shared_state.runtime_mode != mode:
             # suitable mode found - if this is the current mode - change_mode will do nothing
             self.change_mode(mode)
@@ -1242,7 +1245,9 @@ class SimconnectMonitor():
     def _sim_stop(self):
         ''' sim stop event '''
         # syslog = logging.getLogger("system")
-        if self._verbose: syslog.info(f"SCMONITOR: sim stop")        
+        if self._verbose: syslog.info(f"SCMONITOR: sim stop")
+        eh = gremlin.event_handler.EventListener()
+        eh.request_profile_stop.emit("Sim Stop")
 
     def _mode_change_validator(self, new_mode) -> bool:
         ''' hook called when a request for a mode change is made.
@@ -1267,7 +1272,7 @@ class SimconnectMonitor():
         This only changes the mode if we're not already in the mode and the mode exists.
         '''
         eh = gremlin.event_handler.EventHandler()
-        eh.change_mode(mode)
+        eh.change_mode(mode, validate = False)
 
  
 
