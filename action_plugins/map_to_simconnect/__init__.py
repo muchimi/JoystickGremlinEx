@@ -1534,24 +1534,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 
-
-
-        # Configure the widget holding the layout with all the buttons
-        # self.manual_scroll_widget.setLayout(self.manual_scroll_layout)
-        # self.manual_scroll_widget.setSizePolicy(
-        #     QtWidgets.QSizePolicy.Expanding,
-        #     QtWidgets.QSizePolicy.Expanding
-        # )
-        # self.manual_scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        # self.manual_scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-
-        # Configure the scroll area
-        #self.scroll_area.setMinimumWidth(300)
-        # self.manual_scroll_area.setWidgetResizable(True)
-        # self.manual_scroll_area.setWidget(self.manual_scroll_widget)
-
-
-
         self.map_widget = QtWidgets.QWidget()
         self.map_layout = QtWidgets.QGridLayout(self.map_widget)
         self.map_layout.setContentsMargins(0,0,0,0)
@@ -1568,17 +1550,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         self.container_map_layout.addWidget(self.scroll_area)
-        #self.manual_container_map_layout.addWidget(self.manual_scroll_area)
-
-
-        
-        # self.manual_scroll_layout.addWidget(self.manual_map_widget)
-        # self.manual_scroll_layout.setContentsMargins(6,0,6,0)
-        # self.manual_scroll_layout.addStretch()
-        # self.manual_container_map_layout.addWidget(self.manual_scroll_area)
-
-
-
 
         # end scrolling container widget definition
 

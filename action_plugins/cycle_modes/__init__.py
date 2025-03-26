@@ -173,19 +173,17 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Saves UI state to the profile."""
         mode_list = self.model.modes()
         self.action_data.mode_list = mode_list
-        self.action_modified.emit()
+        # self.action_modified.emit()
 
     def _update_mode_list(self):
 
         
         with QtCore.QSignalBlocker(self.mode_list_widget):
             self.mode_list_widget.clear()
-            
-            mode_data = self.ec.getModeNames(as_tuple=True)
-            #modes = gremlin.shared_state.current_profile.get_modes()
+            mode_list = gremlin.shared_state.current_profile.get_modes()
             self.model.clear()
-            for mode, display in mode_data:
-                self.mode_list_widget.addItem(display, mode)
+            for mode in mode_list:
+                self.mode_list_widget.addItem(mode, mode)
 
         # verify the modes in the cycle are valid
         mode_list = self.action_data.mode_list
@@ -195,8 +193,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
                 mode_list.remove(mode)
         self.model.clear()
         for mode in mode_list:
-            node = self.ec.searchModeTree(mode)
-            self.model.addItem(node.display, mode)
+            self.model.addItem(mode, mode)
         
         
       

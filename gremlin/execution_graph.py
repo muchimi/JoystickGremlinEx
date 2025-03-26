@@ -113,6 +113,7 @@ class ExecutionGraphNode(anytree.NodeMixin):
         self.range = None # holds the range info
         self.description = ""
         self.has_actions = False # assume the node has no child action somewhere down the tree
+        self.link = None # link to another node
 
     def clone(self) -> ExecutionGraphNode:
         ''' clone myself '''
@@ -210,7 +211,10 @@ class ExecutionContext():
        el.profile_modes_changed.connect(self.reset) # modes changed
 
        self._mode_tree = None
-       self.root = None # root mode of execution tree
+       self._mode_ancestors = {}  # map of mode branches by mode
+       self._mode_descendants = {} # map of mode children by mode
+       self.root = None # root node of execution tree
+       self.m_root = None # root node of the input / action tree 
        self._last_hash = None
        self._condition_map = {} # map of node ID to conditions that have conditions
        self._functor_map = {} # map of node ID to action nodes to execute for condition checking
@@ -324,25 +328,16 @@ class ExecutionContext():
     @property
     def modeTree(self):
         ''' gets the mode tree '''
-        if not self._mode_tree:
+        if not self._mode_tree or not self._mode_tree.children:
             self.reset()
         return self._mode_tree
     
     def searchModeTree(self, mode : str) -> ExecutionModeNode:
         ''' find the node for a mode in the mode tree '''
         # syslog = logging.getLogger("system")
-        try:
-            nodes = anytree.search.findall_by_attr(self.modeTree, mode, name="mode")
-        except Exception as err:
-            syslog.warning(f"SearchModeTree: tree exception: {err}")
-            nodes = None
-        if nodes:
-            if len(nodes) > 1:
-                syslog.warning(f"CONTEXT: More than one mode named {mode} detected - returning the first one")
-                for node in nodes:
-                    syslog.warning(f"\t{node.display} [{node.mode}]")
-            return nodes[0]
-        return None
+        tree = self._mode_tree
+        node = anytree.find(tree, lambda m: m.mode == mode)
+        return node
     
 
     def getModeHierarchy(self, mode: str):
@@ -358,17 +353,17 @@ class ExecutionContext():
             '''
         
         current_mode = gremlin.shared_state.edit_mode # current edit mode
-        mode_tree = self.modeTree
-        if not mode_tree:
-            return []
+        
         if as_tuple:
+            mode_list = gremlin.shared_state.current_profile.get_mode_display_list()
             if include_current:
-                return [(node.mode, node.display) for node in anytree.PreOrderIter(mode_tree) if node.mode]
-            return [(node.mode, node.display) for node in anytree.PreOrderIter(mode_tree) if node.mode and node.mode != current_mode]
+                return [(mode, display) for (mode, display) in mode_list]
+            return [(mode, display) for (mode, display) in mode_list if mode != current_mode]
 
-        if include_current:       
-            return [node.mode for node in anytree.PreOrderIter(mode_tree) if node.mode]
-        return [node.mode for node in anytree.PreOrderIter(mode_tree) if node.mode if node.mode != current_mode]
+        mode_list = gremlin.shared_state.current_profile.get_modes()
+        if include_current:
+            return mode_list
+        return [mode for mode in mode_list if mode != current_mode]
 
 
         
@@ -535,6 +530,7 @@ class ExecutionContext():
 
     def dump(self, root = None, exclude_empty = True, conditions_only = False):
         self.dumpExecTree(root, exclude_empty, conditions_only)
+        self.dumpInputTree()
         self.dumpModeTree()
 
     def dumpExecTree(self, root = None, exclude_empty = True, conditions_only = False):
@@ -553,6 +549,15 @@ class ExecutionContext():
                     if node.nodeType != ExecutionGraphNodeType.ActivationCondition:
                         continue # activation conditions only
                 syslog.info(f"{pre}{str(node)}")
+
+    def dumpInputTree(self):
+        ''' dumps the input tree '''
+        syslog.info(f"Input Tree:")
+        root = self.m_root
+        if root:
+            for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
+                syslog.info(f"{pre}{str(node)}")
+
 
     def dumpActive(self):
         ''' dumps active execution nodes ONLY'''
@@ -831,6 +836,7 @@ class ExecutionContext():
                     device_guid = gremlin.shared_state.virtual_device_guid,
                     identifier = 1
             )
+        
 
     def _build_execution_tree(self):
         ''' builds the execution tree 
@@ -869,6 +875,7 @@ class ExecutionContext():
         # build the mode tree
         self._mode_tree = ExecutionModeNode()
         mode_nodes = {}
+
         for mode in mode_list:
             if not mode:
                 syslog.error("Execution Tree: error: found a blank mode.")
@@ -879,22 +886,58 @@ class ExecutionContext():
         
         mode_tree = gremlin.shared_state.current_profile.modeTree()
         gremlin.shared_state.current_profile.dumpModeTree()
+        tree_nodes = {}
         for node in anytree.PreOrderIter(mode_tree):
-            mode = node.name
-            if mode and node.parent and node.parent.name:
-                parent_mode = node.parent.name
-                mode_nodes[mode].parent = mode_nodes[parent_mode]
+            mode_name = node.name
+            if not mode_name in tree_nodes:
+                tree_node = ExecutionModeNode(mode_name)
+                tree_node.parent = self._mode_tree
+                tree_nodes[mode_name] = tree_node
+            else:
+                tree_node = tree_nodes[mode_name]
+
+            if mode_name and node.parent and node.parent.name:
+                parent_mode_name = node.parent.name
+                mode_nodes[mode_name].parent = mode_nodes[parent_mode_name]
+                if not parent_mode_name in tree_nodes:
+                    parent_tree_node = ExecutionModeNode(parent_mode_name)
+                    parent_tree_node.parent = self._mode_tree
+                    tree_nodes[parent_mode_name] = parent_tree_node
+                else:
+                    parent_tree_node = tree_nodes[parent_mode_name]
+
+                tree_node.parent = parent_tree_node
+            else:
+                tree_node.parent = self._mode_tree    
+            
+
             
 
 
 
             
 
-
+        current_profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        m_input_nodes = {} # holds the input nodes created for the input/mode hiearchy tree - keyed by the input
+        self._mode_ancestors = {} # ancestor looking list, keyed by mode name
+        self._mode_descendants = {} # descendant looking list, keyed by mode name
 
 
         # build the execution tree
         self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
+        self.m_root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node for the device/input replacement graph for nested modes
+
+        ''' mode tree setup 
+        
+            root
+            +-- input_node (mapped input device/input_type/input_id)
+                +-- action_node
+                    -> mode property holds the mode the action is mapped to
+                    -> link property holds the action_node in the execution tree
+        
+        
+        
+        '''
 
         # latched functors tracker
         latched_data = [] # list of LatchedData items
@@ -902,14 +945,28 @@ class ExecutionContext():
             device_node = ExecutionGraphNode(ExecutionGraphNodeType.Device)
             device_node.device = device
             device_node.parent = self.root
+
             for mode in device.modes.values():
-                if not mode.name in mode_nodes:
-                    syslog.error(f"Execution Tree: error: mode: {mode.name} is not found in the device node: {device_node.name}")
+                mode_name = mode.name
+                if not mode_name in mode_nodes:
+                    syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.name}")
                     continue
-                mode_item = mode_nodes[mode.name]
+
+                
+
+                mode_item = mode_nodes[mode_name]
                 mode_node = ExecutionGraphNode(ExecutionGraphNodeType.Mode)
+                mode_node.mode = mode_name
+
+                # build list of parent modes - contains the current mode if a root mode, or the list of current and parent modes if nested
+                if not mode_name in self._mode_ancestors:
+                    self._mode_ancestors[mode_name] = current_profile.get_mode_ancestors(mode_name)
+                    self._mode_descendants[mode_name] = current_profile.get_mode_descendants(mode_name)
+
+                
+
              
-                mode_node.mode = mode.name
+                mode_node.mode = mode_name
                 mode_node.parent = device_node
                 for input_items in mode.config.values():
                     for input_item in input_items.values():
@@ -919,8 +976,18 @@ class ExecutionContext():
                         input_node = ExecutionGraphNode(ExecutionGraphNodeType.InputItem)
                         input_node.parent = mode_node
                         input_node.input_item = input_item
-                        input_node.mode = mode.name
-                        
+                        input_node.mode = mode_name
+
+                        input_key = input_item.callbackKey()
+                        if not input_key in m_input_nodes:
+                            m_input_node = ExecutionGraphNode(ExecutionGraphNodeType.InputItem)
+                            m_input_node.parent = self.m_root
+                            m_input_node.input_item = input_item
+                            m_input_node.mode = mode_name
+                            m_input_nodes[input_key] = m_input_node
+                        else:
+                            m_input_node = m_input_nodes[input_key]
+
                         if len(input_item.containers) == 0:
                             # no containers = no actions = skip
                             continue
@@ -941,7 +1008,7 @@ class ExecutionContext():
                             container_node.id = container.id
                             container_node.parent = input_container_group # container node parents to its condition node
                             container_node.container = container
-                            container_node.mode = mode.name
+                            container_node.mode = mode_name
                             container_node.description = f"Container type: [{container.__class__.__name__}] ID: [{container.id}]"
 
                             # container condition
@@ -956,8 +1023,18 @@ class ExecutionContext():
                                     action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
                                     action_node.id = action.id
                                     action_node.parent = action_condition_node # action node is owned by its condition node
-                                    action_node.mode = mode.name
+                                    action_node.mode = mode_name
                                     action_node.action = action
+
+                                    m_action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
+                                    m_action_node.id = action.id
+                                    m_action_node.parent = m_input_node # action node is owned by its condition node
+                                    m_action_node.mode = mode_name
+                                    m_action_node.action = action
+                                    m_action_node.link = action_node # link the input tree action node to the execution tree action node
+
+                                    action_node.link = m_action_node # link the execution tree action node to the input tree action node
+
 
                                     # action_node.condition = None
                                     action_node.container = container
@@ -974,7 +1051,7 @@ class ExecutionContext():
                                     #     data.container_node = container_node
                                     #     data.condition_node = condition_node
                                     #     data.extra_inputs = extra_inputs
-                                    #     data.mode = mode.name
+                                    #     data.mode = mode_name
                                         
                                     #     latched_data.append(data)
                                             
@@ -1022,7 +1099,7 @@ class ExecutionContext():
 
                                                             functor = self._get_action_functor(gate_action, gate_action_node)
                                                             gate_action_node.exec_functors = functor
-                                                            gate_action_node.mode = mode.name
+                                                            gate_action_node.mode = mode_name
                                                             gate_action_node.container = container
                                                             gate_action_node.description = f"Gate action: {str(gate_action)}"
                                               
@@ -1071,7 +1148,7 @@ class ExecutionContext():
                                                             range_action_node.action = range_action
                                                             functor = self._get_action_functor(range_action, range_action_node)
                                                             range_action_node.exec_functors = functor
-                                                            range_action_node.mode = mode.name
+                                                            range_action_node.mode = mode_name
                                                             range_action_node.container = container
                                                             range_action_node.description = f"Range action: {str(range_action)}"
 
@@ -1129,6 +1206,11 @@ class ExecutionContext():
             action_node.has_actions = True # action itself
             for node in action_node.ancestors:
                 node.has_actions = True # parent branch
+
+            # look up multi mode inputs - builds a list of [mode][action] by input for nested modes
+            # input -> mode
+
+        # build input
 
         # build execution mode list 
         # input_nodes = anytree.findall_by_attr(self.root, value = ExecutionGraphNodeType.InputItem, name= "nodeType")
@@ -1282,6 +1364,7 @@ class ExecutionContext():
         verbose_id = gremlin.config.Configuration().verbose_mode_condition
         gremlin.shared_state.pushLog()
         logTabs = gremlin.shared_state.logTabs()
+        current_mode = gremlin.shared_state.runtime_mode
 
         if verbose_id: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
         try:
@@ -1301,6 +1384,28 @@ class ExecutionContext():
                             break
                 
                 case _:
+
+                    # action node - check mode behavior if hierarchical
+                    if node.nodeType == ExecutionGraphNodeType.Action and node.link:
+                        # action node is a "main" action (so not gated axis) node
+                        mode_name = node.mode
+                        if mode_name != current_mode:
+                            # the node being executed belongs to a parent mode
+                            m_mode_node = node.link
+                            m_input_node = m_mode_node.parent
+                            mode_list = self._mode_descendants[mode_name]
+                            if mode_list:
+                                # see if there is a defined mapping for the same input in the input tree in a sub mode
+                                for m_node in m_input_node.children:
+                                    if m_node.mode in mode_list:
+                                        # sub mode has an action defined for this input
+                                        result = False # FAIL the current input and let the sub mode 
+                                        break
+
+
+                    if not result:
+                        return result
+
                     # any other node - execute the functor list - first one that fails fails the complete branch to this point
                     functor_list = [] if node.functors is None else (node.functors if  isinstance(node.functors, list) else [node.functors])
                     for functor in functor_list:

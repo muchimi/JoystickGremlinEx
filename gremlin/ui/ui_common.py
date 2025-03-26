@@ -217,6 +217,9 @@ class Color():
             QLineEdit {{
                 border: 1px solid {border_color};
             }}
+            QScrollArea {{
+                border: 1px solid {border_color};
+            }}
             
             '''
         # print (css)
@@ -2000,7 +2003,7 @@ def get_mode_list(profile_data):
     ''' gets a pairs (display_name, mode) '''
     profile = profile_data
     mode_list = []
-    modes = gremlin.shared_state.current_profile.get_modes()
+    
     # Create mode name labels visualizing the tree structure
     inheritance_tree = profile.build_inheritance_tree()
     labels = []
@@ -2012,23 +2015,6 @@ def get_mode_list(profile_data):
     # their correct parent
     mode_names = [n[0] for n in labels]
     display_names = [n[1] for n in labels]
-
-
-
-    # for entry in labels:
-    #     if not entry[0] in modes:
-    #         continue
-    #     if entry[0] in mode_names:
-    #             idx = mode_names.index(entry[0])
-    #             if len(entry[1]) > len(display_names[idx]):
-    #                 del mode_names[idx]
-    #                 del display_names[idx]
-    #                 mode_names.append(entry[0])
-    #                 display_names.append(entry[1])
-    #     else:
-
-    #         mode_names.append(entry[0])
-    #         display_names.append(entry[1])
 
     # Add properly arranged mode names to the drop down list
     for display_name, mode_name in zip(display_names, mode_names):

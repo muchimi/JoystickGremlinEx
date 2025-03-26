@@ -61,6 +61,7 @@ import gremlin.util
 import gremlin.ui.ui_common
 import anytree
 from anytree import Node
+from PySide6.QtWidgets import QMessageBox
 
 syslog = logging.getLogger("system")
 
@@ -1410,6 +1411,10 @@ class InputItem():
     def message_key(self):
         # joystick inputs only - returns id of axis or button
         return self._input_id
+    
+    def callbackKey(self):
+        ''' callback key unique to the input type, input id '''
+        return (self._device_guid, self._input_type, self._input_id)
 
     @property
     def hasCalibration(self):
@@ -2195,6 +2200,42 @@ class Profile():
         self._ensure_mode_tree()
         return self._mode_tree
     
+    def _inheritance_tree_to_labels(self, labels, tree, level):
+        """Generates labels to use in the dropdown menu indicating inheritance.
+
+        :param labels the list containing all the labels
+        :param tree the part of the tree to be processed
+        :param level the indentation level of this tree
+        """
+        # skip the root node
+        for child in tree.children:
+            for pre, _, node in anytree.RenderTree(child, style=gremlin.ui.ui_common.ModeStyle()):
+                labels.append((node.name,f"{pre}{node.name}"))
+
+    def get_mode_display_list(self) -> list:
+        ''' gets a pairs (display_name, mode) '''
+        
+        mode_list = []
+        
+        # Create mode name labels visualizing the tree structure
+        inheritance_tree = self.build_inheritance_tree()
+        labels = []
+
+
+        self._inheritance_tree_to_labels(labels, inheritance_tree, 0)
+
+        # Filter the mode names such that they only occur once below
+        # their correct parent
+        mode_names = [n[0] for n in labels]
+        display_names = [n[1] for n in labels]
+
+        # Add properly arranged mode names to the drop down list
+        for display_name, mode_name in zip(display_names, mode_names):
+            mode_list.append((display_name, mode_name))
+
+
+        return mode_list
+    
     def _ensure_mode_tree(self):
         if not self._mode_tree:
             self._mode_tree = ModeNode()
@@ -2204,7 +2245,7 @@ class Profile():
     def dumpModeTree(self):
         ''' dumps the current mode tree '''
         for pre, fill, node in anytree.RenderTree(self._mode_tree, style=anytree.AsciiStyle()):
-            syslog.info(f"{pre}{node.name}")
+            syslog.info(f"{pre}{node.name if node.name else "root"}")
 
 
     def build_inheritance_tree(self, as_tree = False):
@@ -2251,13 +2292,23 @@ class Profile():
             return next((node.name for node in self._mode_tree.children), None)
         return None
 
-    def get_mode_branch(self, mode : str):
-        ''' gets a list of modes starting with the current mode '''
+    def get_mode_ancestors(self, mode : str, include_self = False):
+        ''' gets a list of parent modes starting with the current mode '''
         node = anytree.find(self._mode_tree, lambda node: node.name == mode)
         if node is None:
             return []
-        mode_list = [node.name]
+        mode_list = [node.name] if include_self else []
         mode_list.extend([n.name for n in node.ancestors if n.name])
+        return mode_list
+    
+    
+    def get_mode_descendants(self, mode : str, include_self = False):
+        ''' gets a list of child modes starting with the current mode '''
+        node = anytree.find(self._mode_tree, lambda node: node.name == mode)
+        if node is None:
+            return []
+        mode_list = [node.name] if include_self else []
+        mode_list.extend([n.name for n in node.descendants if n.name])
         return mode_list
     
     def set_last_runtime_mode(self, mode : str):
@@ -2328,35 +2379,32 @@ class Profile():
         return []
 
 
-        # Get profile root node
-        # parent = self
-        # while parent.parent is not None:
-        #     parent = parent.parent
-        # assert(type(parent) == Profile)
-        # # Generate list of modes
-        # mode_names = []
-        # for device in parent.devices.values():
-        #     mode_names.extend(device.modes.keys())
-        # mode_names = [mode for mode in mode_names if mode is not None]
-        # if mode_names:
-        #     mode_names = list(set(mode_names))
-        #     mode_names.sort(key=lambda x: x.casefold())
-        # return mode_names
-
-
-
-    def add_mode(self, name, inherited_name = None, emit = True):
+    def add_mode(self, name, parent_name = None, emit = True) -> bool:
         import gremlin.event_handler
-        ''' adds a new mode parented to inherited_name'''
+        ''' adds a new mode parented to inherited_name
+        
+        :param name: the name of the mode to add (case sensitive)
+        :param parent_name: the name of the parent mode, can be none if the mode is a root mode
+        :param emit: if set, fires an event that updates the UI
+        :returns: True on
+        
+        
+        '''
+        if not name:
+            return False
+        
+        name = name.strip()
         if name in self.mode_list():
             syslog.warning(f"Add Mode: error: mode {name} already exists")
+            QMessageBox.warning(self, title = "Warning", text = f"Cannot add mode [{name}]: a mode by that name already exists")
             return False
+            
         
         for device in self.devices.values():
             new_mode = Mode(device)
             new_mode.name = name
-            if inherited_name is not None:
-                new_mode.inherit = inherited_name
+            if parent_name is not None:
+                new_mode.inherit = parent_name
             else:
                 new_mode.inherit = self.get_default_mode()
             new_mode.parent = device
@@ -2366,8 +2414,8 @@ class Profile():
             # add the mode 
             node = ModeNode(name)
             parent_node = self._mode_tree
-            if inherited_name:
-                existing_parent_node = next((node for node in self._mode_tree.descendants if node.name == inherited_name), None)
+            if parent_name:
+                existing_parent_node = next((node for node in self._mode_tree.descendants if node.name == parent_name), None)
                 if existing_parent_node:
                     parent_node = existing_parent_node
                 
@@ -2378,11 +2426,11 @@ class Profile():
 
         if emit:
             eh = gremlin.event_handler.EventListener()
-            eh.edit_mode_changed.emit()
+            eh.edit_mode_changed.emit(name)
         return True
     
 
-    def set_mode_parent(self, name, inherited_name, emit = True):
+    def set_mode_parent(self, name, inherited_name, emit = True) -> bool:
         ''' sets the parent of a current mode'''
 
         node = anytree.find(self._mode_tree, lambda node: node.name == name)
@@ -2402,7 +2450,7 @@ class Profile():
                     device.modes[name].inherit = inherited_name
         if emit:
             eh = gremlin.event_handler.EventListener()
-            eh.edit_mode_changed.emit()
+            eh.edit_mode_changed.emit(name)
         return True
         
     
@@ -2413,19 +2461,61 @@ class Profile():
         return self.build_inheritance_tree(as_tree)
         
 
+    def rename_mode(self, current_name, new_name, emit = True):
+        if new_name in self.mode_list():
+            QMessageBox.warning(self, title= "Warning",text = f"Cannot rename mode [{current_name}] to [{new_name}]: [{new_name}] already exists")
+            return False
+        
+        self._ensure_mode_tree()
+        node = anytree.find(self._mode_tree, lambda node: node.name == current_name)
+        if not node:
+            QMessageBox.warning(self, title= "Warning",text = f"Cannot rename mode [{current_name}] to [{new_name}]: [{current_name}] not found")
+            return False
+        
+        node.name = new_name
 
-    
-    def remove_mode(self, name, force = False):
+        for device in self.devices.values():
+
+            device.modes[new_name] = device.modes[current_name]
+            device.modes[new_name].name = new_name
+            del device.modes[current_name]
+      
+
+            # Update inheritance information
+            for mode in device.modes.values():
+                if mode.inherit == current_name:
+                    mode.inherit = new_name
+
+            self._profile.reload_modes()
+
+            # rename the startup mode if it's the same
+            if current_name == gremlin.shared_state.current_profile.get_start_mode():
+                self._profile.set_start_mode(new_name)
+
+        if gremlin.shared_state.edit_mode == current_name:
+            gremlin.shared_state.edit_mode = new_name
+
+        if gremlin.shared_state.runtime_mode == current_name:
+            gremlin.shared_state.runtime_mode = new_name                
+
+        # tell the UI of the name change
+        if emit:
+            el = gremlin.event_handler.EventListener()
+            el.mode_name_changed.emit(current_name, new_name)
+
+        return True
+
+    def remove_mode(self, name, force = False, emit = True):
         ''' removes a mode from this profile '''
-        from PySide6.QtWidgets import QMessageBox
+        
         import gremlin.event_handler
         mode_list = self.mode_list()
         if not name in self.mode_list():
             syslog.warning(f"Remove Mode: error: mode {name} not found")
             return False
                 
-        if not force and len(mode_list.keys()) == 1:
-            QMessageBox.warning(self, "Warning","Cannot delete last mode - one mode must exist")
+        if not force and len(mode_list) == 1:
+            QMessageBox.warning(self, title= "Warning",text = f"Cannot delete mode [{name}]: The profile must have at least one mode")
             return False
 
         parent_of_deleted = None
@@ -2453,8 +2543,11 @@ class Profile():
                     child.parent = node.parent
                 node.parent = None # delete the node
 
-        eh = gremlin.event_handler.EventListener()
-        eh.edit_mode_changed.emit()
+        if emit:
+            eh = gremlin.event_handler.EventListener()
+            eh.edit_mode_changed.emit()
+
+        return True
 
     def get_root_modes(self) -> list[str]:
         """Returns a list of root modes.
@@ -2475,7 +2568,7 @@ class Profile():
         return list(set(root_modes))  # unduplicated
     
     def get_modes(self, casefold = False) -> list[str]:
-        ''' get all profile mode names '''
+        ''' get all profile mode names as a list '''
 
         if self._mode_tree:
             if casefold:
@@ -2501,6 +2594,71 @@ class Profile():
             default_node.parent = self._mode_tree
 
         return modes  # unduplicated
+    
+    def get_mode_map(self, casefold = False) -> dict:
+        ''' gets profile modes as a map of profiles, keyed by name, holds the parent name '''
+
+        mode_map = {}
+        self._ensure_mode_tree()
+        if self._mode_tree:
+            if casefold:
+                modes = [node.name.casefold() for node in self._mode_tree.descendants]    
+            else:
+                modes = [node.name for node in self._mode_tree.descendants]
+
+        for node in anytree.PreOrderIter(self._mode_tree):
+            mode_name = node.name
+            if mode_name:
+                if casefold:
+                    mode_name = mode_name.casefold()
+
+                parent_node = node.parent
+                parent_name = None
+                if parent_node:
+                    parent_name = parent_node.name
+                    if parent_name and casefold:
+                        parent_name = parent_name.casefold()
+
+                mode_map[mode_name] = parent_name
+        return mode_map
+        
+    
+    def reload_modes(self, update_devices = False):
+        ''' reloads the mode tree from the device data 
+        
+        :param update_devices: if set, updates the device to new modes to complete any missing mode sets (do this when loading from XML only)
+        
+        '''
+        self._mode_tree = Node("") # root node
+        mode_list = []
+        node_map = {}
+        node_map[""] = self._mode_tree
+
+        for device in self.devices.values():
+            for mode in device.modes.values():
+                mode_name = mode.name
+                if not mode_name in mode_list:
+                    mode_list.append(mode_name)
+
+                    node = Node(mode_name)
+                    node_map[mode_name] = node
+                    parent_mode_name = mode.inherit
+                    if parent_mode_name:
+                        # find the parent node, create if it does not exist
+                        if not parent_mode_name in node_map:
+                            parent_node = Node(parent_mode_name)
+                            parent_node.name = parent_mode_name
+                            parent_node.parent = self._mode_tree
+                        
+                        parent_node = node_map[parent_mode_name]
+                        node.parent = parent_node
+                    else:
+                        # assign to root node if it doesn't have a parent
+                        node.parent = self._mode_tree
+            break
+        
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: self.dumpModeTree()
     
     def rename_mode(self, old_mode:str, new_mode:str) -> bool:
         ''' renames an existing mode to a new mode '''
@@ -2673,20 +2831,36 @@ class Profile():
         if "force_numlock" in root.attrib:
             self._force_numlock_off = safe_read(root, "force_numlock", bool, True)
 
-        # read mode information (m73 and later profiles only)
-        mode_tree = ModeNode("")
-
-        
 
 
+        # Parse each device into separate DeviceConfiguration objects
+        for child in root.iter("device"):
+            device = Device(self)
+            device.from_xml(child, data)
+            self.devices[device.device_guid] = device
 
-            
 
-        
-        # profile mode definitions
-        
+
+        # Parse each vjoy device into separate DeviceConfiguration objects
+        for child in root.iter("vjoy-device"):
+            device = Device(self)
+            device.from_xml(child, data)
+            self.vjoy_devices[device.device_guid] = device
+
+        # parse simconnect startup entries
+        self._simconnect_modes = {}
+        for child in root.iter("simconnect"):
+            key_cp = safe_read(child,"key_cp",str)
+            key_ap = safe_read(child,"key_ap",str)
+            mode = safe_read(child,"mode")
+            key = (key_cp, key_ap)
+            self._simconnect_modes[key] = mode
+
+
+        # extract the mode list
         mode_node_map = {}
         nodes = {}
+        mode_tree = ModeNode("")
         nodes[""] = mode_tree
         mode_nodes = root.xpath("//device//mode")
         for mode_node in mode_nodes:
@@ -2716,80 +2890,7 @@ class Profile():
                 # no parent - parent to root
                 tree_node.parent = mode_tree
 
-
-        # root_mode_node = gremlin.util.get_xml_child(root, "modes")
-        # mode_list = None
-        # mode_node_map = {}
-        # if root_mode_node is not None:
-        #     nodes = {}
-        #     nodes[""] = mode_tree
-        #     mode_node_map[""] = mode_tree
-        #     for node in root_mode_node.iter():
-        #         mode = node.get("name")
-        #         if "inherit" in node.attrib:
-        #             parent_mode = node.get("inherit")
-        #             if not parent_mode in mode_node_map:
-        #                 tree_parent_mode = ModeNode(parent_mode)
-        #                 nodes[parent_mode] = tree_parent_mode
-        #                 mode_node_map[parent_mode] = tree_parent_mode
-        #                 tree_parent_mode.parent = root_mode_node
-
-        #         tree_node = ModeNode(mode)
-        #         mode_node_map[mode] = tree_node
-        #         nodes[mode] = tree_node
-        #         if parent_mode:
-        #             parent_tree_node = nodes[parent_mode]
-        #             tree_node.parent = parent_tree_node
-        #             continue
-            
-        #         # no parent - parent to root
-        #         tree_node.parent = mode_tree
-
-        if verbose:
-            syslog.info("Profile mode tree:")
-            for pre, fill, node in anytree.RenderTree(mode_tree, style=anytree.AsciiStyle()):
-                syslog.info(f"{pre}{node.name}")
-
-        # profile mode list
-        mode_list = [n.name for n in mode_tree.descendants if n.name] 
-            
-        self._mode_tree = mode_tree
-
-        
-
-
-
-        # Parse each device into separate DeviceConfiguration objects
-        for child in root.iter("device"):
-            device = Device(self)
-            device.from_xml(child, data)
-            self.devices[device.device_guid] = device
-
-            # add any missing modes
-            for mode in mode_list:
-                if not mode in device.modes:
-                    mode_entry = Mode(device)
-                    mode_entry.name = mode
-                    device.modes[mode] = mode_entry
-
-
-        # Parse each vjoy device into separate DeviceConfiguration objects
-        for child in root.iter("vjoy-device"):
-            device = Device(self)
-            device.from_xml(child, data)
-            self.vjoy_devices[device.device_guid] = device
-
-        # parse simconnect startup entries
-        self._simconnect_modes = {}
-        for child in root.iter("simconnect"):
-            key_cp = safe_read(child,"key_cp",str)
-            key_ap = safe_read(child,"key_ap",str)
-            mode = safe_read(child,"mode")
-            key = (key_cp, key_ap)
-            self._simconnect_modes[key] = mode
-
-
-
+        mode_list = list(mode_node_map.keys())
 
         # Ensure that the profile contains an entry for every existing
         # device even if it was not part of the loaded XML and
@@ -2816,17 +2917,7 @@ class Profile():
                     new_device.device_guid = dev.device_guid
                     self.devices[dev.device_guid] = new_device
 
-                # Create required mode objects
-                if not mode_list:
-                    mode_list = gremlin.profile.mode_list()
-                for mode in mode_list:
-                    if mode not in new_device.modes:
-                        mode_object = Mode(new_device)
-                        mode_object.name = mode
-                        new_device.modes[mode] = mode_object
-                        if mode in mode_node_map:
-                            mode_node_map[mode].mode_object = mode_object
-                        
+                      
 
         # Parse merge axis entries
         for child in root.iter("merge-axis"):
@@ -2850,11 +2941,25 @@ class Profile():
         name, _ = os.path.splitext(os.path.basename(fname))
         self._profile_name = name
 
+        # update missing modes from devices
+        for device in self.devices.values():
+            device_modes = [mode.name for mode in device.modes.values()]
+            missing_modes = [mode for mode in mode_list if not mode in device_modes]
+            for mode_name in missing_modes:
+                mode = Mode(device)
+                mode.name = mode_name
+                node = nodes[mode_name]
+                if node.parent and node.parent.name:
+                    mode.inherit = node.parent.name
+                device.modes[mode_name] = mode
+
+
+        # load the mode tree
+        self.reload_modes(update_devices = True)
+
         # have config use updated profile settings
         config = gremlin.config.Configuration()
         config.ensure_profile(self)
-
-
         return profile_was_updated
     
 
