@@ -118,7 +118,7 @@ os.chdir(install_path)
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t17"
+APPLICATION_BASE = "m73t18"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 

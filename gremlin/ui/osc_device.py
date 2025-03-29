@@ -1,3 +1,5 @@
+
+
 # -*- coding: utf-8; -*-
 
 # Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
@@ -24,59 +26,62 @@ import gremlin.base_classes
 import gremlin.config
 import gremlin.event_handler
 import gremlin.input_devices
+import gremlin.input_devices
 import gremlin.shared_state
+import gremlin.shared_state
+from gremlin.types import DeviceType
 from gremlin.input_types import InputType
+import gremlin.shared_state
+from gremlin.keyboard import Key
 import gremlin.ui.joystick_device
 import gremlin.base_profile
 import uuid
 from gremlin.singleton_decorator import SingletonDecorator
 import collections
+import logging
 import re
 import time
-from typing import (
-    overload,
-    List,
-    Any,
-    Tuple,
-    Callable,
-    Optional,
-    Iterator,
-    Union,
-    cast,
-    Coroutine,
-    NamedTuple,
-)
+from typing import overload, List, Union, Any, Generator, Tuple, Callable, Optional, DefaultDict, Iterator, Union, cast, Coroutine, NamedTuple
+import logging
+from typing import Any, Iterator, List, Union
 import asyncio
 from asyncio import BaseEventLoop
 
 import socketserver
 import socket
 from socket import socket as _socket
+import sys
 import os
 from collections.abc import Iterable
 import struct
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 import gremlin.ui.ui_common
-# from gremlin.util import *
+from gremlin.util import *
 from lxml import etree as ElementTree
 
 import enum
 from gremlin.base_classes import AbstractInputItem
 import gremlin.util
+import vjoy
+import vjoy.vjoy
 
 syslog = logging.getLogger("system")
 
-### OSC handler start -------------------------------------------------------
-# Adapted from: Python-OSC  https://github.com/attwad/python-osc
+### OSC handler start ------------------------------------------------------- 
+# Adapted from: Python-OSC  https://github.com/attwad/python-osc 
 # Credits go to AttWad
 # ####
+
+
 
 
 ### ----------------------------------------------------------- OSC server stuff ----------------------------------------------------------
 
 
+
 ### PARSING ###
+
 
 
 """Parsing and conversion of NTP dates contained in datagrams."""
@@ -84,11 +89,11 @@ syslog = logging.getLogger("system")
 
 # 63 zero bits followed by a one in the least signifigant bit is a special
 # case meaning "immediately."
-IMMEDIATELY = struct.pack(">Q", 1)
+IMMEDIATELY = struct.pack('>Q', 1)
 
 # timetag * (1 / 2 ** 32) == l32bits + (r32bits / 1 ** 32)
-_NTP_TIMESTAMP_TO_SECONDS = 1.0 / 2.0**32.0
-_SECONDS_TO_NTP_TIMESTAMP = 2.0**32.0
+_NTP_TIMESTAMP_TO_SECONDS = 1. / 2. ** 32.
+_SECONDS_TO_NTP_TIMESTAMP = 2. ** 32.
 
 # From NTP lib.
 _SYSTEM_EPOCH = datetime(*time.gmtime(0)[0:3])
@@ -97,54 +102,56 @@ _NTP_EPOCH = datetime(1900, 1, 1)
 _NTP_DELTA = (_SYSTEM_EPOCH - _NTP_EPOCH).days * 24 * 3600
 
 
-Timestamp = NamedTuple(
-    "Timestamp",
-    [
-        ("seconds", int),
-        ("fraction", int),
-    ],
-)
+Timestamp = NamedTuple('Timestamp', [
+    ('seconds', int),
+    ('fraction', int),
+])
 
 
 class NtpError(Exception):
     """Base class for ntp module errors."""
-
     pass
 
 
 def parse_timestamp(timestamp: int) -> Timestamp:
-    """Parse NTP timestamp as Timetag."""
+    """Parse NTP timestamp as Timetag.
+    """
     seconds = timestamp >> 32
     fraction = timestamp & 0xFFFFFFFF
     return Timestamp(seconds, fraction)
 
 
 def ntp_to_system_time(timestamp: bytes) -> float:
-    """Convert a NTP timestamp to system time in seconds."""
+    """Convert a NTP timestamp to system time in seconds.
+    """
     try:
-        timestamp = struct.unpack(">Q", timestamp)[0]
+        timestamp = struct.unpack('>Q', timestamp)[0]
     except Exception as e:
         raise NtpError(e)
     return timestamp * _NTP_TIMESTAMP_TO_SECONDS - _NTP_DELTA
 
 
 def system_time_to_ntp(seconds: float) -> bytes:
-    """Convert a system time in seconds to NTP timestamp."""
+    """Convert a system time in seconds to NTP timestamp.
+    """
     try:
         seconds = seconds + _NTP_DELTA
     except TypeError as e:
         raise NtpError(e)
-    return struct.pack(">Q", int(seconds * _SECONDS_TO_NTP_TIMESTAMP))
+    return struct.pack('>Q', int(seconds * _SECONDS_TO_NTP_TIMESTAMP))
 
 
 def ntp_time_to_system_epoch(seconds: float) -> float:
-    """Convert a NTP time in seconds to system time in seconds."""
+    """Convert a NTP time in seconds to system time in seconds.
+    """
     return seconds - _NTP_DELTA
 
 
 def system_time_to_ntp_epoch(seconds: float) -> float:
-    """Convert a system time in seconds to NTP time in seconds."""
+    """Convert a system time in seconds to NTP time in seconds.
+    """
     return seconds + _NTP_DELTA
+
 
 
 MidiPacket = Tuple[int, int, int, int]
@@ -171,7 +178,7 @@ _TIMETAG_DGRAM_LEN = 8
 # Strings and blob dgram length is always a multiple of 4 bytes.
 _STRING_DGRAM_PAD = 4
 _BLOB_DGRAM_PAD = 4
-_EMPTY_STR_DGRAM = b"\x00\x00\x00\x00"
+_EMPTY_STR_DGRAM = b'\x00\x00\x00\x00'
 
 
 def write_string(val: str) -> bytes:
@@ -181,11 +188,11 @@ def write_string(val: str) -> bytes:
     - BuildError if the string could not be encoded.
     """
     try:
-        dgram = val.encode("utf-8")  # Default, but better be explicit.
+        dgram = val.encode('utf-8')  # Default, but better be explicit.
     except (UnicodeEncodeError, AttributeError) as e:
-        raise OscBuildError("Incorrect string, could not encode {}".format(e))
+        raise OscBuildError('Incorrect string, could not encode {}'.format(e))
     diff = _STRING_DGRAM_PAD - (len(dgram) % _STRING_DGRAM_PAD)
-    dgram += b"\x00" * diff
+    dgram += (b'\x00' * diff)
     return dgram
 
 
@@ -208,31 +215,29 @@ def get_string(dgram: bytes, start_index: int) -> Tuple[str, int]:
     ParseError if the datagram could not be parsed.
     """
     if start_index < 0:
-        raise OscParseError("start_index < 0")
+        raise OscParseError('start_index < 0')
     offset = 0
     try:
-        if (
-            len(dgram) > start_index + _STRING_DGRAM_PAD
-            and dgram[start_index + _STRING_DGRAM_PAD] == _EMPTY_STR_DGRAM
-        ):
-            return "", start_index + _STRING_DGRAM_PAD
+        if (len(dgram) > start_index + _STRING_DGRAM_PAD
+                and dgram[start_index + _STRING_DGRAM_PAD] == _EMPTY_STR_DGRAM):
+            return '', start_index + _STRING_DGRAM_PAD
         while dgram[start_index + offset] != 0:
             offset += 1
         # Align to a byte word.
         if (offset) % _STRING_DGRAM_PAD == 0:
             offset += _STRING_DGRAM_PAD
         else:
-            offset += -offset % _STRING_DGRAM_PAD
+            offset += (-offset % _STRING_DGRAM_PAD)
         # Python slices do not raise an IndexError past the last index,
         # do it ourselves.
         if offset > len(dgram[start_index:]):
-            raise OscParseError("Datagram is too short")
-        data_str = dgram[start_index : start_index + offset]
-        return data_str.replace(b"\x00", b"").decode("utf-8"), start_index + offset
+            raise OscParseError('Datagram is too short')
+        data_str = dgram[start_index:start_index + offset]
+        return data_str.replace(b'\x00', b'').decode('utf-8'), start_index + offset
     except IndexError as ie:
-        raise OscParseError(f"Could not parse datagram {ie}")
+        raise OscParseError(f'Could not parse datagram {ie}')
     except TypeError as te:
-        raise OscParseError(f"Could not parse datagram {te}")
+        raise OscParseError(f'Could not parse datagram {te}')
 
 
 def write_int(val: int) -> bytes:
@@ -242,9 +247,9 @@ def write_int(val: int) -> bytes:
     - BuildError if the int could not be converted.
     """
     try:
-        return struct.pack(">i", val)
+        return struct.pack('>i', val)
     except struct.error as e:
-        raise OscBuildError(f"Wrong argument value passed: {e}")
+        raise OscBuildError(f'Wrong argument value passed: {e}')
 
 
 def get_int(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -262,11 +267,11 @@ def get_int(dgram: bytes, start_index: int) -> Tuple[int, int]:
     """
     try:
         if len(dgram[start_index:]) < _INT_DGRAM_LEN:
-            raise OscParseError("Datagram is too short")
+            raise OscParseError('Datagram is too short')
         return (
-            struct.unpack(">i", dgram[start_index : start_index + _INT_DGRAM_LEN])[0],
-            start_index + _INT_DGRAM_LEN,
-        )
+            struct.unpack('>i',
+                        dgram[start_index:start_index + _INT_DGRAM_LEN])[0],
+            start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
         raise OscParseError(f"Could not parse datagram {e}")
 
@@ -278,9 +283,9 @@ def write_int64(val: int) -> bytes:
     - BuildError if the int64 could not be converted.
     """
     try:
-        return struct.pack(">q", val)
+        return struct.pack('>q', val)
     except struct.error as e:
-        raise OscBuildError(f"Wrong argument value passed: {e}")
+        raise OscBuildError(f'Wrong argument value passed: {e}')
 
 
 def get_int64(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -298,11 +303,11 @@ def get_int64(dgram: bytes, start_index: int) -> Tuple[int, int]:
     """
     try:
         if len(dgram[start_index:]) < _INT64_DGRAM_LEN:
-            raise OscParseError("Datagram is too short")
+            raise OscParseError('Datagram is too short')
         return (
-            struct.unpack(">q", dgram[start_index : start_index + _INT64_DGRAM_LEN])[0],
-            start_index + _INT64_DGRAM_LEN,
-        )
+            struct.unpack('>q',
+                        dgram[start_index:start_index + _INT64_DGRAM_LEN])[0],
+            start_index + _INT64_DGRAM_LEN)
     except (struct.error, TypeError) as e:
         raise OscParseError(f"Could not parse datagram {e}")
 
@@ -322,15 +327,13 @@ def get_uint64(dgram: bytes, start_index: int) -> Tuple[int, int]:
     """
     try:
         if len(dgram[start_index:]) < _UINT64_DGRAM_LEN:
-            raise OscParseError("Datagram is too short")
+            raise OscParseError('Datagram is too short')
         return (
-            struct.unpack(">Q", dgram[start_index : start_index + _UINT64_DGRAM_LEN])[
-                0
-            ],
-            start_index + _UINT64_DGRAM_LEN,
-        )
+            struct.unpack('>Q',
+                        dgram[start_index:start_index + _UINT64_DGRAM_LEN])[0],
+            start_index + _UINT64_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError(f"Could not parse datagram {e}")
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], int]:
@@ -349,7 +352,7 @@ def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], i
     """
     try:
         if len(dgram[start_index:]) < _TIMETAG_DGRAM_LEN:
-            raise OscParseError("Datagram is too short")
+            raise OscParseError('Datagram is too short')
 
         timetag, _ = get_uint64(dgram, start_index)
         seconds, fraction = parse_timestamp(timetag)
@@ -357,13 +360,12 @@ def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], i
         hours, seconds = seconds // 3600, seconds % 3600
         minutes, seconds = seconds // 60, seconds % 60
 
-        utc = datetime.combine(_NTP_EPOCH, datetime.min.time()) + timedelta(
-            hours=hours, minutes=minutes, seconds=seconds
-        )
+        utc = (datetime.combine(_NTP_EPOCH, datetime.min.time()) +
+            timedelta(hours=hours, minutes=minutes, seconds=seconds))
 
         return (utc, fraction), start_index + _TIMETAG_DGRAM_LEN
     except (struct.error, TypeError) as e:
-        raise OscParseError(f"Could not parse datagram {e}")
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 def write_float(val: float) -> bytes:
@@ -373,9 +375,9 @@ def write_float(val: float) -> bytes:
     - BuildError if the float could not be converted.
     """
     try:
-        return struct.pack(">f", val)
+        return struct.pack('>f', val)
     except struct.error as e:
-        raise OscBuildError(f"Wrong argument value passed: {e}")
+        raise OscBuildError(f'Wrong argument value passed: {e}')
 
 
 def get_float(dgram: bytes, start_index: int) -> Tuple[float, int]:
@@ -396,13 +398,13 @@ def get_float(dgram: bytes, start_index: int) -> Tuple[float, int]:
             # Noticed that Reaktor doesn't send the last bunch of \x00 needed to make
             # the float representation complete in some cases, thus we pad here to
             # account for that.
-            dgram = dgram + b"\x00" * (_FLOAT_DGRAM_LEN - len(dgram[start_index:]))
+            dgram = dgram + b'\x00' * (_FLOAT_DGRAM_LEN - len(dgram[start_index:]))
         return (
-            struct.unpack(">f", dgram[start_index : start_index + _FLOAT_DGRAM_LEN])[0],
-            start_index + _FLOAT_DGRAM_LEN,
-        )
+            struct.unpack('>f',
+                        dgram[start_index:start_index + _FLOAT_DGRAM_LEN])[0],
+            start_index + _FLOAT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError(f"Could not parse datagram {e}")
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 def write_double(val: float) -> bytes:
@@ -412,9 +414,9 @@ def write_double(val: float) -> bytes:
     - BuildError if the double could not be converted.
     """
     try:
-        return struct.pack(">d", val)
+        return struct.pack('>d', val)
     except struct.error as e:
-        raise OscBuildError(f"Wrong argument value passed: {e}")
+        raise OscBuildError(f'Wrong argument value passed: {e}')
 
 
 def get_double(dgram: bytes, start_index: int) -> Tuple[float, int]:
@@ -432,19 +434,17 @@ def get_double(dgram: bytes, start_index: int) -> Tuple[float, int]:
     """
     try:
         if len(dgram[start_index:]) < _DOUBLE_DGRAM_LEN:
-            raise OscParseError("Datagram is too short")
+            raise OscParseError('Datagram is too short')
         return (
-            struct.unpack(">d", dgram[start_index : start_index + _DOUBLE_DGRAM_LEN])[
-                0
-            ],
-            start_index + _DOUBLE_DGRAM_LEN,
-        )
+            struct.unpack('>d',
+                        dgram[start_index:start_index + _DOUBLE_DGRAM_LEN])[0],
+            start_index + _DOUBLE_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError("Could not parse datagram {}".format(e))
+        raise OscParseError('Could not parse datagram {}'.format(e))
 
 
 def get_blob(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
-    """Get a blob from the datagram.
+    """ Get a blob from the datagram.
 
     According to the specifications, a blob is made of
     "an int32 size count, followed by that many 8-bit bytes of arbitrary
@@ -466,8 +466,8 @@ def get_blob(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
     total_size = size + (-size % _BLOB_DGRAM_PAD)
     end_index = int_offset + size
     if end_index - start_index > len(dgram[start_index:]):
-        raise OscParseError("Datagram is too short.")
-    return dgram[int_offset : int_offset + size], int_offset + total_size
+        raise OscParseError('Datagram is too short.')
+    return dgram[int_offset:int_offset + size], int_offset + total_size
 
 
 def write_blob(val: bytes) -> bytes:
@@ -477,11 +477,11 @@ def write_blob(val: bytes) -> bytes:
     - BuildError if the value was empty or if its size didn't fit an OSC int.
     """
     if not val:
-        raise OscBuildError("Blob value cannot be empty")
+        raise OscBuildError('Blob value cannot be empty')
     dgram = write_int(len(val))
     dgram += val
     while len(dgram) % _BLOB_DGRAM_PAD != 0:
-        dgram += b"\x00"
+        dgram += b'\x00'
     return dgram
 
 
@@ -505,10 +505,10 @@ def get_date(dgram: bytes, start_index: int) -> Tuple[float, int]:
     ParseError if the datagram could not be parsed.
     """
     # Check for the special case first.
-    if dgram[start_index : start_index + _TIMETAG_DGRAM_LEN] == IMMEDIATELY:
+    if dgram[start_index:start_index + _TIMETAG_DGRAM_LEN] == IMMEDIATELY:
         return IMMEDIATELY, start_index + _TIMETAG_DGRAM_LEN
     if len(dgram[start_index:]) < _TIMETAG_DGRAM_LEN:
-        raise OscParseError("Datagram is too short")
+        raise OscParseError('Datagram is too short')
     timetag, start_index = get_uint64(dgram, start_index)
     seconds = timetag * _NTP_TIMESTAMP_TO_SECONDS
     return ntp_time_to_system_epoch(seconds), start_index
@@ -531,9 +531,9 @@ def write_rgba(val: bytes) -> bytes:
     - BuildError if the int could not be converted.
     """
     try:
-        return struct.pack(">I", val)
+        return struct.pack('>I', val)
     except struct.error as e:
-        raise OscBuildError("Wrong argument value passed: {}".format(e))
+        raise OscBuildError('Wrong argument value passed: {}'.format(e))
 
 
 def get_rgba(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
@@ -551,13 +551,13 @@ def get_rgba(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
     """
     try:
         if len(dgram[start_index:]) < _INT_DGRAM_LEN:
-            raise OscParseError("Datagram is too short")
+            raise OscParseError('Datagram is too short')
         return (
-            struct.unpack(">I", dgram[start_index : start_index + _INT_DGRAM_LEN])[0],
-            start_index + _INT_DGRAM_LEN,
-        )
+            struct.unpack('>I',
+                        dgram[start_index:start_index + _INT_DGRAM_LEN])[0],
+            start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError(f"Could not parse datagram {e}")
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 def write_midi(val: MidiPacket) -> bytes:
@@ -570,12 +570,12 @@ def write_midi(val: MidiPacket) -> bytes:
 
     """
     if len(val) != 4:
-        raise OscBuildError("MIDI message length is invalid")
+        raise OscBuildError('MIDI message length is invalid')
     try:
         value = sum((value & 0xFF) << 8 * (3 - pos) for pos, value in enumerate(val))
-        return struct.pack(">I", value)
+        return struct.pack('>I', value)
     except struct.error as e:
-        raise OscBuildError("Wrong argument value passed: {}".format(e))
+        raise OscBuildError('Wrong argument value passed: {}'.format(e))
 
 
 def get_midi(dgram: bytes, start_index: int) -> Tuple[MidiPacket, int]:
@@ -593,19 +593,26 @@ def get_midi(dgram: bytes, start_index: int) -> Tuple[MidiPacket, int]:
     """
     try:
         if len(dgram[start_index:]) < _INT_DGRAM_LEN:
-            raise OscParseError("Datagram is too short")
-        val = struct.unpack(">I", dgram[start_index : start_index + _INT_DGRAM_LEN])[0]
+            raise OscParseError('Datagram is too short')
+        val = struct.unpack('>I',
+                            dgram[start_index:start_index + _INT_DGRAM_LEN])[0]
         midi_msg = cast(
-            MidiPacket, tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1))
-        )
+            MidiPacket,
+            tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1)))
         return (midi_msg, start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError(f"Could not parse datagram {e}")
+        raise OscParseError(f'Could not parse datagram {e}')
+
+
+
 
 
 ### OSC MESSAGE ###
 
 """Representation of an OSC message in a pythonesque way."""
+
+
+
 
 
 class OscMessage(object):
@@ -629,7 +636,7 @@ class OscMessage(object):
 
             # Get the parameters types.
             type_tag, index = get_string(self._dgram, index)
-            if type_tag.startswith(","):
+            if type_tag.startswith(','):
                 type_tag = type_tag[1:]
 
             params = []  # type: List[Any]
@@ -667,23 +674,19 @@ class OscMessage(object):
                     param_stack.append(array)
                 elif param == "]":  # Array stop.
                     if len(param_stack) < 2:
-                        raise OscParseError(
-                            f"Unexpected closing bracket in type tag: {type_tag}"
-                        )
+                        raise OscParseError(f'Unexpected closing bracket in type tag: {type_tag}')
                     param_stack.pop()
                 # TODO: Support more exotic types as described in the specification.
                 else:
-                    syslog.warning(f"Unhandled parameter type: {param}")
+                    syslog.warning(f'Unhandled parameter type: {param}')
                     continue
                 if param not in "[]":
                     param_stack[-1].append(val)
             if len(param_stack) != 1:
-                raise OscParseError(
-                    "Missing closing bracket in type tag: {0}".format(type_tag)
-                )
+                raise OscParseError('Missing closing bracket in type tag: {0}'.format(type_tag))
             self._parameters = params
         except OscParseError as pe:
-            raise OscParseError("Found incorrect datagram, ignoring it", pe)
+            raise OscParseError('Found incorrect datagram, ignoring it', pe)
 
     @property
     def address(self) -> str:
@@ -693,7 +696,7 @@ class OscMessage(object):
     @staticmethod
     def dgram_is_message(dgram: bytes) -> bool:
         """Returns whether this datagram starts as an OSC message."""
-        return dgram.startswith(b"/")
+        return dgram.startswith(b'/')
 
     @property
     def size(self) -> int:
@@ -715,6 +718,7 @@ class OscMessage(object):
         return iter(self._parameters)
 
 
+
 ### OSC PACKET ###
 
 """Use OSC packets to parse incoming UDP packets into messages or bundles.
@@ -727,13 +731,10 @@ It lets you access easily to OscMessage and OscBundle instances in the packet.
 # 1) the system time at which the message should be executed
 #    in seconds since the epoch.
 # 2) the actual message.
-TimedMessage = NamedTuple(
-    "TimedMessage",
-    [
-        ("time", float),
-        ("message", OscMessage),
-    ],
-)
+TimedMessage = NamedTuple('TimedMessage', [
+    ('time', float),
+    ('message', OscMessage),
+])
 
 
 def _timed_msg_of_bundle(bundle, now: float) -> List[TimedMessage]:
@@ -741,13 +742,14 @@ def _timed_msg_of_bundle(bundle, now: float) -> List[TimedMessage]:
     msgs = []
     for content in bundle:
         if type(content) is OscMessage:
-            if bundle.timestamp == IMMEDIATELY or bundle.timestamp < now:
+            if (bundle.timestamp == IMMEDIATELY or bundle.timestamp < now):
                 msgs.append(TimedMessage(now, content))
             else:
                 msgs.append(TimedMessage(bundle.timestamp, content))
         else:
             msgs.extend(_timed_msg_of_bundle(content, now))
     return msgs
+
 
 
 class OscPacket(object):
@@ -770,18 +772,17 @@ class OscPacket(object):
         try:
             if OscBundle.dgram_is_bundle(dgram):
                 self._messages = sorted(
-                    _timed_msg_of_bundle(OscBundle(dgram), now), key=lambda x: x.time
-                )
+                    _timed_msg_of_bundle(OscBundle(dgram), now),
+                    key=lambda x: x.time)
             elif OscMessage.dgram_is_message(dgram):
                 self._messages = [TimedMessage(now, OscMessage(dgram))]
             else:
                 # Empty packet, should not happen as per the spec but heh, UDP...
                 raise OscParseError(
-                    "OSC Packet should at least contain an OscMessage or an "
-                    "OscBundle."
-                )
+                    'OSC Packet should at least contain an OscMessage or an '
+                    'OscBundle.')
         except (OscParseError, OscParseError) as e:
-            raise OscParseError(f"Could not parse packet {e}")
+            raise OscParseError(f'Could not parse packet {e}')
 
     @property
     def messages(self) -> List:
@@ -789,10 +790,12 @@ class OscPacket(object):
         return self._messages
 
 
+
 ### OSC BUNDLE ###
 
 
 _BUNDLE_PREFIX = b"#bundle\x00"
+
 
 
 class OscBundle(object):
@@ -832,7 +835,7 @@ class OscBundle(object):
                 # Get the sub content size.
                 content_size, index = get_int(self._dgram, index)
                 # Get the datagram for the sub content.
-                content_dgram = self._dgram[index : index + content_size]
+                content_dgram = self._dgram[index:index + content_size]
                 # Increment our position index up to the next possible content.
                 index += content_size
                 # Parse the content into an OSC message or bundle.
@@ -841,9 +844,7 @@ class OscBundle(object):
                 elif OscMessage.dgram_is_message(content_dgram):
                     contents.append(OscMessage(content_dgram))
                 else:
-                    logging.warning(
-                        f"Could not identify content type of dgram {content_dgram}"
-                    )
+                    logging.warning(f"Could not identify content type of dgram {content_dgram}")
         except (OscParseError, OscParseError, IndexError) as e:
             raise OscParseError(f"Could not parse a content datagram: {e}")
 
@@ -883,9 +884,13 @@ class OscBundle(object):
         return iter(self._contents)
 
 
+
+
+
 ### OSC BUNDLE BUILDER ###
 
 """Build OSC bundles for client applications."""
+
 
 
 # Shortcut to specify an immediate execution of messages in the bundle.
@@ -922,22 +927,24 @@ class OscBundleBuilder(object):
         Raises:
         - BuildError: if we could not build the bundle.
         """
-        dgram = b"#bundle\x00"
+        dgram = b'#bundle\x00'
         try:
             dgram += write_date(self._timestamp)
             for content in self._contents:
-                if type(content) == OscMessage or type(content) == OscBundle:
+                if (type(content) == OscMessage
+                        or type(content) == OscBundle):
                     size = content.size
                     dgram += write_int(size)
                     dgram += content.dgram
                 else:
                     raise OscBuildError(
                         "Content must be either OscBundle or OscMessage"
-                        "found {}".format(type(content))
-                    )
+                        "found {}".format(type(content)))
             return OscBundle(dgram)
         except OscBuildError as be:
-            raise OscBuildError(f"Could not build the bundle {be}")
+            raise OscBuildError(f'Could not build the bundle {be}')
+
+
 
 
 ### OSC MESSAGE BUILDER ###
@@ -947,10 +954,8 @@ class OscBundleBuilder(object):
 
 ArgValue = Union[str, bytes, bool, int, float, MidiPacket, list]
 
-
 class OscBuildError(Exception):
     """Error raised when an incomplete message is trying to be built."""
-
 
 class OscMessageBuilder(object):
     """Builds arbitrary OscMessage instances."""
@@ -971,18 +976,8 @@ class OscMessageBuilder(object):
     ARG_TYPE_ARRAY_STOP = "]"
 
     _SUPPORTED_ARG_TYPES = (
-        ARG_TYPE_FLOAT,
-        ARG_TYPE_DOUBLE,
-        ARG_TYPE_INT,
-        ARG_TYPE_INT64,
-        ARG_TYPE_BLOB,
-        ARG_TYPE_STRING,
-        ARG_TYPE_RGBA,
-        ARG_TYPE_MIDI,
-        ARG_TYPE_TRUE,
-        ARG_TYPE_FALSE,
-        ARG_TYPE_NIL,
-    )
+        ARG_TYPE_FLOAT, ARG_TYPE_DOUBLE, ARG_TYPE_INT, ARG_TYPE_INT64, ARG_TYPE_BLOB, ARG_TYPE_STRING,
+        ARG_TYPE_RGBA, ARG_TYPE_MIDI, ARG_TYPE_TRUE, ARG_TYPE_FALSE, ARG_TYPE_NIL)
 
     def __init__(self, address: Optional[str] = None) -> None:
         """Initialize a new builder for a message.
@@ -1030,10 +1025,8 @@ class OscMessageBuilder(object):
         """
         if arg_type and not self._valid_type(arg_type):
             raise ValueError(
-                "arg_type must be one of {}, or an array of valid types".format(
-                    self._SUPPORTED_ARG_TYPES
-                )
-            )
+                'arg_type must be one of {}, or an array of valid types'
+                    .format(self._SUPPORTED_ARG_TYPES))
         if not arg_type:
             arg_type = self._get_arg_type(arg_value)
         if isinstance(arg_type, list):
@@ -1076,10 +1069,10 @@ class OscMessageBuilder(object):
         elif arg_value is None:
             arg_type = self.ARG_TYPE_NIL
         else:
-            raise ValueError("Infered arg_value type is not supported")
+            raise ValueError('Infered arg_value type is not supported')
         return arg_type
 
-    def build(self):  # -> OscMessage:
+    def build(self): #-> OscMessage:
         """Builds an OscMessage from the current state of this builder.
 
         Raises:
@@ -1090,18 +1083,18 @@ class OscMessageBuilder(object):
         - an OscMessage instance.
         """
         if not self._address:
-            raise OscBuildError("OSC addresses cannot be empty")
-        dgram = b""
+            raise OscBuildError('OSC addresses cannot be empty')
+        dgram = b''
         try:
             # Write the address.
             dgram += write_string(self._address)
             if not self._args:
-                dgram += write_string(",")
+                dgram += write_string(',')
                 return OscMessage(dgram)
 
             # Write the parameters.
             arg_types = "".join([arg[0] for arg in self._args])
-            dgram += write_string("," + arg_types)
+            dgram += write_string(',' + arg_types)
             for arg_type, value in self._args:
                 if arg_type == self.ARG_TYPE_STRING:
                     dgram += write_string(value)  # type: ignore[arg-type]
@@ -1119,25 +1112,28 @@ class OscMessageBuilder(object):
                     dgram += write_rgba(value)  # type: ignore[arg-type]
                 elif arg_type == self.ARG_TYPE_MIDI:
                     dgram += write_midi(value)  # type: ignore[arg-type]
-                elif arg_type in (
-                    self.ARG_TYPE_TRUE,
-                    self.ARG_TYPE_FALSE,
-                    self.ARG_TYPE_ARRAY_START,
-                    self.ARG_TYPE_ARRAY_STOP,
-                    self.ARG_TYPE_NIL,
-                ):
+                elif arg_type in (self.ARG_TYPE_TRUE,
+                                self.ARG_TYPE_FALSE,
+                                self.ARG_TYPE_ARRAY_START,
+                                self.ARG_TYPE_ARRAY_STOP,
+                                self.ARG_TYPE_NIL):
                     continue
                 else:
-                    raise OscBuildError(f"Incorrect parameter type found {arg_type}")
+                    raise OscBuildError(f'Incorrect parameter type found {arg_type}')
 
             return OscMessage(dgram)
         except OscBuildError as be:
-            raise OscBuildError(f"Could not build the message: {be}")
+            raise OscBuildError(f'Could not build the message: {be}')
+
+
+
 
 
 ### DISPATCHER ###
 """Maps OSC addresses to handler functions
 """
+
+
 
 
 class Handler(object):
@@ -1148,30 +1144,24 @@ class Handler(object):
     message if any were passed.
     """
 
-    def __init__(
-        self,
-        _callback: Callable,
-        _args: Union[Any, List[Any]],
-        _needs_reply_address: bool = False,
-    ) -> None:
+    def __init__(self, _callback: Callable, _args: Union[Any, List[Any]],
+                _needs_reply_address: bool = False) -> None:
         """
         Args:
             _callback Function that is called when handler is invoked
             _args: Message causing invocation
             _needs_reply_address Whether the client's ip address shall be passed as an argument or not
-        """
+    """
         self.callback = _callback
         self.args = _args
         self.needs_reply_address = _needs_reply_address
 
     # needed for test module
     def __eq__(self, other: Any) -> bool:
-        return (
-            type(self) == type(other)
-            and self.callback == other.callback
-            and self.args == other.args
-            and self.needs_reply_address == other.needs_reply_address
-        )
+        return (type(self) == type(other) and
+                self.callback == other.callback and
+                self.args == other.args and
+                self.needs_reply_address == other.needs_reply_address)
 
     def invoke(self, client_address: Tuple[str, int], message) -> None:
         """Invokes the associated callback function
@@ -1179,7 +1169,7 @@ class Handler(object):
         Args:
             client_address: Address match that causes the invocation
             message: Message causing invocation
-        """
+    """
         if self.needs_reply_address:
             if self.args:
                 self.callback(client_address, message.address, self.args, *message)
@@ -1202,13 +1192,8 @@ class OscDispatcher(object):
         self._map = collections.defaultdict(list)  # type: DefaultDict[str, List[Handler]]
         self._default_handler = None  # type: Optional[Handler]
 
-    def map(
-        self,
-        address: str,
-        handler: Callable,
-        *args: Union[Any, List[Any]],
-        needs_reply_address: bool = False,
-    ):
+    def map(self, address: str, handler: Callable, *args: Union[Any, List[Any]],
+            needs_reply_address: bool = False):
         """Map an address to a handler
 
         The callback function must have one of the following signatures:
@@ -1248,13 +1233,8 @@ class OscDispatcher(object):
         pass
 
     @overload
-    def unmap(
-        self,
-        address: str,
-        handler: Callable,
-        *args: Union[Any, List[Any]],
-        needs_reply_address: bool = False,
-    ) -> None:
+    def unmap(self, address: str, handler: Callable, *args: Union[Any, List[Any]],
+            needs_reply_address: bool = False) -> None:
         """Remove an already mapped handler from an address
 
         Args:
@@ -1273,14 +1253,10 @@ class OscDispatcher(object):
             if isinstance(handler, Handler):
                 self._map[address].remove(handler)
             else:
-                self._map[address].remove(
-                    Handler(handler, list(args), needs_reply_address)
-                )
+                self._map[address].remove(Handler(handler, list(args), needs_reply_address))
         except ValueError as e:
             if str(e) == "list.remove(x): x not in list":
-                raise ValueError(
-                    f"Address '{address}' doesn't have handler '{handler}' mapped to it"
-                ) from e
+                raise ValueError(f"Address '{address}' doesn't have handler '{handler}' mapped to it") from e
 
     def handlers_for_address(self, address_pattern: str):
         """Yields handlers matching an address
@@ -1297,31 +1273,27 @@ class OscDispatcher(object):
         # Let's consider numbers and _ "characters" too here, it's not said
         # explicitly in the specification but it sounds good.
         escaped_address_pattern = re.escape(address_pattern)
-        pattern = escaped_address_pattern.replace("\\?", "\\w?")
+        pattern = escaped_address_pattern.replace('\\?', '\\w?')
         # '*' in the OSC Address Pattern matches any sequence of zero or more
         # characters.
-        pattern = pattern.replace(r"\*", r"[\w|\+]*")
+        pattern = pattern.replace(r'\*', r'[\w|\+]*')
         # The rest of the syntax in the specification is like the re module so
         # we're fine.
-        pattern = pattern + "$"
+        pattern = pattern + '$'
         patterncompiled = re.compile(pattern)
         matched = False
 
         for addr, handlers in self._map.items():
-            if patterncompiled.match(addr) or (
-                ("*" in addr)
-                and re.match(addr.replace("*", "[^/]*?/*"), address_pattern)
-            ):
+            if (patterncompiled.match(addr)
+                    or (('*' in addr) and re.match(addr.replace('*', '[^/]*?/*'), address_pattern))):
                 yield from handlers
                 matched = True
 
         if not matched and self._default_handler:
-            logging.debug("No handler matched but default handler present, added it.")
+            logging.debug('No handler matched but default handler present, added it.')
             yield self._default_handler
 
-    def call_handlers_for_packet(
-        self, data: bytes, client_address: Tuple[str, int]
-    ) -> None:
+    def call_handlers_for_packet(self, data: bytes, client_address: Tuple[str, int]) -> None:
         """Invoke handlers for all messages in OSC packet
 
         The incoming OSC Packet is decoded and the handlers for each included message is found and invoked.
@@ -1336,7 +1308,8 @@ class OscDispatcher(object):
             packet = OscPacket(data)
             for timed_msg in packet.messages:
                 now = time.time()
-                handlers = self.handlers_for_address(timed_msg.message.address)
+                handlers = self.handlers_for_address(
+                    timed_msg.message.address)
                 if not handlers:
                     continue
                 # If the message is to be handled later, then so be it.
@@ -1347,9 +1320,7 @@ class OscDispatcher(object):
         except OscParseError:
             pass
 
-    def set_default_handler(
-        self, handler: Callable, needs_reply_address: bool = False
-    ) -> None:
+    def set_default_handler(self, handler: Callable, needs_reply_address: bool = False) -> None:
         """Sets the default handler
 
         The default handler is invoked every time no other handler is mapped to an address.
@@ -1358,15 +1329,17 @@ class OscDispatcher(object):
             handler: Callback function to handle unmapped requests
             needs_reply_address: Whether the callback shall be passed the client address
         """
-        self._default_handler = (
-            None if (handler is None) else Handler(handler, [], needs_reply_address)
-        )
+        self._default_handler = None if (handler is None) else Handler(handler, [], needs_reply_address)
+
+
+
 
 
 ### OSC SERVER ###
 
 """OSC Servers that receive UDP packets and invoke handlers accordingly.
 """
+
 
 
 _RequestType = Union[_socket, Tuple[bytes, _socket]]
@@ -1394,28 +1367,23 @@ def _is_valid_request(request: _RequestType) -> bool:
     Returns:
         True if request is OSC bundle or OSC message
     """
-    assert isinstance(
-        request, tuple
-    )  # TODO: handle requests which are passed just as a socket?
+    assert isinstance(request, tuple)  # TODO: handle requests which are passed just as a socket?
     data = request[0]
-    return OscBundle.dgram_is_bundle(data) or OscMessage.dgram_is_message(data)
+    return (
+            OscBundle.dgram_is_bundle(data)
+            or OscMessage.dgram_is_message(data))
 
 
 class OSCUDPServer(socketserver.UDPServer):
     """Superclass for different flavors of OSC UDP servers"""
 
-    def __init__(
-        self,
-        server_address: Tuple[str, int],
-        dispatcher,
-        bind_and_activate: bool = True,
-    ) -> None:
+    def __init__(self, server_address: Tuple[str, int], dispatcher, bind_and_activate: bool = True) -> None:
         """Initialize
 
         Args:
             server_address: IP and port of server
             dispatcher: Dispatcher this server will use
-            (optional) bind_and_activate: default=True defines if the server has to start on call of constructor
+            (optional) bind_and_activate: default=True defines if the server has to start on call of constructor  
         """
         super().__init__(server_address, _UDPHandler, bind_and_activate)
         self._dispatcher = dispatcher
@@ -1455,7 +1423,6 @@ class ThreadingOSCUDPServer(socketserver.ThreadingMixIn, OSCUDPServer):
 
 
 if hasattr(os, "fork"):
-
     class ForkingOSCUDPServer(socketserver.ForkingMixIn, OSCUDPServer):
         """Forking version of the OSC UDP server.
 
@@ -1465,15 +1432,13 @@ if hasattr(os, "fork"):
         """
 
 
-class AsyncIOOSCUDPServer:
+class AsyncIOOSCUDPServer():
     """Asynchronous OSC Server
 
     An asynchronous OSC Server using UDP. It creates a datagram endpoint that runs in an event loop.
     """
 
-    def __init__(
-        self, server_address: Tuple[str, int], dispatcher, loop: BaseEventLoop
-    ) -> None:
+    def __init__(self, server_address: Tuple[str, int], dispatcher, loop: BaseEventLoop) -> None:
         """Initialize
 
         Args:
@@ -1493,9 +1458,7 @@ class AsyncIOOSCUDPServer:
         def __init__(self, dispatcher) -> None:
             self.dispatcher = dispatcher
 
-        def datagram_received(
-            self, data: bytes, client_address: Tuple[str, int]
-        ) -> None:
+        def datagram_received(self, data: bytes, client_address: Tuple[str, int]) -> None:
             self.dispatcher.call_handlers_for_packet(data, client_address)
 
     def serve(self) -> None:
@@ -1506,11 +1469,7 @@ class AsyncIOOSCUDPServer:
         """
         self._loop.run_until_complete(self.create_serve_endpoint())
 
-    def create_serve_endpoint(
-        self,
-    ) -> Coroutine[
-        Any, Any, Tuple[asyncio.transports.BaseTransport, asyncio.DatagramProtocol]
-    ]:
+    def create_serve_endpoint(self) -> Coroutine[Any, Any, Tuple[asyncio.transports.BaseTransport, asyncio.DatagramProtocol]]:
         """Creates a datagram endpoint and registers it with event loop as coroutine.
 
         Returns:
@@ -1518,8 +1477,7 @@ class AsyncIOOSCUDPServer:
         """
         return self._loop.create_datagram_endpoint(
             lambda: self._OSCProtocolFactory(self.dispatcher),
-            local_addr=self._server_address,
-        )
+            local_addr=self._server_address)
 
     @property
     def dispatcher(self):
@@ -1530,17 +1488,10 @@ class AsyncIOOSCUDPServer:
 
 """UDP Clients for sending OSC messages to an OSC server"""
 
-
 class UDPClient(object):
     """OSC client to send :class:`OscMessage` or :class:`OscBundle` via UDP"""
 
-    def __init__(
-        self,
-        address: str,
-        port: int,
-        allow_broadcast: bool = False,
-        family: socket.AddressFamily = socket.AF_UNSPEC,
-    ) -> None:
+    def __init__(self, address: str, port: int, allow_broadcast: bool = False, family: socket.AddressFamily = socket.AF_UNSPEC) -> None:
         """Initialize client
 
         As this is UDP it will not actually make any attempt to connect to the
@@ -1553,9 +1504,7 @@ class UDPClient(object):
             family: address family parameter (passed to socket.getaddrinfo)
         """
 
-        for addr in socket.getaddrinfo(
-            address, port, type=socket.SOCK_DGRAM, family=family
-        ):
+        for addr in socket.getaddrinfo(address, port, type=socket.SOCK_DGRAM, family=family):
             af, socktype, protocol, canonname, sa = addr
 
             try:
@@ -1602,8 +1551,9 @@ class SimpleUDPClient(UDPClient):
         self.send(msg)
 
 
-class OscClient:
-    def __init__(self, host_ip="127.0.0.1", output_port=8001, name=None):
+class OscClient():
+    def __init__(self, host_ip = "127.0.0.1", output_port = 8001, name = None):
+     
         self._server_ip = host_ip
         self._output_port = output_port
         self._client = None
@@ -1613,35 +1563,31 @@ class OscClient:
     def setPort(self, port):
         self._output_port = port
 
-    def setHost(self, host: str):
+    def setHost(self, host : str):
         self._server_ip = host
 
-    def setName(self, value: str):
+    def setName(self, value : str):
         self._name = value
-
-    def start(self, server_ip=None, server_port=None):
-        """
+    
+    def start(self, server_ip = None, server_port = None):
+        '''
         starts the OSC client to send OSC commands
         :param server_ip = ip address of server in format xxx.xxx.xxx.xxx
         :param server_port = output port
-        """
+        '''
 
         if server_ip:
             self._server_ip = server_ip
         if server_port:
             self._output_port = server_port
-
+        
         # syslog = logging.getLogger("system")
         if self._server_ip is not None and self._output_port is not None:
             self._client = UDPClient(self._server_ip, self._output_port)
             self._started = True
-            syslog.info(
-                f"OSC client: {self._name} starting {self._server_ip} port: {self._output_port}"
-            )
+            syslog.info(f"OSC client: {self._name} starting {self._server_ip} port: {self._output_port}")
         else:
-            syslog.error(
-                f"OSC client: {self._name} Invalid OSC configuration, provide server IP and port #"
-            )
+            syslog.error(f"OSC client: {self._name} Invalid OSC configuration, provide server IP and port #")
 
     def stop(self):
         if self._started:
@@ -1649,6 +1595,7 @@ class OscClient:
             self._started = False
             # syslog = logging.getLogger("system")
             syslog.info("OSC client stop")
+        
 
     def add_arg(self, builder, value):
         if value is not None:
@@ -1665,25 +1612,25 @@ class OscClient:
                     builder.add_arg(value, OscMessageBuilder.ARG_TYPE_FALSE)
             else:
                 # syslog = logging.getLogger("system")
-                syslog.warning(
-                    f"OSC Argument: don't know how to handle {value} {type(value).__name__}"
-                )
+                syslog.warning(f"OSC Argument: don't know how to handle {value} {type(value).__name__}")
 
-    def send(self, command: str, v1=None, v2=None):
-        """sends an osc command
 
+    def send(self, command : str, v1 = None, v2 = None):
+        ''' sends an osc command
+        
         :param command : the OSC command to send (string)
         :param v1 : optional value 1 (type determines what is sent)
         :param v2 : optional value 2 (type determines what is sent)
-
-
-        """
+        
+        
+        '''
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if not self._started:
-            return  # not started
-
+            return # not started
+        
         if verbose:
+            
             msg = f"OSC (internal): Send OSC: {command}  target: {self._server_ip}  port: {self._output_port}"
             if v1 is not None:
                 msg += f" v1 {v1}"
@@ -1698,20 +1645,21 @@ class OscClient:
         osc = builder.build()
         self._send(osc)
 
+    
     def _send(self, content):
         self._client.send(content)
 
 
-class OscServer:
-    def _server_thread_loop(self):
-        """main threading loop"""
 
-        # syslog.info("OSC: server starting")
+class OscServer():
+
+    def _server_thread_loop(self):
+        ''' main threading loop '''
+        
+        #syslog.info("OSC: server starting")
         self._dispatcher = OscDispatcher()
         self._dispatcher.set_default_handler(self._callback)
-        self._server = BlockingOSCUDPServer(
-            (self._host_ip, self._input_port), self._dispatcher
-        )
+        self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
         syslog.info("OSC: server starting")
         # this blocks until the server is shutdown
         self._server.serve_forever()  # blocks until shutdown
@@ -1719,8 +1667,10 @@ class OscServer:
         syslog.info("OSC: server shutdown")
         self._server = None
 
+
+
     def __init__(self):
-        # syslog.info("OSC: server init")
+        #syslog.info("OSC: server init")
         self._server = None
         self._server_thread = None
         self._stop = False
@@ -1737,56 +1687,58 @@ class OscServer:
         eh = gremlin.event_handler.EventListener()
         eh.shutdown.connect(self._shutdown)
 
+
     @QtCore.Slot()
     def _shutdown(self):
-        """app shutdown received"""
+        ''' app shutdown received '''
         self.stop()
 
     @property
     def started(self):
-        """true if server is started or in the process of starting"""
+        ''' true if server is started or in the process of starting '''
         if self._lock.locked():
             syslog.info("OSC: server locked")
             return True
-
+        
         return self._running
 
     def start(self, host_ip, input_port, callback):
-        """starts the server on IP and port
-
+        ''' starts the server on IP and port 
+        
         :param host_ip = ip address of server in format xxx.xxx.xxx.xxx
         :param input_port = input port, numeric, default 8000
         :param callback = the callback to call when a message arrives
-
-        """
+        
+        '''
 
         with self._lock:
             # everything here is now locked until the server start is completed
 
-            # syslog.info("OSC: start requested")
+            #syslog.info("OSC: start requested")
             if self._running:
                 return
-
+            
             self._host_ip = host_ip
             self._input_port = input_port
             self._callback = callback
-
+            
             self._stop = False
-            self._server_thread = threading.Thread(
-                target=self._server_thread_loop, daemon=True
-            )
+            self._server_thread = threading.Thread(target=self._server_thread_loop, daemon=True)
             self._server_thread.setName("OSC server listener")
             self._server_thread.start()
             self._running = True
 
             # syslog = logging.getLogger("system")
-            syslog.info(f"OSC: start {self._host_ip} port {self._input_port}")
+            syslog.info(f"OSC: start {self._host_ip} port {self._input_port}")        
+
+
+
 
     def stop(self):
-        """stops the server"""
+        ''' stops the server '''
         if not self._running or self._start_requested:
             return
-        # syslog.info("OSC: stop requested")
+        #syslog.info("OSC: stop requested")
         self._stop = True
         if self._server:
             self._server.shutdown()
@@ -1795,55 +1747,60 @@ class OscServer:
         self._running = False
         syslog.info("OSC: server stopped")
 
+    
 
-"""  OscInterface ================================================================================================== """
 
+    
+'''  OscInterface ================================================================================================== '''
 
+    
 @SingletonDecorator
 class OscInterface(QtCore.QObject):
-    """GremlinEX Open Sound Control interface"""
+    ''' GremlinEX Open Sound Control interface '''
 
-    osc_message = QtCore.Signal(str, object)  # signal on receiving an osc message
+    osc_message = QtCore.Signal(str, object) # signal on receiving an osc message
 
     def __init__(self):
         super().__init__()
 
         # find our current IP address
-        self._host_ip = gremlin.util.getHostIp()
-
+        self._host_ip = gremlin.util.getHostIp() 
+        
+        
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
         config = gremlin.config.Configuration()
         self._started = False
         self._input_port = config.osc_input_port
-        self._output_port = config.osc_output_port  # self._input_port + 1
+        self._output_port = config.osc_output_port # self._input_port + 1
         self._target_ip = config.osc_host
         self._target_port = config.osc_output_port
-        self._osc_server = OscServer()  # the OSC server
-        self.osc_enabled = True  # always able to listen to ports
-        self._client_pool = {}  # pool of clients keyed by (ip,port)
-        self._osc_internal_client = self.getClient(
-            self._host_ip, self.output_port, "internal"
-        )  # the OSC internal client for loop messages
-        self._osc_client = self.getClient(
-            self._target_ip, self._target_port
-        )  # the default OSC client setup in the configuration file
+        self._osc_server = OscServer() # the OSC server
+        self.osc_enabled = True # always able to listen to ports
+        self._client_pool = {} # pool of clients keyed by (ip,port)
+        self._osc_internal_client = self.getClient(self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
+        self._osc_client = self.getClient(self._target_ip, self._target_port) # the default OSC client setup in the configuration file
 
         el = gremlin.event_handler.EventListener()
         el.request_osc.connect(self._request_osc_state)
         el.osc_input_port_changed.connect(self._input_port_changed)
         el.osc_output_port_changed.connect(self._output_port_changed)
         el.osc_output_server_changed.connect(self._output_server_changed)
+        
 
         self._started = False
+ 
+
 
     @QtCore.Slot(bool)
-    def _request_osc_state(self, state: bool):
+    def _request_osc_state(self, state : bool):
+        from gremlin.input_types import InputType
 
         if state:
             self.start()
         else:
             self.stop()
 
+   
     @QtCore.Slot()
     def _input_port_changed(self):
         config = gremlin.config.Configuration()
@@ -1875,10 +1832,13 @@ class OscInterface(QtCore.QObject):
 
         self.target_server = value
 
-    def getClient(self, server: str, port: int, name: str = None) -> OscClient:
-        """gets the client for that server/port"""
+
+    
+
+    def getClient(self, server : str, port : int, name : str = None) -> OscClient:
+        ''' gets the client for that server/port '''
         key = (server, port)
-        if key not in self._client_pool:
+        if not key in self._client_pool:
             client = OscClient(server, port, name)
             self._client_pool[key] = client
             verbose = gremlin.config.Configuration().verbose_mode_osc
@@ -1886,10 +1846,11 @@ class OscInterface(QtCore.QObject):
                 # syslog = logging.getLogger("system")
                 syslog.info(f"OSC: register client {key}")
 
-        return self._client_pool[key]
 
-    def closeClient(self, client: OscClient):
-        """removes a client from the pool"""
+        return self._client_pool[key]
+    
+    def closeClient(self, client : OscClient):
+        ''' removes a client from the pool '''
         if client is not None:
             key = (client._server_ip, client._output_port)
             if key in self._client_pool:
@@ -1900,13 +1861,14 @@ class OscInterface(QtCore.QObject):
                     syslog.info(f"OSC: unregister client {key}")
                 del self._client_pool[key]
 
+    
     def stopClients(self):
-        """stops all registered clients"""
+        ''' stops all registered clients '''
         for client in self._client_pool.values():
             client.stop()
 
-    def startClients(self, server=None, port=None):
-        """starts all registered clients"""
+    def startClients(self, server = None, port = None):
+        ''' starts all registered clients '''
         remove_list = []
         add_list = []
         for key, client in self._client_pool.items():
@@ -1931,11 +1893,12 @@ class OscInterface(QtCore.QObject):
     def host_ip(self):
         return self._host_ip
 
+
     @property
     def input_port(self):
-        """UDP input port to use for OSC messages - default is 8000"""
+        ''' UDP input port to use for OSC messages - default is 8000 '''
         return self._input_port
-
+    
     @input_port.setter
     def input_port(self, value):
         if value != self._input_port:
@@ -1943,156 +1906,148 @@ class OscInterface(QtCore.QObject):
             self.stop()
             self.start()
 
+
     @property
     def output_port(self):
-        """UDP output port to use for OSC messages - default is 8001"""
+        ''' UDP output port to use for OSC messages - default is 8001 '''
         return self._output_port
-
     @output_port.setter
     def output_port(self, value):
         if value != self._output_port:
             self._output_port = value
             self.stopClients()
             self.startClients(self.target_server, value)
-
+        
     @property
     def target_server(self):
         return self._target_ip
-
     @target_server.setter
-    def target_server(self, value: str):
+    def target_server(self, value:str):
         if value != self._target_ip:
             self._target_ip = value
             self.stopClients()
             self.startClients(value, self.output_port)
-
+    
     @property
     def host_ip(self):
-        """host ip in string form xxx.xxx.xxx.xxx"""
+        ''' host ip in string form xxx.xxx.xxx.xxx'''
         return self._host_ip
-
+    
     @host_ip.setter
     def host_ip(self, value):
         self._host_ip = value
 
     def log(msg):
-        """displays a log message in Gremlin and in the console"""
+        ''' displays a log message in Gremlin and in the console '''
         syslog.info(msg)
 
     def _osc_message_handler(self, address, *args):
-        """handles internal OSC messages"""
+        ''' handles internal OSC messages'''
         verbose = gremlin.config.Configuration().verbose_mode_osc
-        if verbose:
-            syslog.info(f"OSC: {address}: {args}")
+        if verbose: syslog.info(f"OSC: {address}: {args}")
         address = address.casefold()
         if address == "/noop":
             # heartbeat
-            # syslog.info(f"OSC: tick")
+            #syslog.info(f"OSC: tick") 
             return
         self.osc_message.emit(address, args)
 
     def start(self):
-        """starts listening to OSC messages"""
+        ''' starts listening to OSC messages '''
 
         if not self._started:
-            syslog.info(
-                f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}"
-            )
-            self._osc_server.start(
-                self._host_ip, self._input_port, self._osc_message_handler
-            )
+            syslog.info(f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
+            self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
             self.startClients()
             self._started = True
             el = gremlin.event_handler.EventListener()
             el.heartbeat.connect(self._keep_alive)
+            
+            
 
     def _keep_alive(self):
         if self._started:
             self._osc_internal_client.send("/noop")
+            
 
     def stop(self):
-        """stops listencing to OSC messages"""
+        ''' stops listencing to OSC messages '''
         if self._started:
+
             self._osc_server.stop()
             self.stopClients()
             self._started = False
             el = gremlin.event_handler.EventListener()
             el.heartbeat.disconnect(self._keep_alive)
+            
 
-    def send(self, command: str, v1=None, v2=None):
-        """send data via the default client"""
+
+    def send(self, command : str, v1 = None, v2 = None):
+        ''' send data via the default client '''
         self._osc_client.send(command, v1, v2)
 
 
-""" end OscInterface ================================================================================================== """
+''' end OscInterface ================================================================================================== '''
 
-""" GREMLIN UI STUFF """
+''' GREMLIN UI STUFF '''
+
+
 
 
 class OscInputItem(AbstractInputItem):
-    """holds OSC input data"""
+    ''' holds OSC input data '''
 
-    message_key_changed = QtCore.Signal(str, str)  # fires when message key changes
-    input_mode_changed = (
-        QtCore.Signal()
-    )  # fires when the repeater mode changes axis or button
+    message_key_changed = QtCore.Signal(str, str) # fires when message key changes 
+    input_mode_changed = QtCore.Signal() # fires when the repeater mode changes axis or button
 
     class InputMode(enum.Enum):
-        """possible input modes"""
-
+        ''' possible input modes '''
         Axis = 0  # input is variable
-        Button = 1  # input is marked pressed if the value is in the upper range
-        OnChange = 2  # input triggers pressed on any state change
+        Button = 1 # input is marked pressed if the value is in the upper range 
+        OnChange = 2 # input triggers pressed on any state change
 
     class CommandMode(enum.Enum):
-        """OSC command mode = determines how the command key is derived"""
+        ''' OSC command mode = determines how the command key is derived '''
+        Message = 0 # only the command part of the message is used (data is variable)
+        Data = 1 # the message and arguments are considered
 
-        Message = 0  # only the command part of the message is used (data is variable)
-        Data = 1  # the message and arguments are considered
 
     def __init__(self):
         super().__init__()
         self.verbose = gremlin.config.Configuration().verbose_mode_osc
-        self._message = None  # the OSC message command
-        self._message_data = None  # the list of values associated with that command
-        self._message_data_string = None  # the string representation of the data args
+        self._message = None # the OSC message command
+        self._message_data = None # the list of values associated with that command
+        self._message_data_string = None # the string representation of the data args
         self._mode = OscInputItem.InputMode.Button
         self._command_mode = OscInputItem.CommandMode.Message
         self._title_name = "OSC (not configured)"
-        self._display_name = ""
+        self._display_name =  ""
         self._display_tooltip = "Input configuration not set"
         self._device_guid = OscDeviceTabWidget.device_guid
         self._input_type = InputType.OpenSoundControl
         self._message_key = None
-        self._source_index = (
-            0  # OSC parameter source index - used for multi-argument data
-        )
+        self._source_index = 0 # OSC parameter source index - used for multi-argument data
         self.setMessageKey(self._guid)
         self._min_range = 0.0
-        self._max_range = 1.0
-        self._autorelease = False  # true if auto-release
-        self._autorelease_delay = 250  # default release delay
-
+        self._max_range = 1.0 
+        self._autorelease = False # true if auto-release
+        self._autorelease_delay = 250 # default release delay
+        
+      
         self._axis_values = []
         current_mode = gremlin.shared_state.current_mode
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
 
-        tracker.registerWidget(
-            self,
-            self._device_guid,
-            current_mode,
-            self._input_type,
-            self.getCompoundMessageKey(),
-            self._guid,
-        )
+        tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self.getCompoundMessageKey(), self._guid)
         client = InputOscClient()
         client.registerInput(self)
 
     def getCompoundMessageKey(self):
         return f"{self._message_key}_{self._source_index}"
 
+
     def getAxisValue(self):
-        """gets the current axis value (override)"""
+        ''' gets the current axis value (override)'''
         if self._source_index < len(self._axis_values):
             return self._axis_values[self._source_index]
         if self._axis_value is not None:
@@ -2102,7 +2057,6 @@ class OscInputItem(AbstractInputItem):
     @property
     def autoRelease(self) -> bool:
         return self._autorelease
-
     @autoRelease.setter
     def autoRelease(self, value: bool):
         self._autorelease = value
@@ -2111,7 +2065,6 @@ class OscInputItem(AbstractInputItem):
     @property
     def autorelease_delay(self) -> int:
         return self._autorelease_delay
-
     @autorelease_delay.setter
     def autorelease_delay(self, value: int):
         self._autorelease_delay = value
@@ -2119,19 +2072,19 @@ class OscInputItem(AbstractInputItem):
     @property
     def message(self) -> str:
         return self._message
-
+    
     @message.setter
     def message(self, value):
         self._message = value
         self._update()
 
-    @property
+    @property 
     def mode(self) -> OscInputItem.InputMode:
-        """input mode"""
+        ''' input mode '''
         return self._mode
-
-    def setMode(self, value: OscInputItem.InputMode):
-        """changes the input mode"""
+        
+    def setMode(self, value : OscInputItem.InputMode):
+        ''' changes the input mode'''
         if self._mode != value:
             self._mode = value
             self._update()
@@ -2140,66 +2093,68 @@ class OscInputItem(AbstractInputItem):
     @property
     def is_axis(self) -> bool:
         return self._mode == OscInputItem.InputMode.Axis
-
+    
     @property
     def is_button(self) -> bool:
         return self._mode != OscInputItem.InputMode.Axis
-
+    
     def getOverrideInputType(self):
         # override input type
         if self.is_axis:
             return InputType.JoystickAxis
         else:
             return InputType.JoystickButton
-
-    @property
+            
+    
+    @property 
     def command_mode(self) -> OscInputItem.CommandMode:
-        """command mode"""
-        return self._command_mode
-
+        ''' command mode '''
+        return self._command_mode 
+    
     @command_mode.setter
-    def command_mode(self, value: OscInputItem.CommandMode):
+    def command_mode(self, value : OscInputItem.CommandMode):
         self._command_mode = value
         self._update()
 
     @property
     def title_name(self) -> str:
-        """title for this input"""
+        ''' title for this input '''
         return self._title_name
 
     @property
     def display_name(self) -> str:
-        """display name for this input"""
+        ''' display name for this input '''
         return self._display_name
-
+    
     @property
     def data(self):
         return self._message_data
-
+    
     @data.setter
     def data(self, value):
         assert isinstance(value, tuple) or isinstance(value, list)
         self._message_data = value
         self._message_data_string = list_to_csv(value)
         self._update()
-
+    
     @property
     def data_string(self):
-        """string representation of the OSC arguments"""
+        ''' string representation of the OSC arguments '''
         return self._message_data_string
+    
 
     @property
     def min_range(self):
         return self._min_range
-
+    
     @min_range.setter
     def min_range(self, value):
         self._min_range = value
-
-    @property
+    
+    @property 
     def max_range(self):
         return self._max_range
-
+    
     @max_range.setter
     def max_range(self, value):
         self._max_range = value
@@ -2207,37 +2162,24 @@ class OscInputItem(AbstractInputItem):
     @property
     def source_index(self) -> int:
         return self._source_index
-
+    
     @source_index.setter
-    def source_index(self, value: int):
+    def source_index(self, value : int):
         if value >= 0 and self._source_index != value:
             current_mode = gremlin.shared_state.current_mode
             client = InputOscClient()
             client.unregisterInput(self)
             tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
-            tracker.unregisterWidget(
-                self._device_guid,
-                current_mode,
-                self._input_type,
-                self.getCompoundMessageKey(),
-                self._guid,
-            )
-            self._source_index = value
-            tracker.registerWidget(
-                self,
-                self._device_guid,
-                current_mode,
-                self._input_type,
-                self.getCompoundMessageKey(),
-                self._guid,
-            )
+            tracker.unregisterWidget(self._device_guid, current_mode, self._input_type, self.getCompoundMessageKey(), self._guid)
+            self._source_index = value        
+            tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self.getCompoundMessageKey(), self._guid)
             client.registerInput(self)
 
     @property
     def display_tooltip(self):
-        """detailed tooltip"""
+        ''' detailed tooltip '''
         return self._display_tooltip
-
+    
     @property
     def mode_string(self):
         if self._mode == OscInputItem.InputMode.Axis:
@@ -2246,7 +2188,7 @@ class OscInputItem(AbstractInputItem):
             return "button"
         if self._mode == OscInputItem.InputMode.OnChange:
             return "change"
-
+        
     def _mode_from_string(self, value):
         if value == "axis":
             self._mode = OscInputItem.InputMode.Axis
@@ -2256,21 +2198,23 @@ class OscInputItem(AbstractInputItem):
             self._mode = OscInputItem.InputMode.OnChange
         else:
             raise ValueError(f"mode_from_string(): don't know how to handle {value}")
+        
 
     @property
     def command_mode_string(self):
-        return OscInputItem.command_mode_to_string(self._command_mode)
-
+        return  OscInputItem.command_mode_to_string(self._command_mode)
+        
+    
     @staticmethod
     def command_mode_to_string(value):
-        """converts a string to a command mode"""
+        ''' converts a string to a command mode '''
         if value == OscInputItem.CommandMode.Message:
             return "cmd"
         elif value == OscInputItem.CommandMode.Data:
             return "data"
         # default
         return "cmd"
-
+    
     @staticmethod
     def command_mode_from_string(value):
         if value == "cmd":
@@ -2278,34 +2222,28 @@ class OscInputItem(AbstractInputItem):
         elif value == "data":
             return OscInputItem.CommandMode.Data
         else:
-            raise ValueError(
-                f"command_mode_from_string(): don't know how to handle {value}"
-            )
+            raise ValueError(f"command_mode_from_string(): don't know how to handle {value}")
+
 
     @property
     def message_key(self):
-        """returns the sorting key for this message - includes the source parameter index"""
+        ''' returns the sorting key for this message - includes the source parameter index  '''
         if not self._message_key and self._message:
-            self._message_key = OscInputItem.toMessageKey(
-                self._command_mode, self._message, self._source_index
-            )
+            self._message_key = OscInputItem.toMessageKey(self._command_mode, self._message, self._source_index)
         return self._message_key
-
+    
     def setMessageKey(self, value):
         if self.message_key is None or self._message_key != value:
             # ensure OSC is started so we can listen to OSC inputs
             if self._message_key != value:
+
+                
                 tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
                 current_mode = gremlin.shared_state.current_mode
-                tracker.unregisterWidget(
-                    self._device_guid,
-                    current_mode,
-                    self._input_type,
-                    self._message_key,
-                    self._guid,
-                )
+                tracker.unregisterWidget(self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
                 client = InputOscClient()
                 client.unregisterInput(self)
+
 
                 # indicate key changed
                 self.message_key_changed.emit(self._message_key, value)
@@ -2314,35 +2252,28 @@ class OscInputItem(AbstractInputItem):
                 if self._message_key:
                     osc_input.unregisterInput(self)
 
-                if self.verbose:
-                    syslog.info(
-                        f"OSC update message key from {self._message_key} to {value}"
-                    )
-
+                if self.verbose: syslog.info(f"OSC update message key from {self._message_key} to {value}")
+                
                 self._message_key = value
 
                 osc_input.registerInput(self)
-                tracker.registerWidget(
-                    self,
-                    self._device_guid,
-                    current_mode,
-                    self._input_type,
-                    self._message_key,
-                    self._guid,
-                )
+                tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
                 client.registerInput(self)
-
+            
+            
     @staticmethod
     def data_to_string(data):
-        """returns a string representation of the data"""
+        ''' returns a string representation of the data '''
         return list_to_csv(data)
+        
 
     def _string_to_data(self, value):
-        """converts a string representation of the data to a list of args"""
+        ''' converts a string representation of the data to a list of args '''
         return csv_to_list(value)
+    
 
     @staticmethod
-    def toMessageKey(command_mode: OscInputItem.CommandMode, message, args):
+    def toMessageKey(command_mode : OscInputItem.CommandMode, message, args):
         if command_mode == OscInputItem.CommandMode.Data:
             return f"{message} {OscInputItem.data_to_string(args)}"
         elif command_mode == OscInputItem.CommandMode.Message:
@@ -2350,48 +2281,44 @@ class OscInputItem(AbstractInputItem):
                 return f"{message} {args}"
             return f"{message}"
         else:
-            raise ValueError(
-                f"_update(): don't know how to handle {self._command_mode}"
-            )
+            raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
+
 
     def _update(self):
-        """updates the message key based on the current config"""
-        message_key = OscInputItem.toMessageKey(
-            self._command_mode, self.message, self._source_index
-        )
+        ''' updates the message key based on the current config '''
+        message_key =  OscInputItem.toMessageKey(self._command_mode, self.message, self._source_index)
         self.setMessageKey(message_key)
 
+        
         # update data string from the raw data
         self._message_data_string = list_to_csv(self._message_data)
-
+        
         self._update_display_name()
 
-    def parse_xml(self, node, data=None):
-        """reads an input item from xml"""
-
+    def parse_xml(self, node, data = None):
+        ''' reads an input item from xml '''
+        
         if node.tag == "input":
             self.id = read_guid(node, "guid")
-            self._message = safe_read(node, "cmd", str, "")
-            csv = safe_read(node, "data", str, "")
+            self._message = safe_read(node, "cmd", str,"")
+            csv = safe_read(node, "data", str,"")
             self._message_data = csv_to_list(csv)
             self._mode_from_string(safe_read(node, "mode", str, ""))
-            self._command_mode = OscInputItem.command_mode_from_string(
-                safe_read(node, "cmd_mode", str)
-            )
-            self._min_range = safe_read(node, "min", float, 0.0)
-            self._max_range = safe_read(node, "max", float, 1.0)
-            self.source_index = safe_read(node, "source_index", int, 0)
-            if self.verbose:
-                syslog.info(f"OSC: xml source index: {self._source_index}")
+            self._command_mode = OscInputItem.command_mode_from_string(safe_read(node,"cmd_mode", str))
+            self._min_range = safe_read(node,"min",float, 0.0)
+            self._max_range = safe_read(node,"max",float, 1.0)
+            self.source_index = safe_read(node,"source_index", int, 0)
+            if self.verbose: syslog.info(f"OSC: xml source index: {self._source_index}")
             if "autorelease" in node.attrib:
-                self._autorelease = safe_read(node, "autorelease", bool, False)
+                self._autorelease = safe_read(node,"autorelease", bool, False)
             if "autorelease_delay" in node.attrib:
-                self._autorelease_delay = safe_read(node, "autorelease_delay", int, 250)
+                self._autorelease_delay = safe_read(node,"autorelease_delay", int, 250)
 
         self._update()
 
+
     def to_xml(self):
-        """writes the input item to XML"""
+        ''' writes the input item to XML'''
         node = ElementTree.Element("input")
         node.set("guid", str(self.id))
         if self.message:
@@ -2407,10 +2334,12 @@ class OscInputItem(AbstractInputItem):
         node.set("autorelease", str(self._autorelease))
         node.set("autorelease_delay", str(self._autorelease_delay))
         return node
-
+          
+   
     def _update_display_name(self):
+        
         if self._mode == OscInputItem.InputMode.Button:
-            mode_stub = "Button"
+                mode_stub = "Button"
         elif self._mode == OscInputItem.InputMode.Axis:
             mode_stub = "Axis"
         elif self._mode == OscInputItem.InputMode.OnChange:
@@ -2420,18 +2349,15 @@ class OscInputItem(AbstractInputItem):
 
         self._title_name = f"OSC input ({mode_stub})"
         if self._command_mode == OscInputItem.CommandMode.Message:
-            self._display_name = f"{self._message} (P{self._source_index+1})"
+            self._display_name =  f"{self._message} (P{self._source_index+1})"
         else:
-            self._display_name = (
-                f"{self._message}/{self._message_data_string} (P{self._source_index+1})"
-            )
+            self._display_name =  f"{self._message}/{self._message_data_string} (P{self._source_index+1})"
 
     def duplicate(self) -> OscInputItem:
-        """duplicates an input item"""
+        ''' duplicates an input item '''
         import copy
-
         source = self
-        target = OscInputItem()
+        target= OscInputItem()
         target.id = uuid.uuid4()
         target._message = copy.deepcopy(source._message)
         target._message_data = source._message_data
@@ -2439,7 +2365,7 @@ class OscInputItem(AbstractInputItem):
         target._mode = source._mode
         target._command_mode = source._command_mode
         target._title_name = source._title_name
-        target._display_name = source._display_name
+        target._display_name =  source._display_name
         target._display_tooltip = source._display_tooltip
         target.message_key = source._message_key
         target._min_range = source._min_range
@@ -2447,65 +2373,72 @@ class OscInputItem(AbstractInputItem):
         target._source_index = source._source_index
         target._update_display_name()
         return target
+        
+
+
+        
 
     def __hash__(self):
         return str(self.id).__hash__()
-
+    
     def __lt__(self, other):
-        """used for sorting purposes"""
+        ''' used for sorting purposes '''        
         # keep as is (don't sort)
         return False
-
+    
     def __str__(self):
         return self._title_name
 
-
+    
 class OscInputListenerWidget(QtWidgets.QFrame):
-    """opens a centered modal osc message listener dialog
 
-    grabs the first OSC message it hears and closes
+    """ opens a centered modal osc message listener dialog
+    
+        grabs the first OSC message it hears and closes 
 
-    also closes on esc key press
-
+        also closes on esc key press 
+       
     """
 
-    def __init__(self, callback, input_port=None, parent=None):
+    def __init__(
+            self,
+            callback,
+            input_port = None,
+            parent=None
+    ):
         """Creates a new instance.
 
         :param callback the function to pass the key pressed by the
             user to
-        :param host_ip = host ip
+        :param host_ip = host ip 
         :param input_port = input port
 
         """
         super().__init__(parent)
 
+
         # setup and listen for the osc message
         self._interface = OscInterface()
-
+        
         self.host_ip = self._interface.host_ip
         self.input_port = self._interface.input_port
 
         self._interface.osc_message.connect(self._osc_message_cb)
         self._callback = callback
-
+        
         self.message = None
-
+        
         # Create and configure the ui overlay
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.addWidget(
-            QtWidgets.QLabel(
-                f"""<center>Listening to OSC input {self._interface.host_ip} port {self._interface.input_port}.<br/><br/>Press ESC to abort.</center>"""
-            )
+            QtWidgets.QLabel(f"""<center>Listening to OSC input {self._interface.host_ip} port {self._interface.input_port}.<br/><br/>Press ESC to abort.</center>""")
         )
 
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
         palette = QtGui.QPalette()
-        palette.setColor(
-            QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray
-        )
+        palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)
 
         # Disable ui input selection on joystick input
@@ -2515,19 +2448,23 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         event_listener = gremlin.event_handler.EventListener()
         event_listener.keyboard_event.connect(self._kb_event_cb)
 
-        # start listening on all ports
+        # start listening on all ports 
         self._interface.start()
 
+
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
-        """called when dialog is closing"""
+        ''' called when dialog is closing '''
         gremlin.shared_state.pop_suspend_highlighting()
         return super().closeEvent(event)
 
     def _kb_event_cb(self, event):
         from gremlin.keyboard import key_from_code, key_from_name
-
-        key = key_from_code(event.identifier[0], event.identifier[1])
+        key = key_from_code(
+                event.identifier[0],
+                event.identifier[1]
+        )
         if event.is_pressed and key == key_from_name("esc"):
+
             # stop listening
             self._interface.stop()
 
@@ -2535,7 +2472,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
             self.close()
 
     def _osc_message_cb(self, message, data):
-        """called when a osc messages is provided by the listener"""
+        ''' called when a osc messages is provided by the listener '''
         if self.message is None:
             self.message = message
             self._callback(message, data)
@@ -2543,56 +2480,55 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         self.close()
 
 
+
 class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
-    """dialog showing the OSC input configuration options"""
+    ''' dialog showing the OSC input configuration options '''
 
     def __init__(self, current_mode, index, data, parent):
-        """
+        '''
         :param index - the input item index zero based
-        :param identifier - the input item identifier
-        """
-
-        super().__init__(self.__class__.__name__, parent=parent)
+        :param identifier - the input item identifier 
+        '''
+        
+        super().__init__(self.__class__.__name__,parent = parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("OSC Input Mapper")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-        self._parent = parent  # list view
-        assert hasattr(
-            parent, "input_item_list_model"
-        ), "OSC CONFIG: Parent widget does not have required listview model"
-        assert hasattr(
-            parent, "input_item_list_view"
-        ), "OSC CONFIG: Parent widget does not have required listview"
+        self._parent = parent # list view
+        assert hasattr(parent, "input_item_list_model"),"OSC CONFIG: Parent widget does not have required listview model"
+        assert hasattr(parent, "input_item_list_view"),"OSC CONFIG: Parent widget does not have required listview"
 
-        self._config_widget = QtWidgets.QWidget()
+        self._config_widget =  QtWidgets.QWidget()
         self._config_layout = QtWidgets.QHBoxLayout()
         self._config_widget.setLayout(self._config_layout)
-
+        
         self._current_mode = current_mode
         self.index = index
         self.identifier = data
-        self._mode: OscInputItem = OscInputItem.InputMode.Button
-        self._command_mode: OscInputItem = OscInputItem.CommandMode.Message
-        self._mode_locked = (
-            False  # if set, prevents flipping input modes axis to a button mode
-        )
-        self._min_range = 0.0  # min value for axis mapping (maps to -1.0 in vjoy)
-        self._max_range = 1.0  # max value for axis mapping (maps to 1.0 in vjoy)
+        self._mode : OscInputItem = OscInputItem.InputMode.Button
+        self._command_mode : OscInputItem = OscInputItem.CommandMode.Message
+        self._mode_locked = False # if set, prevents flipping input modes axis to a button mode
+        self._min_range = 0.0 # min value for axis mapping (maps to -1.0 in vjoy)
+        self._max_range = 1.0 # max value for axis mapping (maps to 1.0 in vjoy)
         self._autorelease = data._autorelease
         self._pulse_delay = data._autorelease_delay
         self._source_index = data._source_index
 
-        self._data_widgets = {}  # value of the parameter
-        self._label_widgets = {}  # label for the parameter
+        self._data_widgets = {} # value of the parameter
+        self._label_widgets = {} # label for the parameter
         self._select_widgets = {}  # selection radio button for which parameter is active
+        
+
 
         # OSC message
-        self._command = None  # OSC command text
-        self._command_data = []  # OSC arguments
+        self._command = None # OSC command text
+        self._command_data = [] # OSC arguments
 
         self._command_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._command_widget.valueChanged.connect(self._command_changed)
+
+
 
         self._config_layout.addWidget(QtWidgets.QLabel("Cmd:"))
         self._config_layout.addWidget(self._command_widget)
@@ -2601,61 +2537,50 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._data_container_widget = widget
         self._data_container_layout = layout
 
-        widget, layout = gremlin.ui.ui_common.getHContainer(
-            [self._data_container_widget], "Parameters:"
-        )
+        widget, layout = gremlin.ui.ui_common.getHContainer([self._data_container_widget],"Parameters:")
         self._parameter_widget = widget
 
         widget, layout = gremlin.ui.ui_common.getHContainer()
         self._source_container_widget = widget
         self._source_container_layout = layout
 
-        widget, layout = gremlin.ui.ui_common.getHContainer(
-            [self._source_container_widget], "Source:"
-        )
+        widget, layout = gremlin.ui.ui_common.getHContainer([self._source_container_widget],"Source:")
         self._source_widget = widget
-
+        
         self._config_layout.addStretch()
 
         self._container_mode_radio_widget = QtWidgets.QWidget()
-        self._container_mode_radio_layout = QtWidgets.QHBoxLayout(
-            self._container_mode_radio_widget
-        )
-
+        self._container_mode_radio_layout = QtWidgets.QHBoxLayout(self._container_mode_radio_widget )
+        
         self._container_mode_description_widget = QtWidgets.QLabel()
 
         self._container_command_mode_radio_widget = QtWidgets.QWidget()
         self._container_command_mode_radio_layout = QtWidgets.QHBoxLayout()
-        self._container_command_mode_radio_widget.setLayout(
-            self._container_command_mode_radio_layout
-        )
+        self._container_command_mode_radio_widget.setLayout(self._container_command_mode_radio_layout)
         self._container_command_mode_description_widget = QtWidgets.QLabel()
 
+
         self._mode_button_widget = QtWidgets.QRadioButton("Button")
-        self._mode_button_widget.setToolTip(
-            "The input will behave as an on/off button based on the value.<br/>"
-            "If the value is in the lower half of the range, the button is released.<br>"
-            "If the value is in the upper half of the reange, the button will be pressed<br>"
-        )
+        self._mode_button_widget.setToolTip("The input will behave as an on/off button based on the value.<br/>" 
+                                            "If the value is in the lower half of the range, the button is released.<br>" 
+                                            "If the value is in the upper half of the reange, the button will be pressed<br>")
         self._mode_button_widget.clicked.connect(self._mode_button_cb)
 
         self._mode_axis_widget = QtWidgets.QRadioButton("Axis")
-        self._mode_axis_widget.setToolTip(
-            "The input will be scaled (-1 to +1) based on the input's value"
-        )
+        self._mode_axis_widget.setToolTip("The input will be scaled (-1 to +1) based on the input's value")
         self._mode_axis_widget.clicked.connect(self._mode_axis_cb)
 
         self._container_range_widget = QtWidgets.QWidget()
-        self._container_range_layout = QtWidgets.QHBoxLayout(
-            self._container_range_widget
-        )
+        self._container_range_layout = QtWidgets.QHBoxLayout(self._container_range_widget)
+        
 
         self._min_range_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self._min_range_widget.setValue(0.0)  # default min range
+        self._min_range_widget.setValue(0.0) # default min range 
         self._min_range_widget.valueChanged.connect(self._min_range_cb)
         self._max_range_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self._max_range_widget.setValue(1.0)  # default min range
+        self._max_range_widget.setValue(1.0) # default min range 
         self._min_range_widget.valueChanged.connect(self._max_range_cb)
+
 
         self._container_range_layout.addWidget(QtWidgets.QLabel("Min range:"))
         self._container_range_layout.addWidget(self._min_range_widget)
@@ -2674,23 +2599,18 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._command_mode_data_widget.clicked.connect(self._command_mode_data_cb)
 
         self._mode_on_change_widget = QtWidgets.QRadioButton("Change")
-        self._mode_on_change_widget.setToolTip(
-            "The input will trigger as button press on any change in value"
-        )
+        self._mode_on_change_widget.setToolTip("The input will trigger as button press on any change in value")
         self._mode_on_change_widget.clicked.connect(self._mode_change_cb)
         self._mode_locked_widget = gremlin.ui.ui_common.QIconLabel()
 
         self._autorelease_widget = QtWidgets.QCheckBox("Autorelease Button")
-        self._autorelease_widget.setToolTip(
-            "For OSC inputs that only issue a press, GremlinEx will auto-issue a release trigger"
-        )
+        self._autorelease_widget.setToolTip("For OSC inputs that only issue a press, GremlinEx will auto-issue a release trigger")
         self._autorelease_widget.setChecked(self._autorelease)
         self._autorelease_widget.clicked.connect(self._autorelease_change_cb)
 
+
         self._autorelease_container_widget = QtWidgets.QWidget()
-        self._autorelease_container_layout = QtWidgets.QHBoxLayout(
-            self._autorelease_container_widget
-        )
+        self._autorelease_container_layout = QtWidgets.QHBoxLayout(self._autorelease_container_widget)
         self.pulse_spin_widget = QtWidgets.QSpinBox()
         self.pulse_spin_widget.setMinimum(0)
         self.pulse_spin_widget.setMaximum(60000)
@@ -2698,11 +2618,11 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
 
         self._autorelease_container_layout.addWidget(self._autorelease_widget)
-        self._autorelease_container_layout.addWidget(
-            QtWidgets.QLabel("Pulse duration (ms):")
-        )
+        self._autorelease_container_layout.addWidget(QtWidgets.QLabel("Pulse duration (ms):"))
         self._autorelease_container_layout.addWidget(self.pulse_spin_widget)
         self._autorelease_container_layout.addStretch()
+        
+
 
         self._container_mode_radio_layout.addWidget(QtWidgets.QLabel("Action mode:"))
         self._container_mode_radio_layout.addWidget(self._mode_on_change_widget)
@@ -2711,23 +2631,20 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._container_mode_radio_layout.addWidget(self._mode_locked_widget)
         self._container_mode_radio_layout.addStretch()
 
-        self._container_command_mode_radio_layout.addWidget(
-            self._command_mode_message_widget
-        )
-        self._container_command_mode_radio_layout.addWidget(
-            self._command_mode_data_widget
-        )
+
+        self._container_command_mode_radio_layout.addWidget(self._command_mode_message_widget)
+        self._container_command_mode_radio_layout.addWidget(self._command_mode_data_widget)
+
 
         self._container_options_widget = QtWidgets.QWidget()
         self._container_option_layout = QtWidgets.QHBoxLayout()
         self._container_options_widget.setLayout(self._container_option_layout)
 
         self._container_option_layout.addWidget(self._container_mode_radio_widget)
-        self._container_option_layout.addWidget(
-            self._container_command_mode_radio_widget
-        )
-
+        self._container_option_layout.addWidget(self._container_command_mode_radio_widget)
+        
         self._container_option_layout.addStretch()
+
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
@@ -2737,8 +2654,9 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.button_widget = QtWidgets.QWidget()
         self.button_layout = QtWidgets.QHBoxLayout(self.button_widget)
+        
 
-        # listen all ports button
+        # listen all ports button 
         self.listen_widget = QtWidgets.QPushButton("Listen")
         self.listen_widget.clicked.connect(self._listen_cb)
 
@@ -2759,12 +2677,12 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         main_layout.addWidget(self._validation_message_widget)
         main_layout.addWidget(gremlin.ui.ui_common.QHLine())
         main_layout.addWidget(self.button_widget)
-
+        
         self.setLayout(main_layout)
 
         if data:
-            input_id: OscInputItem = data
-            # see if this input has any containers
+            input_id : OscInputItem = data
+            # see if this input has any containers 
             profile = gremlin.shared_state.current_profile
             for device in profile.devices.values():
                 if device.name == "osc":
@@ -2772,9 +2690,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                         for input_items in device.modes[current_mode].config.values():
                             if data in input_items:
                                 item = input_items[data]
-                                self._mode_locked = (
-                                    len(item.containers) > 0
-                                )  # lock mode to prevent axis to button/change
+                                self._mode_locked = len(item.containers) > 0 # lock mode to prevent axis to button/change 
                                 break
 
             message = input_id.message
@@ -2790,17 +2706,17 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @QtCore.Slot()
     def _command_changed(self):
-        """command text changed"""
+        ''' command text changed '''
         self._command = self._command_widget.text()
         self._validate()
 
     def _pulse_value_changed(self, value):
-        """called when the pulse value changes"""
+        ''' called when the pulse value changes '''
         if value >= 0:
             self._pulse_delay = value
 
     def _validate(self):
-        """validates the input to ensure it does not conflict with an existing input"""
+        ''' validates the input to ensure it does not conflict with an existing input '''
         # assume ok
         valid = True
         try:
@@ -2816,19 +2732,18 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 input_item._command_mode = self._command_mode
                 input_item._mode = self._mode
                 input_item._source_index = self._source_index
-                input_item._update()  # this updates the message key
+                input_item._update() # this updates the message key
                 key = input_item.message_key
-
+                
                 for index in range(model.rows()):
                     widget = parent_widget.itemAt(index)
-                    if index == self.index:
-                        continue  # ignore self
+                    if index == self.index : continue # ignore self
                     # grab the input's configured osc message
                     other_input = widget.identifier.input_id
                     other_message = other_input.message
                     if other_message is None:
                         # input not set = ok
-                        continue
+                        continue 
 
                     other_key = other_input.message_key
                     if key == other_key:
@@ -2836,66 +2751,51 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                             # same key, different sources = ok
                             continue
 
-                        syslog.info(
-                            f"OSC: conflict detected: key {key} is the same as {other_key}"
-                        )
-                        self._validation_message_widget.setText(
-                            f"Input conflict detected with input [{index+1}] - ensure inputs are unique"
-                        )
+                        syslog.info(f"OSC: conflict detected: key {key} is the same as {other_key}")
+                        self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
-                        icon_color = QtGui.QColor(warning_color)
-                        self._validation_message_widget.setIcon(
-                            "ph.warning-light", True, color=icon_color
-                        )
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
                         valid = False
                         return
-
+                        
+                    
                 if self._mode == OscInputItem.InputMode.Axis:
                     # cannot be an axis mode for sysex or program change
-
+                    
                     # valid = len(self._command_data) > 0 # in axis mode, data MUST be provided
                     # if not valid:
                     #     self._validation_message_widget.setText(f"Data value must be given in axis mode")
-                    #     self._validation_message_widget.setIcon("ph.warning-light",True, color="red")
+                    #     self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color="red")
                     #     return
-
+                
                     if self._min_range > self._max_range:
-                        self._validation_message_widget.setText(
-                            "Min range must be less than max range"
-                        )
+                        self._validation_message_widget.setText(f"Min range must be less than max range")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
-                        icon_color = QtGui.QColor(warning_color)
-                        self._validation_message_widget.setIcon(
-                            "ph.warning-light", True, color=icon_color
-                        )
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
                         return
-
+                    
                     if self._min_range == self._max_range:
-                        self._validation_message_widget.setText(
-                            "Min range cannot be the same as the max range"
-                        )
+                        self._validation_message_widget.setText(f"Min range cannot be the same as the max range")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
-                        icon_color = QtGui.QColor(warning_color)
-                        self._validation_message_widget.setIcon(
-                            "ph.warning-light", True, color=icon_color
-                        )
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
                         return
-
+                    
                     # ensure the argument is numeric
                     if not self._command_data:
                         self._command_data = [0]
                     arg = self._command_data[0]
                     if not (isinstance(arg, int) or isinstance(arg, float)):
-                        self._validation_message_widget.setText(
-                            "First data item must be a number for axis input"
-                        )
+                        self._validation_message_widget.setText(f"First data item must be a number for axis input")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
-                        icon_color = QtGui.QColor(warning_color)
-                        self._validation_message_widget.setIcon(
-                            "ph.warning-light", True, color=icon_color
-                        )
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
                         return
 
+
+            
         finally:
             self.ok_widget.setEnabled(valid)
             self._valid = valid
@@ -2907,16 +2807,17 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
         return valid
 
+
     def _mode_axis_cb(self):
         if self._mode_axis_widget.isChecked():
             self._mode = OscInputItem.InputMode.Axis
             self._validate()
-            self._update_display()
+            self._update_display()           
 
     def _mode_button_cb(self):
         if self._mode_button_widget.isChecked():
             self._mode = OscInputItem.InputMode.Button
-            self._update_display()
+            self._update_display()             
 
     @QtCore.Slot()
     def _mode_change_cb(self):
@@ -2947,21 +2848,23 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @QtCore.Slot()
     def _max_range_cb(self):
-        self._max_range = self._max_range_widget.value()
-        self._validate()
+        self._max_range = self._max_range_widget.value()  
+        self._validate()     
+
+
 
     @property
     def min_range(self):
         return self._min_range
-
+    
     @min_range.setter
     def min_range(self, value):
         self._min_range = value
-
-    @property
+    
+    @property 
     def max_range(self):
         return self._max_range
-
+    
     @max_range.setter
     def max_range(self, value):
         self._max_range = value
@@ -2969,16 +2872,16 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     @property
     def source_index(self) -> int:
         return self._source_index
-
+    
     @source_index.setter
-    def source_index(self, value: int):
+    def source_index(self, value : int):
         if value >= 0:
             self._source_index = value
 
     def _set_parameter(self, index, value):
-        """sets a data parameter - if the index does not exist, it's created"""
+        ''' sets a data parameter - if the index does not exist, it's created '''
 
-        if index not in self._data_widgets:
+        if not index in self._data_widgets:
             widget = gremlin.ui.ui_common.QDataLineEdit()
             widget.setReadOnly(True)
             widget.data = index
@@ -2992,15 +2895,18 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             self._label_widgets[index] = label
             self._select_widgets[index] = selector
 
+            
             self._data_container_layout.addWidget(label)
             self._data_container_layout.addWidget(widget)
             self._source_container_layout.addWidget(selector)
+
 
         self._label_widgets[index].setVisible(True)
         self._select_widgets[index].setVisible(True)
         self._data_widgets[index].setVisible(True)
 
         self._data_widgets[index].setText(str(value))
+
 
     @QtCore.Slot()
     def _active_parameter_cb(self):
@@ -3009,11 +2915,12 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._validate()
 
     def _clear_parameters(self):
-        """clears paramters UI"""
+        ''' clears paramters UI '''
         for index in self._data_widgets.keys():
             self._label_widgets[index].setVisible(False)
             self._select_widgets[index].setVisible(False)
             self._data_widgets[index].setVisible(False)
+
 
     def _update_parameters_from_command(self):
         self._clear_parameters()
@@ -3027,56 +2934,40 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         return values
 
     def _update_display(self):
-        """loads message data into the UI"""
+        ''' loads message data into the UI '''
         # mode radio buttons
         autorelease_visible = False
         parameters_visible = True
         if self._mode == OscInputItem.InputMode.Button:
-            self._container_mode_description_widget.setText(
-                "The input will trigger a button press when the value is 1<br>Use this to trigger a button press from a specific OSC message."
-            )
+            self._container_mode_description_widget.setText(f"The input will trigger a button press when the value is 1<br>Use this to trigger a button press from a specific OSC message.")
             with QtCore.QSignalBlocker(self._mode_button_widget):
                 self._mode_button_widget.setChecked(True)
             autorelease_visible = True
             parameters_visible = False
-
+            
         elif self._mode == OscInputItem.InputMode.Axis:
-            self._container_mode_description_widget.setText(
-                "The input act as an axis input using the OSC value.<br>Use this mode if mapping to an axis output (OSC value messages only)"
-            )
-            # self._command_mode = OscInputItem.CommandMode.Message # force message mode in axis as the value will determine the state
+            self._container_mode_description_widget.setText(f"The input act as an axis input using the OSC value.<br>Use this mode if mapping to an axis output (OSC value messages only)")
+            #self._command_mode = OscInputItem.CommandMode.Message # force message mode in axis as the value will determine the state
             with QtCore.QSignalBlocker(self._mode_axis_widget):
                 self._mode_axis_widget.setChecked(True)
-
+            
         elif self._mode == OscInputItem.InputMode.OnChange:
-            self._container_mode_description_widget.setText(
-                "The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the OSC command value changes."
-            )
+            self._container_mode_description_widget.setText(f"The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the OSC command value changes.")
             with QtCore.QSignalBlocker(self._mode_on_change_widget):
-                self._mode_on_change_widget.setChecked(True)
+                self._mode_on_change_widget.setChecked(True)      
 
         if self._command_mode == OscInputItem.CommandMode.Message:
-            self._container_command_mode_description_widget.setText(
-                "The OSC message is the primary input (data ignored)"
-            )
+            self._container_command_mode_description_widget.setText(f"The OSC message is the primary input (data ignored)")
             with QtCore.QSignalBlocker(self._command_mode_message_widget):
                 self._command_mode_message_widget.setChecked(True)
-                self._data_container_widget.setEnabled(
-                    False
-                )  # disable the value area if in message only mode
+                self._data_container_widget.setEnabled(False) # disable the value area if in message only mode
         elif self._command_mode == OscInputItem.CommandMode.Data:
-            self._container_command_mode_description_widget.setText(
-                "The OSC message and arguments are used as the primary input"
-            )
+            self._container_command_mode_description_widget.setText(f"The OSC message and arguments are used as the primary input")
             with QtCore.QSignalBlocker(self._command_mode_data_widget):
                 self._command_mode_data_widget.setChecked(True)
-            self._data_container_widget.setEnabled(
-                True
-            )  # enable the value area if in message + data mode
+            self._data_container_widget.setEnabled(True) # enable the value area if in message + data mode
 
-        self._container_range_widget.setVisible(
-            self._mode == OscInputItem.InputMode.Axis
-        )
+        self._container_range_widget.setVisible(self._mode == OscInputItem.InputMode.Axis)
         with QtCore.QSignalBlocker(self._command_widget):
             self._command_widget.setText(self._command)
 
@@ -3085,7 +2976,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._autorelease_container_widget.setVisible(autorelease_visible)
 
     def _update_message(self):
-        """updates message data from UI"""
+        ''' updates message data from UI '''
         if self._mode_button_widget.isChecked():
             mode = OscInputItem.InputMode.Button
         elif self._mode_axis_widget.isChecked():
@@ -3101,19 +2992,24 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._mode = mode
         self._command_mode = command_mode
         self._command = self._command_widget.text()
+        
+
 
     def _ok_button_cb(self):
-        """ok button pressed"""
-        self._update_message()  # update data from UI
+        ''' ok button pressed '''
+        self._update_message() # update data from UI
         self.accept()
-
+        
     def _cancel_button_cb(self):
-        """cancel button pressed"""
-        self.reject()
+        ''' cancel button pressed '''
+        self.reject()        
+    
 
-    def _listen_cb(self, current_port_only=False):
-        """listens to an inbound OSC message"""
+    def _listen_cb(self, current_port_only = False):
+        ''' listens to an inbound OSC message '''
 
+
+        config = gremlin.config.Configuration()
         self.listener_dialog = OscInputListenerWidget(self._capture_message)
 
         # Display the dialog centered in the middle of the UI
@@ -3126,35 +3022,35 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             int(geom.x() + geom.width() / 2 - 150),
             int(geom.y() + geom.height() / 2 - 75),
             300,
-            150,
+            150
         )
-        self.listener_dialog.show()
+        self.listener_dialog.show()               
 
-    def _capture_message(self, command, data):
-        """called when an OSC message is captured"""
+    def _capture_message(self, command, data) :
+        ''' called when an OSC message is captured '''
         self._command = command
         self._command_data = data
         self._validate()
         self._update_parameters_from_command()
-        self._update_display()  # update UI with these settings
+        self._update_display() # update UI with these settings
 
     @property
     def command(self):
-        """returns the current command"""
+        ''' returns the current command '''
         return self._command
-
+    
     @command.setter
     def command(self, value):
         if value is None:
-            value = ""  # catch None type
+            value = "" # catch None type
         self._command = value
         self._update_display()
 
     @property
     def mode(self):
-        """gets the current input mode"""
+        ''' gets the current input mode '''
         return self._mode
-
+    
     @mode.setter
     def mode(self, value):
         self._mode = value
@@ -3162,9 +3058,9 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @property
     def command_mode(self):
-        """returns the command type"""
+        ''' returns the command type'''
         return self._command_mode
-
+    
     @command_mode.setter
     def command_mode(self, value):
         self._command_mode = value
@@ -3172,23 +3068,30 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @property
     def data(self) -> list:
-        """returns a list of parameters for that command"""
+        ''' returns a list of parameters for that command '''
         return self._command_data
-
+    
     @data.setter
     def data(self, value):
         self._command_data = value
         self._update_parameters_from_command()
-        self._update_display()
+        self._update_display()  
+
 
 
 class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
-    """Widget used to configure open sound control (OSC) inputs"""
 
+    """Widget used to configure open sound control (OSC) inputs """
+    
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
     device_guid = gremlin.shared_state.osc_tab_guid
 
-    def __init__(self, device_profile, current_mode, parent=None):
+    def __init__(
+            self,
+            device_profile,
+            current_mode,
+            parent=None
+    ):
         """Creates a new object instance.
 
         :param device_profile profile data of the entire device
@@ -3201,26 +3104,24 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Store parameters
         self.device_profile = device_profile
-        # assert self.device_profile.device_guid == gremlin.shared_state.osc_tab_guid
+        #assert self.device_profile.device_guid == gremlin.shared_state.osc_tab_guid
         self.current_mode = current_mode
 
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.widget_storage = {}
 
-        self._last_selected_index = -1  # index of last input, -1 if none
+        self._last_selected_index = -1 # index of last input, -1 if none
 
         # List of inputs
         self.input_item_list_model = input_item.InputItemListModel(
             device_profile,
             current_mode,
-            [InputType.OpenSoundControl],  # only allow OSC inputs for this widget
+            [InputType.OpenSoundControl] # only allow OSC inputs for this widget
         )
 
-        # update the display names
+        # update the display names 
 
-        self.input_item_list_view = input_item.InputItemListView(
-            custom_widget_handler=self._custom_widget_handler
-        )
+        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler)
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -3240,12 +3141,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
+        
 
         # key clear button
-
-        clear_button = ui_common.ConfirmPushButton(
-            "Clear OSC Inputs", show_callback=self._show_clear_cb
-        )
+        
+        clear_button = ui_common.ConfirmPushButton("Clear OSC Inputs", show_callback = self._show_clear_cb)
         icon = gremlin.util.load_icon("fa6.trash-can")
         clear_button.setIcon(icon)
         clear_button.confirmed.connect(self._clear_inputs_cb)
@@ -3262,59 +3162,64 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(button_container_widget)
 
+
         el = gremlin.event_handler.EventListener()
         # update on an edit mode change so we update the display
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         el.config_changed.connect(self._config_changed_cb)
+
+
 
         # Select default entry
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None:
             self._select_item_cb(selected_index)
 
+
     @QtCore.Slot(str)
-    def _edit_mode_changed_cb(self, mode: str):
-        """occurs when a new mode is selected"""
+    def _edit_mode_changed_cb(self, mode : str):
+        ''' occurs when a new mode is selected '''
         self.set_mode(mode)
+        
 
     def _config_changed_cb(self):
-        """called when configuraition has changed"""
-        self.refresh()
+        ''' called when configuraition has changed '''
+        self.refresh()      
 
     def itemAt(self, index):
-        """returns the input widget at the given index"""
+        ''' returns the input widget at the given index '''
         return self.input_item_list_view.itemAt(index)
 
     def display_name(self, input_id):
-        """returns the name for the given input ID"""
+        ''' returns the name for the given input ID '''
         return input_id.display_name
 
     def _show_clear_cb(self):
         return self.input_item_list_model.rows() > 0
 
     def _clear_inputs_cb(self):
-        """clears all input keys"""
+        ''' clears all input keys '''
         self.input_item_list_model.clear(input_types=[InputType.OpenSoundControl])
         self.input_item_list_view.redraw()
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-
-        widget = gremlin.ui.joystick_device.InputItemConfiguration()
+        
+        widget = gremlin.ui.joystick_device.InputItemConfiguration()     
         self.setRightPanelWidget(widget)
-
+  
     def _add_input_cb(self):
-        """Adds a new input to the inputs list"""
+        """Adds a new input to the inputs list  """
         input_type = InputType.OpenSoundControl
         input_id = OscInputItem()
         self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(self._index_for_key(input_id), True)
-
+        self.input_item_list_view.select_item(self._index_for_key(input_id),True)
+        
         index = self.input_item_list_view.current_index
 
         # last index selected, -1 means none
-        self._last_selected_index = -1
+        self._last_selected_index = -1 
 
         # redraw the UI
         self._select_item_cb(index)
@@ -3322,11 +3227,13 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # auto edit new input
         self._edit_item_cb(None, index, input_id)
 
+
     def _index_for_key(self, input_id):
-        """returns the index of the selected input id"""
+        ''' returns the index of the selected input id'''
         mode = self.device_profile.modes[self.current_mode]
         sorted_keys = list(mode.config[InputType.OpenSoundControl].keys())
         return sorted_keys.index(input_id)
+    
 
     def _select_item_cb(self, index):
         """Handles the selection of an input item.
@@ -3343,74 +3250,71 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if index == -1:
             # select the first item
             if self.input_item_list_model.rows():
-                item_data = self.input_item_list_model.data(0)
+                item_data = self.input_item_list_model.data(0)    
                 index = 0
             else:
-                widget = gremlin.ui.joystick_device.InputItemConfiguration()
+                widget = gremlin.ui.joystick_device.InputItemConfiguration()     
                 self.setRightPanelWidget(widget)
-                return
+                return 
         else:
             item_data = self.input_item_list_model.data(index)
+
 
         device_guid = self.device_guid
         input_id = item_data.input_id if item_data else None
         input_type = InputType.OpenSoundControl
 
         if item_data:
+            
             config = gremlin.config.Configuration()
             device_guid = self.device_guid
-
+        
             config.set_last_input(device_guid, input_type, input_id)
 
             widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data)
             self.setRightPanelWidget(widget)
-
+            
             # Create new configuration widget
-
+            
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
             self.input_item_list_view.select_item(index, False)
         else:
-            widget = gremlin.ui.joystick_device.InputItemConfiguration()
+            widget = gremlin.ui.joystick_device.InputItemConfiguration()     
             self.setRightPanelWidget(widget)
 
-        self._last_selected_index = index
+        self._last_selected_index = index 
         self._item_data = widget
 
         el = gremlin.event_handler.EventListener()
         el.input_selection_changed.emit(device_guid, input_type, input_id)
+    
 
     def _close_item_cb(self, widget, index, data):
-        """called when the close button is clicked"""
+        ''' called when the close button is clicked '''
 
         if not self.input_item_list_model.rows():
             # display blank page if no item left
             self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
             self.setRightPanelWidget(self._item_data)
 
-    def _custom_widget_handler(
-        self, list_view, index: int, identifier, data, parent=None
-    ):
-        """creates a widget for the input
+        
 
+    def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
+        ''' creates a widget for the input 
+        
         the widget must have a selected property
         :param list_view The list view control the widget to create belongs to
         :param index The index in the list starting at 0 being the top item
         :param identifier the InpuIdentifier for the input list
         :param data the data associated with this input item
-
-        """
+        
+        '''
         import gremlin.ui.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(
-            identifier=identifier,
-            populate_ui_callback=self._populate_input_widget_ui,
-            update_callback=self._update_input_widget,
-            config_external=True,
-            parent=parent,
-        )
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
         widget.data = data
         widget.create_action_icons(data)
         widget.setInputDescription(data.input_id.display_name)
@@ -3423,13 +3327,13 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return widget
 
     def _update_conflicts(self):
-        # check for conflicts with other entries
+         # check for conflicts with other entries
         model = self.input_item_list_model
-
+        
         widgets = [self.itemAt(index) for index in range(model.rows())]
         compared_widgets = []
         conflicted_widgets = []
-        for input_widget in widgets:
+        for input_widget in widgets: 
             input_widget_index = widgets.index(input_widget)
             key = input_widget.identifier.input_id.message_key
             compare_widgets = [w for w in widgets if w != input_widget]
@@ -3437,9 +3341,9 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 if not widget:
                     continue
                 if (input_widget, widgets) in compared_widgets:
-                    continue
+                    continue 
                 if (widget, input_widget) in compared_widgets:
-                    continue
+                    continue 
                 compared_widgets.append((input_widget, widget))
 
                 # grab the input's configured OSC message
@@ -3447,79 +3351,69 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 other_message = other_input.message
                 if other_message is None:
                     # input not set = ok
-                    continue
+                    continue 
 
                 other_key = other_input.message_key
                 if key == other_key:
                     index = widgets.index(widget)
                     warning_color = gremlin.ui.ui_common.Color.warningColor()
-                    icon_color = QtGui.QColor(warning_color)
-
-                    self._set_status(
-                        widget,
-                        "ph.warning-light",
-                        f"Input conflict detected with input [{input_widget_index + 1}]",
-                        color=icon_color,
-                    )
-                    self._set_status(
-                        input_widget,
-                        "ph.warning-light",
-                        f"Input conflict detected with input [{index + 1}]",
-                        color=icon_color,
-                    )
+                    icon_color= QtGui.QColor(warning_color)
+                    
+                    self._set_status(widget,"ph.shield-warning-fill", f"Input conflict detected with input [{input_widget_index + 1}]", color = icon_color)
+                    self._set_status(input_widget,"ph.shield-warning-fill", f"Input conflict detected with input [{index + 1}]", color = icon_color)
                     conflicted_widgets.append(widget)
                     conflicted_widgets.append(input_widget)
                     break
 
-        ok_widgets = [widget for widget in widgets if widget not in conflicted_widgets]
+        ok_widgets = [widget for widget in widgets if not widget in conflicted_widgets]
         for widget in ok_widgets:
-            self._set_status(widget)
-
-    def _set_status(self, widget, icon=None, status=None, use_qta=True, color=None):
-        """sets the status of an input widget"""
+            self._set_status(widget)    
+    
+    def _set_status(self, widget, icon = None, status = None, use_qta = True, color = None):
+        ''' sets the status of an input widget '''
         status_widget = widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
         if color:
-            status_widget.setIcon(icon, use_qta=use_qta, color=color)
+            status_widget.setIcon(icon, use_qta = use_qta, color = color)
         else:
-            status_widget.setIcon(icon, use_qta=use_qta)
-
+            status_widget.setIcon(icon, use_qta = use_qta)
+        
         status_widget.setText(status)
-        status_widget.setVisible(status is not None)
+        status_widget.setVisible(status is not None)    
+
 
     def _update_input_widget(self, input_widget, container_widget):
-        """called when the widget has to update itself on a data change"""
-        data: OscInputItem = input_widget.identifier.input_id
+        ''' called when the widget has to update itself on a data change '''
+        data : OscInputItem = input_widget.identifier.input_id 
         data._update_display_name()
         input_widget.setTitle(data.title_name)
         input_widget.setInputDescription(data.display_name)
         input_widget.setToolTip(data.display_tooltip)
 
-        status_text = ""
+        status_text = ''
         is_warning = False
         if not data.message:
             is_warning = True
             status_text = "Not configured"
-
+       
         icon = None
         if is_warning:
             warning_color = gremlin.ui.ui_common.Color.warningColor()
-            icon_color = QtGui.QColor(warning_color)
-            icon = gremlin.util.load_icon(
-                "ph.warning-light", use_qta=True, qta_color=icon_color
-            )
+            icon_color= QtGui.QColor(warning_color)
+            icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=icon_color)
 
         input_widget.setStatus(status_text, icon)
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):
-        """called when a button is created for custom content"""
+        ''' called when a button is created for custom content '''
         layout = QtWidgets.QVBoxLayout(container_widget)
         status_widget = gremlin.ui.ui_common.QIconLabel()
         status_widget.setObjectName("status")
         layout.addWidget(status_widget)
         self._update_input_widget(input_widget, container_widget)
 
+
     def _edit_item_cb(self, widget, index, data):
-        """called when the edit button is clicked"""
+        ''' called when the edit button is clicked  '''
         self._edit_dialog = OscInputConfigDialog(self.current_mode, index, data, self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
         gremlin.util.centerDialog(self._edit_dialog)
@@ -3527,7 +3421,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._index = index
 
     def _dialog_ok_cb(self):
-        """called when the ok button is pressed on the edit dialog"""
+        ''' called when the ok button is pressed on the edit dialog '''
         message = self._edit_dialog.command
         data = self._edit_dialog.data
         index = self._edit_dialog.index
@@ -3537,10 +3431,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         max_range = self._edit_dialog.max_range
         autorelease = self._edit_dialog._autorelease
         autorelease_delay = self._edit_dialog._pulse_delay
+        
 
         identifier = self.input_item_list_model.data(index)
-        input_item: OscInputItem = identifier.input_id
-        input_item._message = message  # OSC command message as text
+        input_item : OscInputItem = identifier.input_id
+        input_item._message = message # OSC command message as text
         input_item._message_data = data  # arguments as a list
         input_item.setMode(mode)
         input_item._command_mode = command_mode
@@ -3555,16 +3450,17 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._item_data.is_axis = is_axis
         self._item_data.item_data.is_axis = is_axis
 
-        input_item._update()  # refresh other properties
+        input_item._update() # refresh other properties
         self.input_item_list_view.update_item(index)
-
+        
         self._select_item_cb(self._index)
 
     def _index_for_key(self, input_id):
-        """returns the index of the selected input id"""
+        ''' returns the index of the selected input id'''
         mode = self.device_profile.modes[self.current_mode]
         sorted_keys = list(mode.config[InputType.OpenSoundControl].keys())
         return sorted_keys.index(input_id)
+        
 
     def _create_change_cb(self, index):
         """Creates a callback handling content changes.
@@ -3575,31 +3471,35 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return lambda: self.input_item_list_view.redraw_index(index)
 
     def set_mode(self, mode):
-        """changes the mode of the tab"""
+        ''' changes the mode of the tab '''        
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.input_item_list_model.mode = mode
-
-        # self.input_item_list_view.select_item(-1)
+        
+        #self.input_item_list_view.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.input_item_list_model.refresh()
-            self.input_item_list_view.redraw()
+            self.input_item_list_view.redraw()        
             self._select_item_cb(self._last_selected_index)
+
+
 
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
         self._select_item_cb(self.input_item_list_view.current_index)
 
 
+
 @gremlin.singleton_decorator.SingletonDecorator
 class InputOscClient(QtCore.QObject):
-    """runtime client for OSC messages
-
-    this is where inbound OSC messages are processed
-
-    """
+    ''' runtime client for OSC messages 
+    
+        this is where inbound OSC messages are processed 
+    
+    '''
 
     def __init__(self):
+        
         super().__init__()
         self._interface = None
 
@@ -3609,10 +3509,10 @@ class InputOscClient(QtCore.QObject):
         self._event_listener.request_osc.connect(self._request_osc_state)
         self._event_listener.profile_start.connect(self._profile_start)
         self._event_listener.options_changed.connect(self._options_changed)
-        self._osc_map = {}  # map of message keys to inputs
+        self._osc_map = {}  # map of message keys to inputs 
         self._started = False
 
-    @QtCore.Slot()
+    @QtCore.Slot()            
     def _options_changed(self):
         config = gremlin.config.Configuration()
         osc_enabled = config.osc_enabled
@@ -3623,11 +3523,11 @@ class InputOscClient(QtCore.QObject):
 
     @QtCore.Slot()
     def _profile_start(self):
-        """called on profile start
-
+        ''' called on profile start
+        
         ensure the OSC server is running if the profile has OSC items
-
-        """
+        
+        '''
         import gremlin.execution_graph
         import gremlin.input_devices
         import gremlin.shared_state
@@ -3637,56 +3537,53 @@ class InputOscClient(QtCore.QObject):
         # syslog = logging.getLogger("system")
         self._update_messages()
 
+       
         if self._osc_map:
             if verbose:
                 # dump the mappings to the log file
                 syslog.info("OSC: Listening for commands:")
-
+                
                 for items in self._osc_map.values():
                     for input_item in items:
                         item_mode = "axis" if input_item.is_axis else "momentary"
-                        syslog.info(
-                            f"\t{input_item.display_name}  key: [{input_item.message_key}] input mode: [{item_mode}]"
-                        )
+                        syslog.info(f"\t{input_item.display_name}  key: [{input_item.message_key}] input mode: [{item_mode}]")
 
             if not self._started:
-                if verbose:
-                    syslog.info("OSC: Start")
+                if verbose: syslog.info(f"OSC: Start")
                 self.start()
             else:
-                syslog.info("OSC: Running")
+                syslog.info(f"OSC: Running")
         else:
-            syslog.info("OSC: no OSC mappings found - start skipped")
+            syslog.info(f"OSC: no OSC mappings found - start skipped")        
 
     @QtCore.Slot(bool)
-    def _request_osc_state(self, state: bool):
+    def _request_osc_state(self, state : bool):
         if state:
             self.start()
         else:
             self.stop()
-
+    
     def registerInput(self, input_item):
-        """registers an OSC input item"""
-
+        ''' registers an OSC input item '''
+       
         if isinstance(input_item, OscInputItem):
             if not self._started:
                 # ensure OSC is listening
                 self._start()
 
             message_key = input_item.message_key
-            if message_key not in self._osc_map.keys():
+            if not message_key in self._osc_map.keys():
                 self._osc_map[message_key] = []
-
-            if input_item not in self._osc_map[message_key]:
+        
+            if not input_item in self._osc_map[message_key]:
                 self._osc_map[message_key].append(input_item)
             if self._verbose:
-                syslog.info(
-                    f"OSC: register trigger on: {input_item.display_name} source index: {input_item.source_index} mode: {input_item.mode_string} key: {message_key}"
-                )
+                syslog.info(f"OSC: register trigger on: {input_item.display_name} source index: {input_item.source_index} mode: {input_item.mode_string} key: {message_key}")
                 pass
+        
 
     def unregisterInput(self, input_item):
-        """unregisters an OSC input item"""
+        ''' unregisters an OSC input item '''
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if isinstance(input_item, OscInputItem):
@@ -3695,34 +3592,35 @@ class InputOscClient(QtCore.QObject):
                 if input_item in self._osc_map[message_key]:
                     self._osc_map[message_key].remove(input_item)
                     if verbose:
-                        syslog.info(
-                            f"OSC: unregister trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}"
-                        )
+                        syslog.info(f"OSC: unregister trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
 
     def start(self):
-        """starts the client"""
-
+        ''' starts the client '''
+        
         # build a list of messages configured for input
+
 
         # build a list of input items to OSC messages
         self._update_messages()
+       
+        
 
     def _start(self):
         from gremlin.ui.osc_device import OscInterface
         import gremlin.shared_state
-
         if self._started:
             return
         self._interface = OscInterface()
-        self._interface.start()  # ensure started
+        self._interface.start() # ensure started
         self._interface.osc_message.connect(self._osc_message_cb)
 
         self._verbose = gremlin.config.Configuration().verbose_mode_osc
         self._started = True
 
-    def _update_messages(self):
-        """refresh OSC message we're listening to"""
 
+    def _update_messages(self):
+        ''' refresh OSC message we're listening to '''
+        from gremlin.ui.osc_device import OscInputItem
         self._osc_map = {}  # list of message keys
         profile = gremlin.shared_state.current_profile
         if profile:
@@ -3733,33 +3631,32 @@ class InputOscClient(QtCore.QObject):
                             for input_item in input_items:
                                 self.registerInput(input_item)
 
+
     def stop(self):
-        """stops the client"""
+        ''' stops the client '''
         if self._started:
             self._interface.osc_message.disconnect(self._osc_message_cb)
             self._interface = None
         self._started = False
+        
 
     def _osc_message_cb(self, message, args):
-        """called when an OSC message is received"""
+        ''' called when an OSC message is received '''
         from gremlin.ui.osc_device import OscInputItem, OscDeviceTabWidget
         from gremlin.input_types import InputType
-
         # get the input items behind this message
-        gremlin.ui.ui_common.DeviceWidgetTracker()
+        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         current_mode = gremlin.shared_state.current_mode
-
+        cache = tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
         command = OscInputItem.CommandMode.Message
         # look for the the message
         message_key = OscInputItem.toMessageKey(command, message, args)
         is_running = gremlin.shared_state.is_running
 
-        # look for the repeater widgets
-        # widget_map = {}
-        # cache = tracker.getCache(
-        #             OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl
-        #         )
-        # cache_hits = [key for key in cache if key.startswith(message)]
+
+        # look for the repeater widgets 
+        #widget_map = {}
+        #cache_hits = [key for key in cache if key.startswith(message)]
         # for cache_key in cache_hits:
         #     for key in cache[cache_key]:
         #         widget = cache[cache_key][key]
@@ -3770,11 +3667,9 @@ class InputOscClient(QtCore.QObject):
         #                 source = cache_key[:len(message_key)]
         #             widget_map[source] = widget
 
-        # verbose = gremlin.config.Configuration().verbose_mode_osc
-        normalized_args = [
-            gremlin.util.scale_to_range(value, source_min=0, source_max=1.0)
-            for value in args
-        ]
+        
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args]
         hits = [key for key in self._osc_map if key.startswith(message)]
         for hit_key in hits:
             if message != hit_key:
@@ -3784,62 +3679,58 @@ class InputOscClient(QtCore.QObject):
             else:
                 source_index = 0
 
-            syslog.info(
-                f"OSC: runtime: processing {message_key}  hit key: {hit_key}  source index: {source_index}"
-            )
+            syslog.info(f"OSC: runtime: processing {message_key}  hit key: {hit_key}  source index: {source_index}")
 
             for input_item in self._osc_map[hit_key]:
+
                 if input_item.source_index != source_index:
                     # incorrect source
                     continue
 
+               
+
                 # button press mode - if the value is in the top half of the range, the button is considered pressed
                 is_axis = False
-
+                
                 # scale each axis value
-
+                
                 input_item._axis_values = normalized_args
-                index = (
-                    source_index  # input_item.source_index # source index of the param
-                )
+                index = source_index # input_item.source_index # source index of the param
                 if index < len(args):
                     raw_value = args[input_item.source_index]
                     value = normalized_args[input_item.source_index]
-                    syslog.info(
-                        f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}"
-                    )
+                    syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
                 else:
-                    syslog.error(
-                        f"OSC: command [{input_item.command}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}"
-                    )
+                    syslog.error(f"OSC: command [{input_item.command}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}")
                     raw_value = args[0]
                     value = normalized_args[0]
-
+                
                 autorelease = False
-
+                
                 if input_item.mode == OscInputItem.InputMode.Axis:
                     # trigger an axis event
                     is_pressed = False
                     is_axis = True
                     # update the current axis value for the input
-
+                    
                     event = gremlin.event_handler.Event(
-                        event_type=InputType.OpenSoundControl,
-                        device_guid=OscDeviceTabWidget.device_guid,
-                        identifier=input_item,
-                        is_pressed=False,
-                        value=value,
-                        raw_value=raw_value,
-                        data=index,  # source index
-                        is_virtual=True,  # indicate we are not a hardware input
-                        is_axis=True,
-                        override_input_type=InputType.JoystickAxis,
-                    )
+                        event_type = InputType.OpenSoundControl,
+                        device_guid = OscDeviceTabWidget.device_guid,
+                        identifier = input_item,
+                        is_pressed = False,
+                        value = value,
+                        raw_value = raw_value,
+                        data = index, # source index
+                        is_virtual = True, # indicate we are not a hardware input
+                        is_axis = True, 
+                        override_input_type= InputType.JoystickAxis
+                        )
 
                     self._event_listener.joystick_event.emit(event)
 
                     if not is_running:
                         self._event_listener.axis_state_change.emit(event)
+                    
 
                     continue
 
@@ -3849,64 +3740,58 @@ class InputOscClient(QtCore.QObject):
 
                 elif input_item.mode == OscInputItem.InputMode.Button:
                     # trigger a button press event
-                    is_pressed = (
-                        raw_value != 0.0
-                    )  # for OSC pressed is any value except 0
+                    is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
                     value = 1 if is_pressed else 0
                     autorelease = input_item._autorelease
                     input_item.setButtonValue(is_pressed)
                     event = gremlin.event_handler.Event(
-                        event_type=InputType.OpenSoundControl,
-                        device_guid=OscDeviceTabWidget.device_guid,
-                        identifier=input_item,
-                        is_pressed=is_pressed,
-                        value=is_pressed,
-                        raw_value=is_pressed,
-                        data=index,  # source index
-                        is_virtual=True,  # indicate we are not a hardware input
-                        is_axis=False,
-                        override_input_type=InputType.JoystickButton,
-                    )
+                            event_type = InputType.OpenSoundControl,
+                            device_guid = OscDeviceTabWidget.device_guid,
+                            identifier = input_item,
+                            is_pressed = is_pressed,
+                            value = is_pressed,
+                            raw_value = is_pressed,
+                            data = index, # source index
+                            is_virtual = True, # indicate we are not a hardware input
+                            is_axis = False,
+                            override_input_type=InputType.JoystickButton
+                            )
 
                     self._event_listener.joystick_event.emit(event)
 
                     if not is_running:
-                        # event.event_type = InputType.OpenSoundControl
+                        #event.event_type = InputType.OpenSoundControl
                         self._event_listener.button_state_change.emit(event)
 
                     continue
+                
 
                 if self._verbose:
-                    syslog.info(
-                        f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}"
-                    )
+                    syslog.info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
                 if not is_axis:
                     input_type = InputType.JoystickButton
                     event = gremlin.event_handler.Event(
-                        event_type=input_type,
-                        device_guid=OscDeviceTabWidget.device_guid,
-                        identifier=input_item,
-                        is_pressed=is_pressed,
-                        value=value,
-                        raw_value=raw_value,
-                        data=index,  # source index
-                        is_virtual=True,  # indicate we are not a hardware input
-                        is_axis=is_axis,
-                    )
+                        event_type = input_type,
+                        device_guid = OscDeviceTabWidget.device_guid,
+                        identifier = input_item,
+                        is_pressed = is_pressed,
+                        value = value,
+                        raw_value = raw_value,
+                        data =  index, # source index
+                        is_virtual = True, # indicate we are not a hardware input
+                        is_axis = is_axis)
 
                     self._event_listener.osc_event.emit(event)
 
+
                     if autorelease:
                         # schedule an autorelease event
-                        delay = input_item.autorelease_delay / 1000  # ms to s
+                        delay = input_item.autorelease_delay/1000 # ms to s
                         release_event = event.clone()
                         release_event.is_pressed = False
                         release_event.value = 0
-                        timer = threading.Timer(
-                            delay,
-                            lambda: self._event_listener.osc_event.emit(release_event),
-                        )
+                        timer = threading.Timer(delay, lambda: self._event_listener.osc_event.emit(release_event))
                         timer.start()
 
         # grab any defined callbacks
@@ -3923,20 +3808,22 @@ class InputOscClient(QtCore.QObject):
                             if index < len(args):
                                 raw_value = args[index]
                                 value = normalized_args[index]
-                                syslog.info(
-                                    f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}"
-                                )
+                                syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
                             else:
-                                syslog.error(
-                                    f"OSC: command [{input_item.command}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}"
-                                )
+                                syslog.error(f"OSC: command [{input_item.command}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}")
                                 raw_value = args[0]
                                 value = normalized_args[0]
-
+                            
                             event.value = value
                             event.raw_value = raw_value
                             event.data = normalized_args
                             self._event_listener.osc_event.emit(event)
+
+
+
+                            
+
+
 
 
 # listen to OSC input

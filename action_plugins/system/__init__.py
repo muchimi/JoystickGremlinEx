@@ -35,7 +35,7 @@
 
 # class CommandList(enum.IntEnum):
 #     ToggleRemote = 1
-
+    
 
 # _command_list_description = {
 #     CommandList.ToggleRemote : "Toggle remote control"
@@ -61,7 +61,7 @@
 #         self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
 #         el = gremlin.event_handler.EventListener()
 #         el.edit_mode_changed.connect(self._profile_edit_mode_changed)
-
+        
 #     def _create_ui(self):
 #         """Creates the UI components."""
 #         self.action_widget = gremlin.ui.ui_common.NoWheelComboBox()
@@ -93,6 +93,10 @@
 
 #         self.main_layout.addWidget(self.grid_widget)
 
+        
+        
+        
+        
 
 #     def _populate_ui(self):
 #         pass
@@ -102,12 +106,14 @@
 #             self.action_widget.clear()
 
 
+
+
 #     @QtCore.Slot()
 #     def _action_changed_cb(self):
 #         action = self.action_widget.currentData()
 #         self.action_data.action = action
 
-
+                    
 #     @QtCore.Slot()
 #     def _mode_changed_cb(self):
 #         mode = self.mode_selector.currentData()
@@ -129,6 +135,7 @@
 #         self._update_input_list()
 
 
+                            
 #     @QtCore.Slot()
 #     def _device_changed_cb(self):
 #         device = self.device_widget.currentData()
@@ -139,18 +146,19 @@
 #     def _input_changed_cb(self):
 #         input_item = self.input_widget.currentData()
 #         self.action_data.target_input_item = input_item
-
+        
+        
 
 # class SystemFunctor(gremlin.base_conditions.AbstractFunctor):
 #     ''' System functor '''
-
+    
 #     def __init__(self, action_data, parent = None):
 #         super().__init__(action_data, parent)
 #         self.action_data = action_data
 
 
 #     def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
-
+    
 #         if event.is_pressed is None:
 #             return
 #         is_pressed = event.is_pressed
@@ -181,8 +189,14 @@
 #                                         item.enabled = not item.enabled
 #                                         if verbose: syslog.info(f"System: toggle input {item.display_name} -> {item.enabled}")
 #                                 return True
-
+                            
 #             return True
+
+                            
+
+
+
+
 
 
 # class System(gremlin.base_profile.AbstractAction):
@@ -196,7 +210,7 @@
 
 #     functor = SystemFunctor
 #     widget = SystemWidget
-
+    
 #     input_types = [
 #         InputType.JoystickButton,
 #         InputType.JoystickHat,
@@ -204,7 +218,7 @@
 #         InputType.KeyboardLatched,
 #         InputType.OpenSoundSystem,
 #         InputType.Midi,
-
+        
 #     ]
 
 #     def __init__(self, parent):
@@ -216,19 +230,20 @@
 #         self.target_input_item = None
 
 #     def icon(self):
-#         return "fa.gears"
-
+#         return "fa6s.gears"
+    
 #     def requires_virtual_button(self):
 #         return False
-
-
+    
+  
+    
 #     def _parse_xml(self, node, data = None):
 #         self.mode = None
 #         self.device_guid = None
 #         self.target_input_item = None
 
 #         #input_items = self._get_input_items()
-
+        
 #         if "mode" in node.attrib:
 #             self.mode = node.get("mode")
 #         if "device_guid" in node.attrib:
@@ -241,6 +256,7 @@
 #             break
 
 
+    
 #     def _generate_xml(self):
 #         node = ElementTree.Element(System.tag)
 #         if self.mode is not None:
@@ -260,12 +276,13 @@
 #             node.append(node_target)
 
 #         return node
-
+    
 
 #     def _is_valid(self):
 #         if self.device_guid is not None and self.target_input_item is not None:
 #             return True
 #         return False
+
 
 
 # version = 1
