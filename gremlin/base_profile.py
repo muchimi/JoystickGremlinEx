@@ -1546,7 +1546,7 @@ class InputItem():
     @input_id.setter
     def input_id(self, value):
         from gremlin.base_classes import AbstractInputItem
-        assert value == None or isinstance(value, int) or isinstance(value, AbstractInputItem)
+        assert value is None or isinstance(value, int) or isinstance(value, AbstractInputItem)
         self._input_id = value
         self._update_input()
 
@@ -1720,7 +1720,7 @@ class InputItem():
             if "id" in node.attrib and node.tag == "key":
                 # legacy format
                 scan_code = safe_read(node, "id", int, 0)
-                description = safe_read(node, "description", str, "")
+                safe_read(node, "description", str, "")
                 key = Key(scan_code=scan_code, is_extended=False, is_mouse = False)
                 input_item.key = key
             else:
@@ -2596,9 +2596,9 @@ class Profile():
         self._ensure_mode_tree()
         if self._mode_tree:
             if casefold:
-                modes = [node.name.casefold() for node in self._mode_tree.descendants]    
+                [node.name.casefold() for node in self._mode_tree.descendants]    
             else:
-                modes = [node.name for node in self._mode_tree.descendants]
+                [node.name for node in self._mode_tree.descendants]
 
         for node in anytree.PreOrderIter(self._mode_tree):
             mode_name = node.name
@@ -2797,7 +2797,7 @@ class Profile():
         :param fname the path to the XML file to parse
         """
         # Check for outdated profile structure and warn user / convert
-        verbose = gremlin.config.Configuration().verbose
+        gremlin.config.Configuration().verbose
         profile_converter = gremlin.profile.ProfileConverter()
         profile_was_updated = False
         if not profile_converter.is_current(fname):

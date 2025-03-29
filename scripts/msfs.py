@@ -350,7 +350,7 @@ def hat_1_up(event, vjoy):
 
 # hat 1 right
 @left_vpc.button(15)
-def hat_1_up(event, vjoy):
+def hat_1_up(event, vjoy): # noqa: F811
     global hat_state
     value = 1 if event.is_pressed else 0
     hat_state[HAT_INDEX_ONE][0] = value
@@ -359,7 +359,7 @@ def hat_1_up(event, vjoy):
 
 # hat 1 down
 @left_vpc.button(16)
-def hat_1_up(event, vjoy):
+def hat_1_up(event, vjoy): # noqa: F811
     global hat_state
     value = -1 if event.is_pressed else 0
     hat_state[HAT_INDEX_ONE][1] = value
@@ -368,7 +368,7 @@ def hat_1_up(event, vjoy):
 
 # hat 1 left
 @left_vpc.button(17)
-def hat_1_up(event, vjoy):
+def hat_1_up(event, vjoy): # noqa: F811
     global hat_state
     value = -1 if event.is_pressed else 0
     hat_state[HAT_INDEX_ONE][0] = value

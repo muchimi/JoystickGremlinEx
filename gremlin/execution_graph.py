@@ -827,8 +827,8 @@ class ExecutionContext():
         return functor
     
     def _get_gate_action_functor(self, action, node):
-        functor : gremlin.base_conditions.AbstractFunctor = self._get_action_functor()
-        event = gremlin.event_handler.Event(
+        self._get_action_functor()
+        gremlin.event_handler.Event(
                     event_type= gremlin.input_types.InputType.VirtualButton,
                     device_guid = gremlin.shared_state.virtual_device_guid,
                     identifier = 1
@@ -865,8 +865,8 @@ class ExecutionContext():
         mode_list = [mode for (_,mode) in mode_source if mode] # parent mode first
         # syslog = logging.getLogger("system")
 
-        tracker = gremlin.base_profile.ConditionTracker()
-        eh = gremlin.event_handler.EventHandler()
+        gremlin.base_profile.ConditionTracker()
+        gremlin.event_handler.EventHandler()
 
 
         # build the mode tree
@@ -937,7 +937,6 @@ class ExecutionContext():
         '''
 
         # latched functors tracker
-        latched_data = [] # list of LatchedData items
         for device in profile.devices.values():
             device_node = ExecutionGraphNode(ExecutionGraphNodeType.Device)
             device_node.device = device

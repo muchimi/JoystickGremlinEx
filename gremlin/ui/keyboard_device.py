@@ -171,7 +171,7 @@ class KeyboardInputItem(AbstractInputItem):
             for child in node:
                 # ready key nodes
                 if child.tag in ("key"):
-                    virtual_code = safe_read(child,"virtual-code", int, 0)
+                    safe_read(child,"virtual-code", int, 0)
                     scan_code = safe_read(child, "scan-code", int, 0)
                     is_extended = safe_read(child, "extended", bool, False)
                     is_mouse = safe_read(child, "mouse", bool, False)
@@ -187,7 +187,7 @@ class KeyboardInputItem(AbstractInputItem):
                     self._key = key
                     for latched_child in child:
                         if latched_child.tag == "latched":
-                            virtual_code = safe_read(latched_child,"virtual-code", int, 0)
+                            safe_read(latched_child,"virtual-code", int, 0)
                             scan_code = safe_read(latched_child, "scan-code", int, 0)
                             is_extended = safe_read(latched_child, "extended", bool, False)
                             is_mouse = safe_read(latched_child, "mouse", bool, False)
@@ -691,7 +691,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         icon = None
         if is_warning:
             warning_color = gremlin.ui.ui_common.Color.warningColor()
-            icon_color= QtGui.QColor(warning_color)
+            QtGui.QColor(warning_color)
             icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=QtGui.QColor(warning_color))
                 
         input_widget.setStatus(status_text, icon)

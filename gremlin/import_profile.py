@@ -1632,7 +1632,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' updates the mappings source to target '''
 
         self._map = {} # clear and rebuild the map
-        verbose = gremlin.config.Configuration().verbose
+        gremlin.config.Configuration().verbose
 
         try:
             gremlin.util.pushCursor() # long running op potentially
@@ -1659,7 +1659,6 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 import_item : ImportItem
 
                 # get mapping output options
-                rollover = self.mode
 
 
 
@@ -2175,7 +2174,6 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
                                 
                                 input_input_id = input_item.input_id
-                                input_input_type = input_item.input_type
                                 if input_input_id == 0:
                                     # no map entry - skip
                                     continue

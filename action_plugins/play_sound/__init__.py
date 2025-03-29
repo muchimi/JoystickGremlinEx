@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@ import threading
 
 
 class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
-
     """Widget for the resume action."""
 
     # player has to be a class reference to avoid it being garbage collected and not playing a sound at all
@@ -43,9 +42,9 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         content_widget = QtWidgets.QWidget()
-        content_widget.setContentsMargins(0,0,0,0)
+        content_widget.setContentsMargins(0, 0, 0, 0)
         content_layout = QtWidgets.QHBoxLayout(content_widget)
-        content_layout.setContentsMargins(0,0,0,0)
+        content_layout.setContentsMargins(0, 0, 0, 0)
         self.icon_widget = QtWidgets.QLabel()
         self.file_path_widget = QtWidgets.QLineEdit()
         self.file_path_widget.installEventFilter(self)
@@ -58,11 +57,11 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.volume_widget.valueChanged.connect(self._volume_changed)
 
         self.play_widget = QtWidgets.QPushButton("Play")
-        self.play_widget.setIcon(load_icon("ei.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
+        self.play_widget.setIcon(
+            load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color.activeColor())
+        )
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._play_cb)
-
-
 
         content_layout.addWidget(self.icon_widget)
         content_layout.addWidget(self.file_path_widget)
@@ -70,16 +69,15 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         content_layout.addWidget(QtWidgets.QLabel("Volume"))
         content_layout.addWidget(self.volume_widget)
         content_layout.addWidget(self.play_widget)
-        
+
         self.main_layout.addWidget(content_widget)
 
         self.player.setAudioOutput(self.audio)
-        
 
     def eventFilter(self, object, event):
         t = event.type()
         if t == QtCore.QEvent.Type.FocusOut:
-            self.action_data.sound_file = self.file_path_widget.text()  
+            self.action_data.sound_file = self.file_path_widget.text()
         return False
 
     def _populate_ui(self):
@@ -92,21 +90,25 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _file_changed(self):
         fname = self.file_path_widget.text()
-        valid =  os.path.isfile(fname)
+        valid = os.path.isfile(fname)
         if valid:
-            self._setIcon("mdi.checkbox-marked-outline", color = gremlin.ui.ui_common.Color.activeColor())
+            self._setIcon(
+                "mdi.checkbox-marked-outline",
+                color=gremlin.ui.ui_common.Color.activeColor(),
+            )
         else:
             self._setIcon("fa6s.circle-exclamation", color="red")
         self.play_widget.setEnabled(valid)
 
-    def _setIcon(self, icon_path = None, use_qta = True, color = None):
+    def _setIcon(self, icon_path=None, use_qta=True, color=None):
         from gremlin.util import load_pixmap
+
         icon_size = QtCore.QSize(16, 16)
-        ''' sets the icon of the label, pass a blank or None path to clear the icon'''
+        """ sets the icon of the label, pass a blank or None path to clear the icon"""
         if icon_path:
             if use_qta:
                 if color:
-                    pixmap = qta.icon(icon_path, color=color).pixmap(icon_size)    
+                    pixmap = qta.icon(icon_path, color=color).pixmap(icon_size)
                 else:
                     pixmap = qta.icon(icon_path).pixmap(icon_size)
             else:
@@ -122,9 +124,9 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _new_sound_file(self):
-        """Prompts the user to select a new sound file to add to the profile.  """
+        """Prompts the user to select a new sound file to add to the profile."""
         config = gremlin.config.Configuration()
-        fname = self.file_path_widget.text() # current entry
+        fname = self.file_path_widget.text()  # current entry
         if os.path.isfile(fname):
             dir = os.path.dirname(fname)
         elif os.path.isdir(fname):
@@ -134,14 +136,11 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             if dir is None or not os.path.isdir(dir):
                 dir = userprofile_path()
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
-            None,
-            "Path to sound file",
-            dir,
-            "All Files (*)"
+            None, "Path to sound file", dir, "All Files (*)"
         )
         if os.path.isfile(fname):
             self.action_data.sound_file = fname
-            dirname,_ = os.path.split(fname)
+            dirname, _ = os.path.split(fname)
             config.last_sound_folder = dirname
             # refresh the UI
             self._populate_ui()
@@ -151,34 +150,33 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         if os.path.isfile(self.action_data.sound_file):
             media = QtCore.QUrl(self.action_data.sound_file)
             self.player.setSource(media)
-            volume = self.action_data.volume/100.0  # 0.0 to 1.0
-            self.audio.setVolume(volume) 
+            volume = self.action_data.volume / 100.0  # 0.0 to 1.0
+            self.audio.setVolume(volume)
             self.player.play()
 
+
 class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
-    ''' fixed for QT6 media player changes '''
+    """fixed for QT6 media player changes"""
 
     player = QtMultimedia.QMediaPlayer()
     audio = QtMultimedia.QAudioOutput()
 
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
         self.sound_file = action.sound_file
         self.volume = action.volume
         PlaySoundFunctor.player.setAudioOutput(PlaySoundFunctor.audio)
 
-
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if os.path.isfile(self.sound_file):
             media = QtCore.QUrl(self.sound_file)
             PlaySoundFunctor.player.setSource(media)
-            PlaySoundFunctor.audio.setVolume(self.volume/100) # 0 to 1
+            PlaySoundFunctor.audio.setVolume(self.volume / 100)  # 0 to 1
             PlaySoundFunctor.player.play()
         return True
 
 
 class PlaySound(gremlin.base_profile.AbstractAction):
-
     """Action to resume callback execution."""
 
     name = "Play Sound"
@@ -199,7 +197,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     def icon(self):
         return "ei.speaker"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -208,16 +206,13 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.volume = 50
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return f"Play: [{self.sound_file}]"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         self.sound_file = node.get("file")
         self.volume = int(node.get("volume", 50))
 

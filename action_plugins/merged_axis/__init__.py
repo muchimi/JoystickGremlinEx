@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
 from PySide6 import QtWidgets, QtGui, QtCore
 from lxml import etree as ElementTree
 
@@ -27,46 +26,42 @@ import gremlin.ui.input_item
 import gremlin.shared_state
 from gremlin.ui import ui_common
 import gremlin.types
-import logging
 import gremlin.ui.ui_common
-from gremlin.util import safe_format, safe_read, scale_to_range, clamp
+from gremlin.util import safe_format, safe_read, clamp
 import gremlin.event_handler
 import gremlin.joystick_handling
-from dinput import GUID
-import qtawesome as qta
 import gremlin.util
 import gremlin.actions
 
 
-
 class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
-    """UI to setup the individual action trigger containers and sub actions """
+    """UI to setup the individual action trigger containers and sub actions"""
 
     def __init__(self, action_data, parent=None):
-        '''
+        """
         :param: data = the gate or range data block
         :item_data: the InputItem data block holding the container and input device configuration for this gated input
-        :index: the gate number of the gated input - there will at least be two for low and high - index is an integer 
-        '''
-        
-        super().__init__(self.__class__.__name__, parent = parent)
+        :index: the gate number of the gated input - there will at least be two for low and high - index is an integer
+        """
+
+        super().__init__(self.__class__.__name__, parent=parent)
 
         # make modal
-        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
 
         # Actual configuration object being managed
         self.setMinimumWidth(600)
         self.setMinimumHeight(800)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        
+
         from gremlin.ui.joystick_device import InputItemConfiguration
+
         self.container_widget = InputItemConfiguration(action_data.item_data)
         self.main_layout.addWidget(self.container_widget)
 
 
 class MergeAxisEntryWidget(QtWidgets.QDockWidget):
-
     """UI dialog which allows configuring how to merge two axes."""
 
     # Signal which is emitted whenever the widget is closed
@@ -87,7 +82,7 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         self.setFeatures(QtWidgets.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
 
         # tracking variables for output computations
-       
+
         self.action_data = action_data
 
         # Setup the dock widget in which the entire dialog will sit
@@ -101,60 +96,62 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
 
         self.setWidget(self.main_widget)
 
-
         # Selectors for both physical and virtual joystick axis for the
         # mapping selection
-        
+
         self.joy1_selector = ui_common.JoystickSelector(
-            lambda x: self._change_cb(),
-            [InputType.JoystickAxis]
+            lambda x: self._change_cb(), [InputType.JoystickAxis]
         )
         self.joy2_selector = ui_common.JoystickSelector(
-            lambda x: self._change_cb(),
-            [InputType.JoystickAxis]
+            lambda x: self._change_cb(), [InputType.JoystickAxis]
         )
-
 
         # Operation selection
         self.operation_selector = ui_common.QComboBox()
-        self.operation_selector.addItem("Average", gremlin.types.MergeAxisOperation.Average)
-        self.operation_selector.addItem("Minimum", gremlin.types.MergeAxisOperation.Minimum)
-        self.operation_selector.addItem("Maximum", gremlin.types.MergeAxisOperation.Maximum)
-        self.operation_selector.addItem("Sum",gremlin.types.MergeAxisOperation.Sum)
-        self.operation_selector.currentIndexChanged.connect(
-            lambda x: self._change_cb()
+        self.operation_selector.addItem(
+            "Average", gremlin.types.MergeAxisOperation.Average
         )
+        self.operation_selector.addItem(
+            "Minimum", gremlin.types.MergeAxisOperation.Minimum
+        )
+        self.operation_selector.addItem(
+            "Maximum", gremlin.types.MergeAxisOperation.Maximum
+        )
+        self.operation_selector.addItem("Sum", gremlin.types.MergeAxisOperation.Sum)
+        self.operation_selector.currentIndexChanged.connect(lambda x: self._change_cb())
 
         self.operation_container_widget = QtWidgets.QWidget()
-        self.operation_container_layout = QtWidgets.QVBoxLayout(self.operation_container_widget)
+        self.operation_container_layout = QtWidgets.QVBoxLayout(
+            self.operation_container_widget
+        )
 
         # output widget
-        self.output_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
-
-        
+        self.output_widget = ui_common.AxisStateWidget(
+            orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False
+        )
 
         # configure button
-    
+
         active_color = gremlin.ui.ui_common.Color.activeContentColor()
-        self.configure_icon_active = gremlin.util.load_icon("fa6s.gear",qta_color= active_color)
+        self.configure_icon_active = gremlin.util.load_icon(
+            "fa6s.gear", qta_color=active_color
+        )
         self.configure_icon_inactive = gremlin.util.load_icon("fa6s.gear")
 
-        self.configure_button_widget = QtWidgets.QPushButton("Actions") 
+        self.configure_button_widget = QtWidgets.QPushButton("Actions")
 
         self.configure_button_widget.setToolTip("Configure Actions")
 
         self.configure_button_widget.clicked.connect(self._configure_cb)
 
-        # reverse checkbox 
+        # reverse checkbox
         self.invert_widget = QtWidgets.QCheckBox(text="Reverse")
         self.invert_widget.setToolTip("Inverts the output of the merge")
         self.invert_widget.setChecked(self.action_data.invert_output)
         self.invert_widget.clicked.connect(self._invert_cb)
 
-
         self.operation_container_layout.addWidget(self.operation_selector)
         self.operation_container_layout.addWidget(self.invert_widget)
-
 
         # Assemble the complete ui
         self.grid_layout.addWidget(
@@ -163,23 +160,23 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         self.grid_layout.addWidget(
             QtWidgets.QLabel("<b><center>Upper Half</center></b>"), 0, 1
         )
-        
+
         self.grid_layout.addWidget(
             QtWidgets.QLabel("<b><center>Operation</center></b>"), 0, 2
         )
 
-        self.grid_layout.addWidget(
-            QtWidgets.QLabel("<b>Mapping</b>"), 0, 3
-        )
+        self.grid_layout.addWidget(QtWidgets.QLabel("<b>Mapping</b>"), 0, 3)
 
-        self.grid_layout.addWidget(
-            QtWidgets.QLabel("<b>Output</b>"), 0, 4
-        )
+        self.grid_layout.addWidget(QtWidgets.QLabel("<b>Output</b>"), 0, 4)
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self.status_widget = ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color), use_wrap=False)
-        
-        
+        self.status_widget = ui_common.QIconLabel(
+            "ph.shield-warning-fill",
+            use_qta=True,
+            icon_color=QtGui.QColor(warning_color),
+            use_wrap=False,
+        )
+
         self.grid_layout.addWidget(self.joy1_selector, 1, 0)
         self.grid_layout.addWidget(self.joy2_selector, 1, 1)
         self.grid_layout.addWidget(self.operation_container_widget, 1, 2)
@@ -187,7 +184,7 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         self.grid_layout.addWidget(self.output_widget, 1, 4)
 
         self.main_layout.addWidget(self.status_widget)
-        
+
         self.grid_layout.addWidget(QtWidgets.QLabel(" "), 1, 5)
         self.grid_layout.setColumnStretch(5, 3)
 
@@ -198,80 +195,83 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         el.profile_start.connect(self._profile_start)
         el.profile_stop.connect(self._profile_stop)
 
-        
     def _profile_start(self):
-        ''' called when the profile starts '''
+        """called when the profile starts"""
         el = gremlin.event_handler.EventListener()
         el.joystick_event.disconnect(self._joystick_event_handler)
 
     def _profile_stop(self):
-        ''' called when the profile stops'''
+        """called when the profile stops"""
         self._update_axis_widget()
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_handler)
 
     def _joystick_event_handler(self, event):
-        ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
+        """handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time"""
         if gremlin.shared_state.is_running:
-            return 
+            return
 
         if not event.is_axis:
-            return 
-        
-        # merge - check two sets 
+            return
+
+        # merge - check two sets
         if self.action_data.joy1_guid == self.action_data.joy2_guid:
             if self.action_data.joy1_input_id == self.action_data.joy2_input_id:
                 # no action on same axis input
                 return
-            if event.identifier != self.action_data.joy1_input_id and event.identifier != self.action_data.joy2_input_id:
+            if (
+                event.identifier != self.action_data.joy1_input_id
+                and event.identifier != self.action_data.joy2_input_id
+            ):
                 # matches neither inputs
                 return
-        elif event.device_guid == self.action_data.joy1_guid and event.identifier != self.action_data.joy1_input_id: 
+        elif (
+            event.device_guid == self.action_data.joy1_guid
+            and event.identifier != self.action_data.joy1_input_id
+        ):
             # no match device 1
             return
-        elif event.device_guid == self.action_data.joy2_guid and event.identifier != self.action_data.joy2_input_id: 
+        elif (
+            event.device_guid == self.action_data.joy2_guid
+            and event.identifier != self.action_data.joy2_input_id
+        ):
             # no match device 2
             return
-        
 
         value = self.action_data.computeValue()
         eh = gremlin.event_handler.EventListener()
         custom_event = event.clone()
         custom_event.value = value
-        custom_event.raw_value = gremlin.util.scale_to_range(value, target_min = -32768, target_max = 32767) # convert back to a raw value
+        custom_event.raw_value = gremlin.util.scale_to_range(
+            value, target_min=-32768, target_max=32767
+        )  # convert back to a raw value
         custom_event.device_guid = self.action_data.hardware_device_guid
         custom_event.identifier = self.action_data.hardware_input_id
         custom_event.is_custom = True
         eh.custom_joystick_event.emit(custom_event)
-        self._update_axis_widget(value)       
+        self._update_axis_widget(value)
 
-    def _update_axis_widget(self, value : float = None): 
-        ''' updates the repeater '''
+    def _update_axis_widget(self, value: float = None):
+        """updates the repeater"""
         if value is None:
             value = self.action_data.computeValue()
         self.output_widget.setValue(value)
 
-        
-
-
-    def setStatus(self, text = ""):
-        ''' sets the warning text '''
+    def setStatus(self, text=""):
+        """sets the warning text"""
         self.status_widget.setText(text)
         visible = True if text else False
         self.status_widget.setVisible(visible)
 
-
     @QtCore.Slot(bool)
-    def _invert_cb(self, checked):        
+    def _invert_cb(self, checked):
         self.action_data.invert_output = checked
-
 
     @QtCore.Slot()
     def _configure_cb(self):
         dialog = ActionContainerUi(self.action_data)
         dialog.exec()
         self.updateStatus()
-        
 
     def closeEvent(self, event):
         """Emits the closed event when this widget is being closed.
@@ -293,33 +293,29 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         joy2_guid = data["upper"]["device_guid"]
         joy1_input_id = data["lower"]["axis_id"]
         joy2_input_id = data["upper"]["axis_id"]
-        
+
         self.joy1_selector.set_selection(
             InputType.JoystickAxis,
             joy1_guid,
             joy1_input_id,
         )
-        
+
         self.joy2_selector.set_selection(
             InputType.JoystickAxis,
             joy2_guid,
             joy2_input_id,
         )
 
-
         self.operation_selector.setCurrentText(
-            gremlin.types.MergeAxisOperation.to_string(
-                data["operation"]
-            ).capitalize()
+            gremlin.types.MergeAxisOperation.to_string(data["operation"]).capitalize()
         )
 
         # sync
         self.sync()
 
-
     def _change_cb(self):
-        ''' occurs when a joystick device selection occurs '''
-        
+        """occurs when a joystick device selection occurs"""
+
         joy1_sel = self.joy1_selector.get_selection()
         joy2_sel = self.joy2_selector.get_selection()
 
@@ -331,50 +327,68 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
 
         self.action_data.operation = self.operation_selector.currentData()
 
-        self._joy1_value = gremlin.joystick_handling.get_curved_axis(self.action_data.joy1_guid, self.action_data.joy1_input_id)
-        self._joy2_value = gremlin.joystick_handling.get_curved_axis(self.action_data.joy2_guid, self.action_data.joy2_input_id)
+        self._joy1_value = gremlin.joystick_handling.get_curved_axis(
+            self.action_data.joy1_guid, self.action_data.joy1_input_id
+        )
+        self._joy2_value = gremlin.joystick_handling.get_curved_axis(
+            self.action_data.joy2_guid, self.action_data.joy2_input_id
+        )
 
         self.updateStatus()
 
-
     @QtCore.Slot()
     def profile_start(self):
-        ''' stop processing joystick events when profile is running '''
+        """stop processing joystick events when profile is running"""
         el = gremlin.event_handler.EventListener()
         el.joystick_event.disconnect(self._event_handler)
 
     @QtCore.Slot()
     def profile_stop(self):
-        ''' process joystick events when profile is not running '''
+        """process joystick events when profile is not running"""
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._event_handler)
 
     def sync(self):
-        ''' syncs the control to the data '''
+        """syncs the control to the data"""
 
-
-        action_data : MergedAxis = self.action_data
+        action_data: MergedAxis = self.action_data
         with QtCore.QSignalBlocker(self.invert_widget):
             self.invert_widget.setChecked(action_data.invert_output)
-        self.joy1_selector.set_selection(gremlin.input_types.InputType.JoystickAxis, action_data.joy1_guid, action_data.joy1_input_id)
-        self.joy2_selector.set_selection(gremlin.input_types.InputType.JoystickAxis, action_data.joy2_guid, action_data.joy2_input_id)
+        self.joy1_selector.set_selection(
+            gremlin.input_types.InputType.JoystickAxis,
+            action_data.joy1_guid,
+            action_data.joy1_input_id,
+        )
+        self.joy2_selector.set_selection(
+            gremlin.input_types.InputType.JoystickAxis,
+            action_data.joy2_guid,
+            action_data.joy2_input_id,
+        )
 
         index = self.operation_selector.findData(action_data.operation)
         self.operation_selector.setCurrentIndex(index)
 
-        
-        self._joy1_value = gremlin.joystick_handling.get_curved_axis(action_data.joy1_guid, action_data.joy1_input_id)
-        self._joy2_value = gremlin.joystick_handling.get_curved_axis(action_data.joy2_guid, action_data.joy2_input_id)
-        
-        if not (action_data.joy1_guid == action_data.joy2_guid and action_data.joy1_input_id == action_data.joy2_input_id):
+        self._joy1_value = gremlin.joystick_handling.get_curved_axis(
+            action_data.joy1_guid, action_data.joy1_input_id
+        )
+        self._joy2_value = gremlin.joystick_handling.get_curved_axis(
+            action_data.joy2_guid, action_data.joy2_input_id
+        )
+
+        if not (
+            action_data.joy1_guid == action_data.joy2_guid
+            and action_data.joy1_input_id == action_data.joy2_input_id
+        ):
             self._update_axis_widget()
 
         self.updateStatus()
-        
 
     def updateStatus(self):
-        action_data : MergedAxis = self.action_data
-        if action_data.joy1_guid == action_data.joy2_guid and action_data.joy1_input_id == action_data.joy2_input_id:
+        action_data: MergedAxis = self.action_data
+        if (
+            action_data.joy1_guid == action_data.joy2_guid
+            and action_data.joy1_input_id == action_data.joy2_input_id
+        ):
             self.setStatus("Merge axes must be different")
         else:
             self.setStatus()
@@ -387,23 +401,20 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
 
 
 class MergedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
-
     """Widget associated with the action of switching to the previous mode."""
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, MergedAxis))
+        assert isinstance(action_data, MergedAxis)
         self.action_data = action_data
 
     def _create_ui(self):
-
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
-        self.container_widget.setContentsMargins(0,0,0,0)
+        self.container_widget.setContentsMargins(0, 0, 0, 0)
 
         self.merge_layout = QtWidgets.QVBoxLayout()
         self.entry = MergeAxisEntryWidget(self.action_data)
-
 
         if not self.action_data.vjoy_valid:
             label = QtWidgets.QLabel(
@@ -413,7 +424,7 @@ class MergedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
             label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
             label.setWordWrap(True)
-            label.setFrameShape(QtWidgets.QFrame.Box)
+            label.setFrameShape(QtWidgets.QFrame.Shape.Box)
             label.setMargin(10)
             self.main_layout.addWidget(label)
         else:
@@ -421,8 +432,6 @@ class MergedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
             container_layout = QtWidgets.QHBoxLayout(container_widget)
             container_layout.addStretch()
 
-
-            
             # self.add_button = QtWidgets.QPushButton("Add Merged Axis")
             # self.add_button.clicked.connect(self.action_data._add_entry)
 
@@ -432,51 +441,53 @@ class MergedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.merge_layout.addWidget(self.entry)
 
             self.main_layout.addLayout(self.merge_layout)
-            self.main_layout.addWidget(container_widget)    
-
-       
-
+            self.main_layout.addWidget(container_widget)
 
     def _populate_ui(self):
         self.entry.sync()
 
 
- 
 class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
         self.action_data = action
         self._joy1_value = 0
         self._joy2_value = 0
         self._callbacks = {}
 
-
-    def process_event(self, event, value, extra_data = None):
-        ''' do nothing because the container will not be called through the normal hierarchy '''
+    def process_event(self, event, value, extra_data=None):
+        """do nothing because the container will not be called through the normal hierarchy"""
         return True
-    
+
     def _event_handler(self, event):
-        ''' internal event on axis input - determine if we should fire an update or not '''
+        """internal event on axis input - determine if we should fire an update or not"""
 
         if not event.is_axis:
-            return 
-            
-        # merge - check two sets 
+            return
+
+        # merge - check two sets
         if self.action_data.joy1_guid == self.action_data.joy2_guid:
             if self.action_data.joy1_input_id == self.action_data.joy2_input_id:
                 # no action on same axis input
                 return
-            if event.identifier != self.action_data.joy1_input_id and event.identifier != self.action_data.joy2_input_id:
+            if (
+                event.identifier != self.action_data.joy1_input_id
+                and event.identifier != self.action_data.joy2_input_id
+            ):
                 # matches neither inputs
                 return
-        elif event.device_guid == self.action_data.joy1_guid and event.identifier != self.action_data.joy1_input_id: 
+        elif (
+            event.device_guid == self.action_data.joy1_guid
+            and event.identifier != self.action_data.joy1_input_id
+        ):
             # no match device 1
             return
-        elif event.device_guid == self.action_data.joy2_guid and event.identifier != self.action_data.joy2_input_id: 
+        elif (
+            event.device_guid == self.action_data.joy2_guid
+            and event.identifier != self.action_data.joy2_input_id
+        ):
             # no match device 2
             return
-        
 
         value = self.action_data.computeValue()
 
@@ -495,27 +506,28 @@ class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     @QtCore.Slot()
     def profile_start(self):
-        ''' profile starts - build execution callbacks by defined container '''
-        
+        """profile starts - build execution callbacks by defined container"""
+
         # build event callback maps from subcontainers in this gated axis
         callbacks_map = {}
         for container in self.action_data.item_data.containers:
             callbacks_map[container] = container.generate_callbacks()
 
-        self._callbacks = callbacks_map  
+        self._callbacks = callbacks_map
 
-        self._joy1_value = gremlin.joystick_handling.get_curved_axis(self.action_data.joy1_guid, self.action_data.joy1_input_id)
-        self._joy2_value = gremlin.joystick_handling.get_curved_axis(self.action_data.joy2_guid, self.action_data.joy2_input_id)
+        self._joy1_value = gremlin.joystick_handling.get_curved_axis(
+            self.action_data.joy1_guid, self.action_data.joy1_input_id
+        )
+        self._joy2_value = gremlin.joystick_handling.get_curved_axis(
+            self.action_data.joy2_guid, self.action_data.joy2_input_id
+        )
 
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._event_handler)
 
-
- 
     @QtCore.Slot()
     def profile_stop(self):
-        ''' profile stops - cleanup '''
-
+        """profile stops - cleanup"""
 
         el = gremlin.event_handler.EventListener()
         el.joystick_event.disconnect(self._event_handler)
@@ -523,12 +535,9 @@ class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
         # clean up callback map
         self._callbacks.clear()
 
-        
-
 
 class MergedAxis(gremlin.base_profile.AbstractAction):
-
-    """ action data for the MergedAxis action """
+    """action data for the MergedAxis action"""
 
     name = "Merged Axis"
     tag = "merged-axis"
@@ -554,11 +563,12 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
         self.invert_output = False
         self.action_valid = True
 
-
         # set this to the current input
         joy1_input_id = self.hardware_input_id
         # get the device info
-        info = gremlin.joystick_handling.device_info_from_guid(self.hardware_device_guid)
+        info = gremlin.joystick_handling.device_info_from_guid(
+            self.hardware_device_guid
+        )
 
         # validate bounds
         if info.axis_count == 0:
@@ -576,11 +586,9 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
 
         self.joy1_guid = self.hardware_device_guid
         self.joy1_input_id = joy1_input_id
-        self.joy2_guid =  self.hardware_device_guid
+        self.joy2_guid = self.hardware_device_guid
         self.joy2_input_id = joy2_input_id
         self.operation = gremlin.types.MergeAxisOperation.Average
-
-
 
         # container holder for this action
         current_item_data = gremlin.base_profile._get_input_item(self)
@@ -591,30 +599,33 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
         item_data._is_action = True
         item_data._profile_mode = current_item_data._profile_mode
         item_data._device_name = current_item_data._device_name
-        self.item_data : gremlin.base_profile.InputItem = item_data
-
+        self.item_data: gremlin.base_profile.InputItem = item_data
 
     def computeValue(self) -> float:
-        ''' computes the output '''
+        """computes the output"""
 
-        joy1_value = gremlin.joystick_handling.get_axis(self.joy1_guid, self.joy1_input_id)
-        joy2_value = gremlin.joystick_handling.get_axis(self.joy2_guid, self.joy2_input_id)
+        joy1_value = gremlin.joystick_handling.get_axis(
+            self.joy1_guid, self.joy1_input_id
+        )
+        joy2_value = gremlin.joystick_handling.get_axis(
+            self.joy2_guid, self.joy2_input_id
+        )
 
-        if self.invert_output:
-            r_min = -1.0
-            r_max = 1.0
-            target = -value
-            value = r_min + (target + 1.0)*((r_max - r_min)/2.0)            
-    
         operation = self.operation
         if operation == gremlin.types.MergeAxisOperation.Sum:
-            value =  clamp(joy1_value + joy2_value,-1.0,1.0)
+            value = clamp(joy1_value + joy2_value, -1.0, 1.0)
         elif operation == gremlin.types.MergeAxisOperation.Maximum:
             value = max(joy1_value, joy2_value)
         elif operation == gremlin.types.MergeAxisOperation.Minimum:
             value = min(joy1_value, joy2_value)
         elif operation == gremlin.types.MergeAxisOperation.Average:
-            value = (joy1_value - joy2_value) / 2.0            
+            value = (joy1_value - joy2_value) / 2.0
+
+        if self.invert_output:
+            r_min = -1.0
+            r_max = 1.0
+            target = -value
+            value = r_min + (target + 1.0) * ((r_max - r_min) / 2.0)
 
         return value
 
@@ -624,41 +635,40 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         # load gate data
         self.entries = []
         for entry_node in node:
             operation_str = safe_read(entry_node, "operation", str, "")
             operation = gremlin.types.MergeAxisOperation.to_enum(operation_str)
 
-            joy1_guid = safe_read(entry_node, "joy1_device_id", str, None )
+            joy1_guid = safe_read(entry_node, "joy1_device_id", str, None)
             if joy1_guid:
                 self.joy1_guid = gremlin.util.parse_guid(joy1_guid)
-            self.joy1_input_id = safe_read(entry_node, "joy1_axis_id",int,0)
+            self.joy1_input_id = safe_read(entry_node, "joy1_axis_id", int, 0)
 
-            joy2_guid = safe_read(entry_node, "joy2_device_id", str, None )
+            joy2_guid = safe_read(entry_node, "joy2_device_id", str, None)
             if joy2_guid:
                 self.joy2_guid = gremlin.util.parse_guid(joy2_guid)
-            self.joy2_input_id = safe_read(entry_node, "joy2_axis_id",int,0)
-            
+            self.joy2_input_id = safe_read(entry_node, "joy2_axis_id", int, 0)
+
             invert_output = safe_read(entry_node, "reverse", bool, False)
             self.invert_output = invert_output
             self.operation = operation
-            
+
             break
         item_node = gremlin.util.get_xml_child(node, "action_containers")
         if item_node is not None:
             item_node.tag = item_node.get("type")
             self.item_data.from_xml(item_node, data)
-            
 
     def _generate_xml(self):
-         # save gate data
+        # save gate data
         node = ElementTree.Element(MergedAxis.tag)
-        #entry : MergeAxisEntryWidget = self.entry
-        operation = self.operation # entry.operation_selector.currentData()
+        # entry : MergeAxisEntryWidget = self.entry
+        operation = self.operation  # entry.operation_selector.currentData()
         operation_str = gremlin.types.MergeAxisOperation.to_string(operation)
-        entry_node = ElementTree.SubElement(node,"entry")
+        entry_node = ElementTree.SubElement(node, "entry")
         entry_node.set("operation", operation_str)
         entry_node.set("joy1_device_id", str(self.joy1_guid))
         entry_node.set("joy1_axis_id", str(self.joy1_input_id))

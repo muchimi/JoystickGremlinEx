@@ -294,7 +294,9 @@ def vjoy_handler(address, args):
                 try:
                     value = int(data)
                 except Exception as ex:
-                    gremlin.util.log(f"Bad number format: {data} - check OSC sequence\n{ex}")
+                    gremlin.util.log(
+                        f"Bad number format: {data} - check OSC sequence\n{ex}"
+                    )
                     # ignore bad data
                     continue
 
@@ -1349,10 +1351,6 @@ class OscBundle(object):
 # Shortcut to specify an immediate execution of messages in the bundle.
 
 
-class BuildError(Exception):
-    """Error raised when an error occurs building the bundle."""
-
-
 class OscBundleBuilder(object):
     """Builds arbitrary OscBundle instances."""
 
@@ -1404,10 +1402,6 @@ class OscBundleBuilder(object):
 
 
 ArgValue = Union[str, bytes, bool, int, float, MidiPacket, list]
-
-
-class BuildError(Exception):
-    """Error raised when an incomplete message is trying to be built."""
 
 
 class OscMessageBuilder(object):

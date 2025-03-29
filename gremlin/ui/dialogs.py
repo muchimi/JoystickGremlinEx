@@ -1595,7 +1595,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         ''' saves the current mappings and options '''
         pushCursor()
 
-        syslog = logging.getLogger("system")
+        logging.getLogger("system")
 
         # reflect any changes to the grid button
         eh = gremlin.event_handler.VjoyRemapEventHandler()
@@ -2310,7 +2310,6 @@ The setting can be overriden by the global mode reload option set in Options for
 
         widget, layout = gremlin.ui.ui_common.getHContainer(close_button_widget, left_stretch=True)
 
-        button_container_layout = layout
         button_container_widget = widget
 
 
@@ -2323,7 +2322,6 @@ The setting can be overriden by the global mode reload option set in Options for
 
 
         options_container_widget = widget
-        options_container_layout = layout
 
 
         # Add header information
@@ -2991,7 +2989,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
         self._device_guid = device_guid # current device GUID
         self._device_name = device_name # current device name
 
-        fm = QtGui.QFontMetrics(self.font())
+        QtGui.QFontMetrics(self.font())
 
 
 
@@ -3068,7 +3066,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
         message_box.setText(content)
         message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
-        result = message_box.exec()
+        message_box.exec()
 
     def confirm_message_box(self, content):
         message_box = QtWidgets.QMessageBox()
