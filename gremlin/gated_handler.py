@@ -1172,7 +1172,8 @@ class GateData:
         self._ec = gremlin.execution_graph.ExecutionContext()
         self.condition = condition
         self.output_mode = mode
-        self.profile_mode = profile_mode  # profile mode this gate data applies to (can be set via reading from XML)
+        self.profile_mode = profile_mode # profile mode this gate data applies to (can be set via reading from XML)
+        self.valid_mode_list = [] # valid mode list for runtime processing
         self.fixed_value = 0
         self.range_min = range_min
         self.range_max = range_max
@@ -1392,6 +1393,8 @@ class GateData:
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_event_handler)
 
+        # build allowed mode list
+        self.valid_mode_list  = gremlin.shared_state.current_profile.get_mode_branch(self.profile_mode)
         item_data: gremlin.ui.joystick_device.InputItemConfiguration
 
         gremlin.event_handler.EventHandler()
@@ -1621,6 +1624,11 @@ class GateData:
                     # non-runtime trigger updates for the UI
                     self._fire_trigger_callbacks(trigger)
                 else:
+
+                    if not gremlin.shared_state.runtime_mode in self.valid_mode_list:
+                        # incorrect mode
+                        return
+
                     # profile is running - trigger the execution node for the containers
                     # the extra data contains the trigger condition type so the correct execution path is taken
                     if verbose:
