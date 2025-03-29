@@ -1595,7 +1595,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         ''' saves the current mappings and options '''
         pushCursor()
 
-        logging.getLogger("system")
+        syslog = logging.getLogger("system")
 
         # reflect any changes to the grid button
         eh = gremlin.event_handler.VjoyRemapEventHandler()
@@ -2989,7 +2989,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
         self._device_guid = device_guid # current device GUID
         self._device_name = device_name # current device name
 
-        QtGui.QFontMetrics(self.font())
+        fm = QtGui.QFontMetrics(self.font())
 
 
 
@@ -3066,7 +3066,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
         message_box.setText(content)
         message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
-        message_box.exec()
+        result = message_box.exec()
 
     def confirm_message_box(self, content):
         message_box = QtWidgets.QMessageBox()

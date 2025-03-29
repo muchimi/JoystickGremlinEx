@@ -502,7 +502,7 @@ class MidiListener(AbortableThread):
                         
                 if verbose:
                     syslog.info(f"MIDI: close port {self.port_number}")
-        except Exception:
+        except Exception as err:
             syslog.error(f"MIDI: unable to open port {self.port_name} {self.port_number} - ensure another utility is not using this port.")
 
 
@@ -1845,7 +1845,7 @@ class MidiClient(QtCore.QObject):
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
         self._midi_map = {}  # list of message keys
-        gremlin.ui.ui_common.DeviceWidgetTracker()
+        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         self._event_listener.request_midi.connect(self._request_midi_state)
         #self._event_listener.profile_loaded.connect(self._update_messages)
         self._event_listener.profile_start.connect(self._profile_start)

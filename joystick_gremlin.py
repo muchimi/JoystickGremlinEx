@@ -811,6 +811,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         """returns the current active profile mode"""
         return gremlin.shared_state.current_mode
 
+    @property
+    def current_profile(self) -> gremlin.base_profile.Profile:
+        return gremlin.shared_state.current_profile
 
     def calibration(self):
         """Opens the calibration window."""

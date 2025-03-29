@@ -2997,7 +2997,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' listens to an inbound OSC message '''
 
 
-        gremlin.config.Configuration()
+        config = gremlin.config.Configuration()
         self.listener_dialog = OscInputListenerWidget(self._capture_message)
 
         # Display the dialog centered in the middle of the UI
@@ -3634,7 +3634,7 @@ class InputOscClient(QtCore.QObject):
         # get the input items behind this message
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         current_mode = gremlin.shared_state.current_mode
-        tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
+        cache = tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
         command = OscInputItem.CommandMode.Message
         # look for the the message
         message_key = OscInputItem.toMessageKey(command, message, args)
@@ -3655,7 +3655,7 @@ class InputOscClient(QtCore.QObject):
         #             widget_map[source] = widget
 
         
-        gremlin.config.Configuration().verbose_mode_osc
+        verbose = gremlin.config.Configuration().verbose_mode_osc
         normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args]
         hits = [key for key in self._osc_map if key.startswith(message)]
         for hit_key in hits:

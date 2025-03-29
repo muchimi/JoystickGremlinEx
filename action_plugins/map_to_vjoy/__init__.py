@@ -2743,7 +2743,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         except gremlin.error.GremlinError as e:
             util.display_error(
                 f"A needed vJoy device is not accessible: {e}\n\n"
-                + "Default values have been set for the input, but they are "
+                "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
             syslog.error(str(e))
