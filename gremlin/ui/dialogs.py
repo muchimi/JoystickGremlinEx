@@ -27,7 +27,6 @@ import dinput
 
 import gremlin
 from PySide6.QtGui import QIcon as load_icon
-from PySide6.QtWidgets import QMessageBox
 from gremlin.clipboard import Clipboard
 import gremlin.config
 import gremlin.event_handler
@@ -42,13 +41,11 @@ import gremlin.ui.ui_common
 import gremlin.ui.ui_about as ui_about
 import gremlin.ui.ui_common as ui_common
 
-from gremlin.util import load_icon, userprofile_path, load_pixmap, pushCursor, popCursor
+from gremlin.util import load_icon, load_pixmap, pushCursor, popCursor
 import logging
 from gremlin.input_types import InputType
 import gremlin.base_profile
-import uuid
 from lxml import etree
-import dinput
 import gremlin.util
 
 syslog = logging.getLogger("system")
@@ -134,7 +131,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         start_mode = mode if mode else self.profile.get_start_mode()
         default_mode = self.profile.get_default_mode()
-        if not start_mode in self.mode_list:
+        if start_mode not in self.mode_list:
             # the start mode no longer exists - use the default mode
             syslog.warning(f"Specified start mode {start_mode} no longer exists - using default mode {default_mode}")
             default_mode = self.profile.get_default_mode()
@@ -1030,7 +1027,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         row = 0
         col = 0
-        layout.addWidget(QtWidgets.QLabel(f"Local OSC Server:"), row, col)
+        layout.addWidget(QtWidgets.QLabel("Local OSC Server:"), row, col)
         col+=1
         layout.addWidget(local_host_ip_widget, row, col)
         col+=1
@@ -1944,7 +1941,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self._data = None
 
         if text and os.path.isfile(text):
-            if not text in process_list:
+            if text not in process_list:
                 # selected item is not in the running process list
                 self._browse(text)
 
@@ -2502,7 +2499,7 @@ The setting can be overriden by the global mode reload option set in Options for
         mode_map = {}
         for device in self._profile.devices:
             for mode in self._profile.devices[device].modes:
-                if not mode in mode_map:
+                if mode not in mode_map:
                     mode_map[mode] = self._profile.devices[device].modes[mode]
         return mode_map
 
@@ -2792,7 +2789,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             s_list.append(f"{var_name}_GUID = \"{entry.device_guid}\"")
             for mode_name in mode_list:
                 mode_suffix = mode_name.replace(" ","_")
-                if not mode_name in a_map.keys():
+                if mode_name not in a_map.keys():
                     a_map[mode_name] = set()
                 a_map[mode_name].add(f"{var_name}_{mode_suffix} = gremlin.input_devices.JoystickDecorator({var_name}_NAME, {var_name}_GUID, \"{mode_name}\")")
 
@@ -3132,7 +3129,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
             parser = etree.XMLParser(remove_blank_text=True)
             root = etree.parse(xml_file, parser)
 
-            nodes = root.xpath(f'//device') # iterate through all because we need to compare case for guid
+            nodes = root.xpath('//device') # iterate through all because we need to compare case for guid
             for node in nodes:
                 tmp_guid = node.get("device-guid")
                 if tmp_guid.casefold() == current_guid.casefold():

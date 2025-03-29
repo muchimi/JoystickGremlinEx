@@ -213,7 +213,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
                         #     data.device_type,
                         #     data.input_name
                         # )
-                        if not data in processed:  
+                        if data not in processed:  
                             if use_prefix and input_type not in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
                                 self.input_widget.addItem(f"[{mode}] {data.input_name}", data)
                             else:

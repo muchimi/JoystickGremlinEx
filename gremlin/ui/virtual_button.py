@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore
 
 import gremlin
 import gremlin.shared_state
@@ -185,11 +185,11 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
                 case gremlin.types.AxisButtonDirection.Below:
                     if value < self.last_value:   
-                        self.range_status_widget.setText(f"(below)")
+                        self.range_status_widget.setText("(below)")
                         visible = True
                 case gremlin.types.AxisButtonDirection.Above:
                     if value > self.last_value:   
-                        self.range_status_widget.setText(f"(below)")
+                        self.range_status_widget.setText("(below)")
                         visible = True
 
 

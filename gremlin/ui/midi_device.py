@@ -32,7 +32,7 @@ import uuid
 import mido
 from gremlin.singleton_decorator import SingletonDecorator
 
-from gremlin.util import parse_guid, byte_list_to_string
+from gremlin.util import byte_list_to_string
 import gremlin.event_handler
 import gremlin.config 
 from gremlin.base_classes import AbstractInputItem
@@ -502,7 +502,7 @@ class MidiListener(AbortableThread):
                         
                 if verbose:
                     syslog.info(f"MIDI: close port {self.port_number}")
-        except Exception as err:
+        except Exception:
             syslog.error(f"MIDI: unable to open port {self.port_name} {self.port_number} - ensure another utility is not using this port.")
 
 
@@ -610,7 +610,7 @@ class MidiInterface(QtCore.QObject):
         # request stop
         verbose = gremlin.config.Configuration().verbose_mode_details
         if verbose:
-            syslog.info(f"MIDI Interface: STOP listen requested")
+            syslog.info("MIDI Interface: STOP listen requested")
 
 
         for port_number in self._monitored_ports:
@@ -688,7 +688,7 @@ class MidiInputListenerWidget(QBoxFrame):
         self._interface.midi_message.connect(self._midi_message)
         self._callback = callback
 
-        if port_name and not port_name in self._interface.ports:
+        if port_name and port_name not in self._interface.ports:
             syslog.error(f"MIDI listener: invalid port name: {port_name}")
             self.close()
             return
@@ -721,7 +721,7 @@ class MidiInputListenerWidget(QBoxFrame):
 
 
     def _kb_event_cb(self, event):
-        from gremlin.keyboard import key_from_code, key_from_name
+        from gremlin.keyboard import key_from_name
         key =  gremlin.keyboard.KeyMap.from_event(event)
         if event.is_pressed and key == key_from_name("esc"):
 
@@ -1018,13 +1018,13 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             with QtCore.QSignalBlocker(self._mode_button_widget):
                 self._mode_button_widget.setChecked(True)
         elif self._mode == MidiInputItem.InputMode.Axis:
-            self._container_mode_description_widget.setText(f"The input act as an axis input using the MIDI value.<br>Use this mode if mapping to an axis output (MIDI value messages only)")
+            self._container_mode_description_widget.setText("The input act as an axis input using the MIDI value.<br>Use this mode if mapping to an axis output (MIDI value messages only)")
             # turn off the value when in axis mode as it will change
             display_b_data = False
             with QtCore.QSignalBlocker(self._mode_axis_widget):
                 self._mode_axis_widget.setChecked(True)
         elif self._mode == MidiInputItem.InputMode.OnChange:
-            self._container_mode_description_widget.setText(f"The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the MIDI command value changes.")
+            self._container_mode_description_widget.setText("The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the MIDI command value changes.")
             with QtCore.QSignalBlocker(self._mode_on_change_widget):
                 self._mode_on_change_widget.setChecked(True)                
             
@@ -1155,7 +1155,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 elif self._mode == MidiInputItem.InputMode.OnChange:
                     with QtCore.QSignalBlocker(self._mode_on_change_widget):
                         self._mode_on_change_widget.setChecked(True)
-                self._validation_message_widget.setText(f"The current MIDI command cannot be setup as an axis input.")
+                self._validation_message_widget.setText("The current MIDI command cannot be setup as an axis input.")
                 warning_color = gremlin.ui.ui_common.Color.warningColor()
                 icon_color= QtGui.QColor(warning_color)
                 self._validation_message_widget.setIcon("ph.shield-warning-fill",True,color=icon_color)
@@ -1772,7 +1772,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     conflicted_widgets.append(input_widget)
                     break
 
-        ok_widgets = [widget for widget in widgets if not widget in conflicted_widgets]
+        ok_widgets = [widget for widget in widgets if widget not in conflicted_widgets]
         for widget in ok_widgets:
             self._set_status(widget)
         
@@ -1891,12 +1891,12 @@ class MidiClient(QtCore.QObject):
 
             if not self._started:
                 
-                if verbose: syslog.info(f"MIDI: Start")
+                if verbose: syslog.info("MIDI: Start")
                 self._start()
             else:
-                syslog.info(f"MIDI: Running")
+                syslog.info("MIDI: Running")
         else:
-            syslog.info(f"MIDI: no MIDI mappings found - start skipped")    
+            syslog.info("MIDI: no MIDI mappings found - start skipped")    
 
                 
     def registerInput(self, input_item):
@@ -1910,9 +1910,9 @@ class MidiClient(QtCore.QObject):
                 self._start()
 
             message_key = input_item.message_key
-            if not current_mode in self._midi_map:
+            if current_mode not in self._midi_map:
                 self._midi_map[current_mode] = {}
-            if not message_key in self._midi_map[current_mode]:
+            if message_key not in self._midi_map[current_mode]:
                 self._midi_map[current_mode][message_key] = []
         
             self._midi_map[current_mode][message_key].append(input_item)
@@ -1944,7 +1944,7 @@ class MidiClient(QtCore.QObject):
         if profile:
             self._midi_map = {}  # list of message keys
             current_mode = gremlin.shared_state.current_mode
-            if not current_mode in self._midi_map:
+            if current_mode not in self._midi_map:
                 self._midi_map[current_mode] = {}
             if verbose: syslog.info("MIDI: reload map")
             for device in profile.devices.values():
@@ -1954,7 +1954,7 @@ class MidiClient(QtCore.QObject):
                             for input_item in input_items:
                                 if isinstance(input_item, MidiInputItem):
                                     message_key = input_item.message_key
-                                    if not message_key in self._midi_map[current_mode]:
+                                    if message_key not in self._midi_map[current_mode]:
                                         self._midi_map[current_mode][message_key] = []
                                     if input_item.port_valid:
                                         self._midi_map[current_mode][message_key].append(input_item)

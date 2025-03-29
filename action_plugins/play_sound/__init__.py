@@ -100,7 +100,6 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.play_widget.setEnabled(valid)
 
     def _setIcon(self, icon_path = None, use_qta = True, color = None):
-        import qtawesome as qta
         from gremlin.util import load_pixmap
         icon_size = QtCore.QSize(16, 16)
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''

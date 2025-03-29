@@ -21,11 +21,8 @@ import time
 import threading
 import anytree
 import os
-from typing import Optional
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
-import PySide6.QtGui
-import PySide6.QtWidgets
 import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.clipboard
@@ -34,7 +31,6 @@ import gremlin.error
 import qtawesome as qta
 import gremlin.event_handler
 from gremlin.input_types import InputType
-from  gremlin.clipboard import Clipboard
 import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.keyboard
@@ -46,7 +42,7 @@ from qtpy.QtCore import (
     Slot, Property)
 
 from qtpy.QtWidgets import QCheckBox
-from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter, QStandardItemModel, QStandardItem
+from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
 import gremlin.ui.ui_common
@@ -391,13 +387,13 @@ class DeviceWidgetTracker():
             mode = self.any_mode
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
-        if not device_guid in self._widget_cache:
+        if device_guid not in self._widget_cache:
             self._widget_cache[device_guid] = {}
-        if not mode in self._widget_cache[device_guid]:
+        if mode not in self._widget_cache[device_guid]:
             self._widget_cache[device_guid][mode] = {}
-        if not input_type in self._widget_cache[device_guid][mode]:
+        if input_type not in self._widget_cache[device_guid][mode]:
             self._widget_cache[device_guid][mode][input_type] = {}
-        if not input_id in self._widget_cache[device_guid][mode][input_type]:
+        if input_id not in self._widget_cache[device_guid][mode][input_type]:
             self._widget_cache[device_guid][mode][input_type][input_id] = {}
 
         self._widget_cache[device_guid][mode][input_type][input_id][key] = widget
@@ -474,9 +470,9 @@ class StateTracker():
     def registerButtonState(self, widget, device_guid, input_type, input_id):
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
-        if not device_guid in self._button_cache:
+        if device_guid not in self._button_cache:
             self._button_cache[device_guid] = {}
-        if not input_type in self._button_cache[device_guid]:
+        if input_type not in self._button_cache[device_guid]:
             self._button_cache[device_guid][input_type] = {}
         key = self._key(input_id)
         if key:
@@ -500,9 +496,9 @@ class StateTracker():
             widget.deleted.connect(self._widget_deleted)
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
-        if not device_guid in self._axis_cache:
+        if device_guid not in self._axis_cache:
             self._axis_cache[device_guid] = {}
-        if not input_type in self._axis_cache[device_guid]:
+        if input_type not in self._axis_cache[device_guid]:
             self._axis_cache[device_guid][input_type] = {}
         key = self._key(input_id)
         # print (f"Add axis {key}")
@@ -626,9 +622,9 @@ class StateTracker():
         ''' stores the last button state for the given input '''
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
-        if not device_guid in self._state_cache:
+        if device_guid not in self._state_cache:
             self._state_cache[device_guid] = {}
-        if not input_type in self._state_cache[device_guid]:
+        if input_type not in self._state_cache[device_guid]:
             self._state_cache[device_guid][input_type] = {}
         # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
         # print (f"Store: {device_name} {InputType.to_display_name(input_type)} {input_id} state: {state}")
@@ -1978,7 +1974,7 @@ class ActionSelector(QtWidgets.QWidget):
         if clipboard.is_action:
             self.paste_button.setToolTip(f"Paste action ({clipboard.data.name})")
         else:
-            self.paste_button.setToolTip(f"Paste action (not available)")
+            self.paste_button.setToolTip("Paste action (not available)")
 
 class ModeStyle(anytree.AbstractStyle):
     """ style for anytree mode rendering """
@@ -2088,12 +2084,12 @@ class ModeWidget(QtWidgets.QWidget):
         syslog.info(f"Mode: set edit selector mode to [{mode}]")
         index =  self.edit_mode_selector.findData(mode)
         if index >= 0:
-            syslog.info(f"Mode: mode exists")
+            syslog.info("Mode: mode exists")
             with QtCore.QSignalBlocker(self.edit_mode_selector):
                 self.edit_mode_selector.setCurrentIndex(index)
         else:
             # not found, update the selector
-            syslog.info(f"Mode: mode does not exist, repopulating")
+            syslog.info("Mode: mode does not exist, repopulating")
             self.populate_selector(gremlin.shared_state.current_profile, mode)
 
     def populate_selector(self, profile, mode_to_select : str = None, emit : bool = False):
@@ -2140,7 +2136,7 @@ class ModeWidget(QtWidgets.QWidget):
             select_index = None
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
 
-            if not last_edit_mode in modes:
+            if last_edit_mode not in modes:
                 last_edit_mode = gremlin.shared_state.current_profile.get_default_mode()
 
             for display_name, mode_name in mode_list_pairs:
@@ -2335,7 +2331,7 @@ class InputListenerWidget(QBoxFrame):
         :param parent the parent widget of this widget
         """
         super().__init__(parent)
-        from gremlin.keyboard import key_from_code, key_from_name
+        from gremlin.keyboard import key_from_name
         self._event_types = event_types
         self._return_kb_event = return_kb_event
         self._multi_keys = multi_keys
@@ -3233,7 +3229,6 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def hookDevice(self, device_guid, input_type, input_id):
         ''' hooks the input  '''
-        import gremlin.joystick_handling
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
@@ -3342,7 +3337,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
             position =  vjoy.vjoy.Hat.to_continuous_position[position]
         position = HatDirection.to_enum(position) 
         
-        if not position in self._hat_icons:
+        if position not in self._hat_icons:
             match position:
                 case HatDirection.Center:
                     png = "hat_ctr_inactive.png"

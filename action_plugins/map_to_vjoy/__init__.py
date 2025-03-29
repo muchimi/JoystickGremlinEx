@@ -1510,7 +1510,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             with QtCore.QSignalBlocker(self.step_count_widget):
                 self.step_count_widget.setValue(steps)
 
-            if not self.action_data.target_step_index in self.action_data.target_step_list:
+            if self.action_data.target_step_index not in self.action_data.target_step_list:
                 # reset the default if no longer in the list
                 self.action_data.target_step_index = 0
 
@@ -1576,7 +1576,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         count = len(data)
         if count >= 20:
             # syslog = logging.getLogger("system")
-            syslog.error(f"VJOY: unable to add more than 20 steps.")
+            syslog.error("VJOY: unable to add more than 20 steps.")
             return
         if count > 1:
             v1 = data[0]
@@ -1943,7 +1943,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _grab_handler(self):
         ''' grab the min value from the axis position '''
         value = gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
-        if not value in self.action_data.target_step_list:
+        if value not in self.action_data.target_step_list:
             self.action_data.target_step_list.append(value)
             self.action_data.target_step_list.sort()
             self._ensure_step_widgets()
@@ -2118,9 +2118,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             action_mode = self._get_action_mode()
             self.setWarning(None) # clear any warnings
 
-            if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
+            if self.action_data.vjoy_device_id not in self.action_data.vjoy_map:
                 self.action_data.refresh_vjoy()
-                if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
+                if self.action_data.vjoy_device_id not in self.action_data.vjoy_map:
                     self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_device_id}")
                     return
 
@@ -2332,9 +2332,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_input_grid(self):
         ''' create a grid of buttons for easy selection'''
 
-        if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
+        if self.action_data.vjoy_device_id not in self.action_data.vjoy_map:
                 self.action_data.refresh_vjoy()
-                if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
+                if self.action_data.vjoy_device_id not in self.action_data.vjoy_map:
                     gremlin.ui.ui_common.MessageBox(prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_device_id}")
                     return
 
@@ -3344,12 +3344,12 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release):
                     if event.device_guid == self.action_data.hardware_device_guid and event.identifier == self.action_data.hardware_input_id:
                         # up direction
-                        syslog.info(f"Step up")
+                        syslog.info("Step up")
                         index +=1
                         trigger = True
                     elif event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id:
                         # down direction
-                        syslog.info(f"Step down")
+                        syslog.info("Step down")
                         index -= 1
                         trigger = True
 
@@ -3876,10 +3876,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
             vjoy_id = safe_read(node, "vjoy", int)
-            if not vjoy_id in self.vjoy_map:
+            if vjoy_id not in self.vjoy_map:
                 self.refresh_vjoy() # ensure we have the latest device list
 
-            if not vjoy_id in self.vjoy_map:
+            if vjoy_id not in self.vjoy_map:
                 syslog.error(f"Profile load: vjoy device {vjoy_id} was not found in the list of valid VJOY devices")
                 self.vjoy_axis_id = 1
                 self.vjoy_button_id = 1

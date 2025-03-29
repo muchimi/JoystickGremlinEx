@@ -20,7 +20,7 @@ import os
 import shutil
 from lxml import etree
 
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtCore
 
 import gremlin.base_classes
 import gremlin.base_profile
@@ -30,7 +30,6 @@ import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
-import gremlin.util
 import gremlin.util
 from .SimConnect import *
 from .SimConnect.SimConnect import *
@@ -687,7 +686,7 @@ class SimConnectManager(QtCore.QObject):
 
 
     def _register_feed(self, command):
-        if not command in self._registered_feed_blocks:
+        if command not in self._registered_feed_blocks:
             block = SimConnectBlock()
             block.command = command
             block.command_type = SimConnectCommandType.Request
@@ -736,7 +735,7 @@ class SimConnectManager(QtCore.QObject):
         s_command, b_command = gremlin.util.to_byte_string(command)
         key = s_command.casefold()
         _, b_datatype = gremlin.util.to_byte_string(datatype)
-        if not key in self._registered_requests:
+        if key not in self._registered_requests:
             request = Request(definitions = (b_command, b_datatype), sm = self.sm, settable = settable)
             request._ensure_def()
             self._registered_requests[key] = request
@@ -805,7 +804,7 @@ class SimConnectManager(QtCore.QObject):
                 root.remove(node)
 
             for node in root.xpath("//command"):
-                if not "value" in node.attrib:
+                if "value" not in node.attrib:
                     root.remove(node)
 
 
@@ -857,7 +856,7 @@ class SimConnectManager(QtCore.QObject):
     def _connected_cb(self):
         self._is_connected = True
         if self.verbose:
-            syslog.info(f"Simconnect Event: connected")
+            syslog.info("Simconnect Event: connected")
 
         self.setFeedEnabled(True)
 
@@ -865,7 +864,7 @@ class SimConnectManager(QtCore.QObject):
     def _disconnected_cb(self):
         self._is_connected = False
         if self.verbose:
-            syslog.info(f"Simconnect Event: disconnected")
+            syslog.info("Simconnect Event: disconnected")
 
         self.setFeedEnabled(False)
 
@@ -880,18 +879,18 @@ class SimConnectManager(QtCore.QObject):
     def _paused_cb(self):
         self._is_paused = True
         if self.verbose:
-            syslog.info(f"Simconnect Event: paused")
+            syslog.info("Simconnect Event: paused")
 
     @QtCore.Slot()
     def _unpaused_cb(self):
         if self.verbose:
             self._is_paused = False
-            syslog.info(f"Simconnect Event: unpaused")
+            syslog.info("Simconnect Event: unpaused")
 
     @QtCore.Slot()
     def _start_cb(self):
         if self.verbose:
-            syslog.info(f"Simconnect Event: started")
+            syslog.info("Simconnect Event: started")
             self._is_started = True
             self.sim_start.emit()
             # update the aircraft
@@ -901,7 +900,7 @@ class SimConnectManager(QtCore.QObject):
     @QtCore.Slot()
     def _stop_cb(self):
         if self.verbose:
-            syslog.info(f"Simconnect Event: stopped")
+            syslog.info("Simconnect Event: stopped")
             self._is_started = False
             self.sim_stop.emit()
 
@@ -1078,7 +1077,7 @@ class SimConnectManager(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
-        if verbose: syslog.info(f"SIMCONNECT MGR: reconnect...")
+        if verbose: syslog.info("SIMCONNECT MGR: reconnect...")
 
         try:
             
@@ -1110,7 +1109,7 @@ class SimConnectManager(QtCore.QObject):
                     pass
 
                 if not self._sm.ok:
-                    syslog.error(f"SIMCONNECT: connect failed")
+                    syslog.error("SIMCONNECT: connect failed")
                     el = gremlin.event_handler.EventListener()
                     if gremlin.shared_state.is_running:
                         if not self._connect_warning_issued:
@@ -1635,7 +1634,7 @@ class SimConnectManager(QtCore.QObject):
         _, b_readback = gremlin.util.to_byte_string(readback_command)
         
         key = s_command.casefold()
-        if not key in self._registered_events:
+        if key not in self._registered_events:
             self._registered_events[key] = self._sm.map_to_sim_event(b_command)
         
         if key in self._registered_events:
@@ -2133,23 +2132,23 @@ class SimConnectBlock():
 
         if self._command:
             if self._command_type == SimConnectCommandType.Event:
-                if verbose: syslog.info(f"\tcommand type: event")
+                if verbose: syslog.info("\tcommand type: event")
                 ae = AircraftEvents(self.sm)
                 trigger = ae.find(self._command)
                 if trigger:
                     if self.is_readonly:
                         # no param to set
-                        if verbose: syslog.info(f"\ttrigger event (single) readonly")
+                        if verbose: syslog.info("\ttrigger event (single) readonly")
                         trigger()
                     else:
-                        if verbose: syslog.info(f"\ttrigger event value")
+                        if verbose: syslog.info("\ttrigger event value")
                         trigger(value)
                     return True
                 else:
                     syslog.error(f"SIMCONNECT: event: '{self._command}' not found")
             elif self._command_type == SimConnectCommandType.SimVar:
                 # set simvar
-                if verbose: syslog.info(f"\tcommand type: simvar")
+                if verbose: syslog.info("\tcommand type: simvar")
                 ae = AircraftEvents(self.sm)
                 request = mgr.findRequest(self._command)
                 if not request:
@@ -2167,7 +2166,7 @@ class SimConnectBlock():
                 
                 if not request:
                     # register it
-                    if verbose: syslog.info(f"\tregistering request...")
+                    if verbose: syslog.info("\tregistering request...")
                     request = mgr.registerRequest(self._command, self._units, self._value)
                 if not request:
                     syslog.error(f"\trequest: '{self._command}' not found or could not be registered.")
@@ -2179,7 +2178,7 @@ class SimConnectBlock():
                 ar = AircraftRequests()
                 if mode == SimConnectActionMode.Trigger:
                     trigger_mode = self.trigger_mode
-                    if verbose: syslog.info(f"\taircraft request trigger mode")
+                    if verbose: syslog.info("\taircraft request trigger mode")
                     match trigger_mode:
                         case  SimConnectTriggerMode.Toggle:
                             # get the current state and flip it
@@ -2207,7 +2206,7 @@ class SimConnectBlock():
                     request.set(value)
 
                 elif mode == SimConnectActionMode.SetValue:
-                    if verbose: syslog.info(f"\tset value mode:")
+                    if verbose: syslog.info("\tset value mode:")
                     ar.set(self._command, value)
                     if verbose: syslog.info(f"\t\tSet value: {value}")
                 elif mode == SimConnectActionMode.GetValue:
@@ -2222,7 +2221,7 @@ class SimConnectBlock():
 
 
             elif self._command_type == SimConnectCommandType.Request and not self._readonly:
-                if verbose: syslog.info(f"\tcommand type: request")
+                if verbose: syslog.info("\tcommand type: request")
                 ar = AircraftRequests(self.sm, time=2000)
                 self._request = ar.request(self._command)
                 if self._request:

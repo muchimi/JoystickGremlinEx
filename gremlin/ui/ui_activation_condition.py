@@ -16,14 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 import logging
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
-from gremlin import hints, input_devices, macro, util
+from gremlin import hints, util
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
@@ -31,7 +31,6 @@ import gremlin.ui
 import gremlin.ui.ui_common
 from gremlin.util import load_icon
 import gremlin.util
-import gremlin.base_classes as bc
 from . import ui_common
 from gremlin.base_conditions import *
 import gremlin.keyboard
@@ -125,7 +124,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
             self.activation_count_widget.setText(f"Container action conditions ({self.container.condition_count} found):")
         else:
             # not a container
-            self.activation_count_widget.setText(f"Conditions:")  
+            self.activation_count_widget.setText("Conditions:")  
 
     def _show_hint(self, state):
         """Shows a help message.
@@ -507,7 +506,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Inside")
         self.comparison_dropdown.addItem("Outside")
-        if not self.condition_data.comparison in ("inside","outside"):
+        if self.condition_data.comparison not in ("inside","outside"):
             self.condition_data.comparison = "inside"
             
         self.comparison_dropdown.setCurrentText(self.condition_data.comparison.capitalize())
@@ -555,7 +554,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
-        if not self.condition_data.comparison in ("pressed","released"):
+        if self.condition_data.comparison not in ("pressed","released"):
             self.condition_data.comparison = "pressed"
         self.comparison_dropdown.setCurrentText(self.condition_data.comparison.capitalize())
         self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
@@ -585,7 +584,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         ]
 
         self.comparison_dropdown = ui_common.QHatSelectorComboBox()
-        if not self.condition_data.comparison or not self.condition_data.comparison.capitalize() in directions:
+        if not self.condition_data.comparison or self.condition_data.comparison.capitalize() not in directions:
             self.condition_data.comparison = "center"
 
         self.comparison_dropdown.setValue(self.condition_data.comparison)
@@ -826,7 +825,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.comparison_widget = ui_common.QComboBox()
         self.comparison_widget.addItem("Inside")
         self.comparison_widget.addItem("Outside")
-        if not self.condition_data.comparison in ("inside","outside"):
+        if self.condition_data.comparison not in ("inside","outside"):
             self.condition_data.comparison = "inside"
         self.comparison_widget.setCurrentText(self.condition_data.comparison.capitalize())
         self.comparison_widget.currentTextChanged.connect(self._comparison_changed_cb)
@@ -855,7 +854,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.comparison_widget = ui_common.QComboBox()
         self.comparison_widget.addItem("Pressed")
         self.comparison_widget.addItem("Released")
-        if not self.condition_data.comparison in ("pressed","released"):
+        if self.condition_data.comparison not in ("pressed","released"):
             self.condition_data.comparison = "pressed"
         self.comparison_widget.setCurrentText(self.condition_data.comparison.capitalize())
         self.comparison_widget.currentTextChanged.connect(self._comparison_changed_cb)
@@ -876,7 +875,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             "South", "South West", "West", "North West"
         ]
         self.comparison_widget = ui_common.QHatSelectorComboBox()
-        if not self.condition_data.comparison or not self.condition_data.comparison.capitalize() in directions:
+        if not self.condition_data.comparison or self.condition_data.comparison.capitalize() not in directions:
             self.condition_data.comparison = "center"
         self.comparison_widget.setValue(self.condition_data.comparison)
         self.comparison_widget.valueChanged.connect(self._comparison_changed_cb)
@@ -897,14 +896,14 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.condition_data.input_id = data["input_id"]
 
         if data["input_type"] == InputType.JoystickAxis:
-            if not self.condition_data.comparison in ("inside","outside"):
+            if self.condition_data.comparison not in ("inside","outside"):
                 self.condition_data.comparison = "inside"
         elif data["input_type"] == InputType.JoystickButton:
-            if not self.condition_data.comparison in ("pressed","released"):
+            if self.condition_data.comparison not in ("pressed","released"):
                 self.condition_data.comparison = "pressed"
         elif data["input_type"] == InputType.JoystickHat:
             directions = ("center", "north", "north-east", "east", "south-east","south", "south-west", "west", "north-west")
-            if not self.condition_data.comparison in directions:
+            if self.condition_data.comparison not in directions:
                 self.condition_data.comparison = "center"
         self._create_ui()
 

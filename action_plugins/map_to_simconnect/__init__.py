@@ -22,15 +22,12 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
 import gremlin.config
-import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
 import gremlin.shared_state
 
-import gremlin.shared_state
-import gremlin.shared_state
 import gremlin.singleton_decorator
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -49,7 +46,6 @@ import gremlin.config
 import gremlin.joystick_handling
 import gremlin.actions
 import gremlin.curve_handler
-from gremlin.input_types import InputType
 from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
 
 syslog = logging.getLogger("system")
@@ -350,7 +346,7 @@ class SimconnectOptions():
                 continue
             if "a350" in key:
                 pass
-            if not key in self._aircraft_definition_map:
+            if key not in self._aircraft_definition_map:
                 item = SimconnectAicraftDefinition(sim_name = aircraft, 
                                                    entry_type=SimconnectAicraftDefinition.EntryType.Sim,
                                                    )
@@ -441,15 +437,15 @@ class SimconnectOptions():
                 continue
             a_list.append(item.key)
             if not item.mode:
-                item.error_status = f"Mode not selected"
+                item.error_status = "Mode not selected"
                 valid = False
                 continue
-            if not item.mode in self._mode_list:
+            if item.mode not in self._mode_list:
                 item.error_status = f"Invalid mode {item.mode}"
                 valid = False
                 continue
             if not item.display_name:
-                item.error_status = f"Aircraft name cannot be blank"
+                item.error_status = "Aircraft name cannot be blank"
                 valid = False
 
         return valid
@@ -644,7 +640,7 @@ class SimconnectOptions():
                                                         state_folder = state_folder,
                                                         sim_name = sim_name,
                                                         entry_type = entry_type)
-                    if not key in self._aircraft_definition_map:
+                    if key not in self._aircraft_definition_map:
                         self._aircraft_definition_map[key] = item
                     
 
@@ -1014,7 +1010,7 @@ class SimconnectOptions():
                 break
 
             item = self._read_aicraft_config(ac_file)
-            if item and not item.key in keys:
+            if item and item.key not in keys:
                 # avoid duplicate entries
                 items.append(item)
                 keys.append(item.key)
@@ -1130,7 +1126,7 @@ class SimconnectMonitor():
         self._startup_mode = {} # reset the mode cache
         self._enabled = enabled
         if enabled:
-            syslog.info(f"SCMONITOR: Start")
+            syslog.info("SCMONITOR: Start")
 
             # change to the correct mode
             self._manager.request_loaded_aircraft()
@@ -1141,7 +1137,7 @@ class SimconnectMonitor():
             self.start()
         else:
             self.stop() # stop monitoring if it was
-            syslog.info(f"SCMONITOR: no simconnect mappings found - start skipped")
+            syslog.info("SCMONITOR: no simconnect mappings found - start skipped")
 
     
     def start(self):
@@ -1238,14 +1234,14 @@ class SimconnectMonitor():
     def _sim_start(self):
         ''' sim started event '''
         # syslog = logging.getLogger("system")
-        if self._verbose: syslog.info(f"SCMONITOR: sim start")
+        if self._verbose: syslog.info("SCMONITOR: sim start")
 
 
     @QtCore.Slot()
     def _sim_stop(self):
         ''' sim stop event '''
         # syslog = logging.getLogger("system")
-        if self._verbose: syslog.info(f"SCMONITOR: sim stop")
+        if self._verbose: syslog.info("SCMONITOR: sim stop")
         eh = gremlin.event_handler.EventListener()
         eh.request_profile_stop.emit("Sim Stop")
 
@@ -2401,7 +2397,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         mode = widget.currentData()
         item, _ = widget.data
         items = self._get_selected()
-        if not item in items:
+        if item not in items:
             # include the current item if not in the selection
             items.append(item)
         mode_index = None
@@ -2435,7 +2431,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         ''' mode from aicraft button '''
         aircraft, model, title = self._sm_data.get_aircraft_data()
         if self._verbose: syslog.info(f"Aircraft: {aircraft} model: {model} title: {title}")
-        if not title in self._mode_list:
+        if title not in self._mode_list:
             self.profile.add_mode(title)
             
 
@@ -3970,7 +3966,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
             if command_type == SimConnectCommandType.SimVar:
                 if block is None:
-                    syslog.warning(f"SIMCONNECT: Error: Simvar Block not set")    
+                    syslog.warning("SIMCONNECT: Error: Simvar Block not set")    
                     return True        
                 if not block.valid:
                     # invalid command

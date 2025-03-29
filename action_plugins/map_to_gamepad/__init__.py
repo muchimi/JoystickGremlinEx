@@ -46,7 +46,6 @@ import vigem.vigem_commons as vc
 from enum import Enum, auto
 
 import gremlin.util
-from gremlin.types import GamePadOutput
 
 syslog = logging.getLogger("system")
 

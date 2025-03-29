@@ -29,13 +29,13 @@ import gremlin.joystick_handling
 
 
 
-from . import common, error, util
+from . import error, util
 from vjoy import vjoy
 from dinput import DeviceSummary
 from gremlin.input_types import InputType
 import gremlin.config
 
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore
 
 # List of all joystick devices
 _joystick_devices = [] # all devices
@@ -267,7 +267,7 @@ def registerSpecialDevice(dev : DeviceSummary):
     assert (_joystick_initialized)
     device_guid = dev.device_guid
     device_id = dev.device_id
-    if not device_id in _joystick_device_guid_map:
+    if device_id not in _joystick_device_guid_map:
         _joystick_device_guid_map[device_guid] = dev
         _joystick_device_guid_map[device_id] = dev
         verbose = gremlin.config.Configuration().verbose_mode_details
@@ -298,7 +298,6 @@ def known_devices() -> list:
 
 def device_info_from_guid(device_guid : str | dinput.GUID) -> DeviceSummary:
     ''' gets physical device information '''
-    import gremlin.shared_state
     assert (_joystick_initialized)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
@@ -389,7 +388,7 @@ def _scan_dinput():
 
     for device_index in range(device_count):
         dev = dinput.DILL.get_device_information_by_index(device_index)
-        if not dev.device_guid in _joystick_device_guid_map:
+        if dev.device_guid not in _joystick_device_guid_map:
             syslog.info(f"\tindex: [{device_index}] {str(dev)}")
             _joystick_devices.append(dev)
             _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
@@ -437,7 +436,7 @@ def joystick_devices_initialization():
         syslog.info(f"INIT: {device_count} hardware devices detected:")
         dinput.DILL.dumpDevices()
     else:
-        syslog.warning(f"INIT: DirectX reports no hardware devices detected")
+        syslog.warning("INIT: DirectX reports no hardware devices detected")
         
 
     # Process all connected devices in order to properly initialize the device registry
@@ -573,12 +572,12 @@ def joystick_devices_initialization():
             try:
                 # register the vjoy device with the proxy
                 vjoy_dev = vjoy_proxy[vjoy_index]
-            except error.VJoyError as e:
+            except error.VJoyError:
                 syslog.debug(f"vJoy id {vjoy_index:} can't be acquired")
 
     if not should_terminate:
         if len(_joystick_device_guid_map) == 0:
-            syslog.error(f"Error (fatal): no usable VJOY devices found.")
+            syslog.error("Error (fatal): no usable VJOY devices found.")
             should_terminate = True
 
     if should_terminate:
@@ -614,7 +613,7 @@ def joystick_devices_update():
         # add missing items
         for device_index in range(device_count):
             dev = dinput.DILL.get_device_information_by_index(device_index)
-            if not dev.device_guid in _joystick_device_guid_map:
+            if dev.device_guid not in _joystick_device_guid_map:
                 _joystick_devices.append(dev)
                 _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
                 _joystick_device_guid_map[dev.device_id] = dev # key by string ID
@@ -734,11 +733,11 @@ class VJoyUsageState():
 
     def ensure_valid(self, vjoy_id : int, input_id : int):
         ''' checks vjoy button mapping exists '''
-        if not vjoy_id in  self._button_usage:
+        if vjoy_id not in self._button_usage:
             # create it
             self._button_usage[vjoy_id] = {}
             self._button_usage_map[vjoy_id] = {}
-        if not input_id in self._button_usage[vjoy_id]:
+        if input_id not in self._button_usage[vjoy_id]:
             self._button_usage[vjoy_id][input_id] = False
             self._button_usage_map[vjoy_id][input_id] = []
 
@@ -777,21 +776,21 @@ class VJoyUsageState():
 
     def _ensure_maps(self, device_guid, input_id):
         ''' automatically registers new inputs if needed '''
-        if not device_guid in self._axis_invert_map:
+        if device_guid not in self._axis_invert_map:
              self._axis_invert_map[device_guid] = {}
-        if not input_id in self._axis_invert_map[device_guid]:
+        if input_id not in self._axis_invert_map[device_guid]:
             self._axis_invert_map[device_guid][input_id] = False
 
-        if not device_guid in self._axis_range_map:
+        if device_guid not in self._axis_range_map:
              self._axis_range_map[device_guid] = {}
-        if not input_id in self._axis_range_map[device_guid]:
+        if input_id not in self._axis_range_map[device_guid]:
             self._axis_range_map[device_guid][input_id] =  [-1.0, 1.0]
 
-        if not device_guid in self._button_usage:
+        if device_guid not in self._button_usage:
              self._button_usage[device_guid] = {}
              self._button_usage_map[device_guid] = {}
 
-        if not input_id in self._button_usage[device_guid]:
+        if input_id not in self._button_usage[device_guid]:
             self._button_usage[device_guid][input_id] = False
             self._button_usage_map[device_guid][input_id] = []
             
@@ -919,7 +918,7 @@ class VJoyUsageState():
         self.ensure_vjoy()
         self.ensure_valid(vjoy_id, button_id) # create entry if needed
         if state:
-            if not action in self._button_usage_map[vjoy_id][button_id]:
+            if action not in self._button_usage_map[vjoy_id][button_id]:
                 self._button_usage_map[vjoy_id][button_id].append(action)
         else:
             # remove the data
@@ -954,7 +953,7 @@ class VJoyUsageState():
         unused_list = self._free_inputs[device_id][name]
         count = self.get_count(device_id, input_type)
         if count > 0:
-            return [id for id in range(1, count+1) if not id in unused_list]
+            return [id for id in range(1, count+1) if id not in unused_list]
         return []
     
     def unused_list(self, device_id, input_type):
@@ -1073,12 +1072,12 @@ class VJoyUsageState():
                 vjoy_device_id = action.vjoy_device_id
                 vjoy_input_id = action.vjoy_input_id
 
-                if not vjoy_device_id in action_map.keys():
+                if vjoy_device_id not in action_map.keys():
                     action_map[vjoy_device_id] = {}
-                if not input_type in action_map[vjoy_device_id].keys():
+                if input_type not in action_map[vjoy_device_id].keys():
                     action_map[vjoy_device_id][input_type] = {}
 
-                if not vjoy_input_id in action_map[vjoy_device_id][input_type].keys():
+                if vjoy_input_id not in action_map[vjoy_device_id][input_type].keys():
                     action_map[vjoy_device_id][input_type][vjoy_input_id] = []
 
                 action_map[vjoy_device_id][input_type][vjoy_input_id].append([dev.device_guid, dev.name, input_type, input_id])

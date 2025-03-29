@@ -228,7 +228,7 @@ class InputItemListModel(ui_common.AbstractModel):
         :return data stored at the provided index
         """
 
-        if not index in self._index_map.keys():
+        if index not in self._index_map.keys():
             # bad index
             #syslog.error(f"InputItemListModel: bad index request {index} for mode: {self._mode} device: {self._device_data.name}")
             return None
@@ -242,7 +242,7 @@ class InputItemListModel(ui_common.AbstractModel):
         data = self.data(index)
         if data:
             input_type = data.input_type
-            if not input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
+            if input_type not in (InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
                 # cannot remove other types
                 return False
 
@@ -654,7 +654,6 @@ class InputItemListView(ui_common.AbstractView):
 
     def _close_item_cb(self, index):
         ''' remove a particular input '''
-        from PySide6.QtCore import QMetaMethod
 
         widget = self.itemAt(index)
         if isSignalConnected(widget,"closed(InputIdentifier)"):
@@ -2013,7 +2012,7 @@ class ContainerSelector(QtWidgets.QWidget):
         if clipboard.is_container:
             self.paste_button.setToolTip(f"Paste container ({clipboard.data.name})")
         else:
-            self.paste_button.setToolTip(f"Paste container (not available)")
+            self.paste_button.setToolTip("Paste container (not available)")
 
     @QtCore.Slot()
     def _paste_container(self):
@@ -2068,11 +2067,11 @@ class ConditionStateTracker():
         device_guid = input_item.device_guid
         mode = gremlin.shared_state.current_mode
         input_id = input_item.input_id
-        if not device_guid in self._cache:
+        if device_guid not in self._cache:
             self._cache[device_guid] = {}
-        if not mode in self._cache[device_guid]:
+        if mode not in self._cache[device_guid]:
             self._cache[device_guid][mode] = {}
-        if not input_id in self._cache[device_guid][mode]:
+        if input_id not in self._cache[device_guid][mode]:
             self._cache[device_guid][mode][input_id] = {}
         info = ConditionTrackerInfo(input_item, device_guid, input_id, container, dock_tab)
         self._cache[device_guid][mode][input_id][container.id] = info
@@ -2439,7 +2438,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                 self.activation_count_widget.setText(f"Container conditions ({self.container.condition_count} found):")
             else:
                 # not a container
-                self.activation_count_widget.setText(f"Container conditions (N/A):")
+                self.activation_count_widget.setText("Container conditions (N/A):")
 
 
 
@@ -2488,7 +2487,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         verbose = config.verbose_mode_device
         verbose_detailed = config.verbose_mode_details
         try:
-            if verbose: syslog.info(f"Device change begin")
+            if verbose: syslog.info("Device change begin")
             tab_text = self.dock_tabs.tabText(index)
             self.profile_data.current_view_type = ui_common.ContainerViewTypes.to_enum(tab_text.lower())
             self._update_selected(index)
@@ -2499,7 +2498,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             return
         finally:
             if verbose_detailed:
-                syslog.info(f"Device change end")
+                syslog.info("Device change end")
 
     
 

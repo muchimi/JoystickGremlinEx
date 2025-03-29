@@ -94,7 +94,7 @@ class CycleModeModel(QtCore.QAbstractItemModel):
         return [data[0] for data in self._data.values()]
     
     def index(self, row, column, parent=QModelIndex()):
-        if not row in self._data:
+        if row not in self._data:
             return QModelIndex()
 
         return self.createIndex(row, column, row)
@@ -189,7 +189,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         mode_list = self.action_data.mode_list
         modes = gremlin.shared_state.current_profile.get_modes()
         for mode in mode_list:
-            if not mode in modes:
+            if mode not in modes:
                 mode_list.remove(mode)
         self.model.clear()
         for mode in mode_list:
