@@ -1,6 +1,7 @@
 # -*- coding: utf-8; -*-
 
-# Based on original concept / code by Lionel Ott - Copyright (C) 2015 - 2019 Lionel Ott  
+
+# Based on original concept / code by Lionel Ott - Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,24 +16,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 import logging
+import os
 from lxml import etree as ElementTree
+from PySide6 import QtCore, QtWidgets
 import gremlin.actions
 import gremlin.config
 import gremlin.event_handler
-from gremlin.input_types import InputType
 import gremlin.joystick_handling
-from gremlin.util import rad2deg, get_guid
-from gremlin.profile import safe_format, safe_read
+from gremlin.input_types import InputType
+from gremlin.util import get_guid, safe_read, safe_format
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
-import os
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
-
-from action_plugins.map_to_keyboard import *
-from action_plugins.map_to_mouse import *
 import gremlin.config
 
 
@@ -40,7 +37,7 @@ syslog = logging.getLogger("system")
 
 
 class RangeContainerWidget(AbstractContainerWidget):
-    ''' Range container for a ranged action '''
+    """Range container for a ranged action"""
 
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.
@@ -49,12 +46,9 @@ class RangeContainerWidget(AbstractContainerWidget):
         :param parent the parent of this widget
         """
         super().__init__(profile_data, parent)
-        
-
 
     def _create_action_ui(self):
-        ''' creates the UI for the container '''
-
+        """creates the UI for the container"""
 
         # get container parent widget
 
@@ -63,17 +57,14 @@ class RangeContainerWidget(AbstractContainerWidget):
         toolbar_widget.setLayout(toolbar_container)
 
         toolbar1_widget = QtWidgets.QWidget()
-        toolbar1_widget.setContentsMargins(0,0,0,0)
+        toolbar1_widget.setContentsMargins(0, 0, 0, 0)
         toolbar1_layout = QtWidgets.QHBoxLayout()
         toolbar1_widget.setLayout(toolbar1_layout)
 
         toolbar2_widget = QtWidgets.QWidget()
-        toolbar2_widget.setContentsMargins(0,0,0,0)
+        toolbar2_widget.setContentsMargins(0, 0, 0, 0)
         toolbar2_layout = QtWidgets.QHBoxLayout()
         toolbar2_widget.setLayout(toolbar2_layout)
-
-
-        
 
         self.widget_layout = QtWidgets.QVBoxLayout()
 
@@ -99,14 +90,14 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         # holds the mode change data when in trigger by value change mode
         mode_widget = QtWidgets.QWidget()
-        mode_container = QtWidgets.QHBoxLayout() 
+        mode_container = QtWidgets.QHBoxLayout()
         mode_widget.setLayout(mode_container)
         mode_widget.setToolTip("Sets the mode of the container.")
         self.ui_mode_widget = mode_widget
 
         # holds the range data when triggered by range
         range_widget = QtWidgets.QWidget()
-        range_container = QtWidgets.QHBoxLayout(range_widget) # holds the range data
+        range_container = QtWidgets.QHBoxLayout(range_widget)  # holds the range data
         self.ui_range_widget = range_widget
 
         # options_widget = QtWidgets.QWidget()
@@ -114,23 +105,31 @@ class RangeContainerWidget(AbstractContainerWidget):
         # options_layout =  QtWidgets.QHBoxLayout(options_widget)
         # self.ui_options_widget = options_widget
 
-        any_change_mode =  QtWidgets.QCheckBox("Any Change") # trigger on any change mode
+        any_change_mode = QtWidgets.QCheckBox(
+            "Any Change"
+        )  # trigger on any change mode
         self.ui_any_change_mode = any_change_mode
         any_change_mode.setChecked(action_data.any_change_mode)
         any_change_mode.clicked.connect(self._any_change_mode_changed)
-        any_change_mode.setToolTip("When set, the action will be triggered on any axis value change.")
+        any_change_mode.setToolTip(
+            "When set, the action will be triggered on any axis value change."
+        )
 
         any_change_label = QtWidgets.QLabel("Delta %")
-        any_change_delta = gremlin.ui.ui_common.QIntLineEdit(min_range=0,max_range=100) # QtWidgets.QSpinBox()
+        any_change_delta = gremlin.ui.ui_common.QIntLineEdit(
+            min_range=0, max_range=100
+        )  # QtWidgets.QSpinBox()
         self.ui_any_change_delta = any_change_delta
-        any_change_delta.setRange(0,100) 
+        any_change_delta.setRange(0, 100)
         any_change_delta.setValue(action_data.any_change_delta)
-        any_change_delta.setToolTip("In any change mode, determines how much the axis should deviate from the old value before triggering the action")
-        
+        any_change_delta.setToolTip(
+            "In any change mode, determines how much the axis should deviate from the old value before triggering the action"
+        )
+
         container_mode_widget = QtWidgets.QWidget()
-        container_mode_widget.setContentsMargins(0,0,0,0)
+        container_mode_widget.setContentsMargins(0, 0, 0, 0)
         container_mode_layout = QtWidgets.QHBoxLayout(container_mode_widget)
-        container_mode_layout.setContentsMargins(0,0,0,0)
+        container_mode_layout.setContentsMargins(0, 0, 0, 0)
         rb_change_both = gremlin.ui.ui_common.QDataRadioButton("Both", 0)
         rb_change_up = gremlin.ui.ui_common.QDataRadioButton("Up", 1)
         rb_change_down = gremlin.ui.ui_common.QDataRadioButton("Down", -1)
@@ -150,18 +149,23 @@ class RangeContainerWidget(AbstractContainerWidget):
         container_mode_layout.addWidget(rb_change_down)
         container_mode_layout.addStretch()
 
-        
         min_box_included = QtWidgets.QCheckBox("[")
         min_box_included.setChecked(action_data.range_min_included)
-        min_box_included.setToolTip("Include/Exclude flag: When set, the range includes the specified min value.<br>When not set, the value is excluded from the max range")
+        min_box_included.setToolTip(
+            "Include/Exclude flag: When set, the range includes the specified min value.<br>When not set, the value is excluded from the max range"
+        )
 
         max_box_included = QtWidgets.QCheckBox("]")
         max_box_included.setChecked(action_data.range_max_included)
-        max_box_included.setToolTip("Include/Exclude flag: When set, the range includes the specified max value<br>When not set, the value is excluded from the max range")
+        max_box_included.setToolTip(
+            "Include/Exclude flag: When set, the range includes the specified max value<br>When not set, the value is excluded from the max range"
+        )
 
         add_button_top_90 = QtWidgets.QPushButton("Top 90%")
         add_button_top_90.clicked.connect(self._add_top_90)
-        add_button_top_90.setToolTip("Configures the container for the top 90 percent range.  When used with the symmetry option, sets a trigger for bottom 10 percent or top 10 percent of the input range")
+        add_button_top_90.setToolTip(
+            "Configures the container for the top 90 percent range.  When used with the symmetry option, sets a trigger for bottom 10 percent or top 10 percent of the input range"
+        )
 
         action_label = QtWidgets.QLabel("Actions")
         self.ui_action_dropdown = gremlin.ui.ui_common.QComboBox()
@@ -171,7 +175,9 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         cfg = gremlin.config.Configuration()
         self.ui_action_dropdown.setCurrentText(cfg.last_action)
-        self.ui_action_dropdown.setToolTip("Determines the default action added to a new container")
+        self.ui_action_dropdown.setToolTip(
+            "Determines the default action added to a new container"
+        )
 
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_action)
@@ -182,19 +188,20 @@ class RangeContainerWidget(AbstractContainerWidget):
         self.ui_range_count.minimum = 1
         self.ui_range_count.maximum = 20
         self.ui_range_count.setValue(5)
-        self.ui_range_count.setToolTip("Determines how many ranges (brackets) will be added.  The range values for each container will be computed based on the number of 'slots' entered here.<br>A value of 5 means 5 containers will be created with a range of 20 percent each.")
-
+        self.ui_range_count.setToolTip(
+            "Determines how many ranges (brackets) will be added.  The range values for each container will be computed based on the number of 'slots' entered here.<br>A value of 5 means 5 containers will be created with a range of 20 percent each."
+        )
 
         add_range = QtWidgets.QPushButton("Add Ranges")
         add_range.clicked.connect(self._add_range)
         add_range.setToolTip("Adds the number of requested ranges (these are added)")
 
-        
         replace_range = QtWidgets.QPushButton("Replace Ranges")
         replace_range.clicked.connect(self._replace_range)
-        replace_range.setToolTip("Replaces all containers with a new range.  Warning: this will delete any existing actions.")
+        replace_range.setToolTip(
+            "Replaces all containers with a new range.  Warning: this will delete any existing actions."
+        )
 
-        
         # max range box
         max_box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         max_box.setMinimum(-1.0)
@@ -203,24 +210,22 @@ class RangeContainerWidget(AbstractContainerWidget):
         max_box.setValue(action_data.range_max)
         max_box.setToolTip("Upper range of the bracket")
 
-
-
         symmetrical_box = QtWidgets.QCheckBox("Symmetrical")
         symmetrical_box.setChecked(action_data.symmetrical)
-        symmetrical_box.setToolTip("When enabled, the range given will be automatically mirrored about the center of the range, causing an action trigger when the range on either side of the center value is entered.")
+        symmetrical_box.setToolTip(
+            "When enabled, the range given will be automatically mirrored about the center of the range, causing an action trigger when the range on either side of the center value is entered."
+        )
 
         # release_box =  QtWidgets.QCheckBox("Autorelease")
         # release_box.setChecked(action_data.autorelease)
         # release_box.setToolTip("When enabled, a release action will be triggered when the input exits the range")
 
         # options_layout.addWidget(release_box)
-        
 
         mode_container.addWidget(any_change_label)
         mode_container.addWidget(any_change_delta)
         mode_container.addWidget(container_mode_widget)
         mode_container.addStretch()
-        
 
         range_container.addWidget(QtWidgets.QLabel("Start:"))
         range_container.addWidget(min_box_included)
@@ -230,8 +235,6 @@ class RangeContainerWidget(AbstractContainerWidget):
         range_container.addWidget(max_box_included)
         range_container.addWidget(symmetrical_box)
         range_container.addStretch()
-
-
 
         toolbar1_layout.addWidget(any_change_mode)
         toolbar1_layout.addWidget(mode_widget)
@@ -247,20 +250,16 @@ class RangeContainerWidget(AbstractContainerWidget):
         toolbar2_layout.addWidget(replace_range)
         toolbar2_layout.addStretch()
 
-
-        
-        self.widget_layout.addWidget(toolbar_widget)        
+        self.widget_layout.addWidget(toolbar_widget)
         self.widget_layout.addWidget(self.action_selector)
-        
+
         self.ui_min_box = min_box
         self.ui_min_box_included = min_box_included
         self.ui_max_box = max_box
         self.ui_max_box_included = min_box_included
         self.ui_symmetrical = symmetrical_box
         self.ui_range_options = toolbar2_widget
-        #self.ui_autorelease = release_box
-
-        
+        # self.ui_autorelease = release_box
 
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
@@ -270,7 +269,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         max_box.valueChanged.connect(self._range_max_changed)
         max_box_included.clicked.connect(self._range_max_included_changed)
         symmetrical_box.clicked.connect(self._symmetrical_changed)
-        #release_box.clicked.connect(self._autorelease_changed)        
+        # release_box.clicked.connect(self._autorelease_changed)
 
         self.action_layout.addLayout(self.widget_layout)
 
@@ -279,23 +278,20 @@ class RangeContainerWidget(AbstractContainerWidget):
         range_widget.setEnabled(not mode)
         toolbar2_widget.setEnabled(not mode)
 
-
         toolbar_container.addWidget(toolbar1_widget)
         toolbar_container.addWidget(toolbar2_widget)
-        #toolbar_container.addWidget(options_widget)
-                
+        # toolbar_container.addWidget(options_widget)
 
         # Insert action widgets
         for i, action in enumerate(self.profile_data.action_sets):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[i],
                 f"Action {i:d}",
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
-
 
     @QtCore.Slot(bool)
     def _change_direction(self, checked):
@@ -310,7 +306,7 @@ class RangeContainerWidget(AbstractContainerWidget):
                 widget = self._create_action_set_widget(
                     self.profile_data.action_sets[i],
                     f"Action {i:d}",
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
@@ -324,14 +320,14 @@ class RangeContainerWidget(AbstractContainerWidget):
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
         self.profile_data.add_action(action_item)
-        self.container_modified.emit()      
+        self.container_modified.emit()
 
     def _paste_action(self, action, container):
-        """ pastes an action into the container """
+        """pastes an action into the container"""
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.add_action(action_item)
-        self.container_modified.emit() 
+        self.container_modified.emit()
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -352,16 +348,22 @@ class RangeContainerWidget(AbstractContainerWidget):
         # Perform action
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Up:
             if index > 0:
-                self.profile_data.action_sets[index],\
-                    self.profile_data.action_sets[index-1] = \
-                    self.profile_data.action_sets[index-1],\
-                    self.profile_data.action_sets[index]
+                (
+                    self.profile_data.action_sets[index],
+                    self.profile_data.action_sets[index - 1],
+                ) = (
+                    self.profile_data.action_sets[index - 1],
+                    self.profile_data.action_sets[index],
+                )
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Down:
             if index < len(self.profile_data.action_sets) - 1:
-                self.profile_data.action_sets[index], \
-                    self.profile_data.action_sets[index + 1] = \
-                    self.profile_data.action_sets[index + 1], \
-                    self.profile_data.action_sets[index]
+                (
+                    self.profile_data.action_sets[index],
+                    self.profile_data.action_sets[index + 1],
+                ) = (
+                    self.profile_data.action_sets[index + 1],
+                    self.profile_data.action_sets[index],
+                )
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
             del self.profile_data.action_sets[index]
 
@@ -373,7 +375,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         return f"Range: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
-    
+
     def _any_change_mode_changed(self):
         mode = self.ui_any_change_mode.isChecked()
         self.ui_range_widget.setEnabled(not mode)
@@ -381,14 +383,14 @@ class RangeContainerWidget(AbstractContainerWidget):
         self.ui_mode_widget.setEnabled(mode)
         self.profile_data.any_change_mode = mode
 
-    
-    ''' event handlers for the UI elements in this action '''
+    """ event handlers for the UI elements in this action """
+
     def _range_min_changed(self):
         self.profile_data.range_min = self.ui_min_box.value()
 
     def _range_max_changed(self):
         self.profile_data.range_max = self.ui_max_box.value()
-        
+
     def _range_min_included_changed(self):
         self.profile_data.range_min_included = self.ui_min_box_included.isChecked()
 
@@ -397,7 +399,7 @@ class RangeContainerWidget(AbstractContainerWidget):
 
     @QtCore.Slot(bool)
     def _symmetrical_changed(self):
-        self.profile_data.symmetrical = self.ui_symmetrical.isChecked()       
+        self.profile_data.symmetrical = self.ui_symmetrical.isChecked()
 
     # @QtCore.Slot(bool)
     # def _autorelease_changed(self):
@@ -406,25 +408,27 @@ class RangeContainerWidget(AbstractContainerWidget):
     def _add_top_90(self):
         self.ui_min_box.setValue(0.90)
         self.ui_max_box.setValue(1.00)
-        
+
     def _add_range(self):
-        ''' adds containers '''
+        """adds containers"""
         count = self.ui_range_count.value()
         action = self.ui_action_dropdown.currentText()
         self._add_containers(count, action)
 
     def _replace_range(self):
-        ''' replaces current containers with new containers '''
+        """replaces current containers with new containers"""
         import gremlin.util
 
         # do a confirmation box just in case
         message_box = QtWidgets.QMessageBox()
         message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
-        message_box.setText("This will remove the current container set and any actions.")
+        message_box.setText(
+            "This will remove the current container set and any actions."
+        )
         message_box.setInformativeText("Are you sure?")
         message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Cancel | 
-            QtWidgets.QMessageBox.StandardButton.Ok 
+            QtWidgets.QMessageBox.StandardButton.Cancel
+            | QtWidgets.QMessageBox.StandardButton.Ok
         )
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
@@ -439,8 +443,7 @@ class RangeContainerWidget(AbstractContainerWidget):
                 widget._remove_container(container)
         self._add_range()
 
-
-    def _add_containers(self, count, action_name = None):
+    def _add_containers(self, count, action_name=None):
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         # the profile_data member is a RangeContainer object
         widget = container_plugins.get_parent_widget(self.profile_data)
@@ -449,10 +452,10 @@ class RangeContainerWidget(AbstractContainerWidget):
             value = -1.0
             offset = 2.0 / count
             for _ in range(count):
-                container : RangeContainer
+                container: RangeContainer
                 container = widget._add_container(RangeContainer.name)
                 container.range_min = value
-                container.range_min_included  = value == -1.0
+                container.range_min_included = value == -1.0
                 value += offset
                 container.range_max = value
 
@@ -460,9 +463,10 @@ class RangeContainerWidget(AbstractContainerWidget):
                 if action_name:
                     container._widget._add_action(action_name)
 
-                
-class RangeReleaseTrigger():
-    ''' holds a release trigger when a value is out of range '''
+
+class RangeReleaseTrigger:
+    """holds a release trigger when a value is out of range"""
+
     def __init__(self, ranges, event, action):
         self.id = get_guid()
         self.ranges = ranges
@@ -472,15 +476,14 @@ class RangeReleaseTrigger():
     def __hash__(self):
         return hash(self.id)
 
-class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
+class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
     """Executes the contents of the associated range container."""
 
-
-    def __init__(self, action_data, parent = None):
+    def __init__(self, action_data, parent=None):
         action_data: RangeContainer
         super().__init__(action_data, parent)
-        
+
         self.action_sets = []
         for action_set in action_data.action_sets:
             self.action_sets.append(
@@ -492,7 +495,9 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.any_change_direction = action_data.any_change_direction
         self.reset_range()
 
-        self.any_change_delta =  action_data.any_change_delta / 200 # 2 * 100 because the range is -1 to +1, so 2 total, to actual range value
+        self.any_change_delta = (
+            action_data.any_change_delta / 200
+        )  # 2 * 100 because the range is -1 to +1, so 2 total, to actual range value
         self.range_min = action_data.range_min
         self.range_max = action_data.range_max
         if self.range_min > self.range_max:
@@ -507,16 +512,17 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.last_target = -2.0
 
     def profile_start(self):
-        ''' called on profile start - get the start position of the axis'''
-        self.last_target = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
-
+        """called on profile start - get the start position of the axis"""
+        self.last_target = gremlin.joystick_handling.get_axis(
+            self.action_data.hardware_device_guid, self.action_data.hardware_input_id
+        )
 
     def reset_range(self):
-        ''' resets the range trigger '''
+        """resets the range trigger"""
         self.last_range_min = -2.0
         self.last_range_max = -2.0
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         """Executes the content with the provided data.
 
         :param event the event to process
@@ -524,12 +530,12 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         :return True if execution was successful, False otherwise
         """
 
-        if not event.is_axis: 
+        if not event.is_axis:
             return
-        
+
         verbose = gremlin.config.Configuration().verbose
         syslog = logging.getLogger("system")
-        
+
         # process release triggers
         releases = set()
         for exit_trigger in self.action_data.exit_range_triggers:
@@ -543,21 +549,16 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         for exit_trigger in releases:
             self.action_data.exit_range_triggers.remove(exit_trigger)
-            #print (f"process release event: {exit_trigger.id}")
+            # print (f"process release event: {exit_trigger.id}")
 
             # trigger the release
             release_event = exit_trigger.event
-            release_event.is_pressed = False # trigger button based values OFF
+            release_event.is_pressed = False  # trigger button based values OFF
             action = exit_trigger.action
             release_event.value = value.current
-            
-            release_value = gremlin.actions.Value(False,False)
+
+            release_value = gremlin.actions.Value(False, False)
             action.process_event(release_event, release_value)
-
-                
-            
-
-
 
         trigger = False
 
@@ -570,24 +571,17 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
             self.latched_loaded = True
 
-
         target = value.current
         in_range = False
-
-
-
 
         is_change_mode = False
 
         if self.any_change_mode:
             # trigger if change meets the deflection delta
             trigger = abs(target - self.last_target) >= self.any_change_delta
-            #syslog.info(f"Target {target:0.3f} last: {self.last_target:0.3f}  dir flag: {target > self.last_target}  delta: {abs(target - self.last_target):0.3f} threshold: {self.any_change_delta:0.3f}")
+            # syslog.info(f"Target {target:0.3f} last: {self.last_target:0.3f}  dir flag: {target > self.last_target}  delta: {abs(target - self.last_target):0.3f} threshold: {self.any_change_delta:0.3f}")
 
             if trigger:
-
-                
-             
                 # apply direction filter if any
                 if self.any_change_direction == 1:
                     trigger = target > self.last_target
@@ -601,13 +595,12 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                     if verbose:
                         syslog.info("Trigger change")
 
-                is_change_mode = trigger        
+                is_change_mode = trigger
                 self.last_target = target
 
         else:
-
             # verify the event is in the correct range
-            container : RangeContainer
+            container: RangeContainer
             container = self.action_data
 
             range_min = self.range_min
@@ -621,13 +614,11 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 if sym_max < sym_min:
                     sym_max, sym_min = sym_min, sym_max
 
-                #print (f"Add range: {sym_min:0.4f} {sym_max:0.4f}")
+                # print (f"Add range: {sym_min:0.4f} {sym_max:0.4f}")
                 ranges.append((sym_min, sym_max))
 
-
-            
-            for (range_min, range_max) in ranges:
-                if target < range_min or target > range_max: 
+            for range_min, range_max in ranges:
+                if target < range_min or target > range_max:
                     continue
                 if not container.range_min_included:
                     if target == range_min:
@@ -636,18 +627,18 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                     if target == range_max:
                         continue
 
-                #syslog.info(f"{target:0.3f} range {range_min:0.3f} {range_max:0.3f} bracket {self.last_range_min:0.3f} {self.last_range_max:0.3f}")    
-                #print (f"{target:0.4f} is in range")
+                # syslog.info(f"{target:0.3f} range {range_min:0.3f} {range_max:0.3f} bracket {self.last_range_min:0.3f} {self.last_range_max:0.3f}")
+                # print (f"{target:0.4f} is in range")
                 in_range = True
                 break
 
             if in_range:
                 # axis value is in a bracket range - make sure it hasn't been processed already
-                trigger = True # self.last_range_min != range_min and self.last_range_max != range_max
+                trigger = True  # self.last_range_min != range_min and self.last_range_max != range_max
 
                 for exit_trigger in self.action_data.exit_range_triggers:
                     for range_min, range_max in exit_trigger.ranges:
-                        if target < range_min or target > range_max: 
+                        if target < range_min or target > range_max:
                             continue
                         if not container.range_min_included:
                             if target == range_min:
@@ -657,18 +648,20 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                                 continue
                         trigger = False
                         break
-            
+
             if trigger:
                 self.last_target = target
 
         if trigger:
-            #syslog.info("trigger!")
+            # syslog.info("trigger!")
             event_clone = event.clone()
             event_clone.event_type = InputType.JoystickButton
-            event_clone.identifier = 1 
-            event_clone.is_axis = False # make this a button event 
-            event_clone.is_pressed = True # button press is ON
-            event_clone.is_virtual_button = True # indicate this is a virtual button press
+            event_clone.identifier = 1
+            event_clone.is_axis = False  # make this a button event
+            event_clone.is_pressed = True  # button press is ON
+            event_clone.is_virtual_button = (
+                True  # indicate this is a virtual button press
+            )
             value_clone = gremlin.actions.Value(True, True)
             for action in self.action_sets:
                 # execute the action
@@ -677,7 +670,7 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                     # register a range exit trigger on non change triggers
                     exit_trigger = RangeReleaseTrigger(ranges, event_clone, action)
                     self.action_data.exit_range_triggers.append(exit_trigger)
-                #print (f"process press event: {exit_trigger.id}")
+                # print (f"process press event: {exit_trigger.id}")
             if in_range:
                 self.last_range_min = range_min
                 self.last_range_max = range_max
@@ -687,18 +680,12 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 for functor in self.latched_functors:
                     functor.reset_range()
 
-            
-            
-
-            
-            
-
         return True
 
-class RangeContainer(AbstractContainer):
-    ''' action data for the map to Range action '''
 
-    
+class RangeContainer(AbstractContainer):
+    """action data for the map to Range action"""
+
     name = "Range"
     tag = "range"
 
@@ -717,48 +704,54 @@ class RangeContainer(AbstractContainer):
     functor = RangeContainerFunctor
     widget = RangeContainerWidget
 
-    def __init__(self, parent, node = None):
-        '''' creates a new instance 
+    def __init__(self, parent, node=None):
+        """' creates a new instance
         :parent the InputItem which is the parent to this action
-        '''
+        """
 
         super().__init__(parent, node)
-        self.id = get_guid() # unique id of this item
-        self._index = 0 # index # of this item
-        self.range_min = -1.0 # lower bound of the range
-        self.range_min_included = False # true if the lower range is excluded from the range
-        self.range_max = 1.0 # upper bound of the range
-        self.range_max_included = False # true if the higher range is excluded from the range
-        self.symmetrical = False # true if the range is symmetrical about the center of the axis 
-        self.range_min_included = True # true if the boundary is included in the range
-        self.range_max_included = True # true if the boundery is included in the range
-        self._widget = None # will be populated by the widget attached to this container
-        self._functor = None # will be populated when the functor is created for this container
-        self.any_change_mode = False # trigger on any change mode
-        self.any_change_delta = 10 # percentage move that must be detected before the action is triggered 0 to 100
-        self.any_change_direction = 0 # direction of change 0 = both, 1 = up, -1 = down
+        self.id = get_guid()  # unique id of this item
+        self._index = 0  # index # of this item
+        self.range_min = -1.0  # lower bound of the range
+        self.range_min_included = (
+            False  # true if the lower range is excluded from the range
+        )
+        self.range_max = 1.0  # upper bound of the range
+        self.range_max_included = (
+            False  # true if the higher range is excluded from the range
+        )
+        self.symmetrical = (
+            False  # true if the range is symmetrical about the center of the axis
+        )
+        self.range_min_included = True  # true if the boundary is included in the range
+        self.range_max_included = True  # true if the boundery is included in the range
+        self._widget = (
+            None  # will be populated by the widget attached to this container
+        )
+        self._functor = (
+            None  # will be populated when the functor is created for this container
+        )
+        self.any_change_mode = False  # trigger on any change mode
+        self.any_change_delta = 10  # percentage move that must be detected before the action is triggered 0 to 100
+        self.any_change_direction = 0  # direction of change 0 = both, 1 = up, -1 = down
         self.condition_enabled = False
         self.virtual_button_enabled = False
-        self.exit_range_triggers = [] # triggers to execute when the range is exited
-        self.autorelease = False # if set, autoreleases when the value is outside the range after being in the range
-        
-        
+        self.exit_range_triggers = []  # triggers to execute when the range is exited
+        self.autorelease = False  # if set, autoreleases when the value is outside the range after being in the range
+
         # make actions think we're attached to a button
         self.override_input_id = 1
         self.override_input_type = InputType.JoystickButton
-
-
 
     def icon(self):
         """Returns the icon to use for this action.
 
         :return icon representing this action
         """
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"        
+        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
-
-    def _parse_xml(self, node, data = None):
-        ''' reads configuration '''
+    def _parse_xml(self, node, data=None):
+        """reads configuration"""
         try:
             if "any" in node.attrib:
                 self.any_change_mode = safe_read(node, "any", bool)
@@ -773,19 +766,18 @@ class RangeContainer(AbstractContainer):
             if "max_inc" in node.attrib:
                 self.range_min_included = safe_read(node, "max_inc", bool)
             if "sym" in node.attrib:
-                self.symmetrical = safe_read(node, "sym",bool)
+                self.symmetrical = safe_read(node, "sym", bool)
             if "direction" in node.attrib:
-                self.any_change_direction = safe_read(node,"direction",int)
+                self.any_change_direction = safe_read(node, "direction", int)
             if "autorelease" in node.attrib:
-                self.autorelease = safe_read(node,"autorelease", bool, False)
-            
-        except:
+                self.autorelease = safe_read(node, "autorelease", bool, False)
+
+        except Exception:
             pass
         pass
 
     def _generate_xml(self):
-        
-        ''' returns an xml node encoding this action's data '''
+        """returns an xml node encoding this action's data"""
         node = ElementTree.Element("container")
         node.set("type", RangeContainer.tag)
         node.set("any", safe_format(self.any_change_mode, bool))
@@ -806,18 +798,14 @@ class RangeContainer(AbstractContainer):
 
         return node
 
-
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.
 
         :return True if the container is configured properly, False otherwise
         """
-        return True # len(self.action_sets) > 0
-
+        return True  # len(self.action_sets) > 0
 
 
 version = 1
 name = "Range"
 create = RangeContainer
-
-

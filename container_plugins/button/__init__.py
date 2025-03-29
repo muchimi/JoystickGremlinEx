@@ -17,12 +17,8 @@
 #
 # this code is build on Gremlin work by Lionel Ott
 
-import copy
-import logging
-import threading
-import time
 from lxml import etree as ElementTree
-
+import logging
 from PySide6 import QtWidgets
 
 import gremlin
@@ -32,14 +28,15 @@ from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 
+syslog = logging.getLogger("system")
+
 class ButtonContainerWidget(AbstractContainerWidget):
-
     """Container with two actions, one for input button is pressed, the other for when the input button is released
-    
-       While this can be duplicated with conditions - this is a helper container to simplify the profile setup.
 
-       Works with buttons or hats
-    
+    While this can be duplicated with conditions - this is a helper container to simplify the profile setup.
+
+    Works with buttons or hats
+
     """
 
     def __init__(self, profile_data, parent=None):
@@ -69,7 +66,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 0,
                 "Button Press",
                 self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
 
         if self.profile_data.action_sets[1] is None:
@@ -83,7 +80,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 1,
                 "Button Release",
                 self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
 
     def _create_condition_ui(self):
@@ -93,7 +90,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
                     0,
                     "Button Press",
                     self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
 
             if self.profile_data.action_sets[1] is not None:
@@ -101,7 +98,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
                     1,
                     "Button Release",
                     self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
@@ -132,9 +129,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :param label the name of the action to create
         """
         widget = self._create_action_set_widget(
-            self.profile_data.action_sets[index],
-            label,
-            view_type
+            self.profile_data.action_sets[index], label, view_type
         )
         layout.addWidget(widget)
         widget.redraw()
@@ -154,15 +149,13 @@ class ButtonContainerWidget(AbstractContainerWidget):
         self.container_modified.emit()
 
     def _paste_action(self, index, action):
-        ''' paste action'''
+        """paste action"""
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         if self.profile_data.action_sets[index] is None:
             self.profile_data.action_sets[index] = []
         self.profile_data.action_sets[index].append(action_item)
         self.profile_data.create_or_delete_virtual_button()
-
-
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -189,8 +182,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
 
 class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
-
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         super().__init__(container, parent)
         self.press_set = gremlin.execution_graph.ActionSetExecutionGraph(
             container.action_sets[0], parent
@@ -199,11 +191,10 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             container.action_sets[1], parent
         )
 
-    def process_event(self, event, value, extra_data = None):
-
+    def process_event(self, event, value, extra_data=None):
         if event.event_type == InputType.JoystickHat:
             is_hat = True
-            is_pressed = value.current != (0,0)
+            is_pressed = value.current != (0, 0)
         elif not isinstance(value.current, bool):
             syslog.warning(
                 f"Invalid data type received in Button container: {type(event.value)}"
@@ -218,14 +209,13 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             self.press_set.process_event(event, value)
         else:
             # button release
-            value.current = (0,0) if is_hat else True
+            value.current = (0, 0) if is_hat else True
             self.release_set.process_event(event, value)
 
         return True
 
 
 class ButtonContainer(AbstractContainer):
-
     """A container with two actions which are triggered based on the duration
     of the activation.
 
@@ -247,7 +237,7 @@ class ButtonContainer(AbstractContainer):
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,
     ]
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
@@ -257,7 +247,7 @@ class ButtonContainer(AbstractContainer):
         self.delay = 0.5
         self.activate_on = "release"
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container

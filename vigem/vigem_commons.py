@@ -14,6 +14,7 @@ class VIGEM_TARGET_TYPE(IntFlag):
     Represents the desired target type for the emulated device.
     NOTE: 1 skipped on purpose to maintain compatibility
     """
+
     Xbox360Wired = 0  # Microsoft Xbox 360 Controller (wired)
     DualShock4Wired = 2  # Sony DualShock 4 (wired)
 
@@ -22,6 +23,7 @@ class XUSB_BUTTON(IntFlag):
     """
     Possible XUSB report buttons.
     """
+
     XUSB_GAMEPAD_DPAD_UP = 0x0001
     XUSB_GAMEPAD_DPAD_DOWN = 0x0002
     XUSB_GAMEPAD_DPAD_LEFT = 0x0004
@@ -43,28 +45,35 @@ class XUSB_REPORT(Structure):
     """
     Represents an XINPUT_GAMEPAD-compatible report structure.
     """
-    _fields_ = [("wButtons", c_ushort),
-                ("bLeftTrigger", c_byte),
-                ("bRightTrigger", c_byte),
-                ("sThumbLX", c_short),
-                ("sThumbLY", c_short),
-                ("sThumbRX", c_short),
-                ("sThumbRY", c_short)]
+
+    _fields_ = [
+        ("wButtons", c_ushort),
+        ("bLeftTrigger", c_byte),
+        ("bRightTrigger", c_byte),
+        ("sThumbLX", c_short),
+        ("sThumbLY", c_short),
+        ("sThumbRX", c_short),
+        ("sThumbRY", c_short),
+    ]
 
 
 class DS4_LIGHTBAR_COLOR(Structure):
     """
     The color value (RGB) of a DualShock 4 Lightbar
     """
-    _fields_ = [("Red", c_ubyte),  # Red part of the Lightbar (0-255).
-                ("Green", c_ubyte),  # Green part of the Lightbar (0-255).
-                ("Blue", c_ubyte)]  # Blue part of the Lightbar (0-255).
+
+    _fields_ = [
+        ("Red", c_ubyte),  # Red part of the Lightbar (0-255).
+        ("Green", c_ubyte),  # Green part of the Lightbar (0-255).
+        ("Blue", c_ubyte),
+    ]  # Blue part of the Lightbar (0-255).
 
 
 class DS4_BUTTONS(IntFlag):
     """
     DualShock 4 digital buttons
     """
+
     DS4_BUTTON_THUMB_RIGHT = 1 << 15
     DS4_BUTTON_THUMB_LEFT = 1 << 14
     DS4_BUTTON_OPTIONS = 1 << 13
@@ -83,6 +92,7 @@ class DS4_SPECIAL_BUTTONS(IntFlag):
     """
     DualShock 4 special buttons
     """
+
     DS4_SPECIAL_BUTTON_PS = 1 << 0
     DS4_SPECIAL_BUTTON_TOUCHPAD = 1 << 1
 
@@ -91,6 +101,7 @@ class DS4_DPAD_DIRECTIONS(IntEnum):
     """
     DualShock 4 directional pad (HAT) values
     """
+
     DS4_BUTTON_DPAD_NONE = 0x8
     DS4_BUTTON_DPAD_NORTHWEST = 0x7
     DS4_BUTTON_DPAD_WEST = 0x6
@@ -106,14 +117,17 @@ class DS4_REPORT(Structure):
     """
     DualShock 4 HID Input report
     """
-    _fields_ = [("bThumbLX", c_byte),
-                ("bThumbLY", c_byte),
-                ("bThumbRX", c_byte),
-                ("bThumbRY", c_byte),
-                ("wButtons", c_ushort),
-                ("bSpecial", c_byte),
-                ("bTriggerL", c_byte),
-                ("bTriggerR", c_byte)]
+
+    _fields_ = [
+        ("bThumbLX", c_byte),
+        ("bThumbLY", c_byte),
+        ("bThumbRX", c_byte),
+        ("bThumbRY", c_byte),
+        ("wButtons", c_ushort),
+        ("bSpecial", c_byte),
+        ("bTriggerL", c_byte),
+        ("bTriggerR", c_byte),
+    ]
 
 
 def DS4_SET_DPAD(report, dpad):
@@ -133,53 +147,65 @@ class DS4_TOUCH(Structure):
     """
     DualShock 4 HID Touchpad structure
     """
-    _fields_ = [("bPacketCounter", c_byte),  # timestamp / packet counter associated with touch event
-                ("bIsUpTrackingNum1", c_byte),  # 0 means down; active low
-                # unique to each finger down, so for a lift and repress the value is incremented
-                ("bTouchData1", c_byte * 3),  # Two 12 bits values (for X and Y)
-                # middle byte holds last 4 bits of X and the starting
-                ("bIsUpTrackingNum2", c_byte),  # second touch data immediately follows data of first
-                ("bTouchData2", c_ushort * 3)]  # resolution is 1920x943
+
+    _fields_ = [
+        (
+            "bPacketCounter",
+            c_byte,
+        ),  # timestamp / packet counter associated with touch event
+        ("bIsUpTrackingNum1", c_byte),  # 0 means down; active low
+        # unique to each finger down, so for a lift and repress the value is incremented
+        ("bTouchData1", c_byte * 3),  # Two 12 bits values (for X and Y)
+        # middle byte holds last 4 bits of X and the starting
+        (
+            "bIsUpTrackingNum2",
+            c_byte,
+        ),  # second touch data immediately follows data of first
+        ("bTouchData2", c_ushort * 3),
+    ]  # resolution is 1920x943
 
 
 class DS4_SUB_REPORT_EX(Structure):
-    _fields_ = [("bThumbLX", c_byte),
-                ("bThumbLY", c_byte),
-                ("bThumbRX", c_byte),
-                ("bThumbRY", c_byte),
-                ("wButtons", c_ushort),
-                ("bSpecial", c_byte),
-                ("bTriggerL", c_byte),
-                ("bTriggerR", c_byte),
-                ("wTimestamp", c_ushort),
-                ("bBatteryLvl", c_byte),
-                ("wGyroX", c_short),
-                ("wGyroY", c_short),
-                ("wGyroZ", c_short),
-                ("wAccelX", c_short),
-                ("wAccelY", c_short),
-                ("wAccelZ", c_short),
-                ("_bUnknown1", c_byte * 5),
-                ("bBatteryLvlSpecial", c_byte),
-                # really should have a enum to show everything that this can represent (USB charging, battery level; EXT, headset, microphone connected)
-                ("_bUnknown2", c_byte * 2),
-                ("bTouchPacketsN", c_byte),  # 0x00 to 0x03 (USB max)
-                ("sCurrentTouch", DS4_TOUCH),
-                ("sPreviousTouch", DS4_TOUCH * 2)]
+    _fields_ = [
+        ("bThumbLX", c_byte),
+        ("bThumbLY", c_byte),
+        ("bThumbRX", c_byte),
+        ("bThumbRY", c_byte),
+        ("wButtons", c_ushort),
+        ("bSpecial", c_byte),
+        ("bTriggerL", c_byte),
+        ("bTriggerR", c_byte),
+        ("wTimestamp", c_ushort),
+        ("bBatteryLvl", c_byte),
+        ("wGyroX", c_short),
+        ("wGyroY", c_short),
+        ("wGyroZ", c_short),
+        ("wAccelX", c_short),
+        ("wAccelY", c_short),
+        ("wAccelZ", c_short),
+        ("_bUnknown1", c_byte * 5),
+        ("bBatteryLvlSpecial", c_byte),
+        # really should have a enum to show everything that this can represent (USB charging, battery level; EXT, headset, microphone connected)
+        ("_bUnknown2", c_byte * 2),
+        ("bTouchPacketsN", c_byte),  # 0x00 to 0x03 (USB max)
+        ("sCurrentTouch", DS4_TOUCH),
+        ("sPreviousTouch", DS4_TOUCH * 2),
+    ]
 
 
 class DS4_REPORT_EX(Union):
     """
     DualShock 4 v1 complete HID Input report
     """
-    _fields_ = [("Report", DS4_SUB_REPORT_EX),
-                ("ReportBuffer", c_ubyte * 63)]
+
+    _fields_ = [("Report", DS4_SUB_REPORT_EX), ("ReportBuffer", c_ubyte * 63)]
 
 
 class VIGEM_ERRORS(IntEnum):
     """
     Values that represent ViGEm errors
     """
+
     VIGEM_ERROR_NONE = 0x20000000
     VIGEM_ERROR_BUS_NOT_FOUND = 0xE0000001
     VIGEM_ERROR_NO_FREE_SLOT = 0xE0000002

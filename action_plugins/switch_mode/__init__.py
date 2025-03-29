@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,8 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtCore
 from lxml import etree as ElementTree
 
 import gremlin.base_profile
@@ -38,7 +37,6 @@ syslog = logging.getLogger("system")
 
 
 class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
-
     """Widget which allows the configuration of a mode to switch to."""
 
     def __init__(self, action_data, parent=None):
@@ -47,7 +45,9 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
-        self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
+        self.mode_selector_widget.currentIndexChanged.connect(
+            self._mode_selected_changed
+        )
         self.main_layout.addWidget(self.mode_selector_widget)
         self.ec = gremlin.execution_graph.ExecutionContext()
         el = gremlin.event_handler.EventListener()
@@ -55,35 +55,35 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         el.execution_context_changed.connect(self._update_modes)
         self._update_modes()
 
-            
-
     @QtCore.Slot()
     def _update_modes(self):
-        ''' called when mode list needs to be updated '''
-        # update the list of available modes 
+        """called when mode list needs to be updated"""
+        # update the list of available modes
         with QtCore.QSignalBlocker(self.mode_selector_widget):
-            current_mode = self.action_data.mode # current mode
+            current_mode = self.action_data.mode  # current mode
             self.mode_selector_widget.clear()
-            
 
             # remove the current mode so we cannot switch to ourselves
-            
-            modes = self.ec.getModeNames(as_tuple=True, include_current = False)
+
+            modes = self.ec.getModeNames(as_tuple=True, include_current=False)
             if not modes:
                 # allow to select self if that's the only option
                 modes = self.ec.getModeNames(as_tuple=True)
-                
+
             index = 0
             select_index = None
             for mode, display in modes:
-                print (f"Mode: {display} -> {mode}")
+                print(f"Mode: {display} -> {mode}")
                 self.mode_selector_widget.addItem(display, mode)
-                if select_index is None and mode == current_mode and current_mode is not None:
+                if (
+                    select_index is None
+                    and mode == current_mode
+                    and current_mode is not None
+                ):
                     select_index = index
                 index += 1
             if select_index is not None:
                 self.mode_selector_widget.setCurrentIndex(select_index)
-        
 
     def _mode_selected_changed(self):
         mode = self.mode_selector_widget.currentData()
@@ -100,34 +100,31 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
                 index = 0
 
         self.mode_selector_widget.setCurrentIndex(index)
-            
-        
 
 
 class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
         self.action_data = action
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         import gremlin.control_action
-        import gremlin.config        
-        import logging
-        
+        import gremlin.config
+
         if event.is_pressed or value.current:
-            verbose =  gremlin.config.Configuration().verbose
+            verbose = gremlin.config.Configuration().verbose
             mode = self.action_data.mode
-            current_mode =  gremlin.shared_state.runtime_mode
+            current_mode = gremlin.shared_state.runtime_mode
             if mode and current_mode and mode != current_mode:
-                if verbose: syslog.info(f"ACTION SWITCH: mode switch from [{current_mode}] to [{mode}] requested")
+                if verbose:
+                    syslog.info(
+                        f"ACTION SWITCH: mode switch from [{current_mode}] to [{mode}] requested"
+                    )
                 gremlin.control_action.switch_mode(mode)
         return True
 
 
-
 class SwitchMode(gremlin.base_profile.AbstractAction):
-
     """Action representing the change of mode."""
 
     name = "Switch Mode"
@@ -156,7 +153,7 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     @property
     def mode(self) -> str:
         return self._mode
-    
+
     @mode.setter
     def mode(self, value: str):
         if value != self._mode:
@@ -165,31 +162,33 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
             verbose = gremlin.config.Configuration().verbose
             if verbose:
                 input_item = self.get_input_item()
-                syslog.info(f"SWITCHMODE: mode set to: {value}  input: {str(input_item)}")
+                syslog.info(
+                    f"SWITCHMODE: mode set to: {value}  input: {str(input_item)}"
+                )
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return f"Switch to: {self.mode}"
 
     def icon(self):
         return "ei.fork"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
-    
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+
     @property
     def priority(self):
         # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - higher numbers run last
         return 999
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         self._mode = node.get("name")
         verbose = gremlin.config.Configuration().verbose_mode_outputs
-        if verbose: syslog.info(f"Read mode: {self._mode} from XML - edit mode: {gremlin.shared_state.edit_mode}")
+        if verbose:
+            syslog.info(
+                f"Read mode: {self._mode} from XML - edit mode: {gremlin.shared_state.edit_mode}"
+            )
 
     def _generate_xml(self):
         node = ElementTree.Element("switch-mode")
@@ -198,7 +197,6 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
 
     def _is_valid(self):
         return True
-        
 
 
 version = 1

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,9 +25,8 @@ TPoint2D = collections.namedtuple("TPoint2D", ["x", "y"])
 
 
 class CubicSpline:
-
     """Creates a new cubic spline based interpolation.
-    
+
     The methods requires a set of control points which are used to
     create a C2 spline which passes through all of them.
     """
@@ -40,9 +39,6 @@ class CubicSpline:
         # Order the points by increasing x coordinate to guarantee proper
         # functioning of the spline code
 
-        
-
-
         ordered_points = sorted(list(set(points)), key=lambda x: x[0])
 
         self.x = [v[0] for v in ordered_points]
@@ -53,7 +49,7 @@ class CubicSpline:
 
     def _fit(self):
         """Computes the second derivatives for the control points."""
-        n = len(self.x)-1
+        n = len(self.x) - 1
 
         if n < 2:
             return
@@ -64,21 +60,21 @@ class CubicSpline:
         v = [0] * n
 
         for i in range(n):
-            h[i] = self.x[i+1] - self.x[i]
+            h[i] = self.x[i + 1] - self.x[i]
             if h[i] == 0:
-                b[i] = (self.y[i+1] - self.y[i]) 
+                b[i] = self.y[i + 1] - self.y[i]
             else:
-                b[i] = (self.y[i+1] - self.y[i]) / h[i]
+                b[i] = (self.y[i + 1] - self.y[i]) / h[i]
 
         u[1] = 2 * (h[0] + h[1])
         v[1] = 6 * (b[1] - b[0])
         for i in range(2, n):
-            u[i] = 2 * (h[i] + h[i-1]) - h[i-1]**2 / u[i-1]
-            v[i] = 6 * (b[i] - b[i-1]) - (h[i-1] * v[i-1]) / u[i-1]
+            u[i] = 2 * (h[i] + h[i - 1]) - h[i - 1] ** 2 / u[i - 1]
+            v[i] = 6 * (b[i] - b[i - 1]) - (h[i - 1] * v[i - 1]) / u[i - 1]
 
         self.z[n] = 0.0
-        for i in range(n-1, 0, -1):
-            self.z[i] = (v[i] - h[i] * self.z[i+1]) / u[i]
+        for i in range(n - 1, 0, -1):
+            self.z[i] = (v[i] - h[i] * self.z[i + 1]) / u[i]
         self.z[0] = 0.0
 
     def __call__(self, x):
@@ -90,21 +86,24 @@ class CubicSpline:
         n = len(self.x)
 
         i = 0
-        for i in range(n-1):
-            if self.x[i] <= x <= self.x[i+1]:
+        for i in range(n - 1):
+            if self.x[i] <= x <= self.x[i + 1]:
                 break
 
-        h = self.x[i+1] - self.x[i]
-        tmp = (self.z[i] / 2.0) + (x - self.x[i]) * \
-            (self.z[i+1] - self.z[i]) / (6 * h)
-        tmp = -(h/6.0) * (self.z[i+1] + 2 * self.z[i]) + \
-            (self.y[i+1] - self.y[i]) / h + (x - self.x[i]) * tmp
+        h = self.x[i + 1] - self.x[i]
+        tmp = (self.z[i] / 2.0) + (x - self.x[i]) * (self.z[i + 1] - self.z[i]) / (
+            6 * h
+        )
+        tmp = (
+            -(h / 6.0) * (self.z[i + 1] + 2 * self.z[i])
+            + (self.y[i + 1] - self.y[i]) / h
+            + (x - self.x[i]) * tmp
+        )
 
         return self.y[i] + (x - self.x[i]) * tmp
 
 
 class CubicBezierSpline:
-
     """Implementation of cubic Bezier splines."""
 
     def __init__(self, points):
@@ -132,7 +131,7 @@ class CubicBezierSpline:
                 TPoint2D(self.x[offset], self.y[offset]),
                 TPoint2D(self.x[offset + 1], self.y[offset + 1]),
                 TPoint2D(self.x[offset + 2], self.y[offset + 2]),
-                TPoint2D(self.x[offset + 3], self.y[offset + 3])
+                TPoint2D(self.x[offset + 3], self.y[offset + 3]),
             ]
 
             # Get t -> coordinate mappings
@@ -157,13 +156,13 @@ class CubicBezierSpline:
 
         return TPoint2D(
             points[0].x * mt3
-                + 3 * points[1].x * mt2 * t
-                + 3 * points[2].x * mt * t2
-                + points[3].x * t3,
+            + 3 * points[1].x * mt2 * t
+            + 3 * points[2].x * mt * t2
+            + points[3].x * t3,
             points[0][1] * mt3
-                + 3 * points[1].y * mt2 * t
-                + 3 * points[2].y * mt * t2
-                + points[3].y * t3
+            + 3 * points[1].y * mt2 * t
+            + 3 * points[2].y * mt * t2
+            + points[3].y * t3,
         )
 
     def __call__(self, x):
@@ -180,12 +179,12 @@ class CubicBezierSpline:
         if self.knots[0][0] > x:
             index = 0
         elif self.knots[-1][0] <= x:
-            index = len(self._lookup)-1
+            index = len(self._lookup) - 1
         else:
             segment_count = int((len(self.x) - 4) / 3) + 1
             for i in range(segment_count):
                 offset = i * 3
-                if self.x[offset] <= x <= self.x[offset+3]:
+                if self.x[offset] <= x <= self.x[offset + 3]:
                     index = i
                     break
 

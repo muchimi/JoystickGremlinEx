@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,11 +30,10 @@ class NoOpActionWidget(AbstractActionWidget):
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, NoOpAction))
-        
+        assert isinstance(action_data, NoOpAction)
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return "Noop"
 
     def _create_ui(self):
@@ -46,18 +45,16 @@ class NoOpActionWidget(AbstractActionWidget):
 
 
 class NoOpActionFunctor(gremlin.base_profile.AbstractFunctor):
-
     """Functor, executing the NoOp action."""
 
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         return True
 
 
 class NoOpAction(gremlin.base_profile.AbstractAction):
-
     """Action which performs no operation."""
 
     name = "NoOp"
@@ -85,7 +82,7 @@ class NoOpAction(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         pass
 
     def _generate_xml(self):

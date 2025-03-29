@@ -28,11 +28,7 @@ from __future__ import annotations
 
 
 from collections import namedtuple
-import os
-import copy
 import logging
-import time
-from typing import Union, Any
 import gremlin.import_profile
 import gremlin.joystick_handling
 import gremlin.plugin_manager
@@ -43,40 +39,32 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
 
-import PySide6
-from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
+from PySide6 import QtCore, QtGui, QtWidgets
 # from gremlin.util import *
 from gremlin.types import DeviceType, TabDeviceType
 from gremlin.input_types import InputType
 import gremlin.util
 from gremlin.util import safe_read
 from gremlin.ui import ui_common,midi_device,osc_device, keyboard_device
-from gremlin.clipboard import Clipboard
 # from gremlin.input_types import InputType
 import dinput 
 import uuid
-import copy
 
-import dinput
 from dinput import DeviceSummary
 import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.event_handler
 import gremlin.shared_state
-from vjoy import vjoy
 
 
 
 
 import gremlin.config
-from gremlin.ui import ui_common
 
 
 import gremlin.joystick_handling
 import gremlin.ui.ui_common
-import dinput
 import enum
-import vjoy
 
 
 
@@ -842,9 +830,9 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _register_mode_item(self, mode, item):
         ''' registers a mode item for a given mode '''
-        if not mode in self._import_mode_item_mode_map.keys():
+        if mode not in self._import_mode_item_mode_map.keys():
             self._import_mode_item_mode_map[mode] = []
-        if not item in self._import_mode_item_mode_map[mode]:
+        if item not in self._import_mode_item_mode_map[mode]:
             self._import_mode_item_mode_map[mode].append(item)
 
     def _register_description(self, device_guid, mode, input_id, description):
@@ -853,9 +841,9 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         assert mode
         assert input_id
         if description:
-            if not device_guid in self.description_map:
+            if device_guid not in self.description_map:
                 self.description_map[device_guid] = {}
-            if not mode in self.description_map[device_guid]:
+            if mode not in self.description_map[device_guid]:
                 self.description_map[device_guid][mode] = {}
             self.description_map[device_guid][mode][input_id] = description
             syslog.info(f"register description: device guid: {str(device_guid)} {gremlin.shared_state.get_device_name(device_guid)} mode: {mode} input: {input_id} description: {description}")
@@ -973,7 +961,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 import_mode_item.mode = mode
                 self._register_mode_item(mode, import_mode_item)
                 import_mode_item.parent_mode = parent_mode
-                if not item.device_guid in self._import_mode_item_map:
+                if item.device_guid not in self._import_mode_item_map:
                     self._import_mode_item_map[item.device_guid] = {}
                 self._import_mode_item_map[item.device_guid][mode] = import_mode_item
                 
@@ -1150,7 +1138,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
         if not import_list:
-            syslog.warning(f"Import profile: warning: no data found")
+            syslog.warning("Import profile: warning: no data found")
             return
 
 
@@ -1173,11 +1161,11 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             parent_mode =  self.parent_mode_map[mode]
 
 
-            if not mode in mode_list:
+            if mode not in mode_list:
                 mode_list.append(mode)
 
             # import (device) node - parents to nothing
-            if not item.device_guid in self._import_map.keys():
+            if item.device_guid not in self._import_map.keys():
                 import_item = ImportItem()
                 import_item.device_name = item.device_name
                 import_item.device_guid = item.device_guid
@@ -1195,7 +1183,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 import_item = self._import_map[item.device_guid]
 
             # mode node - parents to import (device) node
-            if not mode in import_item.mode_map.keys():
+            if mode not in import_item.mode_map.keys():
                 import_mode_item = ImportModeItem()
                 import_mode_item.mode = mode
                 self._register_mode_item(mode, import_mode_item)
@@ -1220,7 +1208,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             import_input_item.data = item.data
 
             import_input_item.device_guid = import_item.device_guid
-            if not import_item.device_guid in self._input_items_by_source_device_guid.keys():
+            if import_item.device_guid not in self._input_items_by_source_device_guid.keys():
                 self._input_items_by_source_device_guid[import_item.device_guid] = [] # create list of ImportInputItems for that specific import device so we can find them easily
             self._input_items_by_source_device_guid[import_item.device_guid].append(import_input_item)
 
@@ -1247,7 +1235,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 # check for old profile format without container IDs - if not set - we need to find it from the profile so the generated IDs are in sync
                 # the logical question is: why don't we just use that "loaded" profile to start with - the answer is - malformed XML profiles that have double entries and other old stuff in them a new profile would not load
                 container_id = container.id
-                if not "container_id" in node.attrib:
+                if "container_id" not in node.attrib:
                     try:
                         
                         items = self.source_profile.devices[import_item.device_guid].modes[mode].config[input_type]
@@ -1326,11 +1314,11 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' registers a device input as used '''
         if input_id is None: 
             return # nothing to register
-        if not device_guid in self.used_target_inputs:
+        if device_guid not in self.used_target_inputs:
             self.used_target_inputs[device_guid] = {}
-        if not input_type in self.used_target_inputs[device_guid]:
+        if input_type not in self.used_target_inputs[device_guid]:
             self.used_target_inputs[device_guid][input_type] = []
-        if not input_id in self.used_target_inputs[device_guid][input_type]:
+        if input_id not in self.used_target_inputs[device_guid][input_type]:
             self.used_target_inputs[device_guid][input_type].append(input_id)
 
 
@@ -1344,7 +1332,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
     
     def _clear_used_input(self, device_guid, input_type):
         ''' clears the registered inputs '''
-        if not device_guid in self.used_target_inputs:
+        if device_guid not in self.used_target_inputs:
             self.used_target_inputs[device_guid] = {}
         self.used_target_inputs[device_guid][input_type] = []
         
@@ -1399,7 +1387,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                             used_inputs = self._get_used_input(target_device_guid, input_type)
                             used_inputs.sort()
                             for id in range(1,target_device.axis_count+1):
-                                if not id in used_inputs:
+                                if id not in used_inputs:
                                     target_input_id = id
                                     break
                     target_input_id = input_id
@@ -1424,7 +1412,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                             used_inputs = self._get_used_input(target_device_guid, input_type)
                             used_inputs.sort()
                             for id in range(1,target_device.button_count+1):
-                                if not id in used_inputs:
+                                if id not in used_inputs:
                                     target_input_id = id
                                     break
                     target_input_id = input_id
@@ -1450,7 +1438,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                             used_inputs = self._get_used_input(target_device_guid, input_type)
                             used_inputs.sort()
                             for id in range(1,target_device.hat_count+1):
-                                if not id in used_inputs:
+                                if id not in used_inputs:
                                     target_input_id = id
                                     break
                     target_input_id = input_id
@@ -1528,7 +1516,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     if verbose:
                         syslog.info(f"\t\t{input_item.input_name} -> not set")
                     continue
-                elif not input_item.input_type in self._default_info_map:
+                elif input_item.input_type not in self._default_info_map:
                     syslog.warning(f"Import: unable to map {input_item.input_type} - no matching suitable device found: type: {input_item.input_type}  name: {input_item.input_name} ")
                     if input_item.input_type == InputType.JoystickHat:
                         input_item.input_type = InputType.JoystickButton
@@ -1644,7 +1632,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' updates the mappings source to target '''
 
         self._map = {} # clear and rebuild the map
-        verbose = gremlin.config.Configuration().verbose
+        gremlin.config.Configuration().verbose
 
         try:
             gremlin.util.pushCursor() # long running op potentially
@@ -1671,7 +1659,6 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 import_item : ImportItem
 
                 # get mapping output options
-                rollover = self.mode
 
 
 
@@ -1823,7 +1810,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             source_input_type = InputType.KeyboardLatched # move to GremlinEX keyboard device
 
  
-        if not target_device_guid in self._target_input_item_map.keys():
+        if target_device_guid not in self._target_input_item_map.keys():
             items = {} # map of possible target input items keyed by input type
             for _, input_type in enumerate(InputType):
                 items[input_type] = []
@@ -1961,7 +1948,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         if index is None:
             index = 0
 
-        if not source_import_item in self._input_id_to_target_input_id:
+        if source_import_item not in self._input_id_to_target_input_id:
             self._input_id_to_target_input_id[source_import_item]={}
 
         self._input_id_to_target_input_id[source_import_item][source_input_item] = target_input_id
@@ -2105,7 +2092,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _clear_profile(self):
         ''' clears the current profile data before import '''
-        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Reset profile?")
+        msgbox = gremlin.ui.ui_common.ConfirmBox("Reset profile?")
         result = msgbox.show()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self.target_profile = gremlin.base_profile.Profile()
@@ -2137,7 +2124,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
             for import_item in import_items:
                 # target output device
-                if not import_item.device_guid in self._input_device_guid_to_target_device_guid:
+                if import_item.device_guid not in self._input_device_guid_to_target_device_guid:
                     # nothing mapped, skip
                     continue
                 target_device_guid = self._input_device_guid_to_target_device_guid[import_item.device_guid]
@@ -2160,14 +2147,14 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         parent_mode = mode_item.parent_mode
 
                         # if the mode is not in the target profile, create that mode
-                        if not target_mode in mode_list:
+                        if target_mode not in mode_list:
                             self.target_profile.add_mode(target_mode, parent_mode, emit=False)
                             
                             if verbose:
                                 syslog.info(f"Adding non existing mode {target_mode} to target profile")
 
                         if parent_mode is not None:      
-                            if not parent_mode in mode_list:
+                            if parent_mode not in mode_list:
                                 self.target_profile.add_mode(parent_mode, emit=False) # ensure the parent mode exists first
                             self.target_profile.set_mode_parent(target_mode, parent_mode, emit = False)
                         
@@ -2187,7 +2174,6 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
                                 
                                 input_input_id = input_item.input_id
-                                input_input_type = input_item.input_type
                                 if input_input_id == 0:
                                     # no map entry - skip
                                     continue
@@ -2452,7 +2438,7 @@ class Mapper():
             if selected_index is not None:
                 self.cb_vjoy_device_selector.setCurrentIndex(selected_index)
 
-            if not self.vjoy_id in self.vjoy_map:
+            if self.vjoy_id not in self.vjoy_map:
                 self.vjoy_id = self.cb_vjoy_device_selector.itemData(0)
                 
 
@@ -2560,7 +2546,7 @@ class Mapper():
                 gremlin_ui = gremlin.shared_state.ui
                 
                 tab_device_type = gremlin_ui.getActiveTabType()
-                if not tab_device_type in (TabDeviceType.Joystick, TabDeviceType.VjoyInput):
+                if tab_device_type not in (TabDeviceType.Joystick, TabDeviceType.VjoyInput):
                     gremlin.ui.ui_common.MessageBox("Information","1:1 mapping is only available on input joysticks")
                     return
 

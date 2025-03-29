@@ -2,42 +2,41 @@
 Adapted from ViGEm source
 """
 
-import platform
 from pathlib import Path
 import ctypes
-from ctypes import CDLL, POINTER, CFUNCTYPE, c_void_p, c_uint, c_ushort, c_ulong, c_bool, c_ubyte
+from ctypes import (
+    c_void_p,
+    c_uint,
+    c_ushort,
+    c_ulong,
+    c_bool,
+)
 
-from .vigem_commons import XUSB_REPORT, DS4_REPORT, DS4_REPORT_EX, VIGEM_TARGET_TYPE
+from .vigem_commons import XUSB_REPORT, DS4_REPORT, VIGEM_TARGET_TYPE
 import os
 import logging
 from gremlin.util import display_error, get_dll_version
+
 syslog = logging.getLogger("system")
 
-class VigemClient():
 
-    
+class VigemClient:
     _dll = None
     _version = None
     initalized = False
 
     @staticmethod
     def init():
-
-
         """Initializes the DILL library.
 
         This has to be called before any other DILL interactions can take place.
         """
-        from pathlib import Path
-
 
         if VigemClient._dll is None:
-
             dll_folder = os.path.dirname(__file__)
             dll_file = "ViGEmClient.dll"
-            _dll_path = os.path.join(dll_folder, dll_file )
+            _dll_path = os.path.join(dll_folder, dll_file)
             if not os.path.isfile(_dll_path):
-
                 # look one level up for packaging in 3.12
                 parent = Path(dll_folder).parent
                 _dll_path = os.path.join(parent, dll_file)
@@ -46,7 +45,7 @@ class VigemClient():
                     display_error(msg)
                     syslog.critical(msg)
                     return
-                    
+
             dll_version = get_dll_version(_dll_path)
             VigemClient._version = dll_version
 
@@ -58,13 +57,14 @@ class VigemClient():
                 syslog.warning(msg)
             try:
                 VigemClient._dll = _di_listener_dll
-                
+
             except Exception as error:
                 msg = f"Unable to initialize Vigem: {_dll_path}\n{error}"
                 display_error(msg)
                 syslog.warning(msg)
 
             VigemClient.initalized = True
+
 
 VigemClient.init()
 
@@ -74,7 +74,7 @@ VigemClient.init()
 # vigem_connect = None
 # vigem_disconnect = None
 
-#vigemClient = CDLL(_dll_path)
+# vigemClient = CDLL(_dll_path)
 vigemClient = VigemClient._dll
 
 
@@ -93,7 +93,7 @@ if vigemClient:
     @param      vigem   The PVIGEM_CLIENT object.
     """
     vigem_free = vigemClient.vigem_free
-    vigem_free.argtypes = (c_void_p, )
+    vigem_free.argtypes = (c_void_p,)
     vigem_free.restype = None
 
     """
@@ -103,7 +103,7 @@ if vigemClient:
     @returns	A VIGEM_ERROR.
     """
     vigem_connect = vigemClient.vigem_connect
-    vigem_connect.argtypes = (c_void_p, )
+    vigem_connect.argtypes = (c_void_p,)
     vigem_connect.restype = c_uint
 
     """
@@ -114,7 +114,7 @@ if vigemClient:
     @param      vigem	The PVIGEM_CLIENT object.
     """
     vigem_disconnect = vigemClient.vigem_disconnect
-    vigem_disconnect.argtypes = (c_void_p, )
+    vigem_disconnect.argtypes = (c_void_p,)
     vigem_disconnect.restype = None
 
     """
@@ -141,7 +141,7 @@ if vigemClient:
     @param 	    target	The target device object.
     """
     vigem_target_free = vigemClient.vigem_target_free
-    vigem_target_free.argtypes = (c_void_p, )
+    vigem_target_free.argtypes = (c_void_p,)
     vigem_target_free.restype = None
 
     """
@@ -193,7 +193,7 @@ if vigemClient:
     @returns	The Vendor ID.
     """
     vigem_target_get_vid = vigemClient.vigem_target_get_vid
-    vigem_target_get_vid.argtypes = (c_void_p, )
+    vigem_target_get_vid.argtypes = (c_void_p,)
     vigem_target_get_vid.restype = c_ushort
 
     """
@@ -202,7 +202,7 @@ if vigemClient:
     @returns	The Product ID.
     """
     vigem_target_get_pid = vigemClient.vigem_target_get_pid
-    vigem_target_get_pid.argtypes = (c_void_p, )
+    vigem_target_get_pid.argtypes = (c_void_p,)
     vigem_target_get_pid.restype = c_ushort
 
     """
@@ -254,7 +254,7 @@ if vigemClient:
     @returns	The internally used index of the target device.
     """
     vigem_target_get_index = vigemClient.vigem_target_get_index
-    vigem_target_get_index.argtypes = (c_void_p, )
+    vigem_target_get_index.argtypes = (c_void_p,)
     vigem_target_get_index.restype = c_ulong
 
     """
@@ -263,7 +263,7 @@ if vigemClient:
     @returns	A VIGEM_TARGET_TYPE.
     """
     vigem_target_get_type = vigemClient.vigem_target_get_type
-    vigem_target_get_type.argtypes = (c_void_p, )
+    vigem_target_get_type.argtypes = (c_void_p,)
     vigem_target_get_type.restype = VIGEM_TARGET_TYPE
 
     """
@@ -273,7 +273,7 @@ if vigemClient:
     @returns	TRUE if device is attached to the bus, FALSE otherwise.
     """
     vigem_target_is_attached = vigemClient.vigem_target_is_attached
-    vigem_target_is_attached.argtypes = (c_void_p, )
+    vigem_target_is_attached.argtypes = (c_void_p,)
     vigem_target_is_attached.restype = c_bool
 
     """
@@ -300,16 +300,25 @@ if vigemClient:
     @param 	userData		The user data passed to the notification callback.
     @returns	A VIGEM_ERROR.
     """
-    vigem_target_x360_register_notification = vigemClient.vigem_target_x360_register_notification
-    vigem_target_x360_register_notification.argtypes = (c_void_p, c_void_p, c_void_p, c_void_p)
+    vigem_target_x360_register_notification = (
+        vigemClient.vigem_target_x360_register_notification
+    )
+    vigem_target_x360_register_notification.argtypes = (
+        c_void_p,
+        c_void_p,
+        c_void_p,
+        c_void_p,
+    )
     vigem_target_x360_register_notification.restype = c_uint
 
     """
     Removes a previously registered callback function from the provided target object.
     @param 	target	The target device object.
     """
-    vigem_target_x360_unregister_notification = vigemClient.vigem_target_x360_unregister_notification
-    vigem_target_x360_unregister_notification.argtypes = (c_void_p, )
+    vigem_target_x360_unregister_notification = (
+        vigemClient.vigem_target_x360_unregister_notification
+    )
+    vigem_target_x360_unregister_notification.argtypes = (c_void_p,)
     vigem_target_x360_unregister_notification.restype = None
 
     """
@@ -322,14 +331,23 @@ if vigemClient:
     @param 	userData		The user data passed to the notification callback.
     @returns	A VIGEM_ERROR.
     """
-    vigem_target_ds4_register_notification = vigemClient.vigem_target_ds4_register_notification
-    vigem_target_ds4_register_notification.argtypes = (c_void_p, c_void_p, c_void_p, c_void_p)
+    vigem_target_ds4_register_notification = (
+        vigemClient.vigem_target_ds4_register_notification
+    )
+    vigem_target_ds4_register_notification.argtypes = (
+        c_void_p,
+        c_void_p,
+        c_void_p,
+        c_void_p,
+    )
     vigem_target_ds4_register_notification.restype = c_uint
 
     """
     Removes a previously registered callback function from the provided target object.
     @param 	target	The target device object.
     """
-    vigem_target_ds4_unregister_notification = vigemClient.vigem_target_ds4_unregister_notification
-    vigem_target_ds4_unregister_notification.argtypes = (c_void_p, )
+    vigem_target_ds4_unregister_notification = (
+        vigemClient.vigem_target_ds4_unregister_notification
+    )
+    vigem_target_ds4_unregister_notification.argtypes = (c_void_p,)
     vigem_target_ds4_unregister_notification.restype = None

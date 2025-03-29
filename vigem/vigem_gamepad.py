@@ -6,12 +6,13 @@ VGamepad API (Windows)  adapted from Yann Boutellier's vgamepad libary and Nefar
 
 from . import vigem_commons as vcom
 from . import vigem_client as vcli
-import ctypes
 from ctypes import CFUNCTYPE, c_void_p, c_ubyte
 from abc import ABC, abstractmethod
 from inspect import signature  # Check if user defined callback function is legal
 import logging
+
 syslog = logging.getLogger("system")
+
 
 def check_err(err):
     if err != vcom.VIGEM_ERRORS.VIGEM_ERROR_NONE:
@@ -38,6 +39,7 @@ class VBus:
     """
     Virtual USB bus (ViGEmBus)
     """
+
     def __init__(self):
         # keep internal references so GC does not remove the dll before the objects are terminated properly
         self.vigem_disconnect = vcli.vigem_disconnect
@@ -51,7 +53,6 @@ class VBus:
     def __del__(self):
         self.vigem_disconnect(self._busp)
         self.vigem_free(self._busp)
-
 
 
 # We instantiate a single global VBus for all controllers
@@ -69,10 +70,14 @@ class VGamepad(ABC):
         self.vigem_target_free = vcli.vigem_target_free
         self._busp = self.vbus.get_busp()
         self._devicep = self.target_alloc()
-        self.CMPFUNC = CFUNCTYPE(None, c_void_p, c_void_p, c_ubyte, c_ubyte, c_ubyte, c_void_p)
+        self.CMPFUNC = CFUNCTYPE(
+            None, c_void_p, c_void_p, c_ubyte, c_ubyte, c_ubyte, c_void_p
+        )
         self.cmp_func = None
         vcli.vigem_target_add(self._busp, self._devicep)
-        assert vcli.vigem_target_is_attached(self._devicep), "The virtual device could not connect to ViGEmBus."
+        assert vcli.vigem_target_is_attached(
+            self._devicep
+        ), "The virtual device could not connect to ViGEmBus."
 
     def __del__(self):
         if not self.vbus.valid:
@@ -128,6 +133,7 @@ class VX360Gamepad(VGamepad):
     """
     Virtual XBox360 gamepad
     """
+
     def __init__(self):
         super().__init__()
         if not self.valid:
@@ -143,7 +149,8 @@ class VX360Gamepad(VGamepad):
             sThumbLX=0,
             sThumbLY=0,
             sThumbRX=0,
-            sThumbRY=0)
+            sThumbRY=0,
+        )
 
     def reset(self):
         """
@@ -219,14 +226,6 @@ class VX360Gamepad(VGamepad):
         self.report.sThumbRX = x_value
         self.report.sThumbRY = y_value
 
-    def left_joystick_float(self, x_value_float, y_value_float):
-        """
-        Sets the values of the X and Y axis for the left joystick
-
-        :param: float between -1.0 and 1.0 (0 = neutral position)
-        """
-        self.left_joystick(round(x_value_float * 32767), round(y_value_float * 32767))
-
     def left_joystick_x_float(self, value_float):
         """
         Sets the values of the X and Y axis for the left joystick
@@ -262,7 +261,6 @@ class VX360Gamepad(VGamepad):
         """
         value = round(value_float * 32767)
         self.report.sThumbRY = value
-        
 
     def right_joystick_float(self, x_value_float, y_value_float):
         """
@@ -271,7 +269,6 @@ class VX360Gamepad(VGamepad):
         :param: float between -1.0 and 1.0 (0 = neutral position)
         """
         self.right_joystick(round(x_value_float * 32767), round(y_value_float * 32767))
-
 
     def left_joystick_float(self, x_value_float, y_value_float):
         """
@@ -298,7 +295,6 @@ class VX360Gamepad(VGamepad):
         """
         value = round(value_float * 32767)
         self.report.sThumbLY = value
-                
 
     def right_joystick_float_x(self, value_float):
         """
@@ -317,7 +313,6 @@ class VX360Gamepad(VGamepad):
         """
         value = round(value_float * 32767)
         self.report.sThumbRY = value
-        
 
     def update(self):
         """
@@ -332,9 +327,19 @@ class VX360Gamepad(VGamepad):
         :param: a function of the form: my_func(client, target, large_motor, small_motor, led_number, user_data)
         """
         if not signature(callback_function) == signature(dummy_callback):
-            raise TypeError("Needed callback function signature: {}, but got: {}".format(signature(dummy_callback), signature(callback_function)))
-        self.cmp_func = self.CMPFUNC(callback_function)  # keep its reference, otherwise the program will crash when a callback is made.
-        check_err(vcli.vigem_target_x360_register_notification(self._busp, self._devicep, self.cmp_func, None))
+            raise TypeError(
+                "Needed callback function signature: {}, but got: {}".format(
+                    signature(dummy_callback), signature(callback_function)
+                )
+            )
+        self.cmp_func = self.CMPFUNC(
+            callback_function
+        )  # keep its reference, otherwise the program will crash when a callback is made.
+        check_err(
+            vcli.vigem_target_x360_register_notification(
+                self._busp, self._devicep, self.cmp_func, None
+            )
+        )
 
     def unregister_notification(self):
         """
@@ -365,7 +370,8 @@ class VDS4Gamepad(VGamepad):
             wButtons=0,
             bSpecial=0,
             bTriggerL=0,
-            bTriggerR=0)
+            bTriggerR=0,
+        )
         vcom.DS4_REPORT_INIT(rep)
         return rep
 
@@ -467,7 +473,9 @@ class VDS4Gamepad(VGamepad):
 
         :param: float between -1.0 and 1.0 (0 = neutral position)
         """
-        self.left_joystick(128 + round(x_value_float * 127), 128 + round(y_value_float * 127))
+        self.left_joystick(
+            128 + round(x_value_float * 127), 128 + round(y_value_float * 127)
+        )
 
     def right_joystick_float(self, x_value_float, y_value_float):
         """
@@ -475,7 +483,9 @@ class VDS4Gamepad(VGamepad):
 
         :param: float between -1.0 and 1.0 (0 = neutral position)
         """
-        self.right_joystick(128 + round(x_value_float * 127), 128 + round(y_value_float * 127))
+        self.right_joystick(
+            128 + round(x_value_float * 127), 128 + round(y_value_float * 127)
+        )
 
     def directional_pad(self, direction):
         """
@@ -499,7 +509,7 @@ class VDS4Gamepad(VGamepad):
 
         :param: a DS4_REPORT_EX
         """
-        #check_err(vcli.vigem_target_ds4_update_ex_ptr(self._busp, self._devicep, ctypes.byref(extended_report)))
+        # check_err(vcli.vigem_target_ds4_update_ex_ptr(self._busp, self._devicep, ctypes.byref(extended_report)))
         pass
 
     def register_notification(self, callback_function):
@@ -509,9 +519,17 @@ class VDS4Gamepad(VGamepad):
         :param: a function of the form: my_func(client, target, large_motor, small_motor, led_number, user_data)
         """
         if not signature(callback_function) == signature(dummy_callback):
-            raise TypeError("Needed callback function signature: {}, but got: {}".format(signature(dummy_callback), signature(callback_function)))
+            raise TypeError(
+                "Needed callback function signature: {}, but got: {}".format(
+                    signature(dummy_callback), signature(callback_function)
+                )
+            )
         self.cmp_func = self.CMPFUNC(callback_function)
-        check_err(vcli.vigem_target_ds4_register_notification(self._busp, self._devicep, self.cmp_func, None))
+        check_err(
+            vcli.vigem_target_ds4_register_notification(
+                self._busp, self._devicep, self.cmp_func, None
+            )
+        )
 
     def unregister_notification(self):
         """

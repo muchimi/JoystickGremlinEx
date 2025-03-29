@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,14 +21,12 @@ from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
 
 
-
-
 class TraceableList(MutableSequence):
-    ''' implements a custom list that can be traced when it changes  '''
+    """implements a custom list that can be traced when it changes"""
 
-    def __init__(self, initlist=None, callback = None):
+    def __init__(self, initlist=None, callback=None):
         MutableSequence.__init__(self)
-        
+
         self.data = []
         self._callbacks = []
         if callback:
@@ -44,23 +42,22 @@ class TraceableList(MutableSequence):
                 self.data = list(initlist)
 
     def add_callback(self, value):
-        ''' adds a callback - signature (action: str, index: int, value [optional object])'''
-        if not value in self._callbacks:
+        """adds a callback - signature (action: str, index: int, value [optional object])"""
+        if value not in self._callbacks:
             self._callbacks.append(value)
 
     def remove_callback(self, value):
-        ''' removes a callback '''
+        """removes a callback"""
         if value in self._callbacks:
             self._callbacks.remove(value)
 
     def clear_callbacks(self):
-        ''' removes all callbacks '''
+        """removes all callbacks"""
         self._callbacks.clear()
 
-    def _trigger(self, action, index = None, value = None):
+    def _trigger(self, action, index=None, value=None):
         for callback in self._callbacks:
             callback(self, action, index, value)
-
 
     def __repr__(self):
         return """<{} data: {}>""".format(self.__class__.__name__, repr(self.data))
@@ -93,10 +90,10 @@ class TraceableList(MutableSequence):
         if isinstance(idx, slice):
             return self.__class__(self.data[idx])
         return self.data[idx]
-        
+
     def __iter__(self):
         return self.data.__iter__()
-    
+
     def __next__(self):
         return self.data.__next__()
 
@@ -160,17 +157,16 @@ class TraceableList(MutableSequence):
     def append(self, value):
         self.data.append(value)
         if self._callbacks:
-            self._trigger("append",value)
-        
+            self._trigger("append", value)
 
     def insert(self, idx, value):
         if self._callbacks:
-            self._trigger("insert",value)
+            self._trigger("insert", value)
         self.data.insert(idx, value)
 
     def pop(self, idx=-1):
         if self._callbacks:
-            self._trigger("pop",idx)
+            self._trigger("pop", idx)
         return self.data.pop(idx)
 
     def remove(self, value):
@@ -201,133 +197,136 @@ class TraceableList(MutableSequence):
     def extend(self, other):
         data = other.data if isinstance(other, TraceableList) else other
         self.data.extend(data)
-        self._trigger("extend", value = data)
+        self._trigger("extend", value=data)
 
     def to_list(self):
         return self.data
-    
+
+
 def empty_copy(obj):
     class Empty(obj.__class__):
-        def __init__(self): pass
-    newcopy = Empty(  )
+        def __init__(self):
+            pass
+
+    newcopy = Empty()
     newcopy.__class__ = obj.__class__
-    return newcopy      
+    return newcopy
+
 
 class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
     pass
 
 
 class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
-    ''' base class for input items for MIDI, OSC and KEYBOARD items '''
+    """base class for input items for MIDI, OSC and KEYBOARD items"""
 
     def __init__(self):
-        
         super().__init__()
         import uuid
-        self._id =  uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
-        self._guid = str(self.id).replace("-","")
+
+        self._id = (
+            uuid.uuid4()
+        )  # GUID (unique) if loaded from XML - will reload that one
+        self._guid = str(self.id).replace("-", "")
         self._display_name = None
         self._description = None
         self._input_description = None
         self._axis_value = None
-        self._button_value = False # true if the equivalent of "pressed"
+        self._button_value = False  # true if the equivalent of "pressed"
 
     @property
     def guid(self):
-        ''' id in string format '''
+        """id in string format"""
         return self._guid
-    
+
     @property
     def id(self):
         return self._id
-    
+
     @id.setter
     def id(self, value):
         self._id = value
-        self._guid = str(value).replace("-","")
+        self._guid = str(value).replace("-", "")
 
     @property
     def display_name(self):
-        ''' display name for this input '''
+        """display name for this input"""
         return self._display_name
-    
-    def setDisplayName(self, value : str):
+
+    def setDisplayName(self, value: str):
         self._display_name = value
-    
+
     @property
     def description(self) -> str:
         return self._description
-    
-    def setDescription(self, value : str):
+
+    def setDescription(self, value: str):
         self._description = value
-    
 
     @property
     def input_description(self) -> str:
         return self._input_description
-    
-    def setInputDescription(self, value : str):
+
+    def setInputDescription(self, value: str):
         self._input_description = value
 
-            
     @property
     def axis_value(self) -> float:
-        ''' gets the current axis value '''
+        """gets the current axis value"""
         return self.getAxisValue()
-    
+
     def getAxisValue(self):
         if self._axis_value is None:
             return 0.0
         return self._axis_value
-    
-    def setAxisValue(self, value : float):
-        ''' sets the axis value and triggers a joystick input event 
-        
+
+    def setAxisValue(self, value: float):
+        """sets the axis value and triggers a joystick input event
+
         :param value: the floating point value to set (-1 to +1)
         :param emit: flag to trigger a joystick event if the value is set
-        
-        '''
+
+        """
         if self.axis_value is None or value != self._axis_value:
             self._axis_value = value
 
-
     def getOverrideInputType(self):
-        # override input type            
+        # override input type
         return None
 
     @property
     def button_value(self) -> bool:
         return self._button_value
-    
+
     def setButtonValue(self, value: bool):
         self._button_value = value
 
-
     @property
     def message_key(self):
-        assert False,"message_key property must be implemented by subclasses"
+        assert False, "message_key property must be implemented by subclasses"
 
     @abstractmethod
     def to_xml(self):
-        ''' must implement '''
+        """must implement"""
         pass
 
     @abstractmethod
     def parse_xml(self):
-        ''' must implement '''
+        """must implement"""
         pass
 
     def __getstate__(self):
-        ''' manual pickle to XML '''
+        """manual pickle to XML"""
         return self.to_xml()
-    
+
     def __setstate__(self, data):
-        ''' manual unpickle '''
+        """manual unpickle"""
         self.parse_xml(data)
 
 
 class SpecialInputItem(AbstractInputItem):
-    ''' specialized input item '''
+    """specialized input item"""
+
     def __init__(self, name):
         super().__init__()
         self._display_name = name
@@ -336,53 +335,50 @@ class SpecialInputItem(AbstractInputItem):
     @property
     def message_key(self):
         return self.display_name
-    
+
     def __str__(self):
         return "special"
-    
+
 
 pickle_targets = {}
 
-class PickleTarget():
-    ''' helper class to pickle objects that don't want to be pickled
-     
+
+class PickleTarget:
+    """helper class to pickle objects that don't want to be pickled
+
     The way this works is we store the object to pickle in a local cache, give it a unique ID, and use that as the pickled value because the ID does pickle.
     When the object is unpickled, we retrieve the object from the cache, remove it from the cache and return the original.
 
     Pickling is automatic and occurs when cloning objects for example.
 
-    '''
+    """
 
     def __init__(self, item):
         self._item = item
 
     def __getstate__(self):
-        ''' pickle '''
+        """pickle"""
         from gremlin.util import get_guid
+
         id = get_guid()
         pickle_targets[id] = self.item
         self.id = id
-        #print (f"pickled to id: {id}")
+        # print (f"pickled to id: {id}")
         return self.id
-    
+
     def __setstate__(self, id):
-        ''' unpickle '''
-        #print (f"pickled from id: {id}")
+        """unpickle"""
+        # print (f"pickled from id: {id}")
         if id in pickle_targets:
-            #print ("target found")
+            # print ("target found")
             self.item = pickle_targets[id]
             del pickle_targets[id]
         return self
-    
+
     @property
     def item(self):
         return self._item
-    
+
     @item.setter
     def item(self, value):
         self._item = value
-
-
-
-            
-    

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,19 +27,19 @@ import gremlin.event_handler
 import gremlin.shared_state
 import threading
 import gremlin.threading
-from . import event_handler, util
+from . import util
 import pyttsx3
 import gremlin.singleton_decorator
 from PySide6 import QtCore
 
 syslog = logging.getLogger("system")
 
+
 @gremlin.singleton_decorator.SingletonDecorator
 class TextToSpeech:
-
-    rate_playback = 100 # default playback rate
-    rate_offset_min = 50 # max slow
-    rate_offset_max = 300 # max fast
+    rate_playback = 100  # default playback rate
+    rate_offset_min = 50  # max slow
+    rate_offset_max = 300  # max fast
 
     def __init__(self):
         """Creates a new instance."""
@@ -49,12 +49,14 @@ class TextToSpeech:
         el.shutdown.connect(self.end)
         self._lock = threading.Lock()
 
-        self._current_rate  = 100 # default rate (global)
+        self._current_rate = 100  # default rate (global)
 
         try:
             self.engine = pyttsx3.init()
-            self.voices = self.engine.getProperty('voices')
-            self.default_voice = next((voice for voice in self.voices if "David Desktop" in voice.name), None)
+            self.voices = self.engine.getProperty("voices")
+            self.default_voice = next(
+                (voice for voice in self.voices if "David Desktop" in voice.name), None
+            )
             self._started = False
             self.valid = True
             self._tts_thread = None
@@ -63,32 +65,27 @@ class TextToSpeech:
 
             verbose = gremlin.config.Configuration().verbose
             if verbose:
-                syslog.info(f"TTS voice listing:")
+                syslog.info("TTS voice listing:")
                 for voice in self.voices:
                     syslog.info(f"\t{voice.name}  (id: {voice.id})")
                 if self.default_voice:
-                    syslog.info(f"TTS default voice: {self.default_voice.name}  (id: {self.default_voice.id})")
-
+                    syslog.info(
+                        f"TTS default voice: {self.default_voice.name}  (id: {self.default_voice.id})"
+                    )
 
             self.start()
 
-
         except Exception as err:
             syslog.error(f"TTS: unable to initialize TTS: {err}")
-                
-
-        
-
-
 
     def getVoices(self):
-        ''' gets a list of defined voices'''
+        """gets a list of defined voices"""
         if self.valid:
-            return self.voices  
+            return self.voices
         return []
-    
+
     def set_voice(self, voice):
-        ''' sets the voice'''
+        """sets the voice"""
         if not self.valid:
             return
         try:
@@ -103,47 +100,48 @@ class TextToSpeech:
                 except Exception as err:
                     syslog.error(f"TTS: unable to activate TTS: {err}")
 
-
-    def speak(self, text, rate = 100, threaded = True):     
+    def speak(self, text, rate=100, threaded=True):
         if not self.valid:
             return
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose
-        if verbose: syslog.info(f"TTS: SPEAK add to queue: {text}")
+        if verbose:
+            syslog.info(f"TTS: SPEAK add to queue: {text}")
 
         self._lock.acquire_lock()
         self._queue.clear()
-        self._queue.append(lambda : self._speak(text, rate))
+        self._queue.append(lambda: self._speak(text, rate))
         self._lock.release_lock()
 
-    def _speak(self, text, rate = None):        
-        ''' speaks the text'''
-        
+    def _speak(self, text, rate=None):
+        """speaks the text"""
+
         try:
             text = self.text_substitution(text)
             if rate is None:
                 rate = self._current_rate
-            new_rate = self.rate_playback + int(util.clamp(rate, self.rate_offset_min, self.rate_offset_max))
-            self.engine.setProperty('rate', new_rate)
+            new_rate = self.rate_playback + int(
+                util.clamp(rate, self.rate_offset_min, self.rate_offset_max)
+            )
+            self.engine.setProperty("rate", new_rate)
             self.engine.say(text)
 
-
         except Exception as err:
-            logging.getLogger(f"system").error(f"Error in TTS: {err}")
+            logging.getLogger("system").error(f"Error in TTS: {err}")
 
-    def speak_single(self, text, rate = None, threaded = True):        
+    def speak_single(self, text, rate=None, threaded=True):
         if text:
             # syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose
-            if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
+            if verbose:
+                syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
             self._lock.acquire_lock()
             self._queue.clear()
-            self._queue.append(lambda : self._speak_single(text, rate))
+            self._queue.append(lambda: self._speak_single(text, rate))
             self._lock.release_lock()
 
-
-    def _speak_single(self, text, rate = None):
-        ''' speaks the test as a single event (don't use this inside an event loop)'''
+    def _speak_single(self, text, rate=None):
+        """speaks the test as a single event (don't use this inside an event loop)"""
         if not self.valid:
             return
         try:
@@ -152,8 +150,10 @@ class TextToSpeech:
             if rate is None:
                 rate = self._current_rate
 
-            new_rate = self.rate_playback + int(util.clamp(rate, self.rate_offset_min, self.rate_offset_max))
-            self.engine.setProperty('rate', new_rate)
+            new_rate = self.rate_playback + int(
+                util.clamp(rate, self.rate_offset_min, self.rate_offset_max)
+            )
+            self.engine.setProperty("rate", new_rate)
             self.engine.say(text)
 
             try:
@@ -162,13 +162,11 @@ class TextToSpeech:
             except:
                 pass
 
-
         except Exception as err:
             syslog.error(f"Error in TTS: {err}")
 
-
     def stop(self):
-        ''' stops any speech '''
+        """stops any speech"""
         if not self.valid:
             return
         try:
@@ -178,21 +176,25 @@ class TextToSpeech:
             self._lock.release_lock()
 
         except Exception as err:
-            logging.getLogger(f"system").error(f"Error in TTS: {err}")
+            logging.getLogger("system").error(f"Error in TTS: {err}")
 
     def start(self):
-        ''' starts the loop '''
+        """starts the loop"""
         if not self.valid:
             return
         if not self._started:
-            self._tts_thread = gremlin.threading.AbortableThread(target = self._tts_runner)
+            self._tts_thread = gremlin.threading.AbortableThread(
+                target=self._tts_runner
+            )
             self._tts_thread.start()
-            self._queue_thread = gremlin.threading.AbortableThread(target= self._queue_runner)
+            self._queue_thread = gremlin.threading.AbortableThread(
+                target=self._queue_runner
+            )
             self._queue_thread.start()
             self._started = True
 
     def _tts_runner(self):
-        ''' runner thread for the TTS engine '''
+        """runner thread for the TTS engine"""
         if not self.valid:
             return
         threading.current_thread().reset()
@@ -200,12 +202,11 @@ class TextToSpeech:
         while not self._tts_thread.stopped():
             time.sleep(0.1)
             self.engine.iterate()
-            
+
         self.engine.endLoop()
 
-
     def _queue_runner(self):
-        ''' processes the speech queue '''
+        """processes the speech queue"""
         # syslog = logging.getLogger("system")
         threading.current_thread().reset()
         verbose = gremlin.config.Configuration().verbose
@@ -214,21 +215,21 @@ class TextToSpeech:
                 self._lock.acquire_lock()
                 functor = self._queue.pop(0)
                 self._lock.release_lock()
-                if verbose: syslog.info("TTS: POP queue")
+                if verbose:
+                    syslog.info("TTS: POP queue")
                 functor()
             time.sleep(0.1)
 
         # terminate any remaining queue items
         self._queue.clear()
 
-
     @QtCore.Slot()
     def end(self):
-        ''' ends the loop '''
-        
+        """ends the loop"""
+
         if not self.valid:
             return
-        
+
         if self._started:
             # syslog = logging.getLogger("system")
             syslog.info("TTS: shutdown")
@@ -245,7 +246,6 @@ class TextToSpeech:
             except:
                 pass
             self._started = False
-        
 
     def set_volume(self, value):
         """Sets the volume anywhere between 0 and 100.
@@ -255,7 +255,9 @@ class TextToSpeech:
         if not self.valid:
             return
         volume = int(util.clamp(value, 0, 100))
-        self.engine.setProperty('volume', volume / 100) # value is 0 to 1 floating point
+        self.engine.setProperty(
+            "volume", volume / 100
+        )  # value is 0 to 1 floating point
 
     def set_rate(self, value):
         """Sets the speaking speed between -10 and 10.
@@ -268,11 +270,11 @@ class TextToSpeech:
         # default is 200 words per minute
         if not self.valid:
             return
-        rate = self.rate_playback + int(util.clamp(value, self.rate_offset_min, self.rate_offset_max))
+        rate = self.rate_playback + int(
+            util.clamp(value, self.rate_offset_min, self.rate_offset_max)
+        )
         self._current_rate = rate
-        self.engine.setProperty('rate', rate )
-        
-
+        self.engine.setProperty("rate", rate)
 
     def text_substitution(self, text):
         """Returns the provided text after running text substitution on it.

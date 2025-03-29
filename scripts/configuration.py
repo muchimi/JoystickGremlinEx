@@ -3,7 +3,7 @@
 import gremlin
 
 
-'''
+"""
 2019-03-16 13:48:37      DEBUG Added: name=T-Rudder windows_id=11 hardware_id=72332921
 2019-03-16 13:48:37      DEBUG Added: name=vJoy Device windows_id=10 hardware_id=305446573
 2019-03-16 13:48:37      DEBUG Added: name=vJoy Device windows_id=9 hardware_id=305446573
@@ -30,9 +30,8 @@ import gremlin
 2019-07-07 14:37:32      DEBUG Added: name=vJoy Device guid={2D3260A0-6FA6-11E7-8002-444553540000}
 2019-07-07 14:37:32      DEBUG Added: name=vJoy Device guid={705DC1A0-C170-11E7-8003-444553540000}
 2019-07-07 14:37:32      DEBUG Added: name=vJoy Device guid={8245C100-2705-11E9-8002-444553540000}
-'''
+"""
 
-    
 
 TM_STICK_ID = 1
 TM_STICK_HWID = 72287234
@@ -123,9 +122,9 @@ MODE_DEFAULT = MODE_ALL
 
 MODE_A = "A"
 
-''' REFERENCE AXES '''
+""" REFERENCE AXES """
 
-'''
+"""
 _AxisNames_to_enum_lookup = {
    1 "X Axis": AxisNames.X,
    2 "Y Axis": AxisNames.Y,
@@ -136,7 +135,7 @@ _AxisNames_to_enum_lookup = {
    7 "Slider": AxisNames.SLIDER,
    8 "Dial": AxisNames.DIAL
 }
-'''
+"""
 
 AXIS_X = 1
 AXIS_Y = 2
@@ -190,61 +189,167 @@ DSD_Flight_Series_Button_Controller_GUID = "{A4F58A50-2156-11E9-8001-44455354000
 # plugin decorator definitions
 
 # decorators for mode A
-LEFT_VPC_Stick_WarBRD_A = gremlin.input_devices.JoystickDecorator(LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "A")
+LEFT_VPC_Stick_WarBRD_A = gremlin.input_devices.JoystickDecorator(
+    LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "A"
+)
 T_Rudder_A = gremlin.input_devices.JoystickDecorator(T_Rudder_NAME, T_Rudder_GUID, "A")
-RaspberryPi_Pico_A = gremlin.input_devices.JoystickDecorator(RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "A")
-Alpha_Flight_Controls_A = gremlin.input_devices.JoystickDecorator(Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "A")
-Bravo_Throttle_Quadrant_A = gremlin.input_devices.JoystickDecorator(Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "A")
-RIGHT_VPC_Stick_WarBRD_A = gremlin.input_devices.JoystickDecorator(RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "A")
-Throttle_HOTAS_Warthog_A = gremlin.input_devices.JoystickDecorator(Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "A")
-DSD_Flight_Series_Button_Controller_A = gremlin.input_devices.JoystickDecorator(DSD_Flight_Series_Button_Controller_NAME, DSD_Flight_Series_Button_Controller_GUID, "A")
+RaspberryPi_Pico_A = gremlin.input_devices.JoystickDecorator(
+    RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "A"
+)
+Alpha_Flight_Controls_A = gremlin.input_devices.JoystickDecorator(
+    Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "A"
+)
+Bravo_Throttle_Quadrant_A = gremlin.input_devices.JoystickDecorator(
+    Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "A"
+)
+RIGHT_VPC_Stick_WarBRD_A = gremlin.input_devices.JoystickDecorator(
+    RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "A"
+)
+Throttle_HOTAS_Warthog_A = gremlin.input_devices.JoystickDecorator(
+    Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "A"
+)
+DSD_Flight_Series_Button_Controller_A = gremlin.input_devices.JoystickDecorator(
+    DSD_Flight_Series_Button_Controller_NAME,
+    DSD_Flight_Series_Button_Controller_GUID,
+    "A",
+)
 
 # decorators for mode Default
-RaspberryPi_Pico_Default = gremlin.input_devices.JoystickDecorator(RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "Default")
-LEFT_VPC_Stick_WarBRD_Default = gremlin.input_devices.JoystickDecorator(LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "Default")
-T_Rudder_Default = gremlin.input_devices.JoystickDecorator(T_Rudder_NAME, T_Rudder_GUID, "Default")
-DSD_Flight_Series_Button_Controller_Default = gremlin.input_devices.JoystickDecorator(DSD_Flight_Series_Button_Controller_NAME, DSD_Flight_Series_Button_Controller_GUID, "Default")
-RIGHT_VPC_Stick_WarBRD_Default = gremlin.input_devices.JoystickDecorator(RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "Default")
-Alpha_Flight_Controls_Default = gremlin.input_devices.JoystickDecorator(Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "Default")
-Throttle_HOTAS_Warthog_Default = gremlin.input_devices.JoystickDecorator(Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "Default")
-Bravo_Throttle_Quadrant_Default = gremlin.input_devices.JoystickDecorator(Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "Default")
+RaspberryPi_Pico_Default = gremlin.input_devices.JoystickDecorator(
+    RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "Default"
+)
+LEFT_VPC_Stick_WarBRD_Default = gremlin.input_devices.JoystickDecorator(
+    LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "Default"
+)
+T_Rudder_Default = gremlin.input_devices.JoystickDecorator(
+    T_Rudder_NAME, T_Rudder_GUID, "Default"
+)
+DSD_Flight_Series_Button_Controller_Default = gremlin.input_devices.JoystickDecorator(
+    DSD_Flight_Series_Button_Controller_NAME,
+    DSD_Flight_Series_Button_Controller_GUID,
+    "Default",
+)
+RIGHT_VPC_Stick_WarBRD_Default = gremlin.input_devices.JoystickDecorator(
+    RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "Default"
+)
+Alpha_Flight_Controls_Default = gremlin.input_devices.JoystickDecorator(
+    Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "Default"
+)
+Throttle_HOTAS_Warthog_Default = gremlin.input_devices.JoystickDecorator(
+    Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "Default"
+)
+Bravo_Throttle_Quadrant_Default = gremlin.input_devices.JoystickDecorator(
+    Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "Default"
+)
 
 # decorators for mode mining
-T_Rudder_mining = gremlin.input_devices.JoystickDecorator(T_Rudder_NAME, T_Rudder_GUID, "mining")
-RIGHT_VPC_Stick_WarBRD_mining = gremlin.input_devices.JoystickDecorator(RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "mining")
-Alpha_Flight_Controls_mining = gremlin.input_devices.JoystickDecorator(Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "mining")
-RaspberryPi_Pico_mining = gremlin.input_devices.JoystickDecorator(RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "mining")
-Bravo_Throttle_Quadrant_mining = gremlin.input_devices.JoystickDecorator(Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "mining")
-Throttle_HOTAS_Warthog_mining = gremlin.input_devices.JoystickDecorator(Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "mining")
-LEFT_VPC_Stick_WarBRD_mining = gremlin.input_devices.JoystickDecorator(LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "mining")
-DSD_Flight_Series_Button_Controller_mining = gremlin.input_devices.JoystickDecorator(DSD_Flight_Series_Button_Controller_NAME, DSD_Flight_Series_Button_Controller_GUID, "mining")
+T_Rudder_mining = gremlin.input_devices.JoystickDecorator(
+    T_Rudder_NAME, T_Rudder_GUID, "mining"
+)
+RIGHT_VPC_Stick_WarBRD_mining = gremlin.input_devices.JoystickDecorator(
+    RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "mining"
+)
+Alpha_Flight_Controls_mining = gremlin.input_devices.JoystickDecorator(
+    Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "mining"
+)
+RaspberryPi_Pico_mining = gremlin.input_devices.JoystickDecorator(
+    RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "mining"
+)
+Bravo_Throttle_Quadrant_mining = gremlin.input_devices.JoystickDecorator(
+    Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "mining"
+)
+Throttle_HOTAS_Warthog_mining = gremlin.input_devices.JoystickDecorator(
+    Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "mining"
+)
+LEFT_VPC_Stick_WarBRD_mining = gremlin.input_devices.JoystickDecorator(
+    LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "mining"
+)
+DSD_Flight_Series_Button_Controller_mining = gremlin.input_devices.JoystickDecorator(
+    DSD_Flight_Series_Button_Controller_NAME,
+    DSD_Flight_Series_Button_Controller_GUID,
+    "mining",
+)
 
 # decorators for mode missile
-Alpha_Flight_Controls_missile = gremlin.input_devices.JoystickDecorator(Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "missile")
-Throttle_HOTAS_Warthog_missile = gremlin.input_devices.JoystickDecorator(Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "missile")
-RaspberryPi_Pico_missile = gremlin.input_devices.JoystickDecorator(RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "missile")
-Bravo_Throttle_Quadrant_missile = gremlin.input_devices.JoystickDecorator(Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "missile")
-RIGHT_VPC_Stick_WarBRD_missile = gremlin.input_devices.JoystickDecorator(RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "missile")
-LEFT_VPC_Stick_WarBRD_missile = gremlin.input_devices.JoystickDecorator(LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "missile")
-T_Rudder_missile = gremlin.input_devices.JoystickDecorator(T_Rudder_NAME, T_Rudder_GUID, "missile")
-DSD_Flight_Series_Button_Controller_missile = gremlin.input_devices.JoystickDecorator(DSD_Flight_Series_Button_Controller_NAME, DSD_Flight_Series_Button_Controller_GUID, "missile")
+Alpha_Flight_Controls_missile = gremlin.input_devices.JoystickDecorator(
+    Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "missile"
+)
+Throttle_HOTAS_Warthog_missile = gremlin.input_devices.JoystickDecorator(
+    Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "missile"
+)
+RaspberryPi_Pico_missile = gremlin.input_devices.JoystickDecorator(
+    RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "missile"
+)
+Bravo_Throttle_Quadrant_missile = gremlin.input_devices.JoystickDecorator(
+    Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "missile"
+)
+RIGHT_VPC_Stick_WarBRD_missile = gremlin.input_devices.JoystickDecorator(
+    RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "missile"
+)
+LEFT_VPC_Stick_WarBRD_missile = gremlin.input_devices.JoystickDecorator(
+    LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "missile"
+)
+T_Rudder_missile = gremlin.input_devices.JoystickDecorator(
+    T_Rudder_NAME, T_Rudder_GUID, "missile"
+)
+DSD_Flight_Series_Button_Controller_missile = gremlin.input_devices.JoystickDecorator(
+    DSD_Flight_Series_Button_Controller_NAME,
+    DSD_Flight_Series_Button_Controller_GUID,
+    "missile",
+)
 
 # decorators for mode scan
-RIGHT_VPC_Stick_WarBRD_scan = gremlin.input_devices.JoystickDecorator(RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "scan")
-RaspberryPi_Pico_scan = gremlin.input_devices.JoystickDecorator(RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "scan")
-T_Rudder_scan = gremlin.input_devices.JoystickDecorator(T_Rudder_NAME, T_Rudder_GUID, "scan")
-Alpha_Flight_Controls_scan = gremlin.input_devices.JoystickDecorator(Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "scan")
-Bravo_Throttle_Quadrant_scan = gremlin.input_devices.JoystickDecorator(Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "scan")
-LEFT_VPC_Stick_WarBRD_scan = gremlin.input_devices.JoystickDecorator(LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "scan")
-DSD_Flight_Series_Button_Controller_scan = gremlin.input_devices.JoystickDecorator(DSD_Flight_Series_Button_Controller_NAME, DSD_Flight_Series_Button_Controller_GUID, "scan")
-Throttle_HOTAS_Warthog_scan = gremlin.input_devices.JoystickDecorator(Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "scan")
+RIGHT_VPC_Stick_WarBRD_scan = gremlin.input_devices.JoystickDecorator(
+    RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "scan"
+)
+RaspberryPi_Pico_scan = gremlin.input_devices.JoystickDecorator(
+    RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "scan"
+)
+T_Rudder_scan = gremlin.input_devices.JoystickDecorator(
+    T_Rudder_NAME, T_Rudder_GUID, "scan"
+)
+Alpha_Flight_Controls_scan = gremlin.input_devices.JoystickDecorator(
+    Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "scan"
+)
+Bravo_Throttle_Quadrant_scan = gremlin.input_devices.JoystickDecorator(
+    Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "scan"
+)
+LEFT_VPC_Stick_WarBRD_scan = gremlin.input_devices.JoystickDecorator(
+    LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "scan"
+)
+DSD_Flight_Series_Button_Controller_scan = gremlin.input_devices.JoystickDecorator(
+    DSD_Flight_Series_Button_Controller_NAME,
+    DSD_Flight_Series_Button_Controller_GUID,
+    "scan",
+)
+Throttle_HOTAS_Warthog_scan = gremlin.input_devices.JoystickDecorator(
+    Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "scan"
+)
 
 # decorators for mode view
-LEFT_VPC_Stick_WarBRD_view = gremlin.input_devices.JoystickDecorator(LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "view")
-DSD_Flight_Series_Button_Controller_view = gremlin.input_devices.JoystickDecorator(DSD_Flight_Series_Button_Controller_NAME, DSD_Flight_Series_Button_Controller_GUID, "view")
-T_Rudder_view = gremlin.input_devices.JoystickDecorator(T_Rudder_NAME, T_Rudder_GUID, "view")
-Throttle_HOTAS_Warthog_view = gremlin.input_devices.JoystickDecorator(Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "view")
-RaspberryPi_Pico_view = gremlin.input_devices.JoystickDecorator(RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "view")
-Bravo_Throttle_Quadrant_view = gremlin.input_devices.JoystickDecorator(Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "view")
-RIGHT_VPC_Stick_WarBRD_view = gremlin.input_devices.JoystickDecorator(RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "view")
-Alpha_Flight_Controls_view = gremlin.input_devices.JoystickDecorator(Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "view")
+LEFT_VPC_Stick_WarBRD_view = gremlin.input_devices.JoystickDecorator(
+    LEFT_VPC_Stick_WarBRD_NAME, LEFT_VPC_Stick_WarBRD_GUID, "view"
+)
+DSD_Flight_Series_Button_Controller_view = gremlin.input_devices.JoystickDecorator(
+    DSD_Flight_Series_Button_Controller_NAME,
+    DSD_Flight_Series_Button_Controller_GUID,
+    "view",
+)
+T_Rudder_view = gremlin.input_devices.JoystickDecorator(
+    T_Rudder_NAME, T_Rudder_GUID, "view"
+)
+Throttle_HOTAS_Warthog_view = gremlin.input_devices.JoystickDecorator(
+    Throttle_HOTAS_Warthog_NAME, Throttle_HOTAS_Warthog_GUID, "view"
+)
+RaspberryPi_Pico_view = gremlin.input_devices.JoystickDecorator(
+    RaspberryPi_Pico_NAME, RaspberryPi_Pico_GUID, "view"
+)
+Bravo_Throttle_Quadrant_view = gremlin.input_devices.JoystickDecorator(
+    Bravo_Throttle_Quadrant_NAME, Bravo_Throttle_Quadrant_GUID, "view"
+)
+RIGHT_VPC_Stick_WarBRD_view = gremlin.input_devices.JoystickDecorator(
+    RIGHT_VPC_Stick_WarBRD_NAME, RIGHT_VPC_Stick_WarBRD_GUID, "view"
+)
+Alpha_Flight_Controls_view = gremlin.input_devices.JoystickDecorator(
+    Alpha_Flight_Controls_NAME, Alpha_Flight_Controls_GUID, "view"
+)

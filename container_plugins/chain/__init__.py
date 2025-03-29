@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ import gremlin.base_conditions
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
-from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
+from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 
@@ -34,7 +34,6 @@ syslog = logging.getLogger("system")
 
 
 class ChainContainerWidget(AbstractContainerWidget):
-
     """Container which holds a sequence of actions."""
 
     def __init__(self, profile_data, parent=None):
@@ -57,7 +56,6 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.add_button.setText("Add Step")
         self.action_selector.action_paste.connect(self._paste_action)
-        
 
         self.widget_layout.addWidget(self.action_selector)
 
@@ -79,7 +77,7 @@ class ChainContainerWidget(AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[i],
                 f"Action {i:d}",
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
             self.action_layout.addWidget(widget)
             widget.redraw()
@@ -91,7 +89,7 @@ class ChainContainerWidget(AbstractContainerWidget):
                 widget = self._create_action_set_widget(
                     self.profile_data.action_sets[i],
                     f"Action {i:d}",
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
@@ -108,7 +106,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.container_modified.emit()
 
     def _paste_action(self, action, container):
-        ''' pastes an action '''
+        """pastes an action"""
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.add_action(action_item)
@@ -140,16 +138,22 @@ class ChainContainerWidget(AbstractContainerWidget):
         # Perform action
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Up:
             if index > 0:
-                self.profile_data.action_sets[index],\
-                    self.profile_data.action_sets[index-1] = \
-                    self.profile_data.action_sets[index-1],\
-                    self.profile_data.action_sets[index]
+                (
+                    self.profile_data.action_sets[index],
+                    self.profile_data.action_sets[index - 1],
+                ) = (
+                    self.profile_data.action_sets[index - 1],
+                    self.profile_data.action_sets[index],
+                )
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Down:
             if index < len(self.profile_data.action_sets) - 1:
-                self.profile_data.action_sets[index], \
-                    self.profile_data.action_sets[index + 1] = \
-                    self.profile_data.action_sets[index + 1], \
-                    self.profile_data.action_sets[index]
+                (
+                    self.profile_data.action_sets[index],
+                    self.profile_data.action_sets[index + 1],
+                ) = (
+                    self.profile_data.action_sets[index + 1],
+                    self.profile_data.action_sets[index],
+                )
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
             del self.profile_data.action_sets[index]
 
@@ -164,8 +168,7 @@ class ChainContainerWidget(AbstractContainerWidget):
 
 
 class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
-
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         super().__init__(container, parent)
         self.action_sets = []
         for action_set in container.action_sets:
@@ -187,9 +190,9 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if event.event_type == InputType.JoystickHat:
-            is_pressed = value.current != (0,0)
+            is_pressed = value.current != (0, 0)
         elif not isinstance(value.current, bool):
             syslog.warning(
                 f"Invalid data type received in Chain container: {type(event.value)}"
@@ -197,7 +200,6 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             return False
         else:
             is_pressed = value.current
-
 
         if self.timeout > 0.0:
             if self.last_execution + self.timeout < time.time():
@@ -215,7 +217,6 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
 class ChainContainer(AbstractContainer):
-
     """Represents a container which holds multiplier actions.
 
     The actions will trigger one after the other with subsequent activations.
@@ -241,7 +242,7 @@ class ChainContainer(AbstractContainer):
     functor = ChainContainerFunctor
     widget = ChainContainerWidget
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
@@ -249,7 +250,7 @@ class ChainContainer(AbstractContainer):
         super().__init__(parent, node)
         self.timeout = 0.0
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
@@ -276,7 +277,7 @@ class ChainContainer(AbstractContainer):
 
         :return True if the container is configured properly, False otherwise
         """
-        #return len(self.action_sets) > 0
+        # return len(self.action_sets) > 0
         return True
 
 

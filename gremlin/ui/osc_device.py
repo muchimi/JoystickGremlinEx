@@ -26,35 +26,26 @@ import gremlin.base_classes
 import gremlin.config
 import gremlin.event_handler
 import gremlin.input_devices
-import gremlin.input_devices
 import gremlin.shared_state
-import gremlin.shared_state
-from gremlin.types import DeviceType
 from gremlin.input_types import InputType
-import gremlin.shared_state
-from gremlin.keyboard import Key
 import gremlin.ui.joystick_device
 import gremlin.base_profile
 import uuid
 from gremlin.singleton_decorator import SingletonDecorator
 import collections
-import logging
 import re
 import time
-from typing import overload, List, Union, Any, Generator, Tuple, Callable, Optional, DefaultDict, Iterator, Union, cast, Coroutine, NamedTuple
-import logging
-from typing import Any, Iterator, List, Union
+from typing import overload, List, Any, Tuple, Callable, Optional, Iterator, Union, cast, Coroutine, NamedTuple
 import asyncio
 from asyncio import BaseEventLoop
 
 import socketserver
 import socket
 from socket import socket as _socket
-import sys
 import os
 from collections.abc import Iterable
 import struct
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 
 import gremlin.ui.ui_common
 from gremlin.util import *
@@ -63,8 +54,6 @@ from lxml import etree as ElementTree
 import enum
 from gremlin.base_classes import AbstractInputItem
 import gremlin.util
-import vjoy
-import vjoy.vjoy
 
 syslog = logging.getLogger("system")
 
@@ -1793,7 +1782,6 @@ class OscInterface(QtCore.QObject):
 
     @QtCore.Slot(bool)
     def _request_osc_state(self, state : bool):
-        from gremlin.input_types import InputType
 
         if state:
             self.start()
@@ -1838,7 +1826,7 @@ class OscInterface(QtCore.QObject):
     def getClient(self, server : str, port : int, name : str = None) -> OscClient:
         ''' gets the client for that server/port '''
         key = (server, port)
-        if not key in self._client_pool:
+        if key not in self._client_pool:
             client = OscClient(server, port, name)
             self._client_pool[key] = client
             verbose = gremlin.config.Configuration().verbose_mode_osc
@@ -2770,14 +2758,14 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                     #     return
                 
                     if self._min_range > self._max_range:
-                        self._validation_message_widget.setText(f"Min range must be less than max range")
+                        self._validation_message_widget.setText("Min range must be less than max range")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
                         icon_color= QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
                         return
                     
                     if self._min_range == self._max_range:
-                        self._validation_message_widget.setText(f"Min range cannot be the same as the max range")
+                        self._validation_message_widget.setText("Min range cannot be the same as the max range")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
                         icon_color= QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
@@ -2788,7 +2776,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                         self._command_data = [0]
                     arg = self._command_data[0]
                     if not (isinstance(arg, int) or isinstance(arg, float)):
-                        self._validation_message_widget.setText(f"First data item must be a number for axis input")
+                        self._validation_message_widget.setText("First data item must be a number for axis input")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
                         icon_color= QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
@@ -2881,7 +2869,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     def _set_parameter(self, index, value):
         ''' sets a data parameter - if the index does not exist, it's created '''
 
-        if not index in self._data_widgets:
+        if index not in self._data_widgets:
             widget = gremlin.ui.ui_common.QDataLineEdit()
             widget.setReadOnly(True)
             widget.data = index
@@ -2939,30 +2927,30 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         autorelease_visible = False
         parameters_visible = True
         if self._mode == OscInputItem.InputMode.Button:
-            self._container_mode_description_widget.setText(f"The input will trigger a button press when the value is 1<br>Use this to trigger a button press from a specific OSC message.")
+            self._container_mode_description_widget.setText("The input will trigger a button press when the value is 1<br>Use this to trigger a button press from a specific OSC message.")
             with QtCore.QSignalBlocker(self._mode_button_widget):
                 self._mode_button_widget.setChecked(True)
             autorelease_visible = True
             parameters_visible = False
             
         elif self._mode == OscInputItem.InputMode.Axis:
-            self._container_mode_description_widget.setText(f"The input act as an axis input using the OSC value.<br>Use this mode if mapping to an axis output (OSC value messages only)")
+            self._container_mode_description_widget.setText("The input act as an axis input using the OSC value.<br>Use this mode if mapping to an axis output (OSC value messages only)")
             #self._command_mode = OscInputItem.CommandMode.Message # force message mode in axis as the value will determine the state
             with QtCore.QSignalBlocker(self._mode_axis_widget):
                 self._mode_axis_widget.setChecked(True)
             
         elif self._mode == OscInputItem.InputMode.OnChange:
-            self._container_mode_description_widget.setText(f"The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the OSC command value changes.")
+            self._container_mode_description_widget.setText("The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the OSC command value changes.")
             with QtCore.QSignalBlocker(self._mode_on_change_widget):
                 self._mode_on_change_widget.setChecked(True)      
 
         if self._command_mode == OscInputItem.CommandMode.Message:
-            self._container_command_mode_description_widget.setText(f"The OSC message is the primary input (data ignored)")
+            self._container_command_mode_description_widget.setText("The OSC message is the primary input (data ignored)")
             with QtCore.QSignalBlocker(self._command_mode_message_widget):
                 self._command_mode_message_widget.setChecked(True)
                 self._data_container_widget.setEnabled(False) # disable the value area if in message only mode
         elif self._command_mode == OscInputItem.CommandMode.Data:
-            self._container_command_mode_description_widget.setText(f"The OSC message and arguments are used as the primary input")
+            self._container_command_mode_description_widget.setText("The OSC message and arguments are used as the primary input")
             with QtCore.QSignalBlocker(self._command_mode_data_widget):
                 self._command_mode_data_widget.setChecked(True)
             self._data_container_widget.setEnabled(True) # enable the value area if in message + data mode
@@ -3365,7 +3353,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     conflicted_widgets.append(input_widget)
                     break
 
-        ok_widgets = [widget for widget in widgets if not widget in conflicted_widgets]
+        ok_widgets = [widget for widget in widgets if widget not in conflicted_widgets]
         for widget in ok_widgets:
             self._set_status(widget)    
     
@@ -3549,12 +3537,12 @@ class InputOscClient(QtCore.QObject):
                         syslog.info(f"\t{input_item.display_name}  key: [{input_item.message_key}] input mode: [{item_mode}]")
 
             if not self._started:
-                if verbose: syslog.info(f"OSC: Start")
+                if verbose: syslog.info("OSC: Start")
                 self.start()
             else:
-                syslog.info(f"OSC: Running")
+                syslog.info("OSC: Running")
         else:
-            syslog.info(f"OSC: no OSC mappings found - start skipped")        
+            syslog.info("OSC: no OSC mappings found - start skipped")        
 
     @QtCore.Slot(bool)
     def _request_osc_state(self, state : bool):
@@ -3572,10 +3560,10 @@ class InputOscClient(QtCore.QObject):
                 self._start()
 
             message_key = input_item.message_key
-            if not message_key in self._osc_map.keys():
+            if message_key not in self._osc_map.keys():
                 self._osc_map[message_key] = []
         
-            if not input_item in self._osc_map[message_key]:
+            if input_item not in self._osc_map[message_key]:
                 self._osc_map[message_key].append(input_item)
             if self._verbose:
                 syslog.info(f"OSC: register trigger on: {input_item.display_name} source index: {input_item.source_index} mode: {input_item.mode_string} key: {message_key}")
@@ -3620,7 +3608,6 @@ class InputOscClient(QtCore.QObject):
 
     def _update_messages(self):
         ''' refresh OSC message we're listening to '''
-        from gremlin.ui.osc_device import OscInputItem
         self._osc_map = {}  # list of message keys
         profile = gremlin.shared_state.current_profile
         if profile:

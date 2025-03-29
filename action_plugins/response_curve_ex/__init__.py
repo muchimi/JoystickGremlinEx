@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,13 +40,11 @@ import gremlin.input_devices
 import gremlin.spline
 
 
-
 class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
-
     """Widget that allows configuring the response of an axis to
     user inputs."""
 
-    def __init__(self, action_data : ResponseCurveEx, parent=None):
+    def __init__(self, action_data: ResponseCurveEx, parent=None):
         """Creates a new instance.
 
         :param action_data the data associated with this specific action.
@@ -57,11 +55,11 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.is_inverted = False
         self.action_data = action_data
 
-   
-
     def _create_ui(self):
         """Creates the required UI elements."""
-        self.curve_widget = gremlin.curve_handler.AxisCurveWidget(self.action_data.curve_data, self)
+        self.curve_widget = gremlin.curve_handler.AxisCurveWidget(
+            self.action_data.curve_data, self
+        )
         self.main_layout.addWidget(self.curve_widget)
 
         el = gremlin.event_handler.EventListener()
@@ -86,14 +84,13 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_event_handler)
 
-
     def _joystick_event_handler(self, event):
-        ''' handles joystick input '''
+        """handles joystick input"""
 
         if not event.is_axis:
             # ignore if not an axis event
             return
-        
+
         if gremlin.shared_state.is_running:
             # ignore if profile is running
             return
@@ -101,40 +98,36 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
         if self.action_data.hardware_device_guid != event.device_guid:
             # ignore if a different input device
             return
-            
+
         if self.action_data.hardware_input_id != event.identifier:
             # ignore if a different input axis on the input device
             return
-        
+
         self.curve_widget.update_value(event.value)
-        
+
 
 class ResponseCurveExFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action_data : ResponseCurveEx, parent = None) :
+    def __init__(self, action_data: ResponseCurveEx, parent=None):
         super().__init__(action_data, parent)
         self.curve_data = action_data.curve_data
         self.curve_data.curve_update()
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if event.is_axis:
             value.current = self.curve_data.curve_value(value.current)
         return True
 
 
 class ResponseCurveEx(gremlin.base_profile.AbstractAction):
-
     """Represents axis response curve mapping."""
 
     name = "Response Curve Ex"
     tag = "response-curve-ex"
 
     default_button_activation = (True, True)
-    
+
     # override allowed input if different from default
-    input_types = [
-        InputType.JoystickAxis
-    ]
+    input_types = [InputType.JoystickAxis]
 
     functor = ResponseCurveExFunctor
     widget = ResponseCurveExWidget
@@ -147,15 +140,18 @@ class ResponseCurveEx(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         self.curve_data = gremlin.curve_handler.AxisCurveData()
-        self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
+        self.curve_data.calibration = (
+            gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
+                self.hardware_device_guid, self.hardware_input_id
+            )
+        )
         self.curve_data.curve_update()
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
-        
 
     def icon(self):
         """Returns the icon representing the action."""
         return "mdi.chart-bell-curve"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
@@ -164,7 +160,7 @@ class ResponseCurveEx(gremlin.base_profile.AbstractAction):
         """
         return False
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Parses the XML corresponding to a response curve.
 
         :param node the XML node to parse
@@ -172,15 +168,12 @@ class ResponseCurveEx(gremlin.base_profile.AbstractAction):
 
         self.curve_data._parse_xml(node)
 
-
-
     def _generate_xml(self):
         """Generates a XML node corresponding to this object.
 
         :return XML node representing the object's data
         """
 
-        
         node = self.curve_data._generate_xml()
         node.tag = "response-curve-ex"
         return node

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,19 +25,20 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
-
+import win32api
+import logging
 
 user32 = ctypes.WinDLL("user32")
 
 
 g_keyboard_callbacks = []
 g_mouse_callbacks = []
-import win32api
-import logging
+
+
 syslog = logging.getLogger("system")
 
-class KeyEvent:
 
+class KeyEvent:
     """Structure containing details about a key event."""
 
     def __init__(self, virtual_code, scan_code, is_extended, is_pressed, is_injected):
@@ -76,14 +77,13 @@ class KeyEvent:
     @property
     def is_injected(self):
         return self._is_injected
-    
+
     @property
     def virtual_code(self):
         return self._virtual_code
 
 
 class MouseEvent:
-
     """Structure containing information about a mouse event."""
 
     def __init__(self, button_id, is_pressed, is_injected):
@@ -102,9 +102,10 @@ class MouseEvent:
     @property
     def is_injected(self):
         return self._is_injected
-    
+
+
 def get_last_error():
-    ''' last error implementatoin'''
+    """last error implementatoin"""
     return win32api.GetLastError()
 
 
@@ -123,36 +124,33 @@ def get_last_error():
 
 # Signature of a hook callback function which can be used as a decorator
 HOOKPROC = ctypes.WINFUNCTYPE(
-    wintypes.LPARAM,
-    ctypes.c_int,
-    wintypes.WPARAM,
-    wintypes.LPARAM
+    wintypes.LPARAM, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM
 )
 
 # Function to hook into an event stream
 user32.SetWindowsHookExW.restype = wintypes.HHOOK
 user32.SetWindowsHookExW.argtypes = (
-    ctypes.c_int,           # _In_ idHook
-    HOOKPROC,               # _In_ lpfn
-    wintypes.HINSTANCE,     # _In_ hMod
-    wintypes.DWORD          # _In_ dwThreadId
+    ctypes.c_int,  # _In_ idHook
+    HOOKPROC,  # _In_ lpfn
+    wintypes.HINSTANCE,  # _In_ hMod
+    wintypes.DWORD,  # _In_ dwThreadId
 )
 
 # Function to call next hook in the chain
 user32.CallNextHookEx.restype = wintypes.LPARAM
 user32.CallNextHookEx.argtypes = (
-    wintypes.HHOOK,         # _In_opt_ hhk
-    ctypes.c_int,           # _In_     nCode
-    wintypes.WPARAM,        # _In_     wParam
-    wintypes.LPARAM         # _In_     lParam
+    wintypes.HHOOK,  # _In_opt_ hhk
+    ctypes.c_int,  # _In_     nCode
+    wintypes.WPARAM,  # _In_     wParam
+    wintypes.LPARAM,  # _In_     lParam
 )
 
 # Retrieve a single message from a stream
 user32.GetMessageW.argtypes = (
-    wintypes.LPMSG,         # _Out_    lpMsg
-    wintypes.HWND,          # _In_opt_ hWnd
-    wintypes.UINT,          # _In_     wMsgFilterMin
-    wintypes.UINT           # _In_     wMsgFilterMax
+    wintypes.LPMSG,  # _Out_    lpMsg
+    wintypes.HWND,  # _In_opt_ hWnd
+    wintypes.UINT,  # _In_     wMsgFilterMin
+    wintypes.UINT,  # _In_     wMsgFilterMax
 )
 
 # Convert message content
@@ -162,51 +160,51 @@ user32.TranslateMessage.argtypes = (wintypes.LPMSG,)
 user32.DispatchMessageW.argtypes = (wintypes.LPMSG,)
 
 # Action definitions
-HC_ACTION       = 0
-WH_KEYBOARD_LL  = 13
-WH_MOUSE_LL     = 14
+HC_ACTION = 0
+WH_KEYBOARD_LL = 13
+WH_MOUSE_LL = 14
 
-WM_QUIT         = 0x0012
-WM_MOUSEMOVE    = 0x0200
-WM_LBUTTONDOWN  = 0x0201
-WM_LBUTTONUP    = 0x0202
-WM_RBUTTONDOWN  = 0x0204
-WM_RBUTTONUP    = 0x0205
-WM_MBUTTONDOWN  = 0x0207
-WM_MBUTTONUP    = 0x0208
-WM_MOUSEWHEEL   = 0x020A
-WM_XBUTTONDOWN  = 0x020B
-WM_XBUTTONUP    = 0x020C
-WM_MOUSEHWHEEL  = 0x020E
-
-
+WM_QUIT = 0x0012
+WM_MOUSEMOVE = 0x0200
+WM_LBUTTONDOWN = 0x0201
+WM_LBUTTONUP = 0x0202
+WM_RBUTTONDOWN = 0x0204
+WM_RBUTTONUP = 0x0205
+WM_MBUTTONDOWN = 0x0207
+WM_MBUTTONUP = 0x0208
+WM_MOUSEWHEEL = 0x020A
+WM_XBUTTONDOWN = 0x020B
+WM_XBUTTONUP = 0x020C
+WM_MOUSEHWHEEL = 0x020E
 
 
 class KBDLLHOOKSTRUCT(ctypes.Structure):
-
     """Data structure used with keuboard callbacks."""
 
     _fields_ = (
-        ("vkCode",      wintypes.DWORD),
-        ("scanCode",    wintypes.DWORD),
-        ("flags",       wintypes.DWORD),
-        ("time",        wintypes.DWORD),
-        ("dwExtraInfo", wintypes.WPARAM)
+        ("vkCode", wintypes.DWORD),
+        ("scanCode", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", wintypes.WPARAM),
     )
+
+
 LPKBDLLHOOKSTRUCT = ctypes.POINTER(KBDLLHOOKSTRUCT)
 
 
 class MSLLHOOKSTRUCT(ctypes.Structure):
-
     """Data structure used with mouse callbacks."""
 
     _fields_ = (
-        ("pt",          wintypes.POINT),
-        ("mouseData",   wintypes.DWORD),
-        ("flags",       wintypes.DWORD),
-        ("time",        wintypes.DWORD),
-        ("dwExtraInfo", wintypes.WPARAM)
+        ("pt", wintypes.POINT),
+        ("mouseData", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", wintypes.WPARAM),
     )
+
+
 LPMSLLHOOKSTRUCT = ctypes.POINTER(MSLLHOOKSTRUCT)
 
 
@@ -230,8 +228,7 @@ def process_keyboard_event(n_code, w_param, l_param):
         is_pressed = w_param in [0x0100, 0x0104]
         is_injected = msg.flags is not None and bool(msg.flags & 0x0010)
 
-        #print (f"****** KEYBOARD HOOK: raw scancode: 0x{msg.scanCode:X} w_param: 0x{w_param:X} flags: 0x{msg.flags:X} scan code: {scan_code} (0x{scan_code:x}) ext: {is_extended} pressed: {is_pressed}")
-
+        # print (f"****** KEYBOARD HOOK: raw scancode: 0x{msg.scanCode:X} w_param: 0x{w_param:X} flags: 0x{msg.flags:X} scan code: {scan_code} (0x{scan_code:x}) ext: {is_extended} pressed: {is_pressed}")
 
         # A scan code of 541 indicates AltGr being pressed. AltGr is sent
         # as a combination of RAlt + RCtrl to the system and as such
@@ -243,15 +240,23 @@ def process_keyboard_event(n_code, w_param, l_param):
 
         # Create the event and pass it to all all registered callbacks
         if msg.scanCode != 541:
-            evt = KeyEvent(virtual_code = virtual_code, scan_code = scan_code, is_extended = is_extended, is_pressed = is_pressed, is_injected = is_injected)
+            evt = KeyEvent(
+                virtual_code=virtual_code,
+                scan_code=scan_code,
+                is_extended=is_extended,
+                is_pressed=is_pressed,
+                is_injected=is_injected,
+            )
             for cb in g_keyboard_callbacks:
                 cb(evt)
 
     # Pass the event on to the next callback in the chain
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
+
 _mouse_h_wheel_time = None
 _mouse_v_wheel_time = None
+
 
 @HOOKPROC
 def process_mouse_event(n_code, w_param, l_param):
@@ -292,15 +297,17 @@ def process_mouse_event(n_code, w_param, l_param):
                 process = True
             else:
                 current_time = time.time()
-                time_delta = (current_time - _mouse_v_wheel_time) * 1000 # in milliseconds
+                time_delta = (
+                    current_time - _mouse_v_wheel_time
+                ) * 1000  # in milliseconds
                 _mouse_v_wheel_time = current_time
-                process = time_delta > 500 # half a second
+                process = time_delta > 500  # half a second
             if process:
                 delta = msg.mouseData >> 16
                 # print (f"mouse V received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
                 if delta == 120:
                     button_id = gremlin.types.MouseButton.WheelUp
-                elif delta == 65416: # -120
+                elif delta == 65416:  # -120
                     button_id = gremlin.types.MouseButton.WheelDown
                 is_wheel = True
         elif w_param == WM_MOUSEHWHEEL:
@@ -312,16 +319,18 @@ def process_mouse_event(n_code, w_param, l_param):
                 process = True
             else:
                 current_time = time.time()
-                time_delta = (current_time - _mouse_h_wheel_time) * 1000 # in milliseconds
+                time_delta = (
+                    current_time - _mouse_h_wheel_time
+                ) * 1000  # in milliseconds
                 _mouse_h_wheel_time = current_time
-                process = time_delta > 500 # half a second
+                process = time_delta > 500  # half a second
 
             if process:
                 delta = msg.mouseData >> 16
                 # print (f"mouse H received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
                 if delta == 120:
                     button_id = gremlin.types.MouseButton.WheelRight
-                elif delta == 65416: # -120
+                elif delta == 65416:  # -120
                     button_id = gremlin.types.MouseButton.WheelLeft
                 is_wheel = True
 
@@ -332,7 +341,7 @@ def process_mouse_event(n_code, w_param, l_param):
             # Create the event and pass it to all all registered callbacks
             evt = MouseEvent(button_id, is_pressed, False)
             if is_wheel:
-                # queue a release event for mouse wheel 
+                # queue a release event for mouse wheel
                 threading.Thread(target=lambda: _queue_wheel_release(button_id)).start()
             for cb in g_mouse_callbacks:
                 cb(evt)
@@ -341,10 +350,10 @@ def process_mouse_event(n_code, w_param, l_param):
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
 
-
 def _queue_wheel_release(button_id):
-    ''' queues a mouse wheel release for wheel events '''
+    """queues a mouse wheel release for wheel events"""
     import time
+
     # print (f"wheel release: {button_id}")
     time.sleep(0.1)
     evt = MouseEvent(button_id, False, False)
@@ -352,10 +361,8 @@ def _queue_wheel_release(button_id):
         cb(evt)
 
 
-
 @SingletonDecorator
 class KeyboardHook:
-
     """Hooks into the event stream and grabs keyboard related events
     and passes them on to registered callback functions.
     """
@@ -363,7 +370,6 @@ class KeyboardHook:
     def __init__(self):
         self._running = False
         self._listen_thread = threading.Thread(target=self._listen, daemon=True)
-        
 
     def register(self, callback):
         """Registers a new message callback.
@@ -394,10 +400,7 @@ class KeyboardHook:
     def _listen(self):
         """Configures the hook and starts listening."""
         self.hook_id = user32.SetWindowsHookExW(
-            WH_KEYBOARD_LL,
-            process_keyboard_event,
-            None,
-            0
+            WH_KEYBOARD_LL, process_keyboard_event, None, 0
         )
 
         msg = wintypes.MSG()
@@ -411,10 +414,8 @@ class KeyboardHook:
             user32.DispatchMessageW(ctypes.byref(msg))
 
 
-
 @SingletonDecorator
 class MouseHook:
-
     """Hooks into the event stream and grabs mouse related events
     and passes them on to registered callback functions.
     """
@@ -432,7 +433,7 @@ class MouseHook:
         g_mouse_callbacks.append(callback)
 
     def unregister(self, callback):
-        ''' removes a mouse callback '''
+        """removes a mouse callback"""
         global g_mouse_callbacks
         if callback in g_mouse_callbacks:
             g_mouse_callbacks.remove(callback)
@@ -458,13 +459,9 @@ class MouseHook:
     def _listen(self):
         """Configures the hook and starts listening."""
         syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose
         syslog.info("MOUSE: HOOK started")
         self.hook_id = user32.SetWindowsHookExW(
-            WH_MOUSE_LL,
-            process_mouse_event,
-            None,
-            0
+            WH_MOUSE_LL, process_mouse_event, None, 0
         )
 
         msg = wintypes.MSG()
@@ -476,4 +473,3 @@ class MouseHook:
                 raise ctypes.WinError(get_last_error())
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
-            

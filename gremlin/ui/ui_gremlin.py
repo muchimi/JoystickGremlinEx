@@ -8,52 +8,51 @@
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+
 class Ui_Gremlin(object):
     def setupUi(self, main_window):
         import gremlin.ui.ui_common
+
         main_window.setObjectName("Gremlin")
         main_window.resize(800, 600)
         self.main = QtWidgets.QWidget(main_window)
         self.main.setObjectName("main")
         self.main_layout = QtWidgets.QVBoxLayout(self.main)
 
-        
         # content panel below the tab
         self.tab_bar_widget = QtWidgets.QWidget(parent=self.main)
-        self.tab_bar_widget.setContentsMargins(0,0,0,0)
-        #self.tab_bar_widget.setStyleSheet("background: yellow")
+        self.tab_bar_widget.setContentsMargins(0, 0, 0, 0)
+        # self.tab_bar_widget.setStyleSheet("background: yellow")
         self.tab_bar_layout = QtWidgets.QVBoxLayout(self.tab_bar_widget)
-        self.tab_bar_layout.setContentsMargins(0,0,0,0)
+        self.tab_bar_layout.setContentsMargins(0, 0, 0, 0)
         self.tab_bar_widget.setMaximumHeight(30)
-        
-        self.devices = gremlin.ui.ui_common.QTabHeader(parent = self.tab_bar_widget)
+
+        self.devices = gremlin.ui.ui_common.QTabHeader(parent=self.tab_bar_widget)
         self.devices.setMovable(True)
         self.devices.setUsesScrollButtons(True)
         self.devices.setObjectName("devices")
-        
-        
+
         self.tab_bar_layout.addWidget(self.devices)
         self.tab_bar_layout.addStretch(2)
 
         # content panel below the tab
         self.tab_content_widget = QtWidgets.QWidget(self.main)
-        self.tab_content_widget.setContentsMargins(0,0,0,0)
-        #self.tab_content_widget.setStyleSheet("background: green")
+        self.tab_content_widget.setContentsMargins(0, 0, 0, 0)
+        # self.tab_content_widget.setStyleSheet("background: green")
         self.tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
-        self.tab_content_layout.setContentsMargins(0,0,0,0)
-        
-        
+        self.tab_content_layout.setContentsMargins(0, 0, 0, 0)
+
         self.main_layout.addWidget(self.tab_bar_widget)
         self.main_layout.addWidget(self.tab_content_widget)
 
         self.statusbar_widget = QtWidgets.QWidget()
-        self.statusbar_widget.setContentsMargins(0,0,0,0)
+        self.statusbar_widget.setContentsMargins(0, 0, 0, 0)
         self.statusbar_layout = QtWidgets.QHBoxLayout(self.statusbar_widget)
-        self.statusbar_layout.setContentsMargins(0,0,0,0)
+        self.statusbar_layout.setContentsMargins(0, 0, 0, 0)
         self.statusbar_widget.setMaximumHeight(32)
 
         self.main_layout.addWidget(self.statusbar_widget)
-        
+
         main_window.setCentralWidget(self.main)
         self.menubar = QtWidgets.QMenuBar(main_window)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
@@ -156,7 +155,7 @@ class Ui_Gremlin(object):
         self.menuFile.addAction(self.actionSaveProfileAs)
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionImportProfile)
-       
+
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionModifyProfile)
         self.menuFile.addSeparator()
@@ -164,7 +163,7 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionManageModes)
         self.menuTools.addAction(self.actionInputRepeater)
         self.menuTools.addAction(self.actionDeviceInformation)
-        #self.menuTools.addAction(self.actionCalibration)
+        # self.menuTools.addAction(self.actionCalibration)
         self.menuTools.addAction(self.actionInputViewer)
         main_window.add_custom_tools_menu(self.menuTools)
         self.menuTools.addSeparator()
@@ -189,7 +188,6 @@ class Ui_Gremlin(object):
         self.menubar.addAction(self.menuTools.menuAction())
         self.menubar.addAction(self.menu_Help.menuAction())
 
-
         # main UI toolbar setup
         self.toolBar.addAction(self.actionSave)
         self.toolBar.addAction(self.actionOpen)
@@ -198,18 +196,17 @@ class Ui_Gremlin(object):
         # separator widget
         widget = QtWidgets.QWidget()
         widget.setMinimumWidth(32)
-        #self.toolBar.addWidget(QtWidgets.QLabel(" "*5))
+        # self.toolBar.addWidget(QtWidgets.QLabel(" "*5))
         self.toolBar.addWidget(widget)
         self.toolBar.addAction(self.actionInputViewer)
         self.toolBar.addAction(self.actionOptions)
 
-
-        self.actionSimconnectOptions = QtGui.QAction(main_window, text = "Simconnect...")
+        self.actionSimconnectOptions = QtGui.QAction(main_window, text="Simconnect...")
         self.actionSimconnectOptions.setObjectName("actionSimconnectOptions")
 
         self.menuTools.addSeparator()
         self.menuTools.addAction(self.actionSimconnectOptions)
-        
+
         self.retranslateUi(main_window)
         self.devices.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(main_window)
@@ -217,7 +214,7 @@ class Ui_Gremlin(object):
     def retranslateUi(self, Gremlin):
         _translate = QtCore.QCoreApplication.translate
         Gremlin.setWindowTitle(_translate("GremlinEx", "Joystick Gremlin Ex"))
-        
+
         self.menuFile.setTitle(_translate("GremlinEx", "&File"))
         self.menuRecent.setTitle(_translate("GremlinEx", "Recent"))
         self.menuTools.setTitle(_translate("GremlinEx", "&Tools"))
@@ -232,23 +229,37 @@ class Ui_Gremlin(object):
         self.actionNewProfile.setText(_translate("GremlinEx", "&New Profile"))
         self.actionSaveProfile.setText(_translate("GremlinEx", "&Save Profile"))
         self.actionSaveProfileAs.setText(_translate("GremlinEx", "&Save Profile As"))
-        self.actionRevealProfile.setText(_translate("GremlinEx", "&Reveal Profile in Explorer..."))
-        self.actionOpenLogFile.setText(_translate("GremlinEx", "Open &Log file in editor..."))
-        self.actionOpenXmlProfile.setText(_translate("GremlinEx","&Open profile XML in editor..."))
-        self.actionOpenGremlinExFolder.setText(_translate("GremlinEx","&Open GremlinEx folder..."))
+        self.actionRevealProfile.setText(
+            _translate("GremlinEx", "&Reveal Profile in Explorer...")
+        )
+        self.actionOpenLogFile.setText(
+            _translate("GremlinEx", "Open &Log file in editor...")
+        )
+        self.actionOpenXmlProfile.setText(
+            _translate("GremlinEx", "&Open profile XML in editor...")
+        )
+        self.actionOpenGremlinExFolder.setText(
+            _translate("GremlinEx", "&Open GremlinEx folder...")
+        )
         self.actionGenerate.setText(_translate("GremlinEx", "Generate"))
-        self.actionDeviceInformation.setText(_translate("GremlinEx", "Device Information"))
+        self.actionDeviceInformation.setText(
+            _translate("GremlinEx", "Device Information")
+        )
         self.actionAbout.setText(_translate("GremlinEx", "&About"))
-        self.actionManageCustomModules.setText(_translate("GremlinEx", "&Manage Custom Modules"))
+        self.actionManageCustomModules.setText(
+            _translate("GremlinEx", "&Manage Custom Modules")
+        )
         self.actionInputRepeater.setText(_translate("GremlinEx", "Input Repeater"))
-        #self.actionCalibration.setText(_translate("GremlinEx", "&Calibration"))
+        # self.actionCalibration.setText(_translate("GremlinEx", "&Calibration"))
         self.actionManageModes.setText(_translate("GremlinEx", "Manage Modes"))
         self.actionHTMLCheatsheet.setText(_translate("GremlinEx", "HTML Cheatsheet"))
         self.actionPDFCheatsheet.setText(_translate("GremlinEx", "PDF Cheatsheet"))
-        self.actionViewInput.setText(_translate("GremlinEx","View Input Map"))
+        self.actionViewInput.setText(_translate("GremlinEx", "View Input Map"))
         self.actionExit.setText(_translate("GremlinEx", "E&xit"))
         self.actionOptions.setText(_translate("GremlinEx", "&Options"))
-        self.actionCreate1to1Mapping.setText(_translate("GremlinEx", "Create 1:1 mapping"))
+        self.actionCreate1to1Mapping.setText(
+            _translate("GremlinEx", "Create 1:1 mapping")
+        )
         self.actionLogDisplay.setText(_translate("GremlinEx", "&Log display"))
         self.actionLogEdit.setText(_translate("GremlinEx", "&Log display in editor"))
         self.actionMergeAxis.setText(_translate("GremlinEx", "&Merge Axis"))
@@ -257,4 +268,3 @@ class Ui_Gremlin(object):
         self.actionEmpty.setText(_translate("GremlinEx", "Empty"))
         self.actionSwapDevices.setText(_translate("GremlinEx", "Swap Devices"))
         self.actionInputViewer.setText(_translate("GremlinEx", "Input Viewer"))
-

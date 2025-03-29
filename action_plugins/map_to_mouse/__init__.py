@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
 
 import logging
 import math
-import os
 from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -35,8 +34,8 @@ from gremlin import input_devices
 
 syslog = logging.getLogger("system")
 
-class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
 
+class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
     """UI widget for mapping inputs to mouse motion or buttons."""
 
     def __init__(self, action_data, parent=None):
@@ -86,9 +85,15 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._create_button_hat_ui()
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Map to Mouse Ex</i> for additional functionality", use_wrap=False)
+        warning_widget = gremlin.ui.ui_common.QIconLabel(
+            "ph.shield-warning-fill",
+            use_qta=True,
+            icon_color=QtGui.QColor(warning_color),
+            text="Legacy mapper - consider using <i>Map to Mouse Ex</i> for additional functionality",
+            use_wrap=False,
+        )
         self.main_layout.addWidget(self.container_widget)
-        self.main_layout.addWidget(warning_widget)            
+        self.main_layout.addWidget(warning_widget)
 
     def _create_axis_ui(self):
         """Creates the UI for axis setups."""
@@ -97,35 +102,40 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.y_axis = QtWidgets.QRadioButton("Y Axis")
 
         self.motion_layout.addWidget(
-            QtWidgets.QLabel("Control"),
-            0,
-            0,
-            QtCore.Qt.AlignLeft
+            QtWidgets.QLabel("Control"), 0, 0, QtCore.Qt.AlignmentFlag.AlignLeft
         )
-        self.motion_layout.addWidget(self.x_axis, 0, 1, QtCore.Qt.AlignLeft)
-        self.motion_layout.addWidget(self.y_axis, 0, 2, 1, 2, QtCore.Qt.AlignLeft)
+        self.motion_layout.addWidget(
+            self.x_axis, 0, 1, QtCore.Qt.AlignmentFlag.AlignLeft
+        )
+        self.motion_layout.addWidget(
+            self.y_axis, 0, 2, 1, 2, QtCore.Qt.AlignmentFlag.AlignLeft
+        )
 
         self.min_speed = QtWidgets.QSpinBox()
         self.min_speed.setRange(0, 1e5)
         self.max_speed = QtWidgets.QSpinBox()
         self.max_speed.setRange(0, 1e5)
         self.motion_layout.addWidget(
-            QtWidgets.QLabel("Minimum speed"), 1, 0, QtCore.Qt.AlignLeft
+            QtWidgets.QLabel("Minimum speed"), 1, 0, QtCore.Qt.AlignmentFlag.AlignLeft
         )
-        self.motion_layout.addWidget(self.min_speed, 1, 1, QtCore.Qt.AlignLeft)
         self.motion_layout.addWidget(
-            QtWidgets.QLabel("Maximum speed"), 1, 2, QtCore.Qt.AlignLeft
+            self.min_speed, 1, 1, QtCore.Qt.AlignmentFlag.AlignLeft
         )
-        self.motion_layout.addWidget(self.max_speed, 1, 3, QtCore.Qt.AlignLeft)
+        self.motion_layout.addWidget(
+            QtWidgets.QLabel("Maximum speed"), 1, 2, QtCore.Qt.AlignmentFlag.AlignLeft
+        )
+        self.motion_layout.addWidget(
+            self.max_speed, 1, 3, QtCore.Qt.AlignmentFlag.AlignLeft
+        )
 
         self._connect_axis()
 
     def _create_button_hat_ui(self):
         """Creates the UI for button setups."""
         self.min_speed = QtWidgets.QSpinBox()
-        self.min_speed.setRange(0, 1e5)
+        self.min_speed.setRange(0, int(1e5))
         self.max_speed = QtWidgets.QSpinBox()
-        self.max_speed.setRange(0, 1e5)
+        self.max_speed.setRange(0, int(1e5))
         self.time_to_max_speed = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.time_to_max_speed.setRange(0.0, 100.0)
         self.time_to_max_speed.setValue(0.0)
@@ -135,22 +145,25 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.direction.setRange(0, 359)
 
         self.motion_layout.addWidget(QtWidgets.QLabel("Minimum speed"), 0, 0)
-        self.motion_layout.addWidget(self.min_speed, 0, 1, QtCore.Qt.AlignLeft)
-        self.motion_layout.addWidget(QtWidgets.QLabel("Maximum speed"), 0, 2)
-        self.motion_layout.addWidget(self.max_speed, 0, 3, QtCore.Qt.AlignLeft)
-
         self.motion_layout.addWidget(
-            QtWidgets.QLabel("Time to maximum speed"), 1, 0
+            self.min_speed, 0, 1, QtCore.Qt.AlignmentFlag.AlignLeft
         )
+        self.motion_layout.addWidget(QtWidgets.QLabel("Maximum speed"), 0, 2)
         self.motion_layout.addWidget(
-            self.time_to_max_speed, 1, 1, QtCore.Qt.AlignLeft
+            self.max_speed, 0, 3, QtCore.Qt.AlignmentFlag.AlignLeft
+        )
+
+        self.motion_layout.addWidget(QtWidgets.QLabel("Time to maximum speed"), 1, 0)
+        self.motion_layout.addWidget(
+            self.time_to_max_speed, 1, 1, QtCore.Qt.AlignmentFlag.AlignLeft
         )
         if self.action_data.get_input_type() in [
-            InputType.JoystickButton, InputType.Keyboard
+            InputType.JoystickButton,
+            InputType.Keyboard,
         ]:
             self.motion_layout.addWidget(QtWidgets.QLabel("Direction"), 1, 2)
             self.motion_layout.addWidget(
-                self.direction, 1, 3, QtCore.Qt.AlignLeft
+                self.direction, 1, 3, QtCore.Qt.AlignmentFlag.AlignLeft
             )
 
         self._connect_button_hat()
@@ -299,8 +312,7 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            [InputType.Mouse],
-            return_kb_event=False
+            [InputType.Mouse], return_kb_event=False
         )
         self.button_press_dialog.item_selected.connect(self._update_mouse_button)
 
@@ -314,13 +326,12 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
             int(geom.x() + geom.width() / 2 - 150),
             int(geom.y() + geom.height() / 2 - 75),
             300,
-            150
+            150,
         )
         self.button_press_dialog.show()
 
 
 class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
-
     """Implements the functionality required to move a mouse cursor.
 
     This moves the mouse cursor by issuing relative motion commands. This is
@@ -328,7 +339,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
     properly with a single input, at least partially.
     """
 
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         """Creates a new functor with the provided data.
 
         :param action contains parameters to use with the functor
@@ -338,7 +349,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
         self.config = action
         self.mouse_controller = gremlin.sendinput.MouseController()
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if self.config.motion_input:
             if event.event_type == InputType.JoystickAxis:
                 self._perform_axis_motion(event, value)
@@ -369,18 +380,22 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_h_wheel(direction)                      
+                    input_devices.remote_client.send_mouse_h_wheel(direction)
         else:
             if value.current:
                 if is_local:
                     gremlin.sendinput.mouse_press(self.config.button_id)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.config.button_id.value, True)
+                    input_devices.remote_client.send_mouse_button(
+                        self.config.button_id.value, True
+                    )
             else:
                 if is_local:
                     gremlin.sendinput.mouse_release(self.config.button_id)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.config.button_id.value, False)
+                    input_devices.remote_client.send_mouse_button(
+                        self.config.button_id.value, False
+                    )
 
     def _perform_axis_motion(self, event, value):
         """Processes events destined for an axis.
@@ -388,8 +403,9 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
         :param event the event triggering the code execution
         :param value the current value of the event chain
         """
-        delta_motion = self.config.min_speed + abs(value.current) * \
-                (self.config.max_speed - self.config.min_speed)
+        delta_motion = self.config.min_speed + abs(value.current) * (
+            self.config.max_speed - self.config.min_speed
+        )
         delta_motion = math.copysign(delta_motion, value.current)
         delta_motion = 0.0 if abs(value.current) < 0.05 else delta_motion
 
@@ -409,11 +425,16 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                     self.config.direction,
                     self.config.min_speed,
                     self.config.max_speed,
-                    self.config.time_to_max_speed
+                    self.config.time_to_max_speed,
                 )
             if is_remote:
-                input_devices.remote_client.send_mouse_acceleration(self.config.direction, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
-     
+                input_devices.remote_client.send_mouse_acceleration(
+                    self.config.direction,
+                    self.config.min_speed,
+                    self.config.max_speed,
+                    self.config.time_to_max_speed,
+                )
+
         else:
             if is_local:
                 self.mouse_controller.set_absolute_motion(0, 0)
@@ -441,14 +462,18 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                     a,
                     self.config.min_speed,
                     self.config.max_speed,
-                    self.config.time_to_max_speed
+                    self.config.time_to_max_speed,
                 )
             if is_remote:
-                input_devices.remote_client.send_mouse_acceleration(a, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
+                input_devices.remote_client.send_mouse_acceleration(
+                    a,
+                    self.config.min_speed,
+                    self.config.max_speed,
+                    self.config.time_to_max_speed,
+                )
 
 
 class MapToMouse(gremlin.base_profile.AbstractAction):
-
     """Action data for the map to mouse action.
 
     Map to mouse allows controlling of the mouse cursor using either a joystick
@@ -491,16 +516,16 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
         self.time_to_max_speed = 1.0
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return f"[{self.button_id.name}]"
-    
+
     def icon(self):
         """Returns the icon to use for this action.
 
         :return icon representing this action
         """
         return "mdi.mouse"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
@@ -513,7 +538,7 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
             return not self.motion_input
         return False
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Reads the contents of an XML node to populate this instance.
 
         :param node the node whose content should be used to populate this
@@ -525,9 +550,7 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
                 safe_read(node, "button-id", int, 1)
             )
         except ValueError as e:
-            syslog.warning(
-                f"Invalid mouse identifier in profile: {e:}"
-            )
+            syslog.warning(f"Invalid mouse identifier in profile: {e:}")
             self.button_id = gremlin.types.MouseButton.Left
         self.direction = safe_read(node, "direction", int, 0)
         self.min_speed = safe_read(node, "min-speed", int, 5)

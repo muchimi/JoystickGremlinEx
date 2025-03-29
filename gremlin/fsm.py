@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,10 +18,11 @@
 """Implementation of a very simple finite state machine."""
 
 import logging
+
 syslog = logging.getLogger("system")
 
-class Transition:
 
+class Transition:
     """Represents a single transition in the finite state machine."""
 
     def __init__(self, callback, new_state):
@@ -36,7 +37,6 @@ class Transition:
 
 
 class FiniteStateMachine:
-
     """Simple finite state machine."""
 
     def __init__(self, start_state, states, actions, transitions, debug=False):
@@ -48,7 +48,7 @@ class FiniteStateMachine:
         :param transitions the states x actions transition matrix
         :param debug log debug messages if True
         """
-        assert(start_state in states)
+        assert start_state in states
 
         self.states = states
         self.actions = actions
@@ -63,11 +63,13 @@ class FiniteStateMachine:
         :return returns the state transition function's return value
         """
         key = (self.current_state, action)
-        assert(action in self.actions)
-        assert(key in self.transitions)
-        assert(self.transitions[key].new_state in self.states)
+        assert action in self.actions
+        assert key in self.transitions
+        assert self.transitions[key].new_state in self.states
         value = self.transitions[key].callback()
         if self.debug:
-            syslog.debug(f"FSM: {self.current_state} -> {self.transitions[key].new_state} ({action})")
+            syslog.debug(
+                f"FSM: {self.current_state} -> {self.transitions[key].new_state} ({action})"
+            )
         self.current_state = self.transitions[key].new_state
         return value

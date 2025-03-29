@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,6 +26,6 @@ hint = {}
 
 
 with open(resource_path("doc/hints.csv")) as csv_stream:
-    reader = csv.reader(csv_stream, delimiter=",", quotechar="\"")
+    reader = csv.reader(csv_stream, delimiter=",", quotechar='"')
     for row in reader:
         hint[row[0]] = row[1]

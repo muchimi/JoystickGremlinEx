@@ -17,13 +17,9 @@
 
 
 from abc import abstractmethod, ABCMeta
-from collections import namedtuple
-import codecs
 import collections
 import os
-import copy
 import logging
-import time
 
 import gremlin.actions
 import gremlin.base_buttons
@@ -49,8 +45,7 @@ from gremlin.types import DeviceType
 from gremlin.plugin_manager import ContainerPlugins
 from gremlin.base_conditions import *
 from gremlin.base_buttons import VirtualAxisButton, VirtualHatButton
-from gremlin.input_types import InputType
-from gremlin.plugin_manager import ActionPlugins, ContainerPlugins
+from gremlin.plugin_manager import ActionPlugins
 import gremlin.joystick_handling
 import gremlin.profile
 import gremlin.input_devices
@@ -669,12 +664,12 @@ class AbstractContainer(ProfileData):
             tag = child.tag
             if config.convert_response_curve and gremlin.base_profile._is_curve_tag(tag):
                 tag = "response-curve-ex"
-                if not tag in action_name_map:
+                if tag not in action_name_map:
                     # new mapper not found
                     tag = child.tag
             elif config.convert_vjoy_remap and tag == "remap":
                 tag = "vjoyremap"
-                if not tag in action_name_map:
+                if tag not in action_name_map:
                     # new mapper not found
                     tag = child.tag
 
@@ -1128,7 +1123,7 @@ class AbstractContainerAction(AbstractAction):
         
         '''
         
-        if autocreate and not index in self._item_data_map.keys():
+        if autocreate and index not in self._item_data_map.keys():
             # get the input item behind the parent action
             current = self.parent
             while current and not isinstance(current, InputItem):
@@ -1551,7 +1546,7 @@ class InputItem():
     @input_id.setter
     def input_id(self, value):
         from gremlin.base_classes import AbstractInputItem
-        assert value == None or isinstance(value, int) or isinstance(value, AbstractInputItem)
+        assert value is None or isinstance(value, int) or isinstance(value, AbstractInputItem)
         self._input_id = value
         self._update_input()
 
@@ -1725,7 +1720,7 @@ class InputItem():
             if "id" in node.attrib and node.tag == "key":
                 # legacy format
                 scan_code = safe_read(node, "id", int, 0)
-                description = safe_read(node, "description", str, "")
+                safe_read(node, "description", str, "")
                 key = Key(scan_code=scan_code, is_extended=False, is_mouse = False)
                 input_item.key = key
             else:
@@ -1739,7 +1734,7 @@ class InputItem():
                     for child in node:
                         if child.tag == "latched":
                             latched_key = Key(scan_code=safe_read(child,"id",int), is_extended= read_bool(child,"extended"))
-                            if not latched_key in key.latched_keys:
+                            if latched_key not in key.latched_keys:
                                 key.latched_keys.append(latched_key)
                 else:
                     # new style
@@ -1814,7 +1809,7 @@ class InputItem():
             if child.tag in ("latched", "input", "keylatched") or gremlin.base_profile._is_curve_tag(child.tag):
                 # ignore extra data
                 continue
-            if not "type" in child.attrib:
+            if "type" not in child.attrib:
                 syslog.error(
                     f"XML {child.tag} is missing container 'type' attribute"
                 )
@@ -1837,7 +1832,6 @@ class InputItem():
 
     def is_valid_for_save(self) -> bool:
         ''' true if the item has something to save to a profile '''
-        from gremlin.keyboard import Key
         if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
             # if isinstance(self.input_id, Key):
             #     # has a key definition, save
@@ -2088,7 +2082,7 @@ class Profile():
         remove_list = []
         for device in self.vjoy_devices.values():
             for mode in device.modes.keys():
-                if not mode in modes:
+                if mode not in modes:
                     remove_list.append(mode)
 
             for mode in remove_list:
@@ -2097,7 +2091,7 @@ class Profile():
 
         # check default startup mode
         mode = self._default_start_mode
-        if not mode in modes:
+        if mode not in modes:
             self._default_start_mode = self.get_default_mode()
             
 
@@ -2510,7 +2504,7 @@ class Profile():
         
         import gremlin.event_handler
         mode_list = self.mode_list()
-        if not name in self.mode_list():
+        if name not in self.mode_list():
             syslog.warning(f"Remove Mode: error: mode {name} not found")
             return False
                 
@@ -2602,9 +2596,9 @@ class Profile():
         self._ensure_mode_tree()
         if self._mode_tree:
             if casefold:
-                modes = [node.name.casefold() for node in self._mode_tree.descendants]    
+                [node.name.casefold() for node in self._mode_tree.descendants]    
             else:
-                modes = [node.name for node in self._mode_tree.descendants]
+                [node.name for node in self._mode_tree.descendants]
 
         for node in anytree.PreOrderIter(self._mode_tree):
             mode_name = node.name
@@ -2637,7 +2631,7 @@ class Profile():
         for device in self.devices.values():
             for mode in device.modes.values():
                 mode_name = mode.name
-                if not mode_name in mode_list:
+                if mode_name not in mode_list:
                     mode_list.append(mode_name)
 
                     node = Node(mode_name)
@@ -2645,7 +2639,7 @@ class Profile():
                     parent_mode_name = mode.inherit
                     if parent_mode_name:
                         # find the parent node, create if it does not exist
-                        if not parent_mode_name in node_map:
+                        if parent_mode_name not in node_map:
                             parent_node = Node(parent_mode_name)
                             parent_node.name = parent_mode_name
                             parent_node.parent = self._mode_tree
@@ -2803,7 +2797,7 @@ class Profile():
         :param fname the path to the XML file to parse
         """
         # Check for outdated profile structure and warn user / convert
-        verbose = gremlin.config.Configuration().verbose
+        gremlin.config.Configuration().verbose
         profile_converter = gremlin.profile.ProfileConverter()
         profile_was_updated = False
         if not profile_converter.is_current(fname):
@@ -2870,7 +2864,7 @@ class Profile():
 
             if "inherit" in mode_node.attrib:
                 parent_mode = mode_node.get("inherit")
-                if not parent_mode in mode_node_map:
+                if parent_mode not in mode_node_map:
                     tree_parent_mode = ModeNode(parent_mode)
                     nodes[parent_mode] = tree_parent_mode
                     mode_node_map[parent_mode] = tree_parent_mode
@@ -2878,7 +2872,7 @@ class Profile():
             else:
                 parent_mode = None
 
-            if not mode in mode_node_map:
+            if mode not in mode_node_map:
                 tree_node = ModeNode(mode)
                 mode_node_map[mode] = tree_node
                 nodes[mode] = tree_node
@@ -2944,7 +2938,7 @@ class Profile():
         # update missing modes from devices
         for device in self.devices.values():
             device_modes = [mode.name for mode in device.modes.values()]
-            missing_modes = [mode for mode in mode_list if not mode in device_modes]
+            missing_modes = [mode for mode in mode_list if mode not in device_modes]
             for mode_name in missing_modes:
                 mode = Mode(device)
                 mode.name = mode_name
@@ -3242,7 +3236,7 @@ class Profile():
             self._default_start_mode = self.get_default_mode()
         mode = self._default_start_mode
         modes = self.get_modes()
-        if not mode in modes:
+        if mode not in modes:
             self._default_start_mode = self.get_root_mode()
         return self._default_start_mode
     
@@ -3657,7 +3651,7 @@ class PluginVariable:
         elif self.type == PluginVariableType.Mode:
             self.value = safe_read(node, "value", str, "")
         elif self.type == PluginVariableType.PhysicalInput:
-            if not "device-guid" in node.attrib:
+            if "device-guid" not in node.attrib:
                 # partial data save
                 self.value = {
                     "device_id": None,
@@ -3673,7 +3667,7 @@ class PluginVariable:
                 }
 
         elif self.type == PluginVariableType.VirtualInput:
-            if not "vjoy-id" in node.attrib:
+            if "vjoy-id" not in node.attrib:
                 # partial data save
                 self.value = {
                 "device_id": None,
@@ -3858,13 +3852,13 @@ class ProfileMapItem():
                         restore_last = safe_read(element, "restore_last", bool, False)
                         force_numlock_off = safe_read(element,"force_numlock", bool, True)
 
-                    if not restore_last is None:
+                    if restore_last is not None:
                         for element in tree.xpath("//startup-mode"):
                             start_mode = element.text
                             break
                     
 
-                    if not restore_last is None:
+                    if restore_last is not None:
                         restore_last = False # default value
 
                     
@@ -4102,12 +4096,12 @@ class ProfileMap():
 
             if not (item.process or item.profile):
                 valid = False
-                warning = f"Mapping incomplete"
+                warning = "Mapping incomplete"
                 self._valid = False
 
             pd = item._get_profile_data()
             if pd.mode_list:
-                if item.default_mode is not None and not item.default_mode in pd.mode_list:
+                if item.default_mode is not None and item.default_mode not in pd.mode_list:
                     valid = False
                     warning = f"Startup mode '{item.default_mode}' does not exist for this profile"
                     self._valid = False

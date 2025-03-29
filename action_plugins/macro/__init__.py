@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,35 +16,28 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import collections
-import logging
-import os
-import pickle
-import time
-from PySide6 import QtCore, QtGui, QtWidgets
 from lxml import etree as ElementTree
-
-from PySide6.QtGui import QIcon
-
+import logging
 import gremlin.base_profile
-from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.macro
+from gremlin.input_types import InputType
+from gremlin.macro_handler import MacroWidget
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
 import gremlin.ui.input_item
 import gremlin.input_devices
 from gremlin.input_devices import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.types
-from gremlin.macro_handler import *
+#from gremlin.macro_handler import *
 
 syslog = logging.getLogger("system")
 
-class MacroFunctor(gremlin.base_profile.AbstractFunctor):
 
+class MacroFunctor(gremlin.base_profile.AbstractFunctor):
     manager = gremlin.macro.MacroManager()
 
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
         self.macro = gremlin.macro.Macro()
         for seq in action.sequence:
@@ -52,18 +45,16 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         self.macro.exclusive = action.exclusive
         self.macro.repeat = action.repeat
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         MacroFunctor.manager.queue_macro(self.macro)
         if isinstance(self.macro.repeat, gremlin.macro.HoldRepeat):
             gremlin.input_devices.ButtonReleaseActions().register_callback(
-                lambda: MacroFunctor.manager.terminate_macro(self.macro),
-                event
+                lambda: MacroFunctor.manager.terminate_macro(self.macro), event
             )
         return True
 
 
 class Macro(gremlin.base_profile.AbstractAction):
-
     """Represents a macro action."""
 
     name = "Macro"
@@ -95,21 +86,18 @@ class Macro(gremlin.base_profile.AbstractAction):
         self.force_remote = False
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
-        #TODO: build something more meaningful
-        return f"Macro sequence"
+        """returns a display string for the current configuration"""
+        # TODO: build something more meaningful
+        return "Macro sequence"
 
     def icon(self):
         return "ei.cogs"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Parses the XML node corresponding to a macro action.
 
         :param node the XML node to parse.
@@ -135,9 +123,7 @@ class Macro(gremlin.base_profile.AbstractAction):
                 elif repeat_type == "hold":
                     self.repeat = gremlin.macro.HoldRepeat()
                 else:
-                    syslog.warning(
-                        f"Invalid macro repeat type: {repeat_type}"
-                    )
+                    syslog.warning(f"Invalid macro repeat type: {repeat_type}")
 
                 if self.repeat:
                     self.repeat.from_xml(child, data)
@@ -147,9 +133,7 @@ class Macro(gremlin.base_profile.AbstractAction):
             if child.tag == "joystick":
                 joy_action = gremlin.macro.JoystickAction(
                     parse_guid(child.get("device-guid")),
-                    InputType.to_enum(
-                        safe_read(child, "input-type")
-                    ),
+                    InputType.to_enum(safe_read(child, "input-type")),
                     safe_read(child, "input-id", int),
                     safe_read(child, "value"),
                 )
@@ -159,40 +143,37 @@ class Macro(gremlin.base_profile.AbstractAction):
                 key_action = gremlin.macro.KeyAction(
                     key_from_code(
                         int(child.get("scan-code")),
-                        gremlin.profile.parse_bool(child.get("extended"))
+                        gremlin.profile.parse_bool(child.get("extended")),
                     ),
-                    gremlin.profile.parse_bool(child.get("press"))
+                    gremlin.profile.parse_bool(child.get("press")),
                 )
                 self.sequence.append(key_action)
             elif child.tag == "mouse":
                 mouse_action = gremlin.macro.MouseButtonAction(
                     gremlin.types.MouseButton(safe_read(child, "button", int)),
-                    gremlin.profile.parse_bool(child.get("press"))
+                    gremlin.profile.parse_bool(child.get("press")),
                 )
                 self.sequence.append(mouse_action)
             elif child.tag == "mouse-motion":
                 mouse_motion = gremlin.macro.MouseMotionAction(
-                    safe_read(child, "dx", int, 0),
-                    safe_read(child, "dy", int, 0)
+                    safe_read(child, "dx", int, 0), safe_read(child, "dy", int, 0)
                 )
                 self.sequence.append(mouse_motion)
             elif child.tag == "pause":
-                self.sequence.append (
+                self.sequence.append(
                     gremlin.macro.PauseAction(
-                                        float(child.get("duration")),
-                                        safe_read(child, "duration_max", float, 0),
-                                        gremlin.profile.parse_bool(child.get("is_random"))
-                                        )
+                        float(child.get("duration")),
+                        safe_read(child, "duration_max", float, 0),
+                        gremlin.profile.parse_bool(child.get("is_random")),
+                    )
                 )
             elif child.tag == "vjoy":
                 vjoy_action = gremlin.macro.VJoyMacroAction(
                     safe_read(child, "vjoy-id", int),
-                    InputType.to_enum(
-                        safe_read(child, "input-type")
-                    ),
+                    InputType.to_enum(safe_read(child, "input-type")),
                     safe_read(child, "input-id", int),
                     safe_read(child, "value"),
-                    safe_read(child, "axis-type", str, "absolute")
+                    safe_read(child, "axis-type", str, "absolute"),
                 )
                 self._str_to_joy_value(vjoy_action)
                 self.sequence.append(vjoy_action)
@@ -202,7 +183,6 @@ class Macro(gremlin.base_profile.AbstractAction):
                 cmd = safe_read(child, "command", str, "VJoyEnableLocalOnly")
                 remote_control_action.command = VjoyAction.from_string(cmd)
                 self.sequence.append(remote_control_action)
-
 
     def _generate_xml(self):
         """Generates a XML node corresponding to this object.
@@ -220,7 +200,6 @@ class Macro(gremlin.base_profile.AbstractAction):
             prop_node = ElementTree.Element("force_remote")
             properties.append(prop_node)
 
-
         node.append(properties)
 
         action_list = ElementTree.Element("actions")
@@ -228,10 +207,7 @@ class Macro(gremlin.base_profile.AbstractAction):
             if isinstance(entry, gremlin.macro.JoystickAction):
                 joy_node = ElementTree.Element("joystick")
                 joy_node.set("device-guid", write_guid(entry.device_guid))
-                joy_node.set(
-                    "input-type",
-                    InputType.to_string(entry.input_type)
-                )
+                joy_node.set("input-type", InputType.to_string(entry.input_type))
                 joy_node.set("input-id", str(entry.input_id))
                 joy_node.set("value", self._joy_value_to_str(entry))
                 action_list.append(joy_node)
@@ -260,10 +236,7 @@ class Macro(gremlin.base_profile.AbstractAction):
             elif isinstance(entry, gremlin.macro.VJoyMacroAction):
                 vjoy_node = ElementTree.Element("vjoy")
                 vjoy_node.set("vjoy-id", str(entry.vjoy_id))
-                vjoy_node.set(
-                    "input-type",
-                    InputType.to_string(entry.input_type)
-                )
+                vjoy_node.set("input-type", InputType.to_string(entry.input_type))
                 vjoy_node.set("input-id", str(entry.input_id))
                 vjoy_node.set("value", self._joy_value_to_str(entry))
                 if entry.input_type == InputType.JoystickAxis:
@@ -271,7 +244,7 @@ class Macro(gremlin.base_profile.AbstractAction):
                 action_list.append(vjoy_node)
             elif isinstance(entry, gremlin.macro.RemoteControlAction):
                 action_node = ElementTree.Element("remote_control")
-                action_node.set("command",entry.command.name)
+                action_node.set("command", entry.command.name)
                 action_list.append(action_node)
 
         node.append(action_list)

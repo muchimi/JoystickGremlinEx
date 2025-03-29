@@ -17,17 +17,20 @@
 
 
 from __future__ import annotations
-from ast import In
 
-from collections.abc import Callable
-from multiprocessing import Event
 import threading
 from typing import List, Optional
 
 from PySide6 import QtCore, QtQml
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, Signal
 
-from gremlin import event_handler, input_devices, keyboard, shared_state,  windows_event_hook
+from gremlin import (
+    event_handler,
+    input_devices,
+    keyboard,
+    shared_state,
+    windows_event_hook,
+)
 
 from gremlin.input_types import InputType
 import gremlin.keyboard
@@ -39,7 +42,6 @@ QML_IMPORT_MAJOR_VERSION = 1
 
 @QtQml.QmlElement
 class InputListenerModel(QtCore.QObject):
-
     """Allows recording user inputs with an on-screen prompt."""
 
     # Signal emitted when the listening for inputs is done to let the UI
@@ -52,7 +54,7 @@ class InputListenerModel(QtCore.QObject):
     # Signal emitted when multiple inputs are accepted or ignored
     multipleInputsChanged = Signal(bool)
 
-    def __init__(self, parent: Optional[QtCore.QObject]=None):
+    def __init__(self, parent: Optional[QtCore.QObject] = None):
         super().__init__(parent)
 
         # List of InputTypes that will be listened to
@@ -72,7 +74,7 @@ class InputListenerModel(QtCore.QObject):
     def _set_event_types(self, event_types: List[str]) -> None:
         types = sorted(
             [InputType.to_enum(v) for v in event_types],
-            key=lambda v: InputType.to_string(v)
+            key=lambda v: InputType.to_string(v),
         )
         if types != self._event_types:
             self._event_types = types
@@ -107,9 +109,11 @@ class InputListenerModel(QtCore.QObject):
         # Start listening to user inputs
         event_listener = event_handler.EventListener()
         event_listener.keyboard_event.connect(self._kb_event_cb)
-        if InputType.JoystickAxis in self._event_types or \
-                InputType.JoystickButton in self._event_types or \
-                InputType.JoystickHat in self._event_types:
+        if (
+            InputType.JoystickAxis in self._event_types
+            or InputType.JoystickButton in self._event_types
+            or InputType.JoystickHat in self._event_types
+        ):
             event_listener.joystick_event.connect(self._joy_event_cb)
         elif InputType.Mouse in self._event_types:
             event_listener = gremlin.event_handler.EventListener()
@@ -123,15 +127,15 @@ class InputListenerModel(QtCore.QObject):
         event_listener = event_handler.EventListener()
         try:
             event_listener.keyboard_event.disconnect(self._kb_event_cb)
-        except RuntimeError as e:
+        except RuntimeError:
             pass
         try:
             event_listener.joystick_event.disconnect(self._joy_event_cb)
-        except RuntimeError as e:
+        except RuntimeError:
             pass
         try:
             event_listener.mouse_event.disconnect(self._mouse_event_cb)
-        except RuntimeError as e:
+        except RuntimeError:
             pass
 
         # Stop mouse hook in case it is running
@@ -148,12 +152,11 @@ class InputListenerModel(QtCore.QObject):
         """Terminates listening to user input if adequate."""
         # ESC key always triggers the abort timer
         if event.is_pressed and event.event_type == InputType.Keyboard:
-            key = keyboard.key_from_code(
-                event.identifier[0],
-                event.identifier[1]
-            )
-            if key == keyboard.key_from_name("esc") and \
-                    not self._abort_timer.is_alive():
+            key = keyboard.key_from_code(event.identifier[0], event.identifier[1])
+            if (
+                key == keyboard.key_from_name("esc")
+                and not self._abort_timer.is_alive()
+            ):
                 self._abort_timer = threading.Timer(1.0, self._stop_listening)
                 self._abort_timer.start()
 
@@ -189,8 +192,7 @@ class InputListenerModel(QtCore.QObject):
             return
 
         # Ensure the event corresponds to a significant enough change in input
-        process_event = \
-            input_devices.JoystickInputSignificant().should_process(event)
+        process_event = input_devices.JoystickInputSignificant().should_process(event)
 
         if process_event:
             input_devices.JoystickInputSignificant().reset()
@@ -237,29 +239,19 @@ class InputListenerModel(QtCore.QObject):
             self._inputs.append(event)
         self._maybe_terminate_listening(event)
 
-    currentInput = Property(
-        str,
-        fget=_get_current_inputs,
-        notify=listeningTerminated
-    )
+    currentInput = Property(str, fget=_get_current_inputs, notify=listeningTerminated)
 
     enabled = Property(
-        bool,
-        fget=_get_is_enabled,
-        fset=_set_is_enabled,
-        notify=enabledChanged
+        bool, fget=_get_is_enabled, fset=_set_is_enabled, notify=enabledChanged
     )
 
     multipleInputs = Property(
         bool,
         fget=_get_multiple_inputs,
         fset=_set_multiple_inputs,
-        notify=multipleInputsChanged
+        notify=multipleInputsChanged,
     )
 
     eventTypes = Property(
-        list,
-        fget=_get_event_types,
-        fset=_set_event_types,
-        notify=eventTypesChanged
+        list, fget=_get_event_types, fset=_set_event_types, notify=eventTypesChanged
     )

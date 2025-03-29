@@ -18,13 +18,11 @@
 import sys
 
 from gremlin import event_handler
+
 sys.path.append(".")
 
-import pytest
-import uuid
 from lxml import etree as ElementTree
 
-import gremlin.error as error
 import gremlin.types as types
 import gremlin.profile_library as profile_library
 import gremlin.util as util
@@ -34,8 +32,7 @@ import action_plugins.condition as condition
 
 def test_from_xml():
     c = condition.ConditionModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
+        profile_library.ActionTree(), types.InputType.JoystickButton
     )
     c.from_xml(ElementTree.fromstring(open("test/action_condition_simple.xml").read()))
 
@@ -55,8 +52,7 @@ def test_from_xml():
 
 def test_from_xml_complex():
     c = condition.ConditionModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
+        profile_library.ActionTree(), types.InputType.JoystickButton
     )
     c.from_xml(ElementTree.fromstring(open("test/action_condition_complex.xml").read()))
 
@@ -117,39 +113,38 @@ def test_from_xml_complex():
 
 def test_to_xml():
     c = condition.ConditionModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
+        profile_library.ActionTree(), types.InputType.JoystickButton
     )
 
     cond = condition.JoystickCondition()
     input_dev = event_handler.Event(
         types.InputType.JoystickButton,
         37,
-        util.parse_guid("4DCB3090-97EC-11EB-8003-444553540000")
+        util.parse_guid("4DCB3090-97EC-11EB-8003-444553540000"),
     )
     cond._inputs.append(input_dev)
     cond._comparator = condition.comparator.PressedComparator(True)
     c._conditions.append(cond)
 
     node = c.to_xml()
-    assert node.find(
-            "./property/name[.='logical-operator']/../value"
-        ).text == "all"
-    assert node.find(
-            "./condition/property/name[.='condition-type']/../value"
-        ).text == "joystick"
-    assert node.find(
-            "./condition/input/property/name[.='input-type']/../value"
-        ).text == "button"
-    assert node.find(
-            "./condition/comparator/property/name[.='is-pressed']/../value"
-        ).text == "True"
+    assert node.find("./property/name[.='logical-operator']/../value").text == "all"
+    assert (
+        node.find("./condition/property/name[.='condition-type']/../value").text
+        == "joystick"
+    )
+    assert (
+        node.find("./condition/input/property/name[.='input-type']/../value").text
+        == "button"
+    )
+    assert (
+        node.find("./condition/comparator/property/name[.='is-pressed']/../value").text
+        == "True"
+    )
 
 
 def test_ctor():
     c = condition.ConditionModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
+        profile_library.ActionTree(), types.InputType.JoystickButton
     )
 
     assert len(c._conditions) == 0

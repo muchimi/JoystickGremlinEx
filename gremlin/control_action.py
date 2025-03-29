@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@ import gremlin.shared_state
 
 
 class ModeList:
-
     """Represents a list of modes to cycle through."""
 
     def __init__(self, modes):
@@ -57,7 +56,7 @@ def switch_to_previous_mode():
     eh.change_mode(eh.previous_mode)
 
 
-def cycle_modes(mode_list : list):
+def cycle_modes(mode_list: list):
     """Cycles to the next mode in the provided mode list.
 
     If the currently active mode is not in the provided list of modes
@@ -74,7 +73,6 @@ def cycle_modes(mode_list : list):
         if index == len(mode_list):
             index = 0
         next_mode = mode_list[index]
-    
 
     gremlin.event_handler.EventHandler().change_mode(next_mode)
 

@@ -17,11 +17,8 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod, ABCMeta
-from collections import namedtuple
 import copy
 import logging
-import time
 
 import gremlin.base_buttons
 import gremlin.base_classes
@@ -538,7 +535,7 @@ class ExecutionContext():
         # syslog = logging.getLogger("system")
         if root is None:
             root = self.root
-        syslog.info(f"Execution Tree:")
+        syslog.info("Execution Tree:")
         if root:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
                 if exclude_empty:
@@ -552,7 +549,7 @@ class ExecutionContext():
 
     def dumpInputTree(self):
         ''' dumps the input tree '''
-        syslog.info(f"Input Tree:")
+        syslog.info("Input Tree:")
         root = self.m_root
         if root:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
@@ -562,7 +559,7 @@ class ExecutionContext():
     def dumpActive(self):
         ''' dumps active execution nodes ONLY'''
         # syslog = logging.getLogger("system")
-        syslog.info(f"Execution Tree:")
+        syslog.info("Execution Tree:")
         if self.root:
             for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
                 if anytree.search.findall_by_attr(node, ExecutionGraphNodeType.Action, "nodeType"):
@@ -571,7 +568,7 @@ class ExecutionContext():
 
     def dumpModeTree(self):
         # syslog = logging.getLogger("system")
-        syslog.info(f"Mode Tree:")
+        syslog.info("Mode Tree:")
         if self.modeTree:
             for pre, fill, node in anytree.RenderTree(self.modeTree, style=anytree.AsciiStyle()):
                 syslog.info(f"{pre}{node.display} [{node.mode}]")
@@ -676,9 +673,9 @@ class ExecutionContext():
     def _register_condition(self, parent_node, node):
         ''' registers a condition in the condition map '''
         node_id = parent_node.id
-        if not node_id in self._condition_map:
+        if node_id not in self._condition_map:
             self._condition_map[node_id] = []
-        if not node in self._condition_map[node_id]:
+        if node not in self._condition_map[node_id]:
             self._condition_map[node_id].append(node)
         syslog.info(f"Register condition: {node_id} {parent_node.description} -> {node.description}")
 
@@ -830,8 +827,8 @@ class ExecutionContext():
         return functor
     
     def _get_gate_action_functor(self, action, node):
-        functor : gremlin.base_conditions.AbstractFunctor = self._get_action_functor()
-        event = gremlin.event_handler.Event(
+        self._get_action_functor()
+        gremlin.event_handler.Event(
                     event_type= gremlin.input_types.InputType.VirtualButton,
                     device_guid = gremlin.shared_state.virtual_device_guid,
                     identifier = 1
@@ -868,8 +865,8 @@ class ExecutionContext():
         mode_list = [mode for (_,mode) in mode_source if mode] # parent mode first
         # syslog = logging.getLogger("system")
 
-        tracker = gremlin.base_profile.ConditionTracker()
-        eh = gremlin.event_handler.EventHandler()
+        gremlin.base_profile.ConditionTracker()
+        gremlin.event_handler.EventHandler()
 
 
         # build the mode tree
@@ -889,7 +886,7 @@ class ExecutionContext():
         tree_nodes = {}
         for node in anytree.PreOrderIter(mode_tree):
             mode_name = node.name
-            if not mode_name in tree_nodes:
+            if mode_name not in tree_nodes:
                 tree_node = ExecutionModeNode(mode_name)
                 tree_node.parent = self._mode_tree
                 tree_nodes[mode_name] = tree_node
@@ -899,7 +896,7 @@ class ExecutionContext():
             if mode_name and node.parent and node.parent.name:
                 parent_mode_name = node.parent.name
                 mode_nodes[mode_name].parent = mode_nodes[parent_mode_name]
-                if not parent_mode_name in tree_nodes:
+                if parent_mode_name not in tree_nodes:
                     parent_tree_node = ExecutionModeNode(parent_mode_name)
                     parent_tree_node.parent = self._mode_tree
                     tree_nodes[parent_mode_name] = parent_tree_node
@@ -940,7 +937,6 @@ class ExecutionContext():
         '''
 
         # latched functors tracker
-        latched_data = [] # list of LatchedData items
         for device in profile.devices.values():
             device_node = ExecutionGraphNode(ExecutionGraphNodeType.Device)
             device_node.device = device
@@ -948,7 +944,7 @@ class ExecutionContext():
 
             for mode in device.modes.values():
                 mode_name = mode.name
-                if not mode_name in mode_nodes:
+                if mode_name not in mode_nodes:
                     syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.name}")
                     continue
 
@@ -959,7 +955,7 @@ class ExecutionContext():
                 mode_node.mode = mode_name
 
                 # build list of parent modes - contains the current mode if a root mode, or the list of current and parent modes if nested
-                if not mode_name in self._mode_ancestors:
+                if mode_name not in self._mode_ancestors:
                     self._mode_ancestors[mode_name] = current_profile.get_mode_ancestors(mode_name)
                     self._mode_descendants[mode_name] = current_profile.get_mode_descendants(mode_name)
 
@@ -979,7 +975,7 @@ class ExecutionContext():
                         input_node.mode = mode_name
 
                         input_key = input_item.callbackKey()
-                        if not input_key in m_input_nodes:
+                        if input_key not in m_input_nodes:
                             m_input_node = ExecutionGraphNode(ExecutionGraphNodeType.InputItem)
                             m_input_node.parent = self.m_root
                             m_input_node.input_item = input_item

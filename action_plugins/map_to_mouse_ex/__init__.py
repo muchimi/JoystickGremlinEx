@@ -21,7 +21,10 @@ import gremlin.sendinput
 from gremlin import input_devices
 
 
-import enum, threading,time, random
+import enum
+import threading
+import time
+import random
 
 import gremlin.util
 
@@ -30,7 +33,6 @@ syslog = logging.getLogger("system")
 
 
 class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
-
     """UI widget for mapping inputs to mouse motion or buttons."""
 
     def __init__(self, action_data, parent=None):
@@ -40,7 +42,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param parent the parent of this widget
         """
         super().__init__(action_data, QtWidgets.QVBoxLayout, parent=parent)
-        
 
     def _create_ui(self):
         """Creates the UI components."""
@@ -57,7 +58,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.click_widget = QtWidgets.QWidget()
         self.click_options_layout = QtWidgets.QHBoxLayout(self.click_widget)
 
-
         self.mode_widget = gremlin.ui.ui_common.NoWheelComboBox()
 
         input_type = self._get_input_type()
@@ -65,7 +65,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             actions = (a for a in MouseAction)
         else:
             actions = (MouseAction.MouseButton, MouseAction.MouseMotion)
-        
+
         for mode in actions:
             self.mode_widget.addItem(MouseAction.to_name(mode), mode)
 
@@ -77,12 +77,13 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.chkb_force_remote_output_only = QtWidgets.QCheckBox("Remote Only")
 
         self.chkb_force_remote_output.clicked.connect(self._force_remote_output_changed)
-        self.chkb_force_remote_output_only.clicked.connect(self._force_remote_output_only_changed)
+        self.chkb_force_remote_output_only.clicked.connect(
+            self._force_remote_output_only_changed
+        )
 
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
-        
-        
+
         self.mode_group = QtWidgets.QButtonGroup()
         self.mode_normal = QtWidgets.QRadioButton("Click")
         self.mode_double_click = QtWidgets.QRadioButton("Double-Click")
@@ -99,20 +100,16 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mode_group.addButton(self.mode_press)
         self.mode_group.addButton(self.mode_release)
 
-
         self.click_options_layout.addWidget(self.mode_normal)
         self.click_options_layout.addWidget(self.mode_double_click)
         self.click_options_layout.addWidget(self.mode_press)
         self.click_options_layout.addWidget(self.mode_release)
         self.click_options_layout.addStretch()
 
-        
-        
         self.options_layout.addWidget(self.chkb_exec_on_release)
         self.options_layout.addWidget(self.chkb_force_remote_output)
         self.options_layout.addWidget(self.chkb_force_remote_output_only)
-        
-        
+
         self.options_layout.addStretch()
 
         # self.button_group = QtWidgets.QButtonGroup()
@@ -132,19 +129,15 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # self.button_radio.clicked.connect(self._change_mode)
         # self.motion_radio.clicked.connect(self._change_mode)
-        
 
         self.button_widget.hide()
         self.motion_widget.hide()
-
 
         self.main_layout.addLayout(self.mode_layout)
         self.main_layout.addWidget(self.release_widget)
         self.main_layout.addWidget(self.button_widget)
         self.main_layout.addWidget(self.click_widget)
         self.main_layout.addWidget(self.motion_widget)
-        
-
 
         # Create the different UI elements
         self._create_mouse_button_ui()
@@ -152,7 +145,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._create_axis_ui()
         else:
             self._create_button_hat_ui()
-
 
     def _click_change_mode(self):
         if self.mode_normal.isChecked():
@@ -173,14 +165,13 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.invert_widget.clicked.connect(self._invert_cb)
 
         self.motion_layout.addWidget(
-            QtWidgets.QLabel("Control"),
-            0,
-            0,
-            QtCore.Qt.AlignLeft
+            QtWidgets.QLabel("Control"), 0, 0, QtCore.Qt.AlignLeft
         )
         self.motion_layout.addWidget(self.x_axis, 0, 1, QtCore.Qt.AlignLeft)
         self.motion_layout.addWidget(self.y_axis, 0, 2, 1, 2, QtCore.Qt.AlignLeft)
-        self.motion_layout.addWidget(self.invert_widget, 0, 3, 1, 2, QtCore.Qt.AlignLeft)
+        self.motion_layout.addWidget(
+            self.invert_widget, 0, 3, 1, 2, QtCore.Qt.AlignLeft
+        )
 
         self.min_speed = QtWidgets.QSpinBox()
         self.min_speed.setRange(0, 1e5)
@@ -195,7 +186,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
         self.motion_layout.addWidget(self.max_speed, 1, 3, QtCore.Qt.AlignLeft)
         self.motion_layout.addWidget(QtWidgets.QLabel(" "), 0, 4)
-        self.motion_layout.setColumnStretch(4,2)
+        self.motion_layout.setColumnStretch(4, 2)
 
         self._connect_axis()
 
@@ -218,19 +209,14 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.motion_layout.addWidget(QtWidgets.QLabel("Maximum speed"), 0, 2)
         self.motion_layout.addWidget(self.max_speed, 0, 3, QtCore.Qt.AlignLeft)
 
-        self.motion_layout.addWidget(
-            QtWidgets.QLabel("Time to maximum speed"), 1, 0
-        )
-        self.motion_layout.addWidget(
-            self.time_to_max_speed, 1, 1, QtCore.Qt.AlignLeft
-        )
+        self.motion_layout.addWidget(QtWidgets.QLabel("Time to maximum speed"), 1, 0)
+        self.motion_layout.addWidget(self.time_to_max_speed, 1, 1, QtCore.Qt.AlignLeft)
         if self.action_data.get_input_type() in [
-            InputType.JoystickButton, InputType.Keyboard
+            InputType.JoystickButton,
+            InputType.Keyboard,
         ]:
             self.motion_layout.addWidget(QtWidgets.QLabel("Direction"), 1, 2)
-            self.motion_layout.addWidget(
-                self.direction, 1, 3, QtCore.Qt.AlignLeft
-            )
+            self.motion_layout.addWidget(self.direction, 1, 3, QtCore.Qt.AlignLeft)
 
         self._connect_button_hat()
 
@@ -247,29 +233,41 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mouse_container_layout.addWidget(QtWidgets.QLabel("Mouse Button"))
         self.mouse_container_layout.addWidget(self.mouse_button)
 
-
         self.mouse_button_widget = gremlin.ui.ui_common.QComboBox()
-        self.mouse_button_widget.addItem("Left (mouse 1)",gremlin.types.MouseButton.Left)
-        self.mouse_button_widget.addItem("Middle (mouse 2)",gremlin.types.MouseButton.Middle)
-        self.mouse_button_widget.addItem("Right (mouse 3)",gremlin.types.MouseButton.Right)
-        self.mouse_button_widget.addItem("Forward (mouse 4)",gremlin.types.MouseButton.Forward)
-        self.mouse_button_widget.addItem("Back (mouse 5)",gremlin.types.MouseButton.Back)
-        self.mouse_button_widget.addItem("Wheel up",gremlin.types.MouseButton.WheelUp)
-        self.mouse_button_widget.addItem("Wheel down",gremlin.types.MouseButton.WheelDown)
-
+        self.mouse_button_widget.addItem(
+            "Left (mouse 1)", gremlin.types.MouseButton.Left
+        )
+        self.mouse_button_widget.addItem(
+            "Middle (mouse 2)", gremlin.types.MouseButton.Middle
+        )
+        self.mouse_button_widget.addItem(
+            "Right (mouse 3)", gremlin.types.MouseButton.Right
+        )
+        self.mouse_button_widget.addItem(
+            "Forward (mouse 4)", gremlin.types.MouseButton.Forward
+        )
+        self.mouse_button_widget.addItem(
+            "Back (mouse 5)", gremlin.types.MouseButton.Back
+        )
+        self.mouse_button_widget.addItem("Wheel up", gremlin.types.MouseButton.WheelUp)
+        self.mouse_button_widget.addItem(
+            "Wheel down", gremlin.types.MouseButton.WheelDown
+        )
 
         # update based on the current data
         index = self.mouse_button_widget.findData(self.action_data.button_id)
         self.mouse_button_widget.setCurrentIndex(index)
 
-        self.mouse_button_widget.currentTextChanged.connect(self._change_mouse_button_cb)
+        self.mouse_button_widget.currentTextChanged.connect(
+            self._change_mouse_button_cb
+        )
 
         self.mouse_container_layout.addWidget(QtWidgets.QLabel("Selected action:"))
         self.mouse_container_layout.addWidget(self.mouse_button_widget)
         self.mouse_container_layout.addStretch(1)
 
         # add to main layout
-        self.button_layout.addWidget(self.mouse_container_widget, 0,0)
+        self.button_layout.addWidget(self.mouse_container_widget, 0, 0)
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -280,7 +278,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._populate_button_hat_ui()
         self._populate_mouse_button_ui()
 
-
         with QtCore.QSignalBlocker(self.chkb_exec_on_release):
             self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
 
@@ -290,7 +287,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             with QtCore.QSignalBlocker(self.mode_widget):
                 self.mode_widget.setCurrentIndex(index)
 
-        
         self.mode_label.setText(MouseAction.to_description(action_mode))
 
         click_mode = self.action_data.click_mode
@@ -308,7 +304,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.mode_double_click.setChecked(True)
 
         self._change_mode()
-
 
     def _populate_axis_ui(self):
         """Populates axis UI elements with data."""
@@ -341,11 +336,9 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _invert_cb(self, checked):
         self.action_data.invert = checked
 
-
-
     @QtCore.Slot()
     def _change_mouse_button_cb(self):
-        ''' mouse event drop down selected '''
+        """mouse event drop down selected"""
         self.action_data.button_id = self.mouse_button_widget.currentData()
         self.mouse_button.setText(
             gremlin.types.MouseButton.to_string(self.action_data.button_id)
@@ -353,7 +346,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     @QtCore.Slot(int)
     def _action_mode_changed(self, index):
-        ''' called when the action mode drop down value changes '''
+        """called when the action mode drop down value changes"""
         with QtCore.QSignalBlocker(self.mode_widget):
             action = self.mode_widget.itemData(index)
             self.action_data.action_mode = action
@@ -366,11 +359,10 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(bool)
     def _force_remote_output_changed(self, checked):
         self.action_data.force_remote_output = checked
-        
+
     @QtCore.Slot(bool)
     def _force_remote_output_only_changed(self, checked):
         self.action_data.force_remote_output_only = checked
-                        
 
     def _update_axis(self):
         """Updates the axis data with UI information."""
@@ -429,8 +421,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             index = self.mouse_button_widget.findData(self.action_data.button_id)
             self.mouse_button_widget.setCurrentIndex(index)
 
-
-
     def _connect_axis(self):
         """Connects all axis input elements to their callbacks."""
         self.x_axis.toggled.connect(self._update_axis)
@@ -472,15 +462,17 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         action_mode = self.action_data.action_mode
         if action_mode == MouseAction.MouseButton:
             show_button = True
-            if not self.action_data.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
+            if self.action_data.button_id not in [
+                MouseButton.WheelDown,
+                MouseButton.WheelUp,
+            ]:
                 show_click_mode = True
         elif action_mode == MouseAction.MouseMotion:
             show_motion = True
 
         self.action_data.motion_input = show_motion
-        
-            
-        #show_motion = self.action_data.motion_input
+
+        # show_motion = self.action_data.motion_input
         self.motion_widget.setVisible(show_motion)
         self.button_widget.setVisible(show_button)
         self.click_widget.setVisible(show_click_mode)
@@ -493,8 +485,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            [InputType.Mouse],
-            return_kb_event=False
+            [InputType.Mouse], return_kb_event=False
         )
         self.button_press_dialog.item_selected.connect(self._update_mouse_button)
         # Display the dialog centered in the middle of the UI
@@ -507,13 +498,12 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             int(geom.x() + geom.width() / 2 - 150),
             int(geom.y() + geom.height() / 2 - 75),
             300,
-            150
+            150,
         )
         self.button_press_dialog.show()
 
 
 class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
-
     """Implements the functionality required to move a mouse cursor.
 
     This moves the mouse cursor by issuing relative motion commands. This is
@@ -528,39 +518,37 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     _wiggle_remote_stop_requested = False
     _mouse_controller = None
 
-
-    def __init__(self, action : MapToMouseEx, parent = None):
+    def __init__(self, action: MapToMouseEx, parent=None):
         """Creates a new functor with the provided data.
 
         :param action contains parameters to use with the functor
         """
         super().__init__(action, parent)
 
-        self.action : MapToMouseEx = action
+        self.action: MapToMouseEx = action
         if not MapToMouseExFunctor._mouse_controller:
             MapToMouseExFunctor._mouse_controller = gremlin.sendinput.MouseController()
-        
+
         self.input_type = action.input_type
         self.exec_on_release = action.exec_on_release
         self.action_mode = action.action_mode
         self.click_mode = action.click_mode
-    
 
-    def process_event(self, event, value, extra_data = None):
-        ''' processes an input event - must return True on success, False to abort the input sequence '''
+    def process_event(self, event, value, extra_data=None):
+        """processes an input event - must return True on success, False to abort the input sequence"""
 
-        #syslog.debug(f"Process mouse functor event: {self.action_mode.name}  {self.action.action_id} exec on release: {self.action.exec_on_release}")
+        # syslog.debug(f"Process mouse functor event: {self.action_mode.name}  {self.action.action_id} exec on release: {self.action.exec_on_release}")
         if self.input_type == InputType.JoystickButton:
             if self.action_mode == MouseAction.MouseWiggleOnLocal:
                 # start the local wiggle thread
                 if self.exec_on_release and not event.is_pressed:
-                        self._wiggle_start(is_local=True)
+                    self._wiggle_start(is_local=True)
                 elif not self.exec_on_release and event.is_pressed:
                     self._wiggle_start(is_local=True)
-                    
+
             elif self.action_mode == MouseAction.MouseWiggleOffLocal:
                 if self.exec_on_release and not event.is_pressed:
-                        self._wiggle_stop(is_local = True)
+                    self._wiggle_stop(is_local=True)
                 elif not self.exec_on_release and event.is_pressed:
                     self._wiggle_stop(is_local=True)
 
@@ -570,13 +558,13 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     self._wiggle_start(is_remote=True)
                 elif not self.exec_on_release and event.is_pressed:
                     self._wiggle_start(is_remote=True)
-                    
+
             elif self.action_mode == MouseAction.MouseWiggleOffRemote:
                 if self.exec_on_release and not event.is_pressed:
-                    self._wiggle_stop(is_remote = True)
+                    self._wiggle_stop(is_remote=True)
                 elif not self.exec_on_release and event.is_pressed:
                     self._wiggle_stop(is_remote=True)
-            
+
             elif self.action_mode == MouseAction.MouseMotion:
                 if event.event_type == InputType.JoystickAxis:
                     self._perform_axis_motion(event, value)
@@ -588,15 +576,15 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 if self.exec_on_release:
                     if not event.is_pressed:
                         self._perform_mouse_button(event, value)
-                    elif  event.is_pressed:
+                    elif event.is_pressed:
                         self._perform_mouse_button(event, value)
                 else:
                     self._perform_mouse_button(event, value)
 
         return True
-    
+
     def get_state(self):
-        ''' gets the control state '''
+        """gets the control state"""
         (is_local, is_remote) = input_devices.remote_state.state
         if self.action.force_remote_output:
             is_remote = True
@@ -632,36 +620,47 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     if is_local:
                         gremlin.sendinput.mouse_press(self.action.button_id)
                     if is_remote:
-                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
+                        input_devices.remote_client.send_mouse_button(
+                            self.action.button_id.value, True
+                        )
                 else:
                     if is_local:
                         gremlin.sendinput.mouse_release(self.action.button_id)
                     if is_remote:
-                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
+                        input_devices.remote_client.send_mouse_button(
+                            self.action.button_id.value, False
+                        )
             elif self.action.click_mode == MouseClickMode.DoubleClick:
                 if value.current:
                     if is_local:
-                        gremlin.sendinput.mouse_press_double_click(self.action.button_id)    
+                        gremlin.sendinput.mouse_press_double_click(
+                            self.action.button_id
+                        )
                     if is_remote:
-                        input_devices.remote_client.send_mouse_button_double_click(self.action.button_id.value, True)
+                        input_devices.remote_client.send_mouse_button_double_click(
+                            self.action.button_id.value, True
+                        )
                 else:
                     if is_local:
                         gremlin.sendinput.mouse_release(self.action.button_id)
                     if is_remote:
-                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)                        
+                        input_devices.remote_client.send_mouse_button(
+                            self.action.button_id.value, False
+                        )
             elif self.action.click_mode == MouseClickMode.Press:
                 if is_local:
                     gremlin.sendinput.mouse_press(self.action.button_id)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
+                    input_devices.remote_client.send_mouse_button(
+                        self.action.button_id.value, True
+                    )
             elif self.action.click_mode == MouseClickMode.Release:
                 if is_local:
                     gremlin.sendinput.mouse_release(self.action.button_id)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
-
-
-        
+                    input_devices.remote_client.send_mouse_button(
+                        self.action.button_id.value, False
+                    )
 
     def _perform_axis_motion(self, event, value):
         """Processes events destined for an axis.
@@ -670,14 +669,14 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         :param value the current value of the event chain
         """
 
-
         if self.action.invert:
             # invert the input
             inverted_value = gremlin.util.scale_to_range(value.current, invert=True)
             value.current = inverted_value
 
-        delta_motion = self.action.min_speed + abs(value.current) * \
-                (self.action.max_speed - self.action.min_speed)
+        delta_motion = self.action.min_speed + abs(value.current) * (
+            self.action.max_speed - self.action.min_speed
+        )
         delta_motion = math.copysign(delta_motion, value.current)
         delta_motion = 0.0 if abs(value.current) < 0.05 else delta_motion
 
@@ -697,11 +696,16 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     self.action.direction,
                     self.action.min_speed,
                     self.action.max_speed,
-                    self.action.time_to_max_speed
+                    self.action.time_to_max_speed,
                 )
             if is_remote:
-                input_devices.remote_client.send_mouse_acceleration(self.action.direction, self.action.min_speed, self.action.max_speed, self.action.time_to_max_speed)
-     
+                input_devices.remote_client.send_mouse_acceleration(
+                    self.action.direction,
+                    self.action.min_speed,
+                    self.action.max_speed,
+                    self.action.time_to_max_speed,
+                )
+
         else:
             if is_local:
                 MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
@@ -728,29 +732,37 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     a,
                     self.action.min_speed,
                     self.action.max_speed,
-                    self.action.time_to_max_speed
+                    self.action.time_to_max_speed,
                 )
             if is_remote:
-                input_devices.remote_client.send_mouse_acceleration(a, self.action.min_speed, self.action.max_speed, self.action.time_to_max_speed)
+                input_devices.remote_client.send_mouse_acceleration(
+                    a,
+                    self.action.min_speed,
+                    self.action.max_speed,
+                    self.action.time_to_max_speed,
+                )
 
-
-    def _wiggle_start(self, is_local = False, is_remote = False):
-        ''' starts the wiggle thread, local or remote '''
+    def _wiggle_start(self, is_local=False, is_remote=False):
+        """starts the wiggle thread, local or remote"""
 
         if is_local and not MapToMouseExFunctor._wiggle_local_thread:
             syslog.debug("Wiggle start local requested...")
             MapToMouseExFunctor._wiggle_local_stop_requested = False
-            MapToMouseExFunctor._wiggle_local_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_local, daemon=True)
+            MapToMouseExFunctor._wiggle_local_thread = threading.Thread(
+                target=MapToMouseExFunctor._wiggle_local, daemon=True
+            )
             MapToMouseExFunctor._wiggle_local_thread.start()
 
         if is_remote and not MapToMouseExFunctor._wiggle_remote_thread:
             syslog.debug("Wiggle start remote requested...")
             MapToMouseExFunctor._wiggle_remote_stop_requested = False
-            MapToMouseExFunctor._wiggle_remote_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_remote, daemon=True)
+            MapToMouseExFunctor._wiggle_remote_thread = threading.Thread(
+                target=MapToMouseExFunctor._wiggle_remote, daemon=True
+            )
             MapToMouseExFunctor._wiggle_remote_thread.start()
 
-    def _wiggle_stop(self, is_local = False, is_remote = False):
-        ''' stops the wiggle thread, local or remote '''
+    def _wiggle_stop(self, is_local=False, is_remote=False):
+        """stops the wiggle thread, local or remote"""
 
         if is_local and MapToMouseExFunctor._wiggle_local_thread:
             syslog.debug("Wiggle stop local requested...")
@@ -768,7 +780,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
     @staticmethod
     def _wiggle_local():
-        ''' wiggles the mouse '''
+        """wiggles the mouse"""
         syslog.debug("Wiggle local start...")
         msg = "local wiggle mode on"
         input_devices.remote_state.say(msg)
@@ -782,17 +794,15 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 MapToMouseExFunctor._mouse_controller.set_absolute_motion(-1, -1)
                 time.sleep(0.5)
                 MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
-                t_wait = time.time() + random.uniform(10,40)
+                t_wait = time.time() + random.uniform(10, 40)
             time.sleep(0.5)
-            
+
         syslog.debug("Wiggle local stop...")
         input_devices.remote_state.say("local wiggle mode off")
 
-
-
     @staticmethod
     def _wiggle_remote():
-        ''' wiggles the mouse - remote clients'''
+        """wiggles the mouse - remote clients"""
         syslog.debug("Wiggle remote start...")
 
         msg = "remote wiggle mode on"
@@ -806,16 +816,15 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 time.sleep(1)
                 input_devices.remote_client.send_mouse_motion(-1, -1)
                 time.sleep(0.5)
-                input_devices.remote_client.send_mouse_motion(0,0)
-                t_wait = time.time() + random.uniform(10,40)
+                input_devices.remote_client.send_mouse_motion(0, 0)
+                t_wait = time.time() + random.uniform(10, 40)
             time.sleep(0.5)
-            
+
         syslog.debug("Wiggle remote stop...")
         input_devices.remote_state.say("remote wiggle mode off")
-        
+
 
 class MapToMouseEx(gremlin.base_profile.AbstractAction):
-
     """Action data for the map to mouse action.
 
     Map to mouse allows controlling of the mouse cursor using either a joystick
@@ -867,9 +876,8 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
 
         self.click_mode = MouseClickMode.Normal
 
-
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return f"[{self.button_id.name}]"
 
     def icon(self):
@@ -890,14 +898,16 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
             return not self.motion_input
         return False
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Reads the contents of an XML node to populate this instance.
 
         :param node the node whose content should be used to populate this
             instance
         """
 
-        self.action_mode = MouseAction.from_string(safe_read(node, "mode", str, "mousebutton"))
+        self.action_mode = MouseAction.from_string(
+            safe_read(node, "mode", str, "mousebutton")
+        )
 
         self.motion_input = read_bool(node, "motion-input", False)
         try:
@@ -905,9 +915,7 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
                 safe_read(node, "button-id", int, 1)
             )
         except ValueError as e:
-            syslog.warning(
-                f"Invalid mouse identifier in profile: {e:}"
-            )
+            syslog.warning(f"Invalid mouse identifier in profile: {e:}")
             self.button_id = gremlin.types.MouseButton.Left
 
         self.direction = safe_read(node, "direction", int, 0)
@@ -916,24 +924,27 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
         self.time_to_max_speed = safe_read(node, "time-to-max-speed", float, 0.0)
 
         # get the type of mapping this is
-        
+
         if "exec_on_release" in node.attrib:
-            self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+            self.exec_on_release = safe_read(node, "exec_on_release", bool, False)
 
         if "force_remote" in node.attrib:
-            self.force_remote_output = safe_read(node,"force_remote_output",bool, False)
+            self.force_remote_output = safe_read(
+                node, "force_remote_output", bool, False
+            )
 
         if "remote_only" in node.attrib:
-            self.force_remote_output_only = safe_read(node,"force_remote_output_only",bool, False)
+            self.force_remote_output_only = safe_read(
+                node, "force_remote_output_only", bool, False
+            )
 
         if "click_mode" in node.attrib:
-            self.click_mode = MouseClickMode.from_string(safe_read(node,"click_mode", str, "normal"))
+            self.click_mode = MouseClickMode.from_string(
+                safe_read(node, "click_mode", str, "normal")
+            )
 
         if "invert" in node.attrib:
-            self.invert = safe_read(node,"invert",bool, False)
-
-
-
+            self.invert = safe_read(node, "invert", bool, False)
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -951,7 +962,9 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
         node.set("time-to-max-speed", safe_format(self.time_to_max_speed, float))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
         node.set("force_remote_output", safe_format(self.force_remote_output, bool))
-        node.set("force_remote_output_only", safe_format(self.force_remote_output_only, bool))
+        node.set(
+            "force_remote_output_only", safe_format(self.force_remote_output_only, bool)
+        )
         node.set("click_mode", self.click_mode.name)
         node.set("invert", safe_format(self.invert, bool))
 

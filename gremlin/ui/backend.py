@@ -24,13 +24,20 @@ import uuid
 from PySide6 import QtCore
 from PySide6.QtCore import Property, Signal, Slot
 
-from gremlin import code_runner, common, config, error, plugin_manager, \
-    profile, shared_state, types
+from gremlin import (
+    code_runner,
+    common,
+    config,
+    error,
+    plugin_manager,
+    profile,
+    shared_state,
+    types,
+)
 from gremlin.signal import signal
 
 from gremlin.ui.device import InputIdentifier
-from gremlin.ui.profile import ActionNodeModel, InputItemBindingModel, \
-    InputItemModel
+from gremlin.ui.profile import ActionNodeModel, InputItemBindingModel, InputItemModel
 
 syslog = logging.getLogger("system")
 
@@ -41,13 +48,12 @@ config.Configuration().register(
     types.PropertyType.List,
     [],
     "List of recently opened profiles",
-    False
+    False,
 )
 
 
 @common.SingletonDecorator
 class Backend(QtCore.QObject):
-
     """Allows interfacing between the QML frontend and the Python backend."""
 
     windowTitleChanged = Signal()
@@ -55,7 +61,6 @@ class Backend(QtCore.QObject):
     lastErrorChanged = Signal()
     inputConfigurationChanged = Signal()
     activityChanged = Signal()
-
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -79,8 +84,6 @@ class Backend(QtCore.QObject):
         """Toggles Gremlin between active and inactive."""
         self.activate_gremlin(not self.runner.is_running())
 
-    
-
     def activate_gremlin(self, activate: bool):
         """Sets the activity state of Gremlin.
 
@@ -91,12 +94,12 @@ class Backend(QtCore.QObject):
         if activate:
             # Generate the code for the profile and run it
             # self._profile_auto_activated = False
-            self.runner.start(self.profile,"Default")
-            
+            self.runner.start(self.profile, "Default")
+
         else:
             # Stop running the code
             self.runner.stop()
-            
+
         self.activityChanged.emit()
 
     @Slot(InputIdentifier, result=int)
@@ -115,12 +118,13 @@ class Backend(QtCore.QObject):
 
         try:
             import gremlin.base_profile
+
             item = gremlin.base_profile.InputItem()
             item.device_guid = identifier.device_guid
             item.input_type = identifier.input_type
             item.input_id = identifier.input_id
             return len(item.action_configurations)
-        except error.ProfileError as e:
+        except error.ProfileError:
             return 0
 
     @Slot(InputIdentifier, result=InputItemModel)
@@ -137,10 +141,7 @@ class Backend(QtCore.QObject):
             return
         try:
             item = self.profile.get_input_item(
-                identifier.device_guid,
-                identifier.input_type,
-                identifier.input_id,
-                True
+                identifier.device_guid, identifier.input_type, identifier.input_id, True
             )
             return InputItemModel(item, self)
         except error.ProfileError as e:
@@ -243,10 +244,7 @@ class Backend(QtCore.QObject):
         library_item.action_tree = profile_library.ActionTree()
         self.profile.library.add_item(library_item)
         input_item = self.profile.get_input_item(
-            identifier.device_guid,
-            identifier.input_type,
-            identifier.input_id,
-            True
+            identifier.device_guid, identifier.input_type, identifier.input_id, True
         )
         # TODO: automatically determine the mode
         input_item.mode = "Default"
@@ -302,16 +300,14 @@ class Backend(QtCore.QObject):
         """
         # Check if there exists a file with this path
         if not os.path.isfile(fpath):
-            self.display_error(
-                f"Unable to load profile '{fpath}', no such file."
-            )
+            self.display_error(f"Unable to load profile '{fpath}', no such file.")
             return
 
         # Disable the program if it is running when we're loading a
         # new profile
         # TODO: implement this for QML
-        #self.ui.actionActivate.setChecked(False)
-        #self.activate(False)
+        # self.ui.actionActivate.setChecked(False)
+        # self.activate(False)
 
         # Attempt to load the new profile
         try:
@@ -341,15 +337,11 @@ class Backend(QtCore.QObject):
         except (KeyError, TypeError) as e:
             # An error occurred while parsing an existing profile,
             # creating an empty profile instead
-            syslog.exception(
-                f"Invalid profile content:\n{e}"
-            )
+            syslog.exception(f"Invalid profile content:\n{e}")
             self.newProfile()
         except error.ProfileError as e:
             # Parsing the profile went wrong, stop loading and start with an
             # empty profile
-            #cfg = config.Configuration()
+            # cfg = config.Configuration()
             self.newProfile()
-            self.display_error(
-                f"Failed to load the profile {fpath} due to:\n\n{e}"
-            )
+            self.display_error(f"Failed to load the profile {fpath} due to:\n\n{e}")

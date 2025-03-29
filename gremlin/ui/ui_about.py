@@ -7,13 +7,14 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 
 class Ui_About(object):
     def setupUi(self, About):
         import joystick_gremlin
         import gremlin.util
+
         About.setObjectName("About")
         About.setWindowModality(QtCore.Qt.WindowModal)
         About.resize(400, 300)
@@ -32,14 +33,16 @@ class Ui_About(object):
         self.about_box_widget = QtWidgets.QWidget()
         self.about_box_widget.setLayout(self.about_box_layout)
 
-        self.version_widget = QtWidgets.QLabel(f"Version: {joystick_gremlin.Version().version}")
+        self.version_widget = QtWidgets.QLabel(
+            f"Version: {joystick_gremlin.Version().version}"
+        )
         self.about_box_layout.addWidget(self.version_widget)
-        self.about_box_layout.addWidget(QtWidgets.QLabel(f"Python: {gremlin.util.getPythonVersion()}"))
+        self.about_box_layout.addWidget(
+            QtWidgets.QLabel(f"Python: {gremlin.util.getPythonVersion()}")
+        )
         self.about_box_layout.addWidget(self.about)
         self.horizontalLayout_4.addWidget(self.about_box_widget)
 
-        
-        
         self.tabWidget.addTab(self.tab, "")
         self.tab_2 = QtWidgets.QWidget()
         self.tab_2.setObjectName("tab_2")
@@ -68,12 +71,23 @@ class Ui_About(object):
     def retranslateUi(self, About):
         _translate = QtCore.QCoreApplication.translate
         About.setWindowTitle(_translate("About", "About JoystickGremlin Ex"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), _translate("About", "About"))
-        self.jg_license.setHtml(_translate("About", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'MS Shell Dlg 2\'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-size:8pt;\"><br /></p></body></html>"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), _translate("About", "License"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), _translate("About", "3rd Party Licenses"))
-
+        self.tabWidget.setTabText(
+            self.tabWidget.indexOf(self.tab), _translate("About", "About")
+        )
+        self.jg_license.setHtml(
+            _translate(
+                "About",
+                '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
+                '<html><head><meta name="qrichtext" content="1" /><style type="text/css">\n'
+                "p, li { white-space: pre-wrap; }\n"
+                "</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n"
+                '<p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-size:8pt;"><br /></p></body></html>',
+            )
+        )
+        self.tabWidget.setTabText(
+            self.tabWidget.indexOf(self.tab_2), _translate("About", "License")
+        )
+        self.tabWidget.setTabText(
+            self.tabWidget.indexOf(self.tab_3),
+            _translate("About", "3rd Party Licenses"),
+        )

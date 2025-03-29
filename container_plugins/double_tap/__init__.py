@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,11 +31,10 @@ from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 
 
-
 syslog = logging.getLogger("system")
 
-class DoubleTapContainerWidget(AbstractContainerWidget):
 
+class DoubleTapContainerWidget(AbstractContainerWidget):
     """DoubleTap container for actions for double or single taps."""
 
     def __init__(self, profile_data, parent=None):
@@ -53,9 +52,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         self.options_layout = QtWidgets.QHBoxLayout()
 
         # Activation delay
-        self.options_layout.addWidget(
-            QtWidgets.QLabel("<b>Double-tap delay: </b>")
-        )
+        self.options_layout.addWidget(QtWidgets.QLabel("<b>Double-tap delay: </b>"))
         self.delay_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay_input.setRange(0.1, 2.0)
         self.delay_input.setSingleStep(0.1)
@@ -91,7 +88,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
                 0,
                 "Single Tap",
                 self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
 
         if self.profile_data.action_sets[1] is None:
@@ -105,7 +102,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
                 1,
                 "Double Tap",
                 self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
 
     def _create_condition_ui(self):
@@ -115,7 +112,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
                     0,
                     "Single Tap",
                     self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
 
             if self.profile_data.action_sets[1] is not None:
@@ -123,7 +120,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
                     1,
                     "Double Tap",
                     self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
@@ -154,9 +151,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         :param label the name of the action to create
         """
         widget = self._create_action_set_widget(
-            self.profile_data.action_sets[index],
-            label,
-            view_type
+            self.profile_data.action_sets[index], label, view_type
         )
         layout.addWidget(widget)
         widget.redraw()
@@ -175,9 +170,8 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()
 
-
     def _paste_action(self, index, action):
-        ''' pastes an action '''
+        """pastes an action"""
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         if self.profile_data.action_sets[index] is None:
@@ -185,7 +179,6 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         self.profile_data.action_sets[index].append(action_item)
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()
-
 
     def _delay_changed_cb(self, value):
         """Updates the activation delay value.
@@ -229,10 +222,9 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
 
 
 class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
-
     """Executes the contents of the associated DoubleTap container."""
 
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         super().__init__(container, parent)
         self.single_tap = gremlin.execution_graph.ActionSetExecutionGraph(
             container.action_sets[0], parent
@@ -250,9 +242,9 @@ class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.event_press = None
         self.processed_single_tap = True
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if event.event_type == InputType.JoystickHat:
-            is_pressed = value.current != (0,0)
+            is_pressed = value.current != (0, 0)
         elif not isinstance(value.current, bool):
             syslog.warning(
                 f"Invalid data type received in DoubleTap container: {type(event.value)}"
@@ -262,59 +254,56 @@ class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             is_pressed = value.current
 
         if self.processed_single_tap:
-                
-                # Copy state when input is pressed
-                if is_pressed:
-                    self.value_press = copy.deepcopy(value)
-                    self.event_press = event.clone()
+            # Copy state when input is pressed
+            if is_pressed:
+                self.value_press = copy.deepcopy(value)
+                self.event_press = event.clone()
 
-                # Execute double tap logic
-                if is_pressed:
-                    
-                    # Second activation within the delay, i.e. second tap
-                    if (self.start_time + self.delay) > time.time():
-                        # Prevent repeated double taps from repeated button presses
-                        self.start_time = 0
-                        self.tap_type = "double"
-                        if self.activate_on == "exclusive":
-                            self.double_action_timer.cancel()
-                    # First activation within the delay, i.e. first tap
-                    else:
-                        self.start_time = time.time()
-                        #print ("first activation")
-                        self.tap_type = "single"
-                        if self.activate_on == "exclusive":
-                            self.double_action_timer = \
-                                threading.Timer(self.delay, self._single_tap)
-                            self.double_action_timer.start()
+            # Execute double tap logic
+            if is_pressed:
+                # Second activation within the delay, i.e. second tap
+                if (self.start_time + self.delay) > time.time():
+                    # Prevent repeated double taps from repeated button presses
+                    self.start_time = 0
+                    self.tap_type = "double"
+                    if self.activate_on == "exclusive":
+                        self.double_action_timer.cancel()
+                # First activation within the delay, i.e. first tap
+                else:
+                    self.start_time = time.time()
+                    # print ("first activation")
+                    self.tap_type = "single"
+                    if self.activate_on == "exclusive":
+                        self.double_action_timer = threading.Timer(
+                            self.delay, self._single_tap
+                        )
+                        self.double_action_timer.start()
 
-                # Input is being released at this point
-                elif self.double_action_timer and self.double_action_timer.is_alive():
-                    # if releasing single tap before delay
-                    # we will want to send a short press and release
-                    self.double_action_timer.cancel()
-                    self.double_action_timer = threading.Timer(
-                        (self.start_time + self.delay) - time.time(),
-                        lambda: self._single_tap(event, value)
-                    )
-                    self.double_action_timer.start()
+            # Input is being released at this point
+            elif self.double_action_timer and self.double_action_timer.is_alive():
+                # if releasing single tap before delay
+                # we will want to send a short press and release
+                self.double_action_timer.cancel()
+                self.double_action_timer = threading.Timer(
+                    (self.start_time + self.delay) - time.time(),
+                    lambda: self._single_tap(event, value),
+                )
+                self.double_action_timer.start()
 
-                if self.tap_type == "double":
-                    #print ("double tap")
-                    self.double_tap.process_event(event, value)
-                    if self.activate_on == "combined":
-                        self.single_tap.process_event(event, value)
-                elif self.activate_on != "exclusive":
-                    #print ("single tap exclusive")
+            if self.tap_type == "double":
+                # print ("double tap")
+                self.double_tap.process_event(event, value)
+                if self.activate_on == "combined":
                     self.single_tap.process_event(event, value)
-        
+            elif self.activate_on != "exclusive":
+                # print ("single tap exclusive")
+                self.single_tap.process_event(event, value)
+
         else:
-            #print ("first tap")
+            # print ("first tap")
             self.start_time = time.time()
             self.single_tap.process_event(event, value)
             self.processed_single_tap = True
-            
-            
 
         return True
 
@@ -327,8 +316,8 @@ class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             self.single_tap.process_event(event_release, value_release)
             self.processed_single_tap = True
 
-class DoubleTapContainer(AbstractContainer):
 
+class DoubleTapContainer(AbstractContainer):
     """A container with two actions which are triggered based on the delay
     between the taps.
 
@@ -352,7 +341,7 @@ class DoubleTapContainer(AbstractContainer):
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,
     ]
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
@@ -362,15 +351,16 @@ class DoubleTapContainer(AbstractContainer):
         self.delay = 0.5
         self.activate_on = "exclusive"
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
         super()._parse_xml(node, data)
         self.delay = gremlin.profile.safe_read(node, "delay", float, 0.5)
-        self.activate_on = \
-            gremlin.profile.safe_read(node, "activate-on", str, "combined")
+        self.activate_on = gremlin.profile.safe_read(
+            node, "activate-on", str, "combined"
+        )
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

@@ -54,7 +54,6 @@ QML_IMPORT_MAJOR_VERSION = 1
 
 @QtQml.QmlElement
 class DeviceListModel(QtCore.QAbstractListModel):
-
     """Model containing absic information about all connected devices."""
 
     roles = {
@@ -83,13 +82,10 @@ class DeviceListModel(QtCore.QAbstractListModel):
         super().__init__(parent)
         self._devices = joystick_handling.joystick_devices()
 
-        event_handler.EventListener().device_change_event.connect(
-            self.update_model
-        )
+        event_handler.EventListener().device_change_event.connect(self.update_model)
 
     def update_model(self) -> None:
         """Updates the model if the connected devices change."""
-        old_count = len(self._devices)
         self._devices = joystick_handling.joystick_devices()
         new_count = len(self._devices)
 
@@ -103,15 +99,13 @@ class DeviceListModel(QtCore.QAbstractListModel):
         #     list(DeviceData.roles.keys())
         # )
 
-    def rowCount(self, parent:QtCore.QModelIndex=...) -> int:
+    def rowCount(self, parent: QtCore.QModelIndex = ...) -> int:
         return len(self._devices)
 
-    def data(self, index:QtCore.QModelIndex, role:int=...) -> typing.Any:
+    def data(self, index: QtCore.QModelIndex, role: int = ...) -> typing.Any:
         if role in DeviceListModel.roles:
             role_name = DeviceListModel.roles[role].data().decode()
-            return DeviceListModel.role_query[role_name](
-                self._devices[index.row()]
-            )
+            return DeviceListModel.role_query[role_name](self._devices[index.row()])
         else:
             return "Unknown"
 
@@ -120,7 +114,7 @@ class DeviceListModel(QtCore.QAbstractListModel):
 
     @Slot(int, result=str)
     def guidAtIndex(self, index: int) -> str:
-        if not(0 <= index < len(self._devices)):
+        if not (0 <= index < len(self._devices)):
             raise error.GremlinError("Provided index out of range")
 
         return str(self._devices[index].device_guid)
@@ -128,7 +122,6 @@ class DeviceListModel(QtCore.QAbstractListModel):
 
 @QtQml.QmlElement
 class Device(QtCore.QAbstractListModel):
-
     """Model providing access to information about a single device."""
 
     roles = {
@@ -153,21 +146,19 @@ class Device(QtCore.QAbstractListModel):
         if self._device is not None and guid == str(self._device.device_guid):
             return
 
-        self._device = dinput.DILL.get_device_information_by_guid(
-            parse_guid(guid)
-        )
+        self._device = dinput.DILL.get_device_information_by_guid(parse_guid(guid))
         self.deviceChanged.emit()
         self.layoutChanged.emit()
 
-    def rowCount(self, parent:QtCore.QModelIndex=...) -> int:
+    def rowCount(self, parent: QtCore.QModelIndex = ...) -> int:
         if self._device is None:
             return 0
 
-        return self._device.axis_count + \
-               self._device.button_count + \
-               self._device.hat_count
+        return (
+            self._device.axis_count + self._device.button_count + self._device.hat_count
+        )
 
-    def data(self, index: QtCore.QModelIndex, role:int=...) -> typing.Any:
+    def data(self, index: QtCore.QModelIndex, role: int = ...) -> typing.Any:
         if role not in Device.roles:
             return "Unknown"
 
@@ -196,6 +187,7 @@ class Device(QtCore.QAbstractListModel):
             the given index.
         """
         import gremlin.ui.input_item
+
         identifier = gremlin.ui.input_item.InputIdentifier(self)
         identifier.device_guid = self._device.device_guid
         input_info = self._convert_index(index)
@@ -210,37 +202,22 @@ class Device(QtCore.QAbstractListModel):
     def _convert_index(self, index: int) -> typing.Tuple[InputType, int]:
         axis_count = self._device.axis_count
         button_count = self._device.button_count
-        hat_count = self._device.hat_count
 
         if index < axis_count:
-            return (
-                InputType.JoystickAxis,
-                self._device.axis_map[index].axis_index
-            )
+            return (InputType.JoystickAxis, self._device.axis_map[index].axis_index)
         elif index < axis_count + button_count:
-            return (
-                InputType.JoystickButton,
-                index + 1 - axis_count
-            )
+            return (InputType.JoystickButton, index + 1 - axis_count)
         else:
-            return (
-                InputType.JoystickHat,
-                index + 1 - axis_count - button_count
-            )
+            return (InputType.JoystickHat, index + 1 - axis_count - button_count)
 
     def roleNames(self) -> typing.Dict:
         return Device.roles
 
-    guid = Property(
-        str,
-        fget=_get_guid,
-        fset=_set_guid
-    )
+    guid = Property(str, fget=_get_guid, fset=_set_guid)
 
 
 @QtQml.QmlElement
 class VJoyDevices(QtCore.QObject):
-
     """vJoy model used together with the VJoySelector QML.
 
     The model provides setters and getters for UI selection index values while
@@ -262,15 +239,14 @@ class VJoyDevices(QtCore.QObject):
         super().__init__(parent)
 
         self._devices = sorted(
-            joystick_handling.vjoy_devices(),
-            key=lambda x: x.vjoy_id
+            joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id
         )
 
         # Information used to determine what to show in the UI
         self._valid_types = [
             InputType.JoystickAxis,
             InputType.JoystickButton,
-            InputType.JoystickHat
+            InputType.JoystickHat,
         ]
         self._input_items = []
         self._input_data = []
@@ -297,9 +273,11 @@ class VJoyDevices(QtCore.QObject):
         Returns:
             True if the state is valid and consistent, False otherwise
         """
-        return self._current_vjoy_index is not None and \
-               self._current_input_index is not None and \
-               self._current_input_type is not None
+        return (
+            self._current_vjoy_index is not None
+            and self._current_input_index is not None
+            and self._current_input_type is not None
+        )
 
     @Slot(int, int, str)
     def setSelection(self, vjoy_id: int, input_id: int, input_type: str) -> None:
@@ -318,19 +296,14 @@ class VJoyDevices(QtCore.QObject):
                 self._set_vjoy_index(i)
 
         if vjoy_index == -1:
-            raise error.GremlinError(
-                f"Could not find vJoy device with id {vjoy_id}"
-            )
+            raise error.GremlinError(f"Could not find vJoy device with id {vjoy_id}")
 
         # Find the index corresponding to the provided input_type and input_id
-        input_label = common.input_to_ui_string(
-            InputType.to_enum(input_type),
-            input_id
-        )
+        input_label = common.input_to_ui_string(InputType.to_enum(input_type), input_id)
         try:
             self._set_input_index(self._input_items.index(input_label))
         except ValueError:
-            raise error.GremlinError(f"No input named \"{input_label}\" present")
+            raise error.GremlinError(f'No input named "{input_label}" present')
 
     @Property(type="QVariantList", notify=deviceModelChanged)
     def deviceModel(self):
@@ -341,7 +314,7 @@ class VJoyDevices(QtCore.QObject):
         input_count = {
             InputType.JoystickAxis: lambda x: x.axis_count,
             InputType.JoystickButton: lambda x: x.button_count,
-            InputType.JoystickHat: lambda x: x.hat_count
+            InputType.JoystickHat: lambda x: x.hat_count,
         }
 
         self._input_items = []
@@ -350,14 +323,13 @@ class VJoyDevices(QtCore.QObject):
         # Add items based on the input type
         for input_type in self._valid_types:
             for i in range(input_count[input_type](device)):
-                input_id = i+1
+                input_id = i + 1
                 if input_type == InputType.JoystickAxis:
                     input_id = device.axis_map[i].axis_index
 
-                self._input_items.append(common.input_to_ui_string(
-                    input_type,
-                    input_id
-                ))
+                self._input_items.append(
+                    common.input_to_ui_string(input_type, input_id)
+                )
                 self._input_data.append((input_type, input_id))
 
         return self._input_items
@@ -381,15 +353,10 @@ class VJoyDevices(QtCore.QObject):
             self.inputModel
 
             input_label = common.input_to_ui_string(
-                InputType.to_enum(old_input_type),
-                old_vjoy_id
+                InputType.to_enum(old_input_type), old_vjoy_id
             )
             if input_label in self._input_items:
-                self.setSelection(
-                    self._get_vjoy_id(),
-                    old_vjoy_id,
-                    old_input_type
-                )
+                self.setSelection(self._get_vjoy_id(), old_vjoy_id, old_input_type)
             else:
                 self._current_vjoy_index = 0
                 self._current_input_index = 0
@@ -456,44 +423,25 @@ class VJoyDevices(QtCore.QObject):
         "QVariantList",
         fget=_get_valid_types,
         fset=_set_valid_types,
-        notify=validTypesChanged
+        notify=validTypesChanged,
     )
 
-    vjoyId = Property(
-        int,
-        fget=_get_vjoy_id,
-        notify=vjoyIdChanged
-    )
+    vjoyId = Property(int, fget=_get_vjoy_id, notify=vjoyIdChanged)
 
     vjoyIndex = Property(
-        int,
-        fget=_get_vjoy_index,
-        fset=_set_vjoy_index,
-        notify=vjoyIndexChanged
+        int, fget=_get_vjoy_index, fset=_set_vjoy_index, notify=vjoyIndexChanged
     )
 
-    inputId = Property(
-        int,
-        fget=_get_input_id,
-        notify=inputIdChanged
-    )
+    inputId = Property(int, fget=_get_input_id, notify=inputIdChanged)
 
     inputIndex = Property(
-        int,
-        fget=_get_input_index,
-        fset=_set_input_index,
-        notify=inputIndexChanged
+        int, fget=_get_input_index, fset=_set_input_index, notify=inputIndexChanged
     )
 
-    inputType = Property(
-        str,
-        fget=_get_input_type,
-        notify=inputTypeChanged
-    )
+    inputType = Property(str, fget=_get_input_type, notify=inputTypeChanged)
 
 
 class AbstractDeviceState(QtCore.QAbstractListModel):
-
     deviceChanged = Signal()
 
     roles = {
@@ -535,13 +483,13 @@ class AbstractDeviceState(QtCore.QAbstractListModel):
             "AbstractDeviceState._initialize_state not implemented"
         )
 
-    def rowCount(self, parent:QtCore.QModelIndex=...) -> int:
+    def rowCount(self, parent: QtCore.QModelIndex = ...) -> int:
         if self._device is None:
             return 0
 
         return len(self._state)
 
-    def data(self, index: QtCore.QModelIndex, role:int=...) -> typing.Any:
+    def data(self, index: QtCore.QModelIndex, role: int = ...) -> typing.Any:
         if role not in AbstractDeviceState.roles:
             return False
 
@@ -551,16 +499,11 @@ class AbstractDeviceState(QtCore.QAbstractListModel):
     def roleNames(self) -> typing.Dict:
         return DeviceButtonState.roles
 
-    guid = Property(
-        str,
-        fset=_set_guid,
-        notify=deviceChanged
-    )
+    guid = Property(str, fset=_set_guid, notify=deviceChanged)
 
 
 @QtQml.QmlElement
 class DeviceAxisState(AbstractDeviceState):
-
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -575,41 +518,35 @@ class DeviceAxisState(AbstractDeviceState):
     def _initialize_state(self) -> None:
         for i in range(self._device.axis_count):
             self._identifier_map[self._device.axis_map[i].axis_index] = i
-            self._state.append({
-                "identifier": self._device.axis_map[i].axis_index,
-                "value": 0.0
-            })
+            self._state.append(
+                {"identifier": self._device.axis_map[i].axis_index, "value": 0.0}
+            )
 
 
 @QtQml.QmlElement
 class DeviceButtonState(AbstractDeviceState):
-
     def __init__(self, parent=None):
         super().__init__(parent)
 
     def _event_handler_impl(self, event):
         if event.event_type == InputType.JoystickButton:
-            idx = event.identifier-1
+            idx = event.identifier - 1
             self._state[idx]["value"] = event.is_pressed
             self.dataChanged.emit(self.index(idx, 0), self.index(idx, 0))
 
     def _initialize_state(self) -> None:
         for i in range(self._device.button_count):
-            self._state.append({
-                "identifier": i+1,
-                "value": False
-            })
+            self._state.append({"identifier": i + 1, "value": False})
 
 
 @QtQml.QmlElement
 class DeviceHatState(AbstractDeviceState):
-
     def __init__(self, parent=None):
         super().__init__(parent)
 
     def _event_handler_impl(self, event):
         if event.event_type == InputType.JoystickHat:
-            idx = event.identifier-1
+            idx = event.identifier - 1
             pt = QtCore.QPoint(event.value[0], event.value[1])
             if pt != self._state[idx]["value"]:
                 self._state[idx]["value"] = pt
@@ -617,15 +554,11 @@ class DeviceHatState(AbstractDeviceState):
 
     def _initialize_state(self) -> None:
         for i in range(self._device.hat_count):
-            self._state.append({
-                "identifier": i+1,
-                "value": QtCore.QPoint(0, 0)
-            })
+            self._state.append({"identifier": i + 1, "value": QtCore.QPoint(0, 0)})
 
 
 @QtQml.QmlElement
 class DeviceAxisSeries(QtCore.QObject):
-
     windowSizeChanged = Signal()
     deviceChanged = Signal()
     axisCountChanged = Signal()
@@ -650,10 +583,9 @@ class DeviceAxisSeries(QtCore.QObject):
         self._state = []
         for i in range(self._device.axis_count):
             self._identifier_map[self._device.axis_map[i].axis_index] = i
-            self._state.append({
-                "identifier": self._device.axis_map[i].axis_index,
-                "timeSeries": []
-            })
+            self._state.append(
+                {"identifier": self._device.axis_map[i].axis_index, "timeSeries": []}
+            )
         self.deviceChanged.emit()
 
     def _get_window_size(self) -> int:
@@ -670,9 +602,7 @@ class DeviceAxisSeries(QtCore.QObject):
 
         if event.event_type == InputType.JoystickAxis:
             index = self._identifier_map[event.identifier]
-            self._state[index]["timeSeries"].append(
-                (time.time(), event.value)
-            )
+            self._state[index]["timeSeries"].append((time.time(), event.value))
 
     @Property(int, notify=axisCountChanged)
     def axisCount(self) -> int:
@@ -683,13 +613,15 @@ class DeviceAxisSeries(QtCore.QObject):
         data = self._state[identifier]["timeSeries"]
 
         if len(data) == 0:
-            series.replace([
-                QtCore.QPointF(0.0, 0.0),
-                QtCore.QPointF(self._window_size, 0.0),
-            ])
+            series.replace(
+                [
+                    QtCore.QPointF(0.0, 0.0),
+                    QtCore.QPointF(self._window_size, 0.0),
+                ]
+            )
             return
 
-        now  = time.time()
+        now = time.time()
         while now - data[0][0] > self._window_size:
             data.pop(0)
 
@@ -703,15 +635,8 @@ class DeviceAxisSeries(QtCore.QObject):
     def axisIdentifier(self, index: int) -> int:
         return self._state[index]["identifier"]
 
-    guid = Property(
-        str,
-        fset=_set_guid,
-        notify=deviceChanged
-    )
+    guid = Property(str, fset=_set_guid, notify=deviceChanged)
 
     windowSize = Property(
-        int,
-        fset=_set_window_size,
-        fget=_get_window_size,
-        notify=windowSizeChanged
+        int, fset=_set_window_size, fget=_get_window_size, notify=windowSizeChanged
     )

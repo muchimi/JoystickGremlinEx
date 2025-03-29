@@ -37,43 +37,45 @@ from gremlin.types import GamePadOutput
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
-from dinput import DILL, GUID, GUID_Invalid
+from dinput import DILL, GUID_Invalid
 import gremlin.util
 from gremlin.util import get_guid
 import gremlin.input_types
-import vjoy.vjoy
 
 
 from . import error
 
 import win32api
-import gremlin.sendinput, gremlin.tts
+import gremlin.sendinput
+import gremlin.tts
 
-import socketserver, socket, msgpack
+import socketserver
+import socket
+import msgpack
 import enum
 
 import gremlin.singleton_decorator
-
 
 
 syslog = logging.getLogger("system")
 
 
 class ControlAction(enum.Enum):
-    ''' defines the available control actions for the control plugin'''
-    EnableInput = 0 # enables an input
-    DisableInput = 1 # disable an input
-    ToggleInput = 2 # toggle the input
+    """defines the available control actions for the control plugin"""
+
+    EnableInput = 0  # enables an input
+    DisableInput = 1  # disable an input
+    ToggleInput = 2  # toggle the input
 
     @staticmethod
     def to_string(action):
         return action.name
-    
+
     @staticmethod
     def to_display_name(action):
         return _control_action_display[action]
-        
-        
+
+
 _control_action_display = {
     ControlAction.EnableInput: "Enable Input",
     ControlAction.DisableInput: "Disable Input",
@@ -81,43 +83,42 @@ _control_action_display = {
 }
 
 
-
-
 class VjoyAction(enum.Enum):
-    ''' defines available vjoy actions supported by the vjoy mapper plugins'''
-    VJoyButton = 0 # action on button press
-    VJoyToggle = 1 # toggle function on/off
-    VJoyPulse = 2 # pulse function (pulses a button),
-    VJoyInvertAxis = 3 # invert axis function
-    VJoySetAxis = 4 # set axis value
-    VJoyAxis = 5 # normal map to axis
-    VJoyHat = 6 #  normal map to hat
-    VJoyRangeAxis = 7 # scale axis
-    VJoyAxisToButton = 8 # axis to button mapping
-    VJoyToggleRemote = 9 # toggle remote control
-    VJoyEnableRemoteOnly = 10 # enables remote control, disables local control
-    VJoyEnableLocalOnly = 11 # enables local control, disables remote control
-    VJoyDisableRemote = 12 # turns remote control off
-    VJoyDisableLocal = 13 # turns local control off
-    VJoyEnableRemote = 14 # enables remote control (does not impact local control)
-    VJoyEnableLocal = 15 # enables local control (does not impact remote control)
-    VJoyEnableLocalAndRemote = 16 # enables concurrent local/remote control
-    VJoyEnablePairedRemote = 17 # enables primary fire one and two on remote client
-    VJoyDisablePairedRemote = 18 # disable primary fire one and two on remote client
-    VJoyButtonRelease = 19 # action button release (clear a button if set)
-    VJoyMergeAxis = 20 # action to merge another axis
-    VJoyHatToButton = 21 # action to map a hat to a button
-    VJoySetAxisStepped = 22 # like VjoySetAxis but uses a list of values to bump the index
+    """defines available vjoy actions supported by the vjoy mapper plugins"""
 
-  
+    VJoyButton = 0  # action on button press
+    VJoyToggle = 1  # toggle function on/off
+    VJoyPulse = 2  # pulse function (pulses a button),
+    VJoyInvertAxis = 3  # invert axis function
+    VJoySetAxis = 4  # set axis value
+    VJoyAxis = 5  # normal map to axis
+    VJoyHat = 6  #  normal map to hat
+    VJoyRangeAxis = 7  # scale axis
+    VJoyAxisToButton = 8  # axis to button mapping
+    VJoyToggleRemote = 9  # toggle remote control
+    VJoyEnableRemoteOnly = 10  # enables remote control, disables local control
+    VJoyEnableLocalOnly = 11  # enables local control, disables remote control
+    VJoyDisableRemote = 12  # turns remote control off
+    VJoyDisableLocal = 13  # turns local control off
+    VJoyEnableRemote = 14  # enables remote control (does not impact local control)
+    VJoyEnableLocal = 15  # enables local control (does not impact remote control)
+    VJoyEnableLocalAndRemote = 16  # enables concurrent local/remote control
+    VJoyEnablePairedRemote = 17  # enables primary fire one and two on remote client
+    VJoyDisablePairedRemote = 18  # disable primary fire one and two on remote client
+    VJoyButtonRelease = 19  # action button release (clear a button if set)
+    VJoyMergeAxis = 20  # action to merge another axis
+    VJoyHatToButton = 21  # action to map a hat to a button
+    VJoySetAxisStepped = (
+        22  # like VjoySetAxis but uses a list of values to bump the index
+    )
 
     @staticmethod
     def to_string(mode):
         return mode.name
-    
+
     def __str__(self):
         return str(self.value)
-    
+
     @classmethod
     def _missing_(cls, name):
         for item in cls:
@@ -125,10 +126,9 @@ class VjoyAction(enum.Enum):
                 return item
             return cls.VJoyButton
 
-    
     @staticmethod
     def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        """converts from a string representation (text or numeric) to the enum, not case sensitive"""
         str = str.lower().strip()
         if str.isnumeric():
             mode = int(str)
@@ -138,10 +138,10 @@ class VjoyAction(enum.Enum):
                 return item
 
         return None
-    
+
     @staticmethod
     def to_description(action):
-        ''' returns a descriptive string for the action '''
+        """returns a descriptive string for the action"""
         match action:
             case VjoyAction.VJoyAxis:
                 return "Maps a vjoy axis"
@@ -192,105 +192,103 @@ class VjoyAction(enum.Enum):
             case VjoyAction.VJoySetAxisStepped:
                 return "Steps through set axis values"
 
-        
-        msg  = f"Unknown [{action}]"
+        msg = f"Unknown [{action}]"
         syslog.debug(f"Warning: missing action description mapping: {msg}")
         return msg
-        
+
     @staticmethod
     def to_name(action):
-        ''' returns a name string for the action '''
+        """returns a name string for the action"""
         match action:
-            case  VjoyAction.VJoyAxis:
+            case VjoyAction.VJoyAxis:
                 return "Axis"
-            case  VjoyAction.VJoyButton:
+            case VjoyAction.VJoyButton:
                 return "Button Press"
-            case  VjoyAction.VJoyHat:
+            case VjoyAction.VJoyHat:
                 return "Hat"
-            case  VjoyAction.VJoyHatToButton:
+            case VjoyAction.VJoyHatToButton:
                 return "Hat to Button"
-            case  VjoyAction.VJoyInvertAxis:
+            case VjoyAction.VJoyInvertAxis:
                 return "Invert Axis"
-            case  VjoyAction.VJoyPulse:
+            case VjoyAction.VJoyPulse:
                 return "Pulse Button"
-            case  VjoyAction.VJoySetAxis:
+            case VjoyAction.VJoySetAxis:
                 return "Sets Axis Value"
-            case  VjoyAction.VJoyToggle:
+            case VjoyAction.VJoyToggle:
                 return "Toggle Button"
             case VjoyAction.VJoyRangeAxis:
                 return "Set Axis Range"
-            case  VjoyAction.VJoyAxisToButton:
+            case VjoyAction.VJoyAxisToButton:
                 return "Axis to Button"
-            case  VjoyAction.VJoyEnableLocalOnly:
+            case VjoyAction.VJoyEnableLocalOnly:
                 return "Local Control Only"
-            case  VjoyAction.VJoyEnableRemoteOnly:
+            case VjoyAction.VJoyEnableRemoteOnly:
                 return "Enable Remote Control (exclusive)"
-            case  VjoyAction.VJoyEnableLocal:
+            case VjoyAction.VJoyEnableLocal:
                 return "Enables Local Control"
-            case  VjoyAction.VJoyEnableRemoteOnly:
+            case VjoyAction.VJoyEnableRemoteOnly:
                 return "Enables Remote Control (exclusive)"
-            case  VjoyAction.VJoyEnableLocalAndRemote:
+            case VjoyAction.VJoyEnableLocalAndRemote:
                 return "Enable Concurrent Local and Remote control"
-            case  VjoyAction.VJoyToggleRemote:
+            case VjoyAction.VJoyToggleRemote:
                 return "Toggle Control"
-            case  VjoyAction.VJoyEnablePairedRemote:
+            case VjoyAction.VJoyEnablePairedRemote:
                 return "Enable remote pairing"
-            case  VjoyAction.VJoyDisablePairedRemote:
+            case VjoyAction.VJoyDisablePairedRemote:
                 return "Disable remote pairing"
-            case  VjoyAction.VJoyEnableRemote:
+            case VjoyAction.VJoyEnableRemote:
                 return "Enable remote control"
-            case  VjoyAction.VJoyDisableLocal:
+            case VjoyAction.VJoyDisableLocal:
                 return "Disable local control"
-            case  VjoyAction.VJoyDisableRemote:
+            case VjoyAction.VJoyDisableRemote:
                 return "Disable remote control"
-            case  VjoyAction.VJoyButtonRelease:
+            case VjoyAction.VJoyButtonRelease:
                 return "Button release"
-            case  VjoyAction.VJoyMergeAxis:
+            case VjoyAction.VJoyMergeAxis:
                 return "Merge Axis"
             case VjoyAction.VJoySetAxisStepped:
                 return "Stepped Axis Value"
 
-        
-        msg  = f"Unknown [{action}]"
+        msg = f"Unknown [{action}]"
         syslog.debug(f"Warning: missing action name mapping: {msg}")
         return msg
-    
 
     @staticmethod
     def is_command(value):
         return value in (
-        VjoyAction.VJoyDisableLocal,
-        VjoyAction.VJoyDisableRemote,
-        VjoyAction.VJoyEnableLocalOnly,
-        VjoyAction.VJoyEnableRemoteOnly,
-        VjoyAction.VJoyEnableLocalAndRemote,
-        VjoyAction.VJoyEnableLocal,
-        VjoyAction.VJoyEnableRemote,
-        VjoyAction.VJoyToggleRemote,
-        VjoyAction.VJoyEnablePairedRemote,
-        VjoyAction.VJoyDisablePairedRemote,
+            VjoyAction.VJoyDisableLocal,
+            VjoyAction.VJoyDisableRemote,
+            VjoyAction.VJoyEnableLocalOnly,
+            VjoyAction.VJoyEnableRemoteOnly,
+            VjoyAction.VJoyEnableLocalAndRemote,
+            VjoyAction.VJoyEnableLocal,
+            VjoyAction.VJoyEnableRemote,
+            VjoyAction.VJoyToggleRemote,
+            VjoyAction.VJoyEnablePairedRemote,
+            VjoyAction.VJoyDisablePairedRemote,
         )
 
 
-class InternalSpeech():
-	''' tts interface '''
-	def __init__(self):
-		import win32com.client
-		self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
+class InternalSpeech:
+    """tts interface"""
 
-	def speak(self, text):
-		try:
-			self.speaker.speak(text)
-		except:
-			pass
+    def __init__(self):
+        import win32com.client
+
+        self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
+
+    def speak(self, text):
+        try:
+            self.speaker.speak(text)
+        except:
+            pass
 
 
 @gremlin.singleton_decorator.SingletonDecorator
-class RemoteControl():
-    ''' holds remote control status information'''
+class RemoteControl:
+    """holds remote control status information"""
 
     def __init__(self):
-        
         self._is_remote = False
         self._is_local = False
         self._is_paired = False
@@ -301,9 +299,10 @@ class RemoteControl():
         el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._config_changed)
         el.broadcast_changed.connect(self._broadcast_changed)
-        
+
     def _update(self, value):
         import gremlin.event_handler
+
         is_local = self._is_local
         is_remote = self._is_remote
         is_paired = self._is_paired
@@ -334,17 +333,23 @@ class RemoteControl():
         else:
             # not sure what this was
             return
-        
+
         self._mode = value
-        syslog.info(f"SYSTEM: Remote control status: local: {self._is_local} remote: {self._is_remote}")
+        syslog.info(
+            f"SYSTEM: Remote control status: local: {self._is_local} remote: {self._is_remote}"
+        )
 
         if self._is_local != is_local or self._is_remote != is_remote:
             # status changed
             self._is_local = is_local
             self._is_remote = is_remote
-            
+
             el = gremlin.event_handler.EventListener()
-            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
+            el.broadcast_changed.emit(
+                gremlin.event_handler.StateChangeEvent(
+                    self._is_local, self._is_remote, self._is_broadcast
+                )
+            )
 
         if self._is_paired != is_paired:
             # pairing mode changed
@@ -354,16 +359,20 @@ class RemoteControl():
             else:
                 msg = "Paired mode disabled"
             syslog.debug(f"Paired mode changed: {msg}")
-            threading.Thread(target = self.say, args=(msg,), daemon=True).start()
+            threading.Thread(target=self.say, args=(msg,), daemon=True).start()
 
     def _config_changed(self):
-        ''' called when broadcast config item changes '''
-        
+        """called when broadcast config item changes"""
+
         config = gremlin.config.Configuration()
         if self._is_broadcast != config.enable_remote_broadcast:
             self._is_broadcast = config.enable_remote_broadcast
             el = gremlin.event_handler.EventListener()
-            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
+            el.broadcast_changed.emit(
+                gremlin.event_handler.StateChangeEvent(
+                    self._is_local, self._is_remote, self._is_broadcast
+                )
+            )
 
     def say(self, msg):
         speech = InternalSpeech()
@@ -380,50 +389,51 @@ class RemoteControl():
             elif event.is_remote:
                 msg = "Remote control is enabled"
             if msg:
-                threading.Thread(target = self.say, args=(msg,), daemon=True).start()
-        
+                threading.Thread(target=self.say, args=(msg,), daemon=True).start()
+
     @property
     def mode(self):
-        ''' gets the current mode '''
+        """gets the current mode"""
         return self._mode
-    
+
     @mode.setter
     def mode(self, value):
         self._update(value)
 
     @property
     def is_local(self):
-        ''' status of local control '''
+        """status of local control"""
         return self._is_local
+
     @property
     def is_remote(self):
-        ''' status of remote control '''
+        """status of remote control"""
         return self._is_remote and self._is_broadcast
-    
+
     @property
     def state(self):
-        ''' returns status as a pair of flags, local, remote'''
+        """returns status as a pair of flags, local, remote"""
         return (self.is_local, self.is_remote)
-    
+
     @property
     def paired(self):
-        ''' paired status '''
+        """paired status"""
         return self._is_paired
 
-    
     def to_state_event(self):
-        ''' returns event data for the current state '''
+        """returns event data for the current state"""
         from gremlin.event_handler import StateChangeEvent
+
         event = StateChangeEvent(self.is_local, self.is_remote, self._is_broadcast)
         return event
 
+
 def get_remote_state():
-    ''' gets the remote state '''
+    """gets the remote state"""
     return remote_state
 
 
 class CallbackRegistry:
-
     """Registry of all callbacks known to the system."""
 
     def __init__(self):
@@ -452,7 +462,10 @@ class CallbackRegistry:
 
         if event not in self._registry[event.device_guid][mode]:
             self._registry[event.device_guid][mode][key] = {}
-        self._registry[event.device_guid][mode][key][function_name] = (callback, always_execute)
+        self._registry[event.device_guid][mode][key][function_name] = (
+            callback,
+            always_execute,
+        )
 
     @property
     def registry(self):
@@ -468,7 +481,6 @@ class CallbackRegistry:
 
 
 class PeriodicRegistry:
-
     """Registry for periodically executed functions."""
 
     def __init__(self):
@@ -526,16 +538,12 @@ class PeriodicRegistry:
                 callback = plugin.install(callback, partial_fn)
         return callback
 
-
     def _thread_loop(self):
         """Main execution loop run in a separate thread."""
         import uuid
+
         # Setup plugins to use
-        self._plugins = [
-            JoystickPlugin(),
-            VJoyPlugin(),
-            KeyboardPlugin()
-        ]
+        self._plugins = [JoystickPlugin(), VJoyPlugin(), KeyboardPlugin()]
         callback_map = {}
         period_map = {}
         # Populate the queue
@@ -548,7 +556,6 @@ class PeriodicRegistry:
             value = time.time() + period_map[node_id]
             heapq.heappush(self._queue, (value, node_id))
 
-
         # Main thread loop
         while self._running:
             # Process all events that require running
@@ -558,19 +565,16 @@ class PeriodicRegistry:
                     callback_map[node_id]()
 
                     heapq.heappush(
-                        self._queue,
-                        (time.time() + period_map[node_id], node_id)
+                        self._queue, (time.time() + period_map[node_id], node_id)
                     )
 
             # Sleep until either the next function needs to be run or
             # our timeout expires
             time.sleep(min(self._queue[0][0] - time.time(), 1.0))
 
-            
 
 class SimpleRegistry:
-
-    """Registry for functions executed  """
+    """Registry for functions executed"""
 
     def __init__(self):
         """Creates a new instance."""
@@ -591,11 +595,9 @@ class SimpleRegistry:
             plugin_cb = self._install_plugins(item)
             plugin_cb()
 
-
     def stop(self):
         """Stops the event loop."""
         self._running = False
-
 
     def add(self, callback):
         """Adds a function to execute periodically.
@@ -604,8 +606,7 @@ class SimpleRegistry:
         :param interval the time between executions
         """
         assert callable(callback)
-        self._registry[callback] =  callback
-
+        self._registry[callback] = callback
 
     def clear(self):
         """Clears the registry."""
@@ -628,8 +629,9 @@ class SimpleRegistry:
         return callback
 
 
-class ModeChangeRegistry():
-    """Registry for functions executed on mode change """
+class ModeChangeRegistry:
+    """Registry for functions executed on mode change"""
+
     def __init__(self):
         """Creates a new instance."""
         self._registry = {}
@@ -644,7 +646,6 @@ class ModeChangeRegistry():
         """
         assert callable(callback)
         self._registry[callback] = callback
-
 
     def clear(self):
         """Clears the registry."""
@@ -670,8 +671,8 @@ class ModeChangeRegistry():
                 callback = plugin.install(callback, partial_fn)
         return callback
 
-    def runtime_mode_changed(self, mode : str):
-        ''' calls all registered callbacks when the GremlinEx mode changes '''
+    def runtime_mode_changed(self, mode: str):
+        """calls all registered callbacks when the GremlinEx mode changes"""
         if len(self._registry) == 0:
             return
         for item in self._registry.values():
@@ -679,12 +680,13 @@ class ModeChangeRegistry():
             plugin_cb(mode)
 
 
+class StateChangeRegistry:
+    """Registry for functions executed on state (remote/local) change"""
 
-class StateChangeRegistry():
-    """Registry for functions executed on state (remote/local) change """
     def __init__(self):
         """Creates a new instance."""
         from gremlin.event_handler import EventListener
+
         self._registry = {}
         self._running = False
         self._plugins = []
@@ -699,7 +701,6 @@ class StateChangeRegistry():
         """
         assert callable(callback)
         self._registry[callback] = callback
-
 
     def clear(self):
         """Clears the registry."""
@@ -726,7 +727,7 @@ class StateChangeRegistry():
         return callback
 
     def state_changed(self, event):
-        ''' calls all registered callbacks when the GremlinEx local or remote states change '''
+        """calls all registered callbacks when the GremlinEx local or remote states change"""
         if len(self._registry) == 0:
             return
         for item in self._registry.values():
@@ -734,26 +735,22 @@ class StateChangeRegistry():
             plugin_cb(event)
 
 
-
-
-class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
+class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
     pass
 
-class GremlinSocketHandler(socketserver.BaseRequestHandler):
-    ''' handles remote input from a gremlin client on the network
-    
-        received network events are processed here
-    
-    '''
 
+class GremlinSocketHandler(socketserver.BaseRequestHandler):
+    """handles remote input from a gremlin client on the network
+
+    received network events are processed here
+
+    """
 
     def handle(self):
-        
-      
         # handles input data
         raw_data = self.request[0].strip()
         # socket = self.request[1]
-        
+
         data = msgpack.unpackb(raw_data)
         # syslog.debug(f"Gremlin received remote data: {data}")
 
@@ -761,12 +758,12 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
         if sender == remote_client.id:
             # ignore our own broadcasts
             return
-        
+
         action = data["action"]
         if action == "hb":
             # heart beat
             return
-        
+
         if action == "key":
             # keyboard output
             virtual_code = data["vc"]
@@ -774,7 +771,6 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             flags = data["flags"]
             win32api.keybd_event(virtual_code, scan_code, flags, 0)
         elif action == "mouse":
-            
             subtype = data["subtype"]
             if subtype == "wheel":
                 direction = data["direction"]
@@ -809,17 +805,21 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                 max_speed = data["max_speed"]
                 time_to_max_speed = data["time_to_speed"]
                 mouse_controller = gremlin.sendinput.MouseController()
-                mouse_controller.set_accelerated_motion(a,min_speed,max_speed,time_to_max_speed)
+                mouse_controller.set_accelerated_motion(
+                    a, min_speed, max_speed, time_to_max_speed
+                )
         elif action == "gamepad":
             # gamepad handling
-            index = data["index"] # id of the gamepad to send the data to
-            subtype = data["subtype"] # axis or button
-            output_mode = data["mode"] # either a gamepadoutput or the translated button code
+            index = data["index"]  # id of the gamepad to send the data to
+            subtype = data["subtype"]  # axis or button
+            output_mode = data[
+                "mode"
+            ]  # either a gamepadoutput or the translated button code
             vigem = gremlin.gamepad_handling.getGamepad(index)
             if vigem is not None:
                 if subtype == "axis":
                     value = data["value"]
-                    
+
                     if vigem:
                         if output_mode == GamePadOutput.LeftStickX:
                             vigem.left_joystick_float_x(vscaled)
@@ -830,10 +830,14 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                         elif output_mode == GamePadOutput.RightStickY:
                             vigem.right_joystick_float_y(vscaled)
                         if output_mode == GamePadOutput.LeftTrigger:
-                            vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                            vscaled = gremlin.util.scale_to_range(
+                                value.current, target_min=0.0, target_max=1.0
+                            )
                             vigem.left_trigger_float(vscaled)
                         if output_mode == GamePadOutput.RightTrigger:
-                            vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                            vscaled = gremlin.util.scale_to_range(
+                                value.current, target_min=0.0, target_max=1.0
+                            )
                             vigem.right_trigger_float(vscaled)
 
                 elif subtype == "button":
@@ -843,13 +847,8 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                     else:
                         vigem.release_button(button)
                 vigem.update()
-            
 
-
-
-
-
-        elif action in ("button","axis","hat","relative_axis"):
+        elif action in ("button", "axis", "hat", "relative_axis"):
             # joystick button
             device = data["device"]
             target = data["target"]
@@ -862,7 +861,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             if device in proxy.vjoy_devices:
                 # valid device
                 vjoy = proxy[device]
-                
+
                 if action == "button":
                     # emit button change
                     if target > 0 and target < vjoy.button_count:
@@ -870,7 +869,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                 elif action == "axis":
                     if value is None:
                         # relative mode = get the current value
-                        value = proxy[device].axis(target).value    
+                        value = proxy[device].axis(target).value
                     if relative_value:
                         # apply the relative value
                         value = gremlin.util.clamp(value + relative_value, -1.0, +1.0)
@@ -880,13 +879,16 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                     if target > 0 and target <= vjoy.hat_count:
                         proxy[device].hat(target).direction = value
                 elif action == "relative_axis":
-                     if target > 0 and target <= vjoy.axis_count:
-                        proxy[device].axis(target).value = max(-1.0,min(1.0, proxy[device].axis(target).value + value))
+                    if target > 0 and target <= vjoy.axis_count:
+                        proxy[device].axis(target).value = max(
+                            -1.0, min(1.0, proxy[device].axis(target).value + value)
+                        )
 
-class RPCGremlin():
-    ''' remote UDP multicast listener '''
 
-    MULTICAST_GROUP = '224.3.29.72' # multicast group
+class RPCGremlin:
+    """remote UDP multicast listener"""
+
+    MULTICAST_GROUP = "224.3.29.72"  # multicast group
     # multicast time to live
     MULTICAST_TTL = 2
 
@@ -901,26 +903,31 @@ class RPCGremlin():
         self._server_thread = None
         self._keep_running = False
 
-        
-
     def _run(self):
         import struct
+
         syslog.debug("Starting gremlin listener...")
-        self._server = GremlinServer(('', self._port),GremlinSocketHandler)
-        self._server_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._server = GremlinServer(("", self._port), GremlinSocketHandler)
+        self._server_thread = threading.Thread(
+            target=self._server.serve_forever, daemon=True
+        )
         self._server_thread.daemon = True
         try:
             self._server_thread.start()
             # enable listen to multicast UDP
             group = socket.inet_aton(RPCGremlin.MULTICAST_GROUP)
-            mreq = struct.pack('4sL', group, socket.INADDR_ANY)
-            self._server.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-            syslog.debug(f"Starting gremlin server listener:  multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
+            mreq = struct.pack("4sL", group, socket.INADDR_ANY)
+            self._server.socket.setsockopt(
+                socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq
+            )
+            syslog.debug(
+                f"Starting gremlin server listener:  multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ..."
+            )
             self._keep_running = True
             self._running = True
             while self._keep_running:
                 time.sleep(1)
-        except Exception as ex:
+        except Exception:
             pass
 
         self._server.shutdown()
@@ -931,13 +938,12 @@ class RPCGremlin():
         # release any locks on devices
         proxy.reset()
 
-        
     @property
     def running(self):
         return self._running
 
     def start(self):
-        ''' starts the listener '''
+        """starts the listener"""
 
         config = gremlin.config.Configuration()
         if not config.enable_remote_control:
@@ -946,25 +952,27 @@ class RPCGremlin():
         if self._running:
             # already running
             return
-        
+
         # register the devices we will need
-        vjoyid_list = [dev.vjoy_id for dev in gremlin.joystick_handling.joystick_devices() if dev.is_virtual]
+        vjoyid_list = [
+            dev.vjoy_id
+            for dev in gremlin.joystick_handling.joystick_devices()
+            if dev.is_virtual
+        ]
         for key in vjoyid_list:
             try:
-                device = gremlin.joystick_handling.VJoyProxy()[key]
+                gremlin.joystick_handling.VJoyProxy()[key]
                 syslog.debug(f"Remote proxy VJOY [{key}] ok")
             except:
                 pass
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
-        
-
     def stop(self):
-        ''' stops the loop'''
+        """stops the loop"""
         if not self._running:
             return
-        
+
         # stop the server loop
         self._keep_running = False
         if self._thread.is_alive():
@@ -974,63 +982,56 @@ class RPCGremlin():
         syslog.debug("Gremlin RPC server stopped...")
 
 
-
 class RemoteServer(QtCore.QObject):
-    """ Provides access to remote a remote Gremlin instance events """
+    """Provides access to remote a remote Gremlin instance events"""
 
     def __init__(self):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
         self._rpc = None
 
-
     def start(self):
-        ''' start listening '''
+        """start listening"""
         config = gremlin.config.Configuration()
         self._enabled = config.enable_remote_control
         if self._enabled:
             self._rpc = RPCGremlin()
             self._rpc.start()
             syslog.debug("Gremlin RPC server started...")
-        
 
     def stop(self):
-        ''' stop listening'''
+        """stop listening"""
         if self._rpc:
             self._rpc.stop()
 
     @property
     def running(self):
-        ''' true if the server is running'''
+        """true if the server is running"""
         return self._rpc and self._rpc.running
-    
+
     @property
     def enabled(self):
-        ''' true if server is accepting input from clients '''
+        """true if server is accepting input from clients"""
         return remote_state.is_remote
-        
-    
+
     @enabled.setter
     def enabled(self, value):
         self._enabled = value
 
 
-
 @gremlin.singleton_decorator.SingletonDecorator
 class RemoteClient(QtCore.QObject):
-    """ Provides access to a remote Gremlin instance """
+    """Provides access to a remote Gremlin instance"""
 
     class ClientMode(enum.Enum):
         Local = 1
         Remote = 2
         LocalAndRemote = 3
 
-        
-
     def __init__(self):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
-        #self._host = "localhost"
+        # self._host = "localhost"
         config = gremlin.config.Configuration()
         self._port = config.server_port
         self._broadcast_enabled = config.enable_remote_broadcast
@@ -1043,29 +1044,28 @@ class RemoteClient(QtCore.QObject):
         self._started = False
 
         el = gremlin.event_handler.EventListener()
-        el.profile_stop.connect(self.stop) # hook stop event
+        el.profile_stop.connect(self.stop)  # hook stop event
 
     def start(self):
-        ''' creates a multicast client send socket on profile start '''
+        """creates a multicast client send socket on profile start"""
         if not self._started:
             self._started = True
             self.ensure_socket()
             el = gremlin.event_handler.EventListener()
             el.heartbeat.connect(self._alive_ticker)
-            
-
 
     def ensure_socket(self):
         # makes sure the socket exists
         import struct
+
         if not self._sock:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
+            ttl = struct.pack("b", RPCGremlin.MULTICAST_TTL)
             self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
             syslog.debug("Gremlin RPC client started...")
 
     def stop(self):
-        ''' closes the client socket'''
+        """closes the client socket"""
         if self._started:
             el = gremlin.event_handler.EventListener()
             el.heartbeat.disconnect(self._alive_ticker)
@@ -1073,13 +1073,12 @@ class RemoteClient(QtCore.QObject):
             if self._alive_thread:
                 syslog.debug("Alive stop requested...")
 
-    
                 self._alive_thread_stop_requested = True
                 if self._alive_thread.is_alive():
                     self._alive_thread.join()
                 syslog.debug("Alive thread stopped")
                 self._alive_thread = None
-            
+
             if self._sock:
                 self._sock.close()
                 self._sock = None
@@ -1088,30 +1087,32 @@ class RemoteClient(QtCore.QObject):
             self._started = False
 
     def _alive_ticker(self):
-        ''' sends an alive packet to keep the ports alive '''
+        """sends an alive packet to keep the ports alive"""
 
         if self._broadcast_enabled:
-                data = {}
-                data["sender"] = self._id
-                data["action"] = "hb"
-                raw_data = msgpack.packb(data)
-                self._send(raw_data)
-                verbose = gremlin.config.Configuration().verbose
-                if verbose: syslog.info("Alive heartbeat")
-        
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "hb"
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                syslog.info("Alive heartbeat")
 
-    def _send(self, data = None):
-        ''' sends data to the socket'''
+    def _send(self, data=None):
+        """sends data to the socket"""
         if data:
             self.ensure_socket()
             self._sock.sendto(data, self._address)
 
-    def send_button(self, device_id, button_id, is_pressed, force_remote = False):
-        ''' handles a remote joystick event '''
+    def send_button(self, device_id, button_id, is_pressed, force_remote=False):
+        """handles a remote joystick event"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: send button: VJoyId: {device_id} button {button_id} pressed: {is_pressed}")               
+                syslog.info(
+                    f"REMOTE OUTPUT: send button: VJoyId: {device_id} button {button_id} pressed: {is_pressed}"
+                )
             data = {}
             data["sender"] = self._id
             data["action"] = "button"
@@ -1120,14 +1121,16 @@ class RemoteClient(QtCore.QObject):
             data["value"] = is_pressed
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set button: {device_id} {button_id} {is_pressed}")
+            # syslog.debug(f"remote gremlin event set button: {device_id} {button_id} {is_pressed}")
 
-    def toggle_button(self, device_id, button_id, force_remote = False):
-        ''' toggles a button '''
+    def toggle_button(self, device_id, button_id, force_remote=False):
+        """toggles a button"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: toggle button: VJoyId: {device_id} button {button_id}")            
+                syslog.info(
+                    f"REMOTE OUTPUT: toggle button: VJoyId: {device_id} button {button_id}"
+                )
             data = {}
             data["sender"] = self._id
             data["action"] = "toggle"
@@ -1135,14 +1138,18 @@ class RemoteClient(QtCore.QObject):
             data["target"] = button_id
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event toggle button: {device_id} {button_id}")
+            # syslog.debug(f"remote gremlin event toggle button: {device_id} {button_id}")
 
-    def send_axis(self, device_id, axis_id, value, relative_value = None, force_remote = False):
-        ''' handles a remote joystick event '''
+    def send_axis(
+        self, device_id, axis_id, value, relative_value=None, force_remote=False
+    ):
+        """handles a remote joystick event"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: relative axis: VJoyId: {device_id} axis: {axis_id} value: {value:0.3f}")
+                syslog.info(
+                    f"REMOTE OUTPUT: relative axis: VJoyId: {device_id} axis: {axis_id} value: {value:0.3f}"
+                )
             data = {}
             data["sender"] = self._id
             data["action"] = "axis"
@@ -1152,14 +1159,16 @@ class RemoteClient(QtCore.QObject):
             data["relative_value"] = relative_value
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")
+            # syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")
 
-    def send_relative_axis(self, device_id, axis_id, value, force_remote = False):
-        ''' handles a remote relative axis joystick event '''
+    def send_relative_axis(self, device_id, axis_id, value, force_remote=False):
+        """handles a remote relative axis joystick event"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: relative axis: VJoyId: {device_id} axis: {axis_id} value: {value:0.3f}")
+                syslog.info(
+                    f"REMOTE OUTPUT: relative axis: VJoyId: {device_id} axis: {axis_id} value: {value:0.3f}"
+                )
             data = {}
             data["sender"] = self._id
             data["action"] = "relative_axis"
@@ -1169,13 +1178,15 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)
 
-    def send_hat(self, device_id, hat_id, direction, force_remote = False):
-        ''' handles a remote joystick event '''
+    def send_hat(self, device_id, hat_id, direction, force_remote=False):
+        """handles a remote joystick event"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: VJoyId: {device_id} hat: {hat_id} direction: {direction}")
-        
+                syslog.info(
+                    f"REMOTE OUTPUT: VJoyId: {device_id} hat: {hat_id} direction: {direction}"
+                )
+
             data = {}
             data["sender"] = self._id
             data["action"] = "hat"
@@ -1184,16 +1195,16 @@ class RemoteClient(QtCore.QObject):
             data["value"] = direction
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set hat: {device_id} {hat_id} {direction}")
+            # syslog.debug(f"remote gremlin event set hat: {device_id} {hat_id} {direction}")
 
-    def send_key(self, virtual_code, scan_code, flags, force_remote = False):
-        ''' handles a key event '''
+    def send_key(self, virtual_code, scan_code, flags, force_remote=False):
+        """handles a key event"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
                 code = int(scan_code)
                 syslog.info(f"REMOTE OUTPUT: key: 0x{code:02x} flags: 0x{flags:02x}")
-        
+
             data = {}
             data["sender"] = self._id
             data["action"] = "key"
@@ -1202,14 +1213,16 @@ class RemoteClient(QtCore.QObject):
             data["flags"] = flags
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set key: virtual code: {virtual_code} scan code: {scan_code} flags: {flags}")
+            # syslog.debug(f"remote gremlin event set key: virtual code: {virtual_code} scan code: {scan_code} flags: {flags}")
 
-    def send_mouse_button(self, button_id, is_pressed, force_remote = False):
-        ''' sends a mouse button press or release '''
+    def send_mouse_button(self, button_id, is_pressed, force_remote=False):
+        """sends a mouse button press or release"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: mouse button: {button_id} pressed: {is_pressed}")
+                syslog.info(
+                    f"REMOTE OUTPUT: mouse button: {button_id} pressed: {is_pressed}"
+                )
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1218,16 +1231,17 @@ class RemoteClient(QtCore.QObject):
             data["value"] = is_pressed
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set mouse: button: {button_id} pressed: {is_pressed}")
+            # syslog.debug(f"remote gremlin event set mouse: button: {button_id} pressed: {is_pressed}")
 
-
-    def send_mouse_button_double_click(self, button_id, is_pressed, force_remote = False):
-        ''' sends a mouse button press or release '''
+    def send_mouse_button_double_click(self, button_id, is_pressed, force_remote=False):
+        """sends a mouse button press or release"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: mouse dblclick {button_id} pressed: {is_pressed}")
-        
+                syslog.info(
+                    f"REMOTE OUTPUT: mouse dblclick {button_id} pressed: {is_pressed}"
+                )
+
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1236,66 +1250,68 @@ class RemoteClient(QtCore.QObject):
             data["value"] = is_pressed
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set mouse: button: {button_id} pressed: {is_pressed}")            
+            # syslog.debug(f"remote gremlin event set mouse: button: {button_id} pressed: {is_pressed}")
 
-    def send_mouse_wheel(self, direction, force_remote = False):
-        ''' sends mousewheel data  '''
+    def send_mouse_wheel(self, direction, force_remote=False):
+        """sends mousewheel data"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse wheel: {direction}")
-        
+
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
             data["subtype"] = "wheel"
             data["direction"] = direction
-            
+
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
+            # syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
 
-    def send_mouse_h_wheel(self, direction, force_remote = False):
-        ''' sends horizontal mousewheel data  '''
+    def send_mouse_h_wheel(self, direction, force_remote=False):
+        """sends horizontal mousewheel data"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse H wheel: {direction}")
-        
+
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
             data["subtype"] = "hwheel"
             data["direction"] = direction
-            
+
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
+            # syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
 
-    def send_mouse_motion(self, dx, dy, force_remote = False):
-        ''' sends mouse motion data '''
+    def send_mouse_motion(self, dx, dy, force_remote=False):
+        """sends mouse motion data"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse motion: {dx}, {dy}")
-        
+
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
             data["subtype"] = "axis"
             data["dx"] = dx
             data["dy"] = dy
-            
+
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set mouse: axis {dx} {dy}")
+            # syslog.debug(f"remote gremlin event set mouse: axis {dx} {dy}")
 
-    def send_mouse_motion_acceleration(self, a, min_speed, max_speed, time_to_max_speed, force_remote = False):
+    def send_mouse_motion_acceleration(
+        self, a, min_speed, max_speed, time_to_max_speed, force_remote=False
+    ):
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: mouse motion acceleration")
-        
+                syslog.info("REMOTE OUTPUT: mouse motion acceleration")
+
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1307,30 +1323,34 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)
 
-    def send_gamepad_axis(self, index, mode, value, force_remote = False):
-        ''' sends a gamepad axis to the remote client '''
+    def send_gamepad_axis(self, index, mode, value, force_remote=False):
+        """sends a gamepad axis to the remote client"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: gamepad axis: index: {index} mode: {mode} value: {value:0.3f}")
-        
+                syslog.info(
+                    f"REMOTE OUTPUT: gamepad axis: index: {index} mode: {mode} value: {value:0.3f}"
+                )
+
             data = {}
             data["sender"] = self._id
             data["action"] = "gamepad"
             data["subtype"] = "axis"
-            data["index"] = index # which device to send to
+            data["index"] = index  # which device to send to
             data["mode"] = mode
             data["value"] = value
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-    
-    def send_gamepad_button(self, index, mode, is_pressed, force_remote = False):
-        ''' sends a gamepad button to the remote client '''
+
+    def send_gamepad_button(self, index, mode, is_pressed, force_remote=False):
+        """sends a gamepad button to the remote client"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: gamepad: index: {index} mode: {mode} pressed: {is_pressed}")
-            
+                syslog.info(
+                    f"REMOTE OUTPUT: gamepad: index: {index} mode: {mode} pressed: {is_pressed}"
+                )
+
             data = {}
             data["sender"] = self._id
             data["action"] = "gamepad"
@@ -1341,21 +1361,14 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)
 
-
     @property
     def enabled(self):
-        ''' enables or disabled sending remote events'''
+        """enables or disabled sending remote events"""
         return remote_state.is_remote
-    
 
     @property
     def id(self):
         return self._id
-
-    
-
-
-
 
 
 def register_callback(callback, device, input_type, input_id):
@@ -1378,19 +1391,15 @@ def register_callback(callback, device, input_type, input_id):
         Index of the input on which to execute the callback
     """
     event = gremlin.event_handler.Event(
-        event_type=input_type,
-        device_guid=device.device_guid,
-        identifier=input_id
+        event_type=input_type, device_guid=device.device_guid, identifier=input_id
     )
     callback_registry.add(callback, event, device.mode, False)
 
 
 class JoystickWrapper:
-
     """Wraps joysticks and presents an API similar to vjoy."""
 
     class Input:
-
         """Represents a joystick input."""
 
         def __init__(self, joystick_guid, index):
@@ -1403,7 +1412,6 @@ class JoystickWrapper:
             self._index = index
 
     class Axis(Input):
-
         """Represents a single axis of a joystick."""
 
         def __init__(self, joystick_guid, index):
@@ -1416,7 +1424,6 @@ class JoystickWrapper:
             return DILL.get_axis(self._joystick_guid, self._index) / float(32768)
 
     class Button(Input):
-
         """Represents a single button of a joystick."""
 
         def __init__(self, joystick_guid, index):
@@ -1427,7 +1434,6 @@ class JoystickWrapper:
             return DILL.get_button(self._joystick_guid, self._index)
 
     class Hat(Input):
-
         """Represents a single hat of a joystick,"""
 
         def __init__(self, joystick_guid, index):
@@ -1436,13 +1442,14 @@ class JoystickWrapper:
         @property
         def direction(self):
             import vjoy
+
             value = gremlin.joystick_handling.get_hat(self._joystick_guid, self._index)
-            if value in vjoy.vjoy.Hat.to_continuous_position: 
+            if value in vjoy.vjoy.Hat.to_continuous_position:
                 position = vjoy.vjoy.Hat.to_continuous_position[value]
             else:
-                position = (0,0)
+                position = (0, 0)
             return position
-            #return gremlin.util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
+            # return gremlin.util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
 
     def __init__(self, device_guid):
         """Creates a new wrapper object for the given object id.
@@ -1497,7 +1504,7 @@ class JoystickWrapper:
         if index not in self._axis:
             raise error.GremlinError(
                 f"Invalid axis {index} specified for device {self._device_guid}"
-                )
+            )
         return self._axis[index]
 
     def button(self, index):
@@ -1568,9 +1575,11 @@ class JoystickWrapper:
 
         :return list of JoystickWrapper.Button objects
         """
-        buttons = [None,]
+        buttons = [
+            None,
+        ]
         for i in range(self._info.button_count):
-            buttons.append(JoystickWrapper.Button(self._device_guid, i+1))
+            buttons.append(JoystickWrapper.Button(self._device_guid, i + 1))
         return buttons
 
     def _init_hats(self):
@@ -1578,14 +1587,15 @@ class JoystickWrapper:
 
         :return list of JoystickWrapper.Hat objects
         """
-        hats = [None,]
+        hats = [
+            None,
+        ]
         for i in range(self._info.hat_count):
-            hats.append(JoystickWrapper.Hat(self._device_guid, i+1))
+            hats.append(JoystickWrapper.Hat(self._device_guid, i + 1))
         return hats
 
 
 class JoystickProxy:
-
     """Allows read access to joystick state information."""
 
     # Dictionary of initialized joystick devices
@@ -1607,23 +1617,21 @@ class JoystickProxy:
                 joy = JoystickWrapper(device_guid)
                 JoystickProxy.joystick_devices[device_guid] = joy
             else:
-                syslog.warning(f"Requested device with guid {device_guid} not found in current hardware set")
+                syslog.warning(
+                    f"Requested device with guid {device_guid} not found in current hardware set"
+                )
                 return None
-
 
         return JoystickProxy.joystick_devices[device_guid]
 
 
 class VJoyPlugin:
-
     """Plugin providing automatic access to the VJoyProxy object.
 
     For a function to use this plugin it requires one of its parameters
     to be named "vjoy".
     """
 
-
-    
     vjoy = gremlin.joystick_handling.VJoyProxy()
 
     def __init__(self):
@@ -1644,7 +1652,6 @@ class VJoyPlugin:
 
 
 class JoystickPlugin:
-
     """Plugin providing automatic access to the JoystickProxy object.
 
     For a function to use this plugin it requires one of its parameters
@@ -1672,13 +1679,12 @@ class JoystickPlugin:
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Keyboard(QtCore.QObject):
-
     """Provides access to the keyboard state."""
 
     def __init__(self):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
-        self._keyboard_state = {} # holds the state of the keys
+        self._keyboard_state = {}  # holds the state of the keys
 
     @QtCore.Slot(object)
     def keyboard_event(self, event):
@@ -1704,7 +1710,6 @@ class Keyboard(QtCore.QObject):
 
 
 class KeyboardPlugin:
-
     """Plugin providing automatic access to the Keyboard object.
 
     For a function to use this plugin it requires one of its parameters
@@ -1728,7 +1733,6 @@ class KeyboardPlugin:
 
 
 class JoystickDecorator:
-
     """Creates customized decorators for physical joystick devices."""
 
     def __init__(self, name, device_guid, mode):
@@ -1745,33 +1749,27 @@ class JoystickDecorator:
         try:
             self.device_guid = gremlin.profile.parse_guid(device_guid)
         except error.ProfileError:
-            syslog.error(
-                f"Invalid guid value '{device_guid}' received"
-            )
+            syslog.error(f"Invalid guid value '{device_guid}' received")
             self.device_guid = GUID_Invalid
 
-        self.axis = functools.partial(
-            _axis, device_guid=self.device_guid, mode=mode
-        )
+        self.axis = functools.partial(_axis, device_guid=self.device_guid, mode=mode)
         self.button = functools.partial(
             _button, device_guid=self.device_guid, mode=mode
         )
-        self.hat = functools.partial(
-            _hat, device_guid=self.device_guid, mode=mode
-        )
+        self.hat = functools.partial(_hat, device_guid=self.device_guid, mode=mode)
 
 
 class OscDecorator:
-    ''' creates a decorator for OSC inputs '''
-    def __init__(self, mode = "Default"):
+    """creates a decorator for OSC inputs"""
 
+    def __init__(self, mode="Default"):
         self.mode = mode
-        self.message = functools.partial(_osc, mode = mode)
+        self.message = functools.partial(_osc, mode=mode)
 
 
-def _osc(message, mode = "Default", always_execute=False):
-    ''' decorator for osc callbacks '''
-    
+def _osc(message, mode="Default", always_execute=False):
+    """decorator for osc callbacks"""
+
     def wrap(callback):
         import gremlin.ui.osc_device
         import gremlin.input_types
@@ -1788,11 +1786,11 @@ def _osc(message, mode = "Default", always_execute=False):
         input_item.source_index = 0
 
         event = gremlin.event_handler.Event(
-            event_type = gremlin.input_types.InputType.OpenSoundControl,
-            device_guid = gremlin.shared_state.osc_tab_guid,
-            identifier = input_item
-            )
-        
+            event_type=gremlin.input_types.InputType.OpenSoundControl,
+            device_guid=gremlin.shared_state.osc_tab_guid,
+            identifier=input_item,
+        )
+
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
         return wrapper_fn
@@ -1800,18 +1798,11 @@ def _osc(message, mode = "Default", always_execute=False):
     return wrap
 
 
-
-
-
-
-ButtonReleaseEntry = collections.namedtuple(
-    "Entry", ["callback", "event", "mode"]
-)
+ButtonReleaseEntry = collections.namedtuple("Entry", ["callback", "event", "mode"])
 
 
 @gremlin.singleton_decorator.SingletonDecorator
 class ButtonReleaseActions(QtCore.QObject):
-
     """Ensures a desired action is run when a button is released."""
 
     def __init__(self):
@@ -1819,7 +1810,7 @@ class ButtonReleaseActions(QtCore.QObject):
         QtCore.QObject.__init__(self)
 
         self._registry = {}
-        #self._registry_key_map = {} # map of event callback keys to the events
+        # self._registry_key_map = {} # map of event callback keys to the events
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._input_event_cb)
         el.keyboard_event.connect(self._input_event_cb)
@@ -1828,11 +1819,7 @@ class ButtonReleaseActions(QtCore.QObject):
 
         el.runtime_mode_changed.connect(self._mode_changed_cb)
 
-    def register_callback(
-        self,
-        callback: Callable[[], None],
-        physical_event
-    ) -> None:
+    def register_callback(self, callback: Callable[[], None], physical_event) -> None:
         """Registers a callback with the system.
 
         Args:
@@ -1850,19 +1837,16 @@ class ButtonReleaseActions(QtCore.QObject):
             self._registry[key] = []
         # Do not record the mode since we may want to run the release action
         # independent of a mode
-        self._registry[key].append(
-            ButtonReleaseEntry(callback, release_evt, None)
-        )
+        self._registry[key].append(ButtonReleaseEntry(callback, release_evt, None))
 
     def register_button_release(
         self,
         vjoy_input: int,
         physical_event,
         activate_on: bool = False,
-        is_local = True,
-        is_remote = False,
-        force_remote = False,
-        
+        is_local=True,
+        is_remote=False,
+        force_remote=False,
     ):
         """Registers a physical and vjoy button pair for tracking.
 
@@ -1882,19 +1866,28 @@ class ButtonReleaseActions(QtCore.QObject):
 
         key = release_evt.callbackKey
         verbose = gremlin.config.Configuration().verbose_mode_outputs
-        if verbose: syslog.info(f"AUTORELEASE: register autorelease key: {key} event: {str(release_evt)}")
+        if verbose:
+            syslog.info(
+                f"AUTORELEASE: register autorelease key: {key} event: {str(release_evt)}"
+            )
         if release_evt not in self._registry:
             self._registry[key] = []
-            #self._registry_key_map[key] = release_evt
+            # self._registry_key_map[key] = release_evt
 
         # Record current mode so we only release if we've changed mode
-        self._registry[key].append(ButtonReleaseEntry(
-            lambda: self._release_callback_prototype(vjoy_input, is_local, is_remote, force_remote),
-            release_evt,
-            self._current_mode
-        ))
+        self._registry[key].append(
+            ButtonReleaseEntry(
+                lambda: self._release_callback_prototype(
+                    vjoy_input, is_local, is_remote, force_remote
+                ),
+                release_evt,
+                self._current_mode,
+            )
+        )
 
-    def _release_callback_prototype(self, vjoy_input: int, is_local = False, is_remote = False, force_remote = False) -> None:
+    def _release_callback_prototype(
+        self, vjoy_input: int, is_local=False, is_remote=False, force_remote=False
+    ) -> None:
         """Prototype of a button release callback, used with lambdas.
 
         Args:
@@ -1906,14 +1899,16 @@ class ButtonReleaseActions(QtCore.QObject):
         if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
             if is_local:
                 vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
-                
+
             if is_remote or force_remote:
-                remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote = force_remote )
-            
+                remote_client.send_button(
+                    vjoy_input[0], vjoy_input[1], False, force_remote=force_remote
+                )
+
         else:
             syslog.warning(
-                f"Attempted to use non existent button: " +
-                f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
+                "Attempted to use non existent button: "
+                + f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
             )
 
     def _input_event_cb(self, event):
@@ -1922,19 +1917,18 @@ class ButtonReleaseActions(QtCore.QObject):
         Args:
             event: the event to process
         """
-        
+
         verbose = gremlin.config.Configuration().verbose_mode_outputs
 
         key = event.callbackKey
-        
+
         if key in self._registry:
-            if verbose: syslog.info(f"AUTORELEASE: execute trigger : {key}")
+            if verbose:
+                syslog.info(f"AUTORELEASE: execute trigger : {key}")
             new_list = []
             for entry in self._registry[key]:
-
                 if entry.event.is_pressed == event.is_pressed:
                     try:
-                        
                         entry.callback()
                     except:
                         pass
@@ -1952,15 +1946,13 @@ class ButtonReleaseActions(QtCore.QObject):
 
 @gremlin.singleton_decorator.SingletonDecorator
 class JoystickInputSignificant:
-
     """Checks whether or not joystick inputs are significant."""
 
     def __init__(self):
         """Initializes the instance."""
         self.reset()
 
-   
-    def should_process(self, event, deviation = 0.1) -> bool:
+    def should_process(self, event, deviation=0.1) -> bool:
         """Returns whether or not a particular event is significant enough to
         process.
 
@@ -1971,6 +1963,7 @@ class JoystickInputSignificant:
             True if the event should be processed, False otherwise
         """
         from gremlin.input_types import InputType
+
         self._mre_registry[event.callbackKey] = event
 
         match event.event_type:
@@ -2007,12 +2000,11 @@ class JoystickInputSignificant:
         self._event_registry = {}
         self._mre_registry = {}
         self._time_registry = {}
-        
 
-    def should_process_axis(self, event, deviation = 0.1) -> bool:
+    def should_process_axis(self, event, deviation=0.1) -> bool:
         return self._process_axis(event, deviation)
 
-    def _process_axis(self, event, deviation = 0.1) -> bool:
+    def _process_axis(self, event, deviation=0.1) -> bool:
         """Process an axis event.
 
         Args:
@@ -2031,14 +2023,14 @@ class JoystickInputSignificant:
             # Update state
             else:
                 self._time_registry[key] = time.time()
-                
+
                 if abs(self._event_registry[key].value - event.value) > deviation:
                     self._event_registry[key] = event
                     self._time_registry[key] = time.time()
-                    #print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} TRUE")
+                    # print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} TRUE")
                     return True
                 else:
-                    #print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} FALSE")
+                    # print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} FALSE")
                     return False
         else:
             self._event_registry[key] = event
@@ -2079,7 +2071,6 @@ def _button(button_id, device_guid, mode, always_execute=False):
     """
 
     def wrap(callback):
-
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
@@ -2087,7 +2078,7 @@ def _button(button_id, device_guid, mode, always_execute=False):
         event = gremlin.event_handler.Event(
             event_type=gremlin.input_types.InputType.JoystickButton,
             device_guid=device_guid,
-            identifier=button_id
+            identifier=button_id,
         )
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
@@ -2107,7 +2098,6 @@ def _hat(hat_id, device_guid, mode, always_execute=False):
     """
 
     def wrap(callback):
-
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
@@ -2115,7 +2105,7 @@ def _hat(hat_id, device_guid, mode, always_execute=False):
         event = gremlin.event_handler.Event(
             event_type=gremlin.input_types.InputType.JoystickHat,
             device_guid=device_guid,
-            identifier=hat_id
+            identifier=hat_id,
         )
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
@@ -2135,7 +2125,6 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
     """
 
     def wrap(callback):
-
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
@@ -2143,7 +2132,7 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
         event = gremlin.event_handler.Event(
             event_type=gremlin.input_types.InputType.JoystickAxis,
             device_guid=device_guid,
-            identifier=axis_id
+            identifier=axis_id,
         )
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
@@ -2152,7 +2141,9 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
     return wrap
 
 
-''' KEYBOARD DECORATOR '''
+""" KEYBOARD DECORATOR """
+
+
 def keyboard(key_name, mode, always_execute=False):
     """Decorator for keyboard key callbacks.
 
@@ -2163,7 +2154,6 @@ def keyboard(key_name, mode, always_execute=False):
     """
 
     def wrap(callback):
-
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
@@ -2177,10 +2167,9 @@ def keyboard(key_name, mode, always_execute=False):
     return wrap
 
 
+""" PERIODIC DECORATOR """
 
 
-
-''' PERIODIC DECORATOR '''
 def periodic(interval):
     """Decorator for periodic function callbacks.
 
@@ -2188,7 +2177,6 @@ def periodic(interval):
     """
 
     def wrap(callback):
-
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
@@ -2200,27 +2188,32 @@ def periodic(interval):
     return wrap
 
 
+""" PROFILE START DECORATOR """
 
-''' PROFILE START DECORATOR '''
+
 def gremlin_start():
-    ''' decorator when a profile is activated '''
-    def wrap(callback):
+    """decorator when a profile is activated"""
 
+    def wrap(callback):
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
-        vjoy = gremlin.joystick_handling.VJoyProxy()
+
+        gremlin.joystick_handling.VJoyProxy()
         start_registry.add(wrapper_fn)
 
         return wrapper_fn
 
     return wrap
 
-''' PROFILE STOP DECORATOR '''
-def gremlin_stop():
-    ''' decorator when a profile is de-activated '''
-    def wrap(callback):
 
+""" PROFILE STOP DECORATOR """
+
+
+def gremlin_stop():
+    """decorator when a profile is de-activated"""
+
+    def wrap(callback):
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
@@ -2231,9 +2224,13 @@ def gremlin_stop():
 
     return wrap
 
-''' PROFILE MODE DECORATOR'''
+
+""" PROFILE MODE DECORATOR"""
+
+
 def gremlin_mode():
-    ''' decorator when gremlin changes profile modes - passes the new mode to the plugin '''
+    """decorator when gremlin changes profile modes - passes the new mode to the plugin"""
+
     def wrap(callback):
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
@@ -2245,9 +2242,13 @@ def gremlin_mode():
 
     return wrap
 
-''' STATE DECORATOR '''
+
+""" STATE DECORATOR """
+
+
 def gremlin_state():
-    ''' decorator when gremlin changes states local or remote or both '''
+    """decorator when gremlin changes states local or remote or both"""
+
     def wrap(callback):
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
@@ -2258,9 +2259,6 @@ def gremlin_state():
         return wrapper_fn
 
     return wrap
-
-
-
 
 
 def squash(value, func):
@@ -2298,7 +2296,6 @@ def deadzone(value, low, low_center, high_center, high):
         high_center = 0.0
     if high is None:
         high = 1.0
-        
 
     if value >= 0:
         return min(1, max(0, (value - high_center) / abs(high - high_center)))
@@ -2325,19 +2322,14 @@ def format_input(event) -> str:
     # Retrieve device name
     label = ""
     if device is None:
-        logging.warning(
-            f"Unable to find a device with GUID {str(event.device_guid)}"
-        )
+        logging.warning(f"Unable to find a device with GUID {str(event.device_guid)}")
         label = "Unknown"
     else:
         label = device.name
 
     # Retrive input name
     label += " - "
-    label += gremlin.common.input_to_ui_string(
-        event.event_type,
-        event.identifier
-    )
+    label += gremlin.common.input_to_ui_string(event.event_type, event.identifier)
 
     return label
 
@@ -2368,5 +2360,3 @@ remote_server = RemoteServer()
 
 # Global remote client = sends events to server
 remote_client = RemoteClient()
-
-

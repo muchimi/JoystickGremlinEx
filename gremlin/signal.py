@@ -19,12 +19,11 @@
 from PySide6 import QtCore
 from PySide6.QtCore import Signal
 
-from gremlin import common
 from gremlin.singleton_decorator import SingletonDecorator
+
 
 @SingletonDecorator
 class Signal(QtCore.QObject):
-
     reloadUi = Signal()
 
 

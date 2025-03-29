@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,7 +42,6 @@ syslog = logging.getLogger("system")
 
 
 class SequenceContainerWidget(AbstractContainerWidget):
-
     """Container which holds a sequence of actions."""
 
     def __init__(self, profile_data, parent=None):
@@ -59,8 +58,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self.profile_data.create_or_delete_virtual_button()
         self.action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type(),
-            self.profile_data
+            self.profile_data.get_input_type(), self.profile_data
         )
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.add_button.setText("Add Step")
@@ -69,7 +67,9 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.widget_layout.addWidget(self.action_selector)
 
         self._trigger_on_release_widget = QtWidgets.QCheckBox("Trigger on release")
-        self._trigger_on_release_widget.setToolTip("Triggers the sequence on input release instead of input press")
+        self._trigger_on_release_widget.setToolTip(
+            "Triggers the sequence on input release instead of input press"
+        )
         self._trigger_on_release_widget.setChecked(self.profile_data.trigger_on_release)
         self._trigger_on_release_widget.clicked.connect(self._trigger_mode_changed)
 
@@ -83,7 +83,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[i],
                 f"Step {i + 1}",
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
             self.action_layout.addWidget(widget)
             widget.redraw()
@@ -99,7 +99,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
                 widget = self._create_action_set_widget(
                     self.profile_data.action_sets[i],
                     f"Step {i:d}",
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions,
                 )
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
@@ -116,13 +116,11 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.container_modified.emit()
 
     def _paste_action(self, action):
-        ''' pastes an action '''
+        """pastes an action"""
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
-
-    
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -143,16 +141,22 @@ class SequenceContainerWidget(AbstractContainerWidget):
         # Perform action
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Up:
             if index > 0:
-                self.profile_data.action_sets[index],\
-                    self.profile_data.action_sets[index-1] = \
-                    self.profile_data.action_sets[index-1],\
-                    self.profile_data.action_sets[index]
+                (
+                    self.profile_data.action_sets[index],
+                    self.profile_data.action_sets[index - 1],
+                ) = (
+                    self.profile_data.action_sets[index - 1],
+                    self.profile_data.action_sets[index],
+                )
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Down:
             if index < len(self.profile_data.action_sets) - 1:
-                self.profile_data.action_sets[index], \
-                    self.profile_data.action_sets[index + 1] = \
-                    self.profile_data.action_sets[index + 1], \
-                    self.profile_data.action_sets[index]
+                (
+                    self.profile_data.action_sets[index],
+                    self.profile_data.action_sets[index + 1],
+                ) = (
+                    self.profile_data.action_sets[index + 1],
+                    self.profile_data.action_sets[index],
+                )
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
             del self.profile_data.action_sets[index]
 
@@ -167,18 +171,17 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
 
 class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
-
-    def __init__(self, container : SequenceContainer, parent = None):
+    def __init__(self, container: SequenceContainer, parent=None):
         super().__init__(container, parent)
         self.action_sets = []
         self.container = container
-        self.graph_map = {} # holds index to graph
-        self.index_map = {} # holds graph to index
+        self.graph_map = {}  # holds index to graph
+        self.index_map = {}  # holds graph to index
         self._macro_id = None
         index = 0
         for action_set in container.action_sets:
             graph = gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-            self.action_sets.append(graph)        
+            self.action_sets.append(graph)
             self.graph_map[index] = graph
             self.index_map[graph] = index
 
@@ -195,54 +198,53 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
-
         eh = gremlin.event_handler.EventListener()
         eh.macro_step_completed.connect(self._macro_completed)
 
     def profile_start(self):
-        ''' occurs at profile start '''
+        """occurs at profile start"""
         self.index = 0
         self._event = None
         self._value = None
         self._macro_id = None
 
-
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
+    def process_event(
+        self,
+        event: gremlin.event_handler.Event,
+        value: gremlin.actions.Value,
+        extra_data=None,
+    ):
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose
 
         if self._macro_id is not None:
             # ignore events while the sequence is still running
             return True
-        
-        auto_release = False
 
 
         if event.event_type == InputType.JoystickHat:
-            is_pressed = value.current != (0,0)
+            is_pressed = value.current != (0, 0)
         elif not isinstance(value.current, bool):
-            syslog.warning(f"Invalid data type received in Sequence container: {type(event.value)}")
+            syslog.warning(
+                f"Invalid data type received in Sequence container: {type(event.value)}"
+            )
             return False
         else:
             is_pressed = value.current
 
-        
         if self.container.trigger_on_release:
             if is_pressed:
-                # ignore pressed event if we're triggering on input release 
-                if verbose: syslog.info(f"SEQUENCE: execute - ignore pressed event")
+                # ignore pressed event if we're triggering on input release
+                if verbose:
+                    syslog.info("SEQUENCE: execute - ignore pressed event")
                 return True
-            is_pressed = True # flip it for containers
-            auto_release = True
+            is_pressed = True  # flip it for containers
             value.is_pressed = is_pressed
             value.current = is_pressed
             event.is_pressed = is_pressed
             event.raw_value = is_pressed
 
-        
-        self._macro_id = 0 
-       
-
+        self._macro_id = 0
 
         count = len(self.action_sets)
 
@@ -255,36 +257,36 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             action.data = f"Step {index + 1}"
             macro.add_action(action)
 
-            
         # queue the work up
         mgr.queue_macro(macro)
-        if verbose: syslog.info(f"SEQUENCE: execute graph sequence - id {self._macro_id}")
-        
+        if verbose:
+            syslog.info(f"SEQUENCE: execute graph sequence - id {self._macro_id}")
+
         return True
-    
+
     @QtCore.Slot(int)
-    def _macro_completed(self, id : int):
-        ''' occurs when a macro completes - the id is the id of the macro completed '''
-        
+    def _macro_completed(self, id: int):
+        """occurs when a macro completes - the id is the id of the macro completed"""
+
         if self._macro_id is not None and id == self._macro_id:
             syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose
-            if verbose: syslog.info(f"SEQUENCE: completed graph sequence - id {self._macro_id}")
+            if verbose:
+                syslog.info(f"SEQUENCE: completed graph sequence - id {self._macro_id}")
             self._macro_id = None
 
 
 class SequenceContainer(AbstractContainer):
-
     """Represents a container which holds sequential actions.
 
     The actions will trigger one after the other with subsequent activations.
-    
+
     """
 
     name = "Sequence"
     tag = "sequence"
 
-    #override default allowed inputs here
+    # override default allowed inputs here
     input_types = [
         InputType.JoystickButton,
         InputType.JoystickHat,
@@ -292,7 +294,7 @@ class SequenceContainer(AbstractContainer):
         InputType.KeyboardLatched,
         InputType.OpenSoundControl,
         InputType.Midi,
-        InputType.Mouse
+        InputType.Mouse,
     ]
     interaction_types = [
         gremlin.ui.input_item.ActionSetView.Interactions.Up,
@@ -303,22 +305,21 @@ class SequenceContainer(AbstractContainer):
     functor = SequenceContainerFunctor
     widget = SequenceContainerWidget
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.trigger_on_release = False # true if the sequence triggers on input release instead of input press
-        
+        self.trigger_on_release = False  # true if the sequence triggers on input release instead of input press
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
         if "trigger_on_release" in node.attrib:
-            self.trigger_on_release = safe_read(node,"trigger_on_release",bool,False)
+            self.trigger_on_release = safe_read(node, "trigger_on_release", bool, False)
             # action sets are read by the parent
 
     def _generate_xml(self):
@@ -328,7 +329,7 @@ class SequenceContainer(AbstractContainer):
         """
         node = ElementTree.Element("container")
         node.set("type", SequenceContainer.tag)
-        node.set("trigger_on_release",safe_format(self.trigger_on_release,bool))
+        node.set("trigger_on_release", safe_format(self.trigger_on_release, bool))
         for actions in self.action_sets:
             as_node = ElementTree.Element("action-set")
             for action in actions:
@@ -342,7 +343,7 @@ class SequenceContainer(AbstractContainer):
         :return True if the container is configured properly, False otherwise
         """
         return True
-        #return len(self.action_sets) > 0
+        # return len(self.action_sets) > 0
 
 
 # Plugin definitions

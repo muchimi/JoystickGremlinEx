@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,38 +16,35 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from abc import abstractmethod, ABCMeta
-import codecs
-import collections
 import copy
 import logging
 import os
 import shutil
 import uuid
-#from xml.dom import minidom
+
+# from xml.dom import minidom
 from lxml import etree as ElementTree
 import gremlin.base_classes
 import gremlin.base_profile
 
-from PySide6 import QtCore
 
 import dinput
 import gremlin.config
 import gremlin.shared_state
 import gremlin.actions
 from gremlin.util import *
-from gremlin.input_types import InputType
 from . import error, joystick_handling
 
 syslog = logging.getLogger("system")
 
-def mode_list(profile = None):
+
+def mode_list(profile=None):
     """Returns a list of all modes based on the given node.
 
     :param node a node from a profile tree
-    :return list of modes in the profile 
+    :return list of modes in the profile
     """
-    profile : gremlin.base_profile.Profile
+    profile: gremlin.base_profile.Profile
     if not profile:
         profile = gremlin.shared_state.current_profile
     if profile:
@@ -56,9 +53,7 @@ def mode_list(profile = None):
     return []
 
 
-
 class ProfileConverter:
-
     """Handle converting and checking profiles."""
 
     # Current profile version number
@@ -74,15 +69,15 @@ class ProfileConverter:
         """
         if not os.path.isfile(fname):
             return True
-        
+
         tree = ElementTree.parse(fname)
         root = tree.getroot()
 
         version = self._determine_version(root)
-        return version == ProfileConverter.current_version # or version == 9
-    
+        return version == ProfileConverter.current_version  # or version == 9
+
     def convert_to_ex(self, fname):
-        ''' applies the options and converts the profile '''
+        """applies the options and converts the profile"""
         import gremlin.util
 
         try:
@@ -91,7 +86,7 @@ class ProfileConverter:
 
             new_root = self._convert_to_ex(root, fname)
             tree = ElementTree.tostring(new_root)
-            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
         except:
             gremlin.util.m
 
@@ -117,7 +112,7 @@ class ProfileConverter:
             6: self._convert_from_v6,
             7: self._convert_from_v7,
             8: self._convert_from_v8,
-            9: None
+            9: None,
         }
 
         # Create a backup of the outdated profile
@@ -130,23 +125,27 @@ class ProfileConverter:
         while old_version < ProfileConverter.current_version:
             if old_version in conversion_map:
                 convert = conversion_map[old_version]
-                if convert:                
+                if convert:
                     if new_root is None:
                         new_root = convert(root, fname=fname)
                     else:
                         new_root = convert(new_root, fname=fname)
                     converted = True
                 old_version += 1
-                    
+
             else:
                 # syslog = logging.getLogger("system")
-                syslog.warning(f"Unexpected version: {old_version} found in profile.  Some unsupported features may not have loaded correctly.")
+                syslog.warning(
+                    f"Unexpected version: {old_version} found in profile.  Some unsupported features may not have loaded correctly."
+                )
 
         if converted:
             if new_root is not None:
                 # Save converted version
                 tree = ElementTree.tostring(new_root)
-                tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+                tree.write(
+                    fname, pretty_print=True, xml_declaration=True, encoding="utf-8"
+                )
             else:
                 raise error.ProfileError("Failed to convert profile")
 
@@ -161,9 +160,7 @@ class ProfileConverter:
         elif root.tag == "profile":
             return int(root.get("version"))
         else:
-            raise error.ProfileError(
-                "Invalid profile version encountered"
-            )
+            raise error.ProfileError("Invalid profile version encountered")
 
     def _convert_from_v1(self, root, fname=None):
         """Converts v1 profiles to v2 profiles.
@@ -178,8 +175,7 @@ class ProfileConverter:
         devices = ElementTree.Element("devices")
         for node in root.iter("device"):
             # Modify each node to include the correct type attribute
-            if node.get("name") == "keyboard" and \
-                    int(node.get("windows_id")) == 0:
+            if node.get("name") == "keyboard" and int(node.get("windows_id")) == 0:
                 node.set("type", "keyboard")
             else:
                 node.set("type", "joystick")
@@ -219,14 +215,14 @@ class ProfileConverter:
 
     def _convert_from_v3(self, root, fname=None):
         """Converts v3 profiles to v4 profiles.
-        
+
         The following operations are performed in this conversion:
         - embed all actions in individual BasicContainer containers
         - remove button and keyboard conditions
         - move hat and axis condition from actions to containers
         - replace double macros for keyboard remaps with the new map to
           keyboard action
-        
+
         :param root the v3 profile
         :return v4 representation of the profile
         """
@@ -234,7 +230,6 @@ class ProfileConverter:
         new_root.set("version", "4")
         for mode in new_root.iter("mode"):
             for input_item in mode:
-
                 # Check if macros are used to create what is now a
                 # "map to keyboard" action
                 press_and_release = [False, False]
@@ -243,11 +238,13 @@ class ProfileConverter:
                     if input_item.tag == "button":
                         if action.tag == "macro":
                             if "on-press" in action.keys():
-                                press_and_release[0] = press_and_release[0] or \
-                                    parse_bool(action.get("on-press"))
+                                press_and_release[0] = press_and_release[
+                                    0
+                                ] or parse_bool(action.get("on-press"))
                             if "on-release" in action.keys():
-                                press_and_release[1] = press_and_release[1] or \
-                                    parse_bool(action.get("on-release"))
+                                press_and_release[1] = press_and_release[
+                                    1
+                                ] or parse_bool(action.get("on-release"))
 
                 # If this widget is purely a map to keyboard action then
                 # replace the two macro widgets with a single one
@@ -255,9 +252,7 @@ class ProfileConverter:
                     container = ElementTree.Element("container")
                     container.set("type", "basic")
 
-                    container.append(
-                        self._p3_extract_map_to_keyboard(input_item)
-                    )
+                    container.append(self._p3_extract_map_to_keyboard(input_item))
                     for action in input_item[:]:
                         input_item.remove(action)
                     input_item.append(container)
@@ -277,8 +272,7 @@ class ProfileConverter:
                         if input_item.tag == "axis":
                             copy_condition = False
                             if action.tag == "remap":
-                                if "button" in action.keys() or \
-                                        "hat" in action.keys():
+                                if "button" in action.keys() or "hat" in action.keys():
                                     copy_condition = True
                             elif gremlin.base_profile._is_curve_tag(action.tag):
                                 pass
@@ -311,7 +305,7 @@ class ProfileConverter:
                                     ("on-s", "south"),
                                     ("on-sw", "south-west"),
                                     ("on-w", "west"),
-                                    ("on-nw", "north-west")
+                                    ("on-nw", "north-west"),
                                 ]
                                 for names in keys:
                                     if action.get(names[0]) == "True":
@@ -391,11 +385,12 @@ class ProfileConverter:
         """
         new_root = copy.deepcopy(root)
         new_root.set("version", "6")
-        search_list = [".[@type='basic']//remap[@axis]",
-                       ".[@type='basic']//response-curve",
-                       ".[@type='basic']//response-curve-ex",
-                       ".[@type='basic']//curve-data"
-                       ]
+        search_list = [
+            ".[@type='basic']//remap[@axis]",
+            ".[@type='basic']//response-curve",
+            ".[@type='basic']//response-curve-ex",
+            ".[@type='basic']//curve-data",
+        ]
         for axis in new_root.iter("axis"):
             has_remap = False
             has_curve = False
@@ -444,7 +439,9 @@ class ProfileConverter:
 
         root.attrib["version"] = "7"
         for module in root.findall("import/module"):
-            module.attrib["name"] = os.path.normpath(f"{base_path}\\{module.attrib["name"]}.py")
+            module.attrib["name"] = os.path.normpath(
+                f"{base_path}\\{module.attrib["name"]}.py"
+            )
 
         return root
 
@@ -479,9 +476,9 @@ class ProfileConverter:
             node.set("motion_input", "True")
 
         return root
-    
-    def _convert_to_ex(self, root, fname = None):
-        ''' converts to the EX version '''
+
+    def _convert_to_ex(self, root, fname=None):
+        """converts to the EX version"""
 
         root.attrib["version"] = "100"
         # syslog = logging.getLogger("system")
@@ -490,16 +487,15 @@ class ProfileConverter:
         convert_response_curve = config.convert_response_curve
         convert_vjoy_remap = config.convert_vjoy_remap
 
-
         # convert all response-curve to response-curve EX
-        if convert_response_curve:        
+        if convert_response_curve:
             nodes = root.xpath("//response-curve")
             nodes.extend(root.xpath("//curve-data"))
             for node in nodes:
                 node.tag = "response-curve-ex"
 
         # convert all remap to vjoy remap if configured in options
-        
+
         if convert_vjoy_remap:
             nodes = root.xpath("//remap")
             for node in nodes:
@@ -507,8 +503,8 @@ class ProfileConverter:
 
         return root
 
-    def _convert_from_noop(self, root, fname = None):
-        ''' no op conversion '''
+    def _convert_from_noop(self, root, fname=None):
+        """no op conversion"""
         pass
 
     def _convert_from_v8(self, root, fname=None):
@@ -568,7 +564,6 @@ class ProfileConverter:
         # syslog = logging.getLogger("system")
 
         class GUIDConverter:
-
             """Simplifies conversion from old device identifiers to the new
             GUID ones."""
 
@@ -642,15 +637,11 @@ class ProfileConverter:
                 try:
                     vjoy_id = int(vjoy_id)
                 except (ValueError, TypeError):
-                    syslog.warn(
-                        f"Cannot convert {vjoy_id} into a valid vjoy id"
-                    )
+                    syslog.warn(f"Cannot convert {vjoy_id} into a valid vjoy id")
                     return f"{{{uuid.uuid4()}}}"
 
                 if vjoy_id not in self.vjoy_to_guid:
-                    syslog.warn(
-                        f"GUID for vjoy {vjoy_id} is unknown"
-                    )
+                    syslog.warn(f"GUID for vjoy {vjoy_id} is unknown")
                     self.vjoy_to_guid[vjoy_id] = f"{{{uuid.uuid4()}}}"
 
                 return self.vjoy_to_guid[vjoy_id]
@@ -665,9 +656,8 @@ class ProfileConverter:
                 entry.set(
                     "device-guid",
                     uuid_converter.lookup(
-                        entry.attrib.get("id", None),
-                        entry.attrib.get("name", "")
-                    )
+                        entry.attrib.get("id", None), entry.attrib.get("name", "")
+                    ),
                 )
 
             # Remove the now obsolete id and windows id attributes
@@ -677,17 +667,17 @@ class ProfileConverter:
             for child in entry.findall("mode/axis"):
                 child.set(
                     "id",
-                    str(uuid_converter.axis_lookup(
-                        entry.attrib["device-guid"],
-                        int(child.attrib["id"])-1
-                    ))
+                    str(
+                        uuid_converter.axis_lookup(
+                            entry.attrib["device-guid"], int(child.attrib["id"]) - 1
+                        )
+                    ),
                 )
 
         for entry in root.findall("vjoy-devices/vjoy-device"):
             entry.set("vjoy-id", entry.attrib["id"])
             entry.set(
-                "device-guid",
-                uuid_converter.vjoy_lookup(int(entry.attrib["id"]))
+                "device-guid", uuid_converter.vjoy_lookup(int(entry.attrib["id"]))
             )
             del entry.attrib["id"]
             del entry.attrib["windows_id"]
@@ -697,7 +687,7 @@ class ProfileConverter:
                 ("scan_code", "scan-code"),
                 ("range_low", "range-low"),
                 ("range_high", "range-high"),
-                ("device_name", "device-name")
+                ("device_name", "device-name"),
             ]
             for rep in replacements:
                 if rep[0] in entry.keys():
@@ -706,7 +696,7 @@ class ProfileConverter:
             if "device_id" in entry.keys():
                 entry.set(
                     "device-guid",
-                    uuid_converter.lookup(entry.attrib.get("device_id", None))
+                    uuid_converter.lookup(entry.attrib.get("device_id", None)),
                 )
                 del entry.attrib["device_id"]
                 del entry.attrib["windows_id"]
@@ -720,7 +710,7 @@ class ProfileConverter:
         for entry in root.findall(".//macro/actions/joystick"):
             entry.set(
                 "device-guid",
-                uuid_converter.lookup(entry.attrib.get("device_id", None))
+                uuid_converter.lookup(entry.attrib.get("device_id", None)),
             )
             entry.set("input-type", entry.attrib["input_type"])
             entry.set("input-id", entry.attrib["input_id"])
@@ -748,8 +738,7 @@ class ProfileConverter:
 
         for entry in root.findall(".//merge-axis/lower"):
             entry.set(
-                "device-guid",
-                uuid_converter.lookup(entry.attrib.get("id", None))
+                "device-guid", uuid_converter.lookup(entry.attrib.get("id", None))
             )
             entry.set("axis-id", entry.attrib["axis"])
             del entry.attrib["id"]
@@ -758,8 +747,7 @@ class ProfileConverter:
 
         for entry in root.findall(".//merge-axis/upper"):
             entry.set(
-                "device-guid",
-                uuid_converter.lookup(entry.attrib.get("id", None))
+                "device-guid", uuid_converter.lookup(entry.attrib.get("id", None))
             )
             entry.set("axis-id", entry.attrib["axis"])
             del entry.attrib["id"]
@@ -830,7 +818,6 @@ class ProfileConverter:
 
 
 class ProfileModifier:
-
     """Modifies profile contents and provides overview information."""
 
     def __init__(self, profile):
@@ -845,7 +832,7 @@ class ProfileModifier:
 
         :return list of devices used in the profile and information about them
         """
-        from gremlin.base_classes import JoystickCondition
+
         device_guids = []
         device_names = {}
         for guid, dev in self.profile.devices.items():
@@ -861,13 +848,15 @@ class ProfileModifier:
 
         device_info = []
         for device_guid in set(device_guids):
-            device_info.append(gremlin.base_profile.ProfileDeviceInformation(
-                device_guid,
-                device_names.get(device_guid, "Unknown"),
-                self.container_count(device_guid),
-                self.condition_count(device_guid),
-                self.merge_axis_count(device_guid)
-            ))
+            device_info.append(
+                gremlin.base_profile.ProfileDeviceInformation(
+                    device_guid,
+                    device_names.get(device_guid, "Unknown"),
+                    self.container_count(device_guid),
+                    self.condition_count(device_guid),
+                    self.merge_axis_count(device_guid),
+                )
+            )
 
         return device_info
 
@@ -893,10 +882,10 @@ class ProfileModifier:
         :return number of conditions associated with the given device
         """
         from gremlin.base_conditions import JoystickCondition
+
         count = 0
         for cond in self.all_conditions():
-            if isinstance(cond, JoystickCondition) and \
-                    cond.device_guid == device_guid:
+            if isinstance(cond, JoystickCondition) and cond.device_guid == device_guid:
                 count += 1
         return count
 
@@ -924,9 +913,7 @@ class ProfileModifier:
         """
 
         if source_guid == target_guid:
-            syslog.warning(
-                "Swap devices: Source and target device are identical"
-            )
+            syslog.warning("Swap devices: Source and target device are identical")
             return
 
         self.change_device_actions(source_guid, target_guid)
@@ -944,9 +931,7 @@ class ProfileModifier:
 
         # Can't move anything from a non-existent source device
         if source_dev is None:
-            syslog.warning(
-                "Swap devices: Specified a source device that doesn't exist"
-            )
+            syslog.warning("Swap devices: Specified a source device that doesn't exist")
             return
 
         # Retrieve target device information structure to get its name and
@@ -961,9 +946,7 @@ class ProfileModifier:
         # copying and deleting things.
         if target_dev is None:
             if target_hardware_device is None:
-                syslog.warning(
-                    "Swap devices: Empty target device configuration found"
-                )
+                syslog.warning("Swap devices: Empty target device configuration found")
                 return
             source_dev.device_guid = target_guid
             source_dev.name = target_hardware_device.name
@@ -994,15 +977,15 @@ class ProfileModifier:
 
                     for container in input_item.containers:
                         container.parent = target_input_item
-                        target_mode.config[input_type] \
-                            [input_id].containers.append(container)
+                        target_mode.config[input_type][input_id].containers.append(
+                            container
+                        )
 
                     # Remove all containers from the source device
                     input_item.containers.clear()
 
         # Remove the device entry completely
         del self.profile.devices[source_guid]
-
 
     def change_conditions(self, source_guid, target_guid):
         """Modifies conditions to use the target device instead of the
@@ -1076,8 +1059,9 @@ class ProfileModifier:
                 return device
         return None
 
+
 def parse_guid(value):
     # parses a GUID
     from gremlin.util import parse_guid
-    return parse_guid(value)
 
+    return parse_guid(value)

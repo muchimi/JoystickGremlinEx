@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,8 +33,8 @@ from gremlin.base_profile import AbstractContainer
 
 syslog = logging.getLogger("system")
 
-class SmartToggleContainerWidget(AbstractContainerWidget):
 
+class SmartToggleContainerWidget(AbstractContainerWidget):
     """SmartToggle container which holds or toggles a single action."""
 
     def __init__(self, profile_data, parent=None):
@@ -52,9 +52,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         self.options_layout = QtWidgets.QHBoxLayout()
 
         # Activation delay
-        self.options_layout.addWidget(
-            QtWidgets.QLabel("<b>Toggle time: </b>")
-        )
+        self.options_layout.addWidget(QtWidgets.QLabel("<b>Toggle time: </b>"))
         self.delay_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay_input.setRange(0.1, 2.0)
         self.delay_input.setSingleStep(0.1)
@@ -72,7 +70,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
                 "Smart Toggle",
-                gremlin.ui.ui_common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action,
             )
             self.action_layout.addWidget(widget)
             widget.redraw()
@@ -88,11 +86,10 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
-
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
                 "Smart Toggle",
-                gremlin.ui.ui_common.ContainerViewTypes.Conditions
+                gremlin.ui.ui_common.ContainerViewTypes.Conditions,
             )
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
@@ -122,7 +119,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
             self.profile_data.action_sets[0] = []
         self.profile_data.action_sets[0].append(action_item)
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()        
+        self.container_modified.emit()
 
     def _delay_changed_cb(self, value):
         """Updates the activation delay value.
@@ -161,10 +158,9 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
 
 
 class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
-
     """Executes the contents of the associated SmartToggle container."""
 
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         """Creates a new functor instance.
 
         Parameters
@@ -187,7 +183,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             if "needs_auto_release" in functor.__dict__:
                 functor.needs_auto_release = False
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         # TODO: Currently this does not handle hat or axis events, however
         #       virtual buttons created on those inputs is supported
         if not isinstance(value.current, bool):
@@ -204,10 +200,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
             # Run release logic when the second press happens in toggle mode
             elif self.mode == "toggle":
-                self.action_set.process_event(
-                    self.release_event,
-                    self.release_value
-                )
+                self.action_set.process_event(self.release_event, self.release_value)
                 self.activation_time = 0.0
                 self.mode = None
         else:
@@ -229,7 +222,6 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
 class SmartToggleContainer(AbstractContainer):
-
     """Represents a container which holds exactly one action."""
 
     name = "Smart Toggle"
@@ -247,7 +239,7 @@ class SmartToggleContainer(AbstractContainer):
     functor = SmartToggleContainerFunctor
     widget = SmartToggleContainerWidget
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
@@ -256,7 +248,7 @@ class SmartToggleContainer(AbstractContainer):
         self.action_sets = [[]]
         self.delay = 0.5
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container

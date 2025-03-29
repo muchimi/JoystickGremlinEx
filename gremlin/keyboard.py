@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-
 import ctypes
 import logging
 from ctypes import wintypes
@@ -26,12 +25,14 @@ import win32con
 
 # from gremlin.base_classes import TraceableList
 from gremlin.types import MouseButton
+
 # from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
 
 
 user32 = ctypes.WinDLL("user32")
 syslog = logging.getLogger("system")
+
 
 def _create_function(lib_name, fn_name, param_types, return_type):
     """Creates a handle to a windows dll library function.
@@ -50,18 +51,12 @@ def _create_function(lib_name, fn_name, param_types, return_type):
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646296(v=vs.85).aspx
 _get_keyboard_layout = _create_function(
-    "user32",
-    "GetKeyboardLayout",
-    [wintypes.DWORD],
-    wintypes.HKL
+    "user32", "GetKeyboardLayout", [wintypes.DWORD], wintypes.HKL
 )
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646299(v=vs.85).aspx
 _get_keyboard_state = _create_function(
-    "user32",
-    "GetKeyboardState",
-    [ctypes.POINTER(ctypes.c_char)],
-    wintypes.BOOL
+    "user32", "GetKeyboardState", [ctypes.POINTER(ctypes.c_char)], wintypes.BOOL
 )
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646307(v=vs.85).aspx
@@ -69,7 +64,7 @@ _map_virtual_key_ex = _create_function(
     "user32",
     "MapVirtualKeyExW",
     [ctypes.c_uint, ctypes.c_uint, wintypes.HKL],
-    ctypes.c_uint
+    ctypes.c_uint,
 )
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646322(v=vs.85).aspx
@@ -83,32 +78,33 @@ _to_unicode_ex = _create_function(
         ctypes.POINTER(ctypes.c_wchar),
         ctypes.c_int,
         ctypes.c_uint,
-        ctypes.c_void_p
+        ctypes.c_void_p,
     ],
-    ctypes.c_int
+    ctypes.c_int,
 )
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646332(v=vs.85).aspx
 _vk_key_scan_ex = _create_function(
-    "user32",
-    "VkKeyScanExW",
-    [ctypes.c_wchar, wintypes.HKL],
-    ctypes.c_short
+    "user32", "VkKeyScanExW", [ctypes.c_wchar, wintypes.HKL], ctypes.c_short
 )
- 
 
 
+class Key:
+    """Represents a single key on the keyboard or mouse together with its different representations and latching (multiple keys)
 
-class Key():
+    If in mouse mode, the virtual code contains the MouseButton enum value for which mouse button this key corresponds to.
 
-    """Represents a single key on the keyboard or mouse together with its different representations and latching (multiple keys) 
-     
-    If in mouse mode, the virtual code contains the MouseButton enum value for which mouse button this key corresponds to.  
-       
-        
+
     """
 
-    def __init__(self, name = None, scan_code : int = None, is_extended : bool = None, virtual_code : int = None, is_mouse : bool = False):
+    def __init__(
+        self,
+        name=None,
+        scan_code: int = None,
+        is_extended: bool = None,
+        virtual_code: int = None,
+        is_mouse: bool = False,
+    ):
         """Creates a new Key instance.
 
         :param name the name used to refer to this key
@@ -125,7 +121,7 @@ class Key():
             scan_code = 0
         if virtual_code is None:
             virtual_code = 0
-        if is_extended  is None:
+        if is_extended is None:
             is_extended = False
         if is_mouse is None:
             is_mouse = False
@@ -133,9 +129,9 @@ class Key():
         self._lookup_name = None
         self._latched_code = ""
         self._latched_name = ""
-        
-        self._latched_keys = [] # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
-        # self._latched_keys.add_callback(self._changed_cb)            
+
+        self._latched_keys = []  # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
+        # self._latched_keys.add_callback(self._changed_cb)
 
         self._name = None
         self._key_id_translate = None
@@ -144,13 +140,12 @@ class Key():
         if not name:
             self._load(scan_code, is_extended, virtual_code, is_mouse)
             name = self._name
-        
+
         else:
-            self._key_id = (scan_code, is_extended)   
+            self._key_id = (scan_code, is_extended)
             self._scan_code = scan_code
             self._is_extended = is_extended
-            self._virtual_code = virtual_code            
-
+            self._virtual_code = virtual_code
 
         self._name = name
         self._is_mouse = is_mouse
@@ -159,37 +154,36 @@ class Key():
     @property
     def key_id(self) -> tuple:
         return self._key_id
-    
+
     @property
     def key_id_translated(self) -> tuple:
         if not self._key_id_translate and self._key_id:
             self._key_id_translate, _ = KeyMap.translate(self._key_id)
         return self._key_id_translate
-        
 
     @property
     def virtual_code(self):
         return self._virtual_code
 
-
     @property
     def scan_code(self):
         return self._scan_code
-    
+
     @property
     def is_extended(self):
         return self._is_extended
-    
+
     def index_tuple(self):
-        ''' returns the gremlin index key for this key '''
-        return  (self._scan_code, self._is_extended)
-    
+        """returns the gremlin index key for this key"""
+        return (self._scan_code, self._is_extended)
+
     @property
     def is_mouse(self):
         return self._is_mouse
 
-
-    def _load(self, scan_code : int, is_extended : bool, virtual_code : int, is_mouse : bool):
+    def _load(
+        self, scan_code: int, is_extended: bool, virtual_code: int, is_mouse: bool
+    ):
         self._mouse_button = None
         name = None
         if is_mouse:
@@ -201,26 +195,23 @@ class Key():
                 mouse_button = mouse_from_name(name)
             if not mouse_button:
                 raise ValueError(f"Don't know how to handle mouse button name: {name}")
-            scan_code = mouse_button.value + 0x1000 # makes it unique in the tuple
+            scan_code = mouse_button.value + 0x1000  # makes it unique in the tuple
             virtual_code = scan_code
             name = MouseButton.to_string(mouse_button)
             self._lookup_name = name
 
-            if name and len(name)==1:
+            if name and len(name) == 1:
                 name = name.upper()
             self._name = name
 
             is_mouse = True
             self._mouse_button = mouse_button
-            
 
         else:
             # regular key
             if scan_code >= 0x1000:
                 scan_code = scan_code & 0xFF
                 is_extended = True
-
-     
 
             if virtual_code > 0 and scan_code == 0:
                 # get scan code from VK
@@ -236,20 +227,20 @@ class Key():
         self._scan_code = scan_code
         self._is_extended = is_extended
         self._virtual_code = virtual_code
-        
-        self._update()
 
+        self._update()
 
     # duplicate
     def duplicate(self):
-        '''' creates a copy of this key '''
+        """' creates a copy of this key"""
         import copy
+
         new_key = copy.deepcopy(self)
         return new_key
 
     @property
     def sequence(self):
-        ''' returns a list of (scan_code, extended) tuples for all latched keys in this sequence '''
+        """returns a list of (scan_code, extended) tuples for all latched keys in this sequence"""
         sequence = [self.index_tuple()]
         lk: Key
         for lk in self._latched_keys:
@@ -258,12 +249,12 @@ class Key():
 
     @property
     def mouse_button(self):
-        ''' returns a mouse button if the key is a virtual mouse button or mouse wheel '''
+        """returns a mouse button if the key is a virtual mouse button or mouse wheel"""
         return self._mouse_button
-    
+
     @mouse_button.setter
     def mouse_button(self, button):
-        ''' sets a mouse button '''
+        """sets a mouse button"""
         scan_code = button.value + 0x1000
         self._mouse_button = button
         self._is_mouse = True
@@ -275,14 +266,13 @@ class Key():
     #     self._update()
 
     def _update(self):
-        
         if len(self._latched_keys) > 0:
             keys = [self]
             keys.extend(self._latched_keys)
-            # order the key by modifier 
+            # order the key by modifier
             keys = sort_keys(keys)
             result = ""
-            code  = ""
+            code = ""
             for key in keys:
                 if result:
                     result += " + "
@@ -291,21 +281,15 @@ class Key():
                 result += key._name
                 code += f"0x{key._scan_code:X}({key._scan_code:02}){' EX' if key._is_extended else ''}"
             self._latched_name = result
-        else: 
+        else:
             code = f"0x{self._scan_code:02X}({self._scan_code:02}){' EX' if self._is_extended else ''}"
             self._latched_name = ""
         self._latched_code = code
-        
-
-
-
-
-        
 
     @property
     def name(self):
         return self._name
-    
+
     @property
     def latched_name(self):
         return self._latched_name if self._latched_name else self._name
@@ -314,18 +298,18 @@ class Key():
     def latched_code(self):
         return self._latched_code
 
-
     @property
     def lookup_name(self):
         if self._lookup_name is not None:
             return self._lookup_name
         else:
-            return self._name    
+            return self._name
 
     @property
     def latched(self):
-        ''' returns true if the current latch keys are pressed (runtime only) '''
+        """returns true if the current latch keys are pressed (runtime only)"""
         from gremlin.event_handler import EventListener
+
         el = EventListener()
         # assume the current key is pressed
         latched = el.get_key_state(self)
@@ -336,36 +320,34 @@ class Key():
                     # one key isn't pressed = not latched
                     return False
 
-        #syslog.info(f"latch check: key {self.name} latched: {latched}")
+        # syslog.info(f"latch check: key {self.name} latched: {latched}")
         return latched
-    
-    
 
     @property
     def is_latched(self):
-        ''' returns true if the key has latched components '''
+        """returns true if the key has latched components"""
         return len(self._latched_keys) > 0
-    
+
     @property
     def state(self):
-        ''' returns the pressed state of the current key '''
+        """returns the pressed state of the current key"""
         from gremlin.event_handler import EventListener
+
         el = EventListener()
         return el.get_key_state(self)
-        
+
     @property
     def data(self):
         # unique key for this key
         return self.__hash__()
-        
+
     @property
     def message_key(self):
         return {self._scan_code, self._is_extended}
-    
+
     @property
     def debug_name(self):
         return f"{self.name} (0x{self._scan_code:02X}/{self._scan_code}{' EX' if self._is_extended else ''}]"
-
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -375,7 +357,7 @@ class Key():
 
     def __hash__(self):
         # computes the hash value for this key combination
-        #if self._latched_keys:
+        # if self._latched_keys:
         data = f"{self._scan_code:x}{1 if self._is_extended else 0}"
         for key in self._latched_keys:
             data += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
@@ -385,83 +367,78 @@ class Key():
         #     return (0x0E << 8) + self._scan_code
         # else:
         #     return self._scan_code
-        
+
     def __lt__(self, other):
         return self.name < other.name
-    
+
     def __le__(self, other):
         return self.name <= other.name
-    
+
     def __gt__(self, other):
         return self.name > other.name
-    
+
     def __ge__(self, other):
         return self.name > other.name
-    
+
     def __str__(self):
         return self.name
-    
 
-    
-    
     @property
     def latched_keys(self):
-        ''' list of key objects that are latched to this key (modifiers)'''
+        """list of key objects that are latched to this key (modifiers)"""
         return self._latched_keys
-    
+
     @latched_keys.setter
     def latched_keys(self, value):
         self._latched_keys.clear()
         self._latched_keys.extend(value)
         self._update()
-    
+
     @property
     def is_latched(self):
-        ''' true if this key is latched '''
+        """true if this key is latched"""
         return len(self._latched_keys) > 0
-    
+
     @property
     def is_modifier(self):
-        ''' true if the key is a modifier '''
+        """true if the key is a modifier"""
         return self._lookup_name in KeyMap._keyboard_modifiers
-    
+
     def modifier_order(self):
-        ''' returns the order of the modifier '''
+        """returns the order of the modifier"""
         lookup_name = self.lookup_name
         modifiers = KeyMap._keyboard_modifiers
         if lookup_name in modifiers:
             return modifiers.index(lookup_name)
-        return -1 # not found
-    
+        return -1  # not found
+
     def key_order(self):
-        ''' gets a unique and predictable key index for ordering a key sequence
-         
+        """gets a unique and predictable key index for ordering a key sequence
+
         Modifiers will be a lower index than normal character which will be lower than special keys
-           
-        '''
+
+        """
         lookup_name = self.lookup_name.lower()
         if lookup_name in KeyMap._keyboard_modifiers:
             return self.modifier_order()
-        
+
         # bump to next index
         start_index = 100
-        
+
         if len(lookup_name) == 1:
             # single keys - use the ascii sequence
             value = ord(lookup_name)
             return start_index + value
-        
+
         start_index = 1000
         # special keys
         special = KeyMap._keyboard_special
         if lookup_name in special:
             value = special.index(lookup_name)
             return start_index + value
-        
+
         # no clue
         return -1
-    
-    
 
 
 def send_key_down(key):
@@ -470,17 +447,20 @@ def send_key_down(key):
     :param key the key for which to send the KEYDOWN event
     """
     from gremlin import input_devices
+
     key: gremlin.keyboard.Key
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     verbose = gremlin.config.Configuration().verbose_mode_outputs
-    
+
     is_local, is_remote = input_devices.remote_state.state
     if is_local:
-        if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
+        if verbose:
+            syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
-        if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
-        input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+        if verbose:
+            syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
+        input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags)
 
 
 def send_key_up(key):
@@ -490,48 +470,88 @@ def send_key_up(key):
     """
 
     from gremlin import input_devices
+
     key: gremlin.keyboard.Key
     verbose = gremlin.config.Configuration().verbose_mode_outputs
 
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
 
-
     (is_local, is_remote) = input_devices.remote_state.state
     if is_local:
-        if verbose: syslog.info(f"OUTPUT: (local) keyup {key.debug_name}")
+        if verbose:
+            syslog.info(f"OUTPUT: (local) keyup {key.debug_name}")
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
-        if verbose: syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
-        input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+        if verbose:
+            syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
+        input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags)
+
 
 def mouse_from_name(name):
-    ''' validates if this is a special mouse key - returns None if it is not'''
+    """validates if this is a special mouse key - returns None if it is not"""
     from gremlin.types import MouseButton
+
     mouse_button = None
     name = name.lower()
-    if name in ("mouse_1", "mouse_left", MouseButton.to_string(MouseButton.Left).lower()): 
+    if name in (
+        "mouse_1",
+        "mouse_left",
+        MouseButton.to_string(MouseButton.Left).lower(),
+    ):
         mouse_button = MouseButton.Left
-    elif name in ("mouse_2", "mouse_right", MouseButton.to_string(MouseButton.Middle).lower()):
+    elif name in (
+        "mouse_2",
+        "mouse_right",
+        MouseButton.to_string(MouseButton.Middle).lower(),
+    ):
         mouse_button = MouseButton.Middle
-    elif name in ("mouse_3", "mouse_middle", MouseButton.to_string(MouseButton.Right).lower()):
+    elif name in (
+        "mouse_3",
+        "mouse_middle",
+        MouseButton.to_string(MouseButton.Right).lower(),
+    ):
         mouse_button = MouseButton.Right
-    elif name in ("mouse_4", "mouse_forward", MouseButton.to_string(MouseButton.Forward).lower()):
+    elif name in (
+        "mouse_4",
+        "mouse_forward",
+        MouseButton.to_string(MouseButton.Forward).lower(),
+    ):
         mouse_button = MouseButton.Forward
-    elif name in ("mouse_5", "mouse_back", MouseButton.to_string(MouseButton.Back).lower()):
+    elif name in (
+        "mouse_5",
+        "mouse_back",
+        MouseButton.to_string(MouseButton.Back).lower(),
+    ):
         mouse_button = MouseButton.Back
-    elif name in ("mouse_up", "wheel_up", MouseButton.to_string(MouseButton.WheelUp).lower()):
+    elif name in (
+        "mouse_up",
+        "wheel_up",
+        MouseButton.to_string(MouseButton.WheelUp).lower(),
+    ):
         mouse_button = MouseButton.WheelUp
-    elif name in ("mouse_down", "wheel_down", MouseButton.to_string(MouseButton.WheelDown).lower()):
+    elif name in (
+        "mouse_down",
+        "wheel_down",
+        MouseButton.to_string(MouseButton.WheelDown).lower(),
+    ):
         mouse_button = MouseButton.WheelDown
-    elif name in ("mouse_wleft", "wheel_left", MouseButton.to_string(MouseButton.WheelLeft).lower()):
+    elif name in (
+        "mouse_wleft",
+        "wheel_left",
+        MouseButton.to_string(MouseButton.WheelLeft).lower(),
+    ):
         mouse_button = MouseButton.WheelLeft
-    elif name in ("mouse_wright", "wheel_right", MouseButton.to_string(MouseButton.WheelRight).lower()):
+    elif name in (
+        "mouse_wright",
+        "wheel_right",
+        MouseButton.to_string(MouseButton.WheelRight).lower(),
+    ):
         mouse_button = MouseButton.WheelRight
     return mouse_button
 
 
-def key_from_name(name, validate = False) -> Key:
+def key_from_name(name, validate=False) -> Key:
     """Returns the key corresponding to the provided name.
 
     If no key exists with the provided name None is returned.
@@ -549,12 +569,11 @@ def key_from_name(name, validate = False) -> Key:
         scan_code = 0x1000 + mouse_button.value
         is_extended = False
         key = Key(key_name, scan_code, is_extended, 0, is_mouse=True)
-        return key    
+        return key
 
     # Attempt to located the key in our database and return it if successful
     key_name = name.lower().replace(" ", "")
 
-       
     key = KeyMap.find_by_name(key_name)
     if key is not None:
         return key
@@ -565,52 +584,44 @@ def key_from_name(name, validate = False) -> Key:
         if validate:
             # skip error reporting on validation
             return None
-        
-        syslog.warning(
-            f"Invalid key name specified \"{name}\""
-        )
-        raise error.KeyboardError(
-            f"Invalid key specified, {name}"
-        )
+
+        syslog.warning(f'Invalid key name specified "{name}"')
+        raise error.KeyboardError(f"Invalid key specified, {name}")
     else:
-        KeyMap.register(key) 
+        KeyMap.register(key)
         return key
 
 
 def sort_keys(keys):
-    ''' sorts a list of keys so the keys are in a predictable order '''
+    """sorts a list of keys so the keys are in a predictable order"""
     key: Key
     sequence = []
     for key in keys:
         index = key.key_order()
         sequence.append((key, index))
-    
-    sequence.sort(key = lambda x: x[1])
+
+    sequence.sort(key=lambda x: x[1])
     keys_list = [pair[0] for pair in sequence]
     return keys_list
 
-def key_name_from_code(scan_code, is_extended):
-    ''' gets the key name '''
 
+def key_name_from_code(scan_code, is_extended):
+    """gets the key name"""
 
     if scan_code >= 0x1000:
         scan_code -= 0x1000
         return MouseButton.to_string(scan_code)
-    
- 
-    
+
     # Attempt to located the key in our database and return it if successful
     key = KeyMap.find(scan_code, is_extended)
     if key:
         return key.name
-    
+
     # Attempt to create the key to store and return if successful
 
     virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
     name = KeyMap.virtual_input_to_unicode(virtual_code)
     return name
-
-
 
 
 def key_from_code(scan_code, is_extended):
@@ -622,24 +633,23 @@ def key_from_code(scan_code, is_extended):
     :param is_extended flag indicating if the key is extended
     :return Key instance or None
     """
-    
+
     import copy
 
     if scan_code >= 0x1000:
         # mouse special code
-        key = Key(scan_code = scan_code, is_mouse = True)
+        key = Key(scan_code=scan_code, is_mouse=True)
         return key
-    
+
     # Attempt to located the key in our database and return it if successful
     key = KeyMap.find(scan_code, is_extended)
     if key is not None:
         return copy.deepcopy(key)
-        
-    
+
     # Attempt to create the key to store and return if successful
     virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
     name = KeyMap.virtual_input_to_unicode(virtual_code)
-    
+
     if virtual_code == 0xFF or name is None:
         syslog.warning(
             f"Invalid scan code specified ({scan_code} (0x{scan_code:x}), {is_extended})"
@@ -652,12 +662,11 @@ def key_from_code(scan_code, is_extended):
         key = Key(name, scan_code, is_extended, virtual_code)
         KeyMap.register(key)
         return key
-    
-
 
 
 class scan_codes(enum.IntEnum):
-    ''' windows scan codes lookup '''
+    """windows scan codes lookup"""
+
     sc_escape = 0x01
     sc_1 = 0x02
     sc_2 = 0x03
@@ -741,16 +750,16 @@ class scan_codes(enum.IntEnum):
     sc_numpad_3 = 0x51
     sc_numpad_0 = 0x52
     sc_numpad_period = 0x53
-    sc_alt_printScreen = 0x54 # Alt + print screen. MapVirtualKeyEx( VK_SNAPSHOT MAPVK_VK_TO_VSC_EX 0 ) returns scancode 0x54. */
-    sc_bracketAngle = 0x56 # Key between the left shift and Z. */
+    sc_alt_printScreen = 0x54  # Alt + print screen. MapVirtualKeyEx( VK_SNAPSHOT MAPVK_VK_TO_VSC_EX 0 ) returns scancode 0x54. */
+    sc_bracketAngle = 0x56  # Key between the left shift and Z. */
     sc_f11 = 0x57
     sc_f12 = 0x58
-    sc_oem_1 = 0x5a # VK_OEM_WSCTRL */
-    sc_oem_2 = 0x5b # VK_OEM_FINISH */
-    sc_oem_3 = 0x5c # VK_OEM_JUMP */
-    sc_eraseEOF = 0x5d
-    sc_oem_4 = 0x5e # VK_OEM_BACKTAB */
-    sc_oem_5 = 0x5f # VK_OEM_AUTO */
+    sc_oem_1 = 0x5A  # VK_OEM_WSCTRL */
+    sc_oem_2 = 0x5B  # VK_OEM_FINISH */
+    sc_oem_3 = 0x5C  # VK_OEM_JUMP */
+    sc_eraseEOF = 0x5D
+    sc_oem_4 = 0x5E  # VK_OEM_BACKTAB */
+    sc_oem_5 = 0x5F  # VK_OEM_AUTO */
     sc_zoom = 0x62
     sc_help = 0x63
     sc_f13 = 0x64
@@ -759,18 +768,18 @@ class scan_codes(enum.IntEnum):
     sc_f16 = 0x67
     sc_f17 = 0x68
     sc_f18 = 0x69
-    sc_f19 = 0x6a
-    sc_f20 = 0x6b
-    sc_f21 = 0x6c
-    sc_f22 = 0x6d
-    sc_f23 = 0x6e
-    sc_oem_6 = 0x6f # VK_OEM_PA3 */
+    sc_f19 = 0x6A
+    sc_f20 = 0x6B
+    sc_f21 = 0x6C
+    sc_f22 = 0x6D
+    sc_f23 = 0x6E
+    sc_oem_6 = 0x6F  # VK_OEM_PA3 */
     sc_katakana = 0x70
-    sc_oem_7 = 0x71 # VK_OEM_RESET */
+    sc_oem_7 = 0x71  # VK_OEM_RESET */
     sc_f24 = 0x76
     sc_sbcschar = 0x77
     sc_convert = 0x79
-    sc_nonconvert = 0x7B # VK_OEM_PA1 */
+    sc_nonconvert = 0x7B  # VK_OEM_PA1 */
 
     sc_media_previous = 0xE010
     sc_media_next = 0xE019
@@ -791,9 +800,9 @@ class scan_codes(enum.IntEnum):
     # - break: 0xE0B7 0xE0AA
     # - MapVirtualKeyEx( VK_SNAPSHOT MAPVK_VK_TO_VSC_EX 0 ) returns scancode 0x54;
     # - There is no VK_KEYDOWN with VK_SNAPSHOT.
-    
+
     sc_altRight = 0xE038
-    sc_cancel = 0xE046 # CTRL + Pause */
+    sc_cancel = 0xE046  # CTRL + Pause */
     sc_home = 0xE047
     sc_arrowUp = 0xE048
     sc_pageUp = 0xE049
@@ -821,7 +830,7 @@ class scan_codes(enum.IntEnum):
     sc_launch_media = 0xE06D
 
     sc_pause = 0xE11D45
-    
+
     # sc_pause:
     # - make: 0xE11D 45 0xE19D C5
     # - make in raw input: 0xE11D 0x45
@@ -829,26 +838,22 @@ class scan_codes(enum.IntEnum):
     # - No repeat when you hold the key down
     # - There are no break so I don't know how the key down/up is expected to work. Raw input sends "keydown" and "keyup" messages and it appears that the keyup message is sent directly after the keydown message (you can't hold the key down) so depending on when GetMessage or PeekMessage will return messages you may get both a keydown and keyup message "at the same time". If you use VK messages most of the time you only get keydown messages but some times you get keyup messages too.
     # - when pressed at the same time as one or both control keys generates a 0xE046 (sc_cancel) and the string for that scancode is "break".
-    
-
 
 
 class KeyMap:
-
-    _g_virtual_code_to_key = {} # map of keyboard virtual codes to the key
-    _g_scan_code_to_key = {} # map of (scancode, extended) to the key
+    _g_virtual_code_to_key = {}  # map of keyboard virtual codes to the key
+    _g_scan_code_to_key = {}  # map of (scancode, extended) to the key
     _key_map = {}
 
-   
     @staticmethod
     def register(key):
         assert key.lookup_name
-        
+
         if key.virtual_code > 0:
             KeyMap._g_virtual_code_to_key[key.virtual_code] = key
-        
+
         index = (key.scan_code, key.is_extended)
-        if not index in KeyMap._g_scan_code_to_key.keys():
+        if index not in KeyMap._g_scan_code_to_key.keys():
             KeyMap._g_scan_code_to_key[index] = key
         if key.name:
             name = key.lookup_name.lower().replace(" ", "")
@@ -857,39 +862,38 @@ class KeyMap:
 
     @staticmethod
     def find(scan_code, is_extended):
-        ''' does a key lookup by scan code and extended key status '''
+        """does a key lookup by scan code and extended key status"""
         lookup = (scan_code, is_extended)
         if lookup in KeyMap._g_map:
             return KeyMap._g_map[lookup].duplicate()
-        if not lookup in KeyMap._g_scan_code_to_key.keys():
+        if lookup not in KeyMap._g_scan_code_to_key.keys():
             # see if we can add it
             key = KeyMap.get_key(scan_code, is_extended)
             if key:
-               KeyMap._g_scan_code_to_key[lookup] = key
-               return key.duplicate()
+                KeyMap._g_scan_code_to_key[lookup] = key
+                return key.duplicate()
             return None
         key = KeyMap._g_scan_code_to_key.get((scan_code, is_extended), None)
         if key:
             return key.duplicate()
         return None
-    
+
     @staticmethod
     def find_virtual(virtual_code):
         if virtual_code in KeyMap._g_virtual_code_to_key.keys():
             return KeyMap._g_virtual_code_to_key[virtual_code].duplicate()
         return None
-            
 
     @staticmethod
     def find_by_name(name):
-        name = name.replace(" ","").lower()
+        name = name.replace(" ", "").lower()
         if name in KeyMap._key_map:
             return KeyMap._key_map[name].duplicate()
         return None
-    
+
     @staticmethod
     def from_event(event):
-        ''' returns a key based on a keyboard event '''
+        """returns a key based on a keyboard event"""
         try:
             if event:
                 scan_code = event.identifier[0]
@@ -898,15 +902,15 @@ class KeyMap:
                 if not key and event.virtual_code > 0:
                     key = KeyMap.find_virtual(event.virtual_code)
                 if key is None:
-                    syslog.error(f"KEY: Don't know how to handle event: 0x{scan_code:02X} ({scan_code}) extended: {extended}")
+                    syslog.error(
+                        f"KEY: Don't know how to handle event: 0x{scan_code:02X} ({scan_code}) extended: {extended}"
+                    )
                 return key
         except Exception as ex:
             syslog.error(f"KEY: error: invalid event: {ex}")
         syslog.error("KEY: invalid event")
         return None
 
-    
-     
     @staticmethod
     def scan_code_to_virtual_code(scan_code, is_extended):
         """Returns the virtual code corresponding to the given scan code.
@@ -919,22 +923,22 @@ class KeyMap:
 
         """
 
-        if scan_code: 
+        if scan_code:
             value = scan_code
             if is_extended:
-                value = 0xe0 << 8 | scan_code
+                value = 0xE0 << 8 | scan_code
 
             virtual_code = _map_virtual_key_ex(value, 3, _get_keyboard_layout(0))
             return virtual_code
         return None
-    
+
     @staticmethod
     def virtual_code_to_scan_code(virtual_code):
-        scan_code = _map_virtual_key_ex(virtual_code, 4,_get_keyboard_layout(0))
+        scan_code = _map_virtual_key_ex(virtual_code, 4, _get_keyboard_layout(0))
         return scan_code
 
     @staticmethod
-    def virtual_input_to_unicode(virtual_code, scan_code = 0):
+    def virtual_input_to_unicode(virtual_code, scan_code=0):
         """Returns the unicode character corresponding to a given virtual code.
 
         :param virtual_code virtual code for which to return a unicode character
@@ -950,7 +954,7 @@ class KeyMap:
 
         # Translate three times to get around dead keys showing up in funny ways
         # as the translation takes them into account for future keys
-        for _ in range (5):
+        for _ in range(5):
             state = _to_unicode_ex(
                 virtual_code,
                 scan_code,
@@ -958,7 +962,7 @@ class KeyMap:
                 output_buffer,
                 8,
                 0,
-                keyboard_layout
+                keyboard_layout,
             )
             if state > 0:
                 break
@@ -966,16 +970,21 @@ class KeyMap:
         if state == 0:
             # resolve manually
             name = None
-            for p_name, p_scan_code, p_extended, p_virtual_code in KeyMap._g_name_map.values():
+            for (
+                p_name,
+                p_scan_code,
+                p_extended,
+                p_virtual_code,
+            ) in KeyMap._g_name_map.values():
                 if scan_code == p_scan_code and virtual_code == p_virtual_code:
                     name = p_name
                     break
-            
+
             if not name:
                 name = f"Key 0x{scan_code:02X}({scan_code:02}) VK {virtual_code:X}))"
             return name
         return output_buffer.value.upper()
-    
+
     @staticmethod
     def get_key(scan_code, is_extended):
         virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
@@ -983,7 +992,6 @@ class KeyMap:
             name = KeyMap.virtual_input_to_unicode(virtual_code, scan_code)
             return Key(name, scan_code, is_extended, virtual_code)
         return None
-        
 
     @staticmethod
     def unicode_to_key(character):
@@ -1004,17 +1012,14 @@ class KeyMap:
         is_extended = False
         if code_value << 8 & 0xE0 or code_value << 8 & 0xE1:
             is_extended = True
-        return Key(character, scan_code, is_extended, virtual_code)    
-    
-
-
+        return Key(character, scan_code, is_extended, virtual_code)
 
     @staticmethod
     def get_latched_key(keys):
-        ''' derives a single latched key from a set of keys'''
+        """derives a single latched key from a set of keys"""
 
         modifier_map = {}
-        modifiers = gremlin.keyboard.KeyMap._keyboard_modifiers # ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
+        modifiers = gremlin.keyboard.KeyMap._keyboard_modifiers  # ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
         for key_name in modifiers:
             modifier_map[key_name] = []
 
@@ -1042,34 +1047,33 @@ class KeyMap:
             return_key = None
 
         if return_key:
-            latched = list(set(keys)) # remove any duplicates
-            latched.remove(return_key) # remove self
+            latched = list(set(keys))  # remove any duplicates
+            latched.remove(return_key)  # remove self
             return_key.latched_keys = latched
 
         return return_key
-    
 
     @staticmethod
     def translate(keyid) -> tuple:
-        ''' translates a key id and returns a list of equivalent keys
-            this is to map similar keys together 
-            :param keyid (scan_code, is_extended)
-            :returns ((scan_code, is_extended), virtual_code)
-        '''
+        """translates a key id and returns a list of equivalent keys
+        this is to map similar keys together
+        :param keyid (scan_code, is_extended)
+        :returns ((scan_code, is_extended), virtual_code)
+        """
         # flip the extended bit to force numlock OFF for numeric keypad so we always get the numeric keys
         scan_code, is_extended = keyid
         if keyid in KeyMap._g_translate_map.keys():
             return KeyMap._g_translate_map[keyid]
         vk = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         return (keyid, vk)
-    
+
     @staticmethod
     def translate_lookup(key_tuple) -> tuple:
-        ''' translates a key id and returns a list of equivalent keys
-            this is to map similar keys together 
-            :param keyid (scan_code, is_extended)
-            :returns (scan_code, is_extended)
-        '''
+        """translates a key id and returns a list of equivalent keys
+        this is to map similar keys together
+        :param keyid (scan_code, is_extended)
+        :returns (scan_code, is_extended)
+        """
         # flip the extended bit to force numlock OFF for numeric keypad so we always get the numeric keys
         if key_tuple in KeyMap._g_map:
             return key_tuple
@@ -1077,52 +1081,49 @@ class KeyMap:
             key_trans, _ = KeyMap._g_translate_map[key_tuple]
             return key_trans
         return key_tuple
-    
+
     @staticmethod
     def reverse_translate(key_tuple) -> tuple:
-         if not KeyMap._g_reverse_translate_map:
-             for key_id, data in KeyMap._g_translate_map.items():
-                 t_key, vk = data
-                 KeyMap._g_reverse_translate_map[t_key] = key_id
+        if not KeyMap._g_reverse_translate_map:
+            for key_id, data in KeyMap._g_translate_map.items():
+                t_key, vk = data
+                KeyMap._g_reverse_translate_map[t_key] = key_id
 
-         if key_tuple in KeyMap._g_reverse_translate_map:
-             return KeyMap._g_reverse_translate_map[key_tuple]
-         
-         
-         
-         return None
-             
-            
-        
+        if key_tuple in KeyMap._g_reverse_translate_map:
+            return KeyMap._g_reverse_translate_map[key_tuple]
+
+        return None
+
     @staticmethod
     def vk_lookup(key_tuple):
-        ''' gets a virtual key from (scancode, extended) '''
+        """gets a virtual key from (scancode, extended)"""
         scan_code, is_extended = key_tuple
         vk = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         return vk
-    
-    
+
     @staticmethod
     def keyid_tostring(keyid):
         scan_code, is_extended = keyid
         return f"({scan_code} 0x{scan_code:X}, {is_extended})"
-    
+
     @staticmethod
     def get_vk_keyboard_state(virtual_code):
-        ''' get the hardware keyboard state by virtual key '''
-        return (user32.GetAsyncKeyState(virtual_code) & 1) != 0 # true if the key is pressed
-    
+        """get the hardware keyboard state by virtual key"""
+        return (
+            user32.GetAsyncKeyState(virtual_code) & 1
+        ) != 0  # true if the key is pressed
+
     @staticmethod
     def get_keyboard_state(scan_code, is_extended):
-        ''' gets the hardware keyboard state by scan code '''
+        """gets the hardware keyboard state by scan code"""
         virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         return KeyMap.get_vk_keyboard_state(virtual_code)
-    
+
     @staticmethod
     def numlock_state():
-        ''' gets the state of the numlock key '''
+        """gets the state of the numlock key"""
         return KeyMap.get_vk_keyboard_state(win32con.VK_NUMLOCK)
-    
+
     @staticmethod
     def set_numlock_state(value):
         state = KeyMap.numlock_state()
@@ -1132,52 +1133,57 @@ class KeyMap:
     @staticmethod
     def toggle_numlock():
         import gremlin.sendinput
+
         # key down
-        flags = win32con.KEYEVENTF_EXTENDEDKEY 
+        flags = win32con.KEYEVENTF_EXTENDEDKEY
         gremlin.sendinput.send_key(win32con.VK_NUMLOCK, 0x45, flags)
 
         # key up
         flags |= win32con.KEYEVENTF_KEYUP
         gremlin.sendinput.send_key(win32con.VK_NUMLOCK, 0x45, flags)
 
-    
     # holds the number pad scan codes
-    _g_numpad_codes = (win32con.VK_NUMPAD0,
-                       win32con.VK_NUMPAD1,
-                       win32con.VK_NUMPAD2,
-                       win32con.VK_NUMPAD3,
-                       win32con.VK_NUMPAD4,
-                       win32con.VK_NUMPAD5,
-                       win32con.VK_NUMPAD6,
-                       win32con.VK_NUMPAD7,
-                       win32con.VK_NUMPAD8,
-                       win32con.VK_NUMPAD9,
-                       )
-    
+    _g_numpad_codes = (
+        win32con.VK_NUMPAD0,
+        win32con.VK_NUMPAD1,
+        win32con.VK_NUMPAD2,
+        win32con.VK_NUMPAD3,
+        win32con.VK_NUMPAD4,
+        win32con.VK_NUMPAD5,
+        win32con.VK_NUMPAD6,
+        win32con.VK_NUMPAD7,
+        win32con.VK_NUMPAD8,
+        win32con.VK_NUMPAD9,
+    )
+
     _g_translate_map = {
-        (0x52,True): ((0x52, False), win32con.VK_NUMPAD0), # make all numpad keys report as numpad
-        (0x4F,True): ((0x4F, False), win32con.VK_NUMPAD1),
-        (0x50,True): ((0x50, True), win32con.VK_DOWN),  # down arrow
-        (0x51,True): ((0x51, False), win32con.VK_NUMPAD3),
-        (0x4B,True): ((0x4B, True), win32con.VK_LEFT), # left arrow
-        (0x4C,True): ((0x4C, False), win32con.VK_NUMPAD5),
-        (0x4D,True): ((0x4D, True), win32con.VK_RIGHT), # right arrow
-        (0x47,True): ((0x47, False), win32con.VK_NUMPAD7),
-        (0x48,True): ((0x48, True), win32con.VK_UP), # up arrow
-        (0x49,True): ((0x49, False), win32con.VK_NUMPAD9),
-
-        (0x52,False): ((0x52, False), win32con.VK_NUMPAD0), 
-        (0x4F,False): ((0x4F, False), win32con.VK_NUMPAD1),
-        (0x50,False): ((0x50, False), win32con.VK_NUMPAD2),
-        (0x51,False): ((0x51, False), win32con.VK_NUMPAD3),
-        (0x4B,False): ((0x4B, False), win32con.VK_NUMPAD4),
-        (0x4C,False): ((0x4C, False), win32con.VK_NUMPAD5),
-        (0x4D,False): ((0x4D, False), win32con.VK_NUMPAD6),
-        (0x47,False): ((0x47, False), win32con.VK_NUMPAD7),
-        (0x48,False): ((0x48, False), win32con.VK_NUMPAD8),
-        (0x49,False): ((0x49, False), win32con.VK_NUMPAD9),
-
-        (0x36,True): ((0x36, False), win32con.VK_RSHIFT),  # combine rshift and rshift 2
+        (0x52, True): (
+            (0x52, False),
+            win32con.VK_NUMPAD0,
+        ),  # make all numpad keys report as numpad
+        (0x4F, True): ((0x4F, False), win32con.VK_NUMPAD1),
+        (0x50, True): ((0x50, True), win32con.VK_DOWN),  # down arrow
+        (0x51, True): ((0x51, False), win32con.VK_NUMPAD3),
+        (0x4B, True): ((0x4B, True), win32con.VK_LEFT),  # left arrow
+        (0x4C, True): ((0x4C, False), win32con.VK_NUMPAD5),
+        (0x4D, True): ((0x4D, True), win32con.VK_RIGHT),  # right arrow
+        (0x47, True): ((0x47, False), win32con.VK_NUMPAD7),
+        (0x48, True): ((0x48, True), win32con.VK_UP),  # up arrow
+        (0x49, True): ((0x49, False), win32con.VK_NUMPAD9),
+        (0x52, False): ((0x52, False), win32con.VK_NUMPAD0),
+        (0x4F, False): ((0x4F, False), win32con.VK_NUMPAD1),
+        (0x50, False): ((0x50, False), win32con.VK_NUMPAD2),
+        (0x51, False): ((0x51, False), win32con.VK_NUMPAD3),
+        (0x4B, False): ((0x4B, False), win32con.VK_NUMPAD4),
+        (0x4C, False): ((0x4C, False), win32con.VK_NUMPAD5),
+        (0x4D, False): ((0x4D, False), win32con.VK_NUMPAD6),
+        (0x47, False): ((0x47, False), win32con.VK_NUMPAD7),
+        (0x48, False): ((0x48, False), win32con.VK_NUMPAD8),
+        (0x49, False): ((0x49, False), win32con.VK_NUMPAD9),
+        (0x36, True): (
+            (0x36, False),
+            win32con.VK_RSHIFT,
+        ),  # combine rshift and rshift 2
     }
 
     _g_reverse_translate_map = {}
@@ -1186,11 +1192,11 @@ class KeyMap:
 
     _g_name_map = {
         # Function keys  (name, scancode, extended, virtual code)
-        "f1": ("F1", 0x3b, False, win32con.VK_F1),
-        "f2": ("F2", 0x3c, False, win32con.VK_F2),
-        "f3": ("F3", 0x3d, False, win32con.VK_F3),
-        "f4": ("F4", 0x3e, False, win32con.VK_F4),
-        "f5": ("F5", 0x3f, False, win32con.VK_F5),
+        "f1": ("F1", 0x3B, False, win32con.VK_F1),
+        "f2": ("F2", 0x3C, False, win32con.VK_F2),
+        "f3": ("F3", 0x3D, False, win32con.VK_F3),
+        "f4": ("F4", 0x3E, False, win32con.VK_F4),
+        "f5": ("F5", 0x3F, False, win32con.VK_F5),
         "f6": ("F6", 0x40, False, win32con.VK_F6),
         "f7": ("F7", 0x41, False, win32con.VK_F7),
         "f8": ("F8", 0x42, False, win32con.VK_F8),
@@ -1204,12 +1210,12 @@ class KeyMap:
         "f16": ("F16", 0x67, False, win32con.VK_F16),
         "f17": ("F17", 0x68, False, win32con.VK_F17),
         "f18": ("F18", 0x69, False, win32con.VK_F18),
-        "f19": ("F19", 0x6a, False, win32con.VK_F19),    
-        "f20": ("F20", 0x6b, False, win32con.VK_F20),    
-        "f21": ("F21", 0x6c, False, win32con.VK_F21),    
-        "f22": ("F22", 0x6d, False, win32con.VK_F22),    
-        "f23": ("F23", 0x6e, False, win32con.VK_F23),    
-        "f24": ("F24", 0x76, False, win32con.VK_F24),   
+        "f19": ("F19", 0x6A, False, win32con.VK_F19),
+        "f20": ("F20", 0x6B, False, win32con.VK_F20),
+        "f21": ("F21", 0x6C, False, win32con.VK_F21),
+        "f22": ("F22", 0x6D, False, win32con.VK_F22),
+        "f23": ("F23", 0x6E, False, win32con.VK_F23),
+        "f24": ("F24", 0x76, False, win32con.VK_F24),
         # Control keys
         "printscreen": ("Print Screen", 0x37, True, win32con.VK_PRINT),
         "scrolllock": ("Scroll Lock", 0x46, False, win32con.VK_SCROLL),
@@ -1219,55 +1225,67 @@ class KeyMap:
         "home": ("Home", 0x47, True, win32con.VK_HOME),
         "pageup": ("PageUp", 0x49, True, win32con.VK_PRIOR),
         "delete": ("Delete", 0x53, True, win32con.VK_DELETE),
-        "end": ("End", 0x4f, True, win32con.VK_END),
+        "end": ("End", 0x4F, True, win32con.VK_END),
         "pagedown": ("PageDown", 0x51, True, win32con.VK_NEXT),
         # Arrow keys
         "up": ("Up", 0x48, True, win32con.VK_UP),
-        "left": ("Left", 0x4b, True, win32con.VK_LEFT),
+        "left": ("Left", 0x4B, True, win32con.VK_LEFT),
         "down": ("Down", 0x50, True, win32con.VK_DOWN),
-        "right": ("Right", 0x4d, True, win32con.VK_RIGHT),
+        "right": ("Right", 0x4D, True, win32con.VK_RIGHT),
         # Numpad
         "numlock": ("NumLock", 0x45, True, win32con.VK_NUMLOCK),
         "npdivide": ("Numpad / (FSlash)", 0x35, True, win32con.VK_DIVIDE),
         "npmultiply": ("Numpad *", 0x37, False, win32con.VK_MULTIPLY),
-        "npminus": ("Numpad -", 0x4a, False, win32con.VK_SUBTRACT),
-        "npplus": ("Numpad +", 0x4e, False, win32con.VK_ADD),
-        "npenter": ("Numpad Enter", 0x1c, True, win32con.VK_SEPARATOR),
+        "npminus": ("Numpad -", 0x4A, False, win32con.VK_SUBTRACT),
+        "npplus": ("Numpad +", 0x4E, False, win32con.VK_ADD),
+        "npenter": ("Numpad Enter", 0x1C, True, win32con.VK_SEPARATOR),
         "npdelete": ("Numpad Delete", 0x53, False, win32con.VK_DECIMAL),
         "np0": ("Numpad 0", 0x52, False, win32con.VK_NUMPAD0),
-        "np1": ("Numpad 1", 0x4f, False, win32con.VK_NUMPAD1),
+        "np1": ("Numpad 1", 0x4F, False, win32con.VK_NUMPAD1),
         "np2": ("Numpad 2", 0x50, False, win32con.VK_NUMPAD2),
         "np3": ("Numpad 3", 0x51, False, win32con.VK_NUMPAD3),
-        "np4": ("Numpad 4", 0x4b, False, win32con.VK_NUMPAD4),
-        "np5": ("Numpad 5", 0x4c, False, win32con.VK_NUMPAD5),
-        "np6": ("Numpad 6", 0x4d, False, win32con.VK_NUMPAD6),
+        "np4": ("Numpad 4", 0x4B, False, win32con.VK_NUMPAD4),
+        "np5": ("Numpad 5", 0x4C, False, win32con.VK_NUMPAD5),
+        "np6": ("Numpad 6", 0x4D, False, win32con.VK_NUMPAD6),
         "np7": ("Numpad 7", 0x47, False, win32con.VK_NUMPAD7),
         "np8": ("Numpad 8", 0x48, False, win32con.VK_NUMPAD8),
         "np9": ("Numpad 9", 0x49, False, win32con.VK_NUMPAD9),
         # Misc keys
-        "backspace": ("Backspace", 0x0e, False, win32con.VK_BACK),
+        "backspace": ("Backspace", 0x0E, False, win32con.VK_BACK),
         "space": ("Space", 0x39, False, win32con.VK_SPACE),
-        "tab": ("Tab", 0x0f, False, win32con.VK_TAB),
-        "capslock": ("CapsLock", 0x3a, False, win32con.VK_CAPITAL),
-        "leftshift": ("Left Shift", 0x2a, False, win32con.VK_LSHIFT),
-        "leftcontrol": ("Left Control", 0x1d, False, win32con.VK_LCONTROL),
-        "leftwin": ("Left Win", 0x5b, True, win32con.VK_LWIN),
+        "tab": ("Tab", 0x0F, False, win32con.VK_TAB),
+        "capslock": ("CapsLock", 0x3A, False, win32con.VK_CAPITAL),
+        "leftshift": ("Left Shift", 0x2A, False, win32con.VK_LSHIFT),
+        "leftcontrol": ("Left Control", 0x1D, False, win32con.VK_LCONTROL),
+        "leftwin": ("Left Win", 0x5B, True, win32con.VK_LWIN),
         "leftalt": ("Left Alt", 0x38, False, win32con.VK_LMENU),
         # Right shift key appears to exist in both extended and
         # non-extended version
         "rightshift": ("Right Shift", 0x36, True, win32con.VK_RSHIFT),
-        #"rightshift2": ("Right Shift", 0x36, True, win32con.VK_RSHIFT),
-        "rightcontrol": ("Right Control", 0x1d, True, win32con.VK_RCONTROL),
-        "rightwin": ("Right Win", 0x5c, True, win32con.VK_RWIN),
+        # "rightshift2": ("Right Shift", 0x36, True, win32con.VK_RSHIFT),
+        "rightcontrol": ("Right Control", 0x1D, True, win32con.VK_RCONTROL),
+        "rightwin": ("Right Win", 0x5C, True, win32con.VK_RWIN),
         "rightalt": ("Right Alt", 0x38, True, win32con.VK_RMENU),
         "rightalt2": ("Right Alt", 0x38, True, win32con.VK_RMENU),
-        "apps": ("Apps", 0x5d, True, win32con.VK_APPS),
-        "enter": ("Enter", 0x1c, False, win32con.VK_RETURN),
-        "esc": ("Esc", 0x01, False, win32con.VK_ESCAPE)
+        "apps": ("Apps", 0x5D, True, win32con.VK_APPS),
+        "enter": ("Enter", 0x1C, False, win32con.VK_RETURN),
+        "esc": ("Esc", 0x01, False, win32con.VK_ESCAPE),
     }
 
     _keyboard_special = list(_g_name_map.keys())
-    _keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightshift2","rightcontrol","rightalt","rightalt2","leftwin","rightwin"]
+    _keyboard_modifiers = [
+        "leftshift",
+        "leftcontrol",
+        "leftalt",
+        "rightshift",
+        "rightshift2",
+        "rightcontrol",
+        "rightalt",
+        "rightalt2",
+        "leftwin",
+        "rightwin",
+    ]
+
 
 # populate special mouse keys
 for mouse_button in MouseButton:
@@ -1285,7 +1303,7 @@ for mouse_button in MouseButton:
 for name_, data in KeyMap._g_name_map.items():
     key = Key(*data)
     key._lookup_name = name_
-    KeyMap._g_map[(data[1],data[2])] = key
+    KeyMap._g_map[(data[1], data[2])] = key
     KeyMap.register(key)
 
 
@@ -1296,7 +1314,7 @@ for enum_code_value in scan_codes:
     is_extended = False
     if code_value << 8 & 0xE0 or code_value << 8 & 0xE1:
         is_extended = True
-    if not (scan_code, is_extended) in KeyMap._g_scan_code_to_key:
+    if (scan_code, is_extended) not in KeyMap._g_scan_code_to_key:
         virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         if virtual_code > 0:
             # only store keys that have a virtual key code
@@ -1307,5 +1325,3 @@ for enum_code_value in scan_codes:
             name = enum_code_value.name
             key = Key(name, scan_code, is_extended, 0)
             KeyMap.register(key)
-            
-

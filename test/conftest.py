@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append(".")
 
 import pytest
@@ -17,6 +18,4 @@ def joystick_init():
 
 @pytest.fixture(scope="session", autouse=True)
 def terminate_event_listener(request):
-    request.addfinalizer(
-        lambda: gremlin.event_handler.EventListener().terminate()
-    )
+    request.addfinalizer(lambda: gremlin.event_handler.EventListener().terminate())

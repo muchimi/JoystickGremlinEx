@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,15 +31,9 @@ def _open_key(sub_key, access=winreg.KEY_READ):
     :return the handle to the opened key
     """
     try:
-        return winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            str(sub_key),
-            access=access
-        )
+        return winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, str(sub_key), access=access)
     except OSError:
-        raise HidGuardianError(
-            f"Unable to open sub key \"{sub_key}\""
-        )
+        raise HidGuardianError(f'Unable to open sub key "{sub_key}"')
 
 
 def _clear_key(handle):
@@ -96,16 +90,18 @@ def _write_value(handle, value_name, data):
     try:
         winreg.SetValueEx(handle, value_name, 0, data[1], data[0])
     except PermissionError:
-        raise HidGuardianError(f"Unable to write value '{value_name}', insufficient permissions"
+        raise HidGuardianError(
+            f"Unable to write value '{value_name}', insufficient permissions"
         )
 
 
 class HidGuardian:
-
     """Interfaces with HidGuardians registry configuration."""
 
     root_path = "SYSTEM\\CurrentControlSet\\Services\\HidGuardian\\Parameters"
-    process_path = "SYSTEM\\CurrentControlSet\\Services\\HidGuardian\\Parameters\\Whitelist"
+    process_path = (
+        "SYSTEM\\CurrentControlSet\\Services\\HidGuardian\\Parameters\\Whitelist"
+    )
     storage_value = "AffectedDevices"
 
     def __init__(self):
@@ -116,27 +112,17 @@ class HidGuardian:
 
         try:
             # Ensure we have the needed parameter entries
-            handle = winreg.CreateKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                HidGuardian.root_path
-            )
-            data = _read_value(
-                handle,
-                HidGuardian.storage_value,
-                winreg.REG_MULTI_SZ
-            )
+            handle = winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, HidGuardian.root_path)
+            data = _read_value(handle, HidGuardian.storage_value, winreg.REG_MULTI_SZ)
             if data[0] is None:
                 _write_value(
-                    handle,
-                    HidGuardian.storage_value,
-                    [[], winreg.REG_MULTI_SZ]
+                    handle, HidGuardian.storage_value, [[], winreg.REG_MULTI_SZ]
                 )
             handle.Close()
 
             # Ensure we can create per process keys
             handle = winreg.CreateKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                HidGuardian.process_path
+                winreg.HKEY_LOCAL_MACHINE, HidGuardian.process_path
             )
             handle.Close()
         except OSError:
@@ -153,11 +139,7 @@ class HidGuardian:
 
         # Add device to the list of devices that HidGuardian is intercepting
         handle = _open_key(HidGuardian.root_path, winreg.KEY_ALL_ACCESS)
-        data = _read_value(
-            handle,
-            HidGuardian.storage_value,
-            winreg.REG_MULTI_SZ
-        )
+        data = _read_value(handle, HidGuardian.storage_value, winreg.REG_MULTI_SZ)
 
         device_string = self._create_device_string(vendor_id, product_id)
         if data[0] is None:
@@ -204,15 +186,8 @@ class HidGuardian:
             return
 
         # Get list of handled devices
-        root_handle = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            HidGuardian.root_path
-        )
-        data = _read_value(
-            root_handle,
-            HidGuardian.storage_value,
-            winreg.REG_MULTI_SZ
-        )
+        root_handle = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, HidGuardian.root_path)
+        data = _read_value(root_handle, HidGuardian.storage_value, winreg.REG_MULTI_SZ)
 
         # Process each entry to extract vendor and product id
         device_data = []
@@ -221,15 +196,13 @@ class HidGuardian:
             match = split_regex.match(entry)
             if match:
                 try:
-                    device_data.append((
-                        int(match.group(1), 16),
-                        int(match.group(2), 16)
-                    ))
+                    device_data.append(
+                        (int(match.group(1), 16), int(match.group(2), 16))
+                    )
                 except ValueError:
                     gremlin.util.display_error(
                         f"Failed to extract vendor and product id for HidGuardian entry:\n\n{entry}"
                     )
-
 
         return device_data
 
@@ -247,8 +220,7 @@ class HidGuardian:
 
         # Ensure the process key exists and write the identifying value
         handle = winreg.CreateKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            f"{HidGuardian.process_path}\\{process_id}"
+            winreg.HKEY_LOCAL_MACHINE, f"{HidGuardian.process_path}\\{process_id}"
         )
         winreg.SetValueEx(handle, "Joystick Gremlin", 0, winreg.REG_DWORD, 1)
         self._synchronize_process(process_id)
@@ -262,10 +234,7 @@ class HidGuardian:
             return
 
         try:
-            handle = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                HidGuardian.process_path
-            )
+            handle = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, HidGuardian.process_path)
             key_handle = winreg.OpenKey(handle, str(process_id))
             _clear_key(key_handle)
             winreg.DeleteKey(handle, str(process_id))
@@ -331,15 +300,10 @@ class HidGuardian:
 
         # Get data about devices handled by HidGuardian
         root_handle = _open_key(HidGuardian.root_path)
-        data = _read_value(
-            root_handle,
-            HidGuardian.storage_value,
-            winreg.REG_MULTI_SZ
-        )
+        data = _read_value(root_handle, HidGuardian.storage_value, winreg.REG_MULTI_SZ)
 
         # Write the same data to the process exemption list
         handle = _open_key(
-            f"{HidGuardian.process_path}\\{process_id}",
-            access=winreg.KEY_WRITE
+            f"{HidGuardian.process_path}\\{process_id}", access=winreg.KEY_WRITE
         )
         _write_value(handle, HidGuardian.storage_value, data)

@@ -20,7 +20,6 @@
 from __future__ import annotations
 import logging
 from PySide6 import QtWidgets, QtCore
-import json
 
 # import container_plugins.basic
 # import gremlin
@@ -35,7 +34,6 @@ from .joystick_device import InputItemConfiguration
 from .input_item import InputItemWidget, InputIdentifier, InputItemListView
 import uuid
 from gremlin.util import *
-from gremlin.input_types import InputType
 import gremlin.base_classes
 from lxml import etree as ElementTree
 import gremlin.ui.ui_common
@@ -165,7 +163,6 @@ class KeyboardInputItem(AbstractInputItem):
 
     def parse_xml(self, node, data = None):
         ''' loads itself from xml '''
-        from gremlin.keyboard import key_from_code
         self._suspend_update = True
         
         if node.tag == "input":
@@ -203,7 +200,7 @@ class KeyboardInputItem(AbstractInputItem):
                                 # else:
                                 (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
                                 key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
-                            if not key in self._key.latched_keys:
+                            if key not in self._key.latched_keys:
                                 self._key._latched_keys.append(key)
 
                     self._key._update()
@@ -714,7 +711,6 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     
     def _edit_item_cb(self, widget, index, data):
         ''' called when the edit button is clicked  '''
-        from gremlin.keyboard import Key
         from gremlin.ui.virtual_keyboard import InputKeyboardDialog
 
         data = self.model.data(index)

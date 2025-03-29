@@ -16,13 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
 import sys
+
 sys.path.append(".")
 
-import pytest
 import uuid
 from lxml import etree as ElementTree
 
-import gremlin.error as error
 import gremlin.types as types
 import gremlin.profile_library as profile_library
 
@@ -51,10 +50,7 @@ xml_simple = """
 
 
 def test_from_xml():
-    a = tempo.TempoModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
-    )
+    a = tempo.TempoModel(profile_library.ActionTree(), types.InputType.JoystickButton)
     a.from_xml(ElementTree.fromstring(xml_simple))
 
     assert len(a._short_action_ids) == 2
@@ -64,31 +60,22 @@ def test_from_xml():
 
 
 def test_to_xml():
-    a = tempo.TempoModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
-    )
+    a = tempo.TempoModel(profile_library.ActionTree(), types.InputType.JoystickButton)
 
     a._short_action_ids.append(uuid.UUID("fbe6be7b-07c9-4400-94f2-caa245ebcc7e"))
     a._threshold = 0.42
 
     node = a.to_xml()
-    assert node.find(
-            "./property/name[.='activate-on']/../value"
-        ).text == "release"
-    assert node.find(
-            "./property/name[.='threshold']/../value"
-    ).text == "0.42"
-    assert node.find(
-            "./short-actions/action-id"
-    ).text == "fbe6be7b-07c9-4400-94f2-caa245ebcc7e"
+    assert node.find("./property/name[.='activate-on']/../value").text == "release"
+    assert node.find("./property/name[.='threshold']/../value").text == "0.42"
+    assert (
+        node.find("./short-actions/action-id").text
+        == "fbe6be7b-07c9-4400-94f2-caa245ebcc7e"
+    )
 
 
 def test_ctor():
-    a = tempo.TempoModel(
-        profile_library.ActionTree(),
-        types.InputType.JoystickButton
-    )
+    a = tempo.TempoModel(profile_library.ActionTree(), types.InputType.JoystickButton)
 
     assert len(a._short_action_ids) == 0
     assert len(a._long_action_ids) == 0
