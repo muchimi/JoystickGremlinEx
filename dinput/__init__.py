@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -415,6 +415,7 @@ class DeviceSummary:
         data : _DeviceSummary
             The data received from DILL and to be held by this instance
         """
+        self._connected = False # true if device is connected
         if data is not None:    
             self.device_guid = GUID(data.device_guid)
             self.device_id = str(self.device_guid)
@@ -432,7 +433,7 @@ class DeviceSummary:
             self.usage = data.usage
             self.axis_names = []
             logical_count = 0
-            self.is_input_enabled = True # allow usage as an input device
+            self.input_enabled = True # allow usage as an input device by default for special and physical devices
             for i in range(8):
                 axis_map = AxisMap(data.axis_map[i])
                 self.axis_map.append(axis_map)
@@ -445,6 +446,8 @@ class DeviceSummary:
                     logical_count += 1
                 self.axis_names.append(axis_name)
             self.vjoy_id = -1
+            self._connected = True
+
         else:
             self.device_guid = None
             self.device_id = None
@@ -461,9 +464,22 @@ class DeviceSummary:
             self.usage = None
             self.axis_names = []
             logical_count = 0
-            self.is_input_enabled = False # do not allow usage as an input device
+            self.input_enabled = False # do not allow usage as an input device
             self.vjoy_id = -1
         self.is_special = False
+
+    @property
+    def connected(self) -> bool:
+        ''' true if the device is connected '''
+        if self.is_special:
+            # special devices are always connected
+            return True 
+        return self._connected
+    @connected.setter
+    def connected(self, value : bool):
+        self._connected = value
+            
+        
         
 
     @property
@@ -542,7 +558,9 @@ class DeviceSummary:
 
     def __str__(self):
         vjoy_stub = f"VjoyID: {self.vjoy_id}" if self.vjoy_id != -1 else ""
-        return f"Device: {self.name} {self.device_id} Axis: {self.axis_count} Buttons: {self.button_count} Hats: {self.hat_count} Vendor: 0x{self.vendor_id:X} Product: 0x{self.product_id:X} Virtual: {self.is_virtual} {vjoy_stub}"
+        vendor_string = f"0x{self.vendor_id}" if self.vendor_id else "N/A"
+        product_string = f"0x{self.product_id}" if self.product_id else "N/A"
+        return f"Device: {self.name} {self.device_id}  Connected: {self.connected} Axis: {self.axis_count} Buttons: {self.button_count} Hats: {self.hat_count} Vendor: {vendor_string} Product: {product_string} Virtual: {self.is_virtual} {vjoy_stub}"
 
 
 C_EVENT_CALLBACK = ctypes.CFUNCTYPE(None, _JoystickInputData)

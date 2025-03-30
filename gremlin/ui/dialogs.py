@@ -2335,18 +2335,6 @@ The setting can be overriden by the global mode reload option set in Options for
         layout.addStretch()
         layout.addWidget(self.add_button)
 
-        # self.header_widget = QtWidgets.QWidget()
-        # self.header_layout = QtWidgets.QGridLayout(self.header_widget)
-        # self.header_layout.addWidget(QtWidgets.QLabel("<b>Mode Name</b>"), 0, 0)
-        # self.header_layout.addWidget(QtWidgets.QLabel("<b>Parent Mode</b>"), 0, 1)
-
-        # self.header_layout.addWidget(QtWidgets.QLabel(" "), 0, 2)
-        # self.header_layout.addWidget(QtWidgets.QLabel(" "), 0, 3)
-        # self.header_layout.addWidget(QtWidgets.QLabel(" "), 0, 4)
-
-        # self.header_layout.setColumnStretch(4,2)
-
-
         self.main_layout.addWidget(header_widget)
         self.main_layout.addWidget(self.scroll_area)
         self.main_layout.addWidget(options_container_widget)

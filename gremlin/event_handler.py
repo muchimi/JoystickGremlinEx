@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -360,6 +360,7 @@ class EventListener(QtCore.QObject):
 	profile_stop_toolbar = QtCore.Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
 	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
 	request_profile_stop = QtCore.Signal(str) # request the profile to stop (reason: str)
+	request_profile_reload = QtCore.Signal(str, bool) # request a profile to load (str = profile file, bool = as new profile flag)
 	
 	process_monitor_changed = QtCore.Signal() # process monitor options changed
 

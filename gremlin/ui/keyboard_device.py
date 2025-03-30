@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -308,7 +308,7 @@ class KeyboardInputItem(AbstractInputItem):
         return not (self == other)
     
     def __hash__(self):
-        return str(self.id).__hash__()
+        return str(self._message_key).__hash__()
     
     def __lt__(self, other):
         ''' used for sorting purposes '''
@@ -737,7 +737,3 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
             self.setRightPanelWidget(self._item_data)
 
-
-
-
-                

@@ -641,28 +641,16 @@ class InputItemBindingModel(QtCore.QObject):
             # Ensure a virtual button instance exists of the correct type
             # if one is needed
             input_type = self._input_item_binding.input_item.input_type
-            if input_type == InputType.JoystickAxis and \
-                    behavior == InputType.JoystickButton:
-                if not isinstance(
-                        self._input_item_binding.virtual_button,
-                        profile.VirtualAxisButton
-                ):
-                    self._input_item_binding.virtual_button = \
-                        profile.VirtualAxisButton()
-                    self._virtual_button_model = VirtualButtonModel(
-                        self._input_item_binding.virtual_button
-                    )
+            if input_type == InputType.JoystickAxis and behavior == InputType.JoystickButton:
+                if not isinstance(self._input_item_binding.virtual_button,profile.VirtualAxisButton):
+                    self._input_item_binding.virtual_button = profile.VirtualAxisButton()
+                    self._virtual_button_model = VirtualButtonModel(self._input_item_binding.virtual_button)
+                    
             elif input_type == InputType.JoystickHat and \
                     behavior == InputType.JoystickButton:
-                if not isinstance(
-                        self._input_item_binding.virtual_button,
-                        profile.VirtualHatButton
-                ):
-                    self._input_item_binding.virtual_button = \
-                        profile.VirtualHatButton()
-                    self._virtual_button_model = VirtualButtonModel(
-                        self._input_item_binding.virtual_button
-                    )
+                if not isinstance(self._input_item_binding.virtual_button,profile.VirtualHatButton):
+                    self._input_item_binding.virtual_button = profile.VirtualHatButton()
+                    self._virtual_button_model = VirtualButtonModel(self._input_item_binding.virtual_button)
 
             # Update input type of all actions
             # node_list = self._action_tree.root.nodes_matching(lambda x: True)

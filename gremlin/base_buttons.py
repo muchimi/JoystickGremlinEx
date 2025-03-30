@@ -51,11 +51,12 @@ class VirtualAxisButton(AbstractVirtualButton):
         self.lower_limit = -1
         self.upper_limit = 1
         self.direction = AxisButtonDirection.Anywhere
+        self.container = container
         self.device_guid = container.device_guid # associated device
         self.input_id = container.get_input_id()
         self.mode = gremlin.shared_state.current_mode
         self.input_type = container.get_input_type()
-        self.container = container
+        
 
     @property
     def enabled(self) -> bool:
@@ -91,7 +92,7 @@ class VirtualAxisButton(AbstractVirtualButton):
         self.direction = AxisButtonDirection.to_enum(
             safe_read(node, "direction", default_value="anywhere")
         )
-        self.enabled = safe_read(node,"enabled", bool, False)
+        self.enabled = safe_read(node,"enabled", bool, True)
 
     def to_xml(self):
         """Returns an XML node representing the data of this instance.

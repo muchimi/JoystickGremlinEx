@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -76,8 +76,8 @@ import gremlin.joystick_handling
 import gremlin.ui.ui_common
 import dinput
 import enum
-import vjoy
-
+from enum import auto
+from anytree import NodeMixin
 
 
 #from xml.dom import minidom
@@ -88,12 +88,15 @@ NodeItem = namedtuple("NodeItem","device_name device_guid device_type node")
 #_ContainerItem= namedtuple("ContainerItem","device_name device_guid device_type mode input_type input_id input_description container_nodes data")
 
 syslog = logging.getLogger("system")
+
     
 class MapperMode(enum.IntEnum):
     ''' automatic mapping modes '''
     Stop = 1 # stop if the vjoy target has fewer axes/buttons/hats
     RoundRobin = 2 # restart at 1 if the vjoy target has fewer axes/buttons/hats
     Unused = 3 # only map unused 
+
+
 
 
 class MapperModeWidget(QtWidgets.QWidget):
@@ -902,9 +905,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         :path: the xml to import
         '''
 
-
-        # syslog = logging.getLogger("system")
-
+        self.root = ImportNode()
 
         self.source_profile = gremlin.base_profile.Profile()
         self.source_profile.from_xml(self.profile_path)

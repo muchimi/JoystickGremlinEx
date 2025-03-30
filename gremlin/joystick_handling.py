@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,10 @@ import time
 
 import gremlin.base_classes
 import gremlin.event_handler
+import gremlin.input_types
 import gremlin.joystick_handling
+import gremlin.types
+import gremlin.types
 
 
 
@@ -42,8 +45,14 @@ _joystick_devices = [] # all devices
 
 _joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID
 
+
 # Joystick initialization lock
 _joystick_init_lock = threading.Lock()
+
+# joystick linear axis names
+
+class AxisNames:
+    joystick_linear_axis_names = ["X","Y","Z","S1","S2","RX","RY","RZ"]
 
 # initialized flag
 _joystick_initialized = False
@@ -111,7 +120,7 @@ def button_input_devices() -> list[DeviceSummary]:
 
 def  is_hardware_device(device_guid) -> bool:
     ''' true if the device is a hardware device '''
-    info = device_info_from_guid(device_guid)
+    info : DeviceSummary = device_info_from_guid(device_guid)
     if info:
         return not info.is_special
     return False
@@ -199,7 +208,7 @@ def physical_devices():
 
     :return list of physical devices
     """
-    return [dev for dev in _joystick_devices if not dev.is_virtual]
+    return [dev for dev in _joystick_devices if dev.device_type == gremlin.types.DeviceType.Joystick and not dev.is_virtual]
 
 
 def select_first_valid_vjoy_input(valid_types):
@@ -284,12 +293,7 @@ def device_name_from_guid(device_guid : str | dinput.GUID) -> str:
     joystick_devices_update()
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
-    #syslog.warning(f"getDeviceName: {str(device_guid)} - name not found")
-    # verbose = gremlin.config.Configuration().verbose
-    # if verbose:
-    #     syslog.info("\tKnown devices:")
-    #     for guid in known_devices():
-    #         syslog.info(f"\t\t{str(guid)} {_joystick_device_guid_map[guid].name}")
+
     return None
     
 def known_devices() -> list:
@@ -298,7 +302,7 @@ def known_devices() -> list:
 
 def device_info_from_guid(device_guid : str | dinput.GUID) -> DeviceSummary:
     ''' gets physical device information '''
-    import gremlin.shared_state
+    
     assert (_joystick_initialized)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
@@ -306,18 +310,6 @@ def device_info_from_guid(device_guid : str | dinput.GUID) -> DeviceSummary:
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
 
-    # attempt to find it
-    # if gremlin.shared_state.is_running:
-    #     _scan_dinput()
-    #     if device_guid in _joystick_device_guid_map:
-    #         return _joystick_device_guid_map[device_guid]
-    
-    # syslog.warning(f"getDeviceInfo: {device_guid} - info not found")
-    # verbose = gremlin.config.Configuration().verbose
-    # if verbose:
-    #     syslog.info("\tKnown devices:")
-    #     for guid in known_devices():
-    #         syslog.info(f"\t\t{guid} {_joystick_device_guid_map[guid].name}")
     return None
 
 def vjoy_info_from_vjoy_id(id : int ) -> DeviceSummary:
@@ -457,6 +449,7 @@ def joystick_devices_initialization():
         if dev.is_virtual: 
             virtual_count += 1
             virtual_devices[dev.hashkey] = dev
+            dev.device_type = gremlin.types.DeviceType.VJoy
         else:
             real_count += 1
 

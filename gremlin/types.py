@@ -216,12 +216,13 @@ class DeviceType(IntEnum):
 
     """Enumeration of the different possible input types."""
     NotSet = 0 # not set
-    Keyboard = 1 # keyboard
-    Joystick = 2 # game controller
+    Keyboard = 1 # keyboard special device
+    Joystick = 2 # joystick or game controller
     VJoy = 3 # vjoy (virtual)
-    Midi = 4 # midi
-    Osc = 5 # open source control
-    ModeControl = 6 # mode control
+    Midi = 4 # midi special device
+    Osc = 5 # open source control special device
+    ModeControl = 6 # mode control special device
+    Settings = 7 # settings special device
 
     @staticmethod
     def to_string(value):
@@ -250,7 +251,8 @@ _DeviceType_to_display_name = {
     DeviceType.VJoy: "VJoy",
     DeviceType.Midi: "MIDI",
     DeviceType.Osc: "OSC",
-    DeviceType.ModeControl: "Mode Control"
+    DeviceType.ModeControl: "Mode Control",
+    DeviceType.Settings : "Settings"
 }
 
 _DeviceType_to_string_lookup = {
@@ -261,6 +263,7 @@ _DeviceType_to_string_lookup = {
     DeviceType.Midi: "midi",
     DeviceType.Osc: "osc",
     DeviceType.ModeControl: "mode",
+    DeviceType.Settings: "settings"
 }
 
 
@@ -272,6 +275,7 @@ _DeviceType_to_enum_lookup = {
     "midi": DeviceType.Midi,
     "osc": DeviceType.Osc,
     "mode": DeviceType.ModeControl,
+    "settings": DeviceType.Settings
 
 }
 

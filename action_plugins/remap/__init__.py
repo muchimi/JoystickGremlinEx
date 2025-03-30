@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -112,9 +112,6 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             input_types[self._get_input_type()],
             self.action_data.get_settings().vjoy_as_input
         )
-
-        
-
         
         self.main_layout.addWidget(self.vjoy_selector)
 
@@ -163,7 +160,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             vjoy_dev_id = self.action_data.vjoy_device_id
 
         # Get the input type which can change depending on the container used
-        input_type = self.action_data.get_input_type()
+        input_type = self.action_data.input_type
         
         
         if self.action_data.parent.tag == "hat_buttons":
@@ -414,11 +411,18 @@ class Remap(gremlin.base_profile.AbstractAction):
         self.vjoy_device_id = None
         self.vjoy_input_id = None
         input_type = self.get_input_type()
-        self.input_type = input_type
+        self._input_type = input_type
         self.is_axis = self.input_is_axis()
         
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
+
+    @property
+    def input_type(self) -> InputType:
+        return self._input_type
+    @input_type.setter
+    def input_type(self, value : InputType):
+        self._input_type = value
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -473,16 +477,17 @@ class Remap(gremlin.base_profile.AbstractAction):
 
         :return True if an activation condition is required, False otherwise
         """
-        input_type = self.get_input_type()
+        mapped_input_type = self.get_input_type()
 
-        if input_type in [InputType.JoystickButton, InputType.Keyboard]:
+        if mapped_input_type in [InputType.JoystickButton, InputType.Keyboard]:
             return False
         elif self.is_axis:
             if self.input_type == InputType.JoystickAxis:
                 return False
             else:
+                # button or hat requires a virtual button setup
                 return True
-        elif input_type == InputType.JoystickHat:
+        elif mapped_input_type == InputType.JoystickHat:
             if self.input_type == InputType.JoystickHat:
                 return False
             else:
@@ -517,8 +522,7 @@ class Remap(gremlin.base_profile.AbstractAction):
                 )
 
 
-            if self.get_input_type() == InputType.JoystickAxis and \
-                    self.input_type == InputType.JoystickAxis:
+            if self.get_input_type() == InputType.JoystickAxis and self.input_type == InputType.JoystickAxis:
                 self.axis_mode = safe_read(node, "axis-type", str, "absolute")
                 self.axis_scaling = safe_read(node, "axis-scaling", float, 1.0)
         except ProfileError:

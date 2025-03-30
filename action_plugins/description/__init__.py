@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -86,7 +86,7 @@ class DescriptionAction(gremlin.base_profile.AbstractAction):
         self.parent = parent
 
     def icon(self):
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "mdi.text"
 
     def requires_virtual_button(self):
         return False

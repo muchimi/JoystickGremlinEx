@@ -44,7 +44,9 @@ import gremlin.gamepad_handling
 import gremlin.import_profile
 import gremlin.input_devices
 import gremlin.joystick_handling
+import gremlin.profile_graph
 import gremlin.shared_state
+import gremlin.types
 import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
 import gremlin.ui.osc_device
@@ -123,7 +125,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t18"
+APPLICATION_BASE = "m73t19"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -139,9 +141,10 @@ class Version():
 
 
 class TabData:
-    def __init__(self, device_guid, tab_type : TabDeviceType):
+    def __init__(self, device_guid, tab_type : TabDeviceType, device : dinput.DeviceSummary):
         self._device_guid = device_guid
         self._tab_type = tab_type
+        self._device = device
 
     @property
     def device_guid(self) -> str:
@@ -149,6 +152,11 @@ class TabData:
     @property
     def tab_type(self) -> TabDeviceType:
         return self._tab_type
+    
+    @property
+    def device(self) -> dinput.DeviceSummary:
+        ''' device data'''
+        return self._device
 
 class GremlinUi(QtWidgets.QMainWindow):
 
@@ -195,6 +203,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         self.ui.devices.tabChanged.connect(self._tab_selected)
         self.ui.devices.tabMoveCompleted.connect(self._tab_moved_cb)
+        self.ui.devices.tabContextMenu.connect(self._tab_context_menu_cb)
 
         self._last_input_item = None # last selected input item
 
@@ -213,6 +222,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.push_input_selection()
         el.request_activate.connect(self.activate) # hook activation / deactivation requests
         el.refresh_devices.connect(self._create_tabs) # refresh device list
+        el.request_profile_reload.connect(self._reload_profile) # reload the profile from a temporary file
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
@@ -365,6 +375,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.config_option_changed.connect(self._config_option_changed)
 
 
+
+
     def _init_tab_data(self):
         self._widget_cache = {} # map of device widgets keyed by the device GUID
 
@@ -390,7 +402,24 @@ class GremlinUi(QtWidgets.QMainWindow):
             with QtCore.QSignalBlocker(self.ui.devices):
                 while self.ui.devices.count():
                     self.ui.devices.removeTab(0)
-        
+
+
+    def _get_device(self, device_guid) -> dinput.DeviceSummary:
+        ''' gets the device for a given GUID, connected or not '''
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._all_devices_map:
+            return self._all_devices_map[device_guid]
+        return gremlin.joystick_handling.device_info_from_guid(device_guid)
+    
+    def _get_device_name(self, device_guid):
+        ''' gets the name of a device '''
+        device = self._get_device(device_guid)
+        if device:
+            return device.name
+        return None
+
+
 
     def _add_tab(self, device_guid, tab_type, index = None) -> int: 
         ''' adds a tab to the tab header 
@@ -399,24 +428,24 @@ class GremlinUi(QtWidgets.QMainWindow):
         :returns int: the index of the tab added 
         '''
 
-
-
-        
-        # syslog = logging.getLogger("system")
-
-        device_name = gremlin.shared_state.get_device_name(device_guid)
-        if not device_name:
-            syslog.error(f"Unknown device GUID found in tabs: {device_guid}")
-            return
-        
         if device_guid in self._tab_device_map:
             syslog.error(f"Duplicate GUID found in tabs: {device_name} {device_guid}")
             assert False
-
         
+        device : dinput.DeviceSummary = self._get_device(device_guid)
+        if not device:
+            syslog.error(f"Unknown device GUID found in tabs: {device_guid}")
+            return
+        device_name = device.name
 
         if index is None:
             position = self.ui.devices.addTab(device_name)
+            if not device.connected:
+                # indicate device is disconnected
+                color = gremlin.ui.ui_common.Color().disconnectedColor()
+                icon = gremlin.ui.ui_common.load_icon("mdi.power-plug-off", qta_color = color)
+                self.ui.devices.setTabIcon(position, icon)
+                self.ui.devices.setTabTextColor(position, color)
         else:
             position = self.ui.devices.insertTab(index, device_name)
     
@@ -424,7 +453,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._tab_index_map[position] = device_guid
         self._tab_name_map[device_guid] = device_name
         
-        self.ui.devices.setTabData(position, TabData(device_guid, tab_type))
+        self.ui.devices.setTabData(position, TabData(device_guid, tab_type, device))
 
         if tab_type == TabDeviceType.Joystick:
             self._joystick_device_guids.append(device_guid)
@@ -469,7 +498,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         for index in range(self.ui.devices.count()):
             data = self.ui.devices.tabData(index)
             device_guid = data.device_guid
-            device_name = gremlin.shared_state.get_device_name(device_guid)
+            device_name = self._get_device_name(device_guid)
             self._tab_index_map[index] = device_guid
             self._tab_device_map[device_guid] = index
             self._tab_name_map[device_guid] = device_name
@@ -602,7 +631,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         if device_guid is not None:
             verbose = gremlin.config.Configuration().verbose
             if verbose:
-                syslog.info(f"Tab index change: new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {gremlin.shared_state.get_device_name(device_guid)}")
+                device_name = self._get_device_name(device_guid)
+                syslog.info(f"Tab index change: new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {device_name}")
             self.last_tab_index = index
             _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
             self._select_input(device_guid = device_guid, input_type = restore_input_type, input_id = restore_input_id, force_update =True, force_switch=True, tab_changed = True)
@@ -613,26 +643,23 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' adds custom tools to the menu '''
         self._actionTabSort = QtGui.QAction("Sort Devices", self, triggered = self._tab_sort_cb)
         self._actionTabSort.setToolTip("Sorts input hardware devices in alphabetical order")
-        self._actionTabSubstitute = QtGui.QAction("Device Substitution...", self, triggered = self._tab_substitute_cb)
-        self._actionTabSubstitute.setToolTip("Substitute device GUIDs")
+        self._actionTabSubstitute = QtGui.QAction("Device Remap...", self, triggered = self._tab_substitute_cb)
+        self._actionTabSubstitute.setToolTip("Remap the device to another device")
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered = self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
-        self._actionTabImport = QtGui.QAction("Import Profile...", self, triggered = self._tab_import_cb)
-        self._actionTabImport.setToolTip("Import profile data into the current device")
+        #self._actionTabImport = QtGui.QAction("Import Profile...", self, triggered = self._tab_import_cb)
+        #self._actionTabImport.setToolTip("Import profile data into the current device")
 
         menuTools.addSeparator()
         menuTools.addAction(self._actionTabSort)
         menuTools.addAction(self._actionTabSubstitute)
-        menuTools.addAction(self._actionTabImport)
+        #menuTools.addAction(self._actionTabImport)
         menuTools.addAction(self._actionTabClearMap)
 
 
 
-    def _tab_context_menu_cb(self, pos):
+    def _tab_context_menu_cb(self, tab_index):
         ''' tab context menu '''
-        tab_index = self.ui.devices.tabAt(pos)
-        if tab_index == -1:
-            return
         self._context_menu_tab_index = tab_index
         data : TabData = self.ui.devices.tabData(tab_index)
         tab_type = data.tab_type
@@ -646,7 +673,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         menu = QtWidgets.QMenu(self)
         menu.addAction(self._actionTabSort)
         menu.addAction(self._actionTabSubstitute)
-        menu.addAction(self._actionTabImport)
+        #menu.addAction(self._actionTabImport)
         menu.addAction(self._actionTabClearMap)
         menu.exec_(QtGui.QCursor.pos())
 
@@ -700,19 +727,25 @@ class GremlinUi(QtWidgets.QMainWindow):
         data : TabData = self.ui.devices.tabData(self._context_menu_tab_index)
         device_guid = data.device_guid
 
-        device_name = self.ui.devices.tabText(self._context_menu_tab_index)
-        dialog = gremlin.ui.dialogs.SubstituteDialog(device_guid=device_guid, device_name=device_name, parent = self)
-        dialog.setModal(True)
+        #device_name = self.ui.devices.tabText(self._context_menu_tab_index)
+        dialog = gremlin.profile_graph.DeviceRemapDialogUI(self.current_profile.graph, self, device_guid)
+        # dialog = gremlin.ui.dialogs.SubstituteDialog(device_guid=device_guid, device_name=device_name, parent = self)
+        # dialog.setModal(True)
         dialog.accepted.connect(self._substitute_complete_cb)
         gremlin.util.centerDialog(dialog)
         dialog.show()
 
     def _substitute_complete_cb(self):
         ''' substitution complete - reload profile '''
-        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        self.load_profile(profile.profile_file)
+        # profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        # self.load_profile(profile.profile_file)
+        pass
 
-
+    @QtCore.Slot(str, bool)
+    def _reload_profile(self, source_xml : str, as_new_profile : bool):
+        ''' loads profile data from the specified file, optionally setting it up a new, unsaved, profile '''
+        self._do_load_profile(source_xml, as_new_profile)
+    
     def _profile_changed_cb(self, new_profile = None):
         ''' called when the a profile should be loaded '''
 
@@ -989,7 +1022,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         self.ui.actionInputRepeater.setEnabled(enabled)
         self.ui.actionGenerate.setEnabled(enabled)
-        self.ui.actionImportProfile.setEnabled(enabled)
+        #self.ui.actionImportProfile.setEnabled(enabled)
         self.ui.actionLoadProfile.setEnabled(enabled)
 
 
@@ -1301,7 +1334,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Menu actions
         # File
         self.ui.actionLoadProfile.triggered.connect(self.load_profile)
-        self.ui.actionImportProfile.triggered.connect(self.import_profile)
+        #self.ui.actionImportProfile.triggered.connect(self.import_profile)
         self.ui.actionNewProfile.triggered.connect(self.new_profile)
         self.ui.actionSaveProfile.triggered.connect(self.save_profile)
         self.ui.actionSaveProfileAs.triggered.connect(self.save_profile_as)
@@ -1603,7 +1636,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def registerWidget(self, device_guid, widget, hide = True):
         ''' registers widget for cleanup - this is needed because QT doesn't tell us when widgets are discarded so we need to manually track this here 
         so widgets cleanup correctly and remove any hooks / references '''
-        device_name = gremlin.shared_state.get_device_name(device_guid)
+        device_name = self._get_device_name(device_guid)
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         if device_guid in self._widget_cache:
@@ -1745,7 +1778,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # already shown
                 return 
         
-            device_name = gremlin.shared_state.get_device_name(current_device_guid)
+            device_name = self._get_device_name(current_device_guid)
             if verbose: syslog.info(f"TAB UNSELECT: {device_name}")
             el.tab_unselected.emit(current_device_guid)
         
@@ -1768,7 +1801,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # tell ui a new device tab was selected
             gremlin.shared_state.current_tab_device_guid = device_guid
-            device_name = gremlin.shared_state.get_device_name(device_guid)
+            device_name = self._get_device_name(device_guid)
 
             verbose = gremlin.config.Configuration().verbose_mode_detailed
             if verbose: syslog.info(f"TAB SELECT: {device_name}")
@@ -1829,12 +1862,43 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self._active_devices = gremlin.joystick_handling.joystick_devices()
 
+
+            # get list of devices in the profile that do not exist or are not connected
+            graph : gremlin.profile_graph.ProfileGraph = gremlin.shared_state.current_profile.graph
+            graph_devices = graph.joystick_devices()
+
+            # derive missing devices found in the profile, but not currently connected
+            missing_phys_devices = [dev for dev in graph_devices if not dev.device_guid in [d.device_guid for d in phys_devices] and dev.device_type == gremlin.types.DeviceType.Joystick]
+            missing_vjoy_devices = [dev for dev in graph_devices if not dev.device_guid in [d.device_guid for d in vjoy_devices] and dev.device_type == gremlin.types.DeviceType.VJoy]
+
+            self._missing_phys_devices = missing_phys_devices
+            self._missing_vjoy_devices = missing_vjoy_devices
+
+            for device in self._missing_phys_devices + self._missing_vjoy_devices:
+                gremlin.joystick_handling.registerSpecialDevice(device)
+
+            
+
+            if verbose:
+                for device in self._missing_phys_devices:
+                    syslog.warning(f"Missing device: {str(device)}")
+
+            all_phys_devices = missing_phys_devices + phys_devices
+            all_vjoy_devices = missing_vjoy_devices + vjoy_devices
+            
+
+            self._all_devices_map = {}
+            for device in all_phys_devices + all_vjoy_devices:
+                self._all_devices_map[device.device_id] = device
+            
+
             # index of the current tab being addded 
             index = 0
-            
+
+           
             # =======================================================
             # Create physical joystick device tabs
-            for device in sorted(phys_devices, key=lambda x: x.name):
+            for device in sorted(all_phys_devices, key=lambda x: x.name):
                 device_profile = self.profile.get_device_modes(
                     device.device_guid,
                     DeviceType.Joystick,
@@ -1848,7 +1912,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 
                 
                 device_guid = str(device.device_guid)
-                device_name = gremlin.shared_state.get_device_name(device_guid)
+                device_name =self._get_device_name(device_guid)
                 if device_name:
                     widget = self.getWidget(device_guid)
                     if not widget:
@@ -1857,15 +1921,16 @@ class GremlinUi(QtWidgets.QMainWindow):
                             device_profile,
                             self.current_mode,
                         )
-
                         
                         self.registerWidget(device_guid, widget)
 
                     self._add_tab(device_guid, TabDeviceType.Joystick)
-                    
+
+                  
                     widget.data = (TabDeviceType.Joystick, device_guid, index)
-                
-                
+
+                    if verbose:
+                        syslog.info(f"Added joystick tab: {device_name} index {index}")
                 
                 index += 1
                         
@@ -1889,14 +1954,17 @@ class GremlinUi(QtWidgets.QMainWindow):
             # add the VJOY input devices to the device tabs
             self._vjoy_input_device_guids = []
 
+
+            
             # Create vJoy as input device tabs
-            for device in sorted(vjoy_devices, key=lambda x: x.vjoy_id):
+            for device in sorted(all_vjoy_devices, key=lambda x: x.vjoy_id):
                 # Ignore vJoy as output devices
-                if not self.profile.settings.vjoy_as_input.get(device.vjoy_id, False):
+                input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+                if not input_enabled:
                     continue
 
                 device_guid = device.device_guid
-                device_name = gremlin.shared_state.get_device_name(device_guid)
+                device_name = self._get_device_name(device_guid)
                 if device_name:
                     device_profile = self.profile.get_device_modes(
                         device.device_guid,
@@ -1917,12 +1985,12 @@ class GremlinUi(QtWidgets.QMainWindow):
                         self.registerWidget(device_guid, widget)
                         gremlin.shared_state.device_widget_map[device.device_guid] = widget
                     
-
-                    
                     widget.data = (TabDeviceType.VjoyInput, device_guid, index)
                     self._add_tab(device_guid, TabDeviceType.VjoyInput)
                     index += 1
                     self._vjoy_input_device_guids.append(device_guid)
+                    if verbose:
+                        syslog.info(f"Added vjoy tab: {device_name} index {index}")
 
             # =======================================================
             # Create keyboard tab
@@ -1933,12 +2001,15 @@ class GremlinUi(QtWidgets.QMainWindow):
             )
 
             device_guid = str(gremlin.shared_state.keyboard_tab_guid)
-            dev = dinput.DeviceSummary()
-            dev.name = "Keyboard"
-            dev.device_guid = gremlin.shared_state.keyboard_tab_guid
-            dev.device_id = device_guid
-            dev.is_special = True
-            gremlin.joystick_handling.registerSpecialDevice(dev)
+            device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+            if not device:
+                device = dinput.DeviceSummary()
+                device.name = "Keyboard"
+                device.device_guid = gremlin.shared_state.keyboard_tab_guid
+                device.device_id = device_guid
+                device.device_type = DeviceType.Keyboard
+                device.is_special = True
+                gremlin.joystick_handling.registerSpecialDevice(device)
             widget = self.getWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.keyboard_device.KeyboardDeviceTabWidget(
@@ -1960,12 +2031,15 @@ class GremlinUi(QtWidgets.QMainWindow):
             # =======================================================
             # Create MIDI tab
             device_guid = str(gremlin.shared_state.midi_tab_guid)
-            dev = dinput.DeviceSummary()
-            dev.name = "MIDI"
-            dev.device_guid = gremlin.shared_state.midi_tab_guid
-            dev.device_id = device_guid
-            dev.is_special = True
-            gremlin.joystick_handling.registerSpecialDevice(dev)
+            device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+            if not device:
+                device = dinput.DeviceSummary()
+                device.name = "MIDI"
+                device.device_guid = gremlin.shared_state.midi_tab_guid
+                device.device_id = device_guid
+                device.device_type = DeviceType.Midi
+                device.is_special = True
+                gremlin.joystick_handling.registerSpecialDevice(device)
             midi_device_guid = device_guid
             if midi_enabled:
                 device_profile = self.profile.get_device_modes(
@@ -1997,13 +2071,16 @@ class GremlinUi(QtWidgets.QMainWindow):
             # =======================================================
             # Create OSC tab
             device_guid = str(gremlin.shared_state.osc_tab_guid)
+            device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+            if not device:
+                device = dinput.DeviceSummary()
+                device.name = "OSC"
+                device.device_guid = gremlin.shared_state.osc_tab_guid
+                device.device_id = device_guid
+                device.is_special = True
+                device.device_type = DeviceType.Osc
+                gremlin.joystick_handling.registerSpecialDevice(device)
             osc_device_guid = device_guid
-            dev = dinput.DeviceSummary()
-            dev.name = "OSC"
-            dev.device_guid = gremlin.shared_state.osc_tab_guid
-            dev.device_id = device_guid
-            dev.is_special = True
-            gremlin.joystick_handling.registerSpecialDevice(dev)
             if osc_enabled:
                 device_profile = self.profile.get_device_modes(
                     gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
@@ -2036,12 +2113,15 @@ class GremlinUi(QtWidgets.QMainWindow):
             # create mode control tab
             guid = gremlin.shared_state.mode_tab_guid
             device_guid = str(guid)
-            dev = dinput.DeviceSummary()
-            dev.name = "MODE"
-            dev.device_guid = guid
-            dev.device_id = device_guid
-            dev.is_special = True
-            gremlin.joystick_handling.registerSpecialDevice(dev)
+            device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+            if not device:
+                device = dinput.DeviceSummary()
+                device.name = "MODE"
+                device.device_guid = guid
+                device.device_id = device_guid
+                device.device_type = DeviceType.ModeControl
+                device.is_special = True
+                gremlin.joystick_handling.registerSpecialDevice(device)
 
             device_profile = self.profile.get_device_modes(
                     guid,
@@ -2063,47 +2143,47 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
 
-            # =======================================================
-            # show output VJOY devices
-            self._vjoy_output_device_guids = []
+            # # =======================================================
+            # # show output VJOY devices
+            # self._vjoy_output_device_guids = []
 
-            if self.config.show_output_vjoy:
+            # if self.config.show_output_vjoy:
 
-                # Create the vjoy as output device tab
-                for device in sorted(vjoy_devices, key=lambda x: x.vjoy_id):
-                    # Ignore vJoy as input devices
-                    if self.profile.settings.vjoy_as_input.get(device.vjoy_id, False):
-                        continue
+            #     # Create the vjoy as output device tab
+            #     for device in sorted(vjoy_devices, key=lambda x: x.vjoy_id):
+            #         # Ignore vJoy as input devices
+            #         if self.profile.settings.vjoy_as_input.get(device.vjoy_id, False):
+            #             continue
 
-                    device_profile = self.profile.get_device_modes(
-                        device.device_guid,
-                        DeviceType.VJoy,
-                        device.name
-                    )
-                    device_guid = str(device.device_guid)
+            #         device_profile = self.profile.get_device_modes(
+            #             device.device_guid,
+            #             DeviceType.VJoy,
+            #             device.name
+            #         )
+            #         device_guid = str(device.device_guid)
 
-                    widget = self.getWidget(device_guid)
-                    if not widget:
-                        widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
-                            device,
-                            device_profile,
-                            self.current_mode
-                        )
+            #         widget = self.getWidget(device_guid)
+            #         if not widget:
+            #             widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
+            #                 device,
+            #                 device_profile,
+            #                 self.current_mode
+            #             )
                     
-                        self.registerWidget(device_guid, widget)
+            #             self.registerWidget(device_guid, widget)
                         
-                        gremlin.shared_state.device_widget_map[device.device_guid] = widget
-                        self._vjoy_output_device_guids.append(device.device_guid)
+            #             gremlin.shared_state.device_widget_map[device.device_guid] = widget
+            #             self._vjoy_output_device_guids.append(device.device_guid)
 
 
-                    widget.data = (TabDeviceType.VjoyOutput, device_guid, index)
+            #         widget.data = (TabDeviceType.VjoyOutput, device_guid, index)
                     
-                    index += 1
+            #         index += 1
 
-                    self.ui.tab_content_layout.addWidget(widget)
+            #         self.ui.tab_content_layout.addWidget(widget)
 
                     
-                    self._add_tab(device_guid, TabDeviceType.VjoyOutput)
+            #         self._add_tab(device_guid, TabDeviceType.VjoyOutput)
 
                     
            
@@ -2113,13 +2193,16 @@ class GremlinUi(QtWidgets.QMainWindow):
             # Add profile configuration tab
 
             device_guid = str(gremlin.shared_state.settings_tab_guid)
-            device_name = "Settings"
-            dev = dinput.DeviceSummary()
-            dev.name = device_name
-            dev.device_guid = gremlin.shared_state.settings_tab_guid
-            dev.device_id = device_guid
-            dev.is_special = True
-            gremlin.joystick_handling.registerSpecialDevice(dev)
+            device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+            if not device:
+                device_name = "Settings"
+                device = dinput.DeviceSummary()
+                device.name = device_name
+                device.device_guid = gremlin.shared_state.settings_tab_guid
+                device.device_id = device_guid
+                device.device_type = DeviceType.Settings
+                device.is_special = True
+                gremlin.joystick_handling.registerSpecialDevice(device)
             if device_name:
                 
                 widget = self.getWidget(device_guid)
@@ -2139,12 +2222,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             # Add a plugin custom modules tab
             device_guid = str(gremlin.shared_state.plugins_tab_guid)
             device_name = "Plugins"
-            dev = dinput.DeviceSummary()
-            dev.name = device_name
-            dev.device_guid = gremlin.shared_state.plugins_tab_guid
-            dev.device_id = device_guid
-            dev.is_special = True
-            gremlin.joystick_handling.registerSpecialDevice(dev)
+            device = dinput.DeviceSummary()
+            device.name = device_name
+            device.device_guid = gremlin.shared_state.plugins_tab_guid
+            device.device_id = device_guid
+            device.is_special = True
+            gremlin.joystick_handling.registerSpecialDevice(device)
             widget = self.getWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.user_plugin_management.ModuleManagementController(self.profile)
@@ -2212,12 +2295,12 @@ class GremlinUi(QtWidgets.QMainWindow):
                     if missing_tab_guids:
                         syslog.info(f"Found {len(missing_data)} devices from the saved ordered list:")
                     for device_guid, tab_type in missing_data:
-                        device_name = gremlin.shared_state.get_device_name(device_guid)
+                        device_name = self._get_device_name(device_guid)
                         syslog.info(f"\t{device_name} {device_guid}")
 
                     syslog.info("UI: Final reordered tabs ----------")
                     for device_guid, _, tab_type, index in reordered_data:
-                        device_name = gremlin.shared_state.get_device_name(device_guid)
+                        device_name = self._get_device_name(device_guid)
                         syslog.info(f"\t[{index}] {device_name} {device_guid} {tab_type}")
 
             
@@ -2227,6 +2310,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self._add_tab(device_guid, tab_type)
 
                 self._reindex_tabs()
+
+            # style the tabs by connection
+            #self._update_tab_stylesheet()
 
 
             el = gremlin.event_handler.EventListener()
@@ -2269,7 +2355,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 for index in range(self.ui.devices.count()):
                     device_guid = self.ui.devices.tabData(index).device_guid
                     if device_guid:
-                        device_name = gremlin.shared_state.get_device_name(device_guid)
+                        device_name = self._get_device_name(device_guid)
                     else:
                         device_name = "(unknown)"
                     syslog.info(f"\t[{index}] {self.ui.devices.tabText(index)} {device_name}  {device_guid}")
@@ -2427,9 +2513,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             eh = gremlin.event_handler.EventListener()
             eh.select_input.emit(device_guid, input_type, input_id, False, True, False)
 
-    def _get_device_name(self, device_guid):
-        ''' gets the name of the specified device '''
-        return gremlin.shared_state.get_device_name(device_guid)
 
     def _get_last_input(self, device_guid : str) -> tuple:
         ''' Gets the last input selection for the given device
@@ -3466,10 +3549,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         gremlin.shared_state.current_profile = value
 
 
-    def _do_load_profile(self, fname):
+    def _do_load_profile(self, source_xml : str, as_new_profile = False):
         """Load the profile with the given filename.
 
-        :param fname the name of the profile file to load
+        :param source_xml: the name of the profile file to load
+        :param as_new_profile: if set, loads the new profile as an unsaved profile
+
         """
         # Disable the program if it is running when we're loading a
         # new profile
@@ -3495,14 +3580,18 @@ class GremlinUi(QtWidgets.QMainWindow):
                 el.profile_unload.emit()
 
             gremlin.shared_state.current_profile = new_profile
-            profile_updated = new_profile.from_xml(fname)
+            profile_updated = new_profile.from_xml(source_xml)
 
-            profile_folder = os.path.dirname(fname)
+            profile_folder = os.path.dirname(source_xml)
             if profile_folder not in sys.path:
                 sys.path = list(self._base_path)
                 sys.path.insert(0, profile_folder)
 
             self._sanitize_profile(new_profile)
+
+            if as_new_profile:
+                # set as new unsaved profile
+                new_profile.setProfileFile(None)
 
 
 
@@ -3536,16 +3625,13 @@ class GremlinUi(QtWidgets.QMainWindow):
             # profile version, as otherwise the change detection logic will
             # trip over insignificant input item additions.
             if profile_updated:
-                new_profile.to_xml(fname)
+                new_profile.to_xml(source_xml)
 
             # ask the UI to update input curve icons
             el.update_input_icons.emit()
 
             # update the hash value
             self._profile_hash = new_profile.getMappingHash()
-
-
-
 
 
         except (KeyError, TypeError) as error:
@@ -3559,7 +3645,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             cfg = gremlin.config.Configuration()
             cfg.last_profile = None
             self.new_profile()
-            gremlin.util.display_error(f"Failed to load the profile {fname} due to:\n\n{error}")
+            gremlin.util.display_error(f"Failed to load the profile {source_xml} due to:\n\n{error}")
 
         finally:
 

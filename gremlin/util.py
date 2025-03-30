@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1429,6 +1429,21 @@ def popCursor(reset = False):
         QtWidgets.QApplication.restoreOverrideCursor()
         #QtWidgets.QApplication.processEvents()
 
+def popCursorTemporary(pop = True):
+    ''' restore cursor temporarily without changing the stack - use for dialog boxes/prompt
+    
+    :param pop: when true, restores the arrow, when false, shows the wait cursor if it was displayed
+    
+    '''
+    global _cursor_push
+    if _cursor_push > 0:
+        if pop:
+            QtWidgets.QApplication.restoreOverrideCursor()  
+        else:
+            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
+        
+
+
 def isCursorActive():
     ''' true if the cursor stack is not empty '''
     global _cursor_push
@@ -1480,15 +1495,24 @@ def isSignalConnected(oObject : QtCore.QObject, signal_name : str):
 
 
 
-def centerDialog(dialog, width = 300, height = 150):
+def centerDialog(dialog : QtWidgets.QDialog, width : int = None, height : int = None):
     ''' centers the dialog on top of the UI '''
     # Display the dialog centered in the middle of the UI
     import gremlin.shared_state
     if gremlin.shared_state.ui is None:
         return # no UI yet
     root = dialog
+
+    if width is None:
+        width = dialog.width()
+    if height is None:
+        height = dialog.height()
+
     if not root.parent():
-        geom = gremlin.shared_state.ui.geometry()
+        if gremlin.shared_state.ui is not None:
+            geom = gremlin.shared_state.ui.geometry()
+        else:
+            geom = QtWidgets.QApplication.desktop().screen().rect()
     else:
         while root.parent():
             root = root.parent()
@@ -1496,12 +1520,13 @@ def centerDialog(dialog, width = 300, height = 150):
 
 
     #dialog.move(geom.x() - geom.width()/2, geom.y() - geom.height()/2)        
-    dialog.setGeometry(
-        int(geom.x() + geom.width() / 2 - width/2),
-        int(geom.y() + geom.height() / 2 - height/2),
-        width,
-        height
-    )
+    dialog.move(geom.center()- dialog.rect().center())
+    # dialog.setGeometry(
+    #     int(geom.x() + geom.width() / 2 - width/2),
+    #     int(geom.y() + geom.height() / 2 - height/2),
+    #     width,
+    #     height
+    # )
 
 
 def swapext(path, ext = None, prefix= '', suffix = ''):

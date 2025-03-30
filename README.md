@@ -222,10 +222,13 @@ Joystick Gremlin EX
 	+ Graph nodes support group/any/all evaluations
 - Improved handling of profile start errors (inability to connect for example)
 - Added notes field for all containers
+- New: Defined devices in a profile that are not connected will load, and show in a disconnected state tab.  The device can then be remapped to another connected device via the context menu.
 - Changed version number from base Gremlin to reflect the product is now significantly different to 16ex
 - VjoyRemap: startup axis value optional, will read raw hardware on start if not set.  
 - VjoyRemap: range and scale correctly applied to output
 - Theme color fixes for UI components
+- Fix Action description icon not themed
+
 
 ## 13.40.16ex (pre-release)
 ### (m72)

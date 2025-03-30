@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -120,6 +120,9 @@ class Color():
     def keyBackgroundColor():
         return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
+    def keyHoverBackgroundColor():
+        return "#525252" if gremlin.shared_state.is_dark_theme else "#F0F0F0"
+    @staticmethod
     def keyEntryBackgroundColor():
         return "#293d2d" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
@@ -164,17 +167,37 @@ class Color():
     @staticmethod
     def activeContentColor():
         return "#458ae6"
-
-        
-
+    @staticmethod
+    def buttonBackgroundColor():
+        return Color.backgroundColor()
+    @staticmethod
+    def buttonColor():
+        return Color.normalColor()
+    @staticmethod
+    def buttonBorderColor():
+        return Color.keyBorderColor()
+    def buttonHoverBorderColor():
+        return Color.keyHoverBorderColor()
+    @staticmethod
+    def buttonHoverBackgroundColor():
+        return Color.keyHoverBackgroundColor()
     @staticmethod
     def warningColor(): # color for the warning flag
         return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
+    @staticmethod
+    def disconnectedBackgroundColor(): # color for the disconnected device 
+        return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
+    @staticmethod
+    def disconnectedColor(): # color for the disconnected device 
+        return "#db6512"
+    
+
 
     @staticmethod
     def cssApplication():
         border_color = Color.borderColor()
         background_color = Color.backgroundColor()
+        foreground_color = Color.normalColor
         if gremlin.config.Configuration().is_debug:
             relative_path = "gfx/"
         else:
@@ -220,7 +243,7 @@ class Color():
             QScrollArea {{
                 border: 1px solid {border_color};
             }}
-            
+           
             '''
         # print (css)
 
@@ -2640,6 +2663,7 @@ class ConfirmBox():
             )
         self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(self._message_box)
+        
 
     def show(self):
         return self._message_box.exec()
@@ -5909,6 +5933,7 @@ class QTabHeader(QtWidgets.QTabBar):
 
     tabMoveCompleted = QtCore.Signal(int, int) # triggers once a tab moved has been completed 
     tabChanged = QtCore.Signal(int) # triggers when a tab is selected, aware of tab drag ops
+    tabContextMenu = QtCore.Signal(int) # triggers a context menu request (index of the tab)
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -5920,7 +5945,12 @@ class QTabHeader(QtWidgets.QTabBar):
         self._mouse_down_index = None
         self._move_in_progress = False
         self.tabMoved.connect(self._tab_moved)
+
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._open_context_menu)
+
         #self.currentChanged.connect(self._tab_selected)
+
 
     @property
     def moveInProgress(self) -> bool:
@@ -5940,13 +5970,19 @@ class QTabHeader(QtWidgets.QTabBar):
         self._to_index = to_index
         # print (f"internal tab move {from_index} {to_index}")
 
+    @QtCore.Slot(QPoint)
+    def _open_context_menu(self, position: QPoint):
+        index = self.tabAt(position)
+        if index != -1:
+            self.tabContextMenu.emit(index)
+
 
     def eventFilter(self, widget, event):
         t = event.type()
         if t == QtCore.QEvent.Type.MouseButtonPress:
             self._mouse_down = True
             self._mouse_down_index = self.currentIndex()
-            #print (f"mouse down - {self._mouse_down_index}")
+
         elif t == QtCore.QEvent.Type.MouseButtonRelease:
             self._mouse_down = False
             index = self.currentIndex()
@@ -5959,7 +5995,7 @@ class QTabHeader(QtWidgets.QTabBar):
                 # fire the tab change on release if there is a tab change
                 self.tabChanged.emit(index)
             
-        return False # allow further processing
+        return super().eventFilter(widget, event)
     
 def getRadioContainer(label_data_pairs, callback, default = None, horizontal = True, label = None, parent = None):
     ''' returns an H container for radio buttons 
@@ -7232,6 +7268,7 @@ class QPaginator(QtWidgets.QWidget):
                 self._update_data_view()
             else:
                 self._page_input_widget.clear()
+
 
 
 
