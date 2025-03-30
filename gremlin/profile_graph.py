@@ -781,9 +781,21 @@ class ProfileInputNode(ProfileBaseNode):
         self.always_execute = False
         self.parent = parent
         self.input_entry = None # the identifier
-        self.input_item = None # the profile input item
+        self._input_item = None # the profile input item
 
 
+    @property
+    def input_item(self) -> gremlin.base_profile.InputItem:
+        if self._input_item is None:
+            registry = gremlin.base_profile.ProfileRegistry()
+            self._input_item = registry.getInputItem(self.device_guid, self.input_type, self.input_id)
+        return self._input_item
+    
+    @input_item.setter
+    def input_item(self, value: gremlin.base_profile.InputItem):
+        if value is None:
+            pass
+        self._input_item = value
 
     @property
     def device_guid(self):

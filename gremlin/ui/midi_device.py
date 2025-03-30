@@ -462,6 +462,8 @@ class MidiInputItem(AbstractInputItem):
     
     
     def __hash__(self):
+        # if self._message_key:
+        #     return str(self._message_key).__hash__()
         return str(self.id).__hash__()
     
     def __lt__(self, other):

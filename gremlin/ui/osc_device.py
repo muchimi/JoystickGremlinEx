@@ -2233,7 +2233,7 @@ class OscInputItem(AbstractInputItem):
         return self._message_key
     
     def setMessageKey(self, value):
-        if self.message_key is None or self._message_key != value:
+        if self._message_key is None or self._message_key != value:
             # ensure OSC is started so we can listen to OSC inputs
             if self._message_key != value:
 
@@ -2379,6 +2379,8 @@ class OscInputItem(AbstractInputItem):
         
 
     def __hash__(self):
+        # if self._message_key:
+        #     return str(self._message_key).__hash__()
         return str(self.id).__hash__()
     
     def __lt__(self, other):

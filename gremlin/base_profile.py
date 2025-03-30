@@ -383,6 +383,10 @@ class AbstractContainer(ProfileData):
         self._action_sets_callback = None # callback to return different action sets if needed for containers that do their own thing
 
         # attached hardware device to this container
+        if isinstance(parent, gremlin.profile_graph.ProfileContainerNode):
+            input_item = _get_input_item(parent)
+            if not input_item:
+                input_item = _get_input_item(parent)
 
         input_item = _get_input_item(parent)
         assert input_item is not None
@@ -1159,29 +1163,46 @@ class AbstractContainerAction(AbstractAction):
         super().from_xml(node, data)
         registry = ProfileRegistry()
         container_nodes = gremlin.util.get_xml_child(node,"action_containers", multiple = True)
+
+        # if hasattr(self,"command") and self.command == 'THROTTLE1_AXIS_SET_EX1':
+        #     pass
+
+
+        # get the input item behind the parent action
+        current = self.parent
+        while current:
+            if isinstance(current, InputItem):
+                # legacy instance
+                break
+            if isinstance(current, gremlin.profile_graph.ProfileInputNode):
+                # graph instance
+                current = current.input_item
+                break
+            current = current.parent
+
+        assert current is not None,"Profile nesting error: unable to find InputItem"
+
+
         for child in container_nodes:
 
-            # get the input item behind the parent action
-            current = self.parent
-            while current and not isinstance(current, InputItem):
-                current = current.parent
+            
 
             # setup a new input item for these containers and read from config the defined containers
             
-            item_data = InputItem(parent = self)
-            item_data._input_type = current._input_type
-            item_data._device_guid = current._device_guid
-            item_data._input_id = current._input_id
+            input_item = InputItem(parent = self)
+            input_item._input_type = current._input_type
+            input_item._device_guid = current._device_guid
+            input_item._input_id = current._input_id
 
             
-            registry.registerInputItem(item_data)
+            registry.registerInputItem(input_item)
 
             if child is not None:
                 child.tag = child.get("type")
                 index = safe_read(child,"index",int,0)
-                item_data.from_xml(child, data)
+                input_item.from_xml(child, data)
 
-            self._item_data_map[index] = item_data
+            self._item_data_map[index] = input_item
 
     def to_xml(self):
         ''' writes node out to XML '''
@@ -1392,12 +1413,20 @@ class ProfileRegistry():
             and input_item.input_id is not None \
             , "Registration error: input item is invalid"
         
-        key = input_item.callbackKey()
+        device_guid = input_item.device_guid
+        input_type = input_item.input_type
+        input_id = input_item.input_id
+        if not isinstance(input_id, int):
+            pass
+        input_id_key = hash(input_id)
+        key = (device_guid, input_type, input_id_key)
         self._input_item_registry[key] = input_item
 
     def getInputItem(self, device_guid, input_type, input_id) -> InputItem:
         ''' retrieves a stored input item '''
-        key = (device_guid, input_type, input_id)
+        
+        input_id_key = hash(input_id)
+        key = (device_guid, input_type, input_id_key)
         if key in self._input_item_registry:
             return self._input_item_registry[key]
         return None # not found
