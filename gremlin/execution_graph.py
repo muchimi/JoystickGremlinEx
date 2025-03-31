@@ -114,6 +114,7 @@ class ExecutionGraphNode(anytree.NodeMixin):
         self.description = ""
         self.has_actions = False # assume the node has no child action somewhere down the tree
         self.link = None # link to another node
+        self.comment = None # comment asociated with this node
 
     def clone(self) -> ExecutionGraphNode:
         ''' clone myself '''
@@ -150,10 +151,15 @@ class ExecutionGraphNode(anytree.NodeMixin):
                 stub = ""
                 if isinstance(self.exec_functors, list):
                     for functor in self.exec_functors:
-                        stub += f"Action: [{functor.__class__.__name__}] "
+                        comment = f"Input: {functor.action_data.input_item.device_name} id: {functor.action_data.input_item.input_id} mode: {functor.action_data.input_item.profile_mode} {functor.action_data.comment if functor.action_data.comment else ''} | "
+                        stub += f"Action: [{functor.__class__.__name__}] {comment}"
                 else:
                     functor = self.exec_functors
-                    stub += f"Action: [{functor.__class__.__name__}] "
+                    if functor is not None:
+                        comment = f"Input: {functor.action_data.input_item.device_name} id: {functor.action_data.input_item.input_id} mode: {functor.action_data.input_item.profile_mode} {functor.action_data.comment if functor.action_data.comment else ''} | "
+                        stub += f"Action: [{functor.__class__.__name__}] {comment}"
+                    else:
+                        stub += "Action: no action found"
             case ExecutionGraphNodeType.Mode:
                 stub = f"Mode: [{self.mode}]"
             case ExecutionGraphNodeType.InputItem:
@@ -1025,6 +1031,9 @@ class ExecutionContext():
                                     action_node.parent = action_condition_node # action node is owned by its condition node
                                     action_node.mode = mode_name
                                     action_node.action = action
+                                    if action.comment:
+                                        pass
+                                    action_node.comment = action.comment
 
                                     m_action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
                                     m_action_node.id = action.id
@@ -1284,7 +1293,7 @@ class ExecutionContext():
             syslog.info(f"\t{item}")
 
 
-    def process_functor(self, functor, event, value, manual = False, extra_data = None) -> bool:
+    def process_functor(self, functor, event, value, manual = False, extra_data : dict = None) -> bool:
         ''' processes a single functor or a list of functors  - first one to fail fails the group '''
         if isinstance(functor, list):
             for item in functor:
@@ -1353,7 +1362,7 @@ class ExecutionContext():
     #     return result
     
 
-    def execute_node(self, node, event, value, manual = False, extra_data = None) -> bool:
+    def execute_node(self, node : ExecutionGraphNode, event, value, manual = False, extra_data : dict = None) -> bool:
         ''' executes a single node '''
 
 
@@ -1365,6 +1374,9 @@ class ExecutionContext():
         gremlin.shared_state.pushLog()
         logTabs = gremlin.shared_state.logTabs()
         current_mode = gremlin.shared_state.runtime_mode
+        if not extra_data:
+            extra_data = {}
+        extra_data["node"] = node
 
         if verbose_id: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
         try:
@@ -1400,7 +1412,7 @@ class ExecutionContext():
                                     if m_node.mode in mode_list:
                                         # sub mode has an action defined for this input
                                         result = False # FAIL the current input and let the sub mode 
-                                        break
+                                        
 
 
                     if not result:
@@ -1420,6 +1432,8 @@ class ExecutionContext():
                             else:
                                 syslog.info(f"{logTabs}> !!! Executed action {functor.__class__.__name__} result: {'PASS' if result else 'FAIL'}")
                         if not result:
+                            if verbose_id:
+                                syslog.info(f"{logTabs}>Failing node: {node.id}")
                             break
 
                     if not result:
@@ -1428,9 +1442,8 @@ class ExecutionContext():
 
                     # any other node fail on first fail
                     for child in node.children:
-                        result = self.execute_node(child, event, value, manual, extra_data)
-                        if not result:
-                            break
+                        self.execute_node(child, event, value, manual, extra_data)
+  
 
             return result
         
@@ -1439,7 +1452,7 @@ class ExecutionContext():
             gremlin.shared_state.popLog()
 
     
-    def execute_functor_id(self, id, event, value, manual = False, extra_data = None) -> bool:
+    def execute_functor_id(self, id, event, value, manual = False, extra_data : dict = None) -> bool:
         ''' executes a functor chain 
         
         id = id of the node to execute, the id is also the id of the action or container
@@ -1616,7 +1629,7 @@ class AbstractExecutionGraph(QtCore.QObject):
 
   
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data : dict = None):
         """
         
         Runs the execution graph for the input.
@@ -1670,7 +1683,7 @@ class AbstractExecutionGraph(QtCore.QObject):
 
                 #result = True # assume pass
                 id = functor.id
-                result = ec.execute_functor_id(id, event, value)
+                result = ec.execute_functor_id(id, event, value, extra_data)
                 
                 # verbose_id = gremlin.config.Configuration().verbose_mode_condition
 

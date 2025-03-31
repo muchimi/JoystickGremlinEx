@@ -609,8 +609,11 @@ class AbstractContainer(ProfileData):
         if "container_id" in node.attrib:
             self.id = node.get("container_id")
 
+        comment = None
         if "comment" in node.attrib:
-            self.comment = node.get("comment")
+            comment = node.get("comment")
+        if comment:
+            self.comment = comment
         self._parse_action_set_xml(node, data)
         self._parse_virtual_button_xml(node, data)
         self._parse_activation_condition_xml(node, data)
@@ -1058,8 +1061,11 @@ class AbstractAction(ProfileData):
         if "action_id" in node.attrib:
             self.action_id = safe_read(node, "action_id", str)
 
+        comment = None
         if "comment" in node.attrib:
-            self.comment = node.get("comment")
+            comment = node.get("comment")
+        if comment:
+            self.comment = comment
 
 
         super().from_xml(node, data)
@@ -2704,6 +2710,19 @@ class Profile():
 
                 mode_map[mode_name] = parent_name
         return mode_map
+    
+    def get_mode_branch(self, mode : str, ancestors : bool = True, descendants : bool = False) -> list:
+        ''' gets the mode branch for the current mode - this is the list of the mode, and all parent modes'''
+        self._ensure_mode_tree()
+        mode_node = self.find_mode_node(mode)
+        if mode_node:
+            branch = [mode]
+            if ancestors:
+                branch.extend([node.name for node in mode_node.ancestors if node.name])
+            if descendants:
+                branch.extend([node.name for node in mode_node.descendants])
+            return branch
+        return None
         
     
     def reload_modes(self, update_devices = False):
@@ -2798,6 +2817,11 @@ class Profile():
             if node:
                 return node.name
         return None # not found
+    
+    def find_mode_node(self, mode : str) -> ModeNode:
+        ''' gets the graph mode node for the given name '''
+        return anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
+
 
 
     def list_actions(self):

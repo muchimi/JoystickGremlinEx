@@ -24,6 +24,7 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.config
 import gremlin.event_handler
+import gremlin.execution_graph
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
@@ -3846,14 +3847,14 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     
     
     
-    def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
+    def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None) -> bool:
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
 
         if not gremlin.shared_state.is_running or gremlin.shared_state.abort:
-            return
+            return False
 
         if not self.valid:
-            return
+            return False
 
         if not self.manager.is_running:
             # sim is not running - attempt to reconnect every few seconds
@@ -3864,11 +3865,11 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 eh.request_connect.emit()
             return True
 
-        return self._process_event(event, action_value)           
+        return self._process_event(event, action_value, extra_data)
 
 
 
-    def _process_event(self, event, action_value : gremlin.actions.Value):
+    def _process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
         ''' handles default input data '''
 
         # execute the nested functors for this action
@@ -3884,13 +3885,13 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         if not self.manager.is_running:
             # sim is not running
             syslog.warning("Simconnect Functor: event ignored, simconnect not connected")
-            return
+            return False
         
 
         if not self.manager.is_bridge_alive:
             # sim is not running
             syslog.warning("Simconnect Functor: event ignored, simconnect bridge not connected")
-            return
+            return False
         
         block = self.action_data.block
         output_mode = self.action_data.mode
@@ -4005,7 +4006,15 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     
   
                     if verbose: 
-                        syslog.info(f"SIMCONNECT: send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+                        comment = ""
+                        if extra_data:
+                            if "node" in extra_data:
+                                node = extra_data["node"]
+                                comment += f"Node: [{node.id}] " 
+                                
+                        comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} {self.action_data.comment if self.action_data.comment else ''} | "
+                        
+                        syslog.info(f"SIMCONNECT FUNCTOR: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
 
                     if command_type == SimConnectCommandType.LVar:
                         request = manager.registerRequest(command, "number", settable = True)

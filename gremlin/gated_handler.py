@@ -1401,7 +1401,7 @@ class GateData():
         for callback in self._trigger_callbacks:
             callback(trigger)
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data  : dict = None):
         ''' handles functor execution '''
         syslog.info("gate data: process handler")
         pass
@@ -1429,6 +1429,13 @@ class GateData():
         if not self._action_data:
             # not initialized yet
             return 
+        
+        is_runtime = gremlin.shared_state.is_running
+        if is_runtime:
+            runtime_mode = gremlin.shared_state.runtime_mode
+            if self.profile_mode != runtime_mode:
+                # wrong mode
+                return
 
         if self._action_data.hardware_device_guid != event.device_guid:
             # ignore if a different input device
@@ -1552,14 +1559,16 @@ class GateData():
                     # profile is running - trigger the execution node for the containers
                     # the extra data contains the trigger condition type so the correct execution path is taken
                     if verbose: syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name}")
+                    extra_data = {}
+                    extra_data["condition_type"] = trigger.condition
                     if trigger.is_range:
                         # linear range trigger event for in-range or outside-range
                         action_value = gremlin.actions.Value(input_value)
-                        self._ec.execute_functor_id(self._action_data.id, range_event, action_value, True, trigger.condition)
+                        self._ec.execute_functor_id(self._action_data.id, range_event, action_value, True, extra_data)
                     else:
                         # non range trigger (gate crossing or range enter/exit)
                         # use a fake button for momentary event
-                        self._ec.execute_functor_id(self._action_data.id, button_press_event, button_action_value, True, trigger.condition)
+                        self._ec.execute_functor_id(self._action_data.id, button_press_event, button_action_value, True, extra_data)
                         autorelease = False
                         if trigger.condition in (GateConditionType.OnCross, GateConditionType.OnCrossDecrease, GateConditionType.OnCrossIncrease):
                             # gate condition
@@ -1574,7 +1583,7 @@ class GateData():
                             button_release_event.is_pressed = False
                             button_release_value = gremlin.actions.Value(input_value, False)
                             delay = trigger.delay/1000 # delay in seconds
-                            timer = threading.Timer(delay, lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, True, trigger.condition))
+                            timer = threading.Timer(delay, lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, True, extra_data))
                             timer.start()
                     
             
@@ -5247,16 +5256,17 @@ class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
     def condition_type(self) -> GateConditionType:
         return self._condition_type        
 
-    def __call__(self, event, value, extra_data = None):
+    def __call__(self, event, value, extra_data  : dict = None):
         # default call
         return self.process_event(event, value, extra_data)
     
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data  : dict = None):
         if event.is_axis:
             return False #  FAIL - wrong event type - gate actions are all momentary so require a non-axis event
-        
-        return self._condition_type == extra_data
+        if extra_data and "condition_type" in extra_data:
+            return self._condition_type == extra_data["condition_type"]
+        return True
 
         
         
@@ -5305,48 +5315,36 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
     def condition_type(self) -> GateConditionType:
         return self._condition_type
 
-    def __call__(self, event, value, extra_data = None):
+    def __call__(self, event, value, extra_data  : dict = None):
         # default call
         return self.process_event(event, value, extra_data)
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data : dict = None):
         require_axis = self._condition_type in (GateConditionType.InRange, GateConditionType.OutsideRange)
         if event.is_axis != require_axis:
             return False # FAIL - wrong event type
-        return self._condition_type == extra_data
+        current = value.current
+        if not extra_data or not "condition_type" in extra_data:
+            assert False,"Data passed to GatedAxisRangeCondition is missing the condition type"
+        condition_type = extra_data["condition_type"]
+        if self._condition_type != condition_type:
+            return False
+        # check range
+        result = False 
+        match condition_type:
+            case GateConditionType.InRange:
+                result = self.range_info.inRange(current)
+            case GateConditionType.OutsideRange:
+                result = not self.range_info.inRange(current)
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        if verbose:
+            syslog.info(f"Range Condition: value: {current:0.3f} range: {self.range_info.range_display()} result: {'PASS' if result else 'FAIL'}")
+        if result:
+            pass
+        return result
     
 
-        # current_value = value.current
-        # range_info = self.range_info
-
-        # syslog.info(f"Range: {range_info.to_display()} current value: {current_value:0.3f}")
-        # try:
-        #     if range_info.mode == GateRangeOutputMode.FilterOut:
-        #         # fail the condition if the range should filter the event out
-        #         return False
-        #     if range_info.hasContainers(GateConditionType.InRange):
-        #         if range_info.valueInRange(current_value):
-        #             # in range
-        #             #event.value = range_info.filterEventValue(event.value)
-        #             return True
-                    
-        #     if range_info.hasContainers(GateConditionType.EnterRange):
-        #         if not range_info.valueInRange(self._last_value) and range_info.valueInRange(current_value):
-        #             # entering range
-        #             return True
-                    
-        #     if range_info.hasContainers(GateConditionType.ExitRange):
-        #         if range_info.valueInRange(self._last_value) and not range_info.valueInRange(current_value):
-        #             # exiting range
-        #             return True
-                    
-        #     if range_info.hasContainers(GateConditionType.OutsideRange):
-        #         if not range_info.valueInRange(current_value):
-        #             # outside of range
-        #             return True
-        #     return False
-        # finally:
-        #     self._last_value = current_value
+     
 
         
     def condition_name(self) -> str:

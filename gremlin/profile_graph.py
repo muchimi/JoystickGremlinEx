@@ -834,7 +834,7 @@ class ProfileInputNode(ProfileBaseNode):
         container_tag_map = container_plugins.tag_map
         # registry = gremlin.base_profile.ProfileRegistry()
 
-        syslog.info(f"node: {etree.tostring(node)}")
+        # syslog.info(f"node: {etree.tostring(node)}")
 
         input_entry = None
         if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):

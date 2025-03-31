@@ -1134,7 +1134,7 @@ class Configuration:
     @property
     def verbose_mode_execution(self):
         ''' true if verbose mode is in condition/execution mode '''
-        return self.verbose and VerboseMode.Condition in self.verbose_mode
+        return self.verbose and VerboseMode.Exec in self.verbose_mode
     
     @property
     def verbose_mode_osc(self):
