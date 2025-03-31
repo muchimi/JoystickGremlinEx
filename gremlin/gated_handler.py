@@ -5324,21 +5324,21 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         if event.is_axis != require_axis:
             return False # FAIL - wrong event type
         current = value.current
-        if not extra_data or not "condition_type" in extra_data:
-            assert False,"Data passed to GatedAxisRangeCondition is missing the condition type"
-        condition_type = extra_data["condition_type"]
-        if self._condition_type != condition_type:
-            return False
+        if extra_data and "condition_type" in extra_data:
+            condition_type = extra_data["condition_type"]
+            if self._condition_type != condition_type:
+                return False
         # check range
         result = False 
-        match condition_type:
+        match self._condition_type:
             case GateConditionType.InRange:
                 result = self.range_info.inRange(current)
             case GateConditionType.OutsideRange:
                 result = not self.range_info.inRange(current)
         verbose = gremlin.config.Configuration().verbose_mode_condition
         if verbose:
-            syslog.info(f"Range Condition: value: {current:0.3f} range: {self.range_info.range_display()} result: {'PASS' if result else 'FAIL'}")
+            logtabs = gremlin.shared_state.logTabs()
+            syslog.info(f"{logtabs}Range Condition: value: {current:0.3f} range: {self.range_info.range_display()} result: {'PASS' if result else 'FAIL'}")
         if result:
             pass
         return result

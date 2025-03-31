@@ -263,6 +263,9 @@ class CalibrationData:
         self._deadzone_center_min = 0.0 # deadzone center left
         self._deadzone_center_max = 0.0 # deadzone center right
         self._inverted = False # true if inverted
+        self._trigger_threshold = 0.005 # trigger threshold
+        self._trigger_threshold_enabled = True
+        self._last_value = None # last value (normalized)
         
         
 
@@ -311,6 +314,21 @@ class CalibrationData:
     def inverted(self, value : bool):
         self._inverted = value
         self._update()
+
+    @property
+    def threshold_enabled(self) -> bool:
+        return self._trigger_threshold_enabled
+    @threshold_enabled.setter
+    def threshold_enabled(self, value: bool):
+        assert isinstance(value, bool)
+        self._trigger_threshold_enabled = value
+
+    @property
+    def threshold(self) -> float:
+        return self._trigger_threshold
+    @threshold.setter
+    def threshold(self, value: float):
+        self._trigger_threshold = value
 
         
 
@@ -411,38 +429,46 @@ class CalibrationData:
             self._update()
 
 
-    def getValue(self, raw_value, normalize = True):
+    def getValue(self, raw_value, normalize = True, return_process = False):
         ''' gets the deadzoned, calibrated value for the input value -1.0 to +1.0 - if normalized is enabled, expects a dinput range value, if not, expects a -1 to +1 value'''
-        if normalize:
-            normalized_value = gremlin.util.scale_to_range(raw_value, source_min = -32768, source_max = 32767, invert = self.inverted)
-        elif self.inverted:
-            normalized_value = gremlin.util.scale_to_range(raw_value, invert = self.inverted) # just handle the inversion
-        else:
-            normalized_value = raw_value
-
-        if self._is_centered:
-            # account for center calibration left/right
-            value = gremlin.util.axis_calibration(normalized_value, self._calibrated_min, self.calibrated_center, self._calibrated_max)
-        else:
-            value = gremlin.util.slider_calibration(normalized_value, self._calibrated_min, self._calibrated_max)
-
-        if self._is_centered:
-            if value > self.deadzone_center_min and value < self.deadzone_center_max:
-                value = 0.0
-            elif value <= self.deadzone_center_min:
-                # center deadzone set - update the range as it's been reduced
-                value = gremlin.util.scale_to_range(value, source_min = self.deadzone_min, source_max = self.deadzone_center_min, target_max = 0)
-            elif value >= self.deadzone_center_max:
-                value = gremlin.util.scale_to_range(value, source_min = self.deadzone_center_max, source_max = self.deadzone_max, target_min = 0)
-        else:
-            value = gremlin.util.scale_to_range(value, source_min=self.deadzone_min, source_max=self.deadzone_max)
-            
-            
-
-
-        return value + 0.0
 
         
+        should_process = True
+        if self.inverted:
+            normalized_value = gremlin.util.scale_to_range(raw_value, invert = self.inverted) # just handle the inversion
+        else:
+            normalized_value = gremlin.util.scale_to_range(raw_value, source_min = -32768, source_max = 32767, invert = self.inverted)
+        if return_process and self._trigger_threshold != 0:
+            if self._last_value is None:
+                self._last_value = normalized_value
+            else:
+                should_process = abs(self._last_value - normalized_value) > self._trigger_threshold
+
+        value = 0.0
+
+        if should_process:
+            if not normalize:
+                normalized_value = raw_value
+            if self._is_centered:
+                # account for center calibration left/right
+                value = gremlin.util.axis_calibration(normalized_value, self._calibrated_min, self.calibrated_center, self._calibrated_max)
+            else:
+                value = gremlin.util.slider_calibration(normalized_value, self._calibrated_min, self._calibrated_max)
+
+            if self._is_centered:
+                if value > self.deadzone_center_min and value < self.deadzone_center_max:
+                    value = 0.0
+                elif value <= self.deadzone_center_min:
+                    # center deadzone set - update the range as it's been reduced
+                    value = gremlin.util.scale_to_range(value, source_min = self.deadzone_min, source_max = self.deadzone_center_min, target_max = 0)
+                elif value >= self.deadzone_center_max:
+                    value = gremlin.util.scale_to_range(value, source_min = self.deadzone_center_max, source_max = self.deadzone_max, target_min = 0)
+            else:
+                value = gremlin.util.scale_to_range(value, source_min=self.deadzone_min, source_max=self.deadzone_max)
+            
+        if return_process:
+            return (value + 0.0, should_process)
+        return value + 0.0
     
 
     def from_xml(self, node, data = None):
@@ -468,6 +494,8 @@ class CalibrationData:
         self.calibrated_max = safe_read(node,"calibrate-max", float, 1.0)
         self.deadzone_min = safe_read(node,"deadzone-min", float, -1.0)
         self.deadzone_max = safe_read(node,"deadzone-max", float, 1.0)
+        self.threshold_enabled = safe_read(node,"threshold-enabled", bool, False)
+        self.threshold = safe_read(node,"threshold-value", float, 0.005)
         if self.centered:
             self.calibrated_center = safe_read(node,"calibrate-center", float, 0.0)
             self.deadzone_center_min = safe_read(node,"deadzone-center-min", float, 0.0)
@@ -488,6 +516,8 @@ class CalibrationData:
         node.set("calibrate-max", safe_format(self.calibrated_max, float))
         node.set("deadzone-min", safe_format(self.deadzone_min, float))
         node.set("deadzone-max", safe_format(self.deadzone_max, float))
+        node.set("threshold-value", safe_format(self.threshold, float))
+        node.set("threshold-enabled", safe_format(self.threshold_enabled, bool))
         if self.centered:
             node.set("calibrate-center", safe_format(self.calibrated_center, float))
             node.set("deadzone-center-min", safe_format(self.deadzone_center_min, float))
@@ -613,7 +643,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-        self.action_data = self.mgr.getCalibration(device_guid, input_id)
+        self.action_data : CalibrationData = self.mgr.getCalibration(device_guid, input_id)
         self.cloned_action_data = self.action_data.clone()
         self.action_data.device_guid = device_guid
         self.action_data.input_id = input_id
@@ -648,8 +678,23 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         self._calibrate_widget.clicked.connect(self._start_calibration)
 
         self._auto_calibrate_widget = QtWidgets.QCheckBox("Auto Calibrate")
+        self._auto_calibrate_widget.setToolTip("If set, the axis will auto-calibrate to min/max travel as needed.")
         self._auto_calibrate_widget.setChecked(True)
         self._auto_calibrate_widget.clicked.connect(self._update)
+
+
+        self._threshold_enabled_widget = QtWidgets.QCheckBox("Enable threshold")
+        self._threshold_enabled_widget.setToolTip("If set, the input movement will need to exceed the specified delta to trigger an axis event")
+        self._threshold_enabled_widget.setChecked(self.action_data.threshold_enabled)
+        
+        self._threshold_enabled_widget.clicked.connect(self._threshold_enabled_changed)
+
+        self._threshold_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._threshold_value_widget.setMinimum(0)
+        self._threshold_value_widget.setValue(self.action_data.threshold)
+        self._threshold_value_widget.valueChanged.connect(self._threshold_value_changed)
+        self._threshold_value_widget.setDecimals(4)
+        self._threshold_value_widget.setEnabled(self.action_data.threshold_enabled)
 
 
         self._center_widget = QtWidgets.QPushButton("Set Center")
@@ -662,6 +707,11 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         self._options_container_repeater_layout.addWidget(self._calibrate_widget)
         self._options_container_repeater_layout.addWidget(self._reset_widget)
         self._options_container_repeater_layout.addWidget(self._auto_calibrate_widget)
+
+
+        widget, layout = gremlin.ui.ui_common.getHContainer([self._threshold_enabled_widget, self._threshold_value_widget])
+
+        self._options_container_repeater_layout.addWidget(widget)
 
         self._options_container_repeater_layout.addStretch()
 
@@ -811,7 +861,15 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         self.action_data._update()
         self._update()
 
-    
+    @QtCore.Slot(bool)
+    def _threshold_enabled_changed(self, checked):
+        self.action_data.threshold_enabled = checked
+        self._threshold_value_widget.setEnabled(checked)
+
+    @QtCore.Slot()
+    def _threshold_value_changed(self):
+        value = self._threshold_value_widget.value()
+        self.action_data.threshold = value
 
     @QtCore.Slot()
     def _calibrated_min_changed(self):

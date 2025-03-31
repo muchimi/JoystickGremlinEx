@@ -2356,8 +2356,6 @@ class AxisCurveData():
             value = self.response_fn(value)
         
         return value
-        
-
 
 class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog box for curve configuration '''

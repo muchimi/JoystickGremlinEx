@@ -3786,6 +3786,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.valid = False
         self._significant = gremlin.input_devices.JoystickInputSignificant()
         self._profile_started = False
+        self._last_event = None
         
         self.reconnect_timeout = 5
         self.last_reconnect_time = None
@@ -3855,6 +3856,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         if not self.valid:
             return False
+        
+        # if self._last_event and self._last_event == event:
+        #     return False
+        # self._last_event = event
+        
+
 
         if not self.manager.is_running:
             # sim is not running - attempt to reconnect every few seconds
@@ -3879,18 +3886,17 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         verbose_details = False # config.verbose_mode_details
         #verbose = True
         manager : SimConnectManager = self.manager
-        # syslog = logging.getLogger("system")
-
+        
+        # syslog.info(f"event: {str(event)} node: {extra_data["node"]}")
 
         if not self.manager.is_running:
             # sim is not running
-            syslog.warning("Simconnect Functor: event ignored, simconnect not connected")
+            syslog.warning(f"Simconnect Functor: event ignored, simconnect not connected")
             return False
         
-
         if not self.manager.is_bridge_alive:
             # sim is not running
-            syslog.warning("Simconnect Functor: event ignored, simconnect bridge not connected")
+            syslog.warning(f"Simconnect Functor: event ignored, simconnect bridge not connected")
             return False
         
         block = self.action_data.block
@@ -3939,7 +3945,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         # calculator expression
                         if not self._auto_repeat_thread.is_alive():
                             # command auto repeats while pressed - not started
-                            if verbose_details: syslog.info("auto repeat start")
+                            if verbose_details: syslog.info(f"auto repeat start")
                             self._auto_repeat_thread.start()
                             return True
                 
@@ -3953,10 +3959,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     # release calculate auto repeat
                     if self.action_data.auto_repeat and self._auto_repeat_thread:
                         # released
-                        if verbose_details: syslog.info("auto repeat stopping...")
+                        if verbose_details: syslog.info(f"auto repeat stopping...")
                         self._auto_repeat_event.set()
                         self._auto_repeat_thread.join()
-                        if verbose_details: syslog.info("auto repeat stopped")
+                        if verbose_details: syslog.info(f"auto repeat stopped")
 
                     if self.action_data.is_release_command:
                         # execute release command
@@ -4007,12 +4013,13 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
   
                     if verbose: 
                         comment = ""
+                        #if verbose_details:
                         if extra_data:
                             if "node" in extra_data:
                                 node = extra_data["node"]
                                 comment += f"Node: [{node.id}] " 
                                 
-                        comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} {self.action_data.comment if self.action_data.comment else ''} | "
+                        comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} | {self.action_data.comment if self.action_data.comment else ''} | "
                         
                         syslog.info(f"SIMCONNECT FUNCTOR: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
 

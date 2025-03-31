@@ -1226,6 +1226,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         new_profile =  gremlin.base_profile.Profile()
         self.profile = new_profile
+        
 
         # default active mode
         gremlin.shared_state.runtime_mode = "Default"
@@ -1865,6 +1866,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # get list of devices in the profile that do not exist or are not connected
             graph : gremlin.profile_graph.ProfileGraph = gremlin.shared_state.current_profile.graph
+
             graph_devices = graph.joystick_devices()
 
             # derive missing devices found in the profile, but not currently connected

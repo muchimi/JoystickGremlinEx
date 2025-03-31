@@ -36,16 +36,19 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
 
+import gremlin.shared_state
 import gremlin.ui
 
 from . import error
 
 from gremlin.singleton_decorator import SingletonDecorator
 
-syslog = logging.getLogger("system")
+
 
 # Table storing which modules have been imported already
 g_loaded_modules = {}
+
+syslog = logging.getLogger("system")
 
 
 class FileWatcher(QtCore.QObject):

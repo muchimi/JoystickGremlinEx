@@ -123,7 +123,7 @@ class ProfileBaseNode(ABC, NodeMixin):
 
 class ProfileRootNode(ProfileBaseNode):
     ''' device node '''
-    def __init__(self, source_xml : str):
+    def __init__(self, source_xml : str = None):
         super().__init__(ProfileNodeType.Profile)
         self.start_mode = None # profile start mode
         self.default_start_mode = None # profile default start mode 
@@ -132,6 +132,9 @@ class ProfileRootNode(ProfileBaseNode):
         self.devices = {} # map of device to device node, keyed by device_guid
         self.simconnect_modes = {} # map of simconnect key to profile mode
         self.source_xml = source_xml # source file
+
+        self._load_default_devices()
+        
 
 
 
@@ -181,7 +184,14 @@ class ProfileRootNode(ProfileBaseNode):
             merged_node = ProfileMergedAxisNode(self)
             merged_node.from_xml(child)
 
- 
+    def _load_default_devices(self):
+        ''' loads default devices '''
+        devices = gremlin.joystick_handling.physical_devices()
+        device: dinput.DeviceSummary
+        for device in devices:
+             device_node = ProfileDeviceNode(device, parent = self)
+             self.devices[device_node.device_guid] = device_node
+
 
 
     def to_xml(self):
@@ -1098,7 +1108,7 @@ class ProfileGraph():
     ''' holds the profile graph '''
 
     def __init__(self):
-        self._root = None # root ProfileRootNode, set when loading a file
+        self._root = ProfileRootNode()
         self._source_xml = None # source XML loaded 
 
     def get_device_node(self, device_guid) -> ProfileDeviceNode:

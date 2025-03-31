@@ -242,23 +242,23 @@ class Event:
 	
 	def __str__(self):
 		if self.event_type == InputType.Mouse:
-			return f"Event: Mouse - button {self.identifier} pressed: {self.is_pressed}"
+			return f"Event: {self._id} Mouse - button {self.identifier} pressed: {self.is_pressed}"
 		elif self.event_type in  (InputType.Keyboard, InputType.KeyboardLatched):
-			return f"Event: Keyboard - scan code, extended : {self.identifier}  vk: {self.virtual_code} (0x{self.virtual_code:X}) pressed: {self.is_pressed}"
+			return f"Event: {self._id} Keyboard - scan code, extended : {self.identifier}  vk: {self.virtual_code} (0x{self.virtual_code:X}) pressed: {self.is_pressed}"
 		elif self.event_type == InputType.JoystickAxis or self.is_axis:
-			return f"Event: Axis : {self.identifier} raw value: {self.raw_value} value: {self.value}"
+			return f"Event: {self._id} Axis : {self.identifier} raw value: {self.raw_value} value: {self.value}"
 		elif self.event_type == InputType.JoystickButton:
-			return f"Event: Button : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
+			return f"Event: {self._id} Button : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
 		elif self.event_type == InputType.ModeControl:
-			return f"Event: Mode Control : {self.identifier} pressed: {self.is_pressed} value: {self.value} mode: {self.mode}"
+			return f"Event: {self._id} Mode Control : {self.identifier} pressed: {self.is_pressed} value: {self.value} mode: {self.mode}"
 		elif self.event_type == InputType.JoystickHat:
-			return f"Event: Hat : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
+			return f"Event: {self._id} Hat : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
 		elif self.event_type == InputType.Midi:
-			return f"Event: Midi : {self.identifier} value: {self.value}"
+			return f"Event: {self._id} Midi : {self.identifier} value: {self.value}"
 		elif self.event_type == InputType.OpenSoundControl:
-			return f"Event: OSC : {self.identifier} value: {self.value}"
+			return f"Event: {self._id} OSC : {self.identifier} value: {self.value}"
 		
-		return f"Event: {self.event_type} identifier {self.identifier}"
+		return f"Event: {self._id} {self.event_type} identifier {self.identifier}"
 
 class DeviceChangeEvent:
 	''' sent when a new device is selected '''
@@ -838,7 +838,11 @@ class EventListener(QtCore.QObject):
 
 			# get the curved input if the input is curved
 			raw_value = event.value
-			value = self._apply_calibration(event)
+			
+			value, should_process = self._apply_calibration(event, True)
+			if not should_process:
+				return
+			
 			curved_value = self._apply_curve_ex(event.device_guid, event.input_index, value)
 			event = Event(
 				event_type= InputType.JoystickAxis,
@@ -1064,26 +1068,24 @@ class EventListener(QtCore.QObject):
 		# Allow the windows event to propagate further
 		return True
 
-	def _apply_calibration(self, event):
-		''' applies calibration data to the vent'''
-		return self._apply_calibration_ex(event.device_guid, event.input_index, event.value)
+	def _apply_calibration(self, event, return_process : bool = False) -> tuple:
+		''' applies calibration data to the vent
+		:param event: the event data
+		:returns: (value, should_process)
+
+		'''
+		return self._apply_calibration_ex(event.device_guid, event.input_index, event.value, return_process)
 	
 	def _apply_curve(self, event):
 		''' applies input curves to the input '''
 		return self._apply_curve_ex(event.device_guid, event.input_index, event.value)
 		
-	def _apply_calibration_ex(self, device_guid, input_id, value):
-		''' applies calibration and deadzone data to the raw input - value -32768 to 32767, returns -1, +1 and optionally inverts the input '''
+	def _apply_calibration_ex(self, device_guid, input_id, value, return_process : bool = False) -> tuple:
+		''' applies calibration and deadzone data to the raw input - value -32768 to 32767, returns -1, +1 and optionally inverts the input, and the process flag '''
 		calibration = self.calibrationManager.getCalibration(device_guid, input_id)
-		calibrated_value = calibration.getValue(value)
-		return calibrated_value
+		return calibration.getValue(value, return_process = return_process)
 
-		# from gremlin.util import axis_calibration
-		# key = (device_guid, input_id)
-		# if key in self._calibrations:
-		# 	return self._calibrations[key](value)
-		# else:
-		# 	return axis_calibration(value, -32768, 0, 32767)
+
 		
 	def _apply_curve_ex(self, device_guid, input_id, value : float):
 		''' applies a curve to the input axis '''
