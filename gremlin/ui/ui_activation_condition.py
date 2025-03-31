@@ -127,6 +127,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
             # not a container
             self.activation_count_widget.setText(f"Conditions:")  
 
+
     def _show_hint(self, state):
         """Shows a help message.
 

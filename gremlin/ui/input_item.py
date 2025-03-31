@@ -2202,6 +2202,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         el = gremlin.event_handler.EventListener()
         el.condition_redraw.connect(self._condition_redraw)
+        el.ui_ready.connect(self._ui_ready)
         self._icon_enabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.activeColor())
         self._icon_disabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.inactiveColor())
 
@@ -2251,13 +2252,6 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         tracker = ConditionStateTracker()
         tracker.register(self.profile_data.input_item, self.profile_data, self.dock_tabs)
         
-        
-        # templates
-        # open_widget = QtWidgets.QPushButton("Load")
-        # open_widget.setToolTip("Load Template")
-        # icon = gremlin.ui.ui_common.load_icon("fa6s.folder-open")
-        # open_widget.setIcon(icon)
-        # open_widget.clicked.connect(self._open_template)
 
         save_widget = QtWidgets.QPushButton("Save") # TitleBarButton()
         save_widget.setToolTip("Save Template")
@@ -2345,6 +2339,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         if dock_tabs.data == container:
             tracker = gremlin.base_conditions.ConditionTracker()
             enabled = tracker.getContainerConditionCount(container) > 0
+            count = self.container.condition_count
+            enabled = count > 0 or enabled
             virtual_enabled = self.profile_data.virtual_button_user_enabled
             try:
                 
@@ -2366,7 +2362,17 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._update_counts()
 
 
-
+    def _ui_ready(self):
+        ''' called when UI is loaded '''
+        # count = self.container.condition_count
+        # enabled = count > 0
+        # dock_tabs = self.dock_tabs
+        # for i in range(dock_tabs.count()):
+        #     if dock_tabs.tabText(i) == "Conditions":
+        #         tb = dock_tabs.tabBar()
+        #         icon = self._icon_enabled if enabled else self._icon_disabled
+        #         tb.setTabIcon(i, icon)
+        self._update_ui(self.container)
 
     def _condition_redraw(self, data):
         ''' occurs when a condition redraws '''
@@ -2444,12 +2450,14 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     
     def _update_counts(self):
         ''' refreshes counts '''   
+        
         if self.activation_count_widget:  # can get called before all is loaded
             if self.container:
                 self.activation_count_widget.setText(f"Container conditions ({self.container.condition_count} found):")
             else:
                 # not a container
                 self.activation_count_widget.setText(f"Container conditions (N/A):")
+        
 
 
 
