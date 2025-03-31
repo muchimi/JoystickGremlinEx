@@ -310,6 +310,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         if VJoyWidget.locked:
             return
         
+        self._ui_loaded = False
+        
         if not gremlin.shared_state.vjoy_enabled:
             self.main_layout.addWidget(QtWidgets.QLabel("VJOY is not available.  Ensure VJOY is installed and configured."))
             return
@@ -381,15 +383,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.load_actions_from_input_type()
 
 
-            # self.notify_device_changed()
-
-
-
-            # update UI visibility
-            #self._update_ui_action_mode(self.action_data)
-
         finally:
             VJoyWidget.locked = False
+            self._ui_loaded = True
 
     @QtCore.Slot(int)
     def _button_usage_changed(self, vjoy_id):
@@ -415,7 +411,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_hat_mapping(self):
         ''' creates the 8 way hat inputs based on the hat input value '''
         self.container_hat_widget = QtWidgets.QWidget()
-        self.container_hat_widget.setVisible(False)
         self.container_hat_widget.setContentsMargins(0,0,0,0)
 
         self.container_hat_layout = QtWidgets.QVBoxLayout(self.container_hat_widget)
@@ -596,6 +591,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_hat_mapping(self):
         ''' updates the hat button options for hat to button mapping '''
+        
         dev = self.action_data.vjoy_map[self.action_data.vjoy_device_id]
         count = dev.button_count
         positions = self.action_data.hat_positions
@@ -1482,7 +1478,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def setWarning(self, text):
         ''' updates warning'''
         self.warning_widget.setText(text)
-        self.warning_widget.setVisible(text is not None and len(text))
+        if self.warning_widget.parent(): self.warning_widget.setVisible(text is not None and len(text))
 
     def update_steps(self):
         ''' updates the stepped list widgets '''
@@ -2175,6 +2171,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_ui(self):
         ''' updates ui based on the current action requested to show/hide needed components '''
+
+        if not self._ui_loaded:
+            return
 
         action_data = self.action_data
 

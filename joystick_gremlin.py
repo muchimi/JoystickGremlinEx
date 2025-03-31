@@ -1244,7 +1244,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Update profile information
         self._update_window_title()
 
-
         # Create device tabs
         self._create_tabs()
 
@@ -1647,7 +1646,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         self.ui.tab_content_layout.addWidget(widget)
         
-        if hide:
+        if hide and widget.parent() is not None:
             widget.setVisible(False)
         
         
@@ -1755,7 +1754,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def hideTabWidgets(self):
         ''' hides all tab widgets '''
         for widget in self._widget_cache.values():
-            widget.setVisible(False)
+            if widget.parent(): widget.setVisible(False)
 
             
     def selectTabWidgetByIndex(self, index : int):
@@ -1796,7 +1795,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._current_tab_widget.setVisible(False)
                 
             # show the new widget
-            widget.setVisible(True)
+            if widget.parent() is not None: widget.setVisible(True)
             self._current_tab_widget = widget
             self._current_tab_device_guid = device_guid
 

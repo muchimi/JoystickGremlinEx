@@ -1073,6 +1073,8 @@ class InputItemWidget(QBoxFrame):
         super().__init__()
         self.parent = parent
 
+        self._ui_loaded = False
+
         
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
@@ -1269,7 +1271,7 @@ class InputItemWidget(QBoxFrame):
             self.custom_container_widget = QtWidgets.QWidget() 
             self.custom_container_widget.setContentsMargins(0,0,0,0)
             #self.custom_container_widget.setMaximumHeight(32)
-            self.custom_container_widget.setVisible(False)
+            
             
             # the layout is set in populate UI
             self.populate_ui(self, self.custom_container_widget, self.data)
@@ -1282,7 +1284,7 @@ class InputItemWidget(QBoxFrame):
             
         
        
-        curve_visible = self.identifier.input_type == InputType.JoystickAxis
+        
 
 
 
@@ -1299,13 +1301,16 @@ class InputItemWidget(QBoxFrame):
         el.input_enabled_changed.connect(self._update_enabled_state)
         el.update_action_icons.connect(self._update_action_icons)
 
-        self._curve_container_widget.setVisible(curve_visible) 
-        self.update_display()
+        
+        
 
         if hasattr(identifier.input_id,"message_key_changed"):
             identifier.input_id.message_key_changed.connect(self._message_key_changed)
 
         self._default_style()
+
+        self._ui_loaded = True
+        self.update_display()
 
     def _cleanup_ui(self):
         ''' called when widget is removed '''
@@ -1409,6 +1414,8 @@ class InputItemWidget(QBoxFrame):
     @QtCore.Slot()
     def _update_icons(self):
         ''' update icons'''
+        if not self._ui_loaded: return
+            
         curve_visible = self.data.input_type == InputType.JoystickAxis
         try:
             
@@ -1618,6 +1625,7 @@ class InputItemWidget(QBoxFrame):
 
     def setStatus(self, status: str, icon = None):
         ''' sets the status'''
+        if not self._ui_loaded: return
         if status:
             self._status_widget.setText(status)
             if icon:
@@ -1698,24 +1706,26 @@ class InputItemWidget(QBoxFrame):
 
     def update_display(self):
         ''' updates the display text for the button '''
-        config = gremlin.config.Configuration()
-        power_visible = config.show_input_enable
 
-        self._input_button_widget.setVisible(power_visible)
+        if self._ui_loaded:
+            config = gremlin.config.Configuration()
+            power_visible = config.show_input_enable
 
-        if self._update_callback:
-            self.custom_container_widget = QtWidgets.QWidget() 
-            self.custom_container_widget.setContentsMargins(0,0,0,0)
-            self.addWidget(self.custom_container_widget)
-            self._update_callback(self, self.custom_container_widget)
-            return
-        
-        if not self._config_external or self.populate_name is not None:
-            #display_text = self.populate_name(self, self.identifier) if self.populate_name else gremlin.common.input_to_ui_string( self.identifier.input_type,self.identifier.input_id)
-            display_text = self.populate_name(self, self.identifier) if self.populate_name is not None else self.identifier.input_name
-            self._title_widget.setText(display_text)
+            self._input_button_widget.setVisible(power_visible)
 
-        self._update_icons()
+            if self._update_callback:
+                self.custom_container_widget = QtWidgets.QWidget() 
+                self.custom_container_widget.setContentsMargins(0,0,0,0)
+                self.addWidget(self.custom_container_widget)
+                self._update_callback(self, self.custom_container_widget)
+                return
+            
+            if not self._config_external or self.populate_name is not None:
+                #display_text = self.populate_name(self, self.identifier) if self.populate_name else gremlin.common.input_to_ui_string( self.identifier.input_type,self.identifier.input_id)
+                display_text = self.populate_name(self, self.identifier) if self.populate_name is not None else self.identifier.input_name
+                self._title_widget.setText(display_text)
+
+            self._update_icons()
         
 
     @property
@@ -1754,19 +1764,23 @@ class InputItemWidget(QBoxFrame):
 
     def enable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''
+        if not self._ui_loaded: return
         self._close_button_widget.setVisible(True)
 
     def disable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''
+        if not self._ui_loaded: return
         self._close_button_widget.setVisible(False)
 
 
     def enable_edit(self):
         ''' enables the edit button on the input widget (keyboard only usually) '''
+        if not self._ui_loaded: return
         self._edit_button_widget.setVisible(True)
 
     def disable_edit(self):
         ''' enables the edit button on the input widget (keyboard only usually) '''
+        if not self._ui_loaded: return
         self._edit_button_widget.setVisible(False)
 
     def create_action_icons(self, profile_data):
