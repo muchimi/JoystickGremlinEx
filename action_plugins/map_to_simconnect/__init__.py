@@ -3883,6 +3883,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         super().process_event(event, action_value)
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_simconnect
+        verbose_exec = config.verbose_mode_exec
         verbose_details = False # config.verbose_mode_details
         #verbose = True
         manager : SimConnectManager = self.manager
@@ -4012,16 +4013,19 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     
   
                     if verbose: 
-                        comment = ""
-                        #if verbose_details:
-                        if extra_data:
-                            if "node" in extra_data:
-                                node = extra_data["node"]
-                                comment += f"Node: [{node.id}] " 
-                                
-                        comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} | {self.action_data.comment if self.action_data.comment else ''} | "
                         
-                        syslog.info(f"SIMCONNECT FUNCTOR: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+                        if verbose_exec:
+                            comment = ""
+                            if extra_data:
+                                if "node" in extra_data:
+                                    node = extra_data["node"]
+                                    comment += f"Node: [{node.id}] " 
+                                    
+                            comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} | {self.action_data.comment if self.action_data.comment else ''} | "
+                        
+                            syslog.info(f"SIMCONNECT: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+                        else:
+                            syslog.info(f"SIMCONNECT: send {command} {output_value:0.3f}")
 
                     if command_type == SimConnectCommandType.LVar:
                         request = manager.registerRequest(command, "number", settable = True)

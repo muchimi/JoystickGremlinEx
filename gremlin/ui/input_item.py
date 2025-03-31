@@ -1764,23 +1764,19 @@ class InputItemWidget(QBoxFrame):
 
     def enable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''
-        if not self._ui_loaded: return
         self._close_button_widget.setVisible(True)
 
     def disable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''
-        if not self._ui_loaded: return
         self._close_button_widget.setVisible(False)
 
 
     def enable_edit(self):
         ''' enables the edit button on the input widget (keyboard only usually) '''
-        if not self._ui_loaded: return
         self._edit_button_widget.setVisible(True)
 
     def disable_edit(self):
         ''' enables the edit button on the input widget (keyboard only usually) '''
-        if not self._ui_loaded: return
         self._edit_button_widget.setVisible(False)
 
     def create_action_icons(self, profile_data):

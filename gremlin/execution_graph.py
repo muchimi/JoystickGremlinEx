@@ -1062,9 +1062,15 @@ class ExecutionContext():
                                     # build gate action execution subtree
                                     if action.name == "Gated Axis":
 
+                                        # for gated axis, repeat the gated axis action container conditions because the gated action node will be executed as root directly, so the parent condition will not be evaluated
+                                        repeat_condition_node = self._get_condition_node(container, container_node)
+                                        repeat_condition_node.parent = action_node  # condition for container - appears after the container node as the entry point is the container
+
                                         # all gated axis functions are grouped - holds a condition per gate or range all of which get executed
                                         gated_axis_group_node = ExecutionGraphNode(ExecutionGraphNodeType.Group)
-                                        gated_axis_group_node.parent = action_node
+                                        gated_axis_group_node.parent = repeat_condition_node
+
+
 
                                         gate_data : gremlin.gated_handler.GateData = action.gate_data
                                         gates = gate_data.getUsedGates()
@@ -1117,16 +1123,20 @@ class ExecutionContext():
                                             range_node.parent = gated_axis_group_node
                                             range_node.description = f"Range {range_info.to_display()}"
 
+                                            # group of all range conditions
+                                            range_group = ExecutionGraphNode(ExecutionGraphNodeType.Group)
+                                            range_group.parent = range_node
 
                                             for condition_type, item_data in range_info.item_data_map.items():
 
+                                                # range condition (condition applied to the range)
                                                 range_condition_node = ExecutionGraphNode(ExecutionGraphNodeType.GatedAxisRangeCondition)
                                                 range_condition_node.exec_functors = gremlin.gated_handler.GatedAxisRangeCondition(gate_data, range_info, condition_type)
-                                                range_condition_node.parent = range_node
+                                                range_condition_node.parent = range_group
 
+                                                # holds the containers for the range
                                                 group_node = ExecutionGraphNode(ExecutionGraphNodeType.Group)
                                                 group_node.parent = range_condition_node
-
 
                                                 for index, container in enumerate(item_data.containers):
                                                     range_container_node = ExecutionGraphNode(ExecutionGraphNodeType.Container)
@@ -1135,12 +1145,16 @@ class ExecutionContext():
                                                     range_container_node.description = f"Range container [{index}] for range: {range_info.to_display()}: condition: [{condition_type.name}] {str(container)}"
                                                     range_container_node.parent = group_node # range container is owned by the range condition
 
+                                                    # conditions applied to the container
+                                                    condition_node = self._get_condition_node(container, range_container_node)
+                                                    condition_node.parent = range_container_node  # condition for container - appears after the container node as the entry point is the container
+
                                                     for action_set in container.action_sets:
                                                         for range_action in action_set:
                                                             
                                                             range_action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
                                                             range_action_node.id = range_action.id
-                                                            range_action_node.parent = range_container_node
+                                                            range_action_node.parent = condition_node
                                                             range_action_node.action = range_action
                                                             range_action_node.exec_functors = self._get_action_functor(range_action, range_action_node)
                                                             range_action_node.mode = mode_name
@@ -1320,27 +1334,23 @@ class ExecutionContext():
                     # any other node - execute the functor list - first one that fails fails the complete branch to this point
                     functor_list = [] if node.functors is None else (node.functors if  isinstance(node.functors, list) else [node.functors])
                     if functor_list:
-                        result = True
                         for functor in functor_list:
-                            functor_result =  self.process_functor(functor, event, value, manual, extra_data)
+                            result =  self.process_functor(functor, event, value, manual, extra_data)
                             if verbose_id:
                                 if isinstance(functor, gremlin.actions.ActivationCondition):
                                     condition_name = functor.condition_name()
-                                    syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if functor_result else 'FAIL'}")
+                                    syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                                 elif isinstance(functor, gremlin.actions.AbstractCondition):
                                     condition_name = functor.condition_name()
                                     syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                                 else:
-                                    syslog.info(f"{logTabs}> !!! Executed action {functor.__class__.__name__} result: {'PASS' if functor_result else 'FAIL'}")
-                            if not functor_result:
-                                if verbose_id:
-                                    syslog.info(f"{logTabs}>Failing node: {node.id}")
+                                    syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} result: {'PASS' if result else 'FAIL'}")
+                            if not result:
+                                # if verbose_id:
+                                #     syslog.info(f"{logTabs}>Failing node: {node.id}")
 
-                            result = functor_result
-
-                        if not result:
-                            # all functors failed - return failure
-                            return result
+                                # all functors failed - return failure
+                                return result
             
 
                     #result = False
