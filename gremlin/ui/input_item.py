@@ -2364,14 +2364,6 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     def _ui_ready(self):
         ''' called when UI is loaded '''
-        # count = self.container.condition_count
-        # enabled = count > 0
-        # dock_tabs = self.dock_tabs
-        # for i in range(dock_tabs.count()):
-        #     if dock_tabs.tabText(i) == "Conditions":
-        #         tb = dock_tabs.tabBar()
-        #         icon = self._icon_enabled if enabled else self._icon_disabled
-        #         tb.setTabIcon(i, icon)
         self._update_ui(self.container)
 
     def _condition_redraw(self, data):

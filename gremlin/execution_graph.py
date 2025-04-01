@@ -116,6 +116,7 @@ class ExecutionGraphNode(anytree.NodeMixin):
         self.description = ""
         self.has_actions = False # assume the node has no child action somewhere down the tree
         self.link = None # link to another node
+        self.device_link = None # link to the device node
         self.comment = None # comment asociated with this node
 
     def clone(self) -> ExecutionGraphNode:
@@ -1041,6 +1042,8 @@ class ExecutionContext():
                                     action_node.mode = mode_name
                                     action_node.action = action
                                     action_node.comment = action.comment
+                                    action_node.device_link = device_node
+                                    action_node.input_item = input_item
 
                                     m_action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
                                     m_action_node.id = action.id
@@ -1284,6 +1287,7 @@ class ExecutionContext():
         gremlin.shared_state.pushLog()
         logTabs = gremlin.shared_state.logTabs()
         current_mode = gremlin.shared_state.runtime_mode
+
         if not extra_data:
             extra_data = {}
         extra_data["node"] = node
@@ -1310,20 +1314,36 @@ class ExecutionContext():
                 case _:
 
                     # action node - check mode behavior if hierarchical
-                    if node.nodeType == ExecutionGraphNodeType.Action and node.link:
-                        # action node is a "main" action (so not gated axis) node
-                        mode_name = node.mode
-                        if mode_name != current_mode:
-                            # the node being executed belongs to a parent mode
-                            m_mode_node = node.link
-                            m_input_node = m_mode_node.parent
-                            mode_list = self._mode_descendants[mode_name]
-                            if mode_list:
-                                # see if there is a defined mapping for the same input in the input tree in a sub mode
-                                for m_node in m_input_node.children:
-                                    if m_node.mode in mode_list:
-                                        # sub mode has an action defined for this input
-                                        result = False # FAIL the current input and let the sub mode 
+                    # if node.nodeType == ExecutionGraphNodeType.Action and node.link:
+                    #     # action node is a "main" action (so not gated axis) node
+                    #     mode_name = node.mode
+                    #     node.device
+                    #     if mode_name != current_mode:
+                    #         # the node being executed belongs to a parent mode
+                    #         m_mode_node = node.link
+                    #         device_node = node.device_link
+                    #         input_item = node.input_item
+                    #         m_mode_node = next((n for n in device_node.children if n.mode == current_mode), None)
+                    #         if m_mode_node is not None:
+                    #             # see if there is a matching input
+                    #             for m_input_node in m_mode_node.children:
+                    #                 if m_input_node.input_item == input_item:
+                    #                     # the mode has a definition for this input item, skip it
+                    #                     result = False
+                    #                     break
+                                    
+                                
+                            # mode_list = self._mode_descendants[mode_name]
+                            # if mode_list:
+                            #     # see if there is a defined mapping for the same input in the input tree in a sub mode
+                            #     if current_mode in mode_list:
+                            #         # same input is mapped in the child mode, ignore
+                            #         result = False
+
+                                # for m_node in m_input_node.children:
+                                #     if m_node.mode in mode_list:
+                                #         # sub mode has an action defined for this input
+                                #         result = False # FAIL the current input and let the sub mode 
                                         
 
 
