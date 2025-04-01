@@ -1069,7 +1069,7 @@ class SimconnectMonitor():
         # syslog = logging.getLogger("system")
         syslog.info("SCMonitor: listening")
         self._manager = SimConnectManager()
-        self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
+        #self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
         self._manager.sim_start.connect(self._sim_start)
         self._manager.sim_stop.connect(self._sim_stop)
         self._manager.registerAircraftChangeCallback(self._sim_aircraft_loaded)
@@ -4042,12 +4042,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                             self.action_data.trigger_on_release and not event.is_pressed
                     if trigger:
                         if command_type == SimConnectCommandType.LVar:
-                            if verbose_details: syslog.info(f"SIMCONNECT: Trigger singleton {self.action_data.command}")
+                            if verbose: syslog.info(f"SIMCONNECT: Trigger singleton {self.action_data.command}")
                             request = manager.registerRequest(self.action_data.command, "number", settable = True)
                             request.value = value
                             request.transmit()
                         else:
-                            if verbose_details: syslog.info(f"SIMCONNECT: Trigger singleton {block.command}")
+                            if verbose: syslog.info(f"SIMCONNECT: Trigger singleton {block.command}")
                             block.execute(value)
 
             elif output_mode == SimConnectActionMode.SetValue:

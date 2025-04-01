@@ -219,15 +219,23 @@ Joystick Gremlin EX
 	+ Graph nodes include conditions and actions
 	+ Execution can start at any node
 	+ Shortcut evaluation with PASS/FAIL nodes during execution
-	+ Graph nodes support group/any/all evaluations
+	+ Graph nodes support group/any/all hiearchical evaluations
 - Improved handling of profile start errors (inability to connect for example)
-- Added notes field for all containers
-- New: Defined devices in a profile that are not connected will load, and show in a disconnected state tab.  The device can then be remapped to another connected device via the context menu.
+- Added notes field for all containers (eliminates the need for the description action in most cases)
+- New: disconnected devices (devices that are not found) will load and show up as disconnected in the device tabs.  This allows copy/paste of components for disconnected devices or for devices that no longer exist, or opening someone else's profile.  
+- Improved: most recent profile list will be sorted by the most recently loaded profile
+- Improved (experimental): Remap dialog to remap devices to another device (this is also known as the GUID remap or changing devices - used for transferring containers to a new device.).
+- Improved: Remap function loads to a new, unsaved profile to preserve the original data.  This profile must be saved to be persisted.
 - Changed version number from base Gremlin to reflect the product is now significantly different to 16ex
 - VjoyRemap: startup axis value optional, will read raw hardware on start if not set.  
 - VjoyRemap: range and scale correctly applied to output
-- Theme color fixes for UI components
-- Fix Action description icon not themed
+- Fix: UI theme fixes for components and icons.
+- Fix: context menu on devices functioning again.
+- Fix: complex recursive condition evaluation (via the new graph execution logic)
+- Fix: virtual button on legacy remap
+
+
+
 
 
 ## 13.40.16ex (pre-release)

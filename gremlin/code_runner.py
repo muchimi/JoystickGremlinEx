@@ -266,11 +266,11 @@ class CodeRunner:
             mode_source.sort(key = lambda x: x[0]) # sort parent to child
             mode_list = [mode for (_,mode) in mode_source] # parent mode first
 
+            # ensure all profile modes are in the execution graph if they are defined - this is so we can search them
             mode_nodes = {}
             for mode in mode_list:
-                mode_node = gremlin.execution_graph.ExecutionGraphNode(gremlin.execution_graph.ExecutionGraphNodeType.Mode)
-                mode_node.parent = ec.root
-                mode_node.mode = mode
+                mode_node = gremlin.execution_graph.ExecutionGraphModeNode(mode)
+                mode_node.parent = ec.graph
                 mode_nodes[mode] = mode_node
 
             # Create input callbacks based on the profile's content

@@ -31,6 +31,7 @@ import gremlin.shared_state
 from gremlin.types import VerboseMode
 import gremlin.types
 import gremlin.util
+from collections import deque
 
 syslog = logging.getLogger("system")
 
@@ -508,14 +509,23 @@ class Configuration:
         if value is not None:
             value = os.path.normpath(value.casefold()) # normalize the profile path
             current = self.recent_profiles
-
             if value in current:
-                del current[current.index(value)]
-            current.insert(0, value)
-            # normalize and remove duplicates
-            current = list(set([os.path.normpath(item.casefold()) for item in current]))
-            current = current[0:19] # limit
+                current.remove(value)
 
+            data = deque(maxlen = 21)
+            data.extend(current)
+
+            # add the current item as the last item
+            data.appendleft(value)
+
+            # trim    
+            while len(data) > 20:
+                data.pop()
+
+            # normalize and remove duplicates
+            current = []
+            while data:
+                current.append(os.path.normpath(data.popleft().casefold()))
             
             self._data["recent_profiles"] = current
         self.save()

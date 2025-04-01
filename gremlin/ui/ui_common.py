@@ -243,6 +243,9 @@ class Color():
             QScrollArea {{
                 border: 1px solid {border_color};
             }}
+            QComboBox {{
+                border: 1px solid {border_color};
+            }}
            
             '''
         # print (css)

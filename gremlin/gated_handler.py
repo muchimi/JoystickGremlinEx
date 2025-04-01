@@ -869,7 +869,7 @@ class RangeInfo():
     def set_gates(self, g1 : GateInfo, g2 : GateInfo):
         ''' sets both gates for the range '''
         
-        assert abs(g1.value < g2.value) >= 0.001,"Ranges require two different gates"
+        assert abs(g1.value - g2.value) >= 0.001,"Ranges require two different gates"
         if self._g1_id != g1.id or self._g2_id != g2.id:
             self._g1_id = g1.id
             self._g2_id = g2.id
@@ -1108,7 +1108,7 @@ class GateData():
 
     def __init__(self,
                  profile_mode, # required - profile mode this applies to (can also be set from XML)
-                 action_data, # required - action data block (usually the object that contains a functor)
+                 action_data : gremlin.base_profile.AbstractAction, # required - action data block (usually the object that contains a functor)
                  min = -1.0,
                  max = 1.0,
                  condition = GateConditionType.OnCross,
@@ -1204,9 +1204,6 @@ class GateData():
         # update the default range when the order of gates changes
         eh = GateEventHandler()
         eh.gate_order_changed.connect(self._update_default_range)
-
-        
-
         self._hooked = False
 
     def replace_gate(self, g1):
@@ -1251,6 +1248,18 @@ class GateData():
             self._hooked = False
 
 
+    @property
+    def device_guid(self):
+        if self._action_data:
+            return self._action_data.hardware_device_guid
+        return None
+    
+    @property
+    def input_id(self):
+        if self._action_data:
+            return self._action_data.hardware_input_id
+        return None
+    
 
     @property
     def hooked(self) -> bool:
@@ -5249,7 +5258,8 @@ class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
         self.gate_data = gate_data
         self.gate_info = gate_info
         self.ranges = gate_data.getUsedRanges()
-        self._last_value = None
+        # starting value
+        self._last_value = gremlin.joystick_handling.get_axis(gate_data.device_guid, gate_data.input_id) 
         self._condition_type = condition_type
 
     @property
@@ -5264,9 +5274,34 @@ class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
     def process_event(self, event, value, extra_data  : dict = None):
         if event.is_axis:
             return False #  FAIL - wrong event type - gate actions are all momentary so require a non-axis event
-        if extra_data and "condition_type" in extra_data:
-            return self._condition_type == extra_data["condition_type"]
-        return True
+        
+        current_value = value.raw
+        gate_value = self.gate_info.value
+        last_value = self._last_value
+        self._last_value = current_value
+        result = False
+        match self._condition_type:
+            case GateConditionType.OnCross:
+                #syslog.info(f"GATE CROSS: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {current_value >= gate_value} {last_value < gate_value} {current_value < gate_value} {last_value >= gate_value} ")
+                if current_value >= gate_value:
+                    result = last_value < gate_value
+                elif current_value < gate_value:
+                    result = last_value >= gate_value
+                
+            case GateConditionType.OnCrossIncrease:
+                #syslog.info(f"GATE INC: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {current_value >= gate_value} {last_value < gate_value}")
+                if current_value >= gate_value:
+                    result = last_value < gate_value
+                
+            case GateConditionType.OnCrossDecrease:
+                #syslog.info(f"GATE DEC: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {current_value < gate_value} {last_value >= gate_value}")
+                if current_value < gate_value:
+                    result = last_value >= gate_value
+
+        # if result:
+        #     pass
+                
+        return result
 
         
         
@@ -5308,7 +5343,8 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         super().__init__(self.comparison)
         self.gate_data = gate_data
         self.range_info = range_info
-        self._last_value = None
+        # starting value
+        self._last_value = gremlin.joystick_handling.get_axis(gate_data.device_guid, gate_data.input_id) 
         self._condition_type = condition_type
 
     @property
