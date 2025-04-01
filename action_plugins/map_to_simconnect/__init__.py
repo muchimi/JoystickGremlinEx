@@ -1072,6 +1072,7 @@ class SimconnectMonitor():
         self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
         self._manager.sim_start.connect(self._sim_start)
         self._manager.sim_stop.connect(self._sim_stop)
+        self._manager.registerAircraftChangeCallback(self._sim_aircraft_loaded)
         self._started = False
         self._startup_mode = {}
         self._verbose = gremlin.config.Configuration().verbose_mode_simconnect

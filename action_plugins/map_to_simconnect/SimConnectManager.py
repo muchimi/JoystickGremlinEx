@@ -474,6 +474,7 @@ class SimConnectManager(QtCore.QObject):
         el.profile_start.connect(self._profile_start) # trap profile start
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        self._aircraft_change_callbacks = []
 
 
         self._connect_in_progress = False
@@ -546,6 +547,10 @@ class SimConnectManager(QtCore.QObject):
 
         # load internal commands
         self.load_internal()
+
+    def registerAircraftChangeCallback(self, callback):
+        if not callback in self._aircraft_change_callbacks:
+            self._aircraft_change_callbacks.append(callback)
 
     def _ensure_simvar_xml(self):
         if not os.path.isfile(self._simvars_xml):
@@ -1032,6 +1037,11 @@ class SimConnectManager(QtCore.QObject):
         self._aircraft_name = name
         self._dump_current_aircraft()
         self.sim_aircraft_loaded.emit(folder, name, title)
+        for callback in self._aircraft_change_callbacks:
+            try:
+                callback(folder, name, title)
+            except:
+                pass
 
 
     def _dump_current_aircraft(self):
