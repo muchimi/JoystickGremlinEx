@@ -5303,32 +5303,6 @@ class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
                 
         return result
 
-        
-        
-        # current_value = value.current
-        
-        # if self._last_value is None:
-        #     self._last_value = current_value
-        # gate_value = self.gate_info.value
-        # verbose = gremlin.config.Configuration().verbose_mode_condition
-        # verbose_detailed = gremlin.config.Configuration().verbose_mode_detailed
-        # if verbose_detailed: syslog.info(f"Gate: {gate_value:0.3f} current value: {current_value:0.3f} last value: {self._last_value:0.3f}")
-        # try:
-        #     if self._last_value > gate_value and current_value < gate_value:
-        #         # cross decreasing
-        #         if verbose: syslog.info(f"Gate: {self.gate_info.gate_display()}: trigger decreasing")
-        #         return True
-        #     if self._last_value < gate_value and current_value > gate_value:
-        #         # cross increasing
-        #         if verbose: syslog.info(f"Gate: {self.gate_info.gate_display()}: trigger increasing")
-        #         return True
-        #     if gate_value == current_value:
-        #         if verbose: syslog.info(f"Gate: {self.gate_info.gate_display()}: trigger equal")
-        #         # cross equal
-        #         return True
-        #     return False
-        # finally:
-        #     self._last_value = current_value
 
         
     def condition_name(self) -> str:
@@ -5359,7 +5333,9 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         require_axis = self._condition_type in (GateConditionType.InRange, GateConditionType.OutsideRange)
         if event.is_axis != require_axis:
             return False # FAIL - wrong event type
-        current = value.current
+        current = value.raw
+        last_value = self._last_value
+        self._last_value = current
         if extra_data and "condition_type" in extra_data:
             condition_type = extra_data["condition_type"]
             if self._condition_type != condition_type:
@@ -5371,12 +5347,17 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
                 result = self.range_info.inRange(current)
             case GateConditionType.OutsideRange:
                 result = not self.range_info.inRange(current)
+            case GateConditionType.EnterRange:
+                result = not self.range_info.inRange(last_value) and self.range_info.inrange(current)
+            case GateConditionType.ExitRange:
+                result = self.range_info.inRange(last_value) and not self.range_info.inrange(current)
+            
         verbose = gremlin.config.Configuration().verbose_mode_condition
         if verbose:
             logtabs = gremlin.shared_state.logTabs()
-            syslog.info(f"{logtabs}Range Condition: value: {current:0.3f} range: {self.range_info.range_display()} result: {'PASS' if result else 'FAIL'}")
-        if result:
-            pass
+            syslog.info(f"{logtabs}Range Condition: {self._condition_type.name} value: {current:0.3f} range: {self.range_info.range_display()} result: {'PASS' if result else 'FAIL'}")
+        # if result:
+        #     pass
         return result
     
 
