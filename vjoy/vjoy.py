@@ -87,7 +87,10 @@ def device_exists(vjoy_id):
     :param vjoy_id id of the vjoy device to check
     :return True if the device exists, False otherwise
     """
-    state = VJoyInterface.GetVJDStatus(vjoy_id)
+    try:
+        state = VJoyInterface.GetVJDStatus(vjoy_id)
+    except:
+        return False
     return state not in [VJoyState.Missing.value, VJoyState.Unknown.value]
 
 

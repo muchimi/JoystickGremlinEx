@@ -1175,7 +1175,8 @@ class ProfileGraph():
         ''' true if the loaded profile has one or more joystick devices that aren't currently connected '''
 
         # get devices
-        device_guids = [node.device_guid for node in self._root.children if node.device_type == DeviceType.Joystick]
+        device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
+        device_guids = [node.device_guid for node in device_nodes if node.device_type == DeviceType.Joystick]
         for device_guid in device_guids:
             info = gremlin.joystick_handling.device_info_from_guid(device_guid)
             if not info:
@@ -1184,7 +1185,8 @@ class ProfileGraph():
     
     def joystick_devices(self) -> list[DeviceSummary]:
         ''' gets a list of joystick devices defined in the profile '''
-        device_list = [node.device for node in self._root.children if node.device_type in (DeviceType.Joystick, DeviceType.VJoy)]
+        device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
+        device_list = [node.device for node in device_nodes if node.device_type in (DeviceType.Joystick, DeviceType.VJoy)]
         return device_list
         
             

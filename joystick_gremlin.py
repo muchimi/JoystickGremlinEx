@@ -125,7 +125,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t19b"
+APPLICATION_BASE = "m73t19c"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -1932,23 +1932,23 @@ class GremlinUi(QtWidgets.QMainWindow):
 
                     if verbose:
                         syslog.info(f"Added joystick tab: {device_name} index {index}")
+
+                    gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
+                    widget.inputChanged.connect(self._device_input_changed_cb)
                 
-                index += 1
+                    index += 1
                         
 
-                gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
 
-                widget.inputChanged.connect(self._device_input_changed_cb)
-
-                # pick a default entry for each tab if one is not currently selected
-                _, last_input_id = self._get_last_input(device_guid)
-                if last_input_id is None:
-                    # get the first input item of the tab
-                    input_item = self._get_input_item(device_guid, 0)
-                    if input_item:
-                        input_id = input_item.input_id
-                        input_type = input_item.input_type
-                        el.input_selection_changed.emit(device_guid, input_type, input_id)
+                    # pick a default entry for each tab if one is not currently selected
+                    _, last_input_id = self._get_last_input(device_guid)
+                    if last_input_id is None:
+                        # get the first input item of the tab
+                        input_item = self._get_input_item(device_guid, 0)
+                        if input_item:
+                            input_id = input_item.input_id
+                            input_type = input_item.input_type
+                            el.input_selection_changed.emit(device_guid, input_type, input_id)
                         
 
             # =======================================================

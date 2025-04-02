@@ -132,6 +132,8 @@ def vjoy_devices() -> list[DeviceSummary]:
     :return list of vJoy devices
     """
     device_list = [dev for dev in _joystick_devices if dev.vjoy_id != -1 and dev.is_virtual]
+
+    
     return device_list
 
 def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
@@ -468,32 +470,54 @@ def joystick_devices_initialization():
     # their matching SDL counterparts have been found.
     vjoy_hash_list = []
     vjoy_proxy = VJoyProxy()
+    config_map = {}
+    disconnected_list = []
+    used_counts = []
     for vjoy_index in range(1,17):  # index 1 up to 16
         # Only process devices that actually exist 
         
-        if not vjoy.device_exists(vjoy_index):
-            syslog.info(f"Vjoy Interface: device {vjoy_index} not found")
-            continue
+        is_connected =  vjoy.device_exists(vjoy_index)
+
+        
 
         # Compute a hash for the vJoy device and match it against the SDL
         # device hashes
 
-        axis_count = vjoy.axis_count(vjoy_index)
-        button_count = vjoy.button_count(vjoy_index)
-        hat_count = vjoy.hat_count(vjoy_index)
-        
+        if is_connected:
+            axis_count = vjoy.axis_count(vjoy_index)
+            button_count = vjoy.button_count(vjoy_index)
+            hat_count = vjoy.hat_count(vjoy_index)
+            if not button_count in used_counts:
+                used_counts.append(button_count)
+            config_map[vjoy_index] = (is_connected, axis_count, button_count, hat_count)
+
+        else:
+            disconnected_list.append(vjoy_index)
+
+    # add missing vjoy devices that are disconnected or not configured so they are still available and marked disconnected
+    for vjoy_index in disconnected_list:
+        count = 128
+        while count in used_counts:
+            count-=1
+        used_counts.append(count)
+        config_map[vjoy_index] = (False, 8, count, 4) # fake configuration, varies by button count only
+    
+
+    for vjoy_index in range(1,17):  # index 1 up to 16            
+            
+        is_connected, axis_count, button_count, hat_count = config_map[vjoy_index]
+            
         hash_value = (axis_count,button_count,hat_count)
         hash_wheel_value = (axis_count+1,button_count,hat_count)
+
 
         syslog.info(f"Vjoy Interface: device index [{vjoy_index}] Hash: {hash_value} Hash wheel: {hash_wheel_value} Axis Count: {axis_count} Button count: {button_count} Hat count: {hat_count}")
 
         if hash_value in vjoy_hash_list:
             syslog.error("Fatal error: This device is not unique in terms of axis/button/hat counts.")
             should_terminate = True
-            
         
-
-        if hat_count > 0 and not vjoy.hat_configuration_valid(vjoy_index):
+        if is_connected and hat_count > 0 and not vjoy.hat_configuration_valid(vjoy_index):
             import gremlin.ui.ui_common
             import gremlin.event_handler
             import sys
@@ -504,12 +528,13 @@ def joystick_devices_initialization():
             util.display_error(error_string)
             sys.exit(1)
 
+    
         # As we are ensured that no duplicate vJoy devices exist from
         # the previous step we can directly link the SDL and vJoy device
         if hash_value in vjoy_lookup:
             # found the vjoy interface index
             vjoy_lookup[hash_value].set_vjoy_id(vjoy_index)
-            syslog.info(f"\tVjoy id {vjoy_index}: found in vjoy interface")
+            syslog.info(f"\tVjoy id {vjoy_index}: {'connected' if is_connected else ' disconnected'} in vjoy interface")
         elif hash_wheel_value in vjoy_wheel_lookup:
             vjoy_lookup[hash_value] = vjoy_wheel_lookup[hash_value]
             vjoy_lookup[hash_value].set_vjoy_id(vjoy_index)
@@ -520,8 +545,11 @@ def joystick_devices_initialization():
             vjoy_lookup[hash_value].set_vjoy_id(vjoy_index)
         else:
             # not found
+            hash_value = (axis_count,button_count,hat_count)
+            hash_wheel_value = (axis_count+1,button_count,hat_count)
             syslog.warning(f"vjoy id {vjoy_index:d}: {hash_value} vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted.  This device cannot be used as input.")
             dev = DeviceSummary()
+            dev.connected = is_connected
             dev.device_guid = gremlin.util.get_dinput_guid() # bogus ID
             dev.device_id = str(dev.device_guid)
             dev.vendor_id = 0x1234 # vjoy vendor
@@ -562,7 +590,7 @@ def joystick_devices_initialization():
         # If the device can be acquired, configure the mapping from
         # vJoy axis id, which may not be sequential, to the
         # sequential SDL axis id
-        if hash_value in vjoy_lookup:
+        if dev.connected and hash_value in vjoy_lookup:
             try:
                 # register the vjoy device with the proxy
                 vjoy_dev = vjoy_proxy[vjoy_index]
