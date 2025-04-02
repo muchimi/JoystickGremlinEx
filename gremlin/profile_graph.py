@@ -1114,7 +1114,7 @@ class ProfileGraph():
     def get_device_node(self, device_guid) -> ProfileDeviceNode:
         ''' gets the profile device node for the given device_guid, None if not found '''
         device_id = str(device_guid) if not isinstance(device_guid, str) else device_guid
-        return next((node for node in self._root.children if node.device_id == device_id),None)
+        return next((node for node in self._root.children if node.nodeType == ProfileNodeType.Device and node.device_id == device_id),None)
     
     def _dump(self):
         ''' dumps the graph '''
