@@ -289,6 +289,12 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         self.close()
 
     def closeEvent(self, event):
+
+        # clear any remaining callbacks
+        device_node: ProfileDeviceNode
+        for device_node in self._device_nodes:
+            device_node.enable_changed_callback = None
+
         gremlin.util.popCursorTemporary()
         return super().closeEvent(event)
 
@@ -305,13 +311,15 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         mode_node : ProfileModeNode
         input_node : ProfileInputNode
 
+        device_nodes = [node for node in profile_node.children if node.nodeType == ProfileNodeType.Device]
+
         if device_guid:
             # remap a single device 
             device_id = str(device_guid) if not isinstance(device_guid, str) else device_guid
-            device_nodes = [node for node in profile_node.children if node.device_id == device_id]
+            device_nodes = [node for node in device_nodes if node.device_id == device_id]
         else:
             # remap all disconnected devices
-            device_nodes = [node for node in profile_node.children if not node.connected]
+            device_nodes = [node for node in device_nodes if not node.connected]
 
         source_map = {}
         for device_node in device_nodes:
@@ -352,15 +360,35 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
         self._target_device_type_map = {}
         self._target_device_guid_map = {}
+        self._enabled_widget_map = {} # holds the map of check boxes keyed by node
 
         device_node : ProfileDeviceNode
+
+        select_all_widget = QtWidgets.QPushButton("Select All")
+        select_all_widget.clicked.connect(self._select_all)
+        select_none_widget = QtWidgets.QPushButton("Select None")
+        select_none_widget.clicked.connect(self._select_none)
+
+        widget, layout = ui_common.getHContainer([select_all_widget, select_none_widget])
+        map_layout.addWidget(widget, row, 0, 1 , 2, alignment = QtCore.Qt.AlignmentFlag.AlignLeft)
+        map_layout.addWidget(QtWidgets.QLabel(""),row,2)
+        row+=1
+        
+
         for device_node in device_nodes:
             if device_node.device_type in (DeviceType.Joystick, DeviceType.VJoy):
 
                 source_device : DeviceSummary = self._source_map[device_node.device_guid]  
 
-                if row == 0:
-                    map_layout.addWidget(QtWidgets.QLabel(""),row,2)
+                enable_widget = ui_common.QDataCheckbox("Enable", data = device_node)
+                enable_widget.setToolTip("Enables remap")
+                enable_widget.setChecked(device_node.enabled)
+                enable_widget.clicked.connect(self._enabled_changed)
+                self._enabled_widget_map[device_node] = enable_widget
+                device_node.enable_changed_callback = self._enable_change_cb
+
+                map_layout.addWidget(enable_widget, row, 0)
+                row+=1
 
                 source_device_name_widget = ui_common.QDataLineEdit(device_node.device_name)
                 source_device_name_widget.setReadOnly(True)
@@ -430,6 +458,33 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
                 row+=1
                 
 
+    @QtCore.Slot()
+    def _select_all(self):
+        ''' deselects all mappings '''
+        device_nodes = self._device_nodes
+        for device in device_nodes:
+            device.enabled = True
+
+    @QtCore.Slot()
+    def _select_none(self):
+        ''' selects all mappings '''
+        device_nodes = self._device_nodes
+        for device in device_nodes:
+            device.enabled = False
+
+    def _enable_change_cb(self, device_node : ProfileDeviceNode):
+        ''' callback when the device changes '''
+        widget = self._enabled_widget_map[device_node]
+        with QtCore.QSignalBlocker(widget):
+            widget.setChecked(device_node.enabled)
+
+
+    @QtCore.Slot(bool)
+    def _enabled_changed(self, checked : bool):
+        ''' individual mapping select for remap '''
+        widget = self.sender()
+        node = widget.data
+        node.enabled = checked
 
     def _populate_devices(self, widget : QtWidgets.QComboBox, device_node : ProfileDeviceNode):
         ''' populates available devices to map to '''
@@ -505,10 +560,15 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         return self._graph.get_device_node(device_guid)
 
     def remap(self) -> bool:
+        gremlin.util.pushCursor()
         data : RemapData
         has_changes = False
         self._dump()
         for data in self._remap_map.values():
+            device_node = data.device_node
+            if not device_node.enabled:
+                # not enabled by the user - skip remap
+                continue
             if data.source_device.device_guid != data.target_device.device_guid:
                 # remap the device
 
@@ -543,7 +603,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
                 # unload the temporary file
                 os.unlink(tmp_file)
 
-          
+        gremlin.util.popCursor()
         return True
 
 
@@ -555,8 +615,19 @@ class ProfileDeviceNode(ProfileBaseNode):
         self.modes = [] # list of defined modes for this node
         self.parent = parent
         self._device = device
-        
+        self._enabled = True # flag to enable/disable the mapping
+        self.enable_changed_callback = None # callback when the enabled changed flag changes - callback gets the node as a parameter callback(node)
         self.label = None
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+    @enabled.setter
+    def enabled(self, value: bool):
+        if self._enabled != value:
+            self._enabled = value
+            if self.enable_changed_callback:
+                self.enable_changed_callback(self)
 
     @property 
     def device_name(self) -> str:
@@ -600,12 +671,14 @@ class ProfileDeviceNode(ProfileBaseNode):
 
     @property
     def device_type(self) -> DeviceType:
-        if self._device:
+        if self._device is not None:
             return self._device.device_type
-        return DeviceType.NotSet
+        return None
     @device_type.setter
     def device_type(self, value : DeviceType):
         if self._device:
+            if value is None:
+                pass
             self._device.device_type = value
 
     @property
@@ -675,13 +748,16 @@ class ProfileDeviceNode(ProfileBaseNode):
 
         :return xml node of this device's contents
         """
-        node_tag = "device" if self.device_type != DeviceType.VJoy else "vjoy-device"
+        device_type = self.device_type
+        if device_type is None:
+            device_type = DeviceType.Joystick
+        node_tag = "device" if device_type != DeviceType.VJoy else "vjoy-device"
         node = etree.Element(node_tag)
         node.set("name", safe_format(self.device_name, str))
         if self.label:
             node.set("label", self.label)
         node.set("device-guid", write_guid(self.device_guid))
-        device_type = DeviceType.to_string(self.device_type)
+        device_type = DeviceType.to_string(device_type)
  
         node.set("type",device_type)
 
@@ -689,7 +765,7 @@ class ProfileDeviceNode(ProfileBaseNode):
             node.append(mode_node.to_xml())
         return node
     
-    def _get_device(self, device_name : str, device_guid : dinput.GUID, device_type : DeviceType):
+    def _get_device(self, device_name : str, device_guid : dinput.GUID, device_type : DeviceType = DeviceType.Joystick):
         ''' gets an existing device or creates a new device '''
         device = gremlin.joystick_handling.device_info_from_guid(device_guid) if device_guid else None
         if not device:
@@ -713,6 +789,9 @@ class ProfileDeviceNode(ProfileBaseNode):
             device.hat_count = 4
             device.input_enabled = True # enable as input
             device._connected = False
+        if device.device_type is None:
+            device.device_type = DeviceType.Joystick
+        assert device.device_type is not None
         return device
         
 
@@ -727,7 +806,7 @@ class ProfileDeviceNode(ProfileBaseNode):
         self._device = value
     
     def __str__(self):
-        return f"{self.nodeType.name}: device: {self.device_name} id: {self.device_id} type: {self.device_type.name}  virtual: {self.virtual}"
+        return f"{self.nodeType.name}: device: {self.device_name} id: {self.device_id} virtual: {self.virtual} remap enabled: {self.enabled}"
     
 
 

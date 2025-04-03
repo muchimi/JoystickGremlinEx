@@ -419,7 +419,7 @@ class DeviceSummary:
         if data is not None:    
             self.device_guid = GUID(data.device_guid)
             self.device_id = str(self.device_guid)
-            self.device_type = DeviceType.Joystick
+            self._device_type = DeviceType.Joystick
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id
             self.joystick_id = data.joystick_id
@@ -451,7 +451,7 @@ class DeviceSummary:
         else:
             self.device_guid = None
             self.device_id = None
-            self.device_type = None
+            self._device_type = None
             self.vendor_id = None
             self.product_id = None
             self.joystick_id = None
@@ -467,6 +467,15 @@ class DeviceSummary:
             self.input_enabled = False # do not allow usage as an input device
             self.vjoy_id = -1
         self.is_special = False
+
+    @property
+    def device_type(self) -> DeviceType:
+        return self._device_type
+    @device_type.setter
+    def device_type(self, value : DeviceType):
+        if value is None:
+            pass
+        self._device_type = value
 
     @property
     def connected(self) -> bool:
