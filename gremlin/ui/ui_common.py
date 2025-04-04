@@ -24,17 +24,12 @@ import os
 from typing import Optional
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
-import PySide6.QtGui
-import PySide6.QtWidgets
-import gremlin.base_classes
-import gremlin.base_profile
-import gremlin.clipboard
 import gremlin.config
 import gremlin.error
 import qtawesome as qta
 import gremlin.event_handler
 from gremlin.input_types import InputType
-from  gremlin.clipboard import Clipboard
+
 import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.keyboard
@@ -123,6 +118,9 @@ class Color():
     def keyHoverBackgroundColor():
         return "#525252" if gremlin.shared_state.is_dark_theme else "#F0F0F0"
     @staticmethod
+    def keyHoverSelectedBackgroundColor():
+        return "#9ab19a" if gremlin.shared_state.is_dark_theme else "#F0F0F0"
+    @staticmethod
     def keyEntryBackgroundColor():
         return "#293d2d" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
@@ -133,7 +131,7 @@ class Color():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
     @staticmethod
     def keyHoverBorderColor():
-        return "#457d45" if gremlin.shared_state.is_dark_theme else "#56b056"
+        return "#CCCCCC" if gremlin.shared_state.is_dark_theme else "#222222"
     @staticmethod
     def containerBackgroundColor():
         return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"

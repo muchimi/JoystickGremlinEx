@@ -201,7 +201,7 @@ def reload_device_map():
     # setup device types
     global device_type_map
     device_type_map = {}
-    for device in gremlin.joystick_handling.joystick_devices():
+    for device in gremlin.joystick_handling.all_joystick_devices():
         gremlin.shared_state.device_type_map[device.device_guid] = device.device_type
     # virtual devices
     for device_guid, device_type in gremlin.shared_state.virtual_device_guid_type_map:

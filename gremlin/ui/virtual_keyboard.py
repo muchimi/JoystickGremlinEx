@@ -29,6 +29,8 @@ class QKeyWidget(QtWidgets.QPushButton):
 
     # fires when selection changes
     selected_changed = QtCore.Signal(object)
+    
+    key_clicked = QtCore.Signal()
 
     ''' custom key label '''
     def __init__(self, text = None, parent = None) -> None:
@@ -36,17 +38,21 @@ class QKeyWidget(QtWidgets.QPushButton):
         self._key = None
         self._selected = False
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
+        #self.clicked.connect(self._clicked)
 
-        foreground_color = gremlin.ui.ui_common.Color.keyForegroundColor()
-        background_color = gremlin.ui.ui_common.Color.keyBackgroundColor()
-        selected_color = gremlin.ui.ui_common.Color.selectColor()
-        border = gremlin.ui.ui_common.Color.keyBorderColor()
-        hover_border = gremlin.ui.ui_common.Color.keyHoverBorderColor()
-        self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
-        self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+        Color = gremlin.ui.ui_common.Color
+        foreground_color = Color.keyForegroundColor()
+        background_color = Color.keyBackgroundColor()
+        selected_color = Color.selectColor()
+        border = Color.keyBorderColor()
+        hover_border = Color.keyHoverBorderColor()
+        hover_background_color = Color.keyHoverBackgroundColor()
+        hover_selected_background_color = Color.keyHoverSelectedBackgroundColor()
+        self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+        self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-        self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px {hover_border};}}"
-        self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+        self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+        self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
         # border-style: outset;
         self._key_size = 1
@@ -57,6 +63,11 @@ class QKeyWidget(QtWidgets.QPushButton):
         self.shifted_key = None # what to display when shifted
         self.installEventFilter(self)
         
+
+    # @QtCore.Slot()
+    # def _clicked(self):
+    #     syslog.info("clicked")
+    #     self.key_clicked.emit()
 
     @property
     def key(self) -> Key:
@@ -100,6 +111,7 @@ class QKeyWidget(QtWidgets.QPushButton):
     @selected.setter
     def selected(self,value):
         if self._selected != value:
+            syslog.info(f"selected state changed to : {value}")
             self._selected = value
             self._update_state()
 
@@ -115,9 +127,10 @@ class QKeyWidget(QtWidgets.QPushButton):
                 selected = self._selected_style
     
         if self._selected:
-            self.setStyleSheet(plain)
-        else:
             self.setStyleSheet(selected)
+        else:
+            self.setStyleSheet(plain)
+        #self.update()
 
   
     def eventFilter(self, widget, event):
@@ -325,6 +338,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     widget.shifted_key = shifted if shifted else widget.normal_key
                     
                     widget.clicked.connect(self._widget_clicked_cb)
+                    #widget.key_clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
                     #syslog.info(f"{key_name}: {key} {shifted}")
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
@@ -1018,6 +1032,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     widget.shifted_key = shifted if shifted else widget.normal_key
                     
                     widget.clicked.connect(self._widget_clicked_cb)
+                    #widget.key_clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
                     #syslog.info(f"{key_name}: {key} {shifted}")
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name

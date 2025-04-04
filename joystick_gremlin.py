@@ -38,6 +38,10 @@ import webbrowser
 import dinput
 from lxml import etree
 
+import gremlin.ui.ui_common
+import gremlin.util
+
+
 import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.gamepad_handling
@@ -52,7 +56,7 @@ import gremlin.ui.midi_device
 import gremlin.ui.osc_device
 import gremlin.ui.mode_device
 import gremlin.ui.theme
-import gremlin.util
+
 import gremlin.curve_handler
 import gremlin.gated_handler
 import gremlin.input_types
@@ -125,7 +129,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t21"
+APPLICATION_BASE = "m73t22"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -1860,7 +1864,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             phys_devices = gremlin.joystick_handling.physical_devices()
             vjoy_devices = gremlin.joystick_handling.vjoy_devices()
 
-            self._active_devices = gremlin.joystick_handling.joystick_devices()
+            self._active_devices = gremlin.joystick_handling.all_joystick_devices()
 
 
             # get list of devices in the profile that do not exist or are not connected
@@ -4313,7 +4317,7 @@ if __name__ == "__main__":
     # and terminate GremlinEx
     try:
         syslog.info("Checking vJoy installation")
-        vjoy_count = len([dev for dev in gremlin.joystick_handling.joystick_devices() if dev.is_virtual])
+        vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.is_virtual])
         vjoy_working = vjoy_count != 0
         syslog.info(f"\tFound {vjoy_count} vjoy device(s)")
 

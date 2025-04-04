@@ -1223,8 +1223,9 @@ class SimconnectMonitor():
     def _sim_aircraft_loaded(self, folder : str, name : str, title : str):
         ''' called when a new aicraft has been detected '''
         # syslog = logging.getLogger("system")
-        if self._verbose: syslog.info(f"SCMONITOR: Aircraft loaded: [{title}]")
-        self.changeModeForAicraft(title)
+        if title:
+            if self._verbose: syslog.info(f"SCMONITOR: Aircraft loaded: [{title}]")
+            self.changeModeForAicraft(title)
         
 
     def changeModeForAicraft(self, title : str):

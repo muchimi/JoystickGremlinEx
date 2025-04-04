@@ -446,12 +446,12 @@ class DeviceSummary:
                     logical_count += 1
                 self.axis_names.append(axis_name)
             self.vjoy_id = -1
-            self._connected = True
+            self._connected = True # if dinput data is provided, the device is marked as connected
 
         else:
             self.device_guid = None
             self.device_id = None
-            self._device_type = None
+            self._device_type = DeviceType.Joystick # assume it's joystick by default
             self.vendor_id = None
             self.product_id = None
             self.joystick_id = None

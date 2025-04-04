@@ -24,8 +24,7 @@ from lxml import etree
 import os
 
 import gremlin
-import gremlin.base_buttons
-import gremlin.base_conditions
+
 import gremlin.base_profile
 import gremlin.base_profile
 import gremlin.config

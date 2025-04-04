@@ -325,7 +325,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
     def _create_ui(self):
         """Creates the UI to set physical input state."""
         for dev in sorted(gremlin.joystick_handling.vjoy_devices(),key=lambda x: x.vjoy_id):
-            check_box = QtWidgets.QCheckBox(f"vJoy {dev.vjoy_id:d}")
+            check_box = QtWidgets.QCheckBox(dev.name)
             if self.profile_data.vjoy_as_input.get(dev.vjoy_id, False):
                 check_box.setChecked(True)
             check_box.stateChanged.connect(

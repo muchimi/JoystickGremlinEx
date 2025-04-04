@@ -2616,7 +2616,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
         self.profile = profile_data
 
-        self.devices = gremlin.joystick_handling.joystick_devices()
+        self.devices = gremlin.joystick_handling.all_joystick_devices()
 
         self.setWindowTitle("Device Information")
 

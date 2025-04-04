@@ -38,6 +38,7 @@ from PySide6.QtGui import QColor
 
 import gremlin.shared_state
 import gremlin.ui
+import gremlin.ui.ui_common
 
 from . import error
 
@@ -847,10 +848,10 @@ def load_pixmap(*paths):
             return None
         return pixmap
     
-    syslog.error(f"load_pixmap(): invalid path")
-    return None
-
-
+    # return a dummy pixmap so the code doesn't blow up
+    syslog.error(f"load_pixmap(): invalid path: {paths}")
+    icon : QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
+    return icon.pixmap(24,24)
 
 
 def load_icon(*paths, use_qta = False, qta_color = None):

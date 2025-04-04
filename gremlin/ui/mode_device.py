@@ -154,8 +154,6 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
 
-
-
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
         ''' occurs when a new mode is selected '''
@@ -314,7 +312,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         import gremlin.ui.input_item
 
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
-        data : gremlin.base_profile.InputItem 
+        data : ModeInputItem
         widget.data = data
         widget.create_action_icons(data)
         widget.setTitle(self._custom_name_handler(data))
@@ -396,3 +394,4 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """Refreshes the current selection, ensuring proper synchronization."""
         self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
         #self._select_item_cb(self.input_item_list_view.current_index)
+

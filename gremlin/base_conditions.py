@@ -733,9 +733,9 @@ class ActivationCondition(QtCore.QObject):
 
         
         #assert input_item is not None,"XML: error:input_item not provided for activation condition"
-        if input_item is None:
-            gremlin.ui.ui_common.MessageBox(prompt="The source action does not support pasting conditions to the new input.")
-            return
+        # if input_item is None:
+        #     gremlin.ui.ui_common.MessageBox(prompt="The source action does not support pasting conditions to the new input.")
+        #     return
         
         for cond_node in node.findall("condition"):
             condition_type = safe_read(cond_node, "condition-type")

@@ -493,7 +493,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         device_id = device_node.device_id
         match device_node.device_type:
             case DeviceType.Joystick:
-                devices = gremlin.joystick_handling.joystick_devices()
+                devices = gremlin.joystick_handling.all_joystick_devices()
                 device : DeviceSummary
                 for index, device in enumerate(devices):
                     widget.addItem(device.name, device)
@@ -863,6 +863,7 @@ class ProfileInputNode(ProfileBaseNode):
     def __init__(self, device_node : ProfileDeviceNode, parent : ProfileModeNode):
         super().__init__(ProfileNodeType.Input)
         self.device_node  = device_node # link to the device node this input belongs to
+        
         self.input_type : InputType = InputType.NotSet # input type
         self.input_id = None # input id, numeric for a joystick or button, or an object for a keyboard, MIDI, OSC item
         self._calibration = None # calibration data if the input has calibration data
@@ -871,6 +872,12 @@ class ProfileInputNode(ProfileBaseNode):
         self.parent = parent
         self.input_entry = None # the identifier
         self._input_item = None # the profile input item
+
+        if device_node.device_type == DeviceType.ModeControl:
+            # create the special input item
+            self._input_item = gremlin.base_profile.InputItem()
+            self._input_item.device_type = DeviceType.ModeControl
+            self._input_item.input_id = 0
 
 
     @property
@@ -985,8 +992,8 @@ class ProfileInputNode(ProfileBaseNode):
         elif self.input_type == InputType.ModeControl:
             # mode control entries - input id is the only item we need
             self.is_axis = False
-            if "id" in node.attrib:
-                self.input_id = safe_read(node,"id",int,0)
+            self.input_id = safe_read(node,"id",int,0)
+            
             
 
 
@@ -1019,8 +1026,11 @@ class ProfileInputNode(ProfileBaseNode):
                 self.input_id = safe_read(node,"id",int,0)
         
         registry = gremlin.base_profile.ProfileRegistry()
-        input_item = registry.getInputItem(self.device_guid, self.input_type, self.input_id)
-        self.input_item = input_item
+        if not self.input_item:
+            input_item = registry.getInputItem(self.device_guid, self.input_type, self.input_id)
+            self.input_item = input_item
+        else:
+            input_item = self.input_item
 
         # add container nodes to the input node
         child: Element
@@ -1217,7 +1227,7 @@ class ProfileGraph():
 
         # add detected devices
         device : dinput.DeviceSummary
-        active_devices = gremlin.joystick_handling.joystick_devices()
+        active_devices = gremlin.joystick_handling.all_joystick_devices()
 
         for device in active_devices:
             if not self.get_device_node(device.device_guid):

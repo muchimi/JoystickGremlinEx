@@ -38,9 +38,7 @@ import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
 import gremlin.ui.keyboard_device
-import gremlin.ui.midi_device
-import gremlin.ui.osc_device
-import gremlin.ui.mode_device
+
 from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
@@ -272,8 +270,13 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         if self._input_item:
             input_id = self._input_item.input_id
             input_type = None
-            if hasattr(input_id, "getOverrideInputType"):
-                input_type = input_id.getOverrideInputType()
+            device_type = self.get_device_type()
+            if device_type == DeviceType.ModeControl:
+                input_type = InputType.JoystickButton
+            else:
+                if hasattr(input_id, "getOverrideInputType"):
+                    input_type = input_id.getOverrideInputType()
+                
             if input_type:
                 self.override_input_type = input_type
         if self.override_input_type is not None:
@@ -1411,7 +1414,7 @@ class ProfileRegistry():
             return self._device_registry[device_guid]
         return None
 
-    def registerInputItem(self, input_item : InputItem):
+    def registerInputItem(self, input_item):
         ''' registers an input item in the profile registry '''
         assert input_item is not None and \
             input_item.device_guid is not None \
@@ -1492,6 +1495,11 @@ class InputItem():
 
         # registry = ProfileRegistry()
         # registry.registerInputItem(self)
+
+    # def getOverrideInputType(self):
+    #     if self.device_type == DeviceType.ModeControl:
+    #         return InputType.JoystickButton
+    #     return None        
 
     @property
     def message_key(self):
@@ -1861,8 +1869,8 @@ class InputItem():
         elif self.input_type == InputType.ModeControl:
             # mode control entries - input id is the only item we need
             self.is_axis = False
-            if "id" in node.attrib:
-                self.input_id = safe_read(node,"id",int,0)
+            input_id = safe_read(node,"id",int,0)
+            self.input_id = input_id
             
 
 
@@ -2659,30 +2667,30 @@ class Profile():
     def get_modes(self, casefold = False) -> list[str]:
         ''' get all profile mode names as a list '''
 
-        if self._mode_tree:
-            if casefold:
-                modes = [node.name.casefold() for node in self._mode_tree.descendants]    
-            else:
-                modes = [node.name for node in self._mode_tree.descendants]
-
+        self._ensure_mode_tree()
+        if casefold:
+            modes = [node.name.casefold() for node in self._mode_tree.descendants]    
         else:
-            modes = []
-            for device in self.devices.values():
-                if device.type != DeviceType.Keyboard:
-                    continue
-                for _, mode in device.modes.items():
-                    if casefold:
-                        modes.append(mode.name.casefold())    
-                    else:
-                        modes.append(mode.name)
-            modes = list(set(modes))
+            modes = [node.name for node in self._mode_tree.descendants]
+
         if not modes:
             modes = ["Default"]
             self._mode_tree = Node("")
             default_node = Node("Default")
-            default_node.parent = self._mode_tree
+            default_node.parent = self._mode_tree            
 
         return modes  # unduplicated
+    
+    def get_mode_objects(self) -> list[Mode]:
+        ''' gets the mode objects in the device list '''
+        modes = []
+        for device in self.devices.values():
+            for mode in device.modes.values():
+                modes.append(mode)
+            break
+
+        return modes
+
     
     def get_mode_map(self, casefold = False) -> dict:
         ''' gets profile modes as a map of profiles, keyed by name, holds the parent name '''
@@ -2759,7 +2767,7 @@ class Profile():
         if verbose: self.dumpModeTree()
             
     
-    def rename_mode(self, old_mode:str, new_mode:str) -> bool:
+    def rename_mode(self, old_mode:str, new_mode:str, emit = False) -> bool:
         ''' renames an existing mode to a new mode '''
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose
@@ -2768,12 +2776,13 @@ class Profile():
             return False
         
 
+        # mode tree
         node = anytree.find(self._mode_tree, lambda node: node.name == old_mode)
         if not node:
             if verbose: syslog.error(f"PROFILE: rename [{old_mode}] to [{new_mode}] - [{old_mode}] not found in the profile")
             return False
         
-        new_node = anytree.find(self._mode_tree, lambda node: node.name == old_mode)
+        new_node = anytree.find(self._mode_tree, lambda node: node.name == new_mode)
         if new_node:
             # already exist
             if verbose: syslog.error(f"PROFILE: rename [{old_mode}] to [{new_mode}] - [{old_mode}] already exists in the profile")
@@ -2781,15 +2790,15 @@ class Profile():
         
         node.name = new_mode
 
+        # mode device objects
         mode : Mode
-        modes = self.get_modes(True)
-        for mode in modes:
-            if mode.name == old_mode:
-                if verbose: syslog.info(f"PROFILE: rename [{old_mode}] to [{new_mode}]")
-                mode.name = new_mode
-                return True
+        for device in self.devices.values():
+            for mode in device.modes.values():
+                if mode.name == old_mode:
+                    #if verbose: syslog.info(f"PROFILE: rename [{old_mode}] to [{new_mode}]")
+                    mode.name = new_mode
 
-        return False
+        return True
 
 
     
@@ -3004,7 +3013,7 @@ class Profile():
         # device even if it was not part of the loaded XML and
         # replicate the modes present in the profile. This adds both entries
         # for physical and virtual joysticks.
-        devices = gremlin.joystick_handling.joystick_devices()
+        devices = gremlin.joystick_handling.all_joystick_devices()
         for dev in devices:
             add_device = False
             if dev.is_virtual and dev.device_guid not in self.vjoy_devices:

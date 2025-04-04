@@ -27,8 +27,9 @@ import gremlin.base_classes
 import gremlin.event_handler
 import gremlin.input_types
 import gremlin.joystick_handling
+import gremlin.shared_state
 import gremlin.types
-import gremlin.types
+from gremlin.types import DeviceType
 
 
 
@@ -41,7 +42,8 @@ import gremlin.config
 from PySide6 import QtWidgets, QtCore, QtGui
 
 # List of all joystick devices
-_joystick_devices = [] # all devices
+_joystick_devices = [] # detected devices only (including virtual devices that exist all the time like OSC or Modes)
+_all_joystick_devices = [] # [DeviceSummary] of all devices, virtual, connected and disconnected
 _vjoy_devices = [] # real vjoy devices
 
 _joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID
@@ -103,11 +105,20 @@ class VJoyProxy:
 
       
 def joystick_devices() -> list[DeviceSummary]:
-    """Returns the list of joystick like devices.
-
+    """Returns the list of connected joystick like devices 
     :return list containing information about all joystick like devices
     """
     return _joystick_devices
+
+
+def all_joystick_devices() -> list[DeviceSummary]:
+    """Returns the list of connected and disconnected joystick like devices 
+    :return list containing information about all joystick like devices
+    """
+    return _all_joystick_devices
+
+
+    
 
 def axis_input_devices() -> list[DeviceSummary]:
     ''' returns the list of input devices '''
@@ -130,13 +141,14 @@ def  is_hardware_device(device_guid) -> bool:
 def vjoy_devices(connected_only = True) -> list[DeviceSummary]:
     """Returns the list of vJoy devices.
 
-    :return list of vJoy devices
+    :param connected_only: if set, filters VJOY devices that are detected only, if not, returns all 16 devices
+    :return list of [DeviceSummary] holding the device configuration for every vjoy device
     """
 
     if connected_only:
-        device_list = [dev for dev in _joystick_devices if dev.vjoy_id in _vjoy_devices and dev.is_virtual and dev.connected]
+        device_list = [dev for dev in _joystick_devices if dev.vjoy_id in _vjoy_devices and dev.is_virtual]
     else:
-        device_list = [dev for dev in _joystick_devices if dev.vjoy_id != -1 and dev.is_virtual and dev.connected]
+        device_list = [dev for dev in _all_joystick_devices if dev.vjoy_id != -1 and dev.is_virtual]
     
     return device_list
 
@@ -308,7 +320,6 @@ def known_devices() -> list:
 
 def device_info_from_guid(device_guid : str | dinput.GUID) -> DeviceSummary:
     ''' gets physical device information '''
-    
     assert (_joystick_initialized)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
@@ -407,7 +418,7 @@ def joystick_devices_initialization():
 
     import gremlin.util
     import time
-    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map, _vjoy_devices
+    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map, _vjoy_devices, _all_joystick_devices
 
     _joystick_initialized = False
     
@@ -440,23 +451,26 @@ def joystick_devices_initialization():
 
     # Process all connected devices in order to properly initialize the device registry
     devices = []
-    _joystick_devices = []
+    _joystick_devices = [] # [DeviceSummary] of connected devices only
+    _all_joystick_devices = [] # [DeviceSummary] of all devices, virtual, connected and disconnected
     _vjoy_devices = []
     _joystick_device_guid_map.clear()
     virtual_count = 0
     real_count = 0
     virtual_devices = {}
     for device_index in range(device_count):
+        # these are all connected devices
         dev = dinput.DILL.get_device_information_by_index(device_index)
         devices.append(dev)
         syslog.info(f"\tindex: [{device_index}] {str(dev)}")
         _joystick_devices.append(dev)
+        _all_joystick_devices.append(dev)
         _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
         _joystick_device_guid_map[dev.device_id] = dev # key by string ID
         if dev.is_virtual: 
             virtual_count += 1
             virtual_devices[dev.hashkey] = dev
-            dev.device_type = gremlin.types.DeviceType.VJoy
+            dev.device_type = DeviceType.VJoy
         else:
             real_count += 1
 
@@ -507,7 +521,7 @@ def joystick_devices_initialization():
         config_map[vjoy_index] = (False, 8, count, 4) # fake configuration, varies by button count only
     
 
-    for vjoy_index in range(1,17):  # index 1 up to 16            
+    for vjoy_index in range(1,17):  # all possible vjoy devices index 1 up to 16
             
         is_connected, axis_count, button_count, hat_count = config_map[vjoy_index]
             
@@ -515,7 +529,7 @@ def joystick_devices_initialization():
         hash_wheel_value = (axis_count+1,button_count,hat_count)
 
 
-        syslog.info(f"Vjoy Interface: device index [{vjoy_index}] Hash: {hash_value} Hash wheel: {hash_wheel_value} Axis Count: {axis_count} Button count: {button_count} Hat count: {hat_count}")
+        syslog.info(f"Vjoy Interface: device index [{vjoy_index}] Hash: {hash_value} Hash wheel: {hash_wheel_value} Axis Count: {axis_count} Button count: {button_count} Hat count: {hat_count}  Connected: {is_connected}")
 
         if hash_value in vjoy_hash_list:
             syslog.error("Fatal error: This device is not unique in terms of axis/button/hat counts.")
@@ -556,6 +570,7 @@ def joystick_devices_initialization():
             dev.connected = False
             dev.device_guid = gremlin.util.get_dinput_guid() # bogus ID
             dev.device_id = str(dev.device_guid)
+            dev.device_type = DeviceType.VJoy
             dev.vendor_id = 0x1234 # vjoy vendor
             dev.product_id = 0xBEAD # vjoy product ID
             dev.joystick_id = vjoy_index
@@ -582,7 +597,7 @@ def joystick_devices_initialization():
 
             
             vjoy_lookup[hash_value] = dev
-            _joystick_devices.append(dev)
+            _all_joystick_devices.append(dev)
             _joystick_device_guid_map[dev.device_guid] = dev
             syslog.info(f"Adding undetected VJOY device: [{vjoy_index}] {str(dev)}")
             
@@ -616,6 +631,24 @@ def joystick_devices_initialization():
     # Reset all devices so we don't hog the ones we aren't actually using
     vjoy_proxy.reset()
 
+    # # fake mode device
+    # mode_device = DeviceSummary()
+    # import gremlin.shared_state
+    # device_guid = gremlin.shared_state.mode_tab_guid
+    # mode_device.device_guid = device_guid
+    # mode_device.device_id = str(mode_device.device_guid)
+    # mode_device.device_type = DeviceType.ModeControl
+    # mode_device.axis_count = 0 
+    # mode_device.button_count = 2 # id 1 is enter, id 2 is exit
+    # mode_device.hat_count = 0
+    # mode_device.is_special = True
+    # mode_device.connected  = True
+    # mode_device.name = "Mode Device"
+    # _joystick_devices.append(mode_device)
+    # _all_joystick_devices.append(mode_device)
+    # _joystick_device_guid_map[device_guid] = mode_device
+    
+
     # device: dinput.DILL.DeviceSummary
     syslog.info("Input device summary:")
     regular_devices_list = [dev for dev in _joystick_devices if not dev.is_virtual]
@@ -640,7 +673,9 @@ def joystick_devices_update():
         for device_index in range(device_count):
             dev = dinput.DILL.get_device_information_by_index(device_index)
             if not dev.device_guid in _joystick_device_guid_map:
-                _joystick_devices.append(dev)
+                if dev.connected:
+                    _joystick_devices.append(dev)
+                _all_joystick_devices.append(dev)
                 _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
                 _joystick_device_guid_map[dev.device_id] = dev # key by string ID
 

@@ -282,7 +282,7 @@ class ModeBindings(QtWidgets.QWidget):
 
         :return dictionary mapping device GUID to the corresponding name
         """
-        devices = joystick_handling.joystick_devices()
+        devices = joystick_handling.all_joystick_devices()
         device_lookup = {}
         for dev in devices:
             device_lookup[dev.device_guid] = dev.name

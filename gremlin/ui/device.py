@@ -81,7 +81,7 @@ class DeviceListModel(QtCore.QAbstractListModel):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._devices = joystick_handling.joystick_devices()
+        self._devices = joystick_handling.all_joystick_devices()
 
         event_handler.EventListener().device_change_event.connect(
             self.update_model
@@ -90,7 +90,7 @@ class DeviceListModel(QtCore.QAbstractListModel):
     def update_model(self) -> None:
         """Updates the model if the connected devices change."""
         old_count = len(self._devices)
-        self._devices = joystick_handling.joystick_devices()
+        self._devices = joystick_handling.all_joystick_devices()
         new_count = len(self._devices)
 
         # Remove everything and then add it back

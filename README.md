@@ -233,7 +233,11 @@ Joystick Gremlin EX
 - Fix: context menu on devices functioning again.
 - Fix: complex recursive condition evaluation (via the new graph execution logic)
 - Fix: virtual button on legacy remap
-
+T22  
+- Fix: keyboard widget hover and selection state clicked/hovered stylesheets
+- Fix: mode rename not renaming all modes
+- Fix: actions added to Mode device not recognizing the special input as a joystick button
+- Improved: default icon pixmap created if the icon cannot be found to provide a suitable default on a missing file (whatever the reason).
 
 
 

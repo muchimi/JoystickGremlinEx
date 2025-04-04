@@ -201,7 +201,7 @@ class ProfileConverter:
         """
         # Get hardware ids of the connected devices
         device_name_map = {}
-        for device in joystick_handling.joystick_devices():
+        for device in joystick_handling.all_joystick_devices():
             device_name_map[device.name] = device.device_guid
 
         # Fix the device entries in the provided document
@@ -577,7 +577,7 @@ class ProfileConverter:
                 # Map for old hardware id to new guid value
                 self.hwid_to_guid = {}
                 self.dev_info = {}
-                for dev in joystick_handling.joystick_devices():
+                for dev in joystick_handling.all_joystick_devices():
                     hwid = (dev.vendor_id << 16) + dev.product_id
                     self.hwid_to_guid[hwid] = str(dev.device_guid)
                     self.dev_info[str(dev.device_guid)] = dev
@@ -952,7 +952,7 @@ class ProfileModifier:
         # Retrieve target device information structure to get its name and
         # properly initialize modes if needed
         target_hardware_device = None
-        for dev in joystick_handling.joystick_devices():
+        for dev in joystick_handling.all_joystick_devices():
             if dev.device_guid == target_guid:
                 target_hardware_device = dev
 
@@ -1013,7 +1013,7 @@ class ProfileModifier:
         """
         # TODO: Does not ensure conditions are valid, i.e. missing inputs
         target_hardware_device = None
-        for dev in joystick_handling.joystick_devices():
+        for dev in joystick_handling.all_joystick_devices():
             if dev.device_guid == target_guid:
                 target_hardware_device = dev
 
