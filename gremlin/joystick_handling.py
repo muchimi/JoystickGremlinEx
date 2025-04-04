@@ -42,6 +42,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 # List of all joystick devices
 _joystick_devices = [] # all devices
+_vjoy_devices = [] # real vjoy devices
 
 _joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID
 
@@ -126,13 +127,16 @@ def  is_hardware_device(device_guid) -> bool:
     return False
     #return device_guid in _joystick_device_guid_map
 
-def vjoy_devices() -> list[DeviceSummary]:
+def vjoy_devices(connected_only = True) -> list[DeviceSummary]:
     """Returns the list of vJoy devices.
 
     :return list of vJoy devices
     """
-    device_list = [dev for dev in _joystick_devices if dev.vjoy_id != -1 and dev.is_virtual]
 
+    if connected_only:
+        device_list = [dev for dev in _joystick_devices if dev.vjoy_id in _vjoy_devices and dev.is_virtual and dev.connected]
+    else:
+        device_list = [dev for dev in _joystick_devices if dev.vjoy_id != -1 and dev.is_virtual and dev.connected]
     
     return device_list
 
@@ -403,7 +407,7 @@ def joystick_devices_initialization():
 
     import gremlin.util
     import time
-    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map
+    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map, _vjoy_devices
 
     _joystick_initialized = False
     
@@ -437,6 +441,7 @@ def joystick_devices_initialization():
     # Process all connected devices in order to properly initialize the device registry
     devices = []
     _joystick_devices = []
+    _vjoy_devices = []
     _joystick_device_guid_map.clear()
     virtual_count = 0
     real_count = 0
@@ -478,8 +483,6 @@ def joystick_devices_initialization():
         
         is_connected =  vjoy.device_exists(vjoy_index)
 
-        
-
         # Compute a hash for the vJoy device and match it against the SDL
         # device hashes
 
@@ -490,9 +493,10 @@ def joystick_devices_initialization():
             if not button_count in used_counts:
                 used_counts.append(button_count)
             config_map[vjoy_index] = (is_connected, axis_count, button_count, hat_count)
-
+            _vjoy_devices.append(vjoy_index)
         else:
             disconnected_list.append(vjoy_index)
+            
 
     # add missing vjoy devices that are disconnected or not configured so they are still available and marked disconnected
     for vjoy_index in disconnected_list:
@@ -549,7 +553,7 @@ def joystick_devices_initialization():
             hash_wheel_value = (axis_count+1,button_count,hat_count)
             syslog.warning(f"vjoy id {vjoy_index:d}: {hash_value} vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted.  This device cannot be used as input.")
             dev = DeviceSummary()
-            dev.connected = is_connected
+            dev.connected = False
             dev.device_guid = gremlin.util.get_dinput_guid() # bogus ID
             dev.device_id = str(dev.device_guid)
             dev.vendor_id = 0x1234 # vjoy vendor

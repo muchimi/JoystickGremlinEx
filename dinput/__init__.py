@@ -473,8 +473,6 @@ class DeviceSummary:
         return self._device_type
     @device_type.setter
     def device_type(self, value : DeviceType):
-        if value is None:
-            pass
         self._device_type = value
 
     @property

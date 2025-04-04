@@ -90,6 +90,9 @@ class ProfileSettingsWidget(QDataWidget):
         # vJoy axis initialization value setup
         for dev in sorted(gremlin.joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id):
             # Only show devices that are not treated as inputs
+            if not dev.connected:
+                # device is disconnected
+                continue
             if self.profile_settings.vjoy_as_input.get(dev.vjoy_id) is True:
                 continue
 
@@ -321,10 +324,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
 
     def _create_ui(self):
         """Creates the UI to set physical input state."""
-        for dev in sorted(
-                gremlin.joystick_handling.vjoy_devices(),
-                key=lambda x: x.vjoy_id
-        ):
+        for dev in sorted(gremlin.joystick_handling.vjoy_devices(),key=lambda x: x.vjoy_id):
             check_box = QtWidgets.QCheckBox(f"vJoy {dev.vjoy_id:d}")
             if self.profile_data.vjoy_as_input.get(dev.vjoy_id, False):
                 check_box.setChecked(True)
