@@ -129,7 +129,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t22"
+APPLICATION_BASE = "m73t23"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -227,6 +227,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.request_activate.connect(self.activate) # hook activation / deactivation requests
         el.refresh_devices.connect(self._create_tabs) # refresh device list
         el.request_profile_reload.connect(self._reload_profile) # reload the profile from a temporary file
+        el.request_reload.connect(self._reload)
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
@@ -651,12 +652,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._actionTabSubstitute.setToolTip("Remap the device to another device")
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered = self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
+        self._actionTabRemoveDevice  = QtGui.QAction("Remove device", self, triggered = self._tab_remove_device_cb)
+        self._actionTabRemoveDevice.setToolTip("Removes the device from the profile (disconnected devices only)")
         #self._actionTabImport = QtGui.QAction("Import Profile...", self, triggered = self._tab_import_cb)
         #self._actionTabImport.setToolTip("Import profile data into the current device")
 
         menuTools.addSeparator()
         menuTools.addAction(self._actionTabSort)
         menuTools.addAction(self._actionTabSubstitute)
+        menuTools.addAction(self._actionTabRemoveDevice)
         #menuTools.addAction(self._actionTabImport)
         menuTools.addAction(self._actionTabClearMap)
 
@@ -678,6 +682,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         menu.addAction(self._actionTabSort)
         menu.addAction(self._actionTabSubstitute)
         #menu.addAction(self._actionTabImport)
+        menu.addAction(self._actionTabRemoveDevice)
         menu.addAction(self._actionTabClearMap)
         menu.exec_(QtGui.QCursor.pos())
 
@@ -696,6 +701,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self._tab_clear_map_execute(device, current_mode)
 
+    def _tab_remove_device_cb(self):
+        ''' removes a disconnected device from the menu '''
+        tab_guid = gremlin.util.parse_guid(self._active_tab_guid())
+        device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
+        if not device.connected:
+            msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove this device from the profile?")
+            result = msgbox.show()
+            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+                self._tab_remove_device_execute(device)
 
     def _tab_import_cb(self):
         ''' imports a profile into the device '''
@@ -711,6 +725,11 @@ class GremlinUi(QtWidgets.QMainWindow):
             for entry in mode.config[input_type].values():
                 entry.containers.clear()
         self._create_tabs()
+
+    def _tab_remove_device_execute(self, device):
+        ''' removes the specified device '''
+        current_profile = gremlin.shared_state.current_profile
+        current_profile.remove_device(device)
 
 
 
@@ -744,6 +763,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         # profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         # self.load_profile(profile.profile_file)
         pass
+
+    def _reload(self):
+        ''' reloads the ui '''
+        self._create_tabs()
+
 
     @QtCore.Slot(str, bool)
     def _reload_profile(self, source_xml : str, as_new_profile : bool):
@@ -2857,9 +2881,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         for device_guid in self._vjoy_input_device_guids:
             guid_list.append(self._find_tab_data_guid(device_guid))
 
-        # add the output vjoy
-        for device_guid in self._vjoy_output_device_guids:
-            guid_list.append(self._find_tab_data_guid(device_guid))
+        # # add the output vjoy
+        # for device_guid in self._vjoy_output_device_guids:
+        #     guid_list.append(self._find_tab_data_guid(device_guid))
 
         # add the settings tab
         guid_list.append(self._find_tab_data_guid(gremlin.shared_state.settings_tab_guid))

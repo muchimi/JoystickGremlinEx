@@ -3740,7 +3740,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.mode = SimConnectActionMode.SetValue
             self._value_widget.isRange = False # disable ranged mode
             self._update_visible()
-            self._update_axis_widget(self._value_widget.value())
+            self._update_axis_widget(self._value_widget.getValue())
         
     @QtCore.Slot(bool)
     def _mode_trigger_cb(self, value):

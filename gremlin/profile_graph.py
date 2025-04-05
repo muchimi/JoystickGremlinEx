@@ -1205,6 +1205,8 @@ class ProfileGraph():
         device_id = str(device_guid) if not isinstance(device_guid, str) else device_guid
         return next((node for node in self._root.children if node.nodeType == ProfileNodeType.Device and node.device_id == device_id),None)
     
+    
+    
     def _dump(self):
         ''' dumps the graph '''
         syslog.info(f"Profile Graph Tree:")

@@ -2601,6 +2601,31 @@ class Profile():
             el.mode_name_changed.emit(current_name, new_name)
 
         return True
+    
+    def remove_device(self, device : dinput.DeviceSummary):
+        ''' removes the specified device from the profile '''
+        if device.connected:
+            syslog.error(f"PROFILE: cannot remove a connected device: {device.name}")
+            return
+        
+        gremlin.util.pushCursor()
+        device_guid = device.device_guid
+        if device_guid in self.devices:
+            del self.devices[device_guid]
+
+        gremlin.joystick_handling.removeDevice(device)
+
+        node = self.graph.get_device_node(device.device_guid)
+        if node is not None:
+            node.parent = None
+
+        ec = gremlin.execution_graph.ExecutionContext()
+        ec.reset(True) # reset and rebuild data around the profile
+        
+        el = gremlin.event_handler.EventListener()
+        el.request_reload.emit()
+        gremlin.util.popCursor()
+
 
     def remove_mode(self, name, force = False, emit = True):
         ''' removes a mode from this profile '''

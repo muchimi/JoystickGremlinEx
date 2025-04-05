@@ -361,6 +361,7 @@ class EventListener(QtCore.QObject):
 	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
 	request_profile_stop = QtCore.Signal(str) # request the profile to stop (reason: str)
 	request_profile_reload = QtCore.Signal(str, bool) # request a profile to load (str = profile file, bool = as new profile flag)
+	request_reload = QtCore.Signal() # request a reload of the current profile data
 	
 	process_monitor_changed = QtCore.Signal() # process monitor options changed
 

@@ -303,6 +303,23 @@ def registerSpecialDevice(dev : DeviceSummary):
             syslog.info(f"\t{dev.device_id} -> {dev.name}")
 
 
+def removeDevice(dev: DeviceSummary):
+    ''' removes a device from the tracking list'''
+    global _all_joystick_devices, _vjoy_devices, _joystick_devices
+    device_guid = dev.device_guid
+    device_id = dev.device_id
+    if device_id in _joystick_device_guid_map:
+        del _joystick_device_guid_map[device_guid]
+        del _joystick_device_guid_map[device_id]
+        
+        _all_joystick_devices = [d for d in _all_joystick_devices if d.device_guid != device_guid]
+        if dev.device_type == DeviceType.VJoy:
+            _vjoy_devices = [d for d in _vjoy_devices if d.device_id != device_id]
+            
+        _joystick_devices = [d for d in _joystick_devices if d.device_guid != device_guid]
+
+
+
 def device_name_from_guid(device_guid : str | dinput.GUID) -> str:
     ''' gets device name from GUID '''
     assert (_joystick_initialized)
