@@ -260,7 +260,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         mgr.queue_macro(macro)
         if verbose: syslog.info(f"SEQUENCE: execute graph sequence - id {self._macro_id}")
         
-        return True
+        return False # stop execution as the logic is internal to trigger the other nodes
     
     @QtCore.Slot(int)
     def _macro_completed(self, id : int):

@@ -211,7 +211,8 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         if (self.switch_on_press and is_pressed) or not is_pressed:
             self.index = (self.index + 1) % len(self.action_sets)
-        return result
+        
+        return False # stop execution as the logic is internal to trigger the other nodes
 
 
 class ChainContainer(AbstractContainer):

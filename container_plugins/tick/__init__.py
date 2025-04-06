@@ -352,7 +352,7 @@ class TickContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         self._last_value = value
         
-        return True
+        return False # stop execution past this container
 
 
 class TickContainer(AbstractContainer):

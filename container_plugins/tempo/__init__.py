@@ -307,7 +307,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
             self.timer = None
 
-        return True
+        return False # stop execution as the logic is internal to trigger the other nodes
 
     def _short_press(self, event_p, value_p, event_r, value_r):
         """Callback executed for a short press action.

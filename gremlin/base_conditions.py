@@ -381,7 +381,7 @@ class AbstractFunctor(QtCore.QObject):
         
 
     
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data = None) -> bool:
         """Processes the functor using the provided event and value data.
 
         :param event the raw event that caused the functor to be executed
@@ -390,7 +390,7 @@ class AbstractFunctor(QtCore.QObject):
         returns: True to continute the execution sequence, False to abort it
 
         """
-        pass
+        return True
 
     def profile_start(self):
         ''' called when the profile starts '''
@@ -399,6 +399,7 @@ class AbstractFunctor(QtCore.QObject):
     def profile_stop(self):
         ''' called when the profile stops '''
         pass
+
     
     @property 
     def profile_mode(self) -> str:

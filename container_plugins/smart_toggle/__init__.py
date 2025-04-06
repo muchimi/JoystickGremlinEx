@@ -225,7 +225,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 self.activation_time = 0.0
                 self.mode = None
 
-        return True
+        return False # stop execution past this container
 
 
 class SmartToggleContainer(AbstractContainer):

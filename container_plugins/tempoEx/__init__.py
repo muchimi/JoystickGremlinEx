@@ -466,14 +466,10 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             # syslog.info(f"bump long index {self.long_index}")            
 
     def process_event(self, event, value, extra_data = None):
-        # TODO: Currently this does not handle hat or axis events, however
-        #       virtual buttons created on those inputs is supported
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
         elif not isinstance(value.current, bool):
-            syslog.warning(
-                f"Invalid data type received in TempoEx container: {type(event.value)}"
-            )
+            syslog.warning(f"Invalid data type received in TempoEx container: {type(event.value)}")
             return False
         else:
             is_pressed = value.current
@@ -491,7 +487,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             self.timer.start()
 
             if self.activate_on == "press":
-                # syslog.info(f"execute short press (activation mode = press)")
+                syslog.info(f"execute short press (activation mode = press)")
                 self._trigger_short_press(self.event_press, self.value_press)
 
         else:
@@ -521,7 +517,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
             self.timer = None
 
-        return True
+        return False # stop execution
 
     def _short_press(self, index, event_p, value_p, event_r, value_r):
         """Callback executed for a short press action.

@@ -32,6 +32,8 @@ from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 
+syslog = logging.getLogger("system")
+
 class ButtonContainerWidget(AbstractContainerWidget):
 
     """Container with two actions, one for input button is pressed, the other for when the input button is released
@@ -205,9 +207,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             is_hat = True
             is_pressed = value.current != (0,0)
         elif not isinstance(value.current, bool):
-            syslog.warning(
-                f"Invalid data type received in Button container: {type(event.value)}"
-            )
+            syslog.warning(f"Invalid data type received in Button container: {type(event.value)}")
             return False
         else:
             is_hat = False
@@ -221,7 +221,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             value.current = (0,0) if is_hat else True
             self.release_set.process_event(event, value)
 
-        return True
+        return False # stop execution as the logic is internal to trigger the other nodes
 
 
 class ButtonContainer(AbstractContainer):

@@ -935,6 +935,12 @@ class ExecutionContext():
         #     functors.extend(node.functors)
 
         return functors
+    
+
+    def _get_container_functor(self, container, node):
+        ''' creates a functor instance of a container '''
+        functor : gremlin.base_conditions.AbstractFunctor = container.functor(container, node)
+        return functor
 
     def _get_action_functor(self, action, node):
         ''' creates a functor instance for an action '''
@@ -1122,6 +1128,7 @@ class ExecutionContext():
                             # no containers = no actions = skip
                             continue
 
+                        # node holding all the containers in this input - this allows a container to fail while letting the others execute
                         input_container_group = ExecutionGraphGroupNode()
                         input_container_group.parent = input_node
 
@@ -1139,6 +1146,9 @@ class ExecutionContext():
                             container_node.parent = input_container_group # container node parents to its condition node
                             container_node.mode = mode_name
                             container_node.description = f"Container type: [{container.__class__.__name__}] ID: [{container.id}]"
+
+                            # container functor - this is what calls the process_events() method on container functors
+                            container_node.functors = self._get_container_functor(container, container_node)
 
                             # container condition
                             condition_node = self._get_condition_node(container, container_node)
@@ -1165,7 +1175,6 @@ class ExecutionContext():
                                     action_node.link = m_action_node # link the execution tree action node to the input tree action node
 
 
-                                    # action_node.condition = None
                                     action_node.container = container
                                     functor = self._get_action_functor(action, action_node)
                                     action_node.exec_functors = functor
@@ -1435,40 +1444,6 @@ class ExecutionContext():
                             break
                 
                 case _:
-
-                    # action node - check mode behavior if hierarchical
-                    # if node.nodeType == ExecutionGraphNodeType.Action and node.link:
-                    #     # action node is a "main" action (so not gated axis) node
-                    #     mode_name = node.mode
-                    #     node.device
-                    #     if mode_name != current_mode:
-                    #         # the node being executed belongs to a parent mode
-                    #         m_mode_node = node.link
-                    #         device_node = node.device_link
-                    #         input_item = node.input_item
-                    #         m_mode_node = next((n for n in device_node.children if n.mode == current_mode), None)
-                    #         if m_mode_node is not None:
-                    #             # see if there is a matching input
-                    #             for m_input_node in m_mode_node.children:
-                    #                 if m_input_node.input_item == input_item:
-                    #                     # the mode has a definition for this input item, skip it
-                    #                     result = False
-                    #                     break
-                                    
-                                
-                            # mode_list = self._mode_descendants[mode_name]
-                            # if mode_list:
-                            #     # see if there is a defined mapping for the same input in the input tree in a sub mode
-                            #     if current_mode in mode_list:
-                            #         # same input is mapped in the child mode, ignore
-                            #         result = False
-
-                                # for m_node in m_input_node.children:
-                                #     if m_node.mode in mode_list:
-                                #         # sub mode has an action defined for this input
-                                #         result = False # FAIL the current input and let the sub mode 
-                                        
-
 
                     if not result:
                         # condition failed

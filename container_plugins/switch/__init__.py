@@ -548,7 +548,7 @@ class SwitchContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             self.action_sets[data.index].process_event(event, value)
 
         
-        return True
+        return False # stop execution past this container
 
 
 class SwitchData():

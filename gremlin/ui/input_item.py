@@ -1347,7 +1347,10 @@ class InputItemWidget(QBoxFrame):
             if self.identifier.is_axis:
                 # axis
                 if not current_axis_widget:
-                    widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+                    widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False, show_value = False)
+                    calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
+                    widget.show_calibrated = calibration.hasData # enable calibrated mode dual repeater
+
                     widget.data = self
                     self.axis_widget = widget
                 # remove button widget if we changed modes
@@ -1359,7 +1362,6 @@ class InputItemWidget(QBoxFrame):
                 if not current_button_widget:
                     widget = gremlin.ui.ui_common.ButtonStateWidget()
                     self.button_widget = widget
-                    
 
                 # remove axis widget if we changed modes
                 if self.axis_widget:

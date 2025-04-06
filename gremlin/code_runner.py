@@ -168,7 +168,9 @@ class CodeRunner:
         # Check if we want to override the start mode as determined by the
         # heuristic
 
-        start_mode = gremlin.shared_state.current_profile.get_start_mode()
+        if not start_mode:
+            start_mode = gremlin.shared_state.current_profile.get_start_mode()
+            
         syslog.info(f"Startup mode: {start_mode}")
         
         # Set default macro action delay
@@ -331,14 +333,17 @@ class CodeRunner:
                                                             syslog.info(f"\t\t\t\tCommand:: {action.command}")
                                             elif hasattr(functor,"action_sets"):
                                                 for action_set in functor.action_sets:
-                                                    for action in action_set.functors:
-                                                        if isinstance(action, gremlin.actions.ActivationCondition):
-                                                            syslog.info(f"\t\t\tActivation Condition: target :{action.target.name}")
-                                                        else:
-                                                            import action_plugins.map_to_simconnect
-                                                            syslog.info(f"\t\t\tAction: {action._name}")
-                                                            if isinstance(action, action_plugins.map_to_simconnect.MapToSimConnectFunctor):
-                                                                syslog.info(f"\t\t\t\tCommand:: {action.command}")                                                            
+                                                    if not isinstance(action_set, list):
+                                                        action_set = [action_set]
+                                                    for action_item in action_set:
+                                                        for action in action_item.functors:
+                                                            if isinstance(action, gremlin.actions.ActivationCondition):
+                                                                syslog.info(f"\t\t\tActivation Condition: target :{action.target.name}")
+                                                            else:
+                                                                import action_plugins.map_to_simconnect
+                                                                syslog.info(f"\t\t\tAction: {action._name}")
+                                                                if isinstance(action, action_plugins.map_to_simconnect.MapToSimConnectFunctor):
+                                                                    syslog.info(f"\t\t\t\tCommand:: {action.command}")                                                            
                                             else:
                                                 syslog.info(f"\t\t\tFunctor: {functor}")
                                     self.event_handler.add_callback(

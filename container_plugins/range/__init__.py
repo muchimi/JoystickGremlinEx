@@ -687,13 +687,7 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 for functor in self.latched_functors:
                     functor.reset_range()
 
-            
-            
-
-            
-            
-
-        return True
+        return False # stop execution as the logic is internal to trigger the other nodes
 
 class RangeContainer(AbstractContainer):
     ''' action data for the map to Range action '''

@@ -432,12 +432,20 @@ class CalibrationData:
     def getValue(self, raw_value, normalize = True, return_process = False):
         ''' gets the deadzoned, calibrated value for the input value -1.0 to +1.0 - if normalized is enabled, expects a dinput range value, if not, expects a -1 to +1 value'''
 
-        
         should_process = True
-        if self.inverted:
-            normalized_value = gremlin.util.scale_to_range(raw_value, invert = self.inverted) # just handle the inversion
+
+
+        if normalize:
+            normalized_value = gremlin.util.scale_to_range(raw_value, source_min = -32768, source_max = 32767)
         else:
-            normalized_value = gremlin.util.scale_to_range(raw_value, source_min = -32768, source_max = 32767, invert = self.inverted)
+            normalized_value = raw_value
+
+        if self.inverted:
+            normalized_value = gremlin.util.scale_to_range(normalized_value, invert = self.inverted) # just handle the inversion
+        
+
+        
+
         if return_process and self._trigger_threshold != 0:
             if self._last_value is None:
                 self._last_value = normalized_value
@@ -813,6 +821,8 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
             is_changed = self.action_data != self.cloned_action_data
             if is_changed:
                 self.mgr.saveCalibration(self.action_data)
+                el = gremlin.event_handler.EventListener()
+                el.calibration_changed.emit(self.action_data)
         return super().closeEvent(event)
 
 

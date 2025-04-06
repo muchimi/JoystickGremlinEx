@@ -426,16 +426,12 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.start_on_f5.clicked.connect(self._start_on_f5)
 
         # Start minimized option
-        self.start_minimized = QtWidgets.QCheckBox(
-            "Start Joystick Gremlin Ex minimized"
-        )
+        self.start_minimized = QtWidgets.QCheckBox("Start Gremlin Ex minimized")
         self.start_minimized.clicked.connect(self._start_minimized)
         self.start_minimized.setChecked(self.config.start_minimized)
 
         # Start on user login
-        self.start_with_windows = QtWidgets.QCheckBox(
-            "Start Joystick Gremlin Ex with Windows"
-        )
+        self.start_with_windows = QtWidgets.QCheckBox("Start Gremlin Ex with Windows")
         self.start_with_windows.clicked.connect(self._start_windows)
         self.start_with_windows.setChecked(self._start_windows_enabled())
 
@@ -463,6 +459,13 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_button_grid_widget.setToolTip("When enabled, Map to Vjoy remapper will display a button grid")
         self.show_button_grid_widget.setChecked(self.config.button_grid_visible)
         self.show_button_grid_widget.clicked.connect(self._show_button_grid_cb)
+
+        # split joystick repeaters raw/calibrated
+        # 
+        self.split_joystick_repeater_widget = QtWidgets.QCheckBox("Show Raw/Calibrated in repeaters")
+        self.split_joystick_repeater_widget.setToolTip("When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
+        self.split_joystick_repeater_widget.setChecked(self.config.splitJoystickRepeater)
+        self.split_joystick_repeater_widget.clicked.connect(self._split_joystick_repeater_cb)
 
 
         # allow partial plugin configurations
@@ -629,6 +632,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         column_layout.addWidget(self.show_joystick_input_widget, row, col)
         row+=1
         column_layout.addWidget(self.show_button_grid_widget, row, col)
+        row+=1
+        column_layout.addWidget(self.split_joystick_repeater_widget, row, col)
         row+=1
         column_layout.addWidget(self.runtime_ui_update, row, col)
         row+=1
@@ -1328,6 +1333,13 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _show_button_grid_cb(self, checked):
         self.config.button_grid_visible = checked
+
+    @QtCore.Slot(bool)
+    def _split_joystick_repeater_cb(self, checked):
+        self.config.splitJoystickRepeater = checked
+        # tell UI options changed
+        el = gremlin.event_handler.EventListener()
+        el.calibration_options_changed.emit()
 
     @QtCore.Slot(bool)
     def _partial_plugin_save(self, checked):

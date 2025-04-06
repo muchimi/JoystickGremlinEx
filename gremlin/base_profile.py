@@ -3364,6 +3364,8 @@ class Profile():
             modes = self.get_modes()
             mode = modes[0]
             self._start_mode = mode
+        if not mode:
+            return self.get_default_start_mode()
         return mode
     
     def set_start_mode(self, value : str):

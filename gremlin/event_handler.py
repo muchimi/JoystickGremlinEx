@@ -431,6 +431,7 @@ class EventListener(QtCore.QObject):
 
 	# occurs when calibration data changes
 	calibration_changed = QtCore.Signal(object) # param - CalibrationData object
+	calibration_options_changed = QtCore.Signal() # fires when calibration options are changed for the UI to update
 
 	# occurs when a macro step completes
 	macro_step_completed = QtCore.Signal(int) # param - macro ID returned by the queue_macro function

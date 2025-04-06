@@ -238,6 +238,11 @@ T22
 - Fix: mode rename not renaming all modes
 - Fix: actions added to Mode device not recognizing the special input as a joystick button
 - Improved: default icon pixmap created if the icon cannot be found to provide a suitable default on a missing file (whatever the reason).
+- Fix: axis repeater visualization issues (custom widget refactor)
+- New: calibration result will be visualized on an axis repeater if calibration data is enabled on that axis
+- New: option to enable visualization of raw and calibrated data on repeaters
+- Fix: some container functors not called causing some containers to fail (like TempoEx, Chain, Sequence, etc)  
+- API: container functors should return False by default to stop further processing of container contents.  Previous logic would call for them to return True.  The reason for this is the containers are now part of an execution group so the return value means something different now - do not automatically process subcomponents.
 
 
 

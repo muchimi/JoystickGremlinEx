@@ -316,7 +316,7 @@ class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             
             
 
-        return True
+        return False # stop execution as the logic is internal to trigger the other nodes
 
     def _single_tap(self, event_release=None, value_release=None):
         """Callback executed, when the delay expires."""

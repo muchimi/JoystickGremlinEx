@@ -789,6 +789,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         else:
             self._load_recent_profile(new_profile)
 
+        self._update_status_bar()
+
     @property
     def current_profile(self):
         ''' gets the curernt active profile '''
@@ -1287,7 +1289,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         #self._mode_configuration_changed()
 
 
-
+        self._update_status_bar()
+        
         popCursor()
 
     def save_profile(self):
@@ -3363,7 +3366,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._is_active = is_active
         self._update_status_bar(gremlin.input_devices.remote_state.to_state_event())
 
-    def _update_status_bar(self, event):
+    def _update_status_bar(self, event = None):
         # updates the status bar
 
 
@@ -3371,25 +3374,29 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param is_active True if the system is active, False otherwise
         """
+        Color = gremlin.ui.ui_common.Color
         try:
             if self._is_active:
-                text_active = "<font color=\"green\">Active</font>"
+                text_active = f"<font color=\"{Color.activeColor()}\">Active</font>"
             else:
-                text_active = "<font color=\"red\">Paused</font>"
+                text_active = f"<font color=\"{Color.inactiveColor()}\">Paused</font>"
             if self.ui.actionActivate.isChecked():
                 text_running = f"Running and {text_active}"
             else:
                 text_running = "Not Running"
 
             # remote control status
+            if not event:
+                event = gremlin.input_devices.remote_state.to_state_event()
+                
             if event.is_local:
-                local_msg = "<font color=\"green\">Active</font>"
+                local_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
             else:
-                local_msg = "<font color=\"red\">Disabled</font>"
+                local_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
             if event.is_remote:
-                remote_msg = "<font color=\"green\">Active</font>"
+                remote_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
             else:
-                remote_msg = "<font color=\"red\">Disabled</font>"
+                remote_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
 
             self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
             self._update_mode_status_bar()
@@ -3837,18 +3844,6 @@ class GremlinUi(QtWidgets.QMainWindow):
                 for node in remove_nodes:
                     node.getparent().remove(node)
 
-
-
-            # tmp1_path = os.path.join(os.getenv("temp"), "g1.xml")
-            # tmp2_path = os.path.join(os.getenv("temp"), "g2.xml")
-            
-            # t1.write(tmp1_path, pretty_print=True,xml_declaration=True,encoding="utf-8")
-            # t2.write(tmp2_path, pretty_print=True,xml_declaration=True,encoding="utf-8")
-
-            # gremlin.util.display_file(tmp1_path)
-            # gremlin.util.display_file(tmp2_path)
-
-
             is_changed = etree.tostring(t1) != etree.tostring(t2)
 
 
@@ -3877,7 +3872,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 syslog.info(f"\tusing profile saved last runtime mode [{last_mode}]")
 
         else:
-            last_mode = self.profile.get_default_mode()
+            last_mode = self.profile.get_start_mode()
             syslog.info(f"\tusing profile default start mode [{last_mode}]")
         
         mode_list = gremlin.profile.mode_list()

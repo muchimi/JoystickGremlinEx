@@ -111,7 +111,7 @@ class QKeyWidget(QtWidgets.QPushButton):
     @selected.setter
     def selected(self,value):
         if self._selected != value:
-            syslog.info(f"selected state changed to : {value}")
+            # syslog.info(f"selected state changed to : {value}")
             self._selected = value
             self._update_state()
 

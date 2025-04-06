@@ -1939,3 +1939,12 @@ class Configuration:
     def keySize(self, value : int):
          self._data["keySize"] = value
          self.save()
+
+
+    @property
+    def splitJoystickRepeater(self) -> bool:
+        return self._data.get("splitJoystickRepeater",False)
+    @splitJoystickRepeater.setter
+    def splitJoystickRepeater(self, value: bool):
+        self._data["splitJoystickRepeater"] = value
+        self.save()
