@@ -918,6 +918,7 @@ class SimConnectManager(QtCore.QObject):
             title = self._aircraft_title
             self._dump_current_aircraft()
             self.sim_aircraft_loaded.emit(folder, name, title)
+            self._run_loaded_callbacks(folder,name,title)
             
             
 
@@ -1037,6 +1038,10 @@ class SimConnectManager(QtCore.QObject):
         self._aircraft_name = name
         self._dump_current_aircraft()
         self.sim_aircraft_loaded.emit(folder, name, title)
+        self._run_loaded_callbacks(folder,name,title)
+
+
+    def _run_loaded_callbacks(self, folder, name, title):
         for callback in self._aircraft_change_callbacks:
             try:
                 callback(folder, name, title)

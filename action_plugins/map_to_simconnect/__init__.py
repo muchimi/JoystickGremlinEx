@@ -3902,6 +3902,18 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             syslog.warning(f"Simconnect Functor: event ignored, simconnect bridge not connected")
             return False
         
+        if verbose:
+            comment = ""
+            if extra_data:
+                if "node" in extra_data:
+                    node = extra_data["node"]
+                    comment += f"Node: [{node.id}] " 
+                    
+            comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} | {self.action_data.comment if self.action_data.comment else ''} | "
+            
+
+                                
+        
         block = self.action_data.block
         output_mode = self.action_data.mode
         
@@ -3956,7 +3968,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     # regular calculate
                     command = self.action_data.command
                     if command:
-                        if verbose_details: syslog.info(f"Simconnect: calc: execute press command: {command}")
+                        if verbose_details: syslog.info(f"Simconnect: {comment} calc: execute press command: {command}")
                         manager.calculate(command) # run RPN script
                 else:
                     # release calculate auto repeat
@@ -3971,7 +3983,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         # execute release command
                         command = self.action_data.command_release
                         if command:
-                            if verbose_details: syslog.info(f"Simconnect: calc: execute release command: {command}")
+                            if verbose_details: syslog.info(f"Simconnect: {comment} calc: execute release command: {command}")
                             manager.calculate(command) # run RPN script
         
         
@@ -3980,11 +3992,11 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
             if command_type == SimConnectCommandType.SimVar:
                 if block is None:
-                    syslog.warning(f"SIMCONNECT: Error: Simvar Block not set")    
+                    syslog.warning(f"SIMCONNECT: {comment} Error: Simvar Block not set")    
                     return True        
                 if not block.valid:
                     # invalid command
-                    syslog.warning(f"SIMCONNECT: Error: invalid block: {block.command} type: {block.command_type}")
+                    syslog.warning(f"SIMCONNECT: {comment}  Error: invalid block: {block.command} type: {block.command_type}")
                     return True        
             
             if event.is_axis and output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.Gated):
@@ -4015,19 +4027,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     
   
                     if verbose: 
-                        
                         if verbose_exec:
-                            comment = ""
-                            if extra_data:
-                                if "node" in extra_data:
-                                    node = extra_data["node"]
-                                    comment += f"Node: [{node.id}] " 
-                                    
-                            comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} | {self.action_data.comment if self.action_data.comment else ''} | "
-                        
                             syslog.info(f"SIMCONNECT: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                         else:
-                            syslog.info(f"SIMCONNECT: send {command} {output_value:0.3f}")
+                            syslog.info(f"SIMCONNECT: send {comment} {command} {output_value:0.3f}")
 
                     if command_type == SimConnectCommandType.LVar:
                         request = manager.registerRequest(command, "number", settable = True)
@@ -4043,12 +4046,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                             self.action_data.trigger_on_release and not event.is_pressed
                     if trigger:
                         if command_type == SimConnectCommandType.LVar:
-                            if verbose: syslog.info(f"SIMCONNECT: Trigger singleton {self.action_data.command}")
+                            if verbose: syslog.info(f"SIMCONNECT: {comment} Trigger singleton {self.action_data.command}")
                             request = manager.registerRequest(self.action_data.command, "number", settable = True)
                             request.value = value
                             request.transmit()
                         else:
-                            if verbose: syslog.info(f"SIMCONNECT: Trigger singleton {block.command}")
+                            if verbose: syslog.info(f"SIMCONNECT: {comment} Trigger singleton {block.command}")
                             block.execute(value)
 
             elif output_mode == SimConnectActionMode.SetValue:
@@ -4060,12 +4063,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                             self.action_data.trigger_on_release and not event.is_pressed
                 if trigger:
                     if command_type == SimConnectCommandType.LVar:
-                        if verbose: syslog.info(f"SIMCONNECT: send lvar fixed value (trigger): {command} {output_value:0.3f}")
+                        if verbose: syslog.info(f"SIMCONNECT: {comment} send lvar fixed value (trigger): {command} {output_value:0.3f}")
                         request = manager.registerRequest(self.action_data.command, "number", settable = True)
                         request.value = output_value
                         request.transmit()
                     else:
-                        if verbose: syslog.info(f"SIMCONNECT: send block: {block.command} fixed value: {output_value:0.3f}")
+                        if verbose: syslog.info(f"SIMCONNECT: {comment} send block: {block.command} fixed value: {output_value:0.3f}")
                         block.execute(output_value)   
                 
             elif self.action_data.mode == SimConnectActionMode.Trigger:
@@ -4074,10 +4077,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 max_range = self.action_data.command_max_range
                 value = action_value.current
                 output_value = gremlin.util.scale_to_range(value, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
-                if verbose: syslog.info(f"SIMCONNECT: send block trigger: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+                if verbose: syslog.info(f"SIMCONNECT: {comment} send block trigger: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                 block.execute(output_value)
 
-        return True
+        return False
     
     def _auto_repeat_command(self):
         verbose_details = False
