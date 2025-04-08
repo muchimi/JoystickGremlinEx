@@ -10,19 +10,19 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/joystick_gremlin.py",
-            "console": "integratedTerminal",
+            "console": "internalConsole",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
             "restart": true
         },
-        {
-            "name": "Python: Current File with profiler",
-            "type": "python",
-            "request": "launch",
-            "module": "cProfile",
-            "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
-            "args": [
-                "-o", "/tmp/tmp.prof", "${workspaceFolder}/joystick_gremlin.py"
-            ]
-        }
+        // {
+        //     "name": "Python: Current File with profiler",
+        //     "type": "python",
+        //     "request": "launch",
+        //     "module": "cProfile",
+        //     "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
+        //     "args": [
+        //         "-o", "/tmp/tmp.prof", "${workspaceFolder}/joystick_gremlin.py"
+        //     ]
+        // }
     ]
 }

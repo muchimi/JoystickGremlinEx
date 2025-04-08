@@ -307,6 +307,7 @@ class GateInfo():
         assert isinstance(self._id,str)
         value = gremlin.util.clamp(value, -1, 1)
         self._value = value
+        self._description = None
         self.profile_mode = profile_mode
         self._last_condition = GateConditionType.OnCross
         self.item_data_map = {}
@@ -325,6 +326,13 @@ class GateInfo():
             GateConditionType.OnCrossIncrease: True,
         }
 
+    @property
+    def description(self) -> str:
+        return self._description
+    @description.setter
+    def description(self, value : str):
+        self._description = value
+
     def to_xml(self):
         ''' generates an xml node from the gate data '''
         node = ElementTree.Element("gate-info")
@@ -334,6 +342,9 @@ class GateInfo():
         node.set("value", safe_format(self._value, float))
         node.set("used", str(self._used))
         node.set("delay", safe_format(self.delay, int))
+        if self.description:
+            node.set("description", self.description)
+
         for condition, item in self.item_data_map.items():
             condition_node = ElementTree.Element("gate-condition")
             condition_node.set("condition", GateConditionType.to_string(condition))
@@ -350,6 +361,12 @@ class GateInfo():
         self.value = safe_read(node,"value",float,0)
         self.used = safe_read(node,"used",bool,False)
         self.delay = safe_read(node,"delay",int,250)
+        description = safe_read(node,"description", str, "")
+        if description:
+            self.description = description
+        else:
+            self.description = None
+
         for condition_node in node:
             condition = GateConditionType.to_enum(condition_node.get("condition"))
             item_node = condition[0]
@@ -415,6 +432,7 @@ class GateInfo():
                       is_default = info.is_default,
                       delay=info.delay,
                       auto_register = False)
+        gi.description = info.description
         gi.item_data_map = info.item_data_map
         return gi
 
@@ -529,7 +547,10 @@ class GateInfo():
         else: # percent
             decimals = 2
 
-        return f"Gate {self.slider_index} [{self.index}]  {self.display_value:0.{decimals}f} used: {self.used}"
+        msg = f"Gate {self.slider_index} [{self.index}/{self.display_value:0.{decimals}f}]"
+        if self.description:
+            msg += f" ({self.description})"
+        return msg
     
     def to_display(self) -> str:
         return self.gate_display()
@@ -570,6 +591,7 @@ class RangeInfo():
         self._output_range_min = None
         self._output_range_max = None
         self._last_condition = GateConditionType.InRange
+        self._description = None
         self.item_data_map = {}
         self.delay = 250 # default delay
 
@@ -612,6 +634,13 @@ class RangeInfo():
         self._swap_gates() # flip the gates so the values are always increasing 
 
         # print (f"RangeInfo: create {self.range_display()} {self.range_gate_display()}")
+    
+    @property
+    def description(self) -> str:
+        return self._description
+    @description.setter
+    def description(self, value : str):
+        self._description = value
 
     def to_display(self):
         if self.v1 is None or self.v2 is None:
@@ -683,6 +712,7 @@ class RangeInfo():
         self._g2_id = other._g2_id
         self._g1_id = other._g1_id
         self.item_data_map = other.item_data_map
+        self.description = other.description
         # print (f"Range: copyfrom: {self.range_display()}")
         
 
@@ -972,7 +1002,10 @@ class RangeInfo():
         else: # percent
             decimals = 2
 
-        return f"{self.v1_display:0.{decimals}f},{self.v2_display:0.{decimals}f}"
+        msg = f"[{self.v1_display:0.{decimals}f},{self.v2_display:0.{decimals}f}]"
+        if self._description:
+            msg += f" ({self._description})"
+        return msg
     
     def range_gate_display(self) -> str:
         ''' displays the gate IDs for this range '''
@@ -996,7 +1029,7 @@ class RangeInfo():
         if self.v1 is None or self.v2 is None:
             rr = f"N/A"
         else:
-            rr = self.range_display()
+            rr = f"{self.range_display()} {self.description}"
         fixed_value = f"{self._fixed_value:0.{_decimals}f}" if self._fixed_value else "n/a"
         output_range_min = f"{self._output_range_min:0.{_decimals}f}" if self._output_range_min else "n/a"
         output_range_max = f"{self._output_range_max:0.{_decimals}f}" if self._output_range_max else "n/a"
@@ -1570,9 +1603,22 @@ class GateData():
                     if verbose: syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name}")
                     extra_data = {}
                     extra_data["condition_type"] = trigger.condition
+                    extra_data["trigger"] = trigger
                     if trigger.is_range:
                         # linear range trigger event for in-range or outside-range
-                        action_value = gremlin.actions.Value(input_value)
+                        #range_info = trigger.range
+
+                        # if range_info.mode == GateRangeOutputMode.Rebased:
+                        #     # rebase the input to the range
+                        #     value = gremlin.util.scale_to_range(input_value, target_min = -1.0, target_max = 1.0)
+                        #     action_value = gremlin.actions.Value(value)
+                        # elif range_info.mode == GateRangeOutputMode.Fixed:
+                        #     action_value = gremlin.actions.Value(range_info.fixed_value)
+                        # elif range_info.mode == GateRangeOutputMode.FilterOut:
+                        #     return
+                        # else:
+                        syslog.info(f"Trigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
+                        action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
                         self._ec.execute_functor_id(self._action_data.id, range_event, action_value, True, extra_data)
                     else:
                         # non range trigger (gate crossing or range enter/exit)
@@ -2358,7 +2404,11 @@ class GateData():
 
     
     def _get_filtered_range_value(self, range_info : RangeInfo, value : float):
-        ''' gets a range filtered value '''
+        ''' gets a range filtered value
+        
+        :param value: value -1 to +1 in the whole range of the axis (not the subrange defined by the range)
+        
+        '''
         range_info : RangeInfo
         verbose = gremlin.config.Configuration().verbose_mode_exec
         
@@ -2388,7 +2438,9 @@ class GateData():
                     #p = self._get_range_percent(value, range_info.v1, range_info.v2)
                     v1 = range_info.range_min
                     v2 = range_info.range_max
-                    output_value = gremlin.util.scale_to_range(value, v1, v2, target_min = range_info.output_range_min, target_max=range_info.output_range_max)
+                    output_value = value
+                    #output_value = gremlin.util.scale_to_range(value, v1, v2, target_min = range_info.range_min, target_max=range_info.range_max)
+                    #output_value = gremlin.util.scale_to_range(value, v1, v2, target_min = range_info.output_range_min, target_max=range_info.output_range_max)
                     if verbose:
                         log_info(f"range [RANGED]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} scaled [{range_info.output_range_min:0.3f},{range_info.output_range_max:0.3f}]-> {output_value:0.3f}")
                     return output_value
@@ -2741,24 +2793,29 @@ class GateData():
 
        
         # save gate data
-        gate : GateInfo
-        for gate in self.getUsedGates():
-            if gate.is_default:
+        gate_info : GateInfo
+        for gate_info in self.getUsedGates():
+            if gate_info.is_default:
                 # skip default gates
                 continue
             
             if verbose:
-                log_info(f"Saving gate {gate.id} value: {gate.value} containers count: {gate.containerCount:,}")
+                log_info(f"Saving gate {gate_info.id} value: {gate_info.value} containers count: {gate_info.containerCount:,}")
             child = ElementTree.SubElement(node, "gate")
-            if gate.is_default:
-                child.set("default",str(gate.is_default))
-            child.set("condition", _gate_condition_to_name[gate.condition]) # last condition selected
-            child.set("value", f"{gate.value:0.{_decimals}f}")
-            child.set("delay", str(gate.delay))
-            child.set("id", gate.id)
-            child.set("index", str(gate.slider_index))
+            if gate_info.is_default:
+                child.set("default",str(gate_info.is_default))
+            child.set("condition", _gate_condition_to_name[gate_info.condition]) # last condition selected
+            child.set("value", f"{gate_info.value:0.{_decimals}f}")
+            child.set("delay", str(gate_info.delay))
+            child.set("id", gate_info.id)
+            child.set("index", str(gate_info.slider_index))
 
-            for condition, item_data in gate.item_data_map.items():
+            
+            # description
+            if gate_info.description:
+                child.set("description", gate_info.description)
+
+            for condition, item_data in gate_info.item_data_map.items():
                 if item_data.containers:
                     item_node = item_data.to_xml()
                     if item_node is not None:
@@ -2778,6 +2835,10 @@ class GateData():
 
             # delay
             child.set("delay", safe_format(range_info.delay, int))
+
+            # description
+            if range_info.description:
+                child.set("description", range_info.description)
             
 
             if range_info.is_default:
@@ -2925,7 +2986,12 @@ class GateData():
             gate_info.setLastCondition(gate_condition)
             gate_map[gate_id] = gate_info
 
-            
+            description = None
+            if "description" in child.attrib:
+                description = child.get("description")
+                if description:
+                    gate_info.description = description
+
             
             item_nodes = gremlin.util.get_xml_child(child, "action_containers", multiple=True)
             for item_node in item_nodes:
@@ -2953,7 +3019,10 @@ class GateData():
             range_id = safe_read(child, "id", str, "")
             if not range_id:
                 range_id = get_guid()
-            
+
+            description = None
+            if "description" in child.attrib:
+                description = child.get("description")
 
 
             if range_default:
@@ -2995,7 +3064,9 @@ class GateData():
                     continue 
 
                 range_pairs[key] = range_info
-            
+
+                description = safe_read(child, "description", str, "")
+                range_info.description = description
 
                 range_condition = safe_read(child, "condition", str, "")
                 if not range_condition in _gate_condition_to_enum.keys():
@@ -3296,7 +3367,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.setup_widget = gremlin.ui.ui_common.QDataPushButton()
         self.setup_widget.setMaximumWidth(20)
         self.setup_widget.clicked.connect(configure_handler)
-        self.setup_widget.setToolTip(f"Setup actions for gate {gate.id}")
+        self.setup_widget.setToolTip(f"Setup actions for gate {gate.gate_display()}")
         self.setup_widget.data = gate
         
 
@@ -4852,6 +4923,10 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         
         self.trigger_container_widget = QtWidgets.QWidget()
         self.trigger_condition_layout = QtWidgets.QHBoxLayout(self.trigger_container_widget)
+
+
+        
+    
         
 
         # the tab container contains all possible trigger modes for the range or gate as a tab
@@ -4875,6 +4950,15 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             range_info : RangeInfo = info_object
             self._range_info = range_info
             self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration: {info_object.range_display()}"))
+
+            self.range_description_widget = gremlin.ui.ui_common.QDataLineEdit()
+            self.range_description_widget.setMinimumWidth(200)
+            self.range_description_widget.setText(self._range_info.description)
+            self.range_description_widget.textChanged.connect(self._range_description_changed)
+            widget, layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel("Range Description:"), self.range_description_widget])
+            self.trigger_condition_layout.addWidget(widget)
+        
+
             # print (f"Range: configuration: {range_info.range_display_ex()}")
             
             self.slider_frame_widget = QtWidgets.QFrame()
@@ -4893,6 +4977,8 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             values = [range_info.g1.value, range_info.g2.value]
             self.slider.setValue(values)
             self.slider.setReadOnly(True)
+
+
 
             self.axis_widget = gremlin.ui.ui_common.AxisStateWidget(orientation = QtCore.Qt.Orientation.Horizontal, show_percentage=False)
             
@@ -4975,6 +5061,13 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             # gate configuration
             self._gate_info = info_object
             self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {self._gate_info.slider_index + 1} Configuration:"))
+
+            self.gate_description_widget = gremlin.ui.ui_common.QDataLineEdit()
+            self.gate_description_widget.setMinimumWidth(200)
+            self.gate_description_widget.setText(self._gate_info.description)
+            self.gate_description_widget.textChanged.connect(self._gate_description_changed)
+            widget, layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel("Gate Description:"), self.gate_description_widget])
+            self.trigger_condition_layout.addWidget(widget)
 
             
         # delay
@@ -5131,6 +5224,14 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             syslog.info(f"Range: set output mode: {value} for range {self._range_info.range_display_ex()} {self._range_info.id}")
         self._update_ui()
     
+    @QtCore.Slot()
+    def _range_description_changed(self):
+        self._range_info.description = self.range_description_widget.text()
+
+    @QtCore.Slot()
+    def _gate_description_changed(self):
+        self._gate_info.description = self.gate_description_widget.text()
+
     @QtCore.Slot(int)
     def _condition_changed_cb(self, index):
         widget = self._condition_tab.widget(index)

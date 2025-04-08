@@ -70,13 +70,13 @@ class Value:
 
     """Represents an input value, keeping track of raw and "seen" value."""
 
-    def __init__(self, raw, is_pressed = None):
+    def __init__(self, value : float, raw : float = None, is_pressed : bool = None):
         """Creates a new value and initializes it.
 
         :param raw the initial raw data
         """
-        self._raw = raw
-        self._current = raw
+        self._raw = raw if raw is not None else value
+        self._current = value
         self._is_pressed = is_pressed
         
 
@@ -87,9 +87,12 @@ class Value:
         :return raw unmodified value
         """
         return self._raw
+    @raw.setter
+    def raw(self, value : float):
+        self._raw = value
 
     @property
-    def current(self):
+    def current(self) -> float: 
         """Returns the current, potentially, modified value.
 
         :return current and potentially modified value
@@ -97,7 +100,7 @@ class Value:
         return self._current
 
     @current.setter
-    def current(self, current):
+    def current(self, current : float):
         """Sets the current value which may differ from the raw one.
 
         :param current the new current value
@@ -105,7 +108,7 @@ class Value:
         self._current = current
 
     @property
-    def is_pressed(self):
+    def is_pressed(self) -> bool:
         if self._is_pressed is not None:
             return self._is_pressed
         return isinstance(self._current, bool) and self.current
@@ -355,6 +358,9 @@ class JoystickCondition(AbstractCondition):
             return retval
         
         elif self.input_type == InputType.JoystickButton:
+
+            if self.input_id == 29 and self.comparison == "pressed":
+                pass
             retval = False
             is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             if self.comparison == "pressed":

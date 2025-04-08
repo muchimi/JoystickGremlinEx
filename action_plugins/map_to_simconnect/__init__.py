@@ -25,6 +25,7 @@ import gremlin.config
 import gremlin.config
 import gremlin.event_handler
 import gremlin.execution_graph
+import gremlin.gated_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
@@ -1087,7 +1088,7 @@ class SimconnectMonitor():
 
         self._auto_reconnect_event = threading.Event() # controls reconnect thread exit
         self._enabled = False # default, not enabled - set by profile start event
-
+        self._last_mode = None # last aircraft mode
         
 
 
@@ -1133,6 +1134,10 @@ class SimconnectMonitor():
         self._enabled = enabled
         if enabled:
             syslog.info(f"SCMONITOR: Start")
+
+            if self._last_mode:
+                # revert to the last mode
+                self.change_mode(self._last_mode)
 
             # change to the correct mode
             self._manager.request_loaded_aircraft()
@@ -1234,6 +1239,7 @@ class SimconnectMonitor():
         if mode and gremlin.shared_state.runtime_mode != mode:
             # suitable mode found - if this is the current mode - change_mode will do nothing
             self.change_mode(mode)
+            self._last_mode = mode
         return mode
 
 
@@ -3890,7 +3896,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         #verbose = True
         manager : SimConnectManager = self.manager
         
-        # syslog.info(f"event: {str(event)} node: {extra_data["node"]}")
+        syslog.info(f"event: {str(event)} node: {extra_data["node"]}")
 
         if not self.manager.is_running:
             # sim is not running
@@ -3907,7 +3913,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             if extra_data:
                 if "node" in extra_data:
                     node = extra_data["node"]
-                    comment += f"Node: [{node.id}] " 
+                    comment += f"Node: [{node.id} {node.description}] " 
                     
             comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} | {self.action_data.comment if self.action_data.comment else ''} | "
             
@@ -3919,6 +3925,14 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         
         command_mode = self.action_data.command_mode
         command_type = self.action_data.command_type
+
+
+        gate_trigger = None
+        if extra_data and "trigger" in extra_data:
+            # use the trigger value
+            gate_trigger : gremlin.gated_handler.TriggerData = extra_data["trigger"]
+            comment += " Range description: " + gate_trigger.range.description
+
 
         trigger = self.action_data.trigger_on_press and event.is_pressed or self.action_data.trigger_on_release and not event.is_pressed
 
@@ -4006,29 +4020,35 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 process_input = True # self._significant.should_process_axis(event, 0.001)
                 if process_input:
 
+                    # if gate_trigger:
+                    #     normalized = gate_trigger.value
+                        
+                    # else:
+
+                    
+                    # filtered_value = self.action_data.get_filtered_axis_value(action_value.current)
+                    # action_value = gremlin.actions.Value(filtered_value)
+                    # raw = filtered_value # -1 to +1
+                    # # apply local curve to the range -1 to + 1
+                    # normalized = self.action_data.get_local_curve_value(filtered_value)
+
+                    if gate_trigger:
+                        v1 = gate_trigger.range.range_min
+                        v2 = gate_trigger.range.range_max
+                        normalized = gremlin.util.scale_to_range(action_value.raw, source_min= v1, source_max = v2) # returns a rebased value -1 to +1 within the range
+                    else:
+                        normalized = action_value.current
 
                     command = self.action_data.command
-          
-                    filtered_value = self.action_data.get_filtered_axis_value(action_value.current)
-                    action_value = gremlin.actions.Value(filtered_value)
-
-                    raw = filtered_value # -1 to +1
-                    normalized = raw 
-
-                    # apply local curve to the range -1 to + 1
-                    curved = self.action_data.get_local_curve_value(normalized)
-
-
-                    # compute the output value based on the range setup
-                    
                     min_range = self.action_data.command_min_range
                     max_range = self.action_data.command_max_range
-                    output_value = gremlin.util.scale_to_range(curved, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
+
+                    output_value = gremlin.util.scale_to_range(normalized, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
                     
   
                     if verbose: 
                         if verbose_exec:
-                            syslog.info(f"SIMCONNECT: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+                            syslog.info(f"SIMCONNECT: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                         else:
                             syslog.info(f"SIMCONNECT: send {comment} {command} {output_value:0.3f}")
 
@@ -4056,11 +4076,20 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
             elif output_mode == SimConnectActionMode.SetValue:
                 # set value mode 
+                
+                # normalized = gate_trigger.value = gate_trigger.value if gate_trigger else self.action_data.value
+                # min_range = self.action_data.command_min_range
+                # max_range = self.action_data.command_max_range
+                #output_value = gremlin.util.scale_to_range(normalized, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
                 output_value = self.action_data.value
+                
                 command = self.action_data.command
                 
-                trigger = (self.action_data.trigger_on_press and event.is_pressed) or \
-                            self.action_data.trigger_on_release and not event.is_pressed
+                if event.is_axis:
+                    trigger = True
+                else:
+                    trigger = (self.action_data.trigger_on_press and event.is_pressed) or \
+                                self.action_data.trigger_on_release and not event.is_pressed
                 if trigger:
                     if command_type == SimConnectCommandType.LVar:
                         if verbose: syslog.info(f"SIMCONNECT: {comment} send lvar fixed value (trigger): {command} {output_value:0.3f}")
@@ -4070,12 +4099,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     else:
                         if verbose: syslog.info(f"SIMCONNECT: {comment} send block: {block.command} fixed value: {output_value:0.3f}")
                         block.execute(output_value)   
-                
+                    
             elif self.action_data.mode == SimConnectActionMode.Trigger:
                 # trigger action 
                 min_range = self.action_data.command_min_range
                 max_range = self.action_data.command_max_range
-                value = action_value.current
+                value = gate_trigger.value if gate_trigger else action_value.current
                 output_value = gremlin.util.scale_to_range(value, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
                 if verbose: syslog.info(f"SIMCONNECT: {comment} send block trigger: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                 block.execute(output_value)
