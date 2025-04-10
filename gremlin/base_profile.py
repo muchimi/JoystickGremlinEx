@@ -581,20 +581,16 @@ class AbstractContainer(ProfileData):
 
         if self._virtual_button_enabled  and self._virtual_button_user_enabled and self.virtual_button is not None:
             # virtual callback requires both the container/action to enable it, and the user to enable it as well
-            callbacks.append(CallbackData(
-                gremlin.execution_graph.VirtualButtonProcess(self.virtual_button),
-                None
-            ))
-            callbacks.append(CallbackData(
-                gremlin.execution_graph.VirtualButtonCallback(self, parent),
-                Event(
-                    InputType.VirtualButton,
-                    callbacks[-1].callback.virtual_button.identifier,
-                    device_guid=dinput.GUID_Virtual,
-                    is_pressed=True,
-                    raw_value=True
-                )
-            ))
+            callbacks.append(CallbackData(gremlin.execution_graph.VirtualButtonProcess(self, self.virtual_button),None))
+            callbacks.append(CallbackData(gremlin.execution_graph.VirtualButtonCallback(self, parent),
+                            Event(
+                                InputType.VirtualButton,
+                                callbacks[-1].callback.virtual_button.identifier,
+                                device_guid=dinput.GUID_Virtual,
+                                is_pressed=True,
+                                raw_value=True
+                            )
+                         ))
         else:
             # regular callback with conditions
             callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self, parent),None))
@@ -1425,8 +1421,6 @@ class ProfileRegistry():
         device_guid = input_item.device_guid
         input_type = input_item.input_type
         input_id = input_item.input_id
-        if not isinstance(input_id, int):
-            pass
         input_id_key = hash(input_id)
         key = (device_guid, input_type, input_id_key)
         self._input_item_registry[key] = input_item

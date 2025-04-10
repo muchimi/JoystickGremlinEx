@@ -1741,7 +1741,7 @@ def snap_to_grid(x : float, y: float, grid_size : int = 50,
             # snap vertical
             sx = ref_x
             sy = y
-            pass
+            
         elif a >= a_45 - a_t and a <= a_45 + a_t:
             # snap 45 degrees    
             sy = ref_y + d * math.sin(a_45) * factor

@@ -966,8 +966,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             node_modes = gremlin.util.get_xml_child(node,"mode",True)
             for node_mode in node_modes:
                 mode = node_mode.get("name")
-                if "EVA" in mode:
-                    pass
+
                 parent_mode = self.parent_mode_map[mode]
                 
                 import_mode_item = ImportModeItem()

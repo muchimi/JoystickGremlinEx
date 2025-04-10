@@ -319,6 +319,7 @@ class InputActionCondition(AbstractCondition):
     def __init__(self):
         """Creates a new instance."""
         super().__init__()
+        self._comparison = "always" # default comparison is press or release
 
     def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
@@ -342,7 +343,7 @@ class InputActionCondition(AbstractCondition):
         return node
 
     def __str__(self):
-        return f"Input Condition: id: {self.id} comparison: {self.comparison}"
+        return f"Input Condition: id: [{self.id}] comparison: [{self.comparison}]"
  
 
 

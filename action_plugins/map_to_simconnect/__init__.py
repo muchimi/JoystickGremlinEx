@@ -350,8 +350,7 @@ class SimconnectOptions():
                 # skip FSLTL AI aircraft
                 # skip passive aircraft
                 continue
-            if "a350" in key:
-                pass
+            
             if not key in self._aircraft_definition_map:
                 item = SimconnectAicraftDefinition(sim_name = aircraft, 
                                                    entry_type=SimconnectAicraftDefinition.EntryType.Sim,
@@ -584,7 +583,7 @@ class SimconnectOptions():
                         self._sort_mode = SimconnectSortMode(sort_mode)
                     except:
                         self._sort_mode = SimconnectSortMode.NotSet
-                        pass
+                        
                 if "last_command_mode" in node.attrib:
                     self._last_command_mode = SimConnectCommandMode.to_enum(node.get("last_command_mode"))
                 break
@@ -4142,6 +4141,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
     name = "Map to SimConnect"
     tag = "map-to-simconnect"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     # override allowed input types if different from default
     # input_types = [
@@ -4526,15 +4526,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self._block = SimConnectManager().block(self._command)
         
 
-        # debug
-        mode = self.get_mode()
-        if mode == "duke" and self._command == "THROTTLE1_AXIS_SET_EX1":
-            for attrib in node.attrib:
-                print (f"{attrib}: {node.get(attrib)}")
-            pass
-                       
-
-
         update_from_output = False
         if "min_range" in node.attrib:
             # old profile 
@@ -4642,8 +4633,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         command = self._command if self._command else ""
         command_release = self._command_release if self._command_release else ""
-        if command == "THROTTLE1_AXIS_SET_EX1":
-            pass
 
         node.set("command",safe_format(command, str))
         node.set("command_release",safe_format(command_release, str))

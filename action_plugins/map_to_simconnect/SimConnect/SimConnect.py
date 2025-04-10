@@ -1397,8 +1397,7 @@ class SimConnect():
 
 	def flight_to_dic(self, fpath):
 		while not os.path.isfile(fpath):
-			pass
-		time.sleep(0.5)
+			time.sleep(0.5)
 		dic = {}
 		index = ""
 		with open(fpath, "r") as tempfile:

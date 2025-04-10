@@ -2224,7 +2224,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 show_grid_visible = False
             start_visible = True
             input_selector_visible = not hat_visible
-            pass
+            
 
 
 
@@ -3425,6 +3425,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     name = "Vjoy Remap"
     tag = "vjoyremap"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
 
     functor = VJoyRemapFunctor

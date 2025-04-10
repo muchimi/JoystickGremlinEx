@@ -889,8 +889,6 @@ class ProfileInputNode(ProfileBaseNode):
     
     @input_item.setter
     def input_item(self, value: gremlin.base_profile.InputItem):
-        if value is None:
-            pass
         self._input_item = value
 
     @property

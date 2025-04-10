@@ -35,6 +35,7 @@ from gremlin.input_devices import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.types
 import gremlin.ui.ui_common
+import gremlin.ui.ui_gremlin
 
 syslog = logging.getLogger("system")
 
@@ -855,11 +856,12 @@ class MacroListModel(QtCore.QAbstractListModel):
         QtCore.QAbstractListModel.__init__(self, parent)
         from gremlin.util import load_icon
 
-                  
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+
         MacroListModel.icon_lookup =  {
-            "press": load_icon("press.svg"),
-            "release": load_icon("release.svg"),
-            "pause": load_icon("pause.svg")
+            "press": load_icon(f"{prefix}press.svg"),
+            "release": load_icon(f"{prefix}release.svg"),
+            "pause": load_icon(f"{prefix}pause.svg")
         }
 
         self._data = data_storage
@@ -893,6 +895,8 @@ class MacroListModel(QtCore.QAbstractListModel):
         if role == QtCore.Qt.SizeHintRole:
             # size hint
             return QtCore.QSize(200, 26)
+        elif role == QtCore.Qt.UserRole:
+            return entry
         elif role == QtCore.Qt.DecorationRole:
             if isinstance(entry, gremlin.macro.PauseAction):
                 return MacroListModel.icon_lookup["pause"]
@@ -1115,8 +1119,10 @@ class MacroListView(QtWidgets.QListView):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # # self.setAlternatingRowColors(True)
-        # self.setStyleSheet("color: black; background-color: white;")
+        
+        # enable multiple selection
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        
 
     def keyPressEvent(self, evt):
         """Process key events.
@@ -1401,7 +1407,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
     def __init__(self, action_data, parent=None):
         """Creates a new UI widget.
 
-        :param action_data the data of the macro action
+        :param action_data the data of the macro action  type: Macro
         :param parent the parent of the widget
         """
         super().__init__(action_data, parent=parent)
@@ -1431,10 +1437,32 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Replace the default vertical with a horizontal layout
             QtWidgets.QWidget().setLayout(self.layout())
-            self.main_layout = QtWidgets.QHBoxLayout(self)
+            self.main_layout = QtWidgets.QVBoxLayout(self)
 
+            # macro list + toolbar + editor widget
+            self.macro_widget, self.macro_layout = gremlin.ui.ui_common.getHContainer()
+            self.main_layout.addWidget(self.macro_widget)
+            
             self.editor_settings_layout = QtWidgets.QVBoxLayout()
             self.buttons_layout = QtWidgets.QVBoxLayout()
+
+
+            execute_label = QtWidgets.QLabel("Execute macro on:")
+            self.execute_on_press_widget = QtWidgets.QCheckBox("Press")
+            self.execute_on_press_widget.setChecked(self.action_data.execute_on_press)
+            self.execute_on_press_widget.clicked.connect(self._execute_on_press_changed)
+
+            self.execute_on_release_widget = QtWidgets.QCheckBox("Release")
+            self.execute_on_release_widget.setChecked(self.action_data.execute_on_release)
+            self.execute_on_release_widget.clicked.connect(self._execute_on_release_changed)
+            widgets = [execute_label,
+                       self.execute_on_press_widget,
+                       self.execute_on_release_widget
+                       ]
+            self.execute_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+            
+            self.macro_layout.addLayout(self.buttons_layout)
+            self.main_layout.addWidget(self.execute_container_widget)
 
             #self.delegate = MacroItemDelegate(self)
 
@@ -1456,32 +1484,43 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.editor_settings_layout.addWidget(self.settings_widget)
             self.editor_settings_layout.addStretch()
 
+            prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+
             # Create buttons used to modify and interact with the macro actions
             self.button_new_entry = self._create_toolbutton(
-                "list_add.svg",
+                f"{prefix}list_add.svg",
                 "Add a new action",
                 False
             )
             self.button_new_entry.clicked.connect(self._add_entry)
 
+            self.button_duplicate_entry = self._create_toolbutton(
+                "mdi.content-duplicate",
+                "Duplicate the selected action(s)",
+                False
+            )
+            self.button_duplicate_entry.clicked.connect(self._duplicate_entry)
+
+            
+
             self.button_delete = self._create_toolbutton(
-                "list_delete.svg",
-                "Delete currently selected entry",
+                f"{prefix}list_delete.svg",
+                "Delete currently selected action(s)",
                 False
             )
             self.button_delete.clicked.connect(self._delete_cb)
 
             self.button_pause = self._create_toolbutton(
-                "pause.svg",
-                "Add pause after the currently selected entry",
+                f"{prefix}pause.svg",
+                "Add pause after the currently selected action(s)",
                 False
             )
             self.button_pause.clicked.connect(self._pause_cb)
 
             self.button_record = self._create_toolbutton(
                 [
-                    "macro_record.svg",
-                    "macro_record_on.svg"
+                    f"{prefix}macro_record.svg",
+                    f"{prefix}macro_record_on.svg"
                 ],
                 "Record keyboard and joystick inputs",
                 True,
@@ -1491,8 +1530,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.record_time = self._create_toolbutton(
                 [
-                    "time.svg",
-                    "time_on.svg"
+                    f"{prefix}time.svg",
+                    f"{prefix}time_on.svg"
                 ],
                 "Record pauses between actions",
                 True,
@@ -1503,8 +1542,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             cfg = gremlin.config.Configuration()
             self.record_axis = self._create_toolbutton(
                 [
-                    "record_axis.svg",
-                    "record_axis_on.svg"
+                    f"{prefix}record_axis.svg",
+                    f"{prefix}record_axis_on.svg"
                 ],
                 "Record joystick axis events",
                 True,
@@ -1513,8 +1552,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_axis.clicked.connect(self._update_record_settings)
             self.record_button = self._create_toolbutton(
                 [
-                    "record_button.svg",
-                    "record_button_on.svg"
+                    f"{prefix}record_button.svg",
+                    f"{prefix}record_button_on.svg"
                 ],
                 "Record joystick button events",
                 True,
@@ -1523,8 +1562,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_button.clicked.connect(self._update_record_settings)
             self.record_hat = self._create_toolbutton(
                 [
-                    "record_hat.svg",
-                    "record_hat_on.svg"
+                    f"{prefix}record_hat.svg",
+                    f"{prefix}record_hat_on.svg"
                 ],
                 "Record joystick hat events",
                 True,
@@ -1533,8 +1572,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_hat.clicked.connect(self._update_record_settings)
             self.record_key = self._create_toolbutton(
                 [
-                    "record_key.svg",
-                    "record_key_on.svg"
+                    f"{prefix}record_key.svg",
+                    f"{prefix}record_key_on.svg"
                 ],
                 "Record keyboard events",
                 True,
@@ -1543,8 +1582,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_key.clicked.connect(self._update_record_settings)
             self.record_mouse = self._create_toolbutton(
                 [
-                    "record_mouse.svg",
-                    "record_mouse_on.svg"
+                    f"{prefix}record_mouse.svg",
+                    f"{prefix}record_mouse_on.svg"
                 ],
                 "Record mouse events",
                 True,
@@ -1554,12 +1593,15 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Toolbar
             self.toolbar = QtWidgets.QToolBar()
-            self.toolbar.setStyleSheet(
-                "QToolBar { border: 1px solid #949494; background-color: #dadada; }"
-            )
+
+
+            background_color = gremlin.ui.ui_common.Color.backgroundColor()
+            border_color = gremlin.ui.ui_common.Color.borderColor()
+            self.toolbar.setStyleSheet(f"QToolBar {{border: 1px solid {border_color}; background-color: {background_color};}}")
             self.toolbar.setIconSize(QtCore.QSize(16, 16))
             self.toolbar.setOrientation(QtCore.Qt.Vertical)
             self.toolbar.addWidget(self.button_new_entry)
+            self.toolbar.addWidget(self.button_duplicate_entry)
             self.toolbar.addWidget(self.button_delete)
             self.toolbar.addWidget(self.button_pause)
             self.toolbar.addSeparator()
@@ -1577,11 +1619,11 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             # Assemble the entire widget
 
 
-            self.main_layout.addWidget(self.list_view)
-            self.main_layout.addWidget(self.toolbar)
+            self.macro_layout.addWidget(self.list_view)
+            self.macro_layout.addWidget(self.toolbar)
+            self.macro_layout.addLayout(self.editor_settings_layout)
 
-            self.main_layout.addWidget(self.toolbar)
-            self.main_layout.addLayout(self.editor_settings_layout)
+            
 
             self.main_layout.setContentsMargins(0, 0, 0, 0)
         finally:
@@ -1597,6 +1639,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         """
         from gremlin.util import load_pixmap, load_icon
         button = QtWidgets.QToolButton()
+
+        # prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
         
         if isinstance(icon_path, list):
             pixmap_0 = load_pixmap(icon_path[0])
@@ -1619,6 +1663,9 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _populate_ui(self):
         """Populate the UI with content from the data."""
         self.model = MacroListModel(self.action_data.sequence)
+        input_type = self._get_input_type()
+        execution_mode_visible = input_type != InputType.JoystickAxis
+        self.execute_container_widget.setVisible(execution_mode_visible)
         self.list_view.setModel(self.model)
         self.list_view.setCurrentIndex(self.model.index(0, 0))
         self._edit_action(self.model.index(0, 0))
@@ -1628,7 +1675,12 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         :param model_index the index of the model entry to edit
         """
-        self.editor_widget = MacroActionEditor(self.model, model_index)
+
+        # ignore if there is more than one item selected
+        if len(self.list_view.selectedIndexes()) > 1:
+            self.editor_widget = QtWidgets.QLabel("Please select a single action")
+        else:
+            self.editor_widget = MacroActionEditor(self.model, model_index)
         old_item = self.editor_settings_layout.takeAt(0)
         old_item.widget().hide()
         old_item.widget().deleteLater()
@@ -1757,26 +1809,86 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             # Disable mouse event hooking
             gremlin.windows_event_hook.MouseHook().stop()
 
+
+    @QtCore.Slot(bool)
+    def _execute_on_press_changed(self, checked : bool):
+        self.action_data.execute_on_press = checked
+
+    @QtCore.Slot(bool)
+    def _execute_on_release_changed(self, checked : bool):
+        self.action_data.execute_on_release = checked
+
+    @QtCore.Slot()
     def _pause_cb(self):
         """Adds a pause macro action to the list."""
         self._insert_entry_at_current_index(gremlin.macro.PauseAction(0.250))
         self._refresh_editor_ui()
 
-
+    @QtCore.Slot()
     def _add_entry(self):
         self._pause_cb()
 
-    def _delete_cb(self):
-        """Callback executed when the delete button is pressed."""
-        idx = self.list_view.currentIndex().row()
-        if 0 <= idx < len(self.action_data.sequence):
-            del self.action_data.sequence[idx]
-            new_idx = min(len(self.action_data.sequence), max(0, idx - 1))
-            self.list_view.setCurrentIndex(
-                self.model.index(new_idx, 0, QtCore.QModelIndex())
-            )
+    @QtCore.Slot()
+    def _duplicate_entry(self):
+        import copy
+        actions = []
+        selected_indices = []
+        for idx in self.list_view.selectedIndexes():
+            action = self.model.data(idx, QtCore.Qt.UserRole)
+            new_action = copy.deepcopy(action)
+            new_action.id = gremlin.util.get_guid() # setup new ID for the entry
+            actions.append(new_action)
+            
+        if actions:
+            # add the actions to the model
+            for action in actions:
+                index = self.model.rowCount()
+                self.model.add_entry(index, action)
+                selected_indices.append(self.model.index(index, 0))
+
+            # select what was added
+            for model_index in selected_indices:
+                self.list_view.setCurrentIndex(model_index)
+
             self._refresh_editor_ui()
 
+        # idx = self.list_view.currentIndex().row()
+        # if 0 <= idx < len(self.action_data.sequence):
+        #     model_idx = self.model.index(idx, 0, QtCore.QModelIndex())
+        #     action = self.model.data(model_idx, QtCore.Qt.UserRole)
+        #     new_action = copy.deepcopy(action)
+        #     self._append_entry(new_action)
+
+
+    @QtCore.Slot()
+    def _delete_cb(self):
+        """Callback executed when the delete button is pressed."""
+
+        indices = self.list_view.selectedIndexes()
+        if indices:
+
+            # warn box 
+            msgbox = gremlin.ui.ui_common.ConfirmBox(f"This will remove the selected macro entries.")
+            result = msgbox.show()
+            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+                for idx in indices:
+                    del self.action_data.sequence[idx]
+
+                # select the last entry
+                item_count = len(self.action_data.sequence)
+                if item_count:
+                    new_idx = min(item_count, max(0, idx - 1))
+                    self.list_view.setCurrentIndex(self.model.index(new_idx, 0, QtCore.QModelIndex()))
+                self._refresh_editor_ui()
+
+        # idx = self.list_view.currentIndex().row()
+        # if 0 <= idx < len(self.action_data.sequence):
+        #     del self.action_data.sequence[idx]
+        #     new_idx = min(len(self.action_data.sequence), max(0, idx - 1))
+        #     self.list_view.setCurrentIndex(self.model.index(new_idx, 0, QtCore.QModelIndex()))
+        #     self._refresh_editor_ui()
+
+    @QtCore.Slot()
     def _insert_entry_at_current_index(self, entry):
         """Adds the given entry after current selection.
 
@@ -1787,6 +1899,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.list_view.setCurrentIndex(self.model.index(cur_index+1, 0))
         self._refresh_editor_ui()
 
+    @QtCore.Slot()
     def _append_entry(self, entry):
         """Adds the given entry at the end of the list.
 
@@ -1794,6 +1907,6 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         """
         index = self.model.rowCount()
         self.model.add_entry(index, entry)
-        self.list_view.setCurrentIndex(self.model.index(index + 1, 0))
+        self.list_view.setCurrentIndex(self.model.index(index, 0))
         self._refresh_editor_ui()
 

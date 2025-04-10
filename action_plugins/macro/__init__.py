@@ -53,13 +53,27 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         self.macro.repeat = action.repeat
 
     def process_event(self, event, value, extra_data = None):
+
+        trigger = event.is_axis or \
+            self.action_data.execute_on_press and event.is_pressed or \
+            self.action_data.execute_on_release and not event.is_pressed
+        
+        verbose = gremlin.config.Configuration().verbose_mode_macro
+        if verbose: syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} {str(event)}")        
+        
+        if not trigger:
+            # do not execute
+            return False
+        
+        if verbose: syslog.info(f"\texecute")
+        
         MacroFunctor.manager.queue_macro(self.macro)
         if isinstance(self.macro.repeat, gremlin.macro.HoldRepeat):
             gremlin.input_devices.ButtonReleaseActions().register_callback(
                 lambda: MacroFunctor.manager.terminate_macro(self.macro),
                 event
             )
-        return True
+        return False
 
 
 class Macro(gremlin.base_profile.AbstractAction):
@@ -69,7 +83,8 @@ class Macro(gremlin.base_profile.AbstractAction):
     name = "Macro"
     tag = "macro"
 
-    default_button_activation = (True, False)
+    # trigger condition (trigger_on_press, trigger_on_release)
+    default_button_activation = (True, True)
 
     # override allowed input types if different from default
     # input_types = [
@@ -93,6 +108,9 @@ class Macro(gremlin.base_profile.AbstractAction):
         self.exclusive = False
         self.repeat = None
         self.force_remote = False
+        self.execute_on_press = True # true if macro executes on input press/change
+        self.execute_on_release = False # true if macro executs on input release
+        
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -119,6 +137,13 @@ class Macro(gremlin.base_profile.AbstractAction):
         self.exclusive = False
         self.repeat = None
         self.force_remote = False
+        self.execute_on_press = True # true if macro executes on input press/change
+        self.execute_on_release = False # true if macro executs on input release
+
+        if "execute-on-press" in node.attrib:
+            self.execute_on_press = safe_read(node,"execute-on-press",bool,True)
+        if "execute-on-release" in node.attrib:
+            self.execute_on_release = safe_read(node,"execute-on-release",bool,True)
 
         # Read properties
         for child in node.find("properties"):
@@ -220,6 +245,8 @@ class Macro(gremlin.base_profile.AbstractAction):
             prop_node = ElementTree.Element("force_remote")
             properties.append(prop_node)
 
+        node.set("execute-on-press",str(self.execute_on_press))
+        node.set("execute-on-release",str(self.execute_on_release))
 
         node.append(properties)
 

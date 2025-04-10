@@ -1174,8 +1174,7 @@ class ExecutionContext():
                             container_node.functors = self._get_container_functor(container, container_node)
 
                             # container condition
-                            if input_item.input_id == 1 and mode_name == "a350" and "Bravo" in device.name:
-                                pass
+                       
                             condition_node = self._get_condition_node(container, container_node)
                             #condition_node.parent = container_node  # condition for container - appears after the container node as the entry point is the container
                             condition_node.parent = input_container_group
@@ -1439,15 +1438,15 @@ class ExecutionContext():
         if not node.has_actions:
             return True # nodes with no actions return PASS
         
-        if isinstance(node, ExecutionGraphInputNode) and node.mode == "a350" and node.input_item.input_id == 1:
-            pass
+        # if isinstance(node, ExecutionGraphInputNode) and node.mode == "a350" and node.input_item.input_id == 1:
+        #     pass
 
         
-        if node.nodeType == ExecutionGraphNodeType.ActivationCondition:
-            condition : gremlin.actions.ActivationCondition = node.condition
-            if isinstance(condition, gremlin.actions.JoystickCondition) or isinstance(condition, gremlin.base_conditions.JoystickCondition):
-                if condition.input_id == 29: # and condition.comparison == "pressed":
-                    pass
+        # if node.nodeType == ExecutionGraphNodeType.ActivationCondition:
+        #     condition : gremlin.actions.ActivationCondition = node.condition
+        #     if isinstance(condition, gremlin.actions.JoystickCondition) or isinstance(condition, gremlin.base_conditions.JoystickCondition):
+        #         if condition.input_id == 29: # and condition.comparison == "pressed":
+        #             pass
 
               
         result = True
@@ -1467,11 +1466,9 @@ class ExecutionContext():
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:
                     for child in node.children:
-                        if child.nodeType == ExecutionGraphNodeType.Range:
-                            pass
                         result = self.execute_node(child, event, value, manual, extra_data)
                         # dont care if result fails for individual groups
-                        pass
+                        
 
 
                 case ExecutionGraphNodeType.ActivationConditionNexus:
@@ -1642,12 +1639,15 @@ class VirtualButtonProcess:
     """Callback that is responsible for emitting press and release events
     for a virtual button."""
 
-    def __init__(self, data):
+    def __init__(self, container, data):
         """Creates a new instance for the given container.
 
         :param container the container using a virtual button configuration
         """
         self.virtual_button = None
+        ec = ExecutionContext()
+        parent = ec.graph
+        self.execution_graph = ContainerExecutionGraph(container, parent)
 
         if isinstance(data, gremlin.base_buttons.VirtualAxisButton):
             self.virtual_button = gremlin.actions.AxisButton(data.lower_limit, data.upper_limit, data.direction)
@@ -1656,12 +1656,25 @@ class VirtualButtonProcess:
         else:
             raise gremlin.error.GremlinError("Invalid virtual button data provided")
 
-    def __call__(self, event, value = None):
+    def __call__(self, event, value = None, extra_data = None):
         """Processes the provided event through the virtual button instance.
 
         :param event the input event being processed
         """
-        self.virtual_button.process_event(event)
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+
+        if not extra_data:
+            extra_data = {}
+        # verify the virtual button should process based on the event
+        result = self.virtual_button._do_process(event)
+        if result:
+            if verbose: syslog.info("VIRTUALBUTTON: execute PASS")
+            extra_data["virtual_button"] = self.virtual_button
+            self.execution_graph.process_event(event, value, extra_data)
+            return
+        #self.virtual_button.process_event(event)
+
+        if verbose: syslog.info("VIRTUALBUTTON: execute FAIL")
 
 
 class AbstractExecutionGraph(QtCore.QObject):
@@ -1760,6 +1773,8 @@ class AbstractExecutionGraph(QtCore.QObject):
                 #result = True # assume pass
 
                 if isinstance(functor, gremlin.actions.ActivationCondition):
+                    # if not event.is_pressed:
+                    #     pass
                     result = functor.process_event(event, value, extra_data)
                     if not result:
                         return False

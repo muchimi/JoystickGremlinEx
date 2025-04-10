@@ -241,8 +241,18 @@ T22
 - Fix: axis repeater visualization issues (custom widget refactor)
 - New: calibration result will be visualized on an axis repeater if calibration data is enabled on that axis
 - New: option to enable visualization of raw and calibrated data on repeaters
+T24
 - Fix: some container functors not called causing some containers to fail (like TempoEx, Chain, Sequence, etc)  
 - API: container functors should return False by default to stop further processing of container contents.  Previous logic would call for them to return True.  The reason for this is the containers are now part of an execution group so the return value means something different now - do not automatically process subcomponents.
+T25
+- Improved: QOL macro multi-selection - ability to select one or more entries concurrently - settings only show if a single selection is made - multi-select is for delete/duplicate operations.
+- Improved: QOL new macro duplicate button in toolbar (will duplicate current multi-selection as new entries)
+- Improved: macro dark theme icons and visuals
+- Improved: macro delete applies to multi-selection with confirm prompt
+- Improved: macro can now execute on input press, input release, or both when mapped to a momentary type input (will not show on linear inputs)
+- Fix: virtual buttons/hats use the new execution graph and execution logic
+- Fix: mode switch and temporary mode switch actions selectors now default to the incorrect entry on load (was broken by flipped return values in the API)
+- Fix: default container condition set to "always" to default to trigger on press/release by default.  This setting is also defined for each container/action default_button_activation() member.
 
 
 

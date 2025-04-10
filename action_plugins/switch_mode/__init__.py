@@ -68,14 +68,14 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # remove the current mode so we cannot switch to ourselves
             
-            modes = self.ec.getModeNames(as_tuple=True, include_current = False)
+            modes = self.ec.getModeNames(as_tuple=True, include_current = False) # (display, mode)
             if not modes:
-                # allow to select self if that's the only option
+                # allow to select self if that's the only option (display, mode)
                 modes = self.ec.getModeNames(as_tuple=True)
                 
             index = 0
             select_index = None
-            for mode, display in modes:
+            for display, mode in modes:
                 print (f"Mode: {display} -> {mode}")
                 self.mode_selector_widget.addItem(display, mode)
                 if select_index is None and mode == current_mode and current_mode is not None:
@@ -133,6 +133,7 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     name = "Switch Mode"
     tag = "switch-mode"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
 
     functor = SwitchModeFunctor

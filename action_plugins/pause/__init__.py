@@ -137,6 +137,7 @@ class PauseAction(gremlin.base_profile.AbstractAction):
     name = "Pause"
     tag = "pause"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
 
     # override allowed input types if different from default
@@ -177,7 +178,7 @@ class PauseAction(gremlin.base_profile.AbstractAction):
                     self.mode = PauseMode.PauseAction
             if "delay" in node.attrib:
                 self.delay = safe_read(node,"delay",int, 250)
-                pass
+                
         else:
             # legacy node - use the old mode
             self.mode = PauseMode.PauseAction

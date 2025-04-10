@@ -824,7 +824,8 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
 
     name = "Map to Mouse EX"
     tag = "map_to_mouse_ex"
-
+    
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     # input_types = [
     #     InputType.JoystickAxis,

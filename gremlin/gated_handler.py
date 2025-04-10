@@ -680,8 +680,6 @@ class RangeInfo():
 
     def setUsed(self, value):
         ''' sets the used flag without triggering an event '''
-        if not value:
-            pass
         self._used = value
         
 

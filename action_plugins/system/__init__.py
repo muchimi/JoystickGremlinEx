@@ -205,7 +205,7 @@
 
 #     name = "System"
 #     tag = "gremlin-System"
-
+#     # trigger condition (trigger_on_press, trigger_on_release)
 #     default_button_activation = (True, True)
 
 #     functor = SystemFunctor

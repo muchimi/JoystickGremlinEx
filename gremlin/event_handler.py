@@ -1056,9 +1056,6 @@ class EventListener(QtCore.QObject):
 			key_id = (event.button_id.value + 0x1000, False)
 			self._keyboard_state[key_id] = event.is_pressed
 
-			# if event.is_pressed:
-			# 	print(f"mouse pressed {event.button_id}")
-
 			self.mouse_event.emit(Event(
 				event_type= InputType.Mouse,
 				device_guid=dinput.GUID_Keyboard,
@@ -1886,6 +1883,7 @@ class EventHandler(QtCore.QObject):
 		# mode to act on
 		mode = event.mode if event.mode else self.runtime_mode  
 
+
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
 		#verbose = True
@@ -1914,6 +1912,7 @@ class EventHandler(QtCore.QObject):
 				for key in keys:
 					syslog.info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
 
+
 			items = self._matching_event_keys(event)  # returns list of primary keys
 			if items:
 				if verbose:
@@ -1930,23 +1929,25 @@ class EventHandler(QtCore.QObject):
 					latched_keys = [input_item.key]
 					latched_keys.extend(input_item.latched_keys)
 					if verbose: syslog.info(f"KEY: Checking latching: {len(latched_keys)} key(s)")
-					for k in latched_keys:
-						index = k.index_tuple()
-						found = index in data.keys()
-						if not found:
-							# try the reverse translate
-							r_index = gremlin.keyboard.KeyMap.reverse_translate(index)
-							if r_index is not None:
-								found = r_index in data.keys()
-								if found:
-									index = r_index
-
-						state = data[index] if found else False
-						if verbose:
-							syslog.info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
+					if len(latched_keys) > 1:
+						# key is latched - check the other keys are also pressed
+						for k in latched_keys:
+							index = k.index_tuple()
+							found = index in data.keys()
 							if not found:
-								syslog.info(f"\t\t* Key not found *")
-						is_latched = is_latched and state
+								# try the reverse translate
+								r_index = gremlin.keyboard.KeyMap.reverse_translate(index)
+								if r_index is not None:
+									found = r_index in data.keys()
+									if found:
+										index = r_index
+
+							state = data[index] if found else False
+							if verbose:
+								syslog.info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
+								if not found:
+									syslog.info(f"\t\t* Key not found *")
+							is_latched = is_latched and state # make sure all latched keys are currently pressed (state = True)
 
 					if verbose:
 						syslog.info(f"\tLatched state: {is_latched}")
@@ -1954,7 +1955,12 @@ class EventHandler(QtCore.QObject):
 					if is_latched:
 						latch_key = input_item.key
 
+				
+
 					if latch_key:
+
+						
+
 						#print (f"Found latched key: {latch_key}")
 						m_list = self._matching_latched_callbacks(event, latch_key)
 						if m_list:
@@ -1983,8 +1989,6 @@ class EventHandler(QtCore.QObject):
 				
 			
 		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
-			if event.identifier == 2:
-				pass
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
 			if verbose and not m_list: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
@@ -2055,8 +2059,8 @@ class EventHandler(QtCore.QObject):
 		if event.event_type == InputType.Midi:
 			key = event.identifier.message_key
 			import gremlin.ui.midi_device
-			if event.identifier.command == gremlin.ui.midi_device.MidiCommandType.SysEx:
-					pass
+			# if event.identifier.command == gremlin.ui.midi_device.MidiCommandType.SysEx:
+			# 		pass
 			if event.device_guid in self.midi_callbacks:
 				import gremlin.execution_graph
 				ec = gremlin.execution_graph.ExecutionContext() # current execution context

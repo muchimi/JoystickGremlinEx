@@ -1339,8 +1339,8 @@ class InputItemWidget(QBoxFrame):
         current_button_widget = self.button_widget
         
         widget = None # widget created for the repeater
-        if self.identifier.input_type == InputType.OpenSoundControl:
-            pass
+        # if self.identifier.input_type == InputType.OpenSoundControl:
+        #     pass
 
         if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.is_hat or self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat, InputType.OpenSoundControl, InputType.Midi)):
             

@@ -28,6 +28,7 @@ import gremlin.base_conditions
 from  gremlin.clipboard import Clipboard
 import gremlin
 import gremlin.base_classes
+import gremlin.config
 import gremlin.plugin_manager
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -438,8 +439,6 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         if self.short_index < len(self.short_set):
             # syslog.info(f"execute short press {self.short_index}")
-            if self.short_index  == 1:
-                pass
             self.short_set[self.short_index].process_event(event, value)
 
         if self.chain_short and (self.switch_on_press and value.current) or not value.current:
@@ -474,6 +473,10 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         else:
             is_pressed = value.current
 
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
+
+        if verbose: syslog.info(f"TEMPOEX: {self.action_data.comment} got trigger: pressed: {is_pressed}")
+
         # Copy state when input is pressed
         if is_pressed:
             self.value_press = copy.deepcopy(value)
@@ -487,7 +490,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             self.timer.start()
 
             if self.activate_on == "press":
-                syslog.info(f"execute short press (activation mode = press)")
+                if verbose: syslog.info(f"execute short press (activation mode = press)")
                 self._trigger_short_press(self.event_press, self.value_press)
 
         else:

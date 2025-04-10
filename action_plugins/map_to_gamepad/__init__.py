@@ -300,7 +300,7 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
     name = "Map to GamePad"
     tag = "map-to-gamepad"
     
-
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     # override allowed input types if different from default
     # input_types = [

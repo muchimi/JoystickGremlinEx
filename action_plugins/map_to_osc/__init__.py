@@ -296,8 +296,6 @@ class OscInputWidget(QtWidgets.QWidget):
         self._container_widget.setEnabled(self._is_enabled)
         self._axis_container_widget.setEnabled(self._is_enabled)
 
-        if not axis_visible:
-            pass
 
 
     def setRepeaterValue(self, value : float):
@@ -768,6 +766,7 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
     name = "Map to OSC"
     tag = "map-to-osc"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     # override allowed input types if different from default
     # input_types = [

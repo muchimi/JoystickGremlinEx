@@ -533,6 +533,7 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
     name = "Merged Axis"
     tag = "merged-axis"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
 
     # override default allowed input types here if not all

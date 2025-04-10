@@ -203,6 +203,7 @@ class SplitAxis(gremlin.base_profile.AbstractAction):
     name = "Split Axis"
     tag = "split-axis"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     # override default allowed inputs here
     input_types = [

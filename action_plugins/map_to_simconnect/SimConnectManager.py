@@ -1851,8 +1851,6 @@ class SimConnectBlock():
 
     @output_mode.setter
     def output_mode(self, value : SimConnectActionMode):
-        if value == SimConnectActionMode.Trigger:
-            pass
         self._output_mode = value
 
     @property

@@ -852,8 +852,6 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' changes the display mode of the keyboard to shifted/unshifted'''
         if value != self._display_shifted:
             for widget in self._key_widget_map.values():
-                if widget.normal_key == "9":
-                        pass
                 if widget.shifted_key != widget.normal_key:
                     # only updates those that are different in shifted form
                     widget.setText(widget.shifted_key if value else widget.normal_key)

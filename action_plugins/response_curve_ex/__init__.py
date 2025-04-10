@@ -129,6 +129,7 @@ class ResponseCurveEx(gremlin.base_profile.AbstractAction):
     name = "Response Curve Ex"
     tag = "response-curve-ex"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     
     # override allowed input if different from default

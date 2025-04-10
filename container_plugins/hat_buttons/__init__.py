@@ -286,7 +286,7 @@ class HatButtonsContainer(AbstractContainer):
 
             # Callback generating virtual button events
             callbacks.append(gremlin.base_profile.CallbackData(
-                gremlin.execution_graph.VirtualButtonProcess(VirtualHatButton(self, [gremlin.util.hat_tuple_to_direction(id_to_direction[i])])),None))
+                gremlin.execution_graph.VirtualButtonProcess(self, VirtualHatButton(self, [gremlin.util.hat_tuple_to_direction(id_to_direction[i])])),None))
             # Create fake BasicContainer for each action set
             basic_container = BasicContainer(self, parent)
             basic_container.action_sets = [action_set]

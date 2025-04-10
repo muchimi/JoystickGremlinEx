@@ -321,6 +321,8 @@ class CodeRunner:
                                 if cb_data.event is None:
                                     if verbose: 
                                         syslog.info(f"\t\tcallback: ")
+                                        if not hasattr(cb_data.callback,"execution_graph"):
+                                            continue
                                         for functor in cb_data.callback.execution_graph.functors:
                                             if hasattr(functor,"action_set"):
                                                 for action in functor.action_set.functors:

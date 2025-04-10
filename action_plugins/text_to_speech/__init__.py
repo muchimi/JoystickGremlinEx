@@ -181,6 +181,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     name = "Text to Speech"
     tag = "text-to-speech"
 
+    # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
     # override default allowed inputs here
     # input_types = [
@@ -264,8 +265,6 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self.rate =gremlin.util.clamp(self.rate, tts.rate_offset_min, tts.rate_offset_max)
         if "text" in node.attrib:
             self.text = node.get("text")
-            pass
-            
 
     def _generate_xml(self):
         node = ElementTree.Element("text-to-speech")

@@ -166,6 +166,9 @@ class ActivationCondition:
         :param value process event value
         :return True if all conditions are satisfied, False otherwise
         """
+        if not self._conditions:
+            # no conditions, always succeeds
+            return True
         return ActivationCondition.rule_function[self._rule](
             [partial(c, event, value) for c in self._conditions]
         )
@@ -176,8 +179,8 @@ class ActivationCondition:
         rule_name = "all" if self._rule == ActivationRule.All else "any"
         condition_name = ""
         for index, c in enumerate(self._conditions):
-            condition_name += f"[C{index}] {c.condition_name()} "
-        return f"Rule: {rule_name} Is container: {self.is_container} Is container condition: {self.is_container_condition} Conditions: {condition_name} "
+            condition_name += f"[C{index}] {c.condition_name()}"
+        return f"Rule: [{rule_name}] Is container: [{self.is_container}] Is container condition: [{self.is_container_condition}] Conditions: [{condition_name}] "
     
     def __str__(self):
         return self.condition_name()
@@ -359,8 +362,6 @@ class JoystickCondition(AbstractCondition):
         
         elif self.input_type == InputType.JoystickButton:
 
-            if self.input_id == 29 and self.comparison == "pressed":
-                pass
             retval = False
             is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             if self.comparison == "pressed":
@@ -736,13 +737,15 @@ class AxisButton(VirtualButton):
         # Execute FSM transitions as required
         if not self.forced_activation:
             if inside_range:
-                return self._fsm.perform("press")
+                return True
+                #return self._fsm.perform("press")
             else:
-                return self._fsm.perform("release")
+                return True
+                #return self._fsm.perform("release")
         # else:
         #     return self._fsm.perform("press")
 
-
+        return False
 class HatButton(VirtualButton):
 
     """Virtual button based around a hat."""
@@ -762,6 +765,9 @@ class HatButton(VirtualButton):
         :return True if a state transition occurred, False otherwise
         """
         if gremlin.util.hat_tuple_to_direction(event.value) in self._directions:
-            return self._fsm.perform("press")
+            return True
+            #return self._fsm.perform("press")
         else:
-            return self._fsm.perform("release")
+            return True
+            #return self._fsm.perform("release")
+        return False

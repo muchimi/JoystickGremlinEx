@@ -39,6 +39,7 @@ import gremlin.error
 import gremlin.keyboard
 import gremlin.sendinput
 import gremlin.input_devices
+import gremlin.util
 
 
 syslog = logging.getLogger("system")
@@ -604,6 +605,7 @@ class Macro:
         self.repeat = None
         self.exclusive = False
         self.completed_callback = None # callback called when macro completes
+
         
 
         # flag set if we're forcing remote mode execution
@@ -725,7 +727,11 @@ class MacroAbstractAction():
     """Base class for all macro action."""
 
     def __init__(self, data = None):
+        
         self._data = data
+        self.id = gremlin.util.get_guid() # unique ID of the macro
+
+   
 
     @property
     def data(self):
@@ -1018,7 +1024,7 @@ class VJoyMacroAction(MacroAbstractAction):
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
-        
+        verbose = gremlin.config.Configuration().verbose_mode_macro
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         vjoy = gremlin.joystick_handling.VJoyProxy()[self.vjoy_id]
         if self.input_type == InputType.JoystickAxis:
@@ -1039,6 +1045,7 @@ class VJoyMacroAction(MacroAbstractAction):
                     gremlin.input_devices.remote_client.send_relative_axis(self.vjoy_id, self.input_id, self.value, force_remote)
         elif self.input_type == InputType.JoystickButton:
             if is_local:
+                if verbose: syslog.info(f"MACRO: vjoy {self.vjoy_id} button: {self.input_id} press: {self.value}")
                 vjoy.button(self.input_id).is_pressed = self.value
             if is_remote:
                 gremlin.input_devices.remote_client.send_button(self.vjoy_id, self.input_id, self.value, force_remote)

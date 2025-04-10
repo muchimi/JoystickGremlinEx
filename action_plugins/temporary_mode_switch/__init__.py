@@ -57,13 +57,13 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_modes(self):
 
-        mode = self.action_data.mode_name
+        current_mode = self.action_data.mode_name
         index = 0
         select_index = None
 
         # remove the current mode so we cannot switch to ourselves
         ec = gremlin.execution_graph.ExecutionContext()
-        modes = ec.getModeNames(as_tuple=True, include_current = False)
+        modes = ec.getModeNames(as_tuple=True, include_current = False) # (display, mode)
         if not modes:
             # allow to select self if that's the only option
             modes = ec.getModeNames(as_tuple=True)
@@ -71,9 +71,9 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         with QtCore.QSignalBlocker(self.mode_selector_widget):
             self.mode_selector_widget.clear()
-            for entry, display in modes:
-                self.mode_selector_widget.addItem(display, entry)
-                if mode and select_index is None and entry == mode:
+            for display, mode in modes:
+                self.mode_selector_widget.addItem(display, mode)
+                if current_mode and select_index is None and mode == current_mode:
                     select_index = index
                 index += 1
 
@@ -152,6 +152,7 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
 
     name = "Temporary Mode Switch"
     tag = "temporary-mode-switch"
+
 
     default_button_activation = (True, False)
     # override default allowed inputs here

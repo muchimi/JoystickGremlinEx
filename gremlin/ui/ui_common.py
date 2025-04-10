@@ -80,6 +80,9 @@ class Color():
     def backgroundColor():
         return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
+    def selectedBackgroundColor():
+        return Color.selectColor()
+    @staticmethod
     def highlightBackgroundColor():
         return "#66612f" if gremlin.shared_state.is_dark_theme else "#FFF4B0"
     @staticmethod
@@ -206,6 +209,7 @@ class Color():
         border_color = Color.borderColor()
         background_color = Color.backgroundColor()
         foreground_color = Color.normalColor
+        selected_background_color = Color.selectedBackgroundColor()
         if gremlin.config.Configuration().is_debug:
             relative_path = "gfx/"
         else:
@@ -252,6 +256,13 @@ class Color():
                 border: 1px solid {border_color};
             }}
             QComboBox {{
+                border: 1px solid {border_color};
+            }}
+            QListView::item:selected {{
+                background: {selected_background_color}
+            }}
+
+            QListView {{
                 border: 1px solid {border_color};
             }}
            
@@ -6813,8 +6824,6 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             with QtCore.QSignalBlocker(self._normalized_min_widget):
                 self._normalized_min_widget.setValue(min_norm)
             with QtCore.QSignalBlocker(self._normalized_max_widget):
-                if max_norm == -1:
-                    pass
                 self._normalized_max_widget.setValue(max_norm)
 
             if self._verbose: syslog.info(f"JRANGE: update from percent:   output: {min_value:0.3f} {max_value:0.3f} normalized: {min_norm:0.3f} {max_norm:0.3f} percent: {min_percent:0.3f} {max_percent:0.3f} cmd: {min_cmd:0.3f} {max_cmd:0.3f} ")
