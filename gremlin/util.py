@@ -849,7 +849,7 @@ def load_pixmap(*paths):
         return pixmap
     
     # return a dummy pixmap so the code doesn't blow up
-    syslog.error(f"load_pixmap(): invalid path: {paths}")
+    syslog.error(f"load_pixmap(): invalid path: {the_path} {paths}")
     icon : QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
     return icon.pixmap(24,24)
 
