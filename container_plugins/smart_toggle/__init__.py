@@ -188,30 +188,22 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 functor.needs_auto_release = False
 
     def process_event(self, event, value, extra_data = None):
-        # TODO: Currently this does not handle hat or axis events, however
-        #       virtual buttons created on those inputs is supported
-        if not isinstance(value.current, bool):
-            syslog.warning(
-                f"Invalid data type received in Smart Toggle container: {type(event.value)}"
-            )
-            return False
-
-        if value.current:
-            # Currently not in either toggle or hold mode
+        ''' called when the event is received '''
+        if event.is_pressed:
+            # pressed mode
             if self.mode is None:
+                # Currently not in either toggle or hold mode
                 self.action_set.process_event(event, value)
                 self.activation_time = time.time()
 
             # Run release logic when the second press happens in toggle mode
             elif self.mode == "toggle":
-                self.action_set.process_event(
-                    self.release_event,
-                    self.release_value
-                )
+                self.action_set.process_event(self.release_event,self.release_value)
                 self.activation_time = 0.0
                 self.mode = None
         else:
-            # If the input is release before the hold timeout occurs switch
+            # release mode
+            # If the input is released before the hold timeout occurs, switch
             # to toggle mode and store the event for artificial release on
             # next input press
             if self.activation_time + self.delay > time.time():
@@ -229,8 +221,12 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
 class SmartToggleContainer(AbstractContainer):
-
-    """Represents a container which holds exactly one action."""
+    '''
+    The smart toggle container allows for a single group of actions that are have on and off states, such as remap and map to keyboard to be used in two manners.
+    If the input is held down the action will perform as a typical remap action would, i.e. staying active as long as the input is pressed.
+    However, when a short button press is detected, specified by the Toggle time then the first such press toggles the down state,
+    i.e. holding the action down, and the second short press releases the action again. 
+    '''
 
     name = "Smart Toggle"
     tag = "smart_toggle"

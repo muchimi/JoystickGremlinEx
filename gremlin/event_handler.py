@@ -324,6 +324,9 @@ class EventListener(QtCore.QObject):
 	# Signal emitted when a joystick is attached or removed
 	device_change_event = QtCore.Signal()
 
+	# fires when vjoy input state changes, parameter is the id of the vjoy and what it's changing to
+	vjoy_as_input_changed = QtCore.Signal(int, bool)
+
 	# fires when the number of gamepad devices changes
 	gamepad_change_event = QtCore.Signal()
 
@@ -826,6 +829,8 @@ class EventListener(QtCore.QObject):
 		verbose = config.Configuration().verbose_mode_joystick
 		
 		event = dinput.InputEvent(data)
+
+		#syslog.info(f"joystick event: {str(event)}")
 		
 		#breakpoint()
 		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
@@ -1757,23 +1762,27 @@ class EventHandler(QtCore.QObject):
 								identifier = mode_exit,
 								device_guid= device_guid,
 								is_pressed=True,
-								mode = self.runtime_mode)
+								mode = self.runtime_mode,
+								override_input_type=InputType.JoystickButton)
 					event_exit_released = Event(InputType.ModeControl, 
 								identifier = mode_exit,
 								device_guid= device_guid,
 								is_pressed=False,
-								mode = self.runtime_mode)
+								mode = self.runtime_mode,
+								override_input_type=InputType.JoystickButton)
 					
 					event_enter_pressed = Event(InputType.ModeControl, 
 								identifier = mode_enter,
 								device_guid= device_guid,
 								is_pressed=True,
-								mode = new_mode)
+								mode = new_mode,
+								override_input_type=InputType.JoystickButton)
 					event_enter_released = Event(InputType.ModeControl, 
 								identifier = mode_enter,
 								device_guid= device_guid,
 								is_pressed=False,
-								mode = new_mode)
+								mode = new_mode,
+								override_input_type=InputType.JoystickButton)
 					
 					# fire mode change control for mode exit (press + release)
 					m1_list, f1_list = self.execute_event(event_exit_pressed)
@@ -1797,14 +1806,6 @@ class EventHandler(QtCore.QObject):
 					if verbose: syslog.info(f"CHANGE MODE: [{current_profile.name}] - Runtime Mode switch to: {new_mode}")
 					if emit:
 						el.runtime_mode_changed.emit(new_mode)
-
-					# tell other internal components the mode is changing (runtime only)
-					
-					el.runtime_mode_changed.emit(new_mode)
-					
-				
-
-
 
 					# fire mode change for mode enter (press + release)
 					m2_list, f2_list = self.execute_event(event_enter_pressed)

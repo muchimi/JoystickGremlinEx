@@ -1499,7 +1499,7 @@ def isSignalConnected(oObject : QtCore.QObject, signal_name : str):
 
 
 
-def centerDialog(dialog : QtWidgets.QDialog, width : int = None, height : int = None):
+def centerDialog(dialog : QtWidgets.QDialog, width : int = None, height : int = None, parent = None):
     ''' centers the dialog on top of the UI '''
     # Display the dialog centered in the middle of the UI
     import gremlin.shared_state
@@ -1512,25 +1512,21 @@ def centerDialog(dialog : QtWidgets.QDialog, width : int = None, height : int = 
     if height is None:
         height = dialog.height()
 
-    if not root.parent():
-        if gremlin.shared_state.ui is not None:
-            geom = gremlin.shared_state.ui.geometry()
-        else:
-            geom = QtWidgets.QApplication.desktop().screen().rect()
+    if parent:
+        geom = parent.geometry() 
     else:
-        while root.parent():
-            root = root.parent()
-        geom = root.geometry()
+        if not root.parent():
+            if gremlin.shared_state.ui is not None:
+                geom = gremlin.shared_state.ui.geometry()
+            else:
+                geom = QtWidgets.QApplication.desktop().screen().rect()
+        else:
+            while root.parent():
+                root = root.parent()
+            geom = root.geometry()
 
-
-    #dialog.move(geom.x() - geom.width()/2, geom.y() - geom.height()/2)        
     dialog.move(geom.center()- dialog.rect().center())
-    # dialog.setGeometry(
-    #     int(geom.x() + geom.width() / 2 - width/2),
-    #     int(geom.y() + geom.height() / 2 - height/2),
-    #     width,
-    #     height
-    # )
+
 
 
 def swapext(path, ext = None, prefix= '', suffix = ''):

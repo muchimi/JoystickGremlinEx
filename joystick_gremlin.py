@@ -129,7 +129,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t25"
+APPLICATION_BASE = "m73t26"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -2372,7 +2372,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                         self._select_input(device_guid, force_switch=True)
                         
 
-                if device_guid is not None and not selected:
+                if device_guid is not None and device and not selected and device.device_type != DeviceType.NotSet:
                     _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
                     self._select_input(device_guid, restore_input_type, restore_input_id, force_switch=True)
                 
@@ -2734,7 +2734,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 widget = self.getWidget(device_guid)
                 if widget:
                     if verbose: syslog.info(f"Select input: select widget {input_type} {input_id}")
-                    if tab_changed:
+                    if tab_changed or not hasattr(widget, "input_item_list_view"):
                         widget.refresh()
                     else:
                         
@@ -3020,6 +3020,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         """Handles addition and removal of joystick devices."""
         # Update device tabs
 
+        gremlin.util.pushCursor() # long running op
+
         # record the device change
         self._device_change_queue +=1
         #print (f"device change detected {self._device_change_queue}")
@@ -3074,6 +3076,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self.device_change_locked = False
                 # mark items processed
                 self._device_change_queue = 0
+
+        gremlin.util.popCursor()
 
 
     @QtCore.Slot()

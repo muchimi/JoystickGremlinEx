@@ -73,6 +73,21 @@ class ProfileSettingsWidget(QDataWidget):
         if emit_change:
             self.changed.emit()
 
+    def refresh(self):
+        self.refresh_ui()
+
+    @QtCore.Slot(int, bool)
+    def vjoy_as_input_changed(self, vid : int, enabled : bool):
+        ''' ask the UI to add a new tab for the vjoy device that was enabled '''
+        if enabled:
+            # ensure the VJOy device is released so another app can trigger UI events here
+            vjoy = gremlin.joystick_handling.VJoyProxy()[vid]
+            vjoy.ensure_released()
+        el = gremlin.event_handler.EventListener()
+        el.vjoy_as_input_changed.emit(vid, enabled)
+        el.device_change_event.emit()
+        
+
 
     def _create_ui(self):
         """Creates the UI elements of this widget."""
@@ -85,7 +100,7 @@ class ProfileSettingsWidget(QDataWidget):
         # vJoy devices as inputs
         vjoy_as_input_widget = VJoyAsInputWidget(self.profile_settings)
         self.scroll_layout.addWidget(vjoy_as_input_widget)
-        vjoy_as_input_widget.changed.connect(lambda: self.refresh_ui(True))
+        vjoy_as_input_widget.changed.connect(self.vjoy_as_input_changed)
 
         # vJoy axis initialization value setup
         for dev in sorted(gremlin.joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id):
@@ -303,7 +318,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
     """Configures which vJoy devices are treated as physical inputs."""
 
     # Signal emitted when a change occurs
-    changed = QtCore.Signal()
+    changed = QtCore.Signal(int, bool) # (vid, enabled)
 
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.
@@ -325,18 +340,16 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
     def _create_ui(self):
         """Creates the UI to set physical input state."""
         for dev in sorted(gremlin.joystick_handling.vjoy_devices(),key=lambda x: x.vjoy_id):
-            check_box = QtWidgets.QCheckBox(dev.name)
+            widget = gremlin.ui.ui_common.QDataCheckbox(dev.name, data = dev.vjoy_id)
             if self.profile_data.vjoy_as_input.get(dev.vjoy_id, False):
-                check_box.setChecked(True)
-            check_box.stateChanged.connect(
-                self._create_update_state_cb(dev.vjoy_id)
-            )
-            self.vjoy_layout.addWidget(check_box)
+                widget.setChecked(True)
+            widget.clicked.connect(self._state_changed)
+            self.vjoy_layout.addWidget(widget)
 
         # Information label
         label = QtWidgets.QLabel(
             "Declaring a vJoy device as an input device will allow it to be"
-            "used like a physical device, i.e. it can be forwarded to other"
+            "used like a physical device , i.e. it can be forwarded to other"
             "vJoy devices. However, this also means that it won't be available"
             " as an output device."
         )
@@ -355,18 +368,11 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         self.main_layout.addWidget(widget)
         self.main_layout.addStretch()
 
-    def _update_state_cb(self, vid, state):
-        """Callback executed when an entry is modified.
-
-        :param vid the id of the vJoy device being modified
-        :param state the state of the checkbox
-        """
-        self.profile_data.vjoy_as_input[vid] = state == QtCore.Qt.Checked.value
-        self.changed.emit()
-
-    def _create_update_state_cb(self, vid):
-        """Creates the callback allowing handling of state changes.
-
-        :param vid the id of the vJoy device being modified
-        """
-        return lambda x: self._update_state_cb(vid, x)
+    @QtCore.Slot(bool)
+    def _state_changed(self, checked : bool):
+        widget = self.sender()
+        vid : int = widget.data
+        self.profile_data.vjoy_as_input[vid] = checked
+        self.changed.emit(vid, checked)
+    
+    

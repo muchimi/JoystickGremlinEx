@@ -6106,7 +6106,10 @@ class QRememberDialog(QtWidgets.QDialog):
         self._resize_count = 0
         assert key,"unique key must be provided"
         self.window_key = key
+
+        
         self.apply_window_settings()
+        gremlin.util.centerDialog(self, parent = parent)
 
 
 
@@ -6127,8 +6130,8 @@ class QRememberDialog(QtWidgets.QDialog):
         window_location = config.getWindowLocation(self.window_key)
         if window_size:
             self.resize(window_size[0], window_size[1])
-        if window_location:
-            self.move(window_location[0], window_location[1])
+        # if window_location:
+        #     self.move(window_location[0], window_location[1])
 
     def moveEvent(self, evt):
         """Handle changing the position of the window.

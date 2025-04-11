@@ -39,6 +39,7 @@ import gremlin.shared_state
 import gremlin.types
 import gremlin.plugin_manager
 import vjoy as vjoy_module
+from vjoy import vjoy
 import gremlin.config
 import gremlin.event_handler
 import gremlin.util
@@ -412,11 +413,31 @@ class CodeRunner:
             # Use inheritance to build input action lookup table
             self.event_handler.build_event_lookup(inheritance_tree)
 
+            # list of vjoys as input
+            input_vids = [vid for vid in range(1,17) if gremlin.shared_state.current_profile.settings.vjoy_as_input.get(vid, False)]
+            # list of connected vjoy devices
+            #used_vids = [dev.vjoy_id for dev in gremlin.joystick_handling.vjoy_devices()]
+            # list of unused vjoy devices
+            #unused_vids = [vid for vid in range(1,17) if not vid in used_vids]
+           
+            # list of vjoy device ID to force a release on
+            for vid in input_vids:
+                if vjoy.device_exists(vid):
+                    vjoy_proxy = gremlin.joystick_handling.VJoyProxy()[vid]
+                    vjoy_proxy.ensure_released()
+
+            
+
+
             # Set vJoy axis default values
             for vid, data in settings.vjoy_initial_values.items():
+                input_enabled = vid in input_vids
                 vjoy_proxy = gremlin.joystick_handling.VJoyProxy()[vid]
-                for aid, value in data.items():
-                    vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
+                if not input_enabled:
+                    for aid, value in data.items():
+                        vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
+
+
 
             if verbose_detailed:
                 self.event_handler.dump_callbacks()

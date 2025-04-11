@@ -253,6 +253,16 @@ T25
 - Fix: virtual buttons/hats use the new execution graph and execution logic
 - Fix: mode switch and temporary mode switch actions selectors now default to the incorrect entry on load (was broken by flipped return values in the API)
 - Fix: default container condition set to "always" to default to trigger on press/release by default.  This setting is also defined for each container/action default_button_activation() member.
+T26
+- Improved: Popup dialogs will move to a more centered UI location
+- Fix: Vjoy devices used as input will be forcibly released when their input state is toggled or when the profile start so they trigger DirectInput events.
+- Fix: some actions not executing in containers that contain multiple actions
+- Fix: added missing dark theme icons to the macro toolbar
+- Fix: SmartToggle container updated to use current event logic to detect press/release events - this would prevent it from detecting the correct input state.
+- Fix: Settings UI if selected on start will not display as blank in some cases.
+
+
+
 
 
 

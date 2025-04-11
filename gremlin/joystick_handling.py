@@ -30,6 +30,7 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
 from gremlin.types import DeviceType
+from gremlin.singleton_decorator import SingletonDecorator
 
 
 
@@ -68,30 +69,27 @@ class VJoyProxy:
 
     vjoy_devices = {}
 
-    def __getitem__(self, key):
+    def __getitem__(self, vid):
         """Returns the requested vJoy instance.
 
         :param key id of the vjoy device
         :return the corresponding vjoy device
         """
-        assert key is not None and key > 0 and key < 17,"Invalid VJOY device ID provided"
-        if key in VJoyProxy.vjoy_devices:
-            return VJoyProxy.vjoy_devices[key]
+        # device IDs are 1 min to 16 max
+        assert vid is not None and vid > 0 and vid < 17,"Invalid VJOY device ID provided"
+        if vid in VJoyProxy.vjoy_devices:
+            return VJoyProxy.vjoy_devices[vid]
         else:
-            if not isinstance(key, int):
-                raise error.GremlinError(
-                    "Integer ID for vjoy device ID expected"
-                )
+            if not isinstance(vid, int):
+                raise error.GremlinError("Integer ID for vjoy device ID expected")
 
             try:
-                device = vjoy.VJoy(key)
-                VJoyProxy.vjoy_devices[key] = device
-                # msg = f"Registering vJoy id={key}"
-                # syslog.debug(msg)
+                # ok for output
+                device = vjoy.VJoy(vid)
+                VJoyProxy.vjoy_devices[vid] = device
                 return device
             except error.VJoyError as e:
-                msg = f"Failed accessing vJoy id={key}, error is: {e}"
-                syslog.debug(msg)
+                msg = f"Failed accessing vJoy id={vid}, error is: {e}"
                 syslog.error(msg)
                 raise e
 
@@ -102,6 +100,8 @@ class VJoyProxy:
         for device in devices:
             device.invalidate()
         VJoyProxy.vjoy_devices = {}
+
+        
 
       
 def joystick_devices() -> list[DeviceSummary]:
@@ -525,6 +525,7 @@ def joystick_devices_initialization():
                 used_counts.append(button_count)
             config_map[vjoy_index] = (is_connected, axis_count, button_count, hat_count)
             _vjoy_devices.append(vjoy_index)
+            vjoy.ensure_released(vjoy_index)
         else:
             disconnected_list.append(vjoy_index)
             

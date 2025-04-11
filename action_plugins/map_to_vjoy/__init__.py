@@ -3444,6 +3444,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self._vjoy_device_id : int = 1
         self._vjoy_input_id : int  = 1
         self.input_type : InputType = self.hardware_input_type
+        if self.input_type in (InputType.ModeControl, InputType.VirtualButton):
+            self.input_type = InputType.JoystickButton
 
         # default hat map table setup and default mapping for new hats
         self.hat_map = {} # map of button id keyed by hat position tuple

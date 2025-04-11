@@ -94,6 +94,13 @@ def device_exists(vjoy_id):
     return state not in [VJoyState.Missing.value, VJoyState.Unknown.value]
 
 
+def ensure_released(vjoy_id):
+    ''' ensures the vjoy device is released '''
+    
+    if device_exists(vjoy_id):
+        VJoyInterface.RelinquishVJD(vjoy_id)
+
+
 def axis_count(vjoy_id):
     """Returns the number of axes of the given vJoy device.
 
@@ -576,8 +583,11 @@ class VJoy:
             #     f"Failed to acquire the vJoy device - vid: {vjoy_id}"
             # )
 
+        self._acquired = True
+
         self.vjoy_id = vjoy_id
         self.pid = os.getpid()
+        self._acquired = False # true if the device is acquired by GremlinEx
 
         # Initialize all controls
         self._axis_lookup = {}
@@ -588,14 +598,17 @@ class VJoy:
 
         # Timestamp of the last time the device was used
         self._last_active = time.time()
-        self._keep_alive_timer = threading.Timer(
-            VJoy.keep_alive_timeout,
-            self._keep_alive
-        )
+        self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
+        self._keep_alive_timer.setName(f"VJOY{self.vjoy_id} keepalive")
         self._keep_alive_timer.start()
 
         # Reset all controls
         self.reset()
+
+    @property
+    def acquired(self) -> bool:
+        ''' true if GremlinEx controls the VJOY device '''
+        return self._acquired
 
     def ensure_ownership(self):
         """Ensure this devices is still owned by the process.
@@ -617,6 +630,21 @@ class VJoy:
                 raise VJoyError(
                     f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}"
                 )
+            self._acquired = True # indicate we own this
+            
+    def ensure_released(self):
+        ''' ensures the VJOY device is not acquired '''
+        vjoy_id = self.vjoy_id
+        if VJoyInterface.vJoyEnabled():
+            if self._keep_alive_timer:
+                self._keep_alive_timer.cancel()
+                self._keep_alive_timer = None
+            VJoyInterface.RelinquishVJD(vjoy_id)
+            self.reset()
+            self._acquired = False
+            
+
+
 
     @property
     def axis_count(self):
@@ -785,10 +813,10 @@ class VJoy:
                 self._button[i].is_pressed = button_states[i]
             for i in self._hat:
                 self._hat[i].direction = hat_states[i]
-        else:
-            syslog.info(
-                "Could not reset vJoy device, are we using it?"
-            )
+        # else:
+        #     syslog.info(
+        #         "Could not reset vJoy device, are we using it?"
+        #     )
 
     def used(self):
         """Updates the timestamp of the last time the device has been used."""
@@ -801,10 +829,9 @@ class VJoy:
         the keep alive timer.
         """
         if self.vjoy_id:
-            self.reset()
-            VJoyInterface.RelinquishVJD(self.vjoy_id)
+            self.ensure_released()
             self.vjoy_id = None
-            self._keep_alive_timer.cancel()
+
 
     def _keep_alive(self):
         """Timer callback ensuring the vJoy device stays active.
@@ -814,10 +841,8 @@ class VJoy:
         """
         if self._last_active + VJoy.keep_alive_timeout < time.time():
             self.reset()
-        self._keep_alive_timer = threading.Timer(
-            VJoy.keep_alive_timeout,
-            self._keep_alive
-        )
+        self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
+        self._keep_alive_timer.setName(f"VJOY{self.vjoy_id} keepalive")
         self._keep_alive_timer.start()
 
     def _init_axes(self):

@@ -127,7 +127,7 @@ def isDeviceTabActive(device_guid):
 # map of virtual devics to their input types
 virtual_device_guid_type_map = [
     (plugins_tab_guid, DeviceType.NotSet),
-    (settings_tab_guid, DeviceType.NotSet),
+    (settings_tab_guid, DeviceType.Settings),
     (midi_tab_guid, DeviceType.Midi),
     (osc_tab_guid, DeviceType.Osc),
     (mode_tab_guid, DeviceType.ModeControl)

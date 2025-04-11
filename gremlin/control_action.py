@@ -48,7 +48,9 @@ def switch_mode(mode):
 
     :param mode the mode to switch to
     """
-    gremlin.event_handler.EventHandler().change_mode(mode)
+    #gremlin.event_handler.EventHandler().change_mode(mode)
+    eh = gremlin.event_handler.EventHandler()
+    eh.change_mode(mode)
 
 
 def switch_to_previous_mode():

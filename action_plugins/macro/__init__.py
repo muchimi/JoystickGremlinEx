@@ -63,7 +63,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         
         if not trigger:
             # do not execute
-            return False
+            return True
         
         if verbose: syslog.info(f"\texecute")
         
@@ -73,7 +73,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
                 lambda: MacroFunctor.manager.terminate_macro(self.macro),
                 event
             )
-        return False
+        return True
 
 
 class Macro(gremlin.base_profile.AbstractAction):

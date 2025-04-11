@@ -1510,7 +1510,7 @@ class Configuration:
         #     return (None, None, None)
 
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
-        if device_type == gremlin.types.DeviceType.Joystick:
+        if device_type in (gremlin.types.DeviceType.Joystick, gremlin.types.DeviceType.VJoy):
             device_info = gremlin.joystick_handling.device_info_from_guid(dinput_device_guid)
             if device_info:
                 if device_info.axis_count > 0:
@@ -1561,11 +1561,16 @@ class Configuration:
         elif device_type == gremlin.types.DeviceType.ModeControl:
             save_input_id = input_id
             input_type = gremlin.input_types.InputType.ModeControl
+        elif device_type == gremlin.types.DeviceType.Settings:
+            input_type = gremlin.input_types.InputType.NotSet
+            input_id = None
+            save_input_id = None
         elif device_type == gremlin.types.DeviceType.NotSet:
             # settings or other non input type page
             input_type = gremlin.input_types.InputType.NotSet
             save_input_id = None
             input_id = None
+        
         
                     
         else:

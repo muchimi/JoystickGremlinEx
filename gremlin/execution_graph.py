@@ -341,6 +341,7 @@ class ExecutionContext():
        
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self.reset) # reload data on mode changes
+        #el.runtime_mode_changed.connect(self._runtime_mode_changed)
         el.profile_start.connect(self._profile_start) # reload data on profile start
         el.profile_changed.connect(self.reset) # reload data on profile change
         el.profile_modes_changed.connect(self.reset) # modes changed
@@ -398,8 +399,6 @@ class ExecutionContext():
         
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
         
-            
-
     def reset(self, force_rebuild = False):
         ''' reloads the execution context to capture changes '''
         # syslog = logging.getLogger("system")
@@ -1438,31 +1437,40 @@ class ExecutionContext():
         if not node.has_actions:
             return True # nodes with no actions return PASS
         
-        # if isinstance(node, ExecutionGraphInputNode) and node.mode == "a350" and node.input_item.input_id == 1:
-        #     pass
-
-        
-        # if node.nodeType == ExecutionGraphNodeType.ActivationCondition:
-        #     condition : gremlin.actions.ActivationCondition = node.condition
-        #     if isinstance(condition, gremlin.actions.JoystickCondition) or isinstance(condition, gremlin.base_conditions.JoystickCondition):
-        #         if condition.input_id == 29: # and condition.comparison == "pressed":
-        #             pass
-
-              
-        result = True
-        verbose = self._verbose_exec
         verbose_condition = self._verbose_condition
-        
-        gremlin.shared_state.pushLog()
-        logTabs = gremlin.shared_state.logTabs()
-        
-
-        if not extra_data:
-            extra_data = {}
-        extra_data["node"] = node
-
-        if verbose: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description} ")
         try:
+            gremlin.shared_state.pushLog()
+            logTabs = gremlin.shared_state.logTabs()
+            
+            # if isinstance(node, ExecutionGraphInputNode) and node.mode == "a350" and node.input_item.input_id == 1:
+            #     pass
+
+            
+            # if node.nodeType == ExecutionGraphNodeType.ActivationCondition:
+            #     condition : gremlin.actions.ActivationCondition = node.condition
+            #     if isinstance(condition, gremlin.actions.JoystickCondition) or isinstance(condition, gremlin.base_conditions.JoystickCondition):
+            #         if condition.input_id == 29: # and condition.comparison == "pressed":
+            #             pass
+
+                
+            # abort if the mode changed and the event was fired in a different mode
+            if event.mode and event.mode != gremlin.shared_state.runtime_mode:
+                syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description} - ignoring event due to wrong mode {event.mode} current runtime: {gremlin.shared_state.runtime_mode} ")    
+                return False
+
+            result = True
+            verbose = self._verbose_exec
+            
+            
+
+            
+
+            if not extra_data:
+                extra_data = {}
+            extra_data["node"] = node
+
+            if verbose: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
+
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:
                     for child in node.children:
@@ -1498,7 +1506,8 @@ class ExecutionContext():
                                     syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                                 else:
                                     syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} result: {'PASS' if result else 'FAIL'}")
-                            if not result:
+                            if node.nodeType != ExecutionGraphNodeType.Action and not result:
+                                # not an action and the functor failed = fail the series
                                 # if verbose_id:
                                 #     syslog.info(f"{logTabs}>Failing node: {node.id}")
 
@@ -1778,6 +1787,7 @@ class AbstractExecutionGraph(QtCore.QObject):
                     result = functor.process_event(event, value, extra_data)
                     if not result:
                         return False
+                    continue # next functor
 
                 id = functor.id
                 result = ec.execute_functor_id(id, event, value, extra_data)
