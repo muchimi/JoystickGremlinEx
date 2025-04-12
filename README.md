@@ -260,7 +260,9 @@ T26
 - Fix: added missing dark theme icons to the macro toolbar
 - Fix: SmartToggle container updated to use current event logic to detect press/release events - this would prevent it from detecting the correct input state.
 - Fix: Settings UI if selected on start will not display as blank in some cases.
-
+T27
+- Improved: Ability to select OSC host IP if host has multiple interfaces in options
+- 
 
 
 

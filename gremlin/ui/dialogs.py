@@ -179,6 +179,95 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.start_mode_changed.emit(mode_name)
 
 
+class HostIpDialog(ui_common.BaseDialogUi):
+    ''' dialog to display and have the user select an IP address for the current host 
+    
+        hosts may have multiple IP addresses
+        a manual entry can aslo be entered
+    
+    '''
+
+    def __init__(self, host_ip : str = None, parent=None):
+        ''' 
+        :param host_ip: current host IP to display (optional) '''
+        super().__init__(self.__class__.__name__, parent)
+
+        self._host_ip = host_ip
+        self._ip_list = gremlin.util.getHostIp() # get list of host IPs
+        self.setWindowTitle("Host IP Selection")
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        grid_layout = QtWidgets.QGridLayout()
+
+
+        self._ip_list_widget = QtWidgets.QComboBox()
+        w = gremlin.ui.ui_common.get_text_width("888.888.888.888 ")
+        self._ip_list_widget.setMinimumWidth(w)
+        self._ip_list_widget.currentIndexChanged.connect(self._ip_selection_changed)
+        grid_layout.addWidget(QtWidgets.QLabel("Available IPs:"), 0, 0)
+        grid_layout.addWidget(self._ip_list_widget, 0, 1)
+        grid_layout.addWidget(QtWidgets.QLabel(""), 0, 3)
+
+        self._host_ip_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._host_ip_widget.setMinimumWidth(w)
+        self._host_ip_widget.textChanged.connect(self._ip_host_changed)
+        grid_layout.addWidget(QtWidgets.QLabel("Host Ip:"), 1, 0)
+        grid_layout.addWidget(self._host_ip_widget, 1, 1)
+
+        refresh_widget = QtWidgets.QPushButton()
+        refresh_widget.setToolTip("Refresh")
+        refresh_widget.clicked.connect(self._update_ip)
+        icon = gremlin.util.load_icon("ei.refresh")
+        refresh_widget.setIcon(icon)
+        refresh_widget.setMaximumWidth(24)
+        grid_layout.addWidget(refresh_widget, 0,2)
+
+        grid_layout.setColumnStretch(3,2)
+        self.main_layout.addLayout(grid_layout)
+
+        ok_widget = QtWidgets.QPushButton("Ok")
+        ok_widget.clicked.connect(self._ok_cb)
+
+        cancel_widget = QtWidgets.QPushButton("Cancel")
+        cancel_widget.clicked.connect(self._cancel_cb)
+
+        widget,layout = gremlin.ui.ui_common.getHContainer([ok_widget, cancel_widget],left_stretch=True)
+        self.main_layout.addWidget(widget)
+
+        self._update_ip()
+
+
+    def _update_ip(self):
+        ''' updates the IP addresses '''
+        self._ip_list = gremlin.util.getHostIp() # get updated list of host IPs
+        self._ip_list_widget.clear()
+        self._ip_list_widget.addItems(self._ip_list)
+        if self._host_ip in self._ip_list:
+            self._ip_list_widget.setCurrentText(self._host_ip)
+
+    @QtCore.Slot()
+    def _ip_selection_changed(self):
+        ''' drop down changed '''
+        self._host_ip = self._ip_list_widget.currentText()
+        with QtCore.QSignalBlocker(self._host_ip_widget):
+            self._host_ip_widget.setText(self._host_ip)
+
+    @QtCore.Slot()
+    def _ip_host_changed(self):
+        self._host_ip = self._ip_list_widget.currentText()
+
+    @QtCore.Slot()
+    def _ok_cb(self):
+        self.accept()
+        self.close()
+
+    @QtCore.Slot()
+    def _cancel_cb(self):
+        self.close()
+        
+
+
 
 class OptionsUi(ui_common.BaseDialogUi):
 
@@ -314,7 +403,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         el.process_monitor_changed.emit()
 
         # change the host ip if needed
-        el.host_ip_changed.emit(self._local_host_ip_widget.text())
+        el.host_ip_changed.emit(self._host_ip)
 
 
 
@@ -1029,19 +1118,22 @@ This setting is also available on a profile by profile basis on the profile tab,
         layout = QtWidgets.QGridLayout(container)
         layout.setContentsMargins(0,0,0,0)
 
-        host_ip = self.config.hostIp
-        if not host_ip:
-            host_ip = next((ipa for ipa in gremlin.util.getHostIp()),None)
-        if not host_ip:
-            host_ip = "127.0.0.1"
+        self._host_ip = self.config.hostIp
+        if not self._host_ip:
+            self._host_ip = next((ipa for ipa in gremlin.util.getHostIp()),None)
+        if not self._host_ip:
+            self._host_ip = "127.0.0.1"
         else:
-            self.config.hostIp = host_ip
+            self.config.hostIp = self._host_ip
         self._local_host_ip_widget = ui_common.QDataIPLineEdit()
-        self._local_host_ip_widget.setText(host_ip)
+        self._local_host_ip_widget.setText(self._host_ip)
         self._local_host_ip_widget.textChanged.connect(self._local_host_ip_changed)
-        #local_host_ip_widget.setReadOnly(True)
+        self._local_host_ip_widget.setReadOnly(True)
         self._local_host_ip_widget.setMinimumWidth(w)
         self._local_host_ip_widget.setMaximumWidth(w)
+
+        self._select_ip_widget = QtWidgets.QPushButton("Change")
+        self._select_ip_widget.clicked.connect(self._change_host_ip)
 
         row = 0
         col = 0
@@ -1049,23 +1141,27 @@ This setting is also available on a profile by profile basis on the profile tab,
         col+=1
         layout.addWidget(self._local_host_ip_widget, row, col)
         col+=1
+        layout.addWidget(self._select_ip_widget, row, col)
+        col+=1
         layout.addWidget(QtWidgets.QLabel("OSC Input port:"), row, col)
         col+=1
         layout.addWidget(self.osc_input_port, row, col)
-
+        col+=1
+        layout.addWidget(QtWidgets.QLabel(""), row, col)
+        stretch_col = col
 
         row += 1
         col = 0
         layout.addWidget(QtWidgets.QLabel("Output host IP:"), row, col)
         col+=1
         layout.addWidget(remote_host_ip_widget, row, col)
-        col+=1
+        col+=2
         layout.addWidget(QtWidgets.QLabel("Output port:"), row, col)
         col+=1
         layout.addWidget(self.osc_output_port, row, col)
 
-        layout.addWidget(QtWidgets.QWidget(),0,4)
-        layout.setColumnStretch(4,2)
+        
+        layout.setColumnStretch(stretch_col,2)
 
         page_layout.addWidget(container)
 
@@ -1077,6 +1173,18 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
         page_layout.addStretch()
+
+    @QtCore.Slot()
+    def _change_host_ip(self):
+       self._host_dialog = HostIpDialog(self._host_ip)
+       self._host_dialog.accepted.connect(self._host_ip_selected)
+       self._host_dialog.exec()
+       self._host_dialog = None
+
+    @QtCore.Slot()
+    def _host_ip_selected(self):
+        self._host_ip = self._host_dialog._host_ip
+        self._local_host_ip_widget.setText(self._host_ip)
 
     @QtCore.Slot()
     def _local_host_ip_changed(self):
