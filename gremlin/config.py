@@ -1953,3 +1953,12 @@ class Configuration:
     def splitJoystickRepeater(self, value: bool):
         self._data["splitJoystickRepeater"] = value
         self.save()
+
+    @property 
+    def hostIp(self) -> str:
+        ''' host IP '''
+        return self._data.get("host_ip","")
+    @hostIp.setter
+    def hostIp(self, value : str):
+        self._data["host_ip"] = value
+        self.save()

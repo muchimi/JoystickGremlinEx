@@ -1667,8 +1667,6 @@ class OscServer():
         syslog.info("OSC: server shutdown")
         self._server = None
 
-
-
     def __init__(self):
         #syslog.info("OSC: server init")
         self._server = None
@@ -1687,6 +1685,12 @@ class OscServer():
         eh = gremlin.event_handler.EventListener()
         eh.shutdown.connect(self._shutdown)
 
+
+    def setHostIp(self, host_ip):
+        ''' changes the OSC server IP '''
+        self.stop()
+        self._host_ip = host_ip
+        self.start()
 
     @QtCore.Slot()
     def _shutdown(self):
@@ -1760,11 +1764,21 @@ class OscInterface(QtCore.QObject):
 
     osc_message = QtCore.Signal(str, object) # signal on receiving an osc message
 
-    def __init__(self):
+    def __init__(self, host_ip : str = None):
         super().__init__()
 
         # find our current IP address
-        self._host_ip = gremlin.util.getHostIp() 
+        if not host_ip:
+            host_ip = gremlin.config.Configuration().hostIp
+        ip_list = gremlin.util.getHostIp()
+        if ip_list:
+            if host_ip in ip_list:
+                pass
+            else:
+                host_ip = ip_list[0]
+        else:
+            host_ip = "127.0.0.1" 
+        self._host_ip = host_ip
         
         
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
@@ -1785,10 +1799,18 @@ class OscInterface(QtCore.QObject):
         el.osc_input_port_changed.connect(self._input_port_changed)
         el.osc_output_port_changed.connect(self._output_port_changed)
         el.osc_output_server_changed.connect(self._output_server_changed)
+        el.host_ip_changed.connect(self.setHostIp)
         
 
         self._started = False
  
+    def setHostIp(self, host_ip):
+        ''' sets a new host IP for the OSC server '''
+        if host_ip != self._host_ip and host_ip:
+            self._host_ip = host_ip
+            self._osc_internal_client.setHost(host_ip)
+            self._osc_server.setHostIp(host_ip)
+
 
 
     @QtCore.Slot(bool)

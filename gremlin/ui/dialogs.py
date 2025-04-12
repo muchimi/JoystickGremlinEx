@@ -313,6 +313,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         el = gremlin.event_handler.EventListener()
         el.process_monitor_changed.emit()
 
+        # change the host ip if needed
+        el.host_ip_changed.emit(self._local_host_ip_widget.text())
+
 
 
     def _tab_changed_cb(self, new_index):
@@ -1026,18 +1029,25 @@ This setting is also available on a profile by profile basis on the profile tab,
         layout = QtWidgets.QGridLayout(container)
         layout.setContentsMargins(0,0,0,0)
 
-        host_ip = gremlin.util.getHostIp()
-        local_host_ip_widget = ui_common.QDataIPLineEdit()
-        local_host_ip_widget.setText(host_ip)
-        local_host_ip_widget.setReadOnly(True)
-        local_host_ip_widget.setMinimumWidth(w)
-        local_host_ip_widget.setMaximumWidth(w)
+        host_ip = self.config.hostIp
+        if not host_ip:
+            host_ip = next((ipa for ipa in gremlin.util.getHostIp()),None)
+        if not host_ip:
+            host_ip = "127.0.0.1"
+        else:
+            self.config.hostIp = host_ip
+        self._local_host_ip_widget = ui_common.QDataIPLineEdit()
+        self._local_host_ip_widget.setText(host_ip)
+        self._local_host_ip_widget.textChanged.connect(self._local_host_ip_changed)
+        #local_host_ip_widget.setReadOnly(True)
+        self._local_host_ip_widget.setMinimumWidth(w)
+        self._local_host_ip_widget.setMaximumWidth(w)
 
         row = 0
         col = 0
         layout.addWidget(QtWidgets.QLabel(f"Local OSC Server:"), row, col)
         col+=1
-        layout.addWidget(local_host_ip_widget, row, col)
+        layout.addWidget(self._local_host_ip_widget, row, col)
         col+=1
         layout.addWidget(QtWidgets.QLabel("OSC Input port:"), row, col)
         col+=1
@@ -1067,6 +1077,12 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
         page_layout.addStretch()
+
+    @QtCore.Slot()
+    def _local_host_ip_changed(self):
+        config = gremlin.config.Configuration()
+        host_ip = self._local_host_ip_widget.text()
+        config.host_ip = host_ip
 
     def _create_vigem_page(self):
         page_widget = QtWidgets.QWidget()

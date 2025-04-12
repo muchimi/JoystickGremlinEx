@@ -1761,8 +1761,8 @@ def is_binary_string(data):
   return isinstance(data, bytes)
 
 
-def getHostIp():
-    ''' gets the current machine's IP address '''
+def getHostIp() -> list:
+    ''' gets the list of the current machine's IP address '''
     import socket
 
     # get the local, non VPN, non loopback address
@@ -1770,7 +1770,8 @@ def getHostIp():
     try:
         # this can blow up on some systems
         hostname = socket.getfqdn()
-        return socket.gethostbyname_ex(hostname)[2][1]
+        ip_list = socket.gethostbyname_ex(hostname)[2]
+        return [ipa for ipa in ip_list if not ipa.startswith("127.")]
     except:
         pass
     # use the old method
@@ -1784,7 +1785,7 @@ def getHostIp():
     finally:
         s.close()
 
-    return host_ip
+    return [host_ip]
 
 
 def to_byte_string(source) -> tuple:

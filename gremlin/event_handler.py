@@ -368,6 +368,7 @@ class EventListener(QtCore.QObject):
 	
 	process_monitor_changed = QtCore.Signal() # process monitor options changed
 
+	host_ip_changed = QtCore.Signal(str) # indicates the local machines' host IP changed
 	
 	config_changed =  QtCore.Signal() # occurs on broadcast configuration change
 	config_option_changed = QtCore.Signal() # occurs on broadcast configuration change
