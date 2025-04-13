@@ -64,6 +64,15 @@ import gremlin.profile_graph
 
 syslog = logging.getLogger("system")
 
+
+
+@SingletonDecorator
+class ProfileImportData():
+    def __init__(self):
+        self.used_ids = {} # used at load time to validate there are no duplicate container/action IDs in the profile
+
+_import_data = ProfileImportData()
+
 # Data struct representing profile information of a device
 ProfileDeviceInformation = collections.namedtuple(
     "ProfileDeviceInformation",
@@ -355,7 +364,7 @@ class AbstractContainer(ProfileData):
         InputType.Midi: None,
     }
 
-    id_changed = QtCore.Signal(str, str) # fires when id changes (old_id, new_id)
+    #id_changed = QtCore.Signal(str, str) # fires when id changes (old_id, new_id)
 
     # default allowed input types = all
     input_types = InputType.to_list()
@@ -483,12 +492,13 @@ class AbstractContainer(ProfileData):
     @property
     def id(self):
         return self._id
-    @id.setter
-    def id(self, new_id):
-        if new_id != self._id:
-            old_id = self._id
-            self._id = new_id
-            self.id_changed.emit(old_id, new_id)
+    
+    # @id.setter
+    # def id(self, new_id):
+    #     if new_id != self._id:
+    #         old_id = self._id
+    #         self._id = new_id
+    #         self.id_changed.emit(old_id, new_id)
 
     
     @property
@@ -605,8 +615,19 @@ class AbstractContainer(ProfileData):
         :param node the XML node to populate fields with
         """
         super().from_xml(node, data)
+        import_data = gremlin.base_profile.ProfileImportData()
         if "container_id" in node.attrib:
-            self.id = node.get("container_id")
+            id = node.get("container_id")
+            if id in import_data.used_ids:
+                new_id = gremlin.util.get_guid()
+                # syslog.warning(f"PROFILE: duplicate ID found - ActivationCondition: [{id}] - assigning new id: [{new_id}]")
+                id = new_id
+        else:
+            id = gremlin.util.get_guid()
+
+        import_data.used_ids[id] = self
+        self._id = id
+
 
         comment = None
         if "comment" in node.attrib:
@@ -896,7 +917,7 @@ class AbstractAction(ProfileData):
     """Base class for all actions that can be encoded via the XML and
     UI system."""
 
-    id_changed = QtCore.Signal(str, str)  # triggers when the ID changes
+    #id_changed = QtCore.Signal(str, str)  # triggers when the ID changes
 
     # allow all input types by default
     input_types = InputType.to_list()
@@ -910,7 +931,7 @@ class AbstractAction(ProfileData):
         super().__init__(parent)
 
         self.activation_condition = None # stores the conditions attached to that action
-        self._id = None
+        self._id = gremlin.util.get_guid()
         self._action_type = None
         self._enabled = False # true if the action is enabled
         self.singleton = False # true if the action can only appear once in the input's mapping
@@ -929,18 +950,15 @@ class AbstractAction(ProfileData):
     @property
     def id(self):
         ''' unique ID for this condition, persisted '''
-        if not self._id:
-            import gremlin.util
-            self._id = gremlin.util.get_guid()
         return self._id
     
-    @id.setter
-    def id(self, new_id):
-        ''' changes the ID '''
-        old_id = self._id
-        if old_id != new_id:
-            self._id = new_id
-            self.id_changed.emit(old_id, new_id)   
+    # @id.setter
+    # def id(self, new_id):
+    #     ''' changes the ID '''
+    #     old_id = self._id
+    #     if old_id != new_id:
+    #         self._id = new_id
+    #         self.id_changed.emit(old_id, new_id)   
 
     @property
     def has_conditions(self):
@@ -1029,14 +1047,12 @@ class AbstractAction(ProfileData):
     @property
     def action_id(self):
         ''' id '''
-        if not self._id:
-            # generate a new ID
-            self._id = get_guid()
         return self._id
-    @action_id.setter
-    def action_id(self, value):
-        ''' id setter'''
-        self._id = value
+    
+    # @action_id.setter
+    # def action_id(self, value):
+    #     ''' id setter'''
+    #     self._id = value
 
     @property
     def action_type(self):
@@ -1057,8 +1073,18 @@ class AbstractAction(ProfileData):
         """
 
         # set the action ID first as it can be read by subsequent code
+        import_data = gremlin.base_profile.ProfileImportData()
         if "action_id" in node.attrib:
-            self.action_id = safe_read(node, "action_id", str)
+            id = node.get("action_id")
+            if id in import_data.used_ids:
+                new_id = gremlin.util.get_guid()
+                # syslog.warning(f"PROFILE: duplicate ID found - Action: [{id}] - assigning new id: [{new_id}]")
+                id = new_id
+        else:
+            id = gremlin.util.get_guid()
+    
+        import_data.used_ids[id] = self
+        self._id = id
 
         comment = None
         if "comment" in node.attrib:
@@ -2127,6 +2153,7 @@ class Profile():
         self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
         self._substitution_map = {} # map of device GUID to any new device GUID for the load process
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
+        
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
@@ -2940,6 +2967,9 @@ class Profile():
         """
         # Check for outdated profile structure and warn user / convert
         verbose = gremlin.config.Configuration().verbose
+        import_data = ProfileImportData()
+        import_data.used_ids = {} # reset used list
+        
         profile_converter = gremlin.profile.ProfileConverter()
         profile_was_updated = False
         if not profile_converter.is_current(fname):
@@ -3105,6 +3135,8 @@ class Profile():
         # load the mode tree
         self.reload_modes(update_devices = True)
 
+        # clear used memory
+        import_data.used_ids = {} # reset used list
 
         return profile_was_updated
     

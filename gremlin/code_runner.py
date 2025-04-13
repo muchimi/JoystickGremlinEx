@@ -132,6 +132,13 @@ class CodeRunner:
 
         el = gremlin.event_handler.EventListener()
 
+        ec = gremlin.execution_graph.ExecutionContext()
+        ec.reset(force_rebuild = True) # rebuild the execution tree
+        build_error = ec.getLastBuildError()
+        if build_error:
+            syslog.error("Error building execution tree - aborting start.")
+            return False
+
         config = gremlin.config.Configuration()
 
         gremlin.shared_state.profile_state = True # assume profile start ok
@@ -180,7 +187,7 @@ class CodeRunner:
         # Retrieve list of current paths searched by Python
         system_paths = [os.path.normcase(os.path.abspath(p)) for p in sys.path]
 
-        ec = gremlin.execution_graph.ExecutionContext()
+        
         
 
         # Load the generated code
@@ -553,7 +560,8 @@ class CodeRunner:
 
             # register callbacks with the execution tree
             eh = gremlin.event_handler.EventHandler()
-            ec.reset(force_rebuild = True) # rebuild the execution tree
+
+
             ec.registerCallbacks(eh.callbacks)
             
                                 

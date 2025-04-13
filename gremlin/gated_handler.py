@@ -1470,6 +1470,10 @@ class GateData():
             # not initialized yet
             return 
         
+        # eh = gremlin.event_handler.EventHandler()
+        # if not eh.shouldProcess(event):
+        #     return
+        
         is_runtime = gremlin.shared_state.is_running
         if is_runtime:
             runtime_mode = gremlin.shared_state.runtime_mode
@@ -1615,7 +1619,7 @@ class GateData():
                         # elif range_info.mode == GateRangeOutputMode.FilterOut:
                         #     return
                         # else:
-                        syslog.info(f"Trigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
+                        if verbose: syslog.info(f"Trigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
                         action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
                         self._ec.execute_functor_id(self._action_data.id, range_event, action_value, True, extra_data)
                     else:

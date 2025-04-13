@@ -24,6 +24,7 @@ import threading
 import anytree
 from threading import Thread, Timer
 from typing import Callable
+import math
 
 
 
@@ -1168,13 +1169,25 @@ class EventHandler(QtCore.QObject):
 		self.plugins = {}
 		self._mode_validator_callbacks = {}  # list of validators (callbacks) that return a boolean True if the mode change can occur - signature must be callable(str)->bool
 		self._last_tts_data = TTSNotifyData() # last mode that triggered a TTS verbal notice
+		self._last_axis_values = {}
 		el = gremlin.event_handler.EventListener()
 		el.profile_start.connect(self._profile_start)
 		el.profile_stop.connect(self._profile_stop)
 		el.runtime_mode_changed.connect(self._update_mode_change)
-
-		
 		self.reset()
+
+	def shouldProcess(self, event):
+		''' true if event should be filtered for an axis event '''
+		key = event.callbackKey
+		current_value = event.value
+		if key in self._last_axis_values:
+			last_value = self._last_axis_values[key]
+			if math.isclose(last_value, current_value, abs_tol = 0.001):
+				return False
+			self._last_axis_values[key] = current_value
+		else:
+			self._last_axis_values[key] = current_value
+		return True
 
 	@QtCore.Slot()
 	def _profile_start(self):
@@ -1988,9 +2001,14 @@ class EventHandler(QtCore.QObject):
 		elif event.event_type == InputType.OpenSoundControl:
 			m_list = self._matching_osc_callbacks(event)
 			if verbose and not m_list: syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
-				
-			
-		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+		elif event.event_type == InputType.JoystickAxis:
+			# if not self.shouldProcess(event):
+			# 	return
+
+			m_list = self._matching_callbacks(event)
+			f_list = self._matching_functors(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+		elif event.event_type in (InputType.JoystickButton, InputType.JoystickHat):
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
 			if verbose and not m_list: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")

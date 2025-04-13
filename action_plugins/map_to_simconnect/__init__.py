@@ -3895,7 +3895,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         #verbose = True
         manager : SimConnectManager = self.manager
         
-        syslog.info(f"event: {str(event)} node: {extra_data["node"]}")
+        #syslog.info(f"event: {str(event)} node: {extra_data["node"]}")
 
         if not self.manager.is_running:
             # sim is not running
@@ -3907,8 +3907,9 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             syslog.warning(f"Simconnect Functor: event ignored, simconnect bridge not connected")
             return False
         
-        if verbose:
-            comment = ""
+        comment = ""
+        if verbose_details:
+            
             if extra_data:
                 if "node" in extra_data:
                     node = extra_data["node"]
@@ -3916,7 +3917,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     
             comment += f"Input: {self.action_data.input_item.device_name} id: {self.action_data.input_item.input_id} mode: {self.action_data.input_item.profile_mode} | {self.action_data.comment if self.action_data.comment else ''} | "
             
-
+        # if self.action_data.command == "THROTTLE1_AXIS_SET_EX1":
+        #     pass
                                 
         
         block = self.action_data.block
@@ -3927,10 +3929,14 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
 
         gate_trigger = None
-        if extra_data and "trigger" in extra_data:
-            # use the trigger value
-            gate_trigger : gremlin.gated_handler.TriggerData = extra_data["trigger"]
-            comment += " Range description: " + gate_trigger.range.description
+        if extra_data:
+            if "trigger" in extra_data:
+                # use the trigger value
+                gate_trigger : gremlin.gated_handler.TriggerData = extra_data["trigger"]
+                if verbose_details: comment += " Using Trigger:  Range description: " + gate_trigger.range.description
+            else:
+                pass
+        
 
 
         trigger = self.action_data.trigger_on_press and event.is_pressed or self.action_data.trigger_on_release and not event.is_pressed
@@ -4019,24 +4025,15 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 process_input = True # self._significant.should_process_axis(event, 0.001)
                 if process_input:
 
-                    # if gate_trigger:
-                    #     normalized = gate_trigger.value
-                        
-                    # else:
-
-                    
-                    # filtered_value = self.action_data.get_filtered_axis_value(action_value.current)
-                    # action_value = gremlin.actions.Value(filtered_value)
-                    # raw = filtered_value # -1 to +1
-                    # # apply local curve to the range -1 to + 1
-                    # normalized = self.action_data.get_local_curve_value(filtered_value)
-
+       
                     if gate_trigger:
                         v1 = gate_trigger.range.range_min
                         v2 = gate_trigger.range.range_max
                         normalized = gremlin.util.scale_to_range(action_value.raw, source_min= v1, source_max = v2) # returns a rebased value -1 to +1 within the range
+                        if verbose_details and verbose_exec: syslog.info(f"Normalized: {normalized: 0.3f}  trigger: {gate_trigger.value:0.3f}")
                     else:
                         normalized = action_value.current
+                        if verbose_details and verbose_exec: syslog.info(f"Normalized: {normalized: 0.3f}")
 
                     command = self.action_data.command
                     min_range = self.action_data.command_min_range
@@ -4046,7 +4043,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     
   
                     if verbose: 
-                        if verbose_exec:
+                        if verbose_details:
                             syslog.info(f"SIMCONNECT: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                         else:
                             syslog.info(f"SIMCONNECT: send {comment} {command} {output_value:0.3f}")

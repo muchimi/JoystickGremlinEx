@@ -361,6 +361,7 @@ class ExecutionContext():
         config = gremlin.config.Configuration()
         self._verbose_exec = config.verbose_mode_execution
         self._verbose_condition = config.verbose_mode_condition
+        self.used_items = {}  # nodes can only be used once
 
     @property
     def functor_map(self) -> dict:
@@ -425,22 +426,20 @@ class ExecutionContext():
         
         verbose = gremlin.config.Configuration().verbose_mode_exec
         if verbose: syslog.info("CONTEXT: rebuild")
+        
+        self.used_items = {}  # nodes can only be used once
+        self._build_error = False # true if a build error occurred
         #self._functor_map = {} # quick access to functor IDs
         self._build_execution_tree()
         assert len(self.graph.children) > 0
-
-
-        # tree = gremlin.shared_state.current_profile.build_inheritance_tree()
-        # root_mode = ExecutionModeNode()
-        # self._walk_mode_tree(root_mode, tree)
-        # self._mode_tree = root_mode
 
         # tell the ui the execution context changed
         el = gremlin.event_handler.EventListener()
         el.execution_context_changed.emit()
 
-        # if verbose:
-        #     self.dump()
+    def getLastBuildError(self) -> bool:
+        ''' true if build errored out'''
+        return self._build_error
             
 
     def _profile_start(self):
@@ -835,7 +834,7 @@ class ExecutionContext():
         try:
             verbose = gremlin.config.Configuration().verbose_mode_execution
             logTabs = gremlin.shared_state.logTabs(True)
-            if verbose: syslog.info(f"{logTabs}EXEC: [{node.id}] {node.description}")
+            if self._verbose_exec: syslog.info(f"{logTabs}EXEC: [{node.id}] {node.description}")
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:
                     # group node
@@ -1016,6 +1015,9 @@ class ExecutionContext():
         The condition nodes are evaluated and if the condition fails, the subtree of the condition is not executed
         
         '''
+        if self._build_error:
+            return False
+        
         profile = gremlin.shared_state.current_profile
         self._functor_map = {}
         self._node_map = {}
@@ -1159,6 +1161,12 @@ class ExecutionContext():
                             if not container.is_valid():
                                 syslog.warning("Incomplete container ignored")
                                 continue
+
+                            if container.id in self.used_items:
+                                syslog.error(f"Container already used: {container.id}")
+                                self._build_error = True
+                                return False
+                            self.used_items[container.id] = container
                             
                             assert isinstance(container, gremlin.base_profile.AbstractContainer), f"invalid node type: {container.__class__.__name__} encountered"
 
@@ -1183,6 +1191,13 @@ class ExecutionContext():
 
                             for action_set in container.action_sets:
                                 for action in action_set:
+
+                                    if action.id in self.used_items:
+                                        syslog.error(f"Action already used: {action.id}")
+                                        self._build_error = True
+                                        return False
+                                    self.used_items[action.id] = action
+
                                     action_condition_node = self._get_condition_node(action, condition_node)
 
                                     # action node
@@ -1459,7 +1474,7 @@ class ExecutionContext():
                 return False
 
             result = True
-            verbose = self._verbose_exec
+            #verbose = self._verbose_exec
             
             
 
@@ -1469,7 +1484,7 @@ class ExecutionContext():
                 extra_data = {}
             extra_data["node"] = node
 
-            if verbose: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
+            if self._verbose_condition: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
 
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:

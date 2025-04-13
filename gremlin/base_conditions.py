@@ -27,7 +27,7 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
 
     """Base class of all individual condition representations."""
 
-    id_changed = QtCore.Signal(str, str)  # triggers when the ID changes
+    #id_changed = QtCore.Signal(str, str)  # triggers when the ID changes
 
     def __init__(self):
         """Creates a new condition."""
@@ -35,7 +35,6 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
         import gremlin.util
         self._id = gremlin.util.get_guid()
         self._comparison = ""
-        self._id = None # unique ID of this condition
         
     @property
     def id(self):
@@ -45,13 +44,6 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
             self._id = gremlin.util.get_guid()
         return self._id
     
-    @id.setter
-    def id(self, new_id):
-        ''' changes the ID '''
-        old_id = self._id
-        if old_id != new_id:
-            self._id = new_id
-            self.id_changed.emit(old_id, new_id)
 
     @property
     def comparison(self):
@@ -67,10 +59,17 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
 
         :param node the XML node to parse for data
         """
+        import_data = gremlin.base_profile.ProfileImportData()
         if "condition_id" in node.attrib:
-            str_id = node.get("condition_id")
-            if str_id:
-                self._id = str_id
+            id = node.get("condition_id")
+            if id in import_data.used_ids:
+                new_id = gremlin.util.get_guid()
+                # syslog.warning(f"PROFILE: duplicate ID found - Condition: [{id}] - assigning new id: [{new_id}]")
+                id = new_id
+        else:
+            id = gremlin.util.get_guid()
+        import_data.used_ids[id] = self
+        self._id = id
 
     
     def to_xml(self):
@@ -540,19 +539,19 @@ class ConditionTracker():
         if verbose:
             syslog = logging.getLogger("system")
             syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name if hasattr(data.input_item,"display_name") else data.input_item} mode: {data.mode}")
-        data.condition.id_changed.connect(self._condition_id_changed)
+        #data.condition.id_changed.connect(self._condition_id_changed)
 
 
-    @QtCore.Slot(str, str)
-    def _condition_id_changed(self, old_id, new_id):
-        ''' handle an ID swap for the condition in the tracking objects '''
-        if old_id in self._owner_map:
-            input_item = self._owner_map[old_id]
-            self._owner_map[new_id] = input_item
-            del self._owner_map[old_id]
-            data = self._data_map[old_id]
-            self._data_map[new_id] = data
-            del self._data_map[old_id]
+    # @QtCore.Slot(str, str)
+    # def _condition_id_changed(self, old_id, new_id):
+    #     ''' handle an ID swap for the condition in the tracking objects '''
+    #     if old_id in self._owner_map:
+    #         input_item = self._owner_map[old_id]
+    #         self._owner_map[new_id] = input_item
+    #         del self._owner_map[old_id]
+    #         data = self._data_map[old_id]
+    #         self._data_map[new_id] = data
+    #         del self._data_map[old_id]
         
 
     def unregisterCondition(self, condition : AbstractCondition):
@@ -651,7 +650,7 @@ class ConditionTracker():
 class ActivationCondition(QtCore.QObject):
 
     """Dictates under what circumstances an associated code can be executed."""
-    id_changed = QtCore.Signal(str, str) # fires when id changes (old_id, new_id)
+    #id_changed = QtCore.Signal(str, str) # fires when id changes (old_id, new_id)
 
     rule_lookup = {
         # String to enum
@@ -689,20 +688,9 @@ class ActivationCondition(QtCore.QObject):
     @property
     def id(self):
         ''' unique ID for this condition, persisted '''
-        if not self._id:
-            import gremlin.util
-            self._id = gremlin.util.get_guid()
-
         return self._id
     
-    @id.setter
-    def id(self, new_id):
-        old_id = self._id
-        if old_id != new_id:
-            self._id = new_id
-            self.id_changed.emit(old_id, new_id)
-
-
+ 
 
     def from_xml(self, node, data = None):
         """Extracts activation condition data from an XML node.
@@ -713,10 +701,17 @@ class ActivationCondition(QtCore.QObject):
         import gremlin.base_profile
         import gremlin.ui.ui_common
 
+        import_data = gremlin.base_profile.ProfileImportData()
         if "condition_id" in node.attrib:
-            str_id = node.get("condition_id")
-            if str_id:
-                self._id = str_id
+            id = node.get("condition_id")
+            if id in import_data.used_ids:
+                new_id = gremlin.util.get_guid()
+                # syslog.warning(f"PROFILE: duplicate ID found - Activation Condition: [{id}] - assigning new id: [{new_id}]")
+                id = new_id
+        else:
+            id = gremlin.util.get_guid()
+        import_data.used_ids[id] = self
+        self._id = id
 
 
         rule = ActivationCondition.rule_lookup[safe_read(node, "rule")]
