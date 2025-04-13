@@ -168,7 +168,7 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
 
     def __init__(self, parent):
         super().__init__(parent)
-
+        self.setPriority(999)
         profile = gremlin.shared_state.current_profile
         current_mode = gremlin.shared_state.edit_mode
         root = profile.modeTree()
@@ -185,11 +185,7 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
         self.mode_name = mode
         self.parent = parent
         self.restore_mode = None
-
-    @property
-    def priority(self):
-        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - the highest number runs last
-        return 999        
+    
 
     def display_name(self):
         ''' returns a display string for the current configuration '''

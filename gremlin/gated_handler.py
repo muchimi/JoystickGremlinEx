@@ -1621,11 +1621,11 @@ class GateData():
                         # else:
                         if verbose: syslog.info(f"Trigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
                         action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
-                        self._ec.execute_functor_id(self._action_data.id, range_event, action_value, True, extra_data)
+                        self._ec.execute_functor_id(self._action_data.id, range_event, action_value, extra_data, True)
                     else:
                         # non range trigger (gate crossing or range enter/exit)
                         # use a fake button for momentary event
-                        self._ec.execute_functor_id(self._action_data.id, button_press_event, button_action_value, True, extra_data)
+                        self._ec.execute_functor_id(self._action_data.id, button_press_event, button_action_value, extra_data, True)
                         autorelease = False
                         if trigger.condition in (GateConditionType.OnCross, GateConditionType.OnCrossDecrease, GateConditionType.OnCrossIncrease):
                             # gate condition
@@ -1640,7 +1640,7 @@ class GateData():
                             button_release_event.is_pressed = False
                             button_release_value = gremlin.actions.Value(input_value, False)
                             delay = trigger.delay/1000 # delay in seconds
-                            timer = threading.Timer(delay, lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, True, extra_data))
+                            timer = threading.Timer(delay, lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, extra_data, True))
                             timer.start()
                     
             

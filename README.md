@@ -261,8 +261,13 @@ T26
 - Fix: SmartToggle container updated to use current event logic to detect press/release events - this would prevent it from detecting the correct input state.
 - Fix: Settings UI if selected on start will not display as blank in some cases.
 T27
-- Improved: Ability to select OSC host IP if host has multiple interfaces in options
-- 
+- Improved: OSC: new dialog to select IP if host has multiple network interfaces
+- Improved: execution graph runtime evaluation speed increase
+- Fix: SmartToggle now behaves like the original [now that I understand how the original was supposed to work (thanks @Speed)]
+- Fix: Execution order respects priority and sequence
+- Fix: Individual actions no longer fail whole container if one fails executing 
+- API: action base class implements default priority for all actions
+
 
 
 

@@ -26,6 +26,8 @@ from PySide6 import QtWidgets
 
 
 import gremlin
+import gremlin.config
+import gremlin.execution_graph
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
@@ -55,13 +57,14 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         self.options_layout.addWidget(
             QtWidgets.QLabel("<b>Toggle time: </b>")
         )
-        self.delay_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.delay_input.setRange(0.1, 2.0)
-        self.delay_input.setSingleStep(0.1)
-        self.delay_input.setValue(0.5)
-        self.delay_input.setValue(self.profile_data.delay)
-        self.delay_input.valueChanged.connect(self._delay_changed_cb)
-        self.options_layout.addWidget(self.delay_input)
+
+        self.delay_widget = gremlin.ui.ui_common.QDelayWidget()
+        self.delay_widget.setToolTip("Delay in milliseconds")
+        self.delay_widget.setValue(self.profile_data.delay * 1000)
+        self.delay_widget.valueChanged.connect(self._delay_changed_cb)
+
+        
+        self.options_layout.addWidget(self.delay_widget)
         self.options_layout.addStretch()
 
         self.action_layout.addLayout(self.options_layout)
@@ -124,12 +127,9 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()        
 
-    def _delay_changed_cb(self, value):
-        """Updates the activation delay value.
-
-        :param value the value after which the long press action activates
-        """
-        self.profile_data.delay = value
+    def _delay_changed_cb(self):
+        value = self.delay_widget.value()
+        self.profile_data.delay = value / 1000 # in seconds
 
     def _activation_changed_cb(self, value):
         """Updates the activation condition state.
@@ -164,68 +164,93 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes the contents of the associated SmartToggle container."""
 
-    def __init__(self, container, parent = None):
-        """Creates a new functor instance.
-
-        Parameters
-        ==========
-        container : SmartToggleContainer
-            The instance containing the configuration of the container
-        """
-        super().__init__(container, parent)
+    def __init__(self, action_data, parent = None):
+        super().__init__(action_data, parent)
         self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0], parent
+            action_data.action_sets[0], parent
         )
-        self.delay = container.delay
+        self.delay = action_data.delay
         self.release_value = None
         self.release_event = None
         self.mode = None
-        self.activation_time = 0.0
+        self.long_press_time = 0.0
+        self.is_pressed = False # assume output is not pressed
 
         # Disable the auto release feature which clashes with the toggle logic
         for functor in self.action_set.functors:
             if "needs_auto_release" in functor.__dict__:
                 functor.needs_auto_release = False
 
-    def process_event(self, event, value, extra_data = None):
-        ''' called when the event is received '''
-        if event.is_pressed:
-            # pressed mode
-            if self.mode is None:
-                # Currently not in either toggle or hold mode
-                self.action_set.process_event(event, value)
-                self.activation_time = time.time()
+    def _execute(self, event, value, extra_data):
+        ec = gremlin.execution_graph.ExecutionContext()
+        for functor in self.action_set.functors:
+            ec.execute_functor_id(functor.id, event, value, extra_data, True)
 
-            # Run release logic when the second press happens in toggle mode
-            elif self.mode == "toggle":
-                self.action_set.process_event(self.release_event,self.release_value)
+    def process_event(self, event, value, extra_data = None):
+        ''' short press = toggle output 
+            long press = toggle ON while held, then toggle off 
+            
+            From original Joystick Gremlin:
+            The smart toggle container allows for a single group of actions that are have on and off states, such as remap and map to keyboard to be used in two manners.
+            If the input is held down the action will perform as a typical remap action would, i.e. staying active as long as the input is pressed.
+            However, when a short button press is detected, specified by the Toggle time then the first such press toggles the down state,
+            i.e. holding the action down, and the second short press releases the action again.
+            
+           
+            
+            '''
+        
+        verbose = gremlin.config.Configuration().verbose_mode_outputs
+        
+        if extra_data is None:
+            extra_data = {}
+        extra_data["autorelease"] = False # disable autorelease on actions regardless of settings
+
+        if event.is_pressed:
+            # input is pressed
+            
+            self.long_press_time = time.time() + self.delay
+
+            if self.mode is None:
+                if verbose: syslog.info("press: normal")
+                self.action_set.process_event(event, value, extra_data) # send press
+              
+        
+            elif self.mode == "long":
+                # long press mode turn off and do not send input press event
+                if verbose: syslog.info("long press: send OFF")
+                self.action_set.process_event(self.release_event, self.release_value, extra_data)
+
+                # reset toggle mode
                 self.activation_time = 0.0
                 self.mode = None
+
+            
+                    
         else:
-            # release mode
-            # If the input is released before the hold timeout occurs, switch
-            # to toggle mode and store the event for artificial release on
-            # next input press
-            if self.activation_time + self.delay > time.time():
-                self.mode = "toggle"
+            # input is released
+            self.double_tap_time = 0.0 # reset
+            if self.long_press_time < time.time():
+                # long press enable long press mode - don't send OFF signal until the next press
+                if verbose: syslog.info("release: enable long press")
+                self.mode = "long"
                 self.release_event = event.clone()
                 self.release_value = value
+                # do not send the input release event in long press mode which effectively keeps the pressed state on
 
-            # Run release logic when the release event occurs in hold mode
             else:
-                self.action_set.process_event(event, value)
-                self.activation_time = 0.0
+                self.action_set.process_event(event, value, extra_data) # send press
                 self.mode = None
+                self.activation_time = 0.0
+            
+
 
         return False # stop execution past this container
 
 
 class SmartToggleContainer(AbstractContainer):
     '''
-    The smart toggle container allows for a single group of actions that are have on and off states, such as remap and map to keyboard to be used in two manners.
-    If the input is held down the action will perform as a typical remap action would, i.e. staying active as long as the input is pressed.
-    However, when a short button press is detected, specified by the Toggle time then the first such press toggles the down state,
-    i.e. holding the action down, and the second short press releases the action again. 
+    smart toggle container - short press = toggle output, long press is press while held and release
     '''
 
     name = "Smart Toggle"

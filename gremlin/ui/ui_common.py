@@ -5111,7 +5111,7 @@ class QDelayWidget(QtWidgets.QWidget):
 
     valueChanged = QtCore.Signal() # fired when the value changes
 
-    def __init__(self, value = 250, parent = None):
+    def __init__(self, value = 250, is_seconds = False, parent = None):
         '''
 
         :params value: default delay in milliseconds '''
@@ -5122,6 +5122,8 @@ class QDelayWidget(QtWidgets.QWidget):
         self.delay_container_widget = QtWidgets.QWidget()
         self.delay_container_layout = QtWidgets.QHBoxLayout()
         self.delay_container_widget.setLayout(self.delay_container_layout)
+
+        self._is_seconds = is_seconds
 
         width = gremlin.ui.ui_common.get_char_width(8)
 
@@ -5150,13 +5152,23 @@ class QDelayWidget(QtWidgets.QWidget):
 
         self.main_layout.addWidget(self.delay_container_widget)
 
+    def setSecondsMode(self, enabled : bool):
+        self._is_seconds = enabled
+
     def value(self):
         ''' gets the delay in milliseconds '''
-        return self._delay_widget.value()
+        value = self._delay_widget.value()
+        if self._is_seconds:
+            value /= 1000 # to seconds
+        return value
 
-    def setValue(self, value : int):
-        if value >= 0 and value != self._delay_widget.value():
-            self._delay_widget.setValue(value)
+    def setValue(self, value : float):
+        ''' sets the widget value 
+        :param value: value in ms or in seconds if the widget mode is set to seconds
+        '''
+        milliseconds = milliseconds = value * 1000 if self._is_seconds else value
+        if milliseconds >= 0 and milliseconds != self._delay_widget.value():
+            self._delay_widget.setValue(milliseconds)
             self.valueChanged.emit()
 
     @QtCore.Slot()

@@ -58,7 +58,9 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
             self.action_data.execute_on_press and event.is_pressed or \
             self.action_data.execute_on_release and not event.is_pressed
         
-        verbose = gremlin.config.Configuration().verbose_mode_macro
+        config = gremlin.config.Configuration()
+        verbose = config.verbose
+        
         if verbose: syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} {str(event)}")        
         
         if not trigger:
@@ -66,6 +68,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
             return True
         
         if verbose: syslog.info(f"\texecute")
+        
         
         MacroFunctor.manager.queue_macro(self.macro)
         if isinstance(self.macro.repeat, gremlin.macro.HoldRepeat):

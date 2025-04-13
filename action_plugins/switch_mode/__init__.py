@@ -142,6 +142,7 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
+        self.setPriority(999)
         profile = gremlin.shared_state.current_profile
         current_mode = gremlin.shared_state.edit_mode
         root = profile.modeTree()
@@ -176,10 +177,6 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
         return "ei.fork"
         #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
     
-    @property
-    def priority(self):
-        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - higher numbers run last
-        return 999
 
     def requires_virtual_button(self):
         return self.get_input_type() in [

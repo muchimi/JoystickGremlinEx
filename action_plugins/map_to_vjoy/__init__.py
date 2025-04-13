@@ -3107,7 +3107,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
         auto_complete = True # assume the functor completes this pass
 
+        #verbose = True
+
         #if verbose: syslog.info(f"VJOY MAPPER: local: {is_local} remote: {is_remote}")
+        # syslog.info(f"REMAP: event pressed: {event.is_pressed}  value pressed: {action_value.is_pressed} value current: {action_value.current}" )
 
         input_type = event.getInputType()
 
@@ -3241,7 +3244,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     is_pressed = action_value.is_pressed
                     auto_release = False
                     if is_pressed and not self.action_data.ignore_release:
-                        auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release 
+                        if extra_data and "autorelease" in extra_data:
+                            auto_release = extra_data["autorelease"]
+                        else:
+                            auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release 
                         if auto_release:
                             if verbose: syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
                             input_devices.ButtonReleaseActions().register_button_release(
@@ -3431,14 +3437,11 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     functor = VJoyRemapFunctor
     widget = VJoyWidget
 
-    @property
-    def priority(self):
-        return 9
-
     def __init__(self, parent):
         """ vjoyremap action block """
         super().__init__(parent)
         self.parent = parent
+        self.setPriority(9)
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
         self._vjoy_device_id : int = 1
@@ -3825,6 +3828,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         return fallback
 
         #return super().icon()
+
 
 
 

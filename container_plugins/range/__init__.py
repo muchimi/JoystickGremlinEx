@@ -717,7 +717,6 @@ class RangeContainer(AbstractContainer):
         '''
 
         super().__init__(parent, node)
-        self.id = get_guid() # unique id of this item
         self._index = 0 # index # of this item
         self.range_min = -1.0 # lower bound of the range
         self.range_min_included = False # true if the lower range is excluded from the range

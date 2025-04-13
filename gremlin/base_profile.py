@@ -380,6 +380,7 @@ class AbstractContainer(ProfileData):
         super().__init__(parent)
 
         self.parent = parent
+        self._id = gremlin.util.get_guid() # unique GUID of this container
         self.action_sets = []
         self.action_model = None # set at creation by the parent of this container
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to product action_sets)
@@ -391,6 +392,7 @@ class AbstractContainer(ProfileData):
         self.current_view_type = None
         self.parent_node = node
         self.comment = None # user comment
+        
 
         self._action_sets_callback = None # callback to return different action sets if needed for containers that do their own thing
 
@@ -459,28 +461,6 @@ class AbstractContainer(ProfileData):
             return len(self.activation_condition.conditions) > 0
         return False
     
-    # def refresh_conditions(self):
-    #     ''' updates action conditions '''
-    #     input_item = _get_input_item(self.parent)
-    #     tracker = ConditionTracker()
-    #     if self.activation_condition is not None:
-    #         self.activation_condition.conditions = []    
-    #         for action_set in self.action_sets:
-    #             action : AbstractAction
-    #             if action_set:
-    #                 for action in action_set:
-    #                     condition = action.activation_condition
-    #                     if condition:
-    #                         if not condition in self.activation_condition.conditions:
-    #                             self.activation_condition.conditions.append(condition)
-    #                             data = ConditionTrackerData(gremlin.shared_state.current_mode, input_item, self, condition, condition.rule)
-    #                             tracker.registerCondition(data)
-    #                             self.activation_condition.conditions.append(condition)
-
-
-
-                            
-    
 
     @property
     def condition_count(self)->int:
@@ -492,14 +472,6 @@ class AbstractContainer(ProfileData):
     @property
     def id(self):
         return self._id
-    
-    # @id.setter
-    # def id(self, new_id):
-    #     if new_id != self._id:
-    #         old_id = self._id
-    #         self._id = new_id
-    #         self.id_changed.emit(old_id, new_id)
-
     
     @property
     def condition_enabled(self):
@@ -939,6 +911,7 @@ class AbstractAction(ProfileData):
         self._is_axis = False
         self._is_hardware = None
         self.comment = None # user comments/notes
+        self._priority = 0 # default priority
 
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)
@@ -952,13 +925,13 @@ class AbstractAction(ProfileData):
         ''' unique ID for this condition, persisted '''
         return self._id
     
-    # @id.setter
-    # def id(self, new_id):
-    #     ''' changes the ID '''
-    #     old_id = self._id
-    #     if old_id != new_id:
-    #         self._id = new_id
-    #         self.id_changed.emit(old_id, new_id)   
+    @property
+    def priority(self):
+        return self._priority
+
+    def setPriority(self, value : int):
+        ''' sets the priority of the action, numeric'''
+        self._priority = value   
 
     @property
     def has_conditions(self):
@@ -1143,6 +1116,12 @@ class AbstractAction(ProfileData):
     def is_valid_for_save(self):
         ''' indicates an action can be saved to a profile even if it's not configured - this allows in process profile saving '''
         return True
+    
+
+    def __str__(self):
+        if hasattr(self,"display_name"):
+            return self.display_name()
+        return super().__str__()
 
 class AbstractContainerAction(AbstractAction):
     ''' abstract action that includes a subcontainers for sub-actions '''

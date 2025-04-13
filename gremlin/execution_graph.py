@@ -189,6 +189,7 @@ class ExecutionGraphConditionNode(ExecutionGraphNode):
     def __init__(self, condition = None):
         super().__init__(ExecutionGraphNodeType.Condition)
         self.condition : gremlin.actions.ActivationCondition = condition # holds the condition 
+        
 
     def to_string(self):
         stub = self.condition.condition_name()
@@ -792,10 +793,9 @@ class ExecutionContext():
             case gremlin.actions.ActivationRule.All:
                 # no nexus created for the all condition - conditions in ALL mode are nested so they are all evaluated
                 node = condition_node #
+        
         if conditions:
             for condition in conditions:
-                if condition.comparison == "pressed":
-                    pass
                 sub_node = ExecutionGraphActivationConditionNode()
                 sub_node.condition = condition
                 sub_node.description =  f"(sub) ActivationCondition node: {str(condition)}"
@@ -806,6 +806,7 @@ class ExecutionContext():
                 if not condition_nexus:
                     # all rule = nest conditions so they are all evaluated
                     node = sub_node
+        
         return node
     
     def _get_functor_node(self, container, functor, parent):
@@ -1182,15 +1183,25 @@ class ExecutionContext():
 
                             # container condition
                        
-                            condition_node = self._get_condition_node(container, container_node)
-                            #condition_node.parent = container_node  # condition for container - appears after the container node as the entry point is the container
-                            condition_node.parent = input_container_group
+                            if container.has_conditions:
+                                condition_node = self._get_condition_node(container, container_node)
+                                condition_node.parent = input_container_group
+                                container_node.parent = condition_node
+                            else:
+                                container_node.parent = input_container_group
 
-                            container_node.parent = condition_node
-
+                                container_group = ExecutionGraphGroupNode()
+                                container_group.parent = container_node
+                            
 
                             for action_set in container.action_sets:
-                                for action in action_set:
+                                # sort actions by priority low to high
+                                action_list = [((action.priority, index),action) for index, action in enumerate(action_set)]
+                                if not action_list:
+                                    # empty set
+                                    continue
+                                action_list.sort(key = lambda x : x[0]) # sort by priority, order of appearance
+                                for index, action in action_list:
 
                                     if action.id in self.used_items:
                                         syslog.error(f"Action already used: {action.id}")
@@ -1198,16 +1209,22 @@ class ExecutionContext():
                                         return False
                                     self.used_items[action.id] = action
 
-                                    action_condition_node = self._get_condition_node(action, condition_node)
-
                                     # action node
                                     action_node = ExecutionGraphActionNode(action)
                                     action_node.id = action.id
-                                    action_node.parent = action_condition_node # action node is owned by its condition node
+                                    
                                     action_node.mode = mode_name
                                     action_node.comment = action.comment
                                     action_node.device_link = device_node
                                     action_node.input_item = input_item
+
+                                    if action.has_conditions:
+                                        action_condition_node = self._get_condition_node(action, container_group)
+                                        action_node.parent = action_condition_node # action node is owned by its condition node
+                                    else:
+                                        action_node.parent = container_group
+                    
+
 
                                     m_action_node = ExecutionGraphActionNode(action)
                                     m_action_node.id = action.id
@@ -1220,7 +1237,7 @@ class ExecutionContext():
                                     action_node.container = container
                                     functor = self._get_action_functor(action, action_node)
                                     action_node.exec_functors = functor
-                                    action_node.description = f"Action node: {str(action)}]"
+                                    action_node.description = f"Action node: [{str(action)}]"
 
 
                                     # build gate action execution subtree
@@ -1452,6 +1469,8 @@ class ExecutionContext():
         if not node.has_actions:
             return True # nodes with no actions return PASS
         
+   
+        
         verbose_condition = self._verbose_condition
         try:
             gremlin.shared_state.pushLog()
@@ -1510,6 +1529,8 @@ class ExecutionContext():
                     # any other node - execute the functor list - first one that fails fails the complete branch to this point
                     functor_list = [] if node.functors is None else (node.functors if  isinstance(node.functors, list) else [node.functors])
                     if functor_list:
+                        if event.is_pressed == False:
+                            pass 
                         for functor in functor_list:
                             result =  self.process_functor(functor, event, value, manual, extra_data)
                             if verbose_condition:
@@ -1533,6 +1554,8 @@ class ExecutionContext():
                     #result = False
                     if node.children:
                         for child in node.children:
+                            if child.nodeType == ExecutionGraphNodeType.ActionSet:
+                                continue # skip activation sets as the actions are in the container node already
                             result = self.execute_node(child, event, value, manual, extra_data)
                             if not result:
                                 break # FAIL
@@ -1549,7 +1572,7 @@ class ExecutionContext():
             gremlin.shared_state.popLog()
 
     
-    def execute_functor_id(self, id, event, value, manual = False, extra_data : dict = None) -> bool:
+    def execute_functor_id(self, id, event, value, extra_data : dict = None, manual = False) -> bool:
         ''' executes a functor chain 
         
         id = id of the node to execute, the id is also the id of the action or container
@@ -2060,7 +2083,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
         sequence = []
 
-        add_default_activation = True
+        add_default_activation = False
 
         nodes = {} # list of tree nodes at this level created for each action in the actions sets
         #node_list = []

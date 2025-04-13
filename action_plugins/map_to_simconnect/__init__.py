@@ -4151,10 +4151,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
     functor = MapToSimConnectFunctor
     widget = MapToSimConnectWidget
 
-    @property
-    def priority(self):
-        # default priority is 0 - the higher the number the earlier the action runs compared to others
-        return 9
 
     def __init__(self, parent):
         """Creates a new instance.
@@ -4166,6 +4162,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         import gremlin.config
 
         super().__init__(parent)
+        self.setPriority(9)
         self.parent = parent
         self.events = MapToSimConnectHelper()
         self._verbose = gremlin.config.Configuration().verbose_mode_details

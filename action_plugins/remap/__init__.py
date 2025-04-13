@@ -391,10 +391,6 @@ class Remap(gremlin.base_profile.AbstractAction):
         InputType.Midi,
     ]
 
-    @property
-    def priority(self):
-        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - higher numbers run last
-        return 9
 
     functor = RemapFunctor
     widget = RemapWidget
@@ -406,6 +402,7 @@ class Remap(gremlin.base_profile.AbstractAction):
         """
         super().__init__(parent)
 
+        self.setPriority(9)
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
         self.parent = parent

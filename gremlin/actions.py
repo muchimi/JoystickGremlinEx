@@ -170,7 +170,7 @@ class ActivationCondition:
             # no conditions, always succeeds
             return True
         return ActivationCondition.rule_function[self._rule](
-            [partial(c, event, value) for c in self._conditions]
+            [partial(c, event, value, extra_data) for c in self._conditions]
         )
 
 

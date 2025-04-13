@@ -305,6 +305,7 @@ class CycleModes(gremlin.base_profile.AbstractAction):
         self.parent = parent
         self.mode_list = []
         self.mode_index = 0 # index of the current cycle mode
+        self.setPriority(999)
 
     def icon(self):
         return "ei.fork"
@@ -331,10 +332,7 @@ class CycleModes(gremlin.base_profile.AbstractAction):
             node.append(child)
         return node
 
-    @property
-    def priority(self):
-        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - higher numbers run last
-        return 999
+   
     
 version = 1
 name = "cycle-modes"

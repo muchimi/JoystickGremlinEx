@@ -150,8 +150,7 @@ class BasicContainerFunctor(AbstractFunctor):
         :param value the value received with the event
         :return True if execution was successful, False otherwise
         """
-        self.action_set.process_event(event, value)
-        return False
+        return self.action_set.process_event(event, value, extra_data)
 
 
 class BasicContainer(AbstractContainer):
