@@ -121,6 +121,15 @@ class Value:
         ''' clones this value '''
         import copy
         return copy.deepcopy(self)
+    
+    def invert(self):
+        ''' inverts itself for pressed state '''
+        e = self.clone()
+        e.is_pressed = not self.is_pressed
+        if isinstance(self._current,bool):
+            e._current = not e._current
+        return e
+        
 
     
 class ActivationCondition:

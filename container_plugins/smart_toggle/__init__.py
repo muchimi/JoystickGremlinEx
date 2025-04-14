@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 
 import copy
 import logging
@@ -22,7 +23,7 @@ import threading
 import time
 from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore
 
 
 import gremlin
@@ -32,6 +33,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
+from gremlin.util import safe_format, safe_read
 
 syslog = logging.getLogger("system")
 
@@ -63,8 +65,13 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         self.delay_widget.setValue(self.profile_data.delay * 1000)
         self.delay_widget.valueChanged.connect(self._delay_changed_cb)
 
+        self.short_widget = QtWidgets.QCheckBox("Toggle on short press")
+        self.short_widget.setChecked(self.profile_data.shortPressMode)
+        self.short_widget.clicked.connect(self._short_press_mode_changed)
+
         
         self.options_layout.addWidget(self.delay_widget)
+        self.options_layout.addWidget(self.short_widget)
         self.options_layout.addStretch()
 
         self.action_layout.addLayout(self.options_layout)
@@ -88,6 +95,11 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
             self.action_layout.addWidget(action_selector)
+
+    @QtCore.Slot(bool)
+    def _short_press_mode_changed(self, checked: bool):
+        self.profile_data.shortPressMode = checked
+
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
@@ -164,12 +176,13 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes the contents of the associated SmartToggle container."""
 
-    def __init__(self, action_data, parent = None):
+    def __init__(self, action_data : SmartToggleContainer, parent = None):
         super().__init__(action_data, parent)
         self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
             action_data.action_sets[0], parent
         )
         self.delay = action_data.delay
+        self.shortPressMode = action_data.shortPressMode
         self.release_value = None
         self.release_event = None
         self.mode = None
@@ -201,6 +214,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             '''
         
         verbose = gremlin.config.Configuration().verbose_mode_outputs
+        verbose = True
         
         if extra_data is None:
             extra_data = {}
@@ -213,13 +227,29 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
             if self.mode is None:
                 if verbose: syslog.info("press: normal")
-                self.action_set.process_event(event, value, extra_data) # send press
-              
+                if self.shortPressMode:
+                    
+                    self.is_pressed = not self.is_pressed # toggle
+                    if self.is_pressed:
+                        self.action_set.process_event(event, value, extra_data)
+                    else:
+                        self.action_set.process_event(event.invert(), value.invert(), extra_data)
+
+                    if verbose: syslog.info(f"press: toggle {'on' if self.is_pressed else 'off'}")
+                else:
+                    if verbose: syslog.info("press: normal")
+                    self.action_set.process_event(event, value, extra_data)
+                    
         
             elif self.mode == "long":
                 # long press mode turn off and do not send input press event
                 if verbose: syslog.info("long press: send OFF")
-                self.action_set.process_event(self.release_event, self.release_value, extra_data)
+                if self.shortPressMode:
+                    # release the press 
+                    self.action_set.process_event(event.invert(), value.invert(), extra_data)
+                    self.is_pressed = False
+                else:
+                    self.action_set.process_event(self.release_event, self.release_value, extra_data)
 
                 # reset toggle mode
                 self.activation_time = 0.0
@@ -229,19 +259,32 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                     
         else:
             # input is released
-            self.double_tap_time = 0.0 # reset
+            
             if self.long_press_time < time.time():
-                # long press enable long press mode - don't send OFF signal until the next press
-                if verbose: syslog.info("release: enable long press")
-                self.mode = "long"
-                self.release_event = event.clone()
-                self.release_value = value
+                # long press detect
+                if self.shortPressMode:
+                    if verbose: syslog.info("long release: toggle OFF")
+                    self.action_set.process_event(event, value, extra_data)
+                    self.mode = None
+                    self.activation_time = 0.0
+                    self.is_pressed = False
+                else:
+                    if verbose: syslog.info("long release: enable long press")
+                    self.mode = "long"
+                    self.release_event = event.clone()
+                    self.release_value = value
                 # do not send the input release event in long press mode which effectively keeps the pressed state on
 
             else:
-                self.action_set.process_event(event, value, extra_data) # send press
-                self.mode = None
-                self.activation_time = 0.0
+
+                if self.shortPressMode:
+                    # don't release on short press mode
+                    pass
+                else:
+                    self.action_set.process_event(event, value, extra_data)
+                    self.mode = None
+                    self.activation_time = 0.0
+                    self.is_pressed = False
             
 
 
@@ -276,6 +319,8 @@ class SmartToggleContainer(AbstractContainer):
         super().__init__(parent, node)
         self.action_sets = [[]]
         self.delay = 0.5
+        self.shortPressMode = True # false to toggle on long press
+
 
     def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.
@@ -283,7 +328,8 @@ class SmartToggleContainer(AbstractContainer):
         :param node the XML node with which to populate the container
         """
         super()._parse_xml(node, data)
-        self.delay = gremlin.profile.safe_read(node, "delay", float, 0.5)
+        self.delay = safe_read(node, "delay", float, 0.5)
+        self.shortPressMode = safe_read(node, "short-press-mode", bool, True)
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -292,7 +338,9 @@ class SmartToggleContainer(AbstractContainer):
         """
         node = ElementTree.Element("container")
         node.set("type", SmartToggleContainer.tag)
-        node.set("delay", gremlin.profile.safe_format(self.delay, float))
+        node.set("delay", safe_format(self.delay, float))
+        node.set("short-press-mode", safe_format(self.shortPressMode, bool))
+
         as_node = ElementTree.Element("action-set")
         for action in self.action_sets[0]:
             as_node.append(action.to_xml())

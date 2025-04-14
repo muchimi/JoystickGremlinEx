@@ -1422,7 +1422,7 @@ class ExecutionContext():
             syslog.info(f"\t{item}")
 
 
-    def process_functor(self, functor, event, value, manual = False, extra_data : dict = None) -> bool:
+    def process_functor(self, functor, event, value, extra_data : dict = None, manual = False) -> bool:
         ''' processes a single functor or a list of functors  - first one to fail fails the group '''
         # id = event._id
         # if not id in self._processed_events:
@@ -1442,7 +1442,7 @@ class ExecutionContext():
         
         if isinstance(functor, list):
             for item in functor:
-                result = self.process_functor(item, event, value, extra_data)
+                result = self.process_functor(item, event, value, extra_data, manual)
                 if not result:
                     return False
         else:
@@ -1462,7 +1462,7 @@ class ExecutionContext():
             node = self.graph_input_map[key]
 
 
-    def execute_node(self, node : ExecutionGraphNode, event, value, manual = False, extra_data : dict = None) -> bool:
+    def execute_node(self, node : ExecutionGraphNode, event, value, extra_data : dict = None,  manual = False) -> bool:
         ''' executes a single node '''
 
 
@@ -1508,14 +1508,14 @@ class ExecutionContext():
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:
                     for child in node.children:
-                        result = self.execute_node(child, event, value, manual, extra_data)
+                        result = self.execute_node(child, event, value, extra_data, manual)
                         # dont care if result fails for individual groups
                         
 
 
                 case ExecutionGraphNodeType.ActivationConditionNexus:
                     for child in node.children:
-                        result = self.execute_node(child, event, value, manual, extra_data)
+                        result = self.execute_node(child, event, value, extra_data, manual)
                         if result:
                             # pass the whole group on first group that doesn't fail
                             break
@@ -1532,7 +1532,7 @@ class ExecutionContext():
                         if event.is_pressed == False:
                             pass 
                         for functor in functor_list:
-                            result =  self.process_functor(functor, event, value, manual, extra_data)
+                            result =  self.process_functor(functor, event, value, extra_data, manual)
                             if verbose_condition:
                                 if isinstance(functor, gremlin.actions.ActivationCondition):
                                     condition_name = functor.condition_name()
@@ -1556,7 +1556,7 @@ class ExecutionContext():
                         for child in node.children:
                             if child.nodeType == ExecutionGraphNodeType.ActionSet:
                                 continue # skip activation sets as the actions are in the container node already
-                            result = self.execute_node(child, event, value, manual, extra_data)
+                            result = self.execute_node(child, event, value, extra_data, manual)
                             if not result:
                                 break # FAIL
 
@@ -1587,7 +1587,7 @@ class ExecutionContext():
         if id in functor_map:
             # cache hit
             root = self._node_map[id]
-            result = self.execute_node(root, event, value, manual, extra_data)
+            result = self.execute_node(root, event, value, extra_data, manual)
         return result
     
 

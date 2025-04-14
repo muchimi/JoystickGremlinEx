@@ -1205,8 +1205,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         header  =  QtWidgets.QWidget()
         box = QtWidgets.QVBoxLayout(header)
         box.addWidget(QtWidgets.QLabel(state._active_device_name))
-        input_type = state._active_device_input_type
-        input_id = state._active_device_input_id
+        input_type = self.action_data.hardware_input_type # state._active_device_input_type
+        input_id = self.action_data.hardware_input_id  # state._active_device_input_id
+        
         vjoy_device_id = self.action_data.vjoy_device_id
         vjoy_input_id = self.action_data.vjoy_input_id
 

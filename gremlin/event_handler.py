@@ -179,7 +179,11 @@ class Event:
 		e.is_pressed = is_pressed
 		return e
 		
-
+	def invert(self):
+		''' flips pressed flag '''
+		e = self.clone()
+		e.is_pressed = not self.is_pressed
+		return e
 
 	def __eq__(self, other):
 		return self.__hash__() == other.__hash__()
