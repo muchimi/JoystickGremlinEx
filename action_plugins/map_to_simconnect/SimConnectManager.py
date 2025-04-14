@@ -493,6 +493,7 @@ class SimConnectManager(QtCore.QObject):
         self.bridge.alive.connect(self._bridge_alive_cb)
 
         self._lvars = [] # list of lvars
+        self._ar_title = None
 
         handler.simconnect_aircraft_loaded.connect(self._aicraft_loaded_cb)
         handler.simconnect_connected.connect(self._connected_cb)
@@ -1001,13 +1002,19 @@ class SimConnectManager(QtCore.QObject):
     def get_aircraft_title(self, force_update = False):
         if not self._aircraft_title or force_update:
             self._aircraft_title = None
-            ar = self._aircraft_requests
-            trigger = ar.find("TITLE")
-            title = trigger.get()
+            if not self._ar_title:
+                self._ar_title = self.registerRequest('TITLE','string')
+            
+            title = self._ar_title.value
+            # trigger = ar.find("TITLE")
+            # title = trigger.get()
             if title:
                 title = title.decode()
             self._aircraft_title = title
         return self._aircraft_title
+    
+    def _aircraft_title_cb(self):
+        ''' callback for the aircraft title '''
     
     def request_loaded_aircraft(self):
         ''' gets the current player aircraft in the sim '''

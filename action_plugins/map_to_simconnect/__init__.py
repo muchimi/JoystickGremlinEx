@@ -2811,6 +2811,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                                        max_cmd= self.action_data.command_max_range,
                                                                        min_range=-16383,
                                                                        max_range=16384,
+                                                                       inverted=self.action_data.inverted,
                                                                        parent = self)
         self._value_widget.valueChanged.connect(self._value_changed)
         self._value_widget.rangeChanged.connect(self._range_changed)
@@ -4345,7 +4346,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
     def display_name(self):
         ''' returns a string for this action for display purposes '''
-        return self.block.display_name
+        if self.block:
+            return self.block.display_name
+        return "n/a"
       
 
     def icon(self):
@@ -4573,7 +4576,10 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         if "type" in node.attrib:
             self._command_type = SimConnectCommandType.to_enum(node.get("type"))
 
-        self.inverted = safe_read(node,"inverted",bool, False)
+        if "inverted" in node.attrib:
+            self.inverted = safe_read(node,"inverted",bool, False)
+
+
         if "trigger" in node.attrib:
             s_trigger = safe_read(node,"trigger",str,"")
             self.trigger_mode = SimConnectTriggerMode.to_enum(s_trigger)
