@@ -15,13 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 import copy
 import logging
 import threading
 import time
 from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore
 from PySide6.QtCore import Slot
 
 import gremlin.base_conditions
@@ -43,7 +44,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
     """Container with two actions, triggered based on activation duration."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, profile_data : TempoExContainer, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
@@ -67,18 +68,21 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.options_layout = QtWidgets.QHBoxLayout()
 
 
-        # Activation delay
-        self.options_layout.addWidget(
-            QtWidgets.QLabel("<b>Long press delay: </b>")
-        )
-        self.delay_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.delay_input.setRange(0.1, 2.0)
-        self.delay_input.setSingleStep(0.1)
-        self.delay_input.setValue(0.5)
-        self.delay_input.setValue(self.profile_data.delay)
-        self.delay_input.valueChanged.connect(self._delay_changed_cb)
-        self.options_layout.addWidget(self.delay_input)
+        self.options_layout = QtWidgets.QHBoxLayout()
+        self.options2_layout = QtWidgets.QHBoxLayout()
+
+        self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Long Press Delay (ms):")
+        self.longpress_delay_widget.setValue(self.profile_data.delay * 1000)
+        self.longpress_delay_widget.valueChanged.connect(self._delay_changed_cb)
+        self.options_layout.addWidget(self.longpress_delay_widget)
         self.options_layout.addStretch()
+
+        self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Autorelease Delay (ms):")
+        self.autorelease_delay_widget.setValue(self.profile_data.autorelease_delay * 1000)
+        self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
+        self.options2_layout.addWidget(self.autorelease_delay_widget)
+        self.options2_layout.addStretch()
+
 
 
 
@@ -101,7 +105,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.options_layout.addWidget(self.activate_release)
 
         # chain options
-        self.options_layout.addWidget(QtWidgets.QLabel("<b>Chain </b>"))
+        self.options2_layout.addWidget(QtWidgets.QLabel("<b>Chain </b>"))
         self.chain_short_widget = QtWidgets.QCheckBox("short actions")
         self.chain_long_widget = QtWidgets.QCheckBox("long actions")
 
@@ -115,22 +119,24 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.chain_short_widget.checkStateChanged.connect(self._chain_short_changed_cb)
         self.chain_long_widget.checkStateChanged.connect(self._chain_long_changed_cb)
 
-        self.options_layout.addWidget(self.chain_short_widget)
-        self.options_layout.addWidget(self.chain_long_widget)
+        self.options2_layout.addWidget(self.chain_short_widget)
+        self.options2_layout.addWidget(self.chain_long_widget)
 
         
         # chain timeout
-        self.options_layout.addWidget(QtWidgets.QLabel("<b>Chain Timeout:</b> "))
+        self.options2_layout.addWidget(QtWidgets.QLabel("<b>Chain Timeout:</b> "))
         self.timeout_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.timeout_input.setRange(0.0, 3600.0)
         self.timeout_input.setSingleStep(0.5)
         self.timeout_input.setValue(0)
         self.timeout_input.setValue(self.profile_data.timeout)
         self.timeout_input.valueChanged.connect(self._timeout_changed_cb)
-        self.options_layout.addWidget(self.timeout_input)
+        self.options2_layout.addWidget(self.timeout_input)
 
 
         self.action_layout.addLayout(self.options_layout)
+        self.action_layout.addLayout(self.options2_layout)
+
         self.action_layout.addWidget(self.short_group_widget)
         self.action_layout.addWidget(self.long_group_widget)
         # self.action_layout.addLayout(self.short_layout)
@@ -273,6 +279,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
 
+    @QtCore.Slot()
     def _delay_changed_cb(self, value):
         """Updates the activation delay value.
 
@@ -280,6 +287,15 @@ class TempoExContainerWidget(AbstractContainerWidget):
         """
         self.profile_data.delay = value
 
+    @QtCore.Slot()
+    def _autorelease_delay_changed_cb(self):
+        """Updates the activation delay value.
+
+        :param value the value after which the long press action activates
+        """
+        self.profile_data.autorelease_delay = self.autorelease_delay_widget.value() / 1000
+
+    
     def _activation_changed_cb(self, value):
         """Updates the activation condition state.
 
@@ -369,7 +385,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
 class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
-    def __init__(self, container, parent = None):
+    def __init__(self, container : TempoExContainer, parent = None):
         super().__init__(container, parent)
         self.action_sets = [[],[]]
         for action_set in container.short_action_sets:
@@ -384,6 +400,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.short_set = self.action_sets[0]
         self.long_set =  self.action_sets[1]
         self.delay = container.delay
+        self.autorelease_delay = container.autorelease_delay
         self.activate_on = container.activate_on
 
         self.start_time = 0
@@ -532,7 +549,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         """
 
         self._trigger_short_press(event_p, value_p)
-        time.sleep(0.05)
+        time.sleep(self.autorelease_delay)
         self._trigger_short_press(event_r, value_r)
 
 
@@ -575,7 +592,8 @@ class TempoExContainer(AbstractContainer):
         super().__init__(parent, node)
         self.short_action_sets = []
         self.long_action_sets = []
-        self.delay = 0.5
+        self.delay = 0.5 # default long press delay in seconds
+        self.autorelease_delay = 0.25 # autorelease in seconds
         self.activate_on = "release"
         self.timeout = 0.0
         self.chain_short = True
@@ -602,6 +620,7 @@ class TempoExContainer(AbstractContainer):
         self.long_action_sets = []
         super()._parse_xml(node, data)
         self.delay = float(node.get("delay", 0.5))
+        self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
         self.activate_on = node.get("activate-on", "release")
         self.chain_long = safe_read(node, "chain_long", bool)
         self.chain_short = safe_read(node, "chain_short", bool)
@@ -628,6 +647,7 @@ class TempoExContainer(AbstractContainer):
         node = ElementTree.Element("container")
         node.set("type", TempoExContainer.tag)
         node.set("delay", str(self.delay))
+        node.set("autorelease-delay", safe_format(self.autorelease_delay, float))
         node.set("activate-on", self.activate_on)
         node.set("chain_short",safe_format(self.chain_short, bool))
         node.set("chain_long",safe_format(self.chain_long, bool))

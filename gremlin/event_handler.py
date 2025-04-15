@@ -2214,3 +2214,16 @@ class EventHandler(QtCore.QObject):
 @gremlin.singleton_decorator.SingletonDecorator
 class VjoyRemapEventHandler(QtCore.QObject):
 	grid_visible_changed = QtCore.Signal(bool) # occurs when a grid was updated
+
+	def __init__(self):
+		super().__init__()
+		self.grid_visible_changed.connect(self._visible_changed)
+
+	@QtCore.Slot(bool)
+	def _visible_changed(self, visible: bool):
+		''' store setting for next time '''
+		config = gremlin.config.Configuration()
+		config.button_grid_visible = visible
+
+
+_vjoy_remap_handler = VjoyRemapEventHandler()

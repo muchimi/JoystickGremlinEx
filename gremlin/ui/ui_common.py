@@ -5111,7 +5111,7 @@ class QDelayWidget(QtWidgets.QWidget):
 
     valueChanged = QtCore.Signal() # fired when the value changes
 
-    def __init__(self, value = 250, is_seconds = False, parent = None):
+    def __init__(self, value = 250, is_seconds = False, parent = None, label = None):
         '''
 
         :params value: default delay in milliseconds '''
@@ -5126,8 +5126,7 @@ class QDelayWidget(QtWidgets.QWidget):
         self._is_seconds = is_seconds
 
         width = gremlin.ui.ui_common.get_char_width(8)
-
-        delay_label = QtWidgets.QLabel("Delay (ms)")
+        delay_label = QtWidgets.QLabel(label if label else "Delay (ms)")
         self._delay_widget = QIntLineEdit()
         self._delay_widget.setRange(0, 20000) # up to 20 seconds
         self._delay_widget.setMaximumWidth(width)

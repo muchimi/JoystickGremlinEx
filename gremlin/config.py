@@ -1147,6 +1147,16 @@ class Configuration:
         return self.verbose and VerboseMode.Exec in self.verbose_mode
     
     @property
+    def verbose_mode_exec(self):
+        ''' true if verbose mode is in condition/execution mode '''
+        return self.verbose and VerboseMode.Exec in self.verbose_mode
+    
+    @property
+    def verbose_mode_exec_detailed(self):
+        ''' true if verbose mode is in condition/execution mode '''
+        return self.verbose and self.verbose_mode_exec and VerboseMode.ExecDetails in self.verbose_mode
+    
+    @property
     def verbose_mode_osc(self):
         ''' true if verbose mode is in OSC mode '''
         return self.verbose and VerboseMode.OSC in self.verbose_mode

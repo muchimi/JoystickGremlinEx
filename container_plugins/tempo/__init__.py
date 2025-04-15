@@ -15,26 +15,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 import copy
 import logging
 import threading
 import time
 from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore
 
 import gremlin
 import gremlin.ui.ui_common
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
+from gremlin.util import safe_read, safe_format
 
 syslog = logging.getLogger("system")
 class TempoContainerWidget(AbstractContainerWidget):
 
     """Container with two actions, triggered based on activation duration."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, profile_data : TempoContainer, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
@@ -47,19 +49,20 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
 
         self.options_layout = QtWidgets.QHBoxLayout()
+        self.options2_layout = QtWidgets.QHBoxLayout()
 
-        # Activation delay
-        self.options_layout.addWidget(
-            QtWidgets.QLabel("<b>Long press delay: </b>")
-        )
-        self.delay_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.delay_input.setRange(0.1, 2.0)
-        self.delay_input.setSingleStep(0.1)
-        self.delay_input.setValue(0.5)
-        self.delay_input.setValue(self.profile_data.delay)
-        self.delay_input.valueChanged.connect(self._delay_changed_cb)
-        self.options_layout.addWidget(self.delay_input)
+        self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Long Press Delay (ms):")
+        self.longpress_delay_widget.setValue(self.profile_data.delay * 1000)
+        self.longpress_delay_widget.valueChanged.connect(self._delay_changed_cb)
+        self.options_layout.addWidget(self.longpress_delay_widget)
         self.options_layout.addStretch()
+
+        self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Autorelease Delay (ms):")
+        self.autorelease_delay_widget.setValue(self.profile_data.autorelease_delay * 1000)
+        self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
+        self.options2_layout.addWidget(self.autorelease_delay_widget)
+        self.options2_layout.addStretch()
+
 
         # Activation moment
         self.options_layout.addWidget(QtWidgets.QLabel("<b>Activate on: </b>"))
@@ -75,6 +78,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.options_layout.addWidget(self.activate_release)
 
         self.action_layout.addLayout(self.options_layout)
+        self.action_layout.addLayout(self.options2_layout)
 
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
@@ -182,13 +186,23 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.container_modified.emit()
         
 
-    def _delay_changed_cb(self, value):
+    @QtCore.Slot()
+    def _delay_changed_cb(self):
         """Updates the activation delay value.
 
         :param value the value after which the long press action activates
         """
-        self.profile_data.delay = value
+        self.profile_data.delay = self.longpress_delay_widget.value() / 1000
 
+    @QtCore.Slot()
+    def _autorelease_delay_changed_cb(self):
+        """Updates the activation delay value.
+
+        :param value the value after which the long press action activates
+        """
+        self.profile_data.autorelease_delay = self.autorelease_delay_widget.value() / 1000
+
+    @QtCore.Slot()
     def _activation_changed_cb(self, value):
         """Updates the activation condition state.
 
@@ -228,7 +242,7 @@ class TempoContainerWidget(AbstractContainerWidget):
 
 class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
-    def __init__(self, container, parent = None):
+    def __init__(self, container : TempoContainer, parent = None):
         super().__init__(container, parent)
         self.short_set = gremlin.execution_graph.ActionSetExecutionGraph(
             container.action_sets[0], parent
@@ -243,6 +257,8 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.timer = None
         self.value_press = None
         self.event_press = None
+        self.delay = container.delay
+        self.autorelease_delay = container.autorelease_delay
 
         # el = gremlin.event_handler.EventListener()
         # el.profile_start.connect(self._profile_start)
@@ -258,40 +274,43 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
     def process_event(self, event, value, extra_data = None):
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
-        elif not isinstance(value.current, bool):
-            syslog.warning(
-                f"Invalid data type received in TempoEx container: {type(event.value)}"
-            )
-            return False
-        else:
-            is_pressed = value.current
+
+        is_pressed = event.is_pressed # use new API for GremlinEx
+
+        # elif not isinstance(value.current, bool):
+        #     syslog.warning(f"Invalid data type received in TempoEx container: {type(event.value)}")
+        #     return False
+        # else:
+        #     is_pressed = value.current
 
         # Copy state when input is pressed
         if is_pressed:
             self.value_press = copy.deepcopy(value)
             self.event_press = event.clone()
+        
 
         # Execute tempo logic
         if is_pressed:
+            # input press event
             self.start_time = time.time()
             self.timer = threading.Timer(self.delay, self._long_press)
             self.timer.start()
 
             if self.activate_on == "press":
                 #print ("tempo short (activate on press)")
-                self.short_set.process_event(self.event_press, self.value_press)
+                self.short_set.process_event(self.event, self.value)
         else:
-            # Short press
+            # input release event
             
             if (self.start_time + self.delay) > time.time():
                 if self.timer:
                     self.timer.cancel()
 
-
                 if self.activate_on == "release":
                     #print ("tempo short (activate on release)")
+
                     threading.Thread(target=lambda: self._short_press(
-                        self.event_press,
+                        self.event_press, # send a press event to the functors
                         self.value_press,
                         event,
                         value
@@ -318,7 +337,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         :param value_r value to release the action
         """
         self.short_set.process_event(event_p, value_p)
-        time.sleep(0.05)
+        time.sleep(self.autorelease_delay)
         self.short_set.process_event(event_r, value_r)
 
     def _long_press(self):
@@ -358,7 +377,8 @@ class TempoContainer(AbstractContainer):
         """
         super().__init__(parent, node)
         self.action_sets = [[], []]
-        self.delay = 0.5
+        self.delay = 0.5 # delay for long press
+        self.autorelease_delay = 0.250 # delay between press and autorelease 
         self.activate_on = "release"
 
     def _parse_xml(self, node, data = None):
@@ -369,6 +389,7 @@ class TempoContainer(AbstractContainer):
         self.action_sets = []
         super()._parse_xml(node, data)
         self.delay = float(node.get("delay", 0.5))
+        self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
         self.activate_on = node.get("activate-on", "release")
 
     def _generate_xml(self):
@@ -378,7 +399,9 @@ class TempoContainer(AbstractContainer):
         """
         node = ElementTree.Element("container")
         node.set("type", TempoContainer.tag)
-        node.set("delay", str(self.delay))
+        node.set("delay", safe_format(self.delay, float))
+        node.set("autorelease-delay", safe_format(self.autorelease_delay, float))
+
         node.set("activate-on", self.activate_on)
         for actions in self.action_sets:
             as_node = ElementTree.Element("action-set")

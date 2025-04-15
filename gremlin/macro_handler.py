@@ -1483,6 +1483,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.editor_settings_layout.addWidget(self.editor_widget)
             self.editor_settings_layout.addWidget(self.settings_widget)
             self.editor_settings_layout.addStretch()
+      
 
             prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
@@ -1685,6 +1686,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         old_item.widget().hide()
         old_item.widget().deleteLater()
         self.editor_settings_layout.insertWidget(0, self.editor_widget)
+        self.editor_widget.setMaximumWidth(200)
 
     def _update_record_settings(self):
         """Store user preferences of inputs to record."""
@@ -1852,14 +1854,6 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._refresh_editor_ui()
 
-        # idx = self.list_view.currentIndex().row()
-        # if 0 <= idx < len(self.action_data.sequence):
-        #     model_idx = self.model.index(idx, 0, QtCore.QModelIndex())
-        #     action = self.model.data(model_idx, QtCore.Qt.UserRole)
-        #     new_action = copy.deepcopy(action)
-        #     self._append_entry(new_action)
-
-
     @QtCore.Slot()
     def _delete_cb(self):
         """Callback executed when the delete button is pressed."""
@@ -1871,7 +1865,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             msgbox = gremlin.ui.ui_common.ConfirmBox(f"This will remove the selected macro entries.")
             result = msgbox.show()
             if result == QtWidgets.QMessageBox.StandardButton.Ok:
-                for idx in indices:
+                for model_indices in indices:
+                    idx = model_indices.row()
                     del self.action_data.sequence[idx]
 
                 # select the last entry
@@ -1880,13 +1875,6 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
                     new_idx = min(item_count, max(0, idx - 1))
                     self.list_view.setCurrentIndex(self.model.index(new_idx, 0, QtCore.QModelIndex()))
                 self._refresh_editor_ui()
-
-        # idx = self.list_view.currentIndex().row()
-        # if 0 <= idx < len(self.action_data.sequence):
-        #     del self.action_data.sequence[idx]
-        #     new_idx = min(len(self.action_data.sequence), max(0, idx - 1))
-        #     self.list_view.setCurrentIndex(self.model.index(new_idx, 0, QtCore.QModelIndex()))
-        #     self._refresh_editor_ui()
 
     @QtCore.Slot()
     def _insert_entry_at_current_index(self, entry):

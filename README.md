@@ -267,7 +267,14 @@ T27
 - Fix: Execution order respects priority and sequence
 - Fix: Individual actions no longer fail whole container if one fails executing 
 - API: action base class implements default priority for all actions
-
+T28
+- Improved: Tempo/TempoEx containers now have a separate delay for the autorelease delay instead of being hardcoded - that autorelease is the time between short press/release
+- Improved: SmartToggle has two modes that flips the behavior between short press/long press based on user preferences (defaults to the legacy mode if not set)
+- Improved: declutter option for execution graph debug information to make it easier to read on large profiles (new verbose option execDetails)
+- Improved: Macro editor right panel width no longer jumps all over the place depending on the options selected
+- Fix: Macro editor delete works again
+- Fix: JoystickCondition and VJoyCondition axis range comparisons failing when they should succeed due to Python FP precision variance when matching exact FP values
+- Fix: Tempo container uses the updated API to detect presses
 
 
 

@@ -33,7 +33,7 @@ import gremlin.shared_state
 import gremlin.util
 import gremlin.fsm
 
-
+import math
 
 
 syslog = logging.getLogger("system")
@@ -362,11 +362,14 @@ class JoystickCondition(AbstractCondition):
             r2 = self.condition.range[1]
             if r1 > r2:
                 r1,r2 = r2,r1
-            in_range = value >= r1 and value <= r2
+            if r1 == r2:
+                in_range = math.isclose(value, r1, 0.0001)
+            else:
+                in_range = value >= r1 and value <= r2
 
             if self.condition.comparison in ["inside", "outside"]:
                 retval = in_range if self.comparison == "inside" else not in_range
-            if verbose: syslog.info(f"{logtabs}JoystickCondition: Axis range comparison: [{self.comparison}]: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"{logtabs}JoystickCondition: Axis range comparison: [{self.comparison}]: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} read value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
             return retval
         
         elif self.input_type == InputType.JoystickButton:
@@ -474,13 +477,19 @@ class VJoyCondition(AbstractCondition):
 
         if self.input_type == InputType.JoystickAxis:
             retval = False
-            in_range = self.condition.range[0] <= \
-                       joy.axis(self.input_id).value <= \
-                       self.condition.range[1]
+            current_value = joy.axis(self.input_id).value + 0.0
+            r1 = self.condition.range[0]
+            r2 = self.condition.range[1]
+            if r1 > r2:
+                r1,r2 = r2,r1
+            if r1 == r2:
+                in_range = math.isclose(current_value, r1, abs_tol = 0.0001)
+            else:
+                in_range = r1 <= current_value <= r2
 
             if self.comparison in ["inside", "outside"]:
                 retval =  in_range if self.comparison == "inside" else not in_range
-            if verbose: syslog.info(f"{logtabs}VjoyCondition: Axis {self.comparison}: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"{logtabs}VjoyCondition: Axis {self.comparison}: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} read value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
             return retval
 
             
@@ -504,7 +513,7 @@ class VJoyCondition(AbstractCondition):
 
     def condition_name(self)->str:
         info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
-        return f"VJoyCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name} "
+        return f"VJoyCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name if info else '(device not found)'} "
 
 
     def __str__(self):

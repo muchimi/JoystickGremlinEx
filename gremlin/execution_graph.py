@@ -361,6 +361,7 @@ class ExecutionContext():
         self._processed_functors = {}
         config = gremlin.config.Configuration()
         self._verbose_exec = config.verbose_mode_execution
+        self._verbose_detailed = config.verbose_mode_exec_detailed
         self._verbose_condition = config.verbose_mode_condition
         self.used_items = {}  # nodes can only be used once
 
@@ -833,13 +834,12 @@ class ExecutionContext():
         ''' recursive forward looking functor tree builder '''
         gremlin.shared_state.pushLog()
         try:
-            verbose = gremlin.config.Configuration().verbose_mode_execution
             logTabs = gremlin.shared_state.logTabs(True)
-            if self._verbose_exec: syslog.info(f"{logTabs}EXEC: [{node.id}] {node.description}")
+            if self._verbose_detailed: syslog.info(f"{logTabs}EXEC: [{node.id}] {node.description}")
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:
                     # group node
-                    if verbose: syslog.info(f"{logTabs}\tGroup node")
+                    if self._verbose_detailed: syslog.info(f"{logTabs}\tGroup node")
                     group_functors = []
                     functors.append(group_functors)
                     for child in node.children:
@@ -854,14 +854,14 @@ class ExecutionContext():
                     # this node contains a bunch of conditions and non-conditions
                     # group the conditions together in a list for evaluation, then add the other functors normally
                     # so the list becomes 
-                    if verbose: syslog.info(f"{logTabs}\tprocessing ANY rule")
+                    if self._verbose_detailed: syslog.info(f"{logTabs}\tprocessing ANY rule")
                     
                     condition_nodes = [n for n in node.children if n.nodeType == ExecutionGraphNodeType.ActivationCondition]
                     other_nodes = [n for n in node.children if n.nodeType != ExecutionGraphNodeType.ActivationCondition]
                     any_functors = []
                     for child in condition_nodes:
                         self._traverse_node_functors(child, any_functors)
-                    if verbose: syslog.info(f"{logTabs}Added {len(any_functors)} condition functors")
+                    if self._verbose_detailed: syslog.info(f"{logTabs}Added {len(any_functors)} condition functors")
                     functors.append(any_functors)
                     for child in other_nodes:
                         # add to the functor chain after conditions
@@ -877,7 +877,7 @@ class ExecutionContext():
                         
                         if condition and container:
                             if isinstance(condition, gremlin.base_conditions.ActivationCondition):
-                                if verbose: syslog.info(f"{logTabs}\tprocessing ALL rule")
+                                if self._verbose_detailed: syslog.info(f"{logTabs}\tprocessing ALL rule")
                                 for child in node.children:
                                     self._traverse_node_functors(child, node_functors)
                                 functors.extend(node_functors)
@@ -885,7 +885,7 @@ class ExecutionContext():
                                 # done processing that branch
                                 return
                             elif isinstance(condition, gremlin.base_conditions.AbstractCondition):
-                                if verbose: syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
+                                if self._verbose_detailed: syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
                                 functor = self._convert_condition(condition)
                                 node_functors.append(functor)
                                 functors.append([functors])
@@ -1407,7 +1407,7 @@ class ExecutionContext():
         assert isinstance(functors, list),"Functors have to be a list"
         self.functor_map[node.id] = functors
         self._node_map[node.id] = node
-        if self._verbose_exec: 
+        if self._verbose_detailed: 
             logtabs = gremlin.shared_state.logTabs()
             syslog.info(f"{logtabs}Register container node functors node id {node.id} {node.description} : {len(functors)} functors")
 

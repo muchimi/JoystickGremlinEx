@@ -925,8 +925,9 @@ class VerboseMode(IntFlag):
     Gate = auto() # auto
     Outputs = auto() # list outputs
     UI = auto() # UI mode
+    ExecDetails = auto()
     
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value
