@@ -1898,6 +1898,7 @@ class ActionSelector(QtWidgets.QWidget):
         super().__init__(parent)
 
         self.input_type = input_type
+        self._input_item = None
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.action_label = QtWidgets.QLabel("Action")
@@ -1932,6 +1933,15 @@ class ActionSelector(QtWidgets.QWidget):
         eh = gremlin.event_handler.EventHandler()
         eh.last_action_changed.connect(self._last_action_changed)
         self._container = None
+
+
+    @property
+    def inputItem(self):
+        return self._input_item
+    @inputItem.setter
+    def inputItem(self, value):
+        self._input_item = value
+
 
 
     @property
@@ -2006,19 +2016,28 @@ class ActionSelector(QtWidgets.QWidget):
                         break
                 parent = parent.parent()
 
-
-        action = gremlin.plugin_manager.ActionPlugins().fromClipboard(container)
-        if action is None:
-            return
-        valid_actions = self._valid_action_list()
-        if action.name in valid_actions:
-            # valid action - clone it and add it
-            # syslog.info("Clipboard paste action trigger...")
-            self.action_paste.emit(action, self.container)
-        else:
-            # dish out a message
-            MessageBox(title =  f"Invalid Action type ({action.name})",
+        if container is None and self.inputItem is None:
+            MessageBox(title =  f"Invalid paste operation",
                 prompt = "Unable to paste action because it is not valid for the current input")
+            return 
+
+        action_list = gremlin.plugin_manager.ActionPlugins().fromClipboard(container, self.inputItem)
+        if not action_list:
+            return
+        
+        valid_actions = self._valid_action_list()
+        warning = False
+        for action in action_list:
+            if action.name in valid_actions:
+                # valid action - clone it and add it
+                # syslog.info("Clipboard paste action trigger...")
+                self.action_paste.emit(action, self.container)
+            else:
+                warning = True
+
+        if warning:
+            MessageBox(title =  f"Invalid Action type",
+                prompt = "Unable to paste one or more actions because the action is invalid for the current input")
 
 
     def _clipboard_changed(self, clipboard):
@@ -3848,17 +3867,20 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
                 self.container_layout.addWidget(self._display_percent_widget, alignment = alignment)
 
         # progress curve 
-        if self._show_curve: 
-            try:
+        try:
+            if self._show_curve: 
+            
                 if self._display_curve_widget:
                     self._display_curve_widget.setText(self._label_curve)
-            except:
-                # C++ exception
-                self._display_curve_widget = None
-            if not self._display_curve_widget:
-                self._display_curve_widget = QtWidgets.QLabel(self._label_curve)
-                self.container_layout.addWidget(self._display_curve_widget, alignment = alignment)
+                    
+                if not self._display_curve_widget:
+                    self._display_curve_widget = QtWidgets.QLabel(self._label_curve)
+                    self.container_layout.addWidget(self._display_curve_widget, alignment = alignment)
         
+           
+        except:
+            pass
+
         self.container_layout.addStretch()
 
         
@@ -4651,9 +4673,14 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             self._create_current_axis()
             el.joystick_event.connect(self._current_axis_update)
+            if self.device_data.is_virtual:
+                el.registerVjoyCallback(self._vjoy_current_axis_update)
+                
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             self._create_temporal_axis()
             el.joystick_event.connect(self._temporal_axis_update)
+            if self.device_data.is_virtual:
+                el.registerVjoyCallback(self._vjoy_temporal_axis_update)
             for widget in self.widgets:
                 for i in self.device_data.axis_index_list():
                     value = gremlin.joystick_handling.get_axis(self.device_guid, i)
@@ -4661,6 +4688,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._create_button_hat()
             el.joystick_event.connect(self._button_hat_update)
+            if self.device_data.is_virtual:
+                el.registerVjoyCallback(self._vjoy_button_hat_update)
 
         self._hooked = True
 
@@ -4672,10 +4701,16 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             el.joystick_event.disconnect(self._current_axis_update)
+            if self.device_data.is_virtual:
+                el.unregisterVjoyCallback(self._vjoy_current_axis_update)
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             el.joystick_event.disconnect(self._temporal_axis_update)
+            if self.device_data.is_virtual:
+                el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             el.joystick_event.disconnect(self._button_hat_update)
+            if self.device_data.is_virtual:
+                el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
 
     def _clear_ui(self):
@@ -4727,12 +4762,29 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         for widget in self.widgets:
             widget.process_event(event)
 
+    def _vjoy_button_hat_update(self, event: gremlin.event_handler.VjoyEvent):
+        if self.device_data.vjoy_id != event.vjoy_id:
+            return
+        
+        event = gremlin.event_handler.Event(event_type = event.input_type, identifier = event.input_id, device_guid= self.device_guid, value = event.value)
+        for widget in self.widgets:
+            widget.process_event(event)
+
     def _current_axis_update(self, event):
         if self.device_guid != event.device_guid:
             return
 
         for widget in self.widgets:
             widget.process_event(event)
+
+    def _vjoy_current_axis_update(self, event : gremlin.event_handler.VjoyEvent):
+        if self.device_data.vjoy_id != event.vjoy_id:
+            return
+        
+        event = gremlin.event_handler.Event(event_type = event.input_type, identifier = event.input_id, device_guid= self.device_guid, value=event.value)
+        for widget in self.widgets:
+            widget.process_event(event)
+       
 
     def _temporal_axis_update(self, event):
         """Updates the temporal axes display.
@@ -4745,6 +4797,13 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if event.event_type == InputType.JoystickAxis:
             for widget in self.widgets:
                 widget.add_point(event.value, event.identifier)
+
+    def _vjoy_temporal_axis_update(self, event : gremlin.event_handler.VjoyEvent):
+        if self.device_data.vjoy_id != event.vjoy_id:
+            return
+        
+        for widget in self.widgets:
+            widget.add_point(event.value, event.input_id)
 
 
 class ButtonState(QtWidgets.QGroupBox):

@@ -498,7 +498,7 @@ class EventListener(QtCore.QObject):
 
 		config = gremlin.config.Configuration()
 		self.mouse_hook = None
-		self.enable_mouse_hook = not config.is_debug
+		self.enable_mouse_hook = not config.is_debug  # disable mouse hooks while in debug mode
 		self.enableMouse()
 
 
@@ -543,7 +543,21 @@ class EventListener(QtCore.QObject):
 		self._keep_alive_thread.setName("heartbeat")
 		self._keep_alive_thread.start()
 
+		self._vjoy_callbacks = []
+
 		self.shutdown.connect(self._shutdown_handler)
+
+	def registerVjoyCallback(self, callback):
+		if not callback in self._vjoy_callbacks:
+			self._vjoy_callbacks.append(callback)
+
+	def unregisterVjoyCallback(self, callback):
+		if callback in self._vjoy_callbacks:
+			self._vjoy_callbacks.remove(callback)
+
+	def vjoy_callback(self, event : VjoyEvent):
+		for callback in self._vjoy_callbacks:
+			callback(event)
 
 
 	@QtCore.Slot()
@@ -1067,13 +1081,19 @@ class EventListener(QtCore.QObject):
 			key_id = (event.button_id.value + 0x1000, False)
 			self._keyboard_state[key_id] = event.is_pressed
 
+			syslog.info(f"mouse event: {str(event)} key id: {key_id}")
+
 			self.mouse_event.emit(Event(
 				event_type= InputType.Mouse,
 				device_guid=dinput.GUID_Keyboard,
-				identifier=event.button_id,
+				identifier=event.button_id, # mouse handler is expecting a mouse ID, not a keyboard ID
 				is_pressed=event.is_pressed,
 				data = self._keyboard_state
 			))
+
+
+
+	
 			# print (f"Mouse button state: {key_id}  {event.is_pressed}")
 		# Allow the windows event to propagate further
 		return True
@@ -1369,11 +1389,13 @@ class EventHandler(QtCore.QObject):
 		key = event.callbackKey
 		if not key in self.latched_functors[device_guid][mode]:
 			self.latched_functors[device_guid][mode][key] = []
-		self.latched_functors[device_guid][mode][key].append(functor)
-		verbose = gremlin.config.Configuration().verbose
-		if verbose:
-			device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-			syslog.info(f"Added latched functor: {device_name} mode: {mode} type: {event.event_type.name} input: {event.identifier}  key: {key}")
+		existing_ids = [f.id for f in self.latched_functors[device_guid][mode][key]]
+		if not functor.id in existing_ids:
+			self.latched_functors[device_guid][mode][key].append(functor)
+			verbose = gremlin.config.Configuration().verbose
+			if verbose:
+				device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+				syslog.info(f"Added latched functor: {device_name} mode: {mode} type: {event.event_type.name} input: {event.identifier}  key: {key}")
 
 	def _matching_input_item(self, mode, event):
 		''' gets the matching input item from the event '''
@@ -1887,10 +1909,7 @@ class EventHandler(QtCore.QObject):
 		
 
 	def execute_event(self, event : Event):
-		"""Processes a single event by passing it to all callbacks registered for this event.
-
-		:param event the event to process
-		"""
+		''' main execution (runtime) event handler - triggers callbacks on input '''
 		
 		import gremlin.config
 		import gremlin.keyboard
@@ -1901,7 +1920,6 @@ class EventHandler(QtCore.QObject):
 
 		# mode to act on
 		mode = event.mode if event.mode else self.runtime_mode  
-
 
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
@@ -1978,7 +1996,8 @@ class EventHandler(QtCore.QObject):
 
 					if latch_key:
 
-						
+						# override the event type to a keyboard so actions think we're using a keyboard when using a mouse click
+						event.override_input_type = InputType.Keyboard
 
 						#print (f"Found latched key: {latch_key}")
 						m_list = self._matching_latched_callbacks(event, latch_key)
@@ -2184,13 +2203,15 @@ class EventHandler(QtCore.QObject):
 		
 
 	def _matching_latched_callbacks(self, event, key):
+		from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
 		callback_list = []
-		if event.event_type in (InputType.KeyboardLatched, InputType.Keyboard):
-			if event.device_guid in self.latched_callbacks:
+		if event.event_type in (InputType.KeyboardLatched, InputType.Keyboard, InputType.Mouse):
+			device_guid = KeyboardDeviceTabWidget.device_guid
+			if device_guid in self.latched_callbacks:
 				import gremlin.execution_graph
 				ec = gremlin.execution_graph.ExecutionContext() # current execution context
 				# search callbacks for mode hierarchy
-				callback_list = ec.getCallbacks(self.latched_callbacks[event.device_guid], key, self.runtime_mode)
+				callback_list = ec.getCallbacks(self.latched_callbacks[device_guid], key, self.runtime_mode)
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:

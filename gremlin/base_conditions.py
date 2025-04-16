@@ -369,7 +369,7 @@ class AbstractFunctor(QtCore.QObject):
         self.enabled = True
         self.node = parent
         self.action_data = action_data
-        self.id = action_data.id
+        self._id = action_data.id
         self.manual_callback = False # functor uses automatic mode
         
 
@@ -378,8 +378,14 @@ class AbstractFunctor(QtCore.QObject):
         el.profile_stop.connect(self.profile_stop)
         el.abort.connect(self.profile_stop) # abort also stops the profile
 
-        
+    
+    @property
+    def id(self) -> str:
+        return self._id
 
+    def setId(self, value : str):
+        ''' sets the ID '''
+        self._id = value
     
     def process_event(self, event, value, extra_data = None) -> bool:
         """Processes the functor using the provided event and value data.
@@ -690,6 +696,9 @@ class ActivationCondition(QtCore.QObject):
         ''' unique ID for this condition, persisted '''
         return self._id
     
+    def setId(self, value : str):
+        ''' sets the ID '''
+        self._id = value
  
 
     def from_xml(self, node, data = None):

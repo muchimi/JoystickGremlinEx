@@ -189,7 +189,7 @@ class ContainerPlugins:
 
         for action_set in new_container.get_action_sets():
             for action in action_set:
-                action.action_id = get_guid()
+                action.setId(get_guid())
 
         return new_container
 
@@ -338,16 +338,22 @@ class ActionPlugins:
         action_tag_map = self.tag_map
         new_action = action_tag_map[action_tag](container)
         new_action.from_xml(node, input_item)
-        new_action.action_id = get_guid()
+        new_action.setId(get_guid())
 
         return new_action
 
-    def fromClipboard(self, container):
+    def fromClipboard(self, container, input_item) -> list:
         ''' grabs an action from the clipboard '''
         from lxml import etree
         from gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
+        import gremlin.plugin_manager
         import gremlin.base_profile
         clipboard = Clipboard()
+        action_list = []
+        if container is None and input_item is None or input_item.parent is None:
+            syslog.warning(f"FromClipboard: invalid container and input data")
+            return None
+        plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         if isinstance(clipboard.data, ObjectEncoder):
             item = clipboard.data
             if item.encoder_type == EncoderType.Action:
@@ -360,9 +366,33 @@ class ActionPlugins:
                     node = etree.fromstring(xml)
                     action = self.get_class(item.name)(container)
                     action._parse_xml(node)
-                return action
-        elif isinstance(clipboard.data, gremlin.base_profile.AbstractAction):
-            return action
-        return None
+                action_list.append(action)
+            elif item.encoder_type in (EncoderType.Container, EncoderType.MultiContainer):
+                # extract actions from the data
+                xml = item.data
+                container_nodes = []
+                root = etree.fromstring(xml)
+                if root.tag == "multi_containers":
+                    # encoded as a multi container
+                    container_nodes = root.xpath("//container")
+                elif node.tag == "container":
+                    # encoded as a single container
+                    container_nodes = [root]
+                else:
+                    syslog.warning(f"FromClipboard: invalid data node: {node.tag} found")
+                    return None
+
+                for node in container_nodes:
+                    container_type = node.get("type")
+                    # verify the container is valid for the input
+                    container_tag_map = plugin_manager.tag_map
+                    if container_type in container_tag_map:
+                        new_container = container_tag_map[container_type](input_item)
+                        new_container.from_xml(node, input_item)
+                        for action_set in new_container.action_sets:
+                            for action in action_set:
+                                action_list.append(action)
+        
+        return action_list
 
 

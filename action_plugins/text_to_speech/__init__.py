@@ -286,7 +286,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         obj.volume = self.volume
         obj.rate = self.rate
         obj.voice_index = self.voice_index
-        obj.action_id = gremlin.util.get_guid()
+        obj.setId(gremlin.util.get_guid())
         return obj
 
 

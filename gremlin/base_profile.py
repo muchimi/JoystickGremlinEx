@@ -422,20 +422,21 @@ class AbstractContainer(ProfileData):
 
         for action_set in self.get_action_sets():
             for action in action_set:
-                action.id = gremlin.util.get_guid()
-                action.action_id = gremlin.util.get_guid()
+                action.setId(gremlin.util.get_guid())
+                
 
-        self.activation_condition.id = gremlin.util.get_guid()
-        for condition in self.activation_condition.conditions:
-            data = tracker.getData(condition)
-            condition.id = gremlin.util.get_guid()
-            if data:
-                new_data = ConditionTrackerData(data.mode, data.input_item, self, condition, data.rule)
-                tracker.registerCondition(new_data)
+        if self.activation_condition:
+            self.activation_condition.setId(gremlin.util.get_guid())
+            for condition in self.activation_condition.conditions:
+                data = tracker.getData(condition)
+                condition.setId = gremlin.util.get_guid()
+                if data:
+                    new_data = ConditionTrackerData(data.mode, data.input_item, self, condition, data.rule)
+                    tracker.registerCondition(new_data)
 
 
-        el = gremlin.event_handler.EventListener()
-        el.condition_state_changed.emit(self)
+            el = gremlin.event_handler.EventListener()
+            el.condition_state_changed.emit(self)
         
 
 
@@ -472,6 +473,10 @@ class AbstractContainer(ProfileData):
     @property
     def id(self):
         return self._id
+
+    def setId(self, value : str):
+        ''' sets the ID '''
+        self._id = value    
     
     @property
     def condition_enabled(self):
@@ -919,11 +924,14 @@ class AbstractAction(ProfileData):
         eh.action_delete.connect(self._action_delete)
 
 
-
     @property
     def id(self):
         ''' unique ID for this condition, persisted '''
         return self._id
+    
+    def setId(self, value : str):
+        ''' sets the ID '''
+        self._id = value
     
     @property
     def priority(self):
@@ -1022,10 +1030,6 @@ class AbstractAction(ProfileData):
         ''' id '''
         return self._id
     
-    # @action_id.setter
-    # def action_id(self, value):
-    #     ''' id setter'''
-    #     self._id = value
 
     @property
     def action_type(self):

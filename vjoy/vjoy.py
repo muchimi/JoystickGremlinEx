@@ -249,9 +249,10 @@ class Axis:
             )
             return
 
-        eh = gremlin.event_handler.EventListener()
+        el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, p_value)
-        eh.vjoy_event.emit(event)
+        #el.vjoy_event.emit(event)
+        el.vjoy_callback(event)
 
         self.vjoy_dev.ensure_ownership()
 
@@ -346,9 +347,9 @@ class Button:
         import gremlin.event_handler
         from gremlin.input_types import InputType
 
-        eh = gremlin.event_handler.EventListener()
+        el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
-        eh.vjoy_event.emit(event)
+        el.vjoy_event.emit(event)
 
 
 
@@ -362,6 +363,8 @@ class Button:
         ):
             syslog.error(f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}")
         self.vjoy_dev.used()
+
+        
 
 
 class Hat:
@@ -479,9 +482,9 @@ class Hat:
         import gremlin.event_handler
         from gremlin.input_types import InputType
 
-        eh = gremlin.event_handler.EventListener()
+        el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickHat, self.hat_id, direction)
-        eh.vjoy_event.emit(event)
+        el.vjoy_event.emit(event)
 
 
 

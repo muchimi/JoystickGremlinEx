@@ -275,7 +275,12 @@ T28
 - Fix: Macro editor delete works again
 - Fix: JoystickCondition and VJoyCondition axis range comparisons failing when they should succeed due to Python FP precision variance when matching exact FP values
 - Fix: Tempo container uses the updated API to detect presses
-
+T29
+- Improved: paste of container data is now enabled for action paste: actions defined in a copied container will be extracted and pasted as individual actions.
+- Fix: copy/paste of containers/actions functional again after the update to ensure unique IDs
+- Fix: Mouse input (via the keyboard tab, selecting the special virtual mouse keys) now triggers containers/actions.
+- Fix: Stepped axis mode on vjoy remap index not persisted on correct object between calls resulting in incorrect output values.
+- Fix: Latched functors (extra inputs for merge axis, stepped axis and others) could include duplicate calls resulting in incorrect behavior.
 
 
 

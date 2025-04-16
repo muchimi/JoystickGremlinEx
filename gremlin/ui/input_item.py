@@ -874,6 +874,7 @@ class ActionSetView(ui_common.AbstractView):
                 profile_data.parent.input_type,
                 profile_data
             )
+            self.action_selector.inputItem = profile_data.parent
             self.action_selector.action_added.connect(self._add_action)
             self.action_selector.action_paste.connect(self._paste_action)
             self.group_layout.addWidget(self.action_selector, 1, 0)
@@ -954,7 +955,7 @@ class ActionSetView(ui_common.AbstractView):
                 action_tag_map = plugin_manager.tag_map
                 new_action = action_tag_map[action_tag](self.profile_data)
                 new_action.from_xml(node)
-                new_action.action_id = get_guid()
+                new_action.setId(get_guid())
                 self.model.add_action(new_action)
         else:
             action_item = plugin_manager.duplicate(action,self.profile_data)
@@ -1094,9 +1095,9 @@ class InputItemWidget(QBoxFrame):
         self._title_container_widget = QtWidgets.QWidget()
         self._title_container_layout = QtWidgets.QGridLayout(self._title_container_widget)
         #self._title_container_widget.setStyleSheet("background: red;")
-        self._title_container_widget.setContentsMargins(0,2,0,2)
-        self._title_container_layout.setContentsMargins(0,0,0,0)
-        self._title_container_layout.setSpacing(0)
+        #self._title_container_widget.setContentsMargins(0,2,0,2)
+        self._title_container_layout.setContentsMargins(2,0,2,0)
+        #self._title_container_layout.setSpacing(0)
 
         self.identifier = identifier
         self._input_id = identifier.input_id
@@ -1126,7 +1127,7 @@ class InputItemWidget(QBoxFrame):
         self._icon_widget = QtWidgets.QWidget()
         self._icon_layout = QtWidgets.QHBoxLayout(self._icon_widget)
         self._icon_widget.setContentsMargins(0,0,0,0)
-        self._icon_layout.setContentsMargins(0,0,0,0)
+        self._icon_layout.setContentsMargins(2,0,2,0)
         self._icons = []
    
         # top row
@@ -1156,64 +1157,79 @@ class InputItemWidget(QBoxFrame):
         #self.container_layout.addWidget(QtWidgets.QWidget(), data_row, 0) # spacer
         self._title_container_layout.addWidget(self._title_widget, data_row, 0) # title
         self._title_container_layout.addWidget(self._icon_widget, data_row, 1) # container icons
+
+        size = 16
                 
 
         # action buttons
-        self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa6s.gear",color=normal_color),"") 
+        icon = gremlin.ui.ui_common.load_icon("fa6s.gear")
+        self._edit_button_widget = QtWidgets.QPushButton() 
+        self._edit_button_widget.setIcon(icon)
         self._edit_button_widget.setToolTip("Configure")
-        self._edit_button_widget.setFixedSize(24,16)
+        self._edit_button_widget.setFixedSize(size,size)
         self._edit_button_widget.clicked.connect(self._edit_button_cb)
 
         # input button on/off
         self._input_button_widget = QtWidgets.QPushButton() 
         self._input_button_widget.setIcon(self._input_icon_active)
         self._input_button_widget.setToolTip("Enables or disables this input.  If disabled, input from this specific input will be ignored.<br>The state can be changed by the control action as well.")
-        self._input_button_widget.setFixedSize(24,16)
+        self._input_button_widget.setFixedSize(size,size)
         self._input_button_widget.clicked.connect(self._input_button_cb)
 
-        # calibration button
-        self._calibration_button_widget = QtWidgets.QPushButton() 
-        self._calibration_button_widget.setIcon(self._calibration_icon_active)
-        self._calibration_button_widget.setToolTip("Device calibration options")
-        self._calibration_button_widget.setFixedSize(24,16)
-        self._calibration_button_widget.clicked.connect(self._calibration_button_cb)
-        
+
+        # close widget
+        icon = gremlin.ui.ui_common.load_icon("mdi.delete")
+        self._close_button_widget = QtWidgets.QPushButton(parent = self)
+        self._close_button_widget.setIcon(icon)
+        self._close_button_widget.setFixedSize(size,size)
+        self._close_button_widget.clicked.connect(self._close_button_cb)
+
 
         self._title_container_layout.addWidget(self._input_button_widget, data_row, 1)
         self._title_container_layout.addWidget(self._edit_button_widget, data_row, 2)
 
-        self._close_button_widget = QtWidgets.QPushButton(qta.icon("mdi.delete"),"")
+
+        # axis only control buttons
+        self.is_axis = self.data.is_axis if self.data else False
+
+        # display calibration only on axis inputs 
+        if self.is_axis:        
+            self._calibration_button_widget = QtWidgets.QPushButton() 
+            self._calibration_button_widget.setIcon(self._calibration_icon_active)
+            self._calibration_button_widget.setToolTip("Device calibration options")
+            self._calibration_button_widget.setFixedSize(size,size)
+            self._calibration_button_widget.clicked.connect(self._calibration_button_cb)
+            
+
+   
+            
+
+
+
+            self._curve_button_widget = QtWidgets.QPushButton() 
+            self._curve_button_widget.setIcon(self._curve_icon_active)
+            self._curve_button_widget.setToolTip("Input Curve")
+            self._curve_button_widget.setFixedSize(size,size)
+            self._curve_button_widget.clicked.connect(self._curve_button_cb)
+
+
+
+            self.clear_curve_widget = QtWidgets.QPushButton()
+            self.clear_curve_widget.setToolTip("Clear Curve")
+            self.clear_curve_widget.setIcon(load_icon("mdi.delete"))
+            self.clear_curve_widget.setFixedSize(size,size)
+            self.clear_curve_widget.clicked.connect(self._clear_curve_cb)
+
+            self._curve_container_widget = QtWidgets.QWidget()
+            self._curve_container_widget.setContentsMargins(0,0,0,0)
+            self._curve_container_layout = QtWidgets.QHBoxLayout(self._curve_container_widget)
+            self._curve_container_layout.setContentsMargins(0,0,0,0)
+
+            self._curve_container_layout.addStretch()
+            self._curve_container_layout.addWidget(self._calibration_button_widget)
+            self._curve_container_layout.addWidget(self._curve_button_widget)
+            self._curve_container_layout.addWidget(self.clear_curve_widget)
         
-        self._close_button_widget.setFixedSize(16,16)
-        self._close_button_widget.clicked.connect(self._close_button_cb)
-        
-        
-
-
-
-        self._curve_button_widget = QtWidgets.QPushButton() 
-        self._curve_button_widget.setIcon(self._curve_icon_active)
-        self._curve_button_widget.setToolTip("Input Curve")
-        self._curve_button_widget.setFixedSize(24,16)
-        self._curve_button_widget.clicked.connect(self._curve_button_cb)
-
-
-
-        self.clear_curve_widget = QtWidgets.QPushButton()
-        self.clear_curve_widget.setToolTip("Clear Curve")
-        self.clear_curve_widget.setIcon(load_icon("mdi.delete"))
-        self.clear_curve_widget.setFixedSize(24,16)
-        self.clear_curve_widget.clicked.connect(self._clear_curve_cb)
-
-        self._curve_container_widget = QtWidgets.QWidget()
-        self._curve_container_widget.setContentsMargins(0,0,0,0)
-        self._curve_container_layout = QtWidgets.QHBoxLayout(self._curve_container_widget)
-        self._curve_container_layout.setContentsMargins(0,0,0,0)
-
-        self._curve_container_layout.addStretch()
-        self._curve_container_layout.addWidget(self._calibration_button_widget)
-        self._curve_container_layout.addWidget(self._curve_button_widget)
-        self._curve_container_layout.addWidget(self.clear_curve_widget)
 
 
         self._title_container_layout.addWidget(self._close_button_widget, data_row, 4)
@@ -1260,9 +1276,10 @@ class InputItemWidget(QBoxFrame):
 
         self._update_repeater() # create the correct repeater widget
         
+        if self.is_axis:
+            self._container_input_axis_layout.addWidget(self._curve_container_widget)
+            self.main_layout.addWidget(self._container_input_axis_widget)
 
-        self._container_input_axis_layout.addWidget(self._curve_container_widget)
-        self.main_layout.addWidget(self._container_input_axis_widget)
         self.main_layout.addWidget(self._status_widget)
 
         
@@ -1415,8 +1432,9 @@ class InputItemWidget(QBoxFrame):
 
     @QtCore.Slot()
     def _update_icons(self):
-        ''' update icons'''
-        if not self._ui_loaded: return
+        ''' update icons for the axis inputs '''
+        if not self._ui_loaded or not self.is_axis:
+            return
             
         curve_visible = self.data.input_type == InputType.JoystickAxis
         try:
@@ -1494,14 +1512,15 @@ class InputItemWidget(QBoxFrame):
 
     def update_curve_icon(self, enabled : bool):
         ''' enables or disables curve buttons '''
-        if enabled:
-            self._curve_button_widget.setIcon(self._curve_icon_active)
-        else:
-            self._curve_button_widget.setIcon(self._curve_icon_inactive)
-        self.clear_curve_widget.setEnabled(enabled)
-        if self.identifier.input_type == InputType.JoystickAxis:
-            if self.axis_widget is not None: # will be null if input axes not displayed
-                self.axis_widget.show_curved = enabled
+        if self.is_axis:
+            if enabled:
+                self._curve_button_widget.setIcon(self._curve_icon_active)
+            else:
+                self._curve_button_widget.setIcon(self._curve_icon_inactive)
+            self.clear_curve_widget.setEnabled(enabled)
+            if self.identifier.input_type == InputType.JoystickAxis:
+                if self.axis_widget is not None: # will be null if input axes not displayed
+                    self.axis_widget.show_curved = enabled
 
 
     @QtCore.Slot(float)

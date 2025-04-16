@@ -644,8 +644,6 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         from gremlin.curve_handler import DeadzoneWidget
 
         self.setModal(True)
-        
-        
 
         self.mgr : CalibrationManager = CalibrationManager()
 

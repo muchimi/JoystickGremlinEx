@@ -1637,6 +1637,7 @@ class ContainerCallback:
             InputType.Midi,
             InputType.OpenSoundControl,
             InputType.Keyboard,
+            InputType.Mouse,
             InputType.VirtualButton,
             InputType.ModeControl,
         ]:

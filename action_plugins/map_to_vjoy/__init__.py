@@ -29,6 +29,7 @@ import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.input_types
 import gremlin.joystick_handling
+import gremlin.keyboard
 import gremlin.ui.qsliderwidget
 from gremlin.util import load_icon
 
@@ -2831,7 +2832,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.in_range = False # true when in axis to button mode and the axis was in range
         self.lock = threading.Lock()
 
-        self.step_index = self.action_data.target_step_start_index
+        
 
 
     def getCurveActions(self):
@@ -3346,16 +3347,16 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if event.device_guid != self.action_data.hardware_device_guid and event.device_guid != self.action_data.stepped_device_guid:
                     return True
                 trigger = False
-                index = self.step_index
+                index = self.action_data.target_step_start_index
                 if (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release):
-                    if event.device_guid == self.action_data.hardware_device_guid and event.identifier == self.action_data.hardware_input_id:
+                    if event.device_guid == self.action_data.hardware_device_guid: # and event.identifier == self.action_data.hardware_input_id:
                         # up direction
-                        syslog.info(f"Step up")
+                        if verbose: syslog.info(f"Step up")
                         index +=1
                         trigger = True
                     elif event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id:
                         # down direction
-                        syslog.info(f"Step down")
+                        if verbose: syslog.info(f"Step down")
                         index -= 1
                         trigger = True
 
@@ -3363,8 +3364,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         index = gremlin.util.clamp(index,0,len(self.action_data.target_step_list)-1)
                         value = self.action_data.target_step_list[index]
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
-                        self.step_index = index
-                        syslog.info(f"Step: Index: {index} value: {value:0.3f}")
+                        self.action_data.target_step_start_index = index
+                        if verbose: syslog.info(f"Step: Index: {index}  value: {value:0.3f}")
 
 
             else:
