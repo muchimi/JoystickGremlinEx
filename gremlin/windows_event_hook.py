@@ -20,15 +20,12 @@ import ctypes
 from ctypes import wintypes
 import threading
 import time
-import gremlin.common
 import gremlin.config
-import gremlin.event_handler
-import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 
 
-user32 = ctypes.WinDLL("user32")
 
+user32 = ctypes.WinDLL("user32")
 
 g_keyboard_callbacks = []
 g_mouse_callbacks = []
@@ -103,6 +100,9 @@ class MouseEvent:
     def is_injected(self):
         return self._is_injected
     
+    def __str__(self):
+        return f"MouseEvent: {self.button_id}  pressed: {self._is_pressed} injected: {self._is_injected}"
+
 def get_last_error():
     ''' last error implementatoin'''
     return win32api.GetLastError()
@@ -250,8 +250,11 @@ def process_keyboard_event(n_code, w_param, l_param):
     # Pass the event on to the next callback in the chain
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
-_mouse_h_wheel_time = None
-_mouse_v_wheel_time = None
+
+_mouse_wheel_timer = {} # timer for wheel releases = keyed by button ID for each possible button, keyed by wheel button ID
+_mouse_wheel_state = {} # holds the current state (pressed) of the wheel button
+_mouse_wheel_delay = 0.5 # mouse wheel delay in ms
+
 
 @HOOKPROC
 def process_mouse_event(n_code, w_param, l_param):
@@ -261,79 +264,93 @@ def process_mouse_event(n_code, w_param, l_param):
     :param w_param message type identifier
     :param l_param message content
     """
+    global g_mouse_callbacks
+    verbose = False
     if n_code == HC_ACTION and w_param != WM_MOUSEMOVE:
         msg = ctypes.cast(l_param, LPMSLLHOOKSTRUCT)[0]
 
         # Only handle events we're supposed to, see
         # https://msdn.microsoft.com/en-us/library/windows/desktop/ms644985(v=vs.85).aspx
         button_id = None
-        is_pressed = True
+        is_pressed = True # assume a press event
         is_wheel = False
+        process = False
         if w_param in [WM_LBUTTONDOWN, WM_LBUTTONUP]:
             button_id = gremlin.types.MouseButton.Left
             is_pressed = w_param == WM_LBUTTONDOWN
+            process = True
         elif w_param in [WM_RBUTTONDOWN, WM_RBUTTONUP]:
             button_id = gremlin.types.MouseButton.Right
             is_pressed = w_param == WM_RBUTTONDOWN
+            process = True
         elif w_param in [WM_MBUTTONDOWN, WM_MBUTTONUP]:
             button_id = gremlin.types.MouseButton.Middle
             is_pressed = w_param == WM_MBUTTONDOWN
+            process = True
         elif w_param in [WM_XBUTTONDOWN, WM_XBUTTONUP]:
             if msg.mouseData & (0x0001 << 16):
                 button_id = gremlin.types.MouseButton.Back
             elif msg.mouseData & (0x0002 << 16):
                 button_id = gremlin.types.MouseButton.Forward
             is_pressed = w_param == WM_XBUTTONDOWN
+            process = True
         elif w_param == WM_MOUSEWHEEL:
-            process = False
-            global _mouse_v_wheel_time
-            if not _mouse_v_wheel_time:
-                _mouse_v_wheel_time = time.time()
-                process = True
-            else:
-                current_time = time.time()
-                time_delta = (current_time - _mouse_v_wheel_time) * 1000 # in milliseconds
-                _mouse_v_wheel_time = current_time
-                process = time_delta > 500 # half a second
-            if process:
-                delta = msg.mouseData >> 16
-                # print (f"mouse V received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
-                if delta == 120:
-                    button_id = gremlin.types.MouseButton.WheelUp
-                elif delta == 65416: # -120
-                    button_id = gremlin.types.MouseButton.WheelDown
-                is_wheel = True
+            # vertical mouse wheel
+            delta = msg.mouseData >> 16
+            # print (f"mouse V received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
+            if delta == 120:
+                button_id = gremlin.types.MouseButton.WheelUp
+                release_button_id = gremlin.types.MouseButton.WheelDown
+            elif delta == 65416: # -120
+                button_id = gremlin.types.MouseButton.WheelDown
+                release_button_id = gremlin.types.MouseButton.WheelUp
+            is_wheel = True
         elif w_param == WM_MOUSEHWHEEL:
-            # horizontal mouse wheel  https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-mousehwheel
-            process = False
-            global _mouse_h_wheel_time
-            if not _mouse_h_wheel_time:
-                _mouse_h_wheel_time = time.time()
-                process = True
+            # horizontal mouse wheel
+            if delta == 120:
+                button_id = gremlin.types.MouseButton.WheelRight
+                release_button_id = gremlin.types.MouseButton.WheelLeft
+            elif delta == 65416: # -120
+                button_id = gremlin.types.MouseButton.WheelLeft
+                release_button_id = gremlin.types.MouseButton.WheelRight
+            is_wheel = True
+
+        if is_wheel and button_id:
+            # mouse wheel event processing
+            global _mouse_wheel_timer, _mouse_wheel_delay, _mouse_wheel_state
+            if verbose: syslog.info(f"wheel press {button_id}")
+
+            if _mouse_wheel_state[button_id]:
+                process = False # don't trigger if already pressed
             else:
-                current_time = time.time()
-                time_delta = (current_time - _mouse_h_wheel_time) * 1000 # in milliseconds
-                _mouse_h_wheel_time = current_time
-                process = time_delta > 500 # half a second
+                _mouse_wheel_state[button_id] = True # mark pressed
+                process = True
+                
+            if _mouse_wheel_timer[button_id]:
+                # cancel current timer
+                _mouse_wheel_timer[button_id].cancel()
 
-            if process:
-                delta = msg.mouseData >> 16
-                # print (f"mouse H received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
-                if delta == 120:
-                    button_id = gremlin.types.MouseButton.WheelRight
-                elif delta == 65416: # -120
-                    button_id = gremlin.types.MouseButton.WheelLeft
-                is_wheel = True
+            # new timer
+            _mouse_wheel_timer[button_id] = threading.Timer(_mouse_wheel_delay, lambda: _queue_wheel_release(button_id))
+            _mouse_wheel_timer[button_id].start()
 
-        # if button_id:
-        #     syslog.info(f"Mouse button: {button_id}")
+            is_pressed = True
+            
 
-        if button_id:
-            # Create the event and pass it to all all registered callbacks
+
+            # release the paired wheel button if needed
+            if _mouse_wheel_state[release_button_id]:
+                # paired button is pressed
+                if verbose: syslog.info(f"wheel timer reset {release_button_id}")
+                _queue_wheel_release(release_button_id) # send the release event for that paird button
+
+                
+       
+
+        if process:
+            # trigger the event
+            if verbose: syslog.info(f"Mouse event press: {button_id}")
             evt = MouseEvent(button_id, is_pressed, False)
-            if is_wheel:
-                # queue a release event for mouse wheel 
-                threading.Thread(target=lambda: _queue_wheel_release(button_id)).start()
             for cb in g_mouse_callbacks:
                 cb(evt)
 
@@ -343,13 +360,19 @@ def process_mouse_event(n_code, w_param, l_param):
 
 
 def _queue_wheel_release(button_id):
-    ''' queues a mouse wheel release for wheel events '''
-    import time
-    # print (f"wheel release: {button_id}")
-    time.sleep(0.1)
-    evt = MouseEvent(button_id, False, False)
-    for cb in g_mouse_callbacks:
-        cb(evt)
+    ''' queues a mouse wheel release event  '''
+    global g_mouse_callbacks, _mouse_wheel_timer, _mouse_wheel_state
+    verbose = False
+    if _mouse_wheel_state[button_id]:
+        if verbose: syslog.info(f"wheel release {button_id}")
+        _mouse_wheel_state[button_id] = False
+        if _mouse_wheel_timer[button_id]:
+            # cancel the timer
+            _mouse_wheel_timer[button_id].cancel()
+
+        evt = MouseEvent(button_id, False, False)
+        for cb in g_mouse_callbacks:
+            cb(evt)
 
 
 
@@ -382,7 +405,6 @@ class KeyboardHook:
 
     def stop(self):
         """Stops the hook from running."""
-        syslog = logging.getLogger("system")
         syslog.info("KEYBOARD: shutdown")
         if self._running:
             self._running = False
@@ -420,8 +442,24 @@ class MouseHook:
     """
 
     def __init__(self):
+        import gremlin.types
+        import gremlin.threading
+        import gremlin.config
+
         self._running = False
         self._listen_thread = threading.Thread(target=self._listen, daemon=True)
+
+        global _mouse_wheel_state, _mouse_wheel_timer, _mouse_wheel_delay
+        wheel_buttons = [gremlin.types.MouseButton.WheelDown,
+                         gremlin.types.MouseButton.WheelUp,
+                         gremlin.types.MouseButton.WheelLeft,
+                         gremlin.types.MouseButton.WheelRight,
+                          ]
+        for button_id in wheel_buttons:
+            _mouse_wheel_state[button_id] = False # assume not pressed
+            _mouse_wheel_timer[button_id] = None
+
+        _mouse_wheel_delay = gremlin.config.Configuration().mouse_wheel_autorelease_delay
 
     def register(self, callback):
         """Registers a new message callback.
@@ -446,19 +484,44 @@ class MouseHook:
 
     def stop(self):
         """Stops the hook from running."""
-        syslog = logging.getLogger("system")
-        syslog.info("MOUSE: shutdown")
+        
+        syslog.info("MOUSE: stop")
         if self._running:
             self._running = False
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
             self._listen_thread.join()
             # Recreate thread so we can launch it again
             self._listen_thread = threading.Thread(target=self._listen, daemon=True)
+            self._stop_timers()
+        
+
+    def shutdown(self):
+        ''' requests a shutdown '''
+        self.stop()
+
+        syslog.info("MOUSE: shutdown")
+        if self._listen_thread:
+            if self._listen_thread.is_alive():
+                self._listen_thread.join()
+            self._listen_thread = None
+        
+
+    def _stop_timers(self):
+        # stop any mouse event timers
+        global _mouse_wheel_timer
+        for id in _mouse_wheel_timer:
+            if _mouse_wheel_timer[id]:
+                _mouse_wheel_timer[id].cancel()
+                _mouse_wheel_timer[id] = None
+
 
     def _listen(self):
         """Configures the hook and starts listening."""
-        syslog = logging.getLogger("system")
+        
         verbose = gremlin.config.Configuration().verbose
+
+
+
         syslog.info("MOUSE: HOOK started")
         self.hook_id = user32.SetWindowsHookExW(
             WH_MOUSE_LL,
@@ -477,3 +540,4 @@ class MouseHook:
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
             
+_mouse_hook = MouseHook()

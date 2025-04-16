@@ -131,7 +131,10 @@ class CodeRunner:
         """
 
         el = gremlin.event_handler.EventListener()
+        eh = gremlin.event_handler.EventHandler()
 
+        eh.reset() # reset any prior run data 
+        
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(force_rebuild = True) # rebuild the execution tree
         build_error = ec.getLastBuildError()
@@ -556,10 +559,6 @@ class CodeRunner:
             
             #print ("resume!")
             self.event_handler.resume()
-
-
-            # register callbacks with the execution tree
-            eh = gremlin.event_handler.EventHandler()
 
 
             ec.registerCallbacks(eh.callbacks)

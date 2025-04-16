@@ -681,6 +681,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.macro_axis_minimum_change_layout.addStretch()
 
 
+        self.mouse_wheel_delay_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 0, max_range = 2000)
+        self.mouse_wheel_delay_widget.setValue(self.config.mouse_wheel_autorelease_delay * 1000)
+        self.mouse_wheel_delay_widget.setToolTip("Mouse wheel autorelease timeout - this value in ms determines how long the wheel stops moving before triggering a wheel release event.")
+        self.mouse_wheel_delay_widget.valueChanged.connect(self._mouse_wheel_delay_change_value)
+
         self.runtime_ui_update = QtWidgets.QCheckBox("Update UI when profile is active")
         self.runtime_ui_update.setChecked(self.config.runtime_ui_update)
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
@@ -710,6 +715,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         column_layout.addWidget(self.numlock_enabled, row, col)
         row+=1
         column_layout.addWidget(self.start_on_f5, row, col)
+        row+=1
+        widget, layout = gremlin.ui.ui_common.getHContainer(self.mouse_wheel_delay_widget,"Mouse Wheel Release:")
+        column_layout.addWidget(widget, row, col)
 
 
         # column 2
@@ -1174,6 +1182,12 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         page_layout.addStretch()
 
+
+    @QtCore.Slot()
+    def _mouse_wheel_delay_change_value(self):
+        value = self.mouse_wheel_delay_widget.value() / 1000 # to seconds
+        self.config.mouse_wheel_autorelease_delay = value
+
     @QtCore.Slot()
     def _change_host_ip(self):
        self._host_dialog = HostIpDialog(self._host_ip)
@@ -1188,9 +1202,8 @@ This setting is also available on a profile by profile basis on the profile tab,
 
     @QtCore.Slot()
     def _local_host_ip_changed(self):
-        config = gremlin.config.Configuration()
         host_ip = self._local_host_ip_widget.text()
-        config.host_ip = host_ip
+        self.config.host_ip = host_ip
 
     def _create_vigem_page(self):
         page_widget = QtWidgets.QWidget()

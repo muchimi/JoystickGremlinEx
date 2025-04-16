@@ -638,7 +638,7 @@ class EventListener(QtCore.QObject):
 
 	def disableMouse(self):
 		if self.mouse_hook is not None:
-			self.mouse_hook.stop()
+			self.mouse_hook.shutdown()
 			self.mouse_hook.unregister(self._mouse_handler)
 			self.mouse_hook = None
 
@@ -775,6 +775,7 @@ class EventListener(QtCore.QObject):
 		self._running = False
 		self.keyboard_hook.stop()
 		self.disableMouse()
+		
 
 		# send the shutdown trigger to all code parts
 		if self._run_thread is not None:
@@ -1081,7 +1082,7 @@ class EventListener(QtCore.QObject):
 			key_id = (event.button_id.value + 0x1000, False)
 			self._keyboard_state[key_id] = event.is_pressed
 
-			syslog.info(f"mouse event: {str(event)} key id: {key_id}")
+			# syslog.info(f"mouse event: {str(event)} key id: {key_id}")
 
 			self.mouse_event.emit(Event(
 				event_type= InputType.Mouse,
@@ -1090,11 +1091,7 @@ class EventListener(QtCore.QObject):
 				is_pressed=event.is_pressed,
 				data = self._keyboard_state
 			))
-
-
-
-	
-			# print (f"Mouse button state: {key_id}  {event.is_pressed}")
+			
 		# Allow the windows event to propagate further
 		return True
 
@@ -1958,8 +1955,7 @@ class EventHandler(QtCore.QObject):
 						syslog.info(f"\t[{index}]: {input_item.name}")
 				
 				for input_item in items:
-					if verbose:
-						syslog.info("-"*50)
+					if verbose: syslog.info("-"*50)
 					is_latched = True
 					latch_key = None
 					# print (data)
@@ -1986,8 +1982,7 @@ class EventHandler(QtCore.QObject):
 									syslog.info(f"\t\t* Key not found *")
 							is_latched = is_latched and state # make sure all latched keys are currently pressed (state = True)
 
-					if verbose:
-						syslog.info(f"\tLatched state: {is_latched}")
+					if verbose:	syslog.info(f"\tLatched state: {is_latched}")
 					
 					if is_latched:
 						latch_key = input_item.key

@@ -281,8 +281,12 @@ T29
 - Fix: Mouse input (via the keyboard tab, selecting the special virtual mouse keys) now triggers containers/actions.
 - Fix: Stepped axis mode on vjoy remap index not persisted on correct object between calls resulting in incorrect output values.
 - Fix: Latched functors (extra inputs for merge axis, stepped axis and others) could include duplicate calls resulting in incorrect behavior.
-
-
+- Improved: input viewer will update VJOY based on internal values sent to VJOY even if the device is not setup as an input device to keep things synchronized.
+T30
+- Improved: low level mouse wheel handling refactored: wheel release no longer triggers while wheel motion detected before a timeout. New option added to set the timeout in options.  The timeout value determines the wait time in milliseconds for a wheel release event after the last detected wheel motion for that direction.  Default is 500ms (half a second).  
+- New feature: Stepped axis mode of vjoy remap can disable the "down" component latching. If disabled, the "down" action will not be latched.
+- New feature: Stepped axis mode of vjoy remap can change the step direction via the new direction option.  When checked, the step direction will be reversed, so up is down, and down is up.
+- Fix: event callback cache now always resets before a new profile start to clear prior cached data.  This will reset any prior cached execution data if the profile is changed, and run again.
 
 
 

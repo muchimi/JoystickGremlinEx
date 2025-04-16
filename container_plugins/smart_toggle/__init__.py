@@ -214,7 +214,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             '''
         
         verbose = gremlin.config.Configuration().verbose_mode_outputs
-        verbose = True
+        # verbose = True
         
         if extra_data is None:
             extra_data = {}

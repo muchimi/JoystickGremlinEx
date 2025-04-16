@@ -1489,6 +1489,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.step_start_index_widget.setEnabled(enabled)
         self.step_start_value_widget.setEnabled(enabled)
 
+        self.latched_device_widget.setEnabled(self.action_data._stepped_latched)
+
         index = self.step_start_index_widget.value()
         if steps > 0:
             index = gremlin.util.clamp(index, 1, steps)
@@ -1616,6 +1618,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.update_steps()
 
+    @QtCore.Slot(bool)
+    def _step_direction_changed(self, checked):
+        self.action_data.target_step_direction = -1 if checked else 1
+
+    @QtCore.Slot(bool)
+    def _step_latched_changed(self, checked):
+        self.action_data._stepped_latched = checked
+        self.update_steps()
 
     @QtCore.Slot()
     def _step_start_index_changed(self):
@@ -1674,7 +1684,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
     def _create_step_ui(self):
-        ''' creates the axis merging UI components '''
+        ''' creates the axis step mode UI components '''
         # stepped output 
 
         self.target_step_index_map = {} # map of step index to step widget ID keyed by index in the step list
@@ -1697,6 +1707,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         value = self.action_data.target_step_list[self.action_data.target_step_start_index]
         self.step_start_value_widget.setText(f"{value:0.3f}")
 
+        self.step_direction_widget = QtWidgets.QCheckBox("Invert direction")
+        self.step_direction_widget.setToolTip("When set, inverts the direction of the stepping so up becomes down, and down becomes up.")
+        self.step_direction_widget.setChecked(self.action_data.target_step_direction == -1)
+        self.step_direction_widget.clicked.connect(self._step_direction_changed)
+        
+        self.step_latched_enabled_widget = QtWidgets.QCheckBox("Enable down input")
+        self.step_latched_enabled_widget.setToolTip("If enabled, allows binding of another input to trigger a down step")
+        self.step_latched_enabled_widget.setChecked(self.action_data._stepped_latched)
+        self.step_latched_enabled_widget.clicked.connect(self._step_latched_changed)
 
         self.step_start_index_widget.setRange(1,100)
         self.step_start_index_widget.valueChanged.connect(self._step_start_index_changed)
@@ -1749,6 +1768,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.step_value_container_layout.addWidget(self.step_start_value_widget)
         self.step_value_container_layout.addWidget(QtWidgets.QLabel("Steps:"))
         self.step_value_container_layout.addWidget(self.step_count_widget)
+        self.step_value_container_layout.addWidget(self.step_direction_widget)
         
         self.step_value_container_layout.addStretch()
 
@@ -1771,17 +1791,23 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         listen_widget = QtWidgets.QPushButton("Listen")
         listen_widget.clicked.connect(self._stepped_listen)
 
-        device_widget = QtWidgets.QWidget()
-        device_layout = QtWidgets.QGridLayout(device_widget)
-        device_layout.addWidget(QtWidgets.QLabel("Down Device:"),0,0)
-        device_layout.addWidget(self.stepped_selector_device_widget,0,1)
-        device_layout.addWidget(listen_widget,0,3)
-        device_layout.addWidget(QtWidgets.QLabel(" "),0,4)
-        device_layout.addWidget(QtWidgets.QLabel("Down Input:"),1,0)
-        device_layout.addWidget(self.stepped_selector_input_widget,1,1)
+        self.latched_device_widget = QtWidgets.QWidget()
+        device_layout = QtWidgets.QGridLayout(self.latched_device_widget)
+
+        row = 0
+        device_layout.addWidget(QtWidgets.QLabel("Down Device:"),row,0)
+        device_layout.addWidget(self.stepped_selector_device_widget,row,1)
+        device_layout.addWidget(listen_widget,row,3)
+        device_layout.addWidget(QtWidgets.QLabel(" "),row,4)
+
+        row+=1
+        device_layout.addWidget(QtWidgets.QLabel("Down Input:"),row,0)
+        device_layout.addWidget(self.stepped_selector_input_widget,row,1)
         device_layout.setColumnStretch(4,2)
 
-        self.container_stepped_layout.addWidget(device_widget)
+
+        self.container_stepped_layout.addWidget(self.step_latched_enabled_widget)
+        self.container_stepped_layout.addWidget(self.latched_device_widget)
         self.container_stepped_layout.addWidget(self.step_value_container_widget)
         self.container_stepped_layout.addWidget(self.progression_container_widget)
         self.container_stepped_layout.addWidget(self.step_widget_container)
@@ -3109,7 +3135,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
         auto_complete = True # assume the functor completes this pass
 
-        #verbose = True
+        # verbose = True
 
         #if verbose: syslog.info(f"VJOY MAPPER: local: {is_local} remote: {is_remote}")
         # syslog.info(f"REMAP: event pressed: {event.is_pressed}  value pressed: {action_value.is_pressed} value current: {action_value.current}" )
@@ -3348,16 +3374,18 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     return True
                 trigger = False
                 index = self.action_data.target_step_start_index
+                direction = self.action_data.target_step_direction
+                latched = self.action_data._stepped_latched
                 if (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release):
                     if event.device_guid == self.action_data.hardware_device_guid: # and event.identifier == self.action_data.hardware_input_id:
                         # up direction
-                        if verbose: syslog.info(f"Step up")
-                        index +=1
+                        if verbose: syslog.info(f"Step {'up' if direction == 1 else 'down'}")
+                        index += direction
                         trigger = True
-                    elif event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id:
+                    elif latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id:
                         # down direction
-                        if verbose: syslog.info(f"Step down")
-                        index -= 1
+                        if verbose: syslog.info(f"Step {'down' if direction == 1 else 'up'}")
+                        index -= direction
                         trigger = True
 
                     if trigger:
@@ -3520,6 +3548,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.target_step_index = 0 # index of last value sent
         self.target_step_start_index = 0 # start index when profile is loaded (initial step)
         self.target_step_direction = 1 # direction of stepping, +1 or -1
+        self._stepped_latched = True # true if the step down latching is enabled
         self.target_value_valid = True
         self.target_is_relative = False # true if the set value axis is a relative value (+ or -)
         self._stepped_device_id : str = None # device of the down step action to latch
@@ -4021,10 +4050,14 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 self.ignore_release = safe_read(node,"ignore-release",bool, False)
 
             if "step-dir" in node.attrib:
-                self.target_step_index = safe_read(node,"step-dir", int, 1)
+                self.target_step_direction = safe_read(node,"step-dir", int, 1)
+
             if "steps" in node.attrib:
                 csv = node.get("steps")
                 self.target_step_list = gremlin.util.csv_to_floatlist(csv)
+
+            self._stepped_latched = safe_read(node,"latched", bool, True)
+
             if "step-start-index" in node.attrib:
                 self.target_step_start_index = safe_read(node,"step-start-index", int, 0)
             if "stepped-device-id" in node.attrib:
@@ -4153,6 +4186,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 node.set("step-dir", safe_format(self.target_step_direction, int))
                 node.set("steps", gremlin.util.floatlist_to_csv(self.target_step_list))
                 node.set("step-start-index", safe_format(self.target_step_start_index, int))
+                node.set("latched", safe_format(self._stepped_latched, bool))
                 if self.stepped_device_id:
                     node.set("stepped-device-id", self.stepped_device_id)
                 if self.stepped_input_id:

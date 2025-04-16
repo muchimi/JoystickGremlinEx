@@ -15,8 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import threading
+from threading import Thread, Event, Timer
+import time
+import logging
+
+syslog = logging.getLogger("system")
 
 
 class AbortableThread(threading.Thread):
@@ -48,3 +53,59 @@ class AbortableThread(threading.Thread):
         #return self._stop_event.is_set()
 
 
+
+
+def TimerEx(*args, **kwargs):
+    """ Global function for Timer """
+    return _TimerEx(*args, **kwargs)
+
+
+
+
+class _TimerEx():
+    def __init__(self, interval, target, args=None, kwargs=None):
+        self._interval = interval
+        self._callback = target
+        self._args = args if args is not None else []
+        self._kwargs = kwargs if kwargs is not None else {}
+        self._timer = None
+        self._is_running = False
+        self._one_shot = False
+        self._name = None
+    
+
+    def _run(self):
+        self._is_running = False
+        self.start()
+        syslog.info(f"timer trigger: {self._name if self._name else ''}")
+        self._callback(*self._args, **self._kwargs)
+        
+        if self._one_shot:
+            self._timer.cancel()
+
+    def setName(self, name : str):
+        self._name = name
+
+    def start(self, oneshot = False):
+      ''' starts the timer, if oneshot is set, the timer runs once and stops when it lapses, if not set, runs until canceled'''
+      if not self._is_running:
+        self._timer = threading.Timer(self._interval, self._run)
+        self._is_running = True
+        self._one_shot = oneshot
+        self._timer.start()
+        syslog.info(f"timer start {self._name if self._name else ''}")
+
+    def isRunning(self) -> bool:
+        return self._is_running
+
+    def cancel(self):
+        if self._is_running:
+            self._timer.cancel()
+            self._is_running = False
+            syslog.info(f"timer cancel {self._name if self._name else ''}")
+
+
+    def reset(self, oneshot = False):
+        syslog.info(f"timer reset {self._name if self._name else ''}")
+        self.cancel()
+        self.start(oneshot)

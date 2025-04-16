@@ -1972,3 +1972,13 @@ class Configuration:
     def hostIp(self, value : str):
         self._data["host_ip"] = value
         self.save()
+
+    @property
+    def mouse_wheel_autorelease_delay(self) -> float:
+        ''' wheel event autorelease timeout in seconds '''
+        return self._data.get("wheel_autorelease_delay", 0.5)
+    @mouse_wheel_autorelease_delay.setter
+    def mouse_wheel_autorelease_delay(self, value : float):
+        assert value > 0
+        self._data["wheel_autorelease_delay"] = value
+        self.save()
