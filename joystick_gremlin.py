@@ -129,7 +129,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t30"
+APPLICATION_BASE = "m73t31"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -3442,7 +3442,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             else:
                 msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
                 if self._status_bar_last_runtime_mode != runtime_mode:
-                    syslog.info(f"Mode: New runtime mode: [{runtime_mode}] (last mode [{self._status_bar_last_runtime_mode}])")
+                    syslog.info(f"CHANGE MODE: To: [{runtime_mode}] (from [{self._status_bar_last_runtime_mode}])")
                     self._status_bar_last_runtime_mode = runtime_mode
 
 

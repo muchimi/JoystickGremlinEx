@@ -2016,10 +2016,16 @@ class ActionSelector(QtWidgets.QWidget):
                         break
                 parent = parent.parent()
 
-        if container is None and self.inputItem is None:
-            MessageBox(title =  f"Invalid paste operation",
-                prompt = "Unable to paste action because it is not valid for the current input")
-            return 
+        if container is None:
+            if self.inputItem is None:
+                MessageBox(title =  f"Invalid paste operation",
+                    prompt = "Unable to paste action because it is not valid for the current input")
+                return 
+            # create a new basic container 
+            container_plugins = gremlin.plugin_manager.ContainerPlugins()
+            container_tag_map = container_plugins.tag_map
+            container = container_tag_map['basic'](self.inputItem)
+        
 
         action_list = gremlin.plugin_manager.ActionPlugins().fromClipboard(container, self.inputItem)
         if not action_list:

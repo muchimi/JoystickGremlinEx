@@ -420,16 +420,17 @@ class AbstractContainer(ProfileData):
 
         tracker = ConditionTracker()
 
+        self.setId(gremlin.util.get_guid())
+
         for action_set in self.get_action_sets():
             for action in action_set:
                 action.setId(gremlin.util.get_guid())
-                
 
         if self.activation_condition:
             self.activation_condition.setId(gremlin.util.get_guid())
             for condition in self.activation_condition.conditions:
                 data = tracker.getData(condition)
-                condition.setId = gremlin.util.get_guid()
+                condition.setId(gremlin.util.get_guid())
                 if data:
                     new_data = ConditionTrackerData(data.mode, data.input_item, self, condition, data.rule)
                     tracker.registerCondition(new_data)

@@ -226,6 +226,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
                     action_name = action_tag_map[action_tag]
                     container = container_plugins.basic.BasicContainer(self.item_data)
                     action_item = action_name(container)
+                    action_item.setId(gremlin.util.get_guid())
             else:
                 # not an action type, ignore
                 return
@@ -379,13 +380,9 @@ class InputItemConfiguration(QtWidgets.QFrame):
                     if container_type in container_tag_map:
                         container_name = container_tag_map[container_type].name
                         if container_name in valid_containers_names:
-                            
                             new_container = container_tag_map[container_type](self.item_data)
                             new_container.from_xml(node, self.item_data)
-
                             new_container.generateGuids()
-                            
-
                             container_list.append(new_container)
 
 

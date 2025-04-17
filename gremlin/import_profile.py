@@ -2289,7 +2289,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                                     # configure the container from the serialized data
                                     new_container.from_xml(node, profile_target_input_item)
                                     # generate a new container ID 
-                                    new_container.id = gremlin.util.get_guid(no_brackets=True)
+                                    new_container.setId(gremlin.util.get_guid())
                                     if verbose:
                                         syslog.info(f"Adding container : {new_container.tag} to input type {InputType.to_display_name(profile_target_input_item.input_type)} input {profile_target_input_item.input_id} {new_container.action_count} actions")
 
