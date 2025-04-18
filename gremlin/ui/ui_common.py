@@ -393,6 +393,81 @@ class Color():
         for index in colors.keys():
             pens[index] = QtGui.QPen(QtGui.QColor(colors[index]), 2 if index else 1)
         return pens
+    
+
+class Buttons():
+    ''' common UI button widgets '''
+
+    maxHeight = 24 # max height in pixels
+
+    @staticmethod
+    def _template(label = "", icon_source : str = "", tooltip = None, callback = None, no_keyboard = True, data = None):
+        if no_keyboard:
+            widget = NoKeyboardPushButton()
+        else:
+            widget = QDataPushButton()
+
+        widget.data = data
+        if label:
+            widget.setText(label)
+
+        if icon_source:
+            icon = gremlin.util.load_icon(icon_source)
+            widget.setIcon(icon)
+        widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        if tooltip:
+            widget.setToolTip(tooltip)
+        if callback:
+            widget.clicked.connect(callback)
+        widget.setMaximumHeight(Buttons.maxHeight)
+        return widget
+
+    @staticmethod
+    def getListenWidget(label = "Listen", tooltip = "Listen", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, "fa6s.microphone", tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
+    def getDeleteWidget(label = None, tooltip = "Delete", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, "mdi6.delete", tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
+    def getAddWidget(label = "Add", tooltip = "Add", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, "ri.add-line", tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
+    def getEditWidget(label = None, tooltip = "Edit", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, "msc.edit", tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
+    def getKeyboardWidget(label = None, tooltip = "Select Keys", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, "fa5.keyboard", tooltip, callback, no_keyboard, data)
+    
+        
+
+    @staticmethod
+    def getPasteWidget(tooltip = "Paste", callback = None):
+        ''' creates a paste widget 
+        
+        :param tooltip: the tooltip to show
+        :callback : optional the callback on click
+        
+        '''
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        return Buttons._template(None, f"{prefix}button_paste.svg", tooltip, callback)
+        
+    
+    @staticmethod
+    def getCopyWidget(tooltip = "Copy", callback = None):
+        ''' creates a copy widget 
+        
+        :param tooltip: the tooltip to show
+        :callback : optional the callback on click
+        
+        '''
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        return Buttons._template(None, f"{prefix}button_copy.svg", tooltip, callback)
+        
+    
 
 class WidgetTracker():
 
@@ -876,6 +951,7 @@ class AbstractView(QtWidgets.QWidget):
         """
         super().__init__(parent)
         self._model = None
+        self._container = None
 
     @property
     def model(self):
@@ -889,12 +965,14 @@ class AbstractView(QtWidgets.QWidget):
             self._model_changed()
             self._model.data_changed.connect(self.redraw)
 
-    def set_model(self, model):
+    def setModel(self, model):
         """Sets the model to display with this view.
 
         :param model the model to visualize
         """
         self.model = model
+
+    
 
     def select_item(self, index):
         """Selects the item at the provided index
@@ -1600,6 +1678,11 @@ class AbstractInputSelector(QtWidgets.QWidget):
         super().__init__(parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.grid_layout = QtWidgets.QGridLayout()
+        self.main_layout.addLayout(self.grid_layout)
+
+        self.grid_layout.addWidget(QtWidgets.QWidget(),0,2)
+        self.grid_layout.setColumnStretch(2,2)
 
         self.change_cb = change_cb
         self.valid_types = valid_types
@@ -1720,7 +1803,8 @@ class AbstractInputSelector(QtWidgets.QWidget):
         for device in self.device_list:
             self.device_dropdown.addItem(self._format_device_name(device))
             self._device_id_registry.append(self._device_identifier(device))
-        self.main_layout.addWidget(self.device_dropdown)
+        self.grid_layout.addWidget(QtWidgets.QLabel("Device:"),0,0)
+        self.grid_layout.addWidget(self.device_dropdown,0,1)
         self.device_dropdown.activated.connect(self._update_device)
 
 
@@ -1738,13 +1822,12 @@ class AbstractInputSelector(QtWidgets.QWidget):
         # Create input item selections for the devices. Each selection
         # will be invisible unless it is selected as the active device
         for device in self.device_list:
-            selection = QComboBox(self)
+            selection_widget = QComboBox(self)
             # limit drop down size
-            selection.setMaxVisibleItems(20)
-            selection.setStyleSheet("QComboBox { combobox-popup: 0; }")
+            selection_widget.setMaxVisibleItems(20)
+            selection_widget.setStyleSheet("QComboBox { combobox-popup: 0; }")
             self._input_type_registry.append([])
-            self.selection_widget = selection
-
+            self.selection_widget = selection_widget
 
             # Add items based on the input type
             max_col = 32
@@ -1761,17 +1844,19 @@ class AbstractInputSelector(QtWidgets.QWidget):
                             input_type,
                             input_id
                         )
-                    selection.addItem(s_ui, (input_type, input_id))
+                    selection_widget.addItem(s_ui, (input_type, input_id))
 
                     self._input_type_registry[-1].append(input_type)
 
             # Add the selection and hide it
-            selection.setVisible(False)
-            selection.activated.connect(self._execute_callback)
-            self.main_layout.addWidget(selection)
-            self.input_item_dropdowns.append(selection)
+            selection_widget.setVisible(False)
+            selection_widget.activated.connect(self._execute_callback)
+            self.grid_layout.addWidget(QtWidgets.QLabel("Input:"),1,0)
+            self.grid_layout.addWidget(selection_widget, 1,1)
 
-            selection.currentIndexChanged.connect(self._execute_callback)
+            self.input_item_dropdowns.append(selection_widget)
+
+            selection_widget.currentIndexChanged.connect(self._execute_callback)
 
         # Show the first entry by default
         if len(self.input_item_dropdowns) > 0:
@@ -5993,11 +6078,7 @@ class ActionLabel(QtWidgets.QLabel):
         self.setPixmap(pixmap)
 
         self.action_entry = action_entry
-        # mask = QtGui.QBitmap(pixmap.createMaskFromColor(Qt.transparent))
-        # self.setMask(mask)
-
-        # el = gremlin.event_handler.EventListener()
-        # el.icon_changed.connect(self._icon_change)
+        
         background_color = Color.actionIconBackgroundColor()
         border_color = Color.keyBorderColor()
         self.setStyleSheet(f"QLabel {{ border: 1px solid {border_color}; border-radius: 4px; padding: 1px; background-color: {background_color}; }}")
@@ -7708,3 +7789,5 @@ class IconGenerator():
         pixmap.save(image_path, "PNG")
 
         
+
+    

@@ -388,6 +388,7 @@ class AbstractContainer(ProfileData):
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
         self._virtual_button_user_enabled = True # determins if callbacks use the virtual button function - user set 
         self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
+        self.activation_condition.setContainer(self)
         self.virtual_button = None
         self.current_view_type = None
         self.parent_node = node
@@ -712,7 +713,7 @@ class AbstractContainer(ProfileData):
     def _parse_activation_condition_xml(self, node, data):
         ''' load the container condition '''
         self.activation_condition = ActivationCondition([], ActivationRule.All)
-
+        self.activation_condition.setContainer(self)
         input_item = data
         activation_node = gremlin.util.get_xml_child(node,"activation-condition")
         if activation_node is not None:
@@ -954,9 +955,15 @@ class AbstractAction(ProfileData):
 
     def _cleanup(self):
         ''' called when the action should clean itself up '''
-        eh = gremlin.event_handler.EventListener()
-        eh.profile_unload.disconnect(self._cleanup)
-        eh.action_delete.disconnect(self._action_delete)
+        el = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.DeviceChangeEvent()
+        event.source = self
+        el.icon_changed.emit(event)
+        el.profile_unload.disconnect(self._cleanup)
+        el.action_delete.disconnect(self._action_delete)
+        
+
+    
 
 
     def get_input_item(self):
@@ -1075,6 +1082,7 @@ class AbstractAction(ProfileData):
 
 
         self.activation_condition = ActivationCondition([],ActivationRule.All)
+        self.activation_condition.setContainer(self)
         for _ in node.findall("activation-condition"):
             cond_node = node.find("activation-condition")
             if cond_node is not None:

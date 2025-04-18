@@ -600,3 +600,26 @@ class JoystickHook:
 
             if self._callback:
                 self._callback(self._hook_value, self._hook_calibrated_value)
+
+class BaseCallbacks(QtCore.QObject):
+    ''' base class implementing callback functionality'''
+
+    def __init__(self):
+        super().__init__()
+        self._callbacks = []
+
+    def registerCallback(self, callback):
+        if not callback in self._callbacks:
+            self._callbacks.append(callback)
+
+    def unregisterCallback(self, callback):
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
+
+    def clearCallbacks(self):
+        self._callbacks.clear()
+
+    def DoCallbacks(self):
+        ''' runs the callbacks '''
+        for callback in self._callbacks:
+            callback(self)                

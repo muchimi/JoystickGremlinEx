@@ -1502,14 +1502,12 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
             self.button_duplicate_entry.clicked.connect(self._duplicate_entry)
 
-            
-
-            self.button_delete = self._create_toolbutton(
+            self.button_delete_widget = self._create_toolbutton(
                 f"{prefix}list_delete.svg",
                 "Delete currently selected action(s)",
                 False
             )
-            self.button_delete.clicked.connect(self._delete_cb)
+            self.button_delete_widget.clicked.connect(self._delete_cb)
 
             self.button_pause = self._create_toolbutton(
                 f"{prefix}pause.svg",
@@ -1603,7 +1601,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.toolbar.setOrientation(QtCore.Qt.Vertical)
             self.toolbar.addWidget(self.button_new_entry)
             self.toolbar.addWidget(self.button_duplicate_entry)
-            self.toolbar.addWidget(self.button_delete)
+            self.toolbar.addWidget(self.button_delete_widget)
             self.toolbar.addWidget(self.button_pause)
             self.toolbar.addSeparator()
             self.toolbar.addWidget(self.button_record)

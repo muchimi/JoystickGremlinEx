@@ -2632,10 +2632,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._lvar_selector_widget.setMinimumWidth(200)
         self._lvar_selector_widget.setToolTip("LVAR lookup")
 
-        self._lvar_button_widget = QtWidgets.QPushButton("Add")
-        self._lvar_button_widget.setToolTip("Adds to the calculator expression")
-        self._lvar_button_widget.clicked.connect(self._lvar_selected_cb)
-
+        self._lvar_button_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds to the calculator expression", callback = self._lvar_selected_cb)
+        
         # setup auto-completer for the lvar
         self._lvar_completer = QtWidgets.QCompleter(self._lvar_selector_widget.validator().lvars, self)
         self._lvar_completer.setCaseSensitivity(QtGui.Qt.CaseSensitivity.CaseInsensitive)

@@ -133,11 +133,9 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         # Add widgets which allow modifying the mode list
         self.mode_list_widget = gremlin.ui.ui_common.NoWheelComboBox()
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        self.add = QtWidgets.QPushButton(load_icon(f"{prefix}list_add.svg"),  "Add") 
-        self.add.clicked.connect(self._add_cb)
-        self.delete = QtWidgets.QPushButton(load_icon(f"{prefix}list_delete.svg"), "Delete")
+        self.button_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback = self._add_cb)
+        self.button_delete_widget =gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = self._remove_cb)
         
-        self.delete.clicked.connect(self._remove_cb)
         self.up = QtWidgets.QPushButton(load_icon(f"{prefix}list_up.svg"), "Up")
         
         self.up.clicked.connect(self._up_cb)
@@ -150,8 +148,8 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_container_layout.addWidget(QtWidgets.QLabel("Mode:"))
         self.button_container_layout.addWidget(self.mode_list_widget)
         self.button_container_layout.addStretch()
-        self.button_container_layout.addWidget(self.add)
-        self.button_container_layout.addWidget(self.delete)
+        self.button_container_layout.addWidget(self.button_add_widget)
+        self.button_container_layout.addWidget(self.button_delete_widget)
         self.button_container_layout.addWidget(self.up)
         self.button_container_layout.addWidget(self.down)
         

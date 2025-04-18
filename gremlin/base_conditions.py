@@ -3,8 +3,10 @@ from abc import abstractmethod, ABCMeta
 import enum
 import logging
 from lxml import etree as ElementTree
+import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.config
+import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.shared_state
 import gremlin.util
@@ -13,6 +15,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import ActivationRule
 import dinput
+import lxml
 
 syslog = logging.getLogger("system")
 
@@ -35,6 +38,14 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
         import gremlin.util
         self._id = gremlin.util.get_guid()
         self._comparison = ""
+        self._activation_condition = None # owning container
+
+    def setOwner(self, owner):
+        self._activation_condition = owner
+
+    @property
+    def owner(self):
+        return self._activation_condition
         
     @property
     def id(self):
@@ -43,6 +54,9 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
             import gremlin.util
             self._id = gremlin.util.get_guid()
         return self._id
+    
+    def setId(self, value):
+        self._id = value
     
 
     @property
@@ -653,10 +667,10 @@ class ConditionTracker():
         
 
 
-class ActivationCondition(QtCore.QObject):
+class ActivationCondition(gremlin.base_classes.BaseCallbacks):
 
     """Dictates under what circumstances an associated code can be executed."""
-    #id_changed = QtCore.Signal(str, str) # fires when id changes (old_id, new_id)
+    activation_condition_modified = QtCore.Signal()
 
     rule_lookup = {
         # String to enum
@@ -680,6 +694,17 @@ class ActivationCondition(QtCore.QObject):
         self._rule = rule
         self.conditions = conditions
         self._id = gremlin.util.get_guid()
+        self._container = None # owning container
+
+
+    def setContainer(self, container):
+        ''' sets the owning container '''
+        self._container = container
+
+    @property
+    def container(self):
+        ''' gets the owning container of this activation condition '''
+        return self._container
 
     @property 
     def rule(self) -> ActivationRule:
@@ -748,6 +773,7 @@ class ActivationCondition(QtCore.QObject):
             condition = ActivationCondition.condition_lookup[condition_type]()
             condition.from_xml(cond_node, data)
             self.conditions.append(condition)
+            condition.setOwner(self)
             item = ConditionTrackerData(mode, input_item, container, condition, rule)
             tracker.registerCondition(item)
             
@@ -772,3 +798,110 @@ class ActivationCondition(QtCore.QObject):
     
     def __str__(self):
         return f"Activation Condition: [{self.id}] rule: {self._rule.name} contains: {len(self.conditions)} condition(s)"
+    
+@SingletonDecorator
+class ConditionHelper:
+    ''' helper class to manipulate conditions '''
+
+    def __init__(self):
+        el = gremlin.event_handler.EventListener()
+        el.paste_condition.connect(self.paste_condition)
+        el.copy_condition.connect(self.copy_condition)
+
+
+    @QtCore.Slot(object, object)
+    def paste_condition(self, container, oc):
+        ''' pastes a condition to a container 
+        
+        :param container: the container object receiving the condition
+        :param oc: object encoder data to paste
+        
+        '''
+        from gremlin.clipboard import ObjectEncoder, EncoderType
+        if isinstance(container, gremlin.base_profile.AbstractAction):
+            input_item = container.parent.parent
+        elif isinstance(container, gremlin.base_profile.AbstractContainer):
+            input_item = container.parent
+        else:
+            assert False,"Pasted container is not a valid container type - expected AbstractContainer or AbstractAction"
+
+        if isinstance(oc, ObjectEncoder):
+            
+            data = (input_item, container) # (input item, container)
+            tracker = gremlin.base_conditions.ConditionTracker()
+            mode = gremlin.shared_state.edit_mode
+            
+            if oc.encoder_type == EncoderType.ActivationCondition:
+                xml = oc.data
+                node = lxml.etree.fromstring(xml)    
+                if node.tag == 'activation-condition':
+                    # temporary activation condition
+                    activation_condition = gremlin.base_conditions.ActivationCondition([], gremlin.base_conditions.ActivationRule.All)
+                    rule = container.activation_condition.rule
+                    activation_condition.from_xml(node, data)
+                    for condition in activation_condition.conditions:
+                        condition.setId(gremlin.util.get_guid())
+                        # add the condition to the existing container
+                        container.activation_condition.conditions.append(condition)
+                        item = gremlin.base_conditions.ConditionTrackerData(mode, input_item, container, condition, rule)
+                        tracker.registerCondition(item)
+                if isinstance(container, gremlin.base_profile.AbstractAction):
+                    # we need to send the main container, not the action container for the update
+                    self.update_condition_ui(container.parent)
+                elif isinstance(container, gremlin.base_profile.AbstractContainer):
+                    self.update_condition_ui(container)        
+        
+
+            elif oc.encoder_type == EncoderType.Condition:
+                xml = oc.data
+                node = lxml.etree.fromstring(xml)
+                if node.tag == 'condition':
+                    condition_type = safe_read(node, "condition-type")
+                    condition = gremlin.base_conditions.ActivationCondition.condition_lookup[condition_type]()
+                    condition.from_xml(node, data)
+                    condition.setId(gremlin.util.get_guid())
+                    container.activation_condition.conditions.append(condition)
+                    condition.setOwner(container.activation_condition)
+                    rule = container.activation_condition.rule
+                    input_item = container.parent
+                    item = gremlin.base_conditions.ConditionTrackerData(mode, input_item, container, condition, rule)
+                    tracker.registerCondition(item)
+                    if isinstance(container, gremlin.base_profile.AbstractAction):
+                        # we need to send the main container, not the action container for the update
+                        self.update_condition_ui(container.parent)
+                    elif isinstance(container, gremlin.base_profile.AbstractContainer):
+                        self.update_condition_ui(container)
+                    
+                    
+    def update_condition_ui(self, container):
+        ''' asks the container UI to update '''
+
+        el = gremlin.event_handler.EventListener()
+        el.condition_changed.emit(container)
+
+                    
+
+
+    @QtCore.Slot(object)
+    def copy_condition(self, condition):
+        ''' copies a condition or activation condition to the clipboard  '''
+        from gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
+        clipboard = Clipboard()
+        if isinstance(condition, ActivationCondition):
+            node = condition.to_xml()
+            xml = lxml.etree.tostring(node)
+            oc = ObjectEncoder(condition, xml, "activation-condition", EncoderType.ActivationCondition)
+            clipboard.data = oc
+            syslog.info(f"activation condition copied to clipboard")
+        elif isinstance(condition, AbstractCondition):
+            # regular condition
+            node = condition.to_xml()
+            xml = lxml.etree.tostring(node)
+            oc = ObjectEncoder(condition, xml, "condition", EncoderType.Condition)
+            clipboard.data = oc
+            syslog.info(f"condition copied to clipboard")
+        else:
+            syslog.warning("Unable to copy data - unsupported condition type")
+
+
+_condition_helper = ConditionHelper()

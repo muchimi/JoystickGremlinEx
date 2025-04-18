@@ -287,6 +287,12 @@ T30
 - New feature: Stepped axis mode of vjoy remap can disable the "down" component latching. If disabled, the "down" action will not be latched.
 - New feature: Stepped axis mode of vjoy remap can change the step direction via the new direction option.  When checked, the step direction will be reversed, so up is down, and down is up.
 - Fix: event callback cache now always resets before a new profile start to clear prior cached data.  This will reset any prior cached execution data if the profile is changed, and run again.
+T31
+- New: Add copy/paste functionality to all conditions (may have a few dragons)
+- New: Add listen widget to VJoy conditions
+- New: Add listen widget to keyboard conditions
+- Improved: Further pass on UI for look and feel and consistency including use of icons
+- Fix: ensure action icons on the input selectors are updated on action CRUD (create/read/update/delete) operations in the various permutations allowed by the UI (may still need more work).
 
 
 

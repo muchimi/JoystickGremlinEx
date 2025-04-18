@@ -424,7 +424,9 @@ class EventListener(QtCore.QObject):
 
 	# called when a condition state changes - used to update the UI
 	condition_redraw = QtCore.Signal(object) # fires when a condition is redrawing
-	condition_state_changed = QtCore.Signal(object) # passes along the container
+	condition_state_changed = QtCore.Signal(object) # indicates the container state change  (container : AbstractContainer)
+	condition_changed = QtCore.Signal(object)  # indicates the container's conditions changed (container : AbstractContainer | AbstractAction)
+
 	condition_added = QtCore.Signal(object, str, object) # fires when a condition is added - params (input_item, mode, condition)
 	condition_removed = QtCore.Signal(object, str, object) # fires when a condition is removed - params (input_item, mode, condition)
 
@@ -488,6 +490,12 @@ class EventListener(QtCore.QObject):
 
 	# notify when an input is selected
 	input_selection_changed = QtCore.Signal(object, object, object) # (device_guid, input_type, input_id)
+
+	# request to paste a condition
+	paste_condition = QtCore.Signal(object, object) # (container, object_encoder)
+
+	# request to copy a condition or activation condition
+	copy_condition = QtCore.Signal(object) # (condition or activation condition)
 	
 
 	def __init__(self):
@@ -628,12 +636,13 @@ class EventListener(QtCore.QObject):
 	
 	def enableMouse(self):
 		if self.enable_mouse_hook:
+			syslog.info("MOUSE HOOK: enabled")
 			if self.mouse_hook is None:
 				self.mouse_hook = windows_event_hook.MouseHook()
 				self.mouse_hook.register(self._mouse_handler)
 				self.mouse_hook.start()
 		else:
-			syslog.warning("************ DEBUG MODE - MOUSE HOOKS ARE DISABLED ")
+			syslog.warning("MOUSE HOOK: ************ DEBUG MODE: disabled")
 				
 
 	def disableMouse(self):

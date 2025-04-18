@@ -447,7 +447,7 @@ class MouseHook:
         import gremlin.config
 
         self._running = False
-        self._listen_thread = threading.Thread(target=self._listen, daemon=True)
+        self._listen_thread = None 
 
         global _mouse_wheel_state, _mouse_wheel_timer, _mouse_wheel_delay
         wheel_buttons = [gremlin.types.MouseButton.WheelDown,
@@ -479,8 +479,14 @@ class MouseHook:
         """Starts the hook if it is not yet running."""
         if self._running:
             return
-        self._running = True
-        self._listen_thread.start()
+        if self._listen_thread is None:
+            self._listen_thread = threading.Thread(target=self._listen, daemon=True)
+        try:
+            self._listen_thread.start()
+            self._running = True
+        except:
+            syslog.error("MOUSE HOOK: unable to create listen thread")
+            
 
     def stop(self):
         """Stops the hook from running."""
@@ -491,7 +497,7 @@ class MouseHook:
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
             self._listen_thread.join()
             # Recreate thread so we can launch it again
-            self._listen_thread = threading.Thread(target=self._listen, daemon=True)
+            self._listen_thread = None
             self._stop_timers()
         
 
@@ -499,7 +505,7 @@ class MouseHook:
         ''' requests a shutdown '''
         self.stop()
 
-        syslog.info("MOUSE: shutdown")
+        syslog.info("MOUSE HOOK: shutdown")
         if self._listen_thread:
             if self._listen_thread.is_alive():
                 self._listen_thread.join()
@@ -518,11 +524,6 @@ class MouseHook:
     def _listen(self):
         """Configures the hook and starts listening."""
         
-        verbose = gremlin.config.Configuration().verbose
-
-
-
-        syslog.info("MOUSE: HOOK started")
         self.hook_id = user32.SetWindowsHookExW(
             WH_MOUSE_LL,
             process_mouse_event,

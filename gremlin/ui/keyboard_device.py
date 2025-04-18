@@ -426,7 +426,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             current_mode,
             [InputType.Keyboard, InputType.KeyboardLatched]
         )
-        self.input_item_list_view.set_model(self.input_item_list_model)
+        self.input_item_list_view.setModel(self.input_item_list_model)
         self.input_item_list_view.redraw()
         self._select_item_cb(self._last_selected_index)
 

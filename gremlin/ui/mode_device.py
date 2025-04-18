@@ -118,7 +118,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
-        self.input_item_list_view.set_model(self.input_item_list_model)
+        self.input_item_list_view.setModel(self.input_item_list_model)
         self.input_item_list_view.redraw()
 
         # Handle user interaction

@@ -223,11 +223,11 @@ class SwitchWidget(QtWidgets.QWidget):
         self.selector_input_widget.setCurrentIndex(selected_input_index)
 
 
-
-        self.delete_button = QtWidgets.QPushButton(
-            gremlin.util.load_icon("gfx/{prefix}button_delete.png"), "")
-        self.delete_button.setToolTip("Delete this entry")
-        self.delete_button.clicked.connect(self._delete_cb)
+        self.delete_button = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = self._delete_cb)
+        # self.delete_button = QtWidgets.QPushButton(
+        #     gremlin.util.load_icon("gfx/{prefix}button_delete.png"), "")
+        # self.delete_button.setToolTip("Delete this entry")
+        # self.delete_button.clicked.connect(self._delete_cb)
         device_layout.addStretch()
         device_layout.addWidget(self.delete_button)
 

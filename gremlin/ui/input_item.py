@@ -25,12 +25,10 @@ import gremlin.types
 import gremlin.base_conditions
 import gremlin.base_profile
 import gremlin.config
-import gremlin.actions
 import gremlin.event_handler
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.ui.axis_calibration
-import gremlin.ui.midi_device
 import gremlin.ui.ui_common
 from gremlin.util import load_icon, load_pixmap, get_guid
 import gremlin.util
@@ -45,8 +43,6 @@ from functools import partial
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 
 import logging
-import qtawesome as qta
-import gremlin.ui.input_item
 import lxml
 
 
@@ -799,16 +795,31 @@ class ActionSetModel(ui_common.AbstractModel):
     def add_action(self, action):
         self._action_set.append(action)
         self.data_changed.emit()
+        el = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.DeviceChangeEvent()
+        event.device_guid = action.hardware_device_guid
+        event.device_input_id = action.hardware_input_id
+        event.device_input_type = action.hardware_input_type
+        event.source = action
+        el.icon_changed.emit(event)
+
+        
+
 
     def remove_action(self, action):
+        
         if action in self._action_set:
-            el = gremlin.event_handler.EventListener()
             input_item = action.get_input_item()
             container = action.get_container()
+            del self._action_set[self._action_set.index(action)]
+            el = gremlin.event_handler.EventListener()
             el.action_delete.emit(input_item, container, action)
             if hasattr(action,"_cleanup"):
                 action._cleanup()
-            del self._action_set[self._action_set.index(action)]
+
+            event = gremlin.event_handler.DeviceChangeEvent()
+            event.source = input_item
+            el.icon_changed.emit(event)
             
             
         self.data_changed.emit()
@@ -1000,29 +1011,33 @@ class ActionSetView(ui_common.AbstractView):
             )
             self.controls_layout.addWidget(self.control_move_down)
         if ActionSetView.Interactions.Delete in self.allowed_interactions:
-            self.control_delete = QtWidgets.QPushButton(
-                load_icon(f"gfx/{prefix}button_delete.png"), ""
-            )
-            # syslog.info(f"action: delete allowed")
-            self.control_delete.clicked.connect(
-                lambda: self.interacted.emit(ActionSetView.Interactions.Delete)
-            )
+
+            self.control_delete = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Delete))
+            # self.control_delete = QtWidgets.QPushButton(
+            #     load_icon(f"gfx/{prefix}button_delete.png"), ""
+            # )
+            # # syslog.info(f"action: delete allowed")
+            # self.control_delete.clicked.connect(
+            #     lambda: self.interacted.emit(ActionSetView.Interactions.Delete)
+            # )
             self.controls_layout.addWidget(self.control_delete)
         if ActionSetView.Interactions.Edit in self.allowed_interactions:
-            self.control_edit = QtWidgets.QPushButton(
-                load_icon(f"gfx/{prefix}button_edit.png"), ""
-            )
-            self.control_edit.clicked.connect(
-                lambda: self.interacted.emit(ActionSetView.Interactions.Edit)
-            )
+            self.control_edit = gremlin.ui.ui_common.Buttons.getEditWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Edit))
+            # self.control_edit = QtWidgets.QPushButton(
+            #     load_icon(f"gfx/{prefix}button_edit.png"), ""
+            # )
+            # self.control_edit.clicked.connect(
+            #     lambda: self.interacted.emit(ActionSetView.Interactions.Edit)
+            # )
             self.controls_layout.addWidget(self.control_edit)
         if ActionSetView.Interactions.Copy in self.allowed_interactions:
-            self.control_edit = QtWidgets.QPushButton(
-                load_icon(f"gfx/{prefix}button_copy.svg"), ""
-            )
-            self.control_edit.clicked.connect(
-                lambda: self.interacted.emit(ActionSetView.Interactions.Copy)
-            )
+            self.control_edit = gremlin.ui.ui_common.Buttons.getCopyWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Copy))
+            # self.control_edit = QtWidgets.QPushButton(
+            #     load_icon(f"gfx/{prefix}button_copy.svg"), ""
+            # )
+            # self.control_edit.clicked.connect(
+            #     lambda: self.interacted.emit(ActionSetView.Interactions.Copy)
+            # )
             self.controls_layout.addWidget(self.control_edit)
 
 
@@ -1087,17 +1102,13 @@ class InputItemWidget(QBoxFrame):
 
         self._container_widget = QtWidgets.QWidget()
         self._container_layout = QtWidgets.QGridLayout(self._container_widget)
-        #self._container_widget.setStyleSheet("background: yellow;")
         self._container_widget.setContentsMargins(0,0,0,0)
         self._container_layout.setContentsMargins(0,0,0,0)
         self._container_layout.setSpacing(0)
 
         self._title_container_widget = QtWidgets.QWidget()
         self._title_container_layout = QtWidgets.QGridLayout(self._title_container_widget)
-        #self._title_container_widget.setStyleSheet("background: red;")
-        #self._title_container_widget.setContentsMargins(0,2,0,2)
         self._title_container_layout.setContentsMargins(2,0,2,0)
-        #self._title_container_layout.setSpacing(0)
 
         self.identifier = identifier
         self._input_id = identifier.input_id
@@ -1471,6 +1482,7 @@ class InputItemWidget(QBoxFrame):
 
     @QtCore.Slot(object)
     def _icon_changed_cb(self, event : gremlin.event_handler.DeviceChangeEvent):
+        ''' updates the input item icons based on the actions it contains '''
         if isinstance(event.source, gremlin.base_profile.AbstractAction):
             action = event.source
             if self.findAction(action):
@@ -1944,10 +1956,7 @@ class ContainerSelector(QtWidgets.QWidget):
         self.container_dropdown = ui_common.QComboBox()
         for name in self._valid_container_list():
             self.container_dropdown.addItem(name)
-        self.add_container_widget = QtWidgets.QPushButton("Add")
-        self.add_container_widget.setToolTip("Adds a container")
-        self.add_container_widget.clicked.connect(self._add_container)
-
+        self.add_container_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds a container", callback = self._add_container)
 
         self.load_template_widget =  QtWidgets.QPushButton()
         icon = gremlin.ui.ui_common.load_icon("fa6s.folder-open")
@@ -2070,13 +2079,18 @@ class ContainerSelector(QtWidgets.QWidget):
         self.container_from_template.emit()
 
 class ConditionTrackerInfo:
-    def __init__(self, input_item, device_guid, input_id, container, dock_tabs):
+    def __init__(self, input_item, device_guid, input_id, container, widget):
         self.device_guid = device_guid
         self.input_id = input_id
-        self.dock_tabs = dock_tabs
+        self.containerWidget = widget
         self.input_item = input_item
         self.container = container
         
+    @property
+    def dock_tabs(self):
+        if self.containerWidget:
+            return self.containerWidget.dock_tabs
+        return None
     
 
 @SingletonDecorator
@@ -2086,16 +2100,18 @@ class ConditionStateTracker():
         self._widget_cache = {} # tracks the dock tab widget for the registered input_item for this mode
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.connect(self._condition_state_changed)
+        el.condition_changed.connect(self._condition_changed)
         el.container_delete.connect(self._container_delete)
         el.mapping_changed.connect(self._mapping_changed)
         self._icon_enabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.activeColor())
         self._icon_disabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.inactiveColor())
 
-    def register(self, input_item, container, dock_tab : QtWidgets.QTabWidget):
+    def register(self, input_item, container, container_widget):
         ''' registers a condition tracker '''
         if not isinstance(container, gremlin.base_profile.AbstractContainer):
             return
 
+        dock_tab : QtWidgets.QTabWidget = container_widget.dock_tabs
         device_guid = input_item.device_guid
         mode = gremlin.shared_state.current_mode
         input_id = input_item.input_id
@@ -2105,7 +2121,7 @@ class ConditionStateTracker():
             self._cache[device_guid][mode] = {}
         if not input_id in self._cache[device_guid][mode]:
             self._cache[device_guid][mode][input_id] = {}
-        info = ConditionTrackerInfo(input_item, device_guid, input_id, container, dock_tab)
+        info = ConditionTrackerInfo(input_item, device_guid, input_id, container, container_widget)
         self._cache[device_guid][mode][input_id][container.id] = info
 
         enabled = info.input_item.hasConditions()
@@ -2139,14 +2155,40 @@ class ConditionStateTracker():
                     if container.id in self._cache[device_guid][mode][input_id]:
                         info = self._cache[device_guid][mode][input_id][container.id]
                         enabled = info.input_item.hasConditions()
+                       
                         dock_tabs = info.dock_tabs
                         self.set_condition_tab_state(dock_tabs, enabled)
+                        
+                        
+
+    @QtCore.Slot(object)
+    def _condition_changed(self, container):
+        device_guid = container.hardware_device_guid
+        input_id = container.hardware_input_id
+        mode = gremlin.shared_state.current_mode
+        if device_guid in self._cache:
+            if mode in self._cache[device_guid]:
+                if input_id in self._cache[device_guid][mode]:
+                    if container.id in self._cache[device_guid][mode][input_id]:
+                        info = self._cache[device_guid][mode][input_id][container.id]
+                        container_widget : AbstractContainerWidget = info.containerWidget
+                        container_widget._update_ui()
+                        enabled = info.input_item.hasConditions()
+                        dock_tabs = info.dock_tabs
+                        self.set_condition_tab_state(dock_tabs, enabled)
+
 
     @QtCore.Slot(object, object)
     def _container_delete(self, input_item, container):
         if not isinstance(container, gremlin.base_profile.AbstractContainer):
             return
         self.unregister(input_item, container)
+
+        # update the input item icons
+        el = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.DeviceChangeEvent()
+        event.source = input_item
+        el.icon_changed.emit(event)
                     
     @QtCore.Slot()
     def _mapping_changed(self):
@@ -2222,7 +2264,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         
 
         el = gremlin.event_handler.EventListener()
-        el.condition_redraw.connect(self._condition_redraw)
+        el.condition_redraw.connect(self._condition_redraw) # hook the condition redraw event so we can remove existing references to the UI going away on redraw
+        el.condition_changed.connect(self._condition_changed) # hook condition changed so we can update the UI
+
         el.ui_ready.connect(self._ui_ready)
         self._icon_enabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.activeColor())
         self._icon_disabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.inactiveColor())
@@ -2271,7 +2315,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self._select_tab(self.profile_data.current_view_type)
 
         tracker = ConditionStateTracker()
-        tracker.register(self.profile_data.input_item, self.profile_data, self.dock_tabs)
+        tracker.register(self.profile_data.input_item, self.profile_data, self)
         
 
         save_widget = QtWidgets.QPushButton("Save") # TitleBarButton()
@@ -2290,6 +2334,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         self.activation_count_widget = None
         el.condition_state_changed.emit(self.container)
+
+        
+
+    
         
         
     @QtCore.Slot()
@@ -2352,7 +2400,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                 return False
             return True
             
-        
+    
 
     @QtCore.Slot(object)
     def _update_ui(self, container):
@@ -2382,11 +2430,17 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         if self.container == container:
             self._update_counts()
 
+    @QtCore.Slot(object, object)
+    def _condition_changed(self, container):
+        ''' called when conditions change '''
+        if container.id == self.container.id:
+            self.activation_condition_widget._update_conditions_ui()
 
     def _ui_ready(self):
         ''' called when UI is loaded '''
         self._update_ui(self.container)
 
+    @QtCore.Slot()
     def _condition_redraw(self, data):
         ''' occurs when a condition redraws '''
 
@@ -2459,6 +2513,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self._update_counts()
 
         self._update_selected(self.dock_tabs.currentIndex())
+
+    def _update_condition_ui(self):
+        ''' updates the condition UI tab only '''
+        self.activation_condition_widget._update_conditions_ui()
 
     
     def _update_counts(self):
@@ -2561,7 +2619,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             view_type,
             parent = self
         )
-        action_set_view.set_model(action_set_model)
+        action_set_view.setModel(action_set_model)
         action_set_view.interacted.connect(
             lambda x: self._handle_interaction(action_set_view, x)
         )
@@ -2898,9 +2956,7 @@ class TitleBar(QtWidgets.QFrame):
 
         # close button
         self.close_button = TitleBarButton()
-        close_icon = load_icon("mdi.close")
-
-        
+        close_icon = load_icon("mdi.delete")
 
         pixmap_close = close_icon.pixmap(size,size) # load_pixmap("gfx/close.png")
         if not pixmap_close or pixmap_close.isNull():
@@ -2912,7 +2968,7 @@ class TitleBar(QtWidgets.QFrame):
             self.close_button.setIcon(icon)
         self.close_button.setToolTip("Delete")
 
-        self.close_button.clicked.connect(self._close_cb)
+        self.close_button.clicked.connect(self._delete_cb)
 
         # clipboard copy button - only if a handler is given
         if clipboard_cb:
@@ -2971,7 +3027,7 @@ class TitleBar(QtWidgets.QFrame):
             self.hint
         )
 
-    def _close_cb(self):
+    def _delete_cb(self):
         if self._close_callback:
             self._close_callback()
 
@@ -3046,21 +3102,19 @@ class ConditionActionWrapper(AbstractActionWrapper):
         self.setWindowTitle(action_widget.action_data.name)
 
         # Setup activation condition UI
-        action_data = self.action_widget.action_data
+        container = self.action_widget.action_data
         # if action_data.parent.has_action_conditions:
-        if action_data.activation_condition is None:
-            action_data.activation_condition = \
-                gremlin.base_conditions.ActivationCondition(
-                    [],
-                    gremlin.types.ActivationRule.All
-                )
+        if container.activation_condition is None:
+            container.activation_condition = gremlin.base_conditions.ActivationCondition([],gremlin.types.ActivationRule.All)
+            container.activation_condition.setContainer(container)
 
         self.condition_model = ui_activation_condition.ConditionModel(
-            action_data,
-            action_data.activation_condition
+            container,
+            container.activation_condition
         )
         self.condition_view = ui_activation_condition.ConditionView()
-        self.condition_view.set_model(self.condition_model)
+        self.condition_view.setContainer(container)
+        self.condition_view.setModel(self.condition_model)
         self.condition_view.redraw()
         self.main_layout.addWidget(self.condition_view)
         # else:

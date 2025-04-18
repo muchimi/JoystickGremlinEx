@@ -34,10 +34,12 @@ import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.profile
 import gremlin.shared_state
+import gremlin.shared_state
 import gremlin.types
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.util
+from gremlin.util import safe_read
 import gremlin.ui.input_item as input_item
 import gremlin.ui.ui_common
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
@@ -126,7 +128,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             self.action_view = ActionContainerView(self)
             self.main_layout.addWidget(self.action_view)
             self.action_view.setContentsMargins(0,0,0,0)
-            self.action_view.set_model(self.action_model)
+            self.action_view.setModel(self.action_model)
             
 
             # setup the container widget reference
@@ -406,6 +408,13 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         return container_list
     
+
+    
+
+
+
+
+    
     def _delete_container(self):
         ''' call to delete all containers '''
         if not self.item_data.containers:
@@ -482,6 +491,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.container_selector.container_added.connect(self._add_container)
         self.container_selector.container_copy.connect(self._copy_container)
         self.container_selector.container_paste.connect(self._paste_container)
+
         self.container_selector.container_from_template.connect(self._load_container_from_template)
         self.container_selector.container_delete.connect(self._delete_container)
         self.always_execute = QtWidgets.QCheckBox("Always execute")
@@ -809,7 +819,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_delete_curve.connect(self._delete_curve_item_cb)
 
         # load the model
-        self.input_item_list_view.set_model(self.input_item_list_model)
+        self.input_item_list_view.setModel(self.input_item_list_model)
         self.input_item_list_view.redraw()
     
 

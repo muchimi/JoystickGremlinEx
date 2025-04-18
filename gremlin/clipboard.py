@@ -4,7 +4,7 @@ import base64
 import os
 import lxml
 import logging
-from PySide6 import QtCore
+from PySide6 import QtCore, QtWidgets
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QClipboard
 import lxml.etree
@@ -22,6 +22,8 @@ class EncoderType(IntEnum):
     Action = 1 # single action
     Container = 2 # single container
     MultiContainer = 3 # data holds multiple containers
+    ActivationCondition = 4 # data holds an activation condition group
+    Condition = 5 # data holds a condition
 
 class ObjectEncoder():
     ''' helper class to encode objects '''
@@ -246,3 +248,5 @@ class Clipboard(QtCore.QObject):
         ''' true if cliboard data is valid '''
         return self.data is not None and self.is_action or self.is_container
 
+   
+    
