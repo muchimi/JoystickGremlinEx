@@ -1170,7 +1170,6 @@ class InputItemWidget(QBoxFrame):
         self._title_container_layout.addWidget(self._icon_widget, data_row, 1) # container icons
 
         size = 16
-                
 
         # action buttons
         icon = gremlin.ui.ui_common.load_icon("fa6s.gear")
@@ -1211,19 +1210,11 @@ class InputItemWidget(QBoxFrame):
             self._calibration_button_widget.setFixedSize(size,size)
             self._calibration_button_widget.clicked.connect(self._calibration_button_cb)
             
-
-   
-            
-
-
-
             self._curve_button_widget = QtWidgets.QPushButton() 
             self._curve_button_widget.setIcon(self._curve_icon_active)
             self._curve_button_widget.setToolTip("Input Curve")
             self._curve_button_widget.setFixedSize(size,size)
             self._curve_button_widget.clicked.connect(self._curve_button_cb)
-
-
 
             self.clear_curve_widget = QtWidgets.QPushButton()
             self.clear_curve_widget.setToolTip("Clear Curve")
@@ -1274,12 +1265,17 @@ class InputItemWidget(QBoxFrame):
         self._row_custom_content = row + 2
         self._row_comment = row + 3
 
-        self._container_input_axis_widget = QtWidgets.QWidget()
-        self._container_input_axis_layout = QtWidgets.QHBoxLayout(self._container_input_axis_widget)
-        self._container_input_axis_widget.setContentsMargins(8,0,0,0)
-        self._container_input_axis_layout.setContentsMargins(0,0,0,0)
-        self._container_input_axis_widget.setMinimumHeight(32)
-        self._container_input_axis_widget.setMaximumHeight(32)
+
+        self._container_input_state_widget, self._container_input_state_layout = gremlin.ui.ui_common.getHContainer()
+
+        # self._container_input_axis_widget = QtWidgets.QWidget()
+        # self._container_input_axis_layout = QtWidgets.QHBoxLayout(self._container_input_axis_widget)
+        self._container_input_state_widget.setContentsMargins(8,0,0,0)
+        # self._container_input_axis_layout.setContentsMargins(0,0,0,0)
+        self._container_input_state_widget.setMinimumHeight(32)
+        self._container_input_state_widget.setMaximumHeight(32)
+
+
         
         
         self.axis_widget = None
@@ -1288,8 +1284,10 @@ class InputItemWidget(QBoxFrame):
         self._update_repeater() # create the correct repeater widget
         
         if self.is_axis:
-            self._container_input_axis_layout.addWidget(self._curve_container_widget)
-            self.main_layout.addWidget(self._container_input_axis_widget)
+            self._container_input_state_layout.addWidget(self._curve_container_widget)
+
+
+        self.main_layout.addWidget(self._container_input_state_widget)
 
         self.main_layout.addWidget(self._status_widget)
 
@@ -1399,12 +1397,12 @@ class InputItemWidget(QBoxFrame):
                 
         if current_axis_widget and remove_axis:
             current_axis_widget.unhookDevice()
-            gremlin.util.clear_layout(self._container_input_axis_layout)
+            gremlin.util.clear_layout(self._container_input_state_layout)
             self.axis_widget = None
 
         if current_button_widget and remove_button:
             current_button_widget.unhookDevice()
-            gremlin.util.clear_layout(self._container_input_axis_layout)
+            gremlin.util.clear_layout(self._container_input_state_layout)
             self.button_widget = None
                
 
@@ -1412,8 +1410,8 @@ class InputItemWidget(QBoxFrame):
             # widget created
             widget.setMaximumWidth(200)
             widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
-            self._container_input_axis_layout.addWidget(widget)                
-            self._container_input_axis_layout.addStretch()
+            self._container_input_state_layout.addWidget(widget)                
+            self._container_input_state_layout.addStretch()
 
 
     def _message_key_changed(self, old_message_key, new_message_key):

@@ -293,6 +293,9 @@ T31
 - New: Add listen widget to keyboard conditions
 - Improved: Further pass on UI for look and feel and consistency including use of icons
 - Fix: ensure action icons on the input selectors are updated on action CRUD (create/read/update/delete) operations in the various permutations allowed by the UI (may still need more work).
+T32
+- Fix: Button repeater disappeared in T30
+- Fix: Resolved an issue where some actions would not execute because of shortcut logic.  This should resolve several reported condition issues.
 
 
 

@@ -119,6 +119,21 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
     def node_string(self):
          return f"{self.nodeType.name}: (node {self.id}) {self.description} has actions: {self.has_actions}"
     
+    def getFunctors(self):
+        ''' gets the functors in the node '''
+        return [] if self.functors is None else (self.functors if  isinstance(self.functors, list) else [self.functors])
+    
+    def getConditionFunctors(self):
+        ''' gets the list of condition functors in the node '''
+        functor_list = self.getFunctors()
+        return [functor for functor in functor_list if isinstance(functor, gremlin.actions.ActivationCondition) or isinstance(functor, gremlin.actions.AbstractCondition)]
+    
+    def getActionFunctors(self):
+        functor_list = self.getFunctors()
+        return [functor for functor in functor_list if isinstance(functor, gremlin.base_conditions.AbstractFunctor)]
+        
+
+    
     @abstractmethod
     def to_string(self):
         return self.node_string()
@@ -1190,9 +1205,9 @@ class ExecutionContext():
                             else:
                                 container_node.parent = input_container_group
 
-                                container_group = ExecutionGraphGroupNode()
-                                container_group.parent = container_node
-                            
+                            container_group = ExecutionGraphGroupNode()
+                            container_group.parent = container_node
+                        
 
                             for action_set in container.action_sets:
                                 # sort actions by priority low to high
@@ -1220,6 +1235,8 @@ class ExecutionContext():
 
                                     if action.has_conditions:
                                         action_condition_node = self._get_condition_node(action, container_group)
+                                        # action_condition_group = ExecutionGraphGroupNode()
+                                        # action_condition_group.parent = action_condition_node
                                         action_node.parent = action_condition_node # action node is owned by its condition node
                                     else:
                                         action_node.parent = container_group
@@ -1507,62 +1524,79 @@ class ExecutionContext():
 
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:
+                    # group nodes: every subnode is executed regardless of the return value
                     for child in node.children:
                         result = self.execute_node(child, event, value, extra_data, manual)
                         # dont care if result fails for individual groups
-                        
+                    return True # groups always pass 
 
 
                 case ExecutionGraphNodeType.ActivationConditionNexus:
+                    # activation condition group - pass on the first ok
                     for child in node.children:
                         result = self.execute_node(child, event, value, extra_data, manual)
                         if result:
                             # pass the whole group on first group that doesn't fail
-                            break
-                
-                case _:
+                            return True
+                    return False # all failed
 
+                case ExecutionGraphNodeType.Container:
+                    # container node - check for conditions and fail if they fail, 
+                    # otherwise, run the container's children
+                    condition_functors = node.getConditionFunctors()
+                    for functor in condition_functors:
+                        result =  self.process_functor(functor, event, value, extra_data, manual)
+                        if verbose_condition:
+                            condition_name = functor.condition_name()
+                            if isinstance(functor, gremlin.actions.ActivationCondition):
+                                syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                            elif isinstance(functor, gremlin.actions.AbstractCondition):
+                                syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                     if not result:
                         # condition failed
                         return result
+                    
+                case ExecutionGraphNodeType.ActivationCondition:
+                    # activation condition
+                    condition_functors = node.getConditionFunctors()
+                    for functor in condition_functors:
+                        result =  self.process_functor(functor, event, value, extra_data, manual)
+                        if verbose_condition:
+                            condition_name = functor.condition_name()
+                            if isinstance(functor, gremlin.actions.ActivationCondition):
+                                syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                            elif isinstance(functor, gremlin.actions.AbstractCondition):
+                                syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                    if not result:
+                        # condition failed
+                        return result
+                
+                case _:
+                    # action node
 
                     # any other node - execute the functor list - first one that fails fails the complete branch to this point
-                    functor_list = [] if node.functors is None else (node.functors if  isinstance(node.functors, list) else [node.functors])
+                    functor_list = node.getActionFunctors()
                     if functor_list:
                         if event.is_pressed == False:
                             pass 
                         for functor in functor_list:
-                            result =  self.process_functor(functor, event, value, extra_data, manual)
-                            if verbose_condition:
-                                if isinstance(functor, gremlin.actions.ActivationCondition):
-                                    condition_name = functor.condition_name()
-                                    syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                                elif isinstance(functor, gremlin.actions.AbstractCondition):
-                                    condition_name = functor.condition_name()
-                                    syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                                else:
-                                    syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} result: {'PASS' if result else 'FAIL'}")
-                            if node.nodeType != ExecutionGraphNodeType.Action and not result:
-                                # not an action and the functor failed = fail the series
-                                # if verbose_id:
-                                #     syslog.info(f"{logTabs}>Failing node: {node.id}")
+                            action_result =  self.process_functor(functor, event, value, extra_data, manual)
+                            description = str(functor.action_data)
+                            syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} {description} action result: {'PASS' if action_result else 'FAIL'}")
+                            
 
-                                # all functors failed - return failure
-                                return result
-            
+            # execute children nodes
+            if node.children:
+                for child in node.children:
+                    if child.nodeType == ExecutionGraphNodeType.ActionSet:
+                        continue # skip activation sets as the actions are in the container node already
+                    result = self.execute_node(child, event, value, extra_data, manual)
+                    if not result:
+                        break # FAIL
 
-                    #result = False
-                    if node.children:
-                        for child in node.children:
-                            if child.nodeType == ExecutionGraphNodeType.ActionSet:
-                                continue # skip activation sets as the actions are in the container node already
-                            result = self.execute_node(child, event, value, extra_data, manual)
-                            if not result:
-                                break # FAIL
-
-                        if not result:
-                            # return failure
-                            return result
+                if not result:
+                    # return failure
+                    return result
     
 
             return result

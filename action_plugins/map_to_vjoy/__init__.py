@@ -3141,6 +3141,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         # syslog.info(f"REMAP: event pressed: {event.is_pressed}  value pressed: {action_value.is_pressed} value current: {action_value.current}" )
 
         input_type = event.getInputType()
+        result = True # assume functor executes
 
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
@@ -3300,9 +3301,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = is_pressed
                         if is_remote or is_paired:
                             self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, is_pressed, force_remote = is_paired )
-
-
-
+                    else:
+                        # indicate no execution
+                        result = False 
 
             elif self.action_mode == VjoyAction.VJoyButtonRelease:
                 # normal default behavior
@@ -3370,30 +3371,32 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     remote_state.mode = self.action_mode
 
             elif self.action_mode == VjoyAction.VJoySetAxisStepped:
-                if event.device_guid != self.action_data.hardware_device_guid and event.device_guid != self.action_data.stepped_device_guid:
-                    return True
-                trigger = False
-                index = self.action_data.target_step_start_index
-                direction = self.action_data.target_step_direction
-                latched = self.action_data._stepped_latched
-                if (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release):
-                    if event.device_guid == self.action_data.hardware_device_guid: # and event.identifier == self.action_data.hardware_input_id:
-                        # up direction
-                        if verbose: syslog.info(f"Step {'up' if direction == 1 else 'down'}")
-                        index += direction
-                        trigger = True
-                    elif latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id:
-                        # down direction
-                        if verbose: syslog.info(f"Step {'down' if direction == 1 else 'up'}")
-                        index -= direction
-                        trigger = True
+                if event.device_guid == self.action_data.hardware_device_guid and event.device_guid == self.action_data.stepped_device_guid:
+                    trigger = False
+                    index = self.action_data.target_step_start_index
+                    direction = self.action_data.target_step_direction
+                    latched = self.action_data._stepped_latched
+                    if (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release):
+                        if event.device_guid == self.action_data.hardware_device_guid: # and event.identifier == self.action_data.hardware_input_id:
+                            # up direction
+                            if verbose: syslog.info(f"Step {'up' if direction == 1 else 'down'}")
+                            index += direction
+                            trigger = True
+                        elif latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id:
+                            # down direction
+                            if verbose: syslog.info(f"Step {'down' if direction == 1 else 'up'}")
+                            index -= direction
+                            trigger = True
 
-                    if trigger:
-                        index = gremlin.util.clamp(index,0,len(self.action_data.target_step_list)-1)
-                        value = self.action_data.target_step_list[index]
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
-                        self.action_data.target_step_start_index = index
-                        if verbose: syslog.info(f"Step: Index: {index}  value: {value:0.3f}")
+                        if trigger:
+                            index = gremlin.util.clamp(index,0,len(self.action_data.target_step_list)-1)
+                            value = self.action_data.target_step_list[index]
+                            joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+                            self.action_data.target_step_start_index = index
+                            if verbose: syslog.info(f"Step: Index: {index}  value: {value:0.3f}")
+                else:
+                    # wrong input
+                    result = False
 
 
             else:
@@ -3416,7 +3419,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
         if auto_complete:
             self.functor_complete.emit() # indicate completed
-        return True
+        return result
 
     def relative_axis_thread(self):
         self.thread_running = True

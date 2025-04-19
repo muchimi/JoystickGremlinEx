@@ -3893,6 +3893,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         verbose_details = False # config.verbose_mode_details
         #verbose = True
         manager : SimConnectManager = self.manager
+   
         
         #syslog.info(f"event: {str(event)} node: {extra_data["node"]}")
 
@@ -4068,6 +4069,9 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         else:
                             if verbose: syslog.info(f"SIMCONNECT: {comment} Trigger singleton {block.command}")
                             block.execute(value)
+                    else:
+                        # not executed
+                        return False
 
             elif output_mode == SimConnectActionMode.SetValue:
                 # set value mode 
@@ -4094,6 +4098,9 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     else:
                         if verbose: syslog.info(f"SIMCONNECT: {comment} send block: {block.command} fixed value: {output_value:0.3f}")
                         block.execute(output_value)   
+                else:
+                    # fail
+                    return False 
                     
             elif self.action_data.mode == SimConnectActionMode.Trigger:
                 # trigger action 
@@ -4104,7 +4111,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 if verbose: syslog.info(f"SIMCONNECT: {comment} send block trigger: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                 block.execute(output_value)
 
-        return False
+            else:
+                # unknown mode
+                syslog.error(f"SIMCONNECT: unhandled mode: {self.action_data.mode}")
+                return False
+
+        return True
     
     def _auto_repeat_command(self):
         verbose_details = False
