@@ -4701,6 +4701,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         eh = SimConnectEventHandler()
         self._manager = eh.manager
 
+    def __str__(self):
+        return f"MapToSimConnect: command: {self.command} mode: {self.command_mode}"
+
 
 
 

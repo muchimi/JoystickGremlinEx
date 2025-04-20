@@ -78,6 +78,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.main_layout.addWidget(QtWidgets.QLabel("VJOY is not available.  Ensure VJOY is installed and configured."))
             return
 
+        self._last_input_type = self.action_data.input_type
 
         input_types = {
             InputType.Keyboard: [
@@ -113,6 +114,8 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.get_settings().vjoy_as_input
         )
         
+        self.vjoy_selector.input_changed.connect(self._input_changed)
+
         self.main_layout.addWidget(self.vjoy_selector)
 
         # Create UI widgets for absolute / relative axis modes if the remap
@@ -151,6 +154,23 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(warning_container)            
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
+
+    @QtCore.Slot()
+    def _input_changed(self):
+        ''' called when the input changed '''
+        vjoy_data = self.vjoy_selector.get_selection()
+        input_type = vjoy_data["input_type"]
+        if input_type != self._last_input_type:
+            
+            self._last_input_type = input_type
+            self.action_data.vjoy_device_id = vjoy_data["device_id"]
+            self.action_data.vjoy_input_id = vjoy_data["input_id"]
+            self.action_data.input_type = input_type
+            el = gremlin.event_handler.EventListener()
+            container = self.action_data.parent
+            input_item = container.input_item
+            el.virtual_button_changed.emit(input_item, container, self.action_data)
+        
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -410,10 +430,13 @@ class Remap(gremlin.base_profile.AbstractAction):
         self.vjoy_input_id = None
         input_type = self.get_input_type()
         self._input_type = input_type
-        self.is_axis = self.input_is_axis()
         
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
+
+    @property
+    def is_axis(self):
+        return self.input_is_axis()
 
     @property
     def input_type(self) -> InputType:
@@ -473,11 +496,13 @@ class Remap(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         """Returns whether or not the action requires an activation condition.
 
-        :return True if an activation condition is required, False otherwise
+        :return True if a virtual button condition is required, False otherwise
         """
         mapped_input_type = self.get_input_type()
 
-        if mapped_input_type in [InputType.JoystickButton, InputType.Keyboard]:
+
+
+        if mapped_input_type in (InputType.JoystickButton, InputType.Keyboard):
             return False
         elif self.is_axis:
             if self.input_type == InputType.JoystickAxis:

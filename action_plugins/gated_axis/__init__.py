@@ -73,8 +73,8 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
-    def __init__(self, action, parent = None):
-        super().__init__(action, parent)
+    def __init__(self, action_data, parent = None):
+        super().__init__(action_data, parent)
         self.manual_callback = True # indicate this functor only uses manual callbacks
 
     # def profile_start(self):
@@ -86,7 +86,9 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
         # all the work happens in the gate widget hook function - nothing to do
         #self.action_data.gate_data.process_event(event, value)
         #syslog.info("Gated Axis: trigger")
-        return True # prevent child from executing
+        #return self.action_data.gate_data.process_event(event, value, extra_data)
+        #return True # prevent child from executing
+        return True
 
 class GatedAxis(gremlin.base_profile.AbstractAction):
 

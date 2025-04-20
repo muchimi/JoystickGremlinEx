@@ -397,7 +397,9 @@ class EventListener(QtCore.QObject):
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
 
 	# remove action
-	action_delete = QtCore.Signal(object, object, object) # fires when an action is about to be deleted, passes the inputItem, container, action as a parameters
+	action_delete = QtCore.Signal(object, object, object) # fires when an action is about to be deleted, passes the (input_item, container, action) as a parameters
+
+	virtual_button_changed = QtCore.Signal(object, object, object) # runs when the action has modified its input mode (input_item, container, action) as parameters
 
 	# selection event - tells the UI to show a different input
 	select_input = QtCore.Signal(object, object, object, bool, bool, bool) # selects a particular input (device_guid, input_type, input_id, force_update, force_switch, tab_changed)

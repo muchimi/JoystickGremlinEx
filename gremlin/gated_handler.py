@@ -1365,10 +1365,17 @@ class GateData():
             syslog.info("GateData: Starting profile with ranges:")
             self.dumpActiveRanges()
 
-        if not self.hooked:        
-            # listen to hardware events
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self._joystick_event_handler)
+        # if not self.hooked:        
+        #     # listen to hardware events
+        #     el = gremlin.event_handler.EventListener()
+        #     el.joystick_event.connect(self._joystick_event_handler)
+        self.hook() # ensure hooked
+
+        # if self._hooked:        
+        #     # listen to hardware events
+        #     el = gremlin.event_handler.EventListener()
+        #     el.joystick_event.disconnect(self._joystick_event_handler)            
+        #     self._hooked = False
 
         # build allowed mode list
         self.valid_mode_list  = gremlin.shared_state.current_profile.get_mode_branch(self.profile_mode)
@@ -1422,10 +1429,16 @@ class GateData():
     def _profile_stop_cb(self):
         ''' profile stops - cleanup '''
 
-        if not self.hooked:        
-            # stop listening to hardware events
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.disconnect(self._joystick_event_handler)
+        # if not self.hooked:        
+        #     # stop listening to hardware events
+        #     el = gremlin.event_handler.EventListener()
+        #     el.joystick_event.disconnect(self._joystick_event_handler)
+
+        # if not self._hooked:        
+        #     # stop listening to hardware events
+        #     el = gremlin.event_handler.EventListener()
+        #     el.joystick_event.connect(self._joystick_event_handler)
+        #     self._hooked = True
 
         # clean up callback map
         self._callbacks.clear()
@@ -1444,9 +1457,8 @@ class GateData():
     def process_event(self, event, value, extra_data  : dict = None):
         ''' handles functor execution '''
         syslog.info("gate data: process handler")
-        pass
-
-
+        self._joystick_event_handler(event)
+    
 
     @QtCore.Slot(object)
     def _joystick_event_handler(self, event):
@@ -1459,16 +1471,16 @@ class GateData():
 
         if not event.is_axis:
             # ignore if not an axis event
-            return
+            return False
         
         if not hasattr(self,"_action_data"):
             # this happens at shutdown usually as objects are removed
             # syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
-            return
+            return False
         
         if not self._action_data:
             # not initialized yet
-            return 
+            return  False
         
         # eh = gremlin.event_handler.EventHandler()
         # if not eh.shouldProcess(event):
@@ -1479,19 +1491,19 @@ class GateData():
             runtime_mode = gremlin.shared_state.runtime_mode
             if self.profile_mode != runtime_mode:
                 # wrong mode
-                return
+                return False
 
         if self._action_data.hardware_device_guid != event.device_guid:
             # ignore if a different input device
-            return
+            return False
             
         if hasattr(self._action_data.hardware_input_id, "message_key"):
             if self._action_data.hardware_input_id.message_key != event.identifier.message_key:
                 # ignore if a different input axis on the input device
-                return
+                return False
             
         elif self._action_data.hardware_input_id != event.identifier:
-            return
+            return False
         
 
         # process curved intput
@@ -1594,6 +1606,7 @@ class GateData():
                 if not gremlin.shared_state.is_running:
                     # non-runtime trigger updates for the UI
                     self._fire_trigger_callbacks(trigger)
+                    return True
                 else:
 
                     if not gremlin.shared_state.runtime_mode in self.valid_mode_list:
@@ -1607,19 +1620,8 @@ class GateData():
                     extra_data["condition_type"] = trigger.condition
                     extra_data["trigger"] = trigger
                     if trigger.is_range:
-                        # linear range trigger event for in-range or outside-range
-                        #range_info = trigger.range
-
-                        # if range_info.mode == GateRangeOutputMode.Rebased:
-                        #     # rebase the input to the range
-                        #     value = gremlin.util.scale_to_range(input_value, target_min = -1.0, target_max = 1.0)
-                        #     action_value = gremlin.actions.Value(value)
-                        # elif range_info.mode == GateRangeOutputMode.Fixed:
-                        #     action_value = gremlin.actions.Value(range_info.fixed_value)
-                        # elif range_info.mode == GateRangeOutputMode.FilterOut:
-                        #     return
-                        # else:
-                        if verbose: syslog.info(f"Trigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
+                     
+                        if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
                         action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
                         self._ec.execute_functor_id(self._action_data.id, range_event, action_value, extra_data, True)
                     else:
@@ -5374,36 +5376,50 @@ class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
         return self.process_event(event, value, extra_data)
     
 
-    def process_event(self, event, value, extra_data  : dict = None):
-        if event.is_axis:
-            return False #  FAIL - wrong event type - gate actions are all momentary so require a non-axis event
+    def process_event(self, event, value, extra_data : dict = None):
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+
+        if extra_data and "trigger" in extra_data:
+            # if we get a trigger, this is kicked off by the gated axis so we compare types only as we're already in the right branch and checked inputs
+            trigger = extra_data["trigger"]
+            result = False
+            if trigger.gate:
+                condition_type = extra_data["condition_type"]
+                result = self._condition_type == condition_type and self.gate_info.id == trigger.gate.id
+                if verbose: syslog.info(f"GATE TRIGGER {self._condition_type.name}:  result: {result}")
+            return result
+
+
+        if not event.is_axis:
+            return False #  not an axis event
         
         current_value = value.raw
         gate_value = self.gate_info.value
         last_value = self._last_value
-        self._last_value = current_value
+
+        
         result = False
         match self._condition_type:
             case GateConditionType.OnCross:
-                #syslog.info(f"GATE CROSS: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {current_value >= gate_value} {last_value < gate_value} {current_value < gate_value} {last_value >= gate_value} ")
                 if current_value >= gate_value:
                     result = last_value < gate_value
                 elif current_value < gate_value:
                     result = last_value >= gate_value
+                if verbose: syslog.info(f"GATE CROSS: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {result}")
                 
             case GateConditionType.OnCrossIncrease:
-                #syslog.info(f"GATE INC: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {current_value >= gate_value} {last_value < gate_value}")
                 if current_value >= gate_value:
                     result = last_value < gate_value
+                if verbose: syslog.info(f"GATE CROSS INC: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {result}")
                 
             case GateConditionType.OnCrossDecrease:
-                #syslog.info(f"GATE DEC: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {current_value < gate_value} {last_value >= gate_value}")
                 if current_value < gate_value:
                     result = last_value >= gate_value
+                if verbose: syslog.info(f"GATE CROSS DEC: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {result}")
 
-        # if result:
-        #     pass
-                
+        self._last_value = current_value    
+
+        
         return result
 
 
@@ -5433,6 +5449,22 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         return self.process_event(event, value, extra_data)
 
     def process_event(self, event, value, extra_data : dict = None):
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+
+        if extra_data and "trigger" in extra_data:
+            # if we get a trigger, this is kicked off by the gated axis so we compare types only as we're already in the right branch and checked inputs
+            trigger = extra_data["trigger"]
+            result = False
+            if trigger.range:
+                condition_type = extra_data["condition_type"]
+                result = self._condition_type == condition_type and self.range_info.id == trigger.range.id
+                if verbose: syslog.info(f"RANGE TRIGGER {self._condition_type.name}:  result: {result}")
+            return result
+
+
+        if not event.is_axis:
+            return False #  not an axis event
+
         require_axis = self._condition_type in (GateConditionType.InRange, GateConditionType.OutsideRange)
         if event.is_axis != require_axis:
             return False # FAIL - wrong event type

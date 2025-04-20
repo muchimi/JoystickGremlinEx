@@ -2170,7 +2170,7 @@ class ConditionStateTracker():
                     if container.id in self._cache[device_guid][mode][input_id]:
                         info = self._cache[device_guid][mode][input_id][container.id]
                         container_widget : AbstractContainerWidget = info.containerWidget
-                        container_widget._update_ui()
+                        container_widget._update_ui(container)
                         enabled = info.input_item.hasConditions()
                         dock_tabs = info.dock_tabs
                         self.set_condition_tab_state(dock_tabs, enabled)

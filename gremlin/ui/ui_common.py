@@ -1674,6 +1674,8 @@ class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
 
 class AbstractInputSelector(QtWidgets.QWidget):
 
+    input_changed = QtCore.Signal() # fires when the input changes 
+
     def __init__(self, change_cb, valid_types, parent=None):
         super().__init__(parent)
 
@@ -1715,14 +1717,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
                 input_value = self.input_item_dropdowns[device_index].currentText()
 
             input_type, input_id = self.input_item_dropdowns[device_index].itemData(input_index)
-
-            # input_type = self._input_type_registry[device_index][input_index]
-
-            # if input_type == InputType.JoystickAxis:
-            #     input_id = gremlin.types.AxisNames.to_enum(input_value).value
-            # else:
-            #     input_id = int(input_value.split()[-1])
-
+            
         return {
             "device_id": device_id,
             "input_id": input_id,
@@ -1828,6 +1823,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
             selection_widget.setStyleSheet("QComboBox { combobox-popup: 0; }")
             self._input_type_registry.append([])
             self.selection_widget = selection_widget
+            selection_widget.currentIndexChanged.connect(self._input_changed)
 
             # Add items based on the input type
             max_col = 32
@@ -1861,6 +1857,11 @@ class AbstractInputSelector(QtWidgets.QWidget):
         # Show the first entry by default
         if len(self.input_item_dropdowns) > 0:
             self.input_item_dropdowns[0].setVisible(True)
+
+    @QtCore.Slot()
+    def _input_changed(self):
+        ''' called when the input changes '''
+        self.input_changed.emit()
 
 
     def _execute_callback(self):

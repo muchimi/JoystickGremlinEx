@@ -21,9 +21,12 @@ from PySide6 import QtWidgets
 from lxml import etree as ElementTree
 
 import gremlin.base_classes 
+import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.input_item
+import logging
 
+syslog = logging.getLogger("system")
 
 class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -57,6 +60,9 @@ class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action, parent)
 
     def process_event(self, event, value, extra_data = None):
+        if event.is_pressed:
+            verbose = gremlin.config.Configuration().verbose
+            if verbose: syslog.info(f"DESCRIPTION: {self.action_data.description}")
         return True
 
 
@@ -103,6 +109,9 @@ class DescriptionAction(gremlin.base_profile.AbstractAction):
 
     def _is_valid(self):
         return True
+    
+    def __str__(self):
+        return f"DescriptionAction: {self.description}"
 
 
 version = 1

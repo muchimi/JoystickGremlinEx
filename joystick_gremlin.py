@@ -129,7 +129,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t32"
+APPLICATION_BASE = "m73t33"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -1607,6 +1607,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _toggle_axis_highlight(self):
         eh = gremlin.event_handler.EventListener()
         status = self.config.highlight_input_axis
+        self.config.highlight_input_axis = not status
         eh.toggle_highlight.emit(None, not status, None)
 
 
@@ -1614,6 +1615,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _toggle_button_highlight(self, checked):
         eh = gremlin.event_handler.EventListener()
         status = self.config.highlight_input_buttons
+        self.config.highlight_input_buttons = not status
         eh.toggle_highlight.emit(None, None, not status)
 
     @QtCore.Slot()

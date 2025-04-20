@@ -393,6 +393,9 @@ class AbstractContainer(ProfileData):
         self.current_view_type = None
         self.parent_node = node
         self.comment = None # user comment
+
+        el = gremlin.event_handler.EventListener()
+        el.virtual_button_changed.connect(self._virtual_button_changed)
         
 
         self._action_sets_callback = None # callback to return different action sets if needed for containers that do their own thing
@@ -415,6 +418,14 @@ class AbstractContainer(ProfileData):
             self.device_input_id = None
             self.device_input_type = None
             self.device = None
+
+    @QtCore.Slot(object, object, object)
+    def _virtual_button_changed(self, input_item, container, action):
+        ''' called when an action changes its virtual button setting '''
+        if self.id == container.id:
+            self.create_or_delete_virtual_button()
+            el = gremlin.event_handler.EventListener()
+            el.condition_changed.emit(self)
 
     def generateGuids(self):
         ''' called when GUIDs for this container, actions and conditions need to be re-set '''
@@ -555,6 +566,8 @@ class AbstractContainer(ProfileData):
                     AbstractContainer.virtual_button_lut[self.parent.input_type](self)
         else:
             self.virtual_button = None
+
+
 
     def generate_callbacks(self, parent = None):
         """Returns a list of callback data entries.

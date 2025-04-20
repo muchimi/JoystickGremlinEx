@@ -296,6 +296,7 @@ T31
 T32
 - Fix: Button repeater disappeared in T30
 - Fix: Resolved an issue where some actions would not execute because of shortcut logic.  This should resolve several reported condition issues.
+T33
 
 
 

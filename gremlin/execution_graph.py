@@ -379,6 +379,7 @@ class ExecutionContext():
         self._verbose_detailed = config.verbose_mode_exec_detailed
         self._verbose_condition = config.verbose_mode_condition
         self.used_items = {}  # nodes can only be used once
+        
 
     @property
     def functor_map(self) -> dict:
@@ -1010,6 +1011,145 @@ class ExecutionContext():
             )
         
 
+    def _build_container_tree(self, container, parent_group, mode_name, device_node, input_item, m_input_node ) -> bool:
+        ''' builds a tree branch for the given container '''
+        if not container.is_valid():
+            syslog.warning("Incomplete container ignored")
+            return True
+
+        if container.id in self.used_items:
+            syslog.error(f"Container already used: {container.id}")
+            self._build_error = True
+            return False
+        self.used_items[container.id] = container
+        
+        assert isinstance(container, gremlin.base_profile.AbstractContainer), f"invalid node type: {container.__class__.__name__} encountered"
+
+        #container.refresh_conditions() # refresh any conditions for this container
+        container_node = ExecutionGraphContainerNode(container)
+        container_node.id = container.id
+        container_node.mode = mode_name
+        container_node.description = f"Container type: [{container.__class__.__name__}] ID: [{container.id}]"
+
+        # container functor - this is what calls the process_events() method on container functors
+        container_node.functors = self._get_container_functor(container, container_node)
+
+        # container condition
+
+        if container.has_conditions:
+            condition_node = self._get_condition_node(container, container_node)
+            condition_node.parent = parent_group
+            container_node.parent = condition_node
+        else:
+            container_node.parent = parent_group
+
+        container_group = ExecutionGraphGroupNode()
+        container_group.parent = container_node
+
+        for action_set in container.action_sets:
+            # sort actions by priority low to high
+            action_list = [((action.priority, index),action) for index, action in enumerate(action_set)]
+            if not action_list:
+                # empty set
+                continue
+            action_list.sort(key = lambda x : x[0]) # sort by priority, order of appearance
+            for index, action in action_list:
+
+                if action.id in self.used_items:
+                    syslog.error(f"Action already used: {action.id}")
+                    self._build_error = True
+                    return False
+                self.used_items[action.id] = action
+
+                # action node
+                action_node = ExecutionGraphActionNode(action)
+                action_node.id = action.id
+                
+                action_node.mode = mode_name
+                action_node.comment = action.comment
+                action_node.device_link = device_node
+                action_node.input_item = input_item
+
+                if action.has_conditions:
+                    action_condition_node = self._get_condition_node(action, container_group)
+                    action_node.parent = action_condition_node # action node is owned by its condition node
+                else:
+                    action_node.parent = container_group
+
+                m_action_node = ExecutionGraphActionNode(action)
+                m_action_node.id = action.id
+                m_action_node.parent = m_input_node # action node is owned by its condition node
+                m_action_node.mode = mode_name
+                m_action_node.link = action_node # link the input tree action node to the execution tree action node
+                action_node.link = m_action_node # link the execution tree action node to the input tree action node
+
+                action_node.container = container
+                functor = self._get_action_functor(action, action_node)
+                action_node.exec_functors = functor
+                action_node.description = f"Action node: [{str(action)}]"
+
+                # build gate action execution subtree
+                if action.name == "Gated Axis":
+    
+                    # build gate subtree
+                    gate_data : gremlin.gated_handler.GateData = action.gate_data
+                    gates = gate_data.getUsedGates()
+                    gate_info: gremlin.gated_handler.GateInfo
+
+                    # gates hold a group of conditions (increase/decrease/cross)
+                    gate_group = ExecutionGraphGroupNode()
+                    gate_group.parent = action_node
+
+                    for gate_info in gates:
+
+                        for condition_type, item_data in gate_info.item_data_map.items():
+                            if not item_data.containers:
+                                # no containers to process for this condition
+                                continue
+
+                            # gate activation condition node
+                            exec_functors = gremlin.gated_handler.GatedAxisGateCondition(gate_data, gate_info, condition_type)
+                            gate_condition_node = ExecutionGraphGateConditionNode(exec_functors)
+                            gate_condition_node.parent = gate_group
+
+                            gate_node = ExecutionGraphGateNode(gate_info)
+                            gate_node.description = f"Gate for condition: {condition_type.name} {gate_info.to_display()}"
+                            gate_node.parent = gate_condition_node # gate node is owned by its parent action
+ 
+                            group_node = ExecutionGraphGroupNode()
+                            group_node.parent = gate_node
+
+
+                            for container in item_data.containers:
+                                self._build_container_tree(container, group_node, mode_name, device_node, input_item, m_input_node)
+
+                    # build range subtree
+                    range_group = gate_group # use the same group
+                    range_info : gremlin.gated_handler.RangeInfo
+                    for range_info in gate_data.getUsedRanges():
+                        for condition_type, item_data in range_info.item_data_map.items():
+
+                            if not item_data.containers:
+                                # no containers to process for this condition
+                                continue
+
+                            # range condition (condition applied to the range)
+                            exec_functors = gremlin.gated_handler.GatedAxisRangeCondition(gate_data, range_info, condition_type)
+                            range_condition_node = ExecutionGraphRangeConditionNode(exec_functors)
+                            range_condition_node.parent = range_group
+
+                            range_node = ExecutionGraphRangeNode(range_info)
+                            range_node.parent = range_condition_node
+                            range_node.description = f"Range for condition: {condition_type.name} {range_info.to_display()}"
+
+                            # holds the containers for the range
+                            group_node = ExecutionGraphGroupNode()
+                            group_node.parent = range_node
+
+                            for container in item_data.containers:
+                                self._build_container_tree(container, group_node, mode_name, device_node, input_item, m_input_node)
+
+
     def _build_execution_tree(self):
         ''' builds the execution tree 
         
@@ -1113,9 +1253,7 @@ class ExecutionContext():
         
         
         '''
-
-        # latched functors tracker
-        latched_data = [] # list of LatchedData items
+        
         for device in profile.devices.values():
             device_node = ExecutionGraphDeviceNode()
             device_node.device = device
@@ -1138,9 +1276,6 @@ class ExecutionContext():
                     self._mode_ancestors[mode_name] = current_profile.get_mode_ancestors(mode_name)
                     self._mode_descendants[mode_name] = current_profile.get_mode_descendants(mode_name)
 
-                
-
-             
                 mode_node.mode = mode_name
                 mode_node.parent = device_node
                 for input_items in mode.config.values():
@@ -1174,192 +1309,8 @@ class ExecutionContext():
 
                         container : gremlin.base_profile.AbstractContainer
                         for container in input_item.containers:
-                            if not container.is_valid():
-                                syslog.warning("Incomplete container ignored")
-                                continue
-
-                            if container.id in self.used_items:
-                                syslog.error(f"Container already used: {container.id}")
-                                self._build_error = True
-                                return False
-                            self.used_items[container.id] = container
-                            
-                            assert isinstance(container, gremlin.base_profile.AbstractContainer), f"invalid node type: {container.__class__.__name__} encountered"
-
-                            #container.refresh_conditions() # refresh any conditions for this container
-                            container_node = ExecutionGraphContainerNode(container)
-                            container_node.id = container.id
-                            container_node.parent = input_container_group # container node parents to its condition node
-                            container_node.mode = mode_name
-                            container_node.description = f"Container type: [{container.__class__.__name__}] ID: [{container.id}]"
-
-                            # container functor - this is what calls the process_events() method on container functors
-                            container_node.functors = self._get_container_functor(container, container_node)
-
-                            # container condition
-                       
-                            if container.has_conditions:
-                                condition_node = self._get_condition_node(container, container_node)
-                                condition_node.parent = input_container_group
-                                container_node.parent = condition_node
-                            else:
-                                container_node.parent = input_container_group
-
-                            container_group = ExecutionGraphGroupNode()
-                            container_group.parent = container_node
-                        
-
-                            for action_set in container.action_sets:
-                                # sort actions by priority low to high
-                                action_list = [((action.priority, index),action) for index, action in enumerate(action_set)]
-                                if not action_list:
-                                    # empty set
-                                    continue
-                                action_list.sort(key = lambda x : x[0]) # sort by priority, order of appearance
-                                for index, action in action_list:
-
-                                    if action.id in self.used_items:
-                                        syslog.error(f"Action already used: {action.id}")
-                                        self._build_error = True
-                                        return False
-                                    self.used_items[action.id] = action
-
-                                    # action node
-                                    action_node = ExecutionGraphActionNode(action)
-                                    action_node.id = action.id
-                                    
-                                    action_node.mode = mode_name
-                                    action_node.comment = action.comment
-                                    action_node.device_link = device_node
-                                    action_node.input_item = input_item
-
-                                    if action.has_conditions:
-                                        action_condition_node = self._get_condition_node(action, container_group)
-                                        # action_condition_group = ExecutionGraphGroupNode()
-                                        # action_condition_group.parent = action_condition_node
-                                        action_node.parent = action_condition_node # action node is owned by its condition node
-                                    else:
-                                        action_node.parent = container_group
-                    
-
-
-                                    m_action_node = ExecutionGraphActionNode(action)
-                                    m_action_node.id = action.id
-                                    m_action_node.parent = m_input_node # action node is owned by its condition node
-                                    m_action_node.mode = mode_name
-                                    m_action_node.link = action_node # link the input tree action node to the execution tree action node
-                                    action_node.link = m_action_node # link the execution tree action node to the input tree action node
-
-
-                                    action_node.container = container
-                                    functor = self._get_action_functor(action, action_node)
-                                    action_node.exec_functors = functor
-                                    action_node.description = f"Action node: [{str(action)}]"
-
-
-                                    # build gate action execution subtree
-                                    if action.name == "Gated Axis":
-
-                                        # for gated axis, repeat the gated axis action container conditions because the gated action node will be executed as root directly, so the parent condition will not be evaluated
-                                        repeat_condition_node = self._get_condition_node(container, container_node)
-                                        repeat_condition_node.parent = action_node  # condition for container - appears after the container node as the entry point is the container
-
-                                        # all gated axis functions are grouped - holds a condition per gate or range all of which get executed
-                                        gated_axis_group_node = ExecutionGraphGroupNode()
-                                        gated_axis_group_node.parent = repeat_condition_node
-
-
-
-                                        gate_data : gremlin.gated_handler.GateData = action.gate_data
-                                        gates = gate_data.getUsedGates()
-                                        gate_info: gremlin.gated_handler.GateInfo
-                                        for gate_info in gates:
-                                            gate_node = ExecutionGraphGateNode(gate_info)
-                                            gate_node.description = f"Gate {gate_info.to_display()}"
-                                            gate_node.parent = gated_axis_group_node # gate node is owned by its parent action
-                                            
-                                            # gates hold a group of conditions (increase/decrease/cross)
-                                            gate_group = ExecutionGraphGroupNode()
-                                            gate_group.parent = gate_node
-
-                                            for condition_type, item_data in gate_info.item_data_map.items():
-
-                                                exec_functors = gremlin.gated_handler.GatedAxisGateCondition(gate_data, gate_info, condition_type)
-                                                gate_condition_node = ExecutionGraphGateConditionNode(exec_functors)
-                                                
-                                                gate_condition_node.parent = gate_group
-
-                                                group_node = ExecutionGraphGroupNode()
-                                                group_node.parent = gate_condition_node
-
-
-                                                for container in item_data.containers:
-                                                    gate_container_node = ExecutionGraphContainerNode(container)
-                                                    gate_container_node.id = container.id
-                                                    gate_container_node.description = f"Gate container for gate: {gate_info.to_display()}: condition: [{condition_type.name}] {str(container)}"
-                                                    gate_container_node.parent = group_node # gate container is owned by the gate condition
-
-                                                    gate_activation_condition_node = self._get_condition_node(container, gate_container_node)
-
-                                                    # build gate container subtree
-                                                    for action_set in container.action_sets:
-                                                        for gate_action in action_set:
-                                                            gate_action_condition_node = self._get_condition_node(gate_action, gate_activation_condition_node)
-                                                            gate_action_node = ExecutionGraphActionNode()
-                                                            gate_action_node.id = gate_action.id
-                                                            gate_action_node.parent = gate_action_condition_node  # gate action is owned by its condition
-                                                            gate_action_node.action = gate_action
-                                                            functor = self._get_action_functor(gate_action, gate_action_node)
-                                                            gate_action_node.exec_functors = functor
-                                                            gate_action_node.mode = mode_name
-                                                            gate_action_node.container = container
-                                                            gate_action_node.description = f"Gate action: {str(gate_action)}"
-                                              
-
-
-                                        # build range subtree
-                                        range_info : gremlin.gated_handler.RangeInfo
-                                        for range_info in gate_data.getUsedRanges():
-                                            range_node = ExecutionGraphRangeNode(range_info)
-                                            range_node.parent = gated_axis_group_node
-                                            range_node.description = f"Range {range_info.to_display()}"
-
-                                            # ranges includ a group of conditions (in range, out of range, enter range, exit range)
-                                            range_group = ExecutionGraphGroupNode()
-                                            range_group.parent = range_node
-
-                                            for condition_type, item_data in range_info.item_data_map.items():
-
-                                                # range condition (condition applied to the range)
-                                                exec_functors = gremlin.gated_handler.GatedAxisRangeCondition(gate_data, range_info, condition_type)
-                                                range_condition_node = ExecutionGraphRangeConditionNode(exec_functors)
-                                                range_condition_node.parent = range_group
-
-                                                # holds the containers for the range
-                                                group_node = ExecutionGraphGroupNode()
-                                                group_node.parent = range_condition_node
-
-                                                for index, container in enumerate(item_data.containers):
-                                                    range_container_node = ExecutionGraphContainerNode(container)
-                                                    range_container_node.id = container.id
-                                                    range_container_node.description = f"Range container [{index}] for range: {range_info.to_display()}: condition: [{condition_type.name}] {str(container)}"
-                                                    range_container_node.parent = group_node # range container is owned by the range condition
-
-                                                    # conditions applied to the container
-                                                    condition_node = self._get_condition_node(container, range_container_node)
-                                                    condition_node.parent = range_container_node  # condition for container - appears after the container node as the entry point is the container
-
-                                                    for action_set in container.action_sets:
-                                                        for range_action in action_set:
-                                                            
-                                                            range_action_node = ExecutionGraphActionNode()
-                                                            range_action_node.id = range_action.id
-                                                            range_action_node.parent = condition_node
-                                                            range_action_node.action = range_action
-                                                            range_action_node.exec_functors = self._get_action_functor(range_action, range_action_node)
-                                                            range_action_node.mode = mode_name
-                                                            range_action_node.container = container
-                                                            range_action_node.description = f"Range action: {str(range_action)}"
+                            self._build_container_tree(container, input_container_group, mode_name, device_node, input_item, m_input_node)
+                                
 
 
         # tell parent nodes if they have an action down each branch so only nodes with mappings get executed
@@ -1482,12 +1433,11 @@ class ExecutionContext():
     def execute_node(self, node : ExecutionGraphNode, event, value, extra_data : dict = None,  manual = False) -> bool:
         ''' executes a single node '''
 
-
         if not node.has_actions:
             return True # nodes with no actions return PASS
         
    
-        
+        verbose_exec = self._verbose_exec
         verbose_condition = self._verbose_condition
         try:
             gremlin.shared_state.pushLog()
@@ -1506,87 +1456,67 @@ class ExecutionContext():
                 
             # abort if the mode changed and the event was fired in a different mode
             if event.mode and event.mode != gremlin.shared_state.runtime_mode:
-                syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description} - ignoring event due to wrong mode {event.mode} current runtime: {gremlin.shared_state.runtime_mode} ")    
+                if verbose_exec: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description} - ignoring event due to wrong mode {event.mode} current runtime: {gremlin.shared_state.runtime_mode} ")    
                 return False
 
             result = True
-            #verbose = self._verbose_exec
-            
-            
-
-            
 
             if not extra_data:
                 extra_data = {}
             extra_data["node"] = node
 
-            if self._verbose_condition: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
+            if verbose_exec:  syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
+            
+            if node.nodeType in (ExecutionGraphNodeType.Group,ExecutionGraphNodeType.Gate, ExecutionGraphNodeType.Range):
+                # group type nodes: every subnode is executed regardless of the return value
+                for child in node.children:
+                    result = self.execute_node(child, event, value, extra_data, manual)
+                    # dont care if result fails for individual groups
+                return True # groups always pass 
 
-            match node.nodeType:
-                case ExecutionGraphNodeType.Group:
-                    # group nodes: every subnode is executed regardless of the return value
-                    for child in node.children:
-                        result = self.execute_node(child, event, value, extra_data, manual)
-                        # dont care if result fails for individual groups
-                    return True # groups always pass 
 
+            elif node.nodeType == ExecutionGraphNodeType.ActivationConditionNexus:
+                # activation condition group - pass on the first ok
+                for child in node.children:
+                    result = self.execute_node(child, event, value, extra_data, manual)
+                    if result:
+                        # pass the whole group on first group that doesn't fail
+                        return True
+                return False # all failed
 
-                case ExecutionGraphNodeType.ActivationConditionNexus:
-                    # activation condition group - pass on the first ok
-                    for child in node.children:
-                        result = self.execute_node(child, event, value, extra_data, manual)
-                        if result:
-                            # pass the whole group on first group that doesn't fail
-                            return True
-                    return False # all failed
-
-                case ExecutionGraphNodeType.Container:
-                    # container node - check for conditions and fail if they fail, 
-                    # otherwise, run the container's children
-                    condition_functors = node.getConditionFunctors()
-                    for functor in condition_functors:
-                        result =  self.process_functor(functor, event, value, extra_data, manual)
-                        if verbose_condition:
-                            condition_name = functor.condition_name()
-                            if isinstance(functor, gremlin.actions.ActivationCondition):
-                                syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                            elif isinstance(functor, gremlin.actions.AbstractCondition):
-                                syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                    if not result:
-                        # condition failed
-                        return result
-                    
-                case ExecutionGraphNodeType.ActivationCondition:
-                    # activation condition
-                    condition_functors = node.getConditionFunctors()
-                    for functor in condition_functors:
-                        result =  self.process_functor(functor, event, value, extra_data, manual)
-                        if verbose_condition:
-                            condition_name = functor.condition_name()
-                            if isinstance(functor, gremlin.actions.ActivationCondition):
-                                syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                            elif isinstance(functor, gremlin.actions.AbstractCondition):
-                                syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                    if not result:
-                        # condition failed
-                        return result
-                
-                case _:
-                    # action node
-
-                    # any other node - execute the functor list - first one that fails fails the complete branch to this point
-                    functor_list = node.getActionFunctors()
-                    if functor_list:
-                        if event.is_pressed == False:
-                            pass 
-                        for functor in functor_list:
-                            action_result =  self.process_functor(functor, event, value, extra_data, manual)
-                            description = str(functor.action_data)
-                            syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} {description} action result: {'PASS' if action_result else 'FAIL'}")
+            elif node.nodeType in (ExecutionGraphNodeType.Container, 
+                                   ExecutionGraphNodeType.ActivationCondition,
+                                   ExecutionGraphNodeType.Condition,
+                                   ExecutionGraphNodeType.GatedAxisGateCondition,
+                                   ExecutionGraphNodeType.GatedAxisRangeCondition):
+                # nodes that have conditions
+                condition_functors = node.getConditionFunctors()
+                for functor in condition_functors:
+                    result =  self.process_functor(functor, event, value, extra_data, manual)
+                    if verbose_condition:
+                        condition_name = functor.condition_name()
+                        if isinstance(functor, gremlin.actions.ActivationCondition):
+                            syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                        elif isinstance(functor, gremlin.actions.AbstractCondition):
+                            syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                if not result:
+                    # condition failed
+                    return result
+            else:
+                # action node - if in manual mode - run the children of that node directly
+                # any other node - execute the functor list - first one that fails fails the complete branch to this point
+                functor_list = node.getActionFunctors()
+                if functor_list:
+                    for functor in functor_list:
+                        action_result =  self.process_functor(functor, event, value, extra_data, manual)
+                        description = str(functor.action_data)
+                        if verbose_exec: syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} {description} action result: {'PASS' if action_result else 'FAIL'}")
                             
+            if manual:
+                pass
 
             # execute children nodes
-            if node.children:
+            if node.children and (node.nodeType != ExecutionGraphNodeType.Action or manual):
                 for child in node.children:
                     if child.nodeType == ExecutionGraphNodeType.ActionSet:
                         continue # skip activation sets as the actions are in the container node already
@@ -1747,6 +1677,8 @@ class VirtualButtonProcess:
 
         if not extra_data:
             extra_data = {}
+        if value is None:
+            value = gremlin.actions.Value(event.value)
         # verify the virtual button should process based on the event
         result = self.virtual_button._do_process(event)
         if result:
@@ -1840,14 +1772,7 @@ class AbstractExecutionGraph(QtCore.QObject):
             gremlin.shared_state.pushLog()
 
         try:
-        
-            
-            # verbose_input = config.verbose_mode_inputs
-            # logTabs = gremlin.shared_state.logTabs(True)
-
-            # if verbose_input: syslog.info(f"{logTabs}{str(event)}")
-            
-            # if verbose_detailed: syslog.info (f"{logTabs}Execution plan:")
+     
             
             # regular functors
             for functor in self.functors:
@@ -1866,50 +1791,7 @@ class AbstractExecutionGraph(QtCore.QObject):
                 result = ec.execute_functor_id(id, event, value, extra_data)
                 if not result:
                     break
-                # verbose_id = gremlin.config.Configuration().verbose_mode_condition
-
-                # if id in functor_map:
-                #     # cache hit
-                #     node = ec.node_map[id]
-                #     if verbose_id: syslog.info(f"{logTabs}\tFunctor ID found - node: [{node.id}] {node.description}")
-                #     functor_list = functor_map[id]
-                #     self.dumpFunctors(functor_list)
-                #     for functor_data in functor_list:
-                #         if not functor_data:
-                #             continue
-                #         if not isinstance(functor_data, list):
-                #             functor_data = [functor_data]
-                #         any_mode = len(functor_data) > 1 # pass on any one of many if in ANY mode (ALL mode are single functors)
-                #         for functor_item in functor_data:
-                #             if not functor_item:
-                #                 continue
-                #             if isinstance(functor_item, list) and len(functor_item) == 1:
-                #                 functor_item = functor_item[0]
-                #             result = self.process_functor(functor_item, event, value)
-                #             if verbose_id:
-                #                 if isinstance(functor_item, gremlin.actions.ActivationCondition):
-                #                     condition_name = functor_item.condition_name()
-                #                     syslog.info(f"{logTabs}\t\tExecuted activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                #                 elif isinstance(functor_item, gremlin.actions.AbstractCondition):
-                #                     condition_name = functor_item.condition_name()
-                #                     syslog.info(f"{logTabs}\t\tExecuted condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                #                 else:
-                #                     syslog.info(f"{logTabs}\t\tExecuted action {str(functor_item)} result: {'PASS' if result else 'FAIL'}")
-                #             if any_mode and result:
-                #                 # any PASS is ok
-                #                 break
-                #         if not result:
-                #             break
-
-
-                # else:
-                #     # node not found - validate
-                #     if validate:
-
-                #         node = ec.findNodeById(id)
-                #         if node and node.functors:
-                #             if verbose_id: syslog.info(f"{logTabs}\t\t\t Found node with functors not added to the execution tree map: {node.description}")
-                #             pass
+             
             return result
         finally:
             self.graph_completed.emit(self)

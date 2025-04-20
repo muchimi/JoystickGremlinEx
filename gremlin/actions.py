@@ -752,18 +752,15 @@ class AxisButton(VirtualButton):
             if self.forced_activation and direction != self._direction:
                 return False
 
-        # Execute FSM transitions as required
         if not self.forced_activation:
             if inside_range:
                 return True
-                #return self._fsm.perform("press")
             else:
                 return True
-                #return self._fsm.perform("release")
-        # else:
-        #     return self._fsm.perform("press")
+        else:
+           return True
 
-        return False
+        
 class HatButton(VirtualButton):
 
     """Virtual button based around a hat."""
