@@ -756,6 +756,9 @@ class ExecutionContext():
             
         elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
+        
+        elif isinstance(condition, gremlin.actions.VirtualButtonCondition):
+            return condition
    
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
 
@@ -787,6 +790,7 @@ class ExecutionContext():
         condition_node.parent = parent
         condition_node.description = f"Condition node for parent owner: {str(owner)} "
         conditions = None
+        root_node = condition_node
         if isinstance(owner, gremlin.base_profile.AbstractContainer):
             conditions = owner.activation_condition.conditions
             condition_node.condition =  owner.activation_condition
@@ -809,7 +813,7 @@ class ExecutionContext():
                 node = condition_nexus
             case gremlin.actions.ActivationRule.All:
                 # no nexus created for the all condition - conditions in ALL mode are nested so they are all evaluated
-                node = condition_node #
+                node = root_node #
         
         if conditions:
             for condition in conditions:
@@ -903,6 +907,11 @@ class ExecutionContext():
                             elif isinstance(condition, gremlin.base_conditions.AbstractCondition):
                                 if self._verbose_detailed: syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
                                 functor = self._convert_condition(condition)
+                                node_functors.append(functor)
+                                functors.append([functors])
+                                node.functors = node_functors
+                            elif isinstance(condition, gremlin.actions.VirtualButtonCondition):
+                                functor = condition
                                 node_functors.append(functor)
                                 functors.append([functors])
                                 node.functors = node_functors
@@ -1025,7 +1034,9 @@ class ExecutionContext():
         
         assert isinstance(container, gremlin.base_profile.AbstractContainer), f"invalid node type: {container.__class__.__name__} encountered"
 
-        #container.refresh_conditions() # refresh any conditions for this container
+
+        container_parent_node = parent_group
+        
         container_node = ExecutionGraphContainerNode(container)
         container_node.id = container.id
         container_node.mode = mode_name
@@ -1036,12 +1047,20 @@ class ExecutionContext():
 
         # container condition
 
+        if container.has_virtual_button:
+            condition = gremlin.actions.VirtualButtonCondition(container.virtual_button)
+            virtual_condition_node = ExecutionGraphActivationConditionNode(condition)
+            virtual_condition_node.container = container
+            virtual_condition_node.functors = condition
+            virtual_condition_node.parent = container_parent_node
+            container_parent_node = virtual_condition_node
+
         if container.has_conditions:
             condition_node = self._get_condition_node(container, container_node)
-            condition_node.parent = parent_group
+            condition_node.parent = container_parent_node
             container_node.parent = condition_node
         else:
-            container_node.parent = parent_group
+            container_node.parent = container_parent_node
 
         container_group = ExecutionGraphGroupNode()
         container_group.parent = container_node
@@ -1392,22 +1411,6 @@ class ExecutionContext():
 
     def process_functor(self, functor, event, value, extra_data : dict = None, manual = False) -> bool:
         ''' processes a single functor or a list of functors  - first one to fail fails the group '''
-        # id = event._id
-        # if not id in self._processed_events:
-        #     self._processed_events.append(id)
-        # if not id in self._processed_functors:
-        #     self._processed_functors[id] = []
-        # if functor in self._processed_functors[id]:
-        #     return True
-        # else:
-        #     self._processed_functors[id].append(functor)
-
-        # if len(self._processed_events) > 3:
-        #     # pop the first one
-        #     id = self._processed_events.pop(0)
-        #     del self._processed_functors[id]
-            
-        
         if isinstance(functor, list):
             for item in functor:
                 result = self.process_functor(item, event, value, extra_data, manual)
@@ -1415,9 +1418,6 @@ class ExecutionContext():
                     return False
         else:
             if functor.manual_callback and not manual:
-                # FAIL nodes that require a manual callbacks and not running in manual callback mode
-                # manual callback nodes come a manual callback trigger mechanism different from the normal callback 
-                # for certain actions that handle their own triggering like gated axis
                 return False
                 
             return functor.process_event(event, value, extra_data)
@@ -1551,9 +1551,17 @@ class ExecutionContext():
         if id in functor_map:
             # cache hit
             root = self._node_map[id]
+
+            parent_node = root.parent
+            if self.isConditionNode(parent_node):
+                root = parent_node # bump to the condition node in case we inserted a condition on the primary node
             result = self.execute_node(root, event, value, extra_data, manual)
         return result
     
+    def isConditionNode(self, node : ExecutionGraphNode):
+        return node is not None and node.nodeType in (ExecutionGraphNodeType.Condition,
+                                                      ExecutionGraphNodeType.ActivationCondition,
+                                                      ExecutionGraphNodeType.ActivationConditionNexus)
 
 class ContainerCallback:
 
@@ -1684,6 +1692,9 @@ class VirtualButtonProcess:
         if result:
             if verbose: syslog.info("VIRTUALBUTTON: execute PASS")
             extra_data["virtual_button"] = self.virtual_button
+            # convert to a fake button
+            event.fake_button(self.virtual_button.is_pressed) # issue press or release
+            syslog.info(f"VIRTUAL TRIGGER:  pressed: {event.is_pressed}")
             self.execution_graph.process_event(event, value, extra_data)
             return
         #self.virtual_button.process_event(event)

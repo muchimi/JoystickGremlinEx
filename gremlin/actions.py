@@ -24,7 +24,8 @@ import dinput
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
-from gremlin.types import ActivationRule
+from gremlin.types import ActivationRule, AxisButtonDirection
+
 
 import gremlin.input_types
 import gremlin.joystick_handling
@@ -202,7 +203,7 @@ class AbstractCondition(metaclass=ABCMeta):
     as possibly processed Value when being evaluated.
     """
 
-    def __init__(self, comparison):
+    def __init__(self, comparison = None):
         """Creates a new condition with a specific comparision operation.
 
         :param comparison the comparison operation to perform when evaluated
@@ -519,6 +520,43 @@ class VJoyCondition(AbstractCondition):
     def __str__(self):
         return self.condition_name()
     
+
+class VirtualButtonCondition(AbstractCondition):
+    ''' condition testing container virtual buttons '''
+    def __init__(self, data):
+        import gremlin.base_buttons
+        super().__init__()
+        if isinstance(data, gremlin.base_buttons.VirtualAxisButton):    
+            # convert to the processing button
+            self.virtual_button = AxisButton(data.lower_limit, data.upper_limit, data.direction)
+        elif isinstance(data, gremlin.base_buttons.VirtualHatButton):
+            self.virtual_button = HatButton(data.directions)
+        else:
+            self.virtual_button = data
+
+
+    def __call__(self, event, value, extra_data : dict = None):
+        # default call
+        return self.process_event(event, value, extra_data)
+    
+    def process_event(self, event, value, extra_data : dict = None): 
+        if extra_data is None:
+            extra_data = {}
+        extra_data["virtual_button"] = self.virtual_button
+        result = self.virtual_button.process_event(event)
+        if result:
+            # convert the vent to a fake event button from a joystick axis event
+            is_pressed = self.virtual_button.is_pressed
+            value.current = is_pressed
+            event.fake_button(is_pressed) # issue press or release depending
+        return result
+    
+    def condition_name(self)->str:
+        return f"VirtualButtonCondition: {str(self.virtual_button)}]"
+    
+    def __str__(self):
+        return self.condition_name()
+
 class ModeCondition(AbstractCondition):
     ''' condition verifying the runtime mode '''
     def __init__(self, mode):
@@ -641,6 +679,14 @@ class VirtualButton(metaclass=ABCMeta):
         """
         pass
 
+    @property
+    def is_pressed(self) -> bool:
+        return self._is_pressed
+    
+    @is_pressed.setter
+    def is_pressed(self, value : bool):
+        self._is_pressed = value
+
     def _press(self):
         """Executes the "press" action."""
         self._is_pressed = True
@@ -673,31 +719,29 @@ class VirtualButton(metaclass=ABCMeta):
         """Performs no action."""
         return False
 
-    @property
-    def is_pressed(self):
-        """Returns whether or not the virtual button is pressed.
-
-        :return True if the button is pressed, False otherwise
-        """
-        return self._is_pressed
-
+ 
 
 class AxisButton(VirtualButton):
 
     """Virtual button based around an axis."""
 
-    def __init__(self, lower_limit, upper_limit, direction):
+    def __init__(self, v1, v2, direction):
         """Creates a new instance.
 
-        :param lower_limit lower axis value where the button range starts
-        :param upper_limit upper axis value where the button range stops
+        :param v1 lower axis value where the button range starts
+        :param v2 upper axis value where the button range stops
         """
         super().__init__()
-        self._lower_limit = min(lower_limit, upper_limit)
-        self._upper_limit = max(lower_limit, upper_limit)
+        if v1 > v2:
+            v1, v2 = v2, v1
+        self._min_range = v1
+        self._max_range = v2
         self._direction = direction
         self._last_value = None
+        self._pressed_issued = False # true if a press event was issued
         self.forced_activation = False
+       
+
 
     def _do_process(self, event):
         """Implementation of the virtual button logic.
@@ -705,67 +749,88 @@ class AxisButton(VirtualButton):
         :param event the input event that is used to decide on the state
         :return True if a state transition occurred, False otherwise
         """
-        from gremlin.types import AxisButtonDirection
-        self.forced_activation = False
+        
+        result = False # assume failed
+
+        crossed = False
         direction = AxisButtonDirection.Anywhere
-        if self._last_value is None:
-            self._last_value = event.value
+        v1 = self._min_range
+        v2 = self._max_range
+        last_value = self._last_value
+        v = event.value
+        is_pressed = False 
+
+        if last_value is None:
+            # first time 
+            last_value = event.value
+            last_inside_range = False
         else:
             # Check if we moved over the activation region between two
             # consecutive measurements
-            if self._last_value < self._lower_limit or self._last_value > self._upper_limit:
-                self.forced_activation = True
-            if self._last_value < self._lower_limit and \
-                    event.value > self._upper_limit:
-                self.forced_activation = True
-            elif self._last_value > self._upper_limit and \
-                    event.value < self._lower_limit:
-                self.forced_activation = True
+   
+            
+            if last_value < v1 and v >= v2:
+                crossed = True
+            elif last_value > v2 and v < v1:
+                crossed = True
             
 
-
             # Determine direction in which the axis is moving
-            if self._last_value < event.value:
+            if last_value < v:
                 direction = AxisButtonDirection.Below
-            elif self._last_value > event.value:
+            elif last_value > v:
                 direction = AxisButtonDirection.Above
             
 
-        inside_range = self._lower_limit <= event.value <= self._upper_limit
-        self._last_value = event.value
+        inside_range = v1 <= v <= v2
+        
+        last_inside_range = v1 <= last_value <= v2
 
-        # If the determined direction is Anywhere this corresponds to an
-        # event that's processed again due to too fast axis motion which
-        # cause the execution of the axis button being skipped. This should
-        # be processed, however, needs to bypass the direction determination
-        # part of the code.
+        if self._pressed_issued and last_inside_range != inside_range:
+            # button should be released because it was pressed before
+            syslog.info(f"issue release {v:0.3f}")
+            is_pressed = False
+            result = True
+            self._pressed_issued = False # reset press event
 
-        # Terminate early if the travel direction is incompatible with the
-        # one required by this instance
-        from gremlin.types import AxisButtonDirection
-        if direction != AxisButtonDirection.Anywhere and \
-                self._direction != AxisButtonDirection.Anywhere:
-            # Ensure we can only press a button by moving in the desired
-            # direction, however, allow releasing in any direction
-            if inside_range and direction != self._direction:
-                return False
-            if self.forced_activation and direction != self._direction:
-                return False
+        if not result:
+            self._last_value = v
+            self.forced_activation = crossed
 
-        if not self.forced_activation:
-            if inside_range:
-                return True
-            else:
-                return True
-        else:
-           return True
+            if crossed or (inside_range and not last_inside_range):
+                is_pressed = True
+                result = True
+    
+            if direction != AxisButtonDirection.Anywhere and self._direction != AxisButtonDirection.Anywhere:
+                # Ensure we can only press a button by moving in the desired
+                # direction, however, allow releasing in any direction
+                if inside_range and direction != self._direction:
+                    pass
+                elif crossed and direction != self._direction:
+                    pass
+                else:
+                    result = False
+                    is_pressed = False
+
+        if result and is_pressed:
+            syslog.info(f"issue press: {v:0.3f}")
+            self._pressed_issued = True
+
+        self.is_pressed = is_pressed
+        
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        if verbose: syslog.info(f"Virtual button: range: {v1:0.3f} {v2:0.3f} crossed: {crossed} in range: {inside_range} last value: {last_value:0.3f} current value: {v:0.3f} pressed: {is_pressed} direction: {direction} result: {'PASS' if result else 'FAIL'}")
+        return result
+    
+    def __str__(self):
+        return f"AxisButton: range: {self._min_range:0.3f} {self._max_range:0.3f}"
 
         
 class HatButton(VirtualButton):
 
     """Virtual button based around a hat."""
 
-    def __init__(self, directions):
+    def __init__(self, directions : list):
         """Creates a new instance.
 
         :param directions hat directions used with this button
@@ -779,10 +844,9 @@ class HatButton(VirtualButton):
         :param event the input event that is used to decide on the state
         :return True if a state transition occurred, False otherwise
         """
-        if gremlin.util.hat_tuple_to_direction(event.value) in self._directions:
-            return True
-            #return self._fsm.perform("press")
-        else:
-            return True
-            #return self._fsm.perform("release")
-        return False
+        
+        self.is_pressed = gremlin.util.hat_tuple_to_direction(event.value) in self._directions
+        return True
+    
+    def __str__(self):
+        return f"AxisButton: directions: {self._directions}"

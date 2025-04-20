@@ -2938,7 +2938,6 @@ class TitleBar(QtWidgets.QFrame):
         # help button
         self.help_button = TitleBarButton()
 
-        #icon_help = "gfx/dark_help.png" if is_dark else "gfx/help.png"
         icon_help = load_icon("mdi.help")
         pixmap_help = icon_help.pixmap(size, size) # load_pixmap(icon_help)
         if not pixmap_help or pixmap_help.isNull():

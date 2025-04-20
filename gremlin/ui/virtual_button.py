@@ -119,9 +119,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.direction_widget.addItem("Below")
 
         self.setTitle("Virtual Button")
-        self.range_layout.addWidget(
-            QtWidgets.QLabel("Activate when axis is between: ")
-        )
+        self.range_layout.addWidget(QtWidgets.QLabel("Activate when axis is between: "))
         self.range_layout.addWidget(self.lower_limit_widget)
         self.range_layout.addWidget(self.grab_low_widget)
         self.range_layout.addWidget(QtWidgets.QLabel("and"))
@@ -132,7 +130,8 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.range_layout.addWidget(self.range_status_widget)
         self.range_layout.addStretch()
 
-        self.help_button_widget = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
+
+        self.help_button_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self.show_hint) # QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
         self.help_button_widget.clicked.connect(self._show_hint)
         self.range_layout.addWidget(self.help_button_widget)
 
@@ -264,25 +263,19 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
             VirtualHatButtonWidget.locked = True
 
-            self.setTitle("Virtual Button")
+            self.setTitle("Virtual Hat Button")
 
             directions = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
-
+            prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
             for direction in directions:
                 self._widgets[direction] = QtWidgets.QCheckBox()
-                self._widgets[direction].setIcon(
-                    load_icon(f"gfx/hat_{direction}.png")
-                )
-                self._widgets[direction].toggled.connect(
-                    self._create_state_changed_cb(direction)
-                )
+                self._widgets[direction].setIcon(load_icon(f"{prefix}hat_{direction}.png"))
+                self._widgets[direction].toggled.connect(self._create_state_changed_cb(direction))
                 self.main_layout.addWidget(self._widgets[direction])
 
-            self.main_layout.addStretch(1)
-
-            prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-            self.help_button = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}help.png"), "")
-            self.help_button.clicked.connect(self._show_hint)
+            self.main_layout.addStretch()
+            
+            self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint)
             self.main_layout.addWidget(self.help_button)
         finally:
             VirtualHatButtonWidget.locked = False

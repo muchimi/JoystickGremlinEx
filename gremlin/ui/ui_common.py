@@ -442,6 +442,9 @@ class Buttons():
     def getKeyboardWidget(label = None, tooltip = "Select Keys", callback = None, no_keyboard = True, data = None):
         return Buttons._template(label, "fa5.keyboard", tooltip, callback, no_keyboard, data)
     
+    @staticmethod
+    def getHelpWidget(label = None, tooltip = "Help", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, "mdi.help", tooltip, callback, no_keyboard, data)
         
 
     @staticmethod

@@ -297,7 +297,11 @@ T32
 - Fix: Button repeater disappeared in T30
 - Fix: Resolved an issue where some actions would not execute because of shortcut logic.  This should resolve several reported condition issues.
 T33
-
+- Fix: Refactored gated axis execution graph build and evaluation logic to resolve a few more complex condition evaluations.
+- Fix: Added virtual button condition (legacy virtual button) to execution graph for both axis and hat input.  This resolves a number of issues when virtual buttons are used and deprecates the legacy callback mechanisms.
+- API: execution graph: when the trigger entry point in the execution graph is a container trigger (which is a default state), the logic will check to see if the container is parented to a condition node and switch to that node as the entry point if needed. 
+- Fix: when the legacy remap action is attached to an axis or a hat and outputs a button, the virtual button tab will appear in the UI without having to reload. Note:  This doesn't apply to other actions like vjoy remap because that has a built-in ability to handle that. This resolves issues with older profiles relying on this functionality working in m73.
+- Fix: virtual button UI in dark mode not showing information.
 
 
 ## 13.40.16ex (pre-release)

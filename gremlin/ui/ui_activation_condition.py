@@ -78,10 +78,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
     def _create_ui(self):
         """Creates the configuration UI."""
 
-        self.help_button = QtWidgets.QPushButton("")
-        icon = load_icon("help.png")
-        self.help_button.setIcon(icon)
-        self.help_button.clicked.connect(self._show_hint)
+        self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint)
 
         self.controls_layout = QtWidgets.QHBoxLayout()
         self.controls_layout.setContentsMargins(0,0,0,0)
@@ -1300,10 +1297,8 @@ class ConditionView(ui_common.AbstractView):
         
         self.controls_layout.addWidget(self.condition_selector)
         self.controls_layout.addWidget(self.condition_add_button)
-        icon = gremlin.util.load_icon("mdi.help")
-        self.help_button = QtWidgets.QPushButton()
-        self.help_button.setIcon(icon)
-        self.help_button.clicked.connect(self._show_hint)
+        
+        self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint)
         self.controls_layout.addWidget(self.help_button)
 
         copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget(callback = self._copy_condition)

@@ -107,6 +107,8 @@ class VirtualAxisButton(AbstractVirtualButton):
         node.set("enabled", str(self.enabled))
         return node
 
+    def __str__(self):
+        return f"VirtualAxisButton: range [{self.lower_limit:0.3f}-{self.upper_limit:0.3f}] direction: {self.direction.name} enabled: {self.enabled}"
 
 class VirtualHatButton(AbstractVirtualButton):
 

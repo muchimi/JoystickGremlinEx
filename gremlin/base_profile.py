@@ -568,6 +568,10 @@ class AbstractContainer(ProfileData):
             self.virtual_button = None
 
 
+    @property
+    def has_virtual_button(self) -> bool:
+        ''' true if the container has a virtual button definition '''
+        return self._virtual_button_enabled and self._virtual_button_user_enabled and self.virtual_button is not None
 
     def generate_callbacks(self, parent = None):
         """Returns a list of callback data entries.
@@ -581,21 +585,21 @@ class AbstractContainer(ProfileData):
         # like a button would.
         from gremlin.event_handler import Event
 
-        if self._virtual_button_enabled  and self._virtual_button_user_enabled and self.virtual_button is not None:
-            # virtual callback requires both the container/action to enable it, and the user to enable it as well
-            callbacks.append(CallbackData(gremlin.execution_graph.VirtualButtonProcess(self, self.virtual_button),None))
-            callbacks.append(CallbackData(gremlin.execution_graph.VirtualButtonCallback(self, parent),
-                            Event(
-                                InputType.VirtualButton,
-                                callbacks[-1].callback.virtual_button.identifier,
-                                device_guid=dinput.GUID_Virtual,
-                                is_pressed=True,
-                                raw_value=True
-                            )
-                         ))
-        else:
+        # if self._virtual_button_enabled  and self._virtual_button_user_enabled and self.virtual_button is not None:
+        #     # virtual callback requires both the container/action to enable it, and the user to enable it as well
+        #     callbacks.append(CallbackData(gremlin.execution_graph.VirtualButtonProcess(self, self.virtual_button),None))
+        #     callbacks.append(CallbackData(gremlin.execution_graph.VirtualButtonCallback(self, parent),
+        #                     Event(
+        #                         InputType.VirtualButton,
+        #                         callbacks[-1].callback.virtual_button.identifier,
+        #                         device_guid=dinput.GUID_Virtual,
+        #                         is_pressed=True,
+        #                         raw_value=True
+        #                     )
+        #                  ))
+        # else:
             # regular callback with conditions
-            callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self, parent),None))
+        callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self, parent),None))
 
 
         return callbacks
