@@ -350,6 +350,13 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         pass
 
 
+class ActionSet(list):
+    ''' holds action set data with a data attribute '''
+    def __init__(self, data = None):
+        self.data = data # any special tag to identify the action set
+
+
+
 class AbstractContainer(ProfileData):
 
     """Base class for action container related information storage."""
@@ -666,15 +673,10 @@ class AbstractContainer(ProfileData):
             if child.tag == "virtual-button":
                 continue
             elif child.tag == "action-set":
-                action_set = []
+                action_set = ActionSet()
                 self._parse_action_xml(child, action_set, data)
                 self.action_sets.append(action_set)
-            # update 5/30/24 - EMCS remove warning as custom action sets won't be read here
-            # else:
-            #     syslog.warning(
-            #         f"Unknown node present: {child.tag}"
-            #     )
-
+ 
     def _parse_action_xml(self, node, action_set, data = None):
         """Parses the XML content related to actions in an action-set.
 
@@ -936,6 +938,7 @@ class AbstractAction(ProfileData):
         self._is_hardware = None
         self.comment = None # user comments/notes
         self._priority = 0 # default priority
+        self.data = None # additional data for runtime purposes, context dependent used to tag actions at runtime for some purpose like action grouping
 
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)

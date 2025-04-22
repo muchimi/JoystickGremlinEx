@@ -359,21 +359,30 @@ class SimConnect():
 		self._request_abort = False
 		self._state_handled = {}
 
-
-
-	@QtCore.Slot()
-	def _shutdown(self):
-		''' called when the app is shutting down '''
-		# syslog = logging.getLogger("system")
+	def unload(self):
+		''' unloads the simconnect DLL '''
+		self.exit()
 		if self._dll:
 			try:
-				syslog.info("SIMCONNECT: shutdown ")
+				syslog.info("SIMCONNECT: unload")	
 				self._dll.close()
 			except:
 				pass
 			self._dll = None
 		if self._win_dll:
-			self._win_dll = None 
+			handle = self._win_dll._handle
+			del self._win_dll
+			
+			ctypes.windll.kernel32.FreeLibrary.argtypes = [HMODULE]
+			ctypes.windll.kernel32.FreeLibrary(handle)
+			self._win_dll = None
+
+	@QtCore.Slot()
+	def _shutdown(self):
+		''' called when the app is shutting down '''
+		syslog.info("SIMCONNECT: shutdown ")
+		self.unload()
+			
 			
 
 	@property
@@ -658,7 +667,7 @@ class SimConnect():
 		''' folder received '''
 		if not self._aircraft_loaded_event.is_set():
 			self._aircraft_loaded_event.set()
-			thread = threading.Thread(target = self._process_aircraft_string, args = [aircraft_cfg], daemon=True)
+			thread = threading.Thread(target = self._process_aircraft_string, args = [aircraft_cfg], daemon=False)
 			thread.setName("process aircraft file thread")
 			thread.start()
 
@@ -932,6 +941,9 @@ class SimConnect():
 		finally:
 			self._connecting = False
 
+
+
+
 		
 	def run(self):
 		if not self._is_loop_running and self._runThread is None:
@@ -1174,7 +1186,7 @@ class SimConnect():
 		self._request_data(request)
 		retries = 0
 		while request.buffer is None and retries < request.attempts:
-			time.sleep(.01)
+			time.sleep(.1)
 			retries += 1
 		if request.buffer is None:
 			if self.verbose:

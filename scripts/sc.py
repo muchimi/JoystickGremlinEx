@@ -755,7 +755,7 @@ class Wiggle():
             self._current_local_step = 0
             with self._lock:
                 self._wiggle_local_stop_requested = threading.Event()
-            self._wiggle_local_thread = threading.Thread(target=self._wiggle_local, daemon=True)
+            self._wiggle_local_thread = threading.Thread(target=self._wiggle_local, daemon=False)
             self._wiggle_local_thread.start()
 
         if is_remote and not self.remote_running:
@@ -763,7 +763,7 @@ class Wiggle():
             self._current_remote_step = 0
             with self._lock:
                 self._wiggle_remote_stop_requested = threading.Event()
-            self._wiggle_remote_thread = threading.Thread(target=self._wiggle_remote, daemon=True)
+            self._wiggle_remote_thread = threading.Thread(target=self._wiggle_remote, daemon=False)
             self._wiggle_remote_thread.start()
 
     def _wiggle_stop(self, is_local = False, is_remote = False):

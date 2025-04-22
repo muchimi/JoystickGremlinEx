@@ -129,7 +129,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t33"
+APPLICATION_BASE = "m73t34"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
@@ -4442,6 +4442,5 @@ if __name__ == "__main__":
     #hg.remove_process(os.getpid())
 
     syslog.info("Terminating GremlinEx")
-    
-    gc.collect()
+    #gc.collect()
     sys.exit(0)

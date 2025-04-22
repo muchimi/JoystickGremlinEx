@@ -476,7 +476,7 @@ class SimConnectManager(QtCore.QObject):
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
         self._aircraft_change_callbacks = []
 
-
+        self._process_running = False # true if MSFS is detected running
         self._connect_in_progress = False
         self._sm = None
         
@@ -549,6 +549,8 @@ class SimConnectManager(QtCore.QObject):
         # load internal commands
         self.load_internal()
 
+    
+
     def registerAircraftChangeCallback(self, callback):
         if not callback in self._aircraft_change_callbacks:
             self._aircraft_change_callbacks.append(callback)
@@ -590,8 +592,31 @@ class SimConnectManager(QtCore.QObject):
     def _profile_start(self):
         ''' occurs on profile start '''
         self.activate()
+        # if self.process_running():
+        #     self.activate()
+        # else:
+        #     syslog.warning("SIMCONNECT MGR: MSFS process not found - start aborted")
+        #     self._stop()
         
-        
+    def process_running(self) -> bool:
+         # verify MSFS is running if not already checked
+        if self._process_running:
+            # already running
+            return True
+        # check
+        monitor = gremlin.process_monitor.ProcessMonitor()
+        msfs2020 = "FlightSimulator2020.exe"
+        msfs2024 = "FlightSimulator2024.exe"
+        process_running = monitor.process_running(msfs2024)
+        if not process_running:
+            process_running = monitor.process_running(msfs2020)
+
+        self._process_running = process_running
+        return process_running
+                
+
+
+
 
     @QtCore.Slot()
     def _abort(self):
@@ -601,6 +626,7 @@ class SimConnectManager(QtCore.QObject):
                 
 
     def _stop(self):
+        self._process_running = False # force a recheck on start
         if self.connected:
             syslog.info("SIMCONNECT: stop")
             self.bridge.stop()
@@ -1186,7 +1212,7 @@ class SimConnectManager(QtCore.QObject):
         if self._sm.ok:
             for request in self._registered_requests.values():
                 self._sm.clear(request)
-            self._sm.exit()
+            self._sm.unload()
 
     @property
     def valid(self):
@@ -1668,7 +1694,7 @@ class SimConnectManager(QtCore.QObject):
 
         # send event and wait for readback value or a timeout
         event = DataThreadingEvent()
-        thread = threading.Thread(target=self._send_readback_event_worker(event, event_id, value, b_readback, readback_value, timeout), daemon=True)
+        thread = threading.Thread(target=self._send_readback_event_worker(event, event_id, value, b_readback, readback_value, timeout), daemon=False)
         thread.start()
         event.wait()
 

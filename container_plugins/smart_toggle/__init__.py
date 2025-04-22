@@ -178,9 +178,9 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def __init__(self, action_data : SmartToggleContainer, parent = None):
         super().__init__(action_data, parent)
-        self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            action_data.action_sets[0], parent
-        )
+        # self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
+        #     action_data.action_sets[0], parent
+        # )
         self.delay = action_data.delay
         self.shortPressMode = action_data.shortPressMode
         self.release_value = None
@@ -194,10 +194,26 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             if "needs_auto_release" in functor.__dict__:
                 functor.needs_auto_release = False
 
+    def profile_started(self):
+        ec = gremlin.execution_graph.ExecutionContext()
+        container_node = ec.find(self.action_data)
+
+        if not container_node:
+            syslog.error("Unable to find this action in the execution tree")
+            self.valid = False
+            return
+
+        group_node = container_node.children[0] # group node is the only child of the container node
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
+
+
+
     def _execute(self, event, value, extra_data):
         ec = gremlin.execution_graph.ExecutionContext()
-        for functor in self.action_set.functors:
-            ec.execute_functor_id(functor.id, event, value, extra_data, True)
+        for node in self.action_set_nodes:
+            ec.execute_node(node, event, value, extra_data)
+        # for functor in self.action_set.functors:
+        #     ec.execute_functor_id(functor.id, event, value, extra_data, True)
 
     def process_event(self, event, value, extra_data = None):
         ''' short press = toggle output 
@@ -231,14 +247,17 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                     
                     self.is_pressed = not self.is_pressed # toggle
                     if self.is_pressed:
-                        self.action_set.process_event(event, value, extra_data)
+                        self._execute(event, value, extra_data)
+                        #self.action_set.process_event(event, value, extra_data)
                     else:
-                        self.action_set.process_event(event.invert(), value.invert(), extra_data)
+                        self._execute(event.invert(), value.invert(), extra_data)
+                        #self.action_set.process_event(event.invert(), value.invert(), extra_data)
 
                     if verbose: syslog.info(f"press: toggle {'on' if self.is_pressed else 'off'}")
                 else:
                     if verbose: syslog.info("press: normal")
-                    self.action_set.process_event(event, value, extra_data)
+                    self._execute(event, value, extra_data)
+                    #self.action_set.process_event(event, value, extra_data)
                     
         
             elif self.mode == "long":
@@ -246,10 +265,12 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 if verbose: syslog.info("long press: send OFF")
                 if self.shortPressMode:
                     # release the press 
-                    self.action_set.process_event(event.invert(), value.invert(), extra_data)
+                    self._execute(event.invert(), value.invert(), extra_data)
+                    #self.action_set.process_event(event.invert(), value.invert(), extra_data)
                     self.is_pressed = False
                 else:
-                    self.action_set.process_event(self.release_event, self.release_value, extra_data)
+                    self._execute(self.release_event, self.release_value, extra_data)
+                    #self.action_set.process_event(self.release_event, self.release_value, extra_data)
 
                 # reset toggle mode
                 self.activation_time = 0.0
@@ -264,7 +285,8 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 # long press detect
                 if self.shortPressMode:
                     if verbose: syslog.info("long release: toggle OFF")
-                    self.action_set.process_event(event, value, extra_data)
+                    #self.action_set.process_event(event, value, extra_data)
+                    self._execute(event, value, extra_data)
                     self.mode = None
                     self.activation_time = 0.0
                     self.is_pressed = False
@@ -281,12 +303,11 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                     # don't release on short press mode
                     pass
                 else:
-                    self.action_set.process_event(event, value, extra_data)
+                    self._execute(event, value, extra_data)
+                    #self.action_set.process_event(event, value, extra_data)
                     self.mode = None
                     self.activation_time = 0.0
                     self.is_pressed = False
-            
-
 
         return False # stop execution past this container
 

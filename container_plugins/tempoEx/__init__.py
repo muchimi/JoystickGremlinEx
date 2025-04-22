@@ -37,6 +37,7 @@ from gremlin.profile import safe_format, safe_read
 from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
 from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
+import gremlin.base_profile
 from gremlin.input_types import InputType
 
 syslog = logging.getLogger("system")
@@ -246,6 +247,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         """
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        action_item.data = "short"
         self.profile_data.short_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
@@ -255,6 +257,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         syslog.info("Paste short action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
+        action_item.data = "short"
         self.profile_data.short_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
@@ -266,6 +269,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         """
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        action_item.data = "long"
         self.profile_data.long_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
@@ -275,6 +279,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         syslog.info("Paste long action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
+        action_item.data = "long"
         self.profile_data.long_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
@@ -387,18 +392,22 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def __init__(self, container : TempoExContainer, parent = None):
         super().__init__(container, parent)
-        self.action_sets = [[],[]]
-        for action_set in container.short_action_sets:
-            self.action_sets[0].append(
-                gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-            )
-        for action_set in container.long_action_sets:
-            self.action_sets[1].append(
-                gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-            )            
+
+
+        # self.action_sets = [[],[]]
+        # for action_set in container.short_action_sets:
+        #     self.action_sets[0].append(
+        #         gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
+        #     )
+        # for action_set in container.long_action_sets:
+        #     self.action_sets[1].append(
+        #         gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
+        #     )            
         
-        self.short_set = self.action_sets[0]
-        self.long_set =  self.action_sets[1]
+        # self.short_set = self.action_sets[0]
+        # self.long_set =  self.action_sets[1]
+
+
         self.delay = container.delay
         self.autorelease_delay = container.autorelease_delay
         self.activate_on = container.activate_on
@@ -417,6 +426,10 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.short_timeout = container.timeout
         self.long_timeout = container.timeout
 
+        self.short_nodes = [] # list of short action set nodes
+        self.long_nodes = [] # list of long action set nodes
+        
+
         # Determine if we need to switch the action index after a press or
         # release event. Only for container conditions this is necessary to
         # ensure proper cycling.
@@ -428,8 +441,9 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                         self.switch_on_press = True       
 
         
+        self.valid = False # validated during profile start
 
-    def profile_start(self):
+    def profile_started(self):
         # reset any prior values before start
         self.start_time = 0
         self.timer = None
@@ -443,9 +457,23 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.last_long_execution = 0.0
         self.last_short_value = None
 
+        self.valid = True
 
+        
+        ec = gremlin.execution_graph.ExecutionContext()
+        container_node = ec.find(self.action_data)
 
-    def _trigger_short_press(self, event, value):
+        if not container_node:
+            syslog.error("Unable to find this action in the execution tree")
+            self.valid = False
+            return
+
+        group_node = container_node.children[0] # group node is the only child of the container node
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
+        self.short_nodes = [node for node in self.action_set_nodes if node.action_set.data == "short"]
+        self.long_nodes = [node for node in self.action_set_nodes if node.action_set.data == "long"]
+
+    def _trigger_short_press(self, event, value, extra_data : dict = None):
         ''' triggers a short press '''
 
         if self.short_timeout > 0.0:
@@ -454,16 +482,19 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 self.short_index = 0
             self.last_short_execution = time.time()
 
-        if self.short_index < len(self.short_set):
+        if self.short_index < len(self.short_nodes):
             # syslog.info(f"execute short press {self.short_index}")
-            self.short_set[self.short_index].process_event(event, value)
+            ec = gremlin.execution_graph.ExecutionContext()
+            node = self.short_nodes[self.short_index]
+            ec.execute_node(node, event, value, extra_data)
+            #self.short_set[self.short_index].process_event(event, value)
 
         if self.chain_short and (self.switch_on_press and value.current) or not value.current:
             # bump short index if chaining
-            self.short_index = (self.short_index + 1) % len(self.short_set)
+            self.short_index = (self.short_index + 1) % len(self.short_nodes)
             # syslog.info(f"bump short index {self.short_index}")
 
-    def _trigger_long_press(self, event, value):
+    def _trigger_long_press(self, event, value, extra_data : dict = None):
         ''' triggers a long press '''
 
         if self.long_timeout > 0.0:
@@ -472,25 +503,30 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 self.long_index = 0
             self.last_long_execution = time.time()
 
-        if self.long_index < len(self.long_set):
+        if self.long_index < len(self.long_nodes):
             # syslog.info(f"execute long press {self.long_index}")
-            self.long_set[self.long_index].process_event(event, value)
+            ec = gremlin.execution_graph.ExecutionContext()
+            node = self.long_nodes[self.long_index]
+            ec.execute_node(node, event, value, extra_data)
+            #self.long_set[self.long_index].process_event(event, value)
 
         if self.chain_long and (self.switch_on_press and value.current) or not value.current:
             # bump long index if chaining
-            self.long_index = (self.long_index + 1) % len(self.long_set)
+            self.long_index = (self.long_index + 1) % len(self.long_nodes)
             # syslog.info(f"bump long index {self.long_index}")            
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data = None) -> bool:
+
+        if not self.valid:
+            return False
+
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
-        elif not isinstance(value.current, bool):
-            syslog.warning(f"Invalid data type received in TempoEx container: {type(event.value)}")
-            return False
         else:
-            is_pressed = value.current
+            is_pressed = event.is_pressed # use new API for GremlinEx
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
+        verbose = True
 
         if verbose: syslog.info(f"TEMPOEX: {self.action_data.comment} got trigger: pressed: {is_pressed}")
 
@@ -508,13 +544,14 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
             if self.activate_on == "press":
                 if verbose: syslog.info(f"execute short press (activation mode = press)")
-                self._trigger_short_press(self.event_press, self.value_press)
+                self._trigger_short_press(event, value, extra_data)
 
         else:
             # raw button was released
             # Short press (activate on button release)
             if (self.start_time + self.delay) > time.time():
-                self.timer.cancel() # kill long press timer - use short press
+                if self.timer:
+                    self.timer.cancel() # kill long press timer - use short press
 
                 if self.activate_on == "release":
                     threading.Thread(target=lambda: self._short_press(
@@ -523,22 +560,19 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                         self.value_press,
                         event,
                         value
-                    ), daemon=True).start()
+                    ), daemon=False).start()
                 else:
-                    self._trigger_short_press(event, value)
+                    self._trigger_short_press(event, value, extra_data)
                 
             else:
                 # Long press
-                self._trigger_long_press(event, value)
+                self._trigger_long_press(event, value, extra_data)
                 if self.activate_on == "press":
-                    # syslog.info(f"execute short press (activation mode = press) in LONG PRESS")
-                    self._trigger_short_press(event, value)
-
+                    self._trigger_short_press(event, value, extra_data)
 
             self.timer = None
 
-        return False # stop execution
-
+        return False # stop execution because it's handled internally
     def _short_press(self, index, event_p, value_p, event_r, value_r):
         """Callback executed for a short press action.
 
@@ -590,8 +624,8 @@ class TempoExContainer(AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.short_action_sets = []
-        self.long_action_sets = []
+        self.short_action_sets = [gremlin.base_profile.ActionSet("short")]
+        self.long_action_sets = [gremlin.base_profile.ActionSet("long")]
         self.delay = 0.5 # default long press delay in seconds
         self.autorelease_delay = 0.25 # autorelease in seconds
         self.activate_on = "release"
@@ -628,12 +662,12 @@ class TempoExContainer(AbstractContainer):
         # custom read of action sets
         for as_node in node:
             if as_node.tag == "short-action-set":
-                action_set = []
+                action_set = gremlin.base_profile.ActionSet("short")
                 self._parse_action_xml(as_node, action_set, data)
                 self.short_action_sets.append(action_set)
                 self.action_sets.append(action_set)
             if as_node.tag == "long-action-set":
-                action_set = []
+                action_set = gremlin.base_profile.ActionSet("long")
                 self._parse_action_xml(as_node, action_set, data)
                 self.long_action_sets.append(action_set)
                 self.action_sets.append(action_set)
@@ -652,6 +686,7 @@ class TempoExContainer(AbstractContainer):
         node.set("chain_short",safe_format(self.chain_short, bool))
         node.set("chain_long",safe_format(self.chain_long, bool))
         node.set("timeout", str(self.timeout))
+        
         for actions in self.short_action_sets:
             as_node = ElementTree.Element("short-action-set")
             for action in actions:
@@ -662,6 +697,8 @@ class TempoExContainer(AbstractContainer):
             for action in actions:
                 as_node.append(action.to_xml())
             node.append(as_node)
+
+        
 
         return node
     

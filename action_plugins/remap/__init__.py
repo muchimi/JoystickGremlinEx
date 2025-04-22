@@ -340,7 +340,7 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if self.thread_running is False:
                     if isinstance(self.thread, threading.Thread):
                         self.thread.join()
-                    self.thread = threading.Thread(target=self.relative_axis_thread, daemon=True)
+                    self.thread = threading.Thread(target=self.relative_axis_thread, daemon=False)
                     self.thread.start()
 
         elif input_type == InputType.JoystickButton:
@@ -470,14 +470,6 @@ class Remap(gremlin.base_profile.AbstractAction):
         dark_stub = "dark_" if is_dark else ""
         if input_string:
             
-            #root_path = gremlin.shared_state.root_path
-            # folder = os.path.join(root_path, "action_plugins", "remap")
-            # icon_file = os.path.join(folder, "gfx", f"icon_{input_string}_{self.vjoy_input_id:03d}.png")
-            # if os.path.isfile(icon_file):
-            #     return icon_file
-            
-
-
             icon_file = f"{dark_stub}icon_{input_string}_{self.vjoy_input_id:03d}.png"
             icon_path = gremlin.util.find_file(icon_file)
             if os.path.isfile(icon_path):

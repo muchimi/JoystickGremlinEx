@@ -390,6 +390,7 @@ class AbstractFunctor(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
         el.profile_stop.connect(self.profile_stop)
+        el.profile_started.connect(self.profile_started)
         el.abort.connect(self.profile_stop) # abort also stops the profile
 
     
@@ -414,6 +415,10 @@ class AbstractFunctor(QtCore.QObject):
 
     def profile_start(self):
         ''' called when the profile starts '''
+        pass
+
+    def profile_started(self):
+        ''' called when the profile started (all other items completed) '''
         pass
 
     def profile_stop(self):

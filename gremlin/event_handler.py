@@ -363,7 +363,7 @@ class EventListener(QtCore.QObject):
 
 	profile_reset = QtCore.Signal() # profile reset signal (when runtime for a profile needs to reset)
 	profile_start = QtCore.Signal() # profile start signal (when a profile starts)
-	profile_started = QtCore.Signal() # profile started signal (after a profile starts)
+	profile_started = QtCore.Signal() # profile started signal (after a profile starts and all process start functions are completed)
 	profile_stop = QtCore.Signal() # profile stop signal (when a profile stops)
 	profile_stop_toolbar = QtCore.Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
 	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
@@ -549,7 +549,7 @@ class EventListener(QtCore.QObject):
 		self._run_thread.start()
 
 		self._keep_alive_event = threading.Event()
-		self._keep_alive_thread = threading.Thread(target = self._keep_alive, daemon=True)
+		self._keep_alive_thread = threading.Thread(target = self._keep_alive, daemon=False)
 		self._keep_alive_thread.setName("heartbeat")
 		self._keep_alive_thread.start()
 

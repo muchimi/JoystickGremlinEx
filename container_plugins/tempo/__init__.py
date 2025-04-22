@@ -30,6 +30,8 @@ from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 from gremlin.util import safe_read, safe_format
+import gremlin.execution_graph
+import gremlin.base_profile
 
 syslog = logging.getLogger("system")
 class TempoContainerWidget(AbstractContainerWidget):
@@ -244,12 +246,8 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def __init__(self, container : TempoContainer, parent = None):
         super().__init__(container, parent)
-        self.short_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0], parent
-        )
-        self.long_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[1], parent
-        )
+
+
         self.delay = container.delay
         self.activate_on = container.activate_on
 
@@ -259,30 +257,57 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.event_press = None
         self.delay = container.delay
         self.autorelease_delay = container.autorelease_delay
+        self.long_nodes = []
+        self.short_nodes = []
 
         # el = gremlin.event_handler.EventListener()
         # el.profile_start.connect(self._profile_start)
 
-    def profile_start(self):
+    def profile_started(self):
         # reset any prior values before start
         self.start_time = 0
         self.timer = None
         self.value_press = None
         self.event_press = None
 
+        ec = gremlin.execution_graph.ExecutionContext()
+        container_node = ec.find(self.action_data)
+
+        if not container_node:
+            syslog.error("Unable to find this action in the execution tree")
+            self.valid = False
+            return
+
+        group_node = container_node.children[0] # group node is the only child of the container node
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
+        self.short_nodes = [self.action_set_nodes[0]]
+        self.long_nodes = [self.action_set_nodes[1]]
+
+
+    def _trigger_short_press(self, event, value, extra_data : dict = None):
+        ''' triggers a short press '''
+
+        # syslog.info(f"execute short press {self.short_index}")
+        ec = gremlin.execution_graph.ExecutionContext()
+        node = self.short_nodes[0]
+        ec.execute_node(node, event, value, extra_data)
+        
+
+    def _trigger_long_press(self, event, value, extra_data : dict = None):
+        ''' triggers a long press '''
+        # syslog.info(f"execute long press {self.long_index}")
+        ec = gremlin.execution_graph.ExecutionContext()
+        node = self.long_nodes[0]
+        ec.execute_node(node, event, value, extra_data)
+
 
     def process_event(self, event, value, extra_data = None):
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
+        else:
+            is_pressed = event.is_pressed # use new API for GremlinEx
 
-        is_pressed = event.is_pressed # use new API for GremlinEx
-
-        # elif not isinstance(value.current, bool):
-        #     syslog.warning(f"Invalid data type received in TempoEx container: {type(event.value)}")
-        #     return False
-        # else:
-        #     is_pressed = value.current
-
+     
         # Copy state when input is pressed
         if is_pressed:
             self.value_press = copy.deepcopy(value)
@@ -298,7 +323,10 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
             if self.activate_on == "press":
                 #print ("tempo short (activate on press)")
-                self.short_set.process_event(self.event, self.value)
+                #self.short_set.process_event(event, value)
+                self._trigger_short_press(event, value, extra_data)
+
+                
         else:
             # input release event
             
@@ -314,15 +342,18 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                         self.value_press,
                         event,
                         value
-                    ), daemon=True).start()
+                    ), daemon=False).start()
                 else:
-                    self.short_set.process_event(event, value)
+                    #self.short_set.process_event(event, value)
+                    self._trigger_short_press(event, value, extra_data)
+
             # Long press
             else:
-                #print ("tempo long")
-                self.long_set.process_event(event, value)
+                #self.long_set.process_event(event, value)
+                self._trigger_long_press(event, value, extra_data)
                 if self.activate_on == "press":
-                    self.short_set.process_event(event, value)
+                    #self.short_set.process_event(event, value)
+                    self._trigger_short_press(event, value, extra_data)
 
             self.timer = None
 
@@ -336,13 +367,15 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         :param event_r event to release the action
         :param value_r value to release the action
         """
-        self.short_set.process_event(event_p, value_p)
+        self._trigger_short_press(event_p, value_p)
         time.sleep(self.autorelease_delay)
-        self.short_set.process_event(event_r, value_r)
+        self._trigger_short_press(event_r, value_r)
+
+
+
 
     def _long_press(self):
-        """Callback executed, when the delay expires."""
-        self.long_set.process_event(self.event_press, self.value_press)
+        self._trigger_long_press(self.event_press, self.value_press)
 
 
 class TempoContainer(AbstractContainer):
@@ -376,21 +409,39 @@ class TempoContainer(AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.action_sets = [[], []]
+        self.action_sets = []
         self.delay = 0.5 # delay for long press
         self.autorelease_delay = 0.250 # delay between press and autorelease 
         self.activate_on = "release"
+        self.short_action_sets = []
+        self.long_action_sets = []
+
+    
 
     def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
-        self.action_sets = []
+        
         super()._parse_xml(node, data)
+        
+        for index, as_node in enumerate(node):
+            if as_node.tag == "action-set":
+                if index == 0:
+                    action_set = gremlin.base_profile.ActionSet("short")
+                    self.short_action_sets.append(action_set)
+                else:
+                    action_set = gremlin.base_profile.ActionSet("long")
+                    self.long_action_sets.append(action_set)
+                self._parse_action_xml(as_node, action_set, data)
+                
+          
+
         self.delay = float(node.get("delay", 0.5))
         self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
         self.activate_on = node.get("activate-on", "release")
+        
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

@@ -6694,7 +6694,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._decimals = decimals
         self._is_range = is_range
         self._inverted = inverted
-        self._verbose = gremlin.config.Configuration().verbose
+        self._verbose = gremlin.config.Configuration().verbose_mode_ui
 
         min_cmd = gremlin.util.clamp(min_cmd, min_range, max_range)
         max_cmd = gremlin.util.clamp(max_cmd, min_range, max_range)

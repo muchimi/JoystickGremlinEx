@@ -29,6 +29,7 @@ import gremlin.gated_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
+import gremlin.process_monitor
 import gremlin.shared_state
 
 import gremlin.shared_state
@@ -1131,8 +1132,13 @@ class SimconnectMonitor():
         enabled = gremlin.shared_state.getSimConnectEnabled()
         self._startup_mode = {} # reset the mode cache
         self._enabled = enabled
+
         if enabled:
             syslog.info(f"SCMONITOR: Start")
+
+            # if not self._manager.process_running():
+            #     # not running - abort
+            #     return
 
             if self._last_mode:
                 # revert to the last mode
@@ -1160,7 +1166,7 @@ class SimconnectMonitor():
         eh.abort.connect(self.stop)
         
         # start the reconnect thread
-        self._auto_reconnect_thread = threading.Thread(target = self._auto_reconnect_loop, daemon=True)
+        self._auto_reconnect_thread = threading.Thread(target = self._auto_reconnect_loop, daemon=False)
         self._auto_reconnect_thread.setName("SCMONITOR: auto-reconnect")
         self._auto_reconnect_event.clear()
         self._auto_reconnect_thread.start()
@@ -1417,6 +1423,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.current_aircraft_widget = ui_common.QDataLineEdit()
         self.current_aircraft_widget.setReadOnly(True)
         self.current_aircraft_widget.setMinimumWidth(line_entry_width)
+        current_aircraft = self._manager.get_loaded_aircraft()
+        self.current_aircraft_widget.setText(current_aircraft)
 
 
         self.current_aircraft_folder = None # holds the active aircraft data folder (from the sim)
@@ -1425,6 +1433,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.refresh_current_aircraft_widget = QtWidgets.QPushButton("Get Current Aircraft")
         self.refresh_current_aircraft_widget.clicked.connect(self._refresh_aircraft_cb)
+
         #self.refresh_current_aircraft_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
         self.refresh_current_aircraft_widget.setToolTip("Queries the current aircraft loaded in the sim")
         #self.refresh_current_aircraft_widget.setMaximumWidth(24)
@@ -3247,8 +3256,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         '''
         # always read the current input as the value could be from another device for merged inputs
 
-
-        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_ui
         
         if self.input_type == InputType.JoystickAxis:
             
@@ -3805,7 +3814,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         
         self._auto_repeat_thread = None
         self._auto_repeat_event = threading.Event()
-        self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command, daemon=True)
+        self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command, daemon=False)
         
         self.valid = True
 

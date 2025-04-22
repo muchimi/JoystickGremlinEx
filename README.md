@@ -302,6 +302,11 @@ T33
 - API: execution graph: when the trigger entry point in the execution graph is a container trigger (which is a default state), the logic will check to see if the container is parented to a condition node and switch to that node as the entry point if needed. 
 - Fix: when the legacy remap action is attached to an axis or a hat and outputs a button, the virtual button tab will appear in the UI without having to reload. Note:  This doesn't apply to other actions like vjoy remap because that has a built-in ability to handle that. This resolves issues with older profiles relying on this functionality working in m73.
 - Fix: virtual button UI in dark mode not showing information.
+T34
+- New: Upgrade to Python 3.13.3 April 2025 release  
+- New: Upgrade to Pyside6 6.9
+- Fix: MSFS interface will unload the SimConnect DLL on profile stop.  This ensures any DLL settings are not persisted across sessions.
+- API: increased time to get buffer data from MSFS to 100 ms per attempt as some requests would fail.
 
 
 ## 13.40.16ex (pre-release)

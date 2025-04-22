@@ -106,7 +106,7 @@ class ProcessMonitor(QtCore.QObject):
                 # verbose = gremlin.config.Configuration().verbose_mode_process
                 syslog.info("PROC: start")
                 self._running = True
-                self._update_thread = threading.Thread(target=self._update, daemon=True)
+                self._update_thread = threading.Thread(target=self._update, daemon=False)
                 self._update_thread.start()
             
 
@@ -163,17 +163,36 @@ class ProcessMonitor(QtCore.QObject):
         return self._current_path
 
 
-def list_current_processes():
-    """Returns a list of executable paths to currently active processes.
+    def list_current_processes(self):
+        """Returns a list of executable paths to currently active processes.
 
-    :return list of active process executable paths
-    """
-    from win32com.client import GetObject
-    wmi = GetObject('winmgmts:')
-    processes = wmi.InstancesOf("Win32_Process")
-    process_list = []
-    for entry in processes:
-        executable = entry.Properties_("ExecutablePath").Value
-        if executable is not None:
-            process_list.append(os.path.normpath(executable).replace("\\", "/"))
-    return sorted(set(process_list))
+        :return list of active process executable paths
+        """
+        from win32com.client import GetObject
+        wmi = GetObject('winmgmts:')
+        processes = wmi.InstancesOf("Win32_Process")
+        process_list = []
+        for entry in processes:
+            executable = entry.Properties_("ExecutablePath").Value
+            if executable is not None:
+                process_list.append(os.path.normpath(executable).replace("\\", "/"))
+        return sorted(set(process_list))
+
+    def process_running(self, process_name : str):
+        ''' checks if a process is currently running '''
+        process_list = self.list_current_processes()
+        for item in process_list:
+            base_dir, exe = os.path.split(item)
+            if exe.casefold() == process_name.casefold():
+                return True
+            
+        return False
+    
+
+# main instance
+_process_monitor = ProcessMonitor()
+
+
+def list_current_processes():
+    ''' gets alist of current processes '''
+    return _process_monitor.list_current_processes()

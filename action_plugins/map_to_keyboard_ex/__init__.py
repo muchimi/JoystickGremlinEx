@@ -522,7 +522,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                         syslog.info(f"MapToKeyboardEx: autorepeat")
                 if self.has_keys:
                     if self._ar_thread is None:
-                        self._ar_thread = threading.Thread(target=self._ar_execute, daemon=True)
+                        self._ar_thread = threading.Thread(target=self._ar_execute) #threading.Thread(target=self._ar_execute, daemon=False)
                         self._ar_running = True
                         self._ar_event.clear()
                         self._ar_thread.start()

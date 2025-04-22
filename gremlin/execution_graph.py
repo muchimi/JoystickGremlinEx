@@ -140,6 +140,9 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
     
     def __str__(self):
         return self.to_string()
+    
+    def __hash__(self):
+        return hash(self.id)
 
 class ExecutionGraphRootNode(ExecutionGraphNode):
     ''' holds a mode in the execution graph '''
@@ -233,9 +236,9 @@ class ExecutionGraphFunctorNode(ExecutionGraphNode):
 
 class ExecutionGraphActionSetNode(ExecutionGraphNode):
     ''' holds an input item in the execution graph '''
-    def __init__(self, action_set : list = []):
+    def __init__(self, action_set : gremlin.base_profile.ActionSet = []):
         super().__init__(ExecutionGraphNodeType.ActionSet)
-        self.action_set: list[gremlin.base_profile.AbstractAction] = action_set
+        self.action_set = action_set
 
     def to_string(self):
         stub = f"Action Count: {len(self.action_set)}"
@@ -623,8 +626,18 @@ class ExecutionContext():
     def find(self, item):
         ''' looks for a container, action or action set in the execution tree node '''
         for node in anytree.PreOrderIter(self.graph):
-            if node.container == item or node.functor == item or node.action_set == item or item in node.functors:
-                return node
+            if hasattr(node,"container"):
+                if node.container == item:
+                    return node
+            if hasattr(node,"functor"):
+                if node.functor == item:
+                    return node
+            if hasattr(node,"action_set"):
+                if node.action_set == item:
+                    return node
+            if hasattr(node,"functor"):
+                if item in node.functors:
+                    return node
         return None
     
     
@@ -1066,7 +1079,16 @@ class ExecutionContext():
         container_group.parent = container_node
 
         for action_set in container.action_sets:
+
+            # a container usually has a single action set, but some like tempo/tempoEx have multipe action sets so each is grouped by an action set
             # sort actions by priority low to high
+
+            action_set_node = ExecutionGraphActionSetNode(action_set)
+            action_set_group_node = ExecutionGraphGroupNode()
+            action_set_node.parent = container_group
+            action_set_group_node.parent = action_set_node
+
+
             action_list = [((action.priority, index),action) for index, action in enumerate(action_set)]
             if not action_list:
                 # empty set
@@ -1090,10 +1112,10 @@ class ExecutionContext():
                 action_node.input_item = input_item
 
                 if action.has_conditions:
-                    action_condition_node = self._get_condition_node(action, container_group)
+                    action_condition_node = self._get_condition_node(action, action_set_group_node)
                     action_node.parent = action_condition_node # action node is owned by its condition node
                 else:
-                    action_node.parent = container_group
+                    action_node.parent = action_set_group_node
 
                 m_action_node = ExecutionGraphActionNode(action)
                 m_action_node.id = action.id
@@ -1435,23 +1457,17 @@ class ExecutionContext():
 
         if not node.has_actions:
             return True # nodes with no actions return PASS
-        
-   
+
         verbose_exec = self._verbose_exec
         verbose_condition = self._verbose_condition
         try:
             gremlin.shared_state.pushLog()
             logTabs = gremlin.shared_state.logTabs()
             
-            # if isinstance(node, ExecutionGraphInputNode) and node.mode == "a350" and node.input_item.input_id == 1:
-            #     pass
+            if isinstance(node, ExecutionGraphContainerNode):
+                pass
 
-            
-            # if node.nodeType == ExecutionGraphNodeType.ActivationCondition:
-            #     condition : gremlin.actions.ActivationCondition = node.condition
-            #     if isinstance(condition, gremlin.actions.JoystickCondition) or isinstance(condition, gremlin.base_conditions.JoystickCondition):
-            #         if condition.input_id == 29: # and condition.comparison == "pressed":
-            #             pass
+           
 
                 
             # abort if the mode changed and the event was fired in a different mode
@@ -1502,6 +1518,20 @@ class ExecutionContext():
                 if not result:
                     # condition failed
                     return result
+                
+                # if container - execute the container functor if any
+                container_functors = node.getActionFunctors()
+                result = True
+                for functor in container_functors:
+                    result = self.process_functor(functor, event, value, extra_data, manual)
+                    if not result:
+                        # stop execution if the container fires the events internally
+                        return result
+                    
+            elif node.nodeType == ExecutionGraphNodeType.ActionSet:
+                # for action sets and go straigh to process children
+                pass
+
             else:
                 # action node - if in manual mode - run the children of that node directly
                 # any other node - execute the functor list - first one that fails fails the complete branch to this point
@@ -1512,14 +1542,11 @@ class ExecutionContext():
                         description = str(functor.action_data)
                         if verbose_exec: syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} {description} action result: {'PASS' if action_result else 'FAIL'}")
                             
-            if manual:
-                pass
-
             # execute children nodes
             if node.children and (node.nodeType != ExecutionGraphNodeType.Action or manual):
                 for child in node.children:
-                    if child.nodeType == ExecutionGraphNodeType.ActionSet:
-                        continue # skip activation sets as the actions are in the container node already
+                    # if child.nodeType == ExecutionGraphNodeType.ActionSet:
+                    #     continue # skip activation sets as the actions are in the container node already
                     result = self.execute_node(child, event, value, extra_data, manual)
                     if not result:
                         break # FAIL
@@ -1535,7 +1562,7 @@ class ExecutionContext():
             if verbose_condition: syslog.info(f"{logTabs}>Overall Result: {'PASS' if result else 'FAIL'}")
             gremlin.shared_state.popLog()
 
-    
+
     def execute_functor_id(self, id, event, value, extra_data : dict = None, manual = False) -> bool:
         ''' executes a functor chain 
         
@@ -1995,6 +2022,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         """
         super().__init__(action_set, parent)
 
+
     def _build_graph(self, action_set, parent = None):
         """Builds the graph structure based on the content of the action set.
 
@@ -2042,7 +2070,6 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             node.exec_functors = functor
             node.priority = priority
             nodes[action] = node
-            #node_list.append(node)
 
 
 

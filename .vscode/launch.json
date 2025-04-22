@@ -10,7 +10,7 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/joystick_gremlin.py",
-            "console": "internalConsole",
+            //"console": "internalConsole",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
             "restart": true
         },

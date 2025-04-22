@@ -498,10 +498,14 @@ class VJoyCondition(AbstractCondition):
             retval = False
             is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             if self.comparison == "pressed":
-                retval = is_pressed #  joy.button(self.input_id).is_pressed
+                retval = is_pressed # true if the vjoy button is pressed
+            elif self.comparison == "released":
+                retval = not is_pressed # true if the vjoy button is not pressed
             else:
-                retval = not is_pressed # joy.button(self.input_id).is_pressed
+                syslog.error(f"{logtabs}VjoyCondition: Button {self.comparison} is not a valid condition for a button")
+                
             if verbose: syslog.info(f"{logtabs}VjoyCondition: Button {self.comparison}: device {info.name} input: {self.input_id} return: {"OK" if retval else "FAILED"}")
+
             return retval
             
         elif self.input_type == InputType.JoystickHat:
@@ -611,10 +615,14 @@ class InputActionCondition(AbstractCondition):
 
         syslog = logging.getLogger("system")
         retval = False
+        is_pressed = event.is_pressed
+        if not is_pressed:
+            # not a pressed type input
+            is_pressed = False
         if self.comparison == "pressed":
-            retval = value.current
+            retval =  is_pressed
         elif self.comparison == "released":
-            retval = not value.current
+            retval = not is_pressed
         elif self.comparison == "always":
             retval = True
         

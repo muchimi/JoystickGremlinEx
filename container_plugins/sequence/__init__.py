@@ -175,12 +175,12 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.graph_map = {} # holds index to graph
         self.index_map = {} # holds graph to index
         self._macro_id = None
-        index = 0
-        for action_set in container.action_sets:
-            graph = gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-            self.action_sets.append(graph)        
-            self.graph_map[index] = graph
-            self.index_map[graph] = index
+        #index = 0
+        # for action_set in container.action_sets:
+        #     graph = gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
+        #     self.action_sets.append(graph)        
+        #     self.graph_map[index] = graph
+        #     self.index_map[graph] = index
 
         self.index = 0
         self.last_execution = 0.0
@@ -199,15 +199,31 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         eh = gremlin.event_handler.EventListener()
         eh.macro_step_completed.connect(self._macro_completed)
 
-    def profile_start(self):
+    def profile_started(self):
         ''' occurs at profile start '''
         self.index = 0
         self._event = None
         self._value = None
         self._macro_id = None
 
+        ec = gremlin.execution_graph.ExecutionContext()
+        container_node = ec.find(self.action_data)
 
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
+        if not container_node:
+            syslog.error("Unable to find this action in the execution tree")
+            self.valid = False
+            return
+
+        group_node = container_node.children[0] # group node is the only child of the container node
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
+        for index, node in enumerate(self.action_set_nodes):
+            self.graph_map[index] = node
+            self.index_map[node] = index
+
+
+
+
+    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data : dict = None):
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose
 
@@ -246,19 +262,27 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         count = len(self.action_sets)
 
-        mgr = gremlin.macro.MacroManager()
-        macro = gremlin.macro.Macro()
-        self._macro_id = macro.id
+        ec = gremlin.execution_graph.ExecutionContext()
         for index in range(count):
-            graph = self.action_sets[index]
-            action = gremlin.macro.GraphAction(graph, event, value)
-            action.data = f"Step {index + 1}"
-            macro.add_action(action)
+            node = self.action_sets[index]
+            ec.execute_node(node, event, value, extra_data)
+
+
+
+        # mgr = gremlin.macro.MacroManager()
+        # macro = gremlin.macro.Macro()
+        # self._macro_id = macro.id
+        # for index in range(count):
+        #     node = self.action_sets[index]
+
+        #     action = gremlin.macro.GraphAction(node, event, value)
+        #     action.data = f"Step {index + 1}"
+        #     macro.add_action(action)
 
             
         # queue the work up
-        mgr.queue_macro(macro)
-        if verbose: syslog.info(f"SEQUENCE: execute graph sequence - id {self._macro_id}")
+        # mgr.queue_macro(macro)
+        # if verbose: syslog.info(f"SEQUENCE: execute graph sequence - id {self._macro_id}")
         
         return False # stop execution as the logic is internal to trigger the other nodes
     

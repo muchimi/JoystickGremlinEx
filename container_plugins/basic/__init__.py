@@ -138,10 +138,10 @@ class BasicContainerFunctor(AbstractFunctor):
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
-        self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0],
-            parent
-        )
+        # self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
+        #     container.action_sets[0],
+        #     parent
+        # )
 
     def process_event(self, event, value, extra_data = None):
         """Executes the content with the provided data.
@@ -150,7 +150,8 @@ class BasicContainerFunctor(AbstractFunctor):
         :param value the value received with the event
         :return True if execution was successful, False otherwise
         """
-        return self.action_set.process_event(event, value, extra_data)
+        return True
+        #return self.action_set.process_event(event, value, extra_data)
 
 
 class BasicContainer(AbstractContainer):
