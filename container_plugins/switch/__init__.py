@@ -478,12 +478,12 @@ class SwitchContainerFunctor(gremlin.base_conditions.AbstractFunctor):
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
         self.profile_data :  SwitchContainer = container
-        self.action_sets = []
-        for action_set in container.action_sets:
-            self.action_sets.append(
-                gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-            )
-        self.timeout = container.timeout
+        # self.action_sets = []
+        # for action_set in container.action_sets:
+        #     self.action_sets.append(
+        #         gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
+        #     )
+        # self.timeout = container.timeout
 
         self.index = 0
         self.last_execution = 0.0
@@ -543,9 +543,9 @@ class SwitchContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             if value.current is None:
                 value.current = (0,0) if is_hat else is_pressed
 
-            
+            self._trigger(data.index, event, value, extra_data)
 
-            self.action_sets[data.index].process_event(event, value)
+            #self.action_sets[data.index].process_event(event, value)
 
         
         return False # stop execution past this container

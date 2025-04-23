@@ -163,15 +163,15 @@ class ChainContainerWidget(AbstractContainerWidget):
         return f"Chain: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
 
 
-class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class ChainContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
-        self.action_sets = []
-        for action_set in container.action_sets:
-            self.action_sets.append(
-                gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-            )
+        # self.action_sets = []
+        # for action_set in container.action_sets:
+        #     self.action_sets.append(
+        #         gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
+        #     )
         self.timeout = container.timeout
 
         self.index = 0
@@ -186,6 +186,8 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             if isinstance(cond, gremlin.base_conditions.InputActionCondition):
                 if cond.comparison == "press":
                     self.switch_on_press = True
+
+    
 
     def process_event(self, event, value, extra_data = None):
         if event.event_type == InputType.JoystickHat:
@@ -207,10 +209,11 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             syslog.info(f"Chain: index {self.index}")
-        result = self.action_sets[self.index].process_event(event, value)
+        self._trigger(self.index, event, value, extra_data)
+        #result = self._action_sets[self.index].process_event(event, value)
 
         if (self.switch_on_press and is_pressed) or not is_pressed:
-            self.index = (self.index + 1) % len(self.action_sets)
+            self.index = (self.index + 1) % len(self.action_set_nodes)
         
         return False # stop execution as the logic is internal to trigger the other nodes
 

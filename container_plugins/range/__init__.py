@@ -471,7 +471,7 @@ class RangeReleaseTrigger():
     def __hash__(self):
         return hash(self.id)
 
-class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class RangeContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
 
     """Executes the contents of the associated range container."""
 
@@ -480,11 +480,11 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         action_data: RangeContainer
         super().__init__(action_data, parent)
         
-        self.action_sets = []
-        for action_set in action_data.action_sets:
-            self.action_sets.append(
-                gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-            )
+        # self.action_sets = []
+        # for action_set in action_data.action_sets:
+        #     self.action_sets.append(
+        #         gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
+        #     )
 
         self.action_data = action_data
         self.any_change_mode = action_data.any_change_mode
@@ -551,7 +551,8 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             release_event.value = value.current
             
             release_value = gremlin.actions.Value(False,False)
-            action.process_event(release_event, release_value)
+            self._execute(release_event, release_value, extra_data)
+            #action.process_event(release_event, release_value)
 
                 
             
@@ -671,12 +672,13 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             value_clone = gremlin.actions.Value(True, True)
             for action in self.action_sets:
                 # execute the action
-                action.process_event(event_clone, value_clone)
+                # action.process_event(event_clone, value_clone)
                 if not is_change_mode:
                     # register a range exit trigger on non change triggers
                     exit_trigger = RangeReleaseTrigger(ranges, event_clone, action)
                     self.action_data.exit_range_triggers.append(exit_trigger)
                 #print (f"process press event: {exit_trigger.id}")
+            self._execute(event_clone, value_clone, extra_data)
             if in_range:
                 self.last_range_min = range_min
                 self.last_range_max = range_max

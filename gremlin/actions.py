@@ -610,6 +610,7 @@ class InputActionCondition(AbstractCondition):
         """
 
         verbose = gremlin.config.Configuration().verbose_mode_condition
+        verbose = True
 
         
 
@@ -620,15 +621,24 @@ class InputActionCondition(AbstractCondition):
             # not a pressed type input
             is_pressed = False
         if self.comparison == "pressed":
-            retval =  is_pressed
+            retval = is_pressed
         elif self.comparison == "released":
             retval = not is_pressed
+            if retval:
+                # flip the event to a press event so the item executes
+                event.is_pressed = True
+                if value is not None:
+                    value.is_pressed = True
+
         elif self.comparison == "always":
             retval = True
-        
+            event.is_pressed = True
+            if value is not None:
+                value.is_pressed = True
+
         if verbose: 
             logtabs = gremlin.shared_state.logTabs(True)
-            syslog.info(f"{logtabs}InputActionCondition: comparison {self.comparison}: return: {retval}")
+            syslog.info(f"{logtabs}InputActionCondition: comparison {self.comparison}: return: {'PASS' if retval else 'FAIL'}")
         return retval
 
     def condition_name(self)->str:

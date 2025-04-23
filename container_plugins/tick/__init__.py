@@ -280,16 +280,16 @@ class TickContainerWidget(AbstractContainerWidget):
             return "TickContainer"
 
 
-class TickContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class TickContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
 
     def __init__(self, container : TickContainer, parent = None):
         super().__init__(container, parent)
-        self.increase_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0], parent
-        )
-        self.decrease_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[1], parent
-        )
+        # self.increase_set = gremlin.execution_graph.ActionSetExecutionGraph(
+        #     container.action_sets[0], parent
+        # )
+        # self.decrease_set = gremlin.execution_graph.ActionSetExecutionGraph(
+        #     container.action_sets[1], parent
+        # )
         self.action_data = container
 
     def profile_start(self):
@@ -339,13 +339,14 @@ class TickContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 # going up 
                 #print (f"increase set trigger  value: {value:0.3f} tick: {tick} last tick: {last_tick} count: {trigger_count}")
                 for _ in range(trigger_count):
-                    
-                    self.increase_set.process_event(event, value)
+                    self._trigger(0, event, value, extra_data)
+                    #self.increase_set.process_event(event, value)
             elif last_value > value:
                 # going down
                 #print (f"decrease set trigger  value: {value:0.3f} tick: {tick} count: {trigger_count}")
                 for _ in range(trigger_count):
-                    self.decrease_set.process_event(event, value)
+                    self._trigger(1, event, value, extra_data)
+                    #self.decrease_set.process_event(event, value)
 
             self.last_tick = tick
 

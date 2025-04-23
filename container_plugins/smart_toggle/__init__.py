@@ -172,7 +172,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
             return "Smart Toggle"
 
 
-class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
 
     """Executes the contents of the associated SmartToggle container."""
 
@@ -194,27 +194,20 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             if "needs_auto_release" in functor.__dict__:
                 functor.needs_auto_release = False
 
+    def profile_start(self):
+        action_data = self.action_data
+        self.delay = action_data.delay
+        self.shortPressMode = action_data.shortPressMode
+        self.release_value = None
+        self.release_event = None
+        self.mode = None
+        self.long_press_time = 0.0
+        self.is_pressed = False # assume output is not pressed
+
     def profile_started(self):
-        ec = gremlin.execution_graph.ExecutionContext()
-        container_node = ec.find(self.action_data)
+        super().profile_started()        
 
-        if not container_node:
-            syslog.error("Unable to find this action in the execution tree")
-            self.valid = False
-            return
-
-        group_node = container_node.children[0] # group node is the only child of the container node
-        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
-
-
-
-    def _execute(self, event, value, extra_data):
-        ec = gremlin.execution_graph.ExecutionContext()
-        for node in self.action_set_nodes:
-            ec.execute_node(node, event, value, extra_data)
-        # for functor in self.action_set.functors:
-        #     ec.execute_functor_id(functor.id, event, value, extra_data, True)
-
+   
     def process_event(self, event, value, extra_data = None):
         ''' short press = toggle output 
             long press = toggle ON while held, then toggle off 

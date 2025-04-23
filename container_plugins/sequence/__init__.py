@@ -166,14 +166,15 @@ class SequenceContainerWidget(AbstractContainerWidget):
         return f"Sequence: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
 
 
-class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
 
     def __init__(self, container : SequenceContainer, parent = None):
         super().__init__(container, parent)
+
+
         self.action_sets = []
         self.container = container
-        self.graph_map = {} # holds index to graph
-        self.index_map = {} # holds graph to index
+  
         self._macro_id = None
         #index = 0
         # for action_set in container.action_sets:
@@ -199,31 +200,29 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         eh = gremlin.event_handler.EventListener()
         eh.macro_step_completed.connect(self._macro_completed)
 
-    def profile_started(self):
+    def profile_start(self):
         ''' occurs at profile start '''
         self.index = 0
         self._event = None
         self._value = None
         self._macro_id = None
 
-        ec = gremlin.execution_graph.ExecutionContext()
-        container_node = ec.find(self.action_data)
-
-        if not container_node:
-            syslog.error("Unable to find this action in the execution tree")
-            self.valid = False
-            return
-
-        group_node = container_node.children[0] # group node is the only child of the container node
-        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
-        for index, node in enumerate(self.action_set_nodes):
-            self.graph_map[index] = node
-            self.index_map[node] = index
+    def profile_started(self):
+        super().profile_started()        
+        
+        # if self.valid:
+        #     self.graph_map = {} # holds index to graph
+        #     self.index_map = {} # holds graph to index
+        #     for index, node in enumerate(self.action_set_nodes):
+        #         self.graph_map[index] = node
+        #         self.index_map[node] = index
 
 
 
 
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data : dict = None):
+    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data : dict = None) -> bool:
+        if not self.valid:
+            return False
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose
 
@@ -247,7 +246,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             if is_pressed:
                 # ignore pressed event if we're triggering on input release 
                 if verbose: syslog.info(f"SEQUENCE: execute - ignore pressed event")
-                return True
+                return False
+            
             is_pressed = True # flip it for containers
             auto_release = True
             value.is_pressed = is_pressed
@@ -259,13 +259,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self._macro_id = 0 
        
 
-
-        count = len(self.action_sets)
-
-        ec = gremlin.execution_graph.ExecutionContext()
-        for index in range(count):
-            node = self.action_sets[index]
-            ec.execute_node(node, event, value, extra_data)
+        self._execute(event, value, extra_data)    
 
 
 

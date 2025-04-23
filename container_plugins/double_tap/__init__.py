@@ -228,18 +228,16 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
             return "DoubleTap"
 
 
-class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
 
     """Executes the contents of the associated DoubleTap container."""
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
-        self.single_tap = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0], parent
-        )
-        self.double_tap = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[1], parent
-        )
+
+    def profile_start(self):
+        container = self.action_data
+
         self.delay = container.delay
         self.activate_on = container.activate_on
 
@@ -249,6 +247,19 @@ class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.value_press = None
         self.event_press = None
         self.processed_single_tap = True
+
+
+    def profile_started(self):
+        super().profile_started()
+
+    def _trigger_single_tap(self, event, value, extra_data : dict = None) -> bool:
+        ''' triggers a short press '''
+        return self._trigger(0, event, value, extra_data)
+        
+
+    def _trigger_double_tap(self, event, value, extra_data : dict = None) -> bool:
+        ''' triggers a long press '''
+        return self._trigger(1, event, value, extra_data)
 
     def process_event(self, event, value, extra_data = None):
         if event.event_type == InputType.JoystickHat:
@@ -295,36 +306,42 @@ class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                     self.double_action_timer.cancel()
                     self.double_action_timer = threading.Timer(
                         (self.start_time + self.delay) - time.time(),
-                        lambda: self._single_tap(event, value)
+                        lambda: self._single_tap(event, value, extra_data)
                     )
                     self.double_action_timer.start()
 
                 if self.tap_type == "double":
                     #print ("double tap")
-                    self.double_tap.process_event(event, value)
+                    self._trigger_double_tap(event, value, extra_data)
+                    #self.double_tap.process_event(event, value)
                     if self.activate_on == "combined":
-                        self.single_tap.process_event(event, value)
+                        self._trigger_single_tap(event, value, extra_data)
+                        #self.single_tap.process_event(event, value)
                 elif self.activate_on != "exclusive":
                     #print ("single tap exclusive")
-                    self.single_tap.process_event(event, value)
+                    self._trigger_single_tap(event, value, extra_data)
+                    #self.single_tap.process_event(event, value)
         
         else:
             #print ("first tap")
             self.start_time = time.time()
-            self.single_tap.process_event(event, value)
+            self._trigger_single_tap(event, value, extra_data)
+            #self.single_tap.process_event(event, value)
             self.processed_single_tap = True
             
             
 
         return False # stop execution as the logic is internal to trigger the other nodes
 
-    def _single_tap(self, event_release=None, value_release=None):
+    def _single_tap(self, event_release=None, value_release=None, extra_data : dict = None):
         """Callback executed, when the delay expires."""
         self.processed_single_tap = False
-        self.single_tap.process_event(self.event_press, self.value_press)
+        self._trigger_single_tap(self.event_press, self.value_press, extra_data)
+        #self.single_tap.process_event(self.event_press, self.value_press)
         if event_release:
             time.sleep(0.05)
-            self.single_tap.process_event(event_release, value_release)
+            self._trigger_single_tap(event_release, value_release, extra_data)
+            #self.single_tap.process_event(event_release, value_release)
             self.processed_single_tap = True
 
 class DoubleTapContainer(AbstractContainer):

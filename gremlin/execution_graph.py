@@ -1519,11 +1519,15 @@ class ExecutionContext():
                     # condition failed
                     return result
                 
+                
                 # if container - execute the container functor if any
                 container_functors = node.getActionFunctors()
                 result = True
                 for functor in container_functors:
                     result = self.process_functor(functor, event, value, extra_data, manual)
+                    if isinstance(functor, gremlin.base_conditions.AbstractSelfTriggerFunctor):
+                        # do not execute other items because the functor self triggers subsequent nodes as needed
+                        return True
                     if not result:
                         # stop execution if the container fires the events internally
                         return result

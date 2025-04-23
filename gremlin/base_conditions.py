@@ -16,6 +16,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import ActivationRule
 import dinput
 import lxml
+import gremlin.execution_graph
 
 syslog = logging.getLogger("system")
 
@@ -502,6 +503,63 @@ class AbstractFunctor(QtCore.QObject):
             return str(self.action_data)
         return "Plugin Functor"
 
+
+class AbstractSelfTriggerFunctor(AbstractFunctor):
+    ''' functor that has self trigger mechanisms to trigger its content '''
+
+    def __init__(self, action_data, parent = None):
+        super().__init__(action_data, parent)
+        self._valid = False # assume invalid
+
+    @property
+    def valid(self):
+        ''' true if the action set nodes are loaded '''
+        return self._valid
+
+    def profile_started(self):
+        super().profile_started()
+        self._ec = gremlin.execution_graph.ExecutionContext()
+        container_node = self._ec.find(self.action_data)
+
+        if not container_node:
+            syslog.error("Unable to find this action in the execution tree")
+            self._valid = False
+            return
+        
+        group_node = container_node.children[0] # group node is the only child of the container node
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
+
+        self._valid = True
+
+    def _trigger(self, index : int, event, value, extra_data : dict = None) -> bool:
+        ''' executes an action set node 
+        
+        :param index: the index of the action set, use None to execute all action sets, 0 based so index = 0 is the first action set of the container
+        :param event: the event
+        :param value: the action value
+        :param extra_data : extra data dictionary, optional
+        '''
+        if self.valid:
+            return self._ec.execute_node(self.action_set_nodes[index], event, value, extra_data)
+        return False
+    
+    
+        
+
+    def _execute(self, event, value, extra_data) -> bool:
+        ''' executes all action set nodes
+        
+        :param event: the event
+        :param value: the action value
+        :param extra_data : extra data dictionary, optional
+        '''
+        if self.valid:
+            result = True # assume ok
+            for node in self.action_set_nodes:
+                result = result and self._ec.execute_node(node, event, value, extra_data)
+            return result
+        return False
+        
 
 class AbstractContainerActionFunctor(AbstractFunctor):
     ''' used by action functors for actions that have containers '''

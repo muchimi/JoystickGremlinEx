@@ -190,16 +190,10 @@ class ButtonContainerWidget(AbstractContainerWidget):
             return "ButtonContainer"
 
 
-class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
-        self.press_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0], parent
-        )
-        self.release_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[1], parent
-        )
 
     def process_event(self, event, value, extra_data = None):
 
@@ -215,11 +209,13 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         if is_pressed:
             # button press
-            self.press_set.process_event(event, value)
+            self._trigger(0, event, value, extra_data)
+            #self.press_set.process_event(event, value)
         else:
             # button release
             value.current = (0,0) if is_hat else True
-            self.release_set.process_event(event, value)
+            self._trigger(1, event, value, extra_data)
+            #self.release_set.process_event(event, value)
 
         return False # stop execution as the logic is internal to trigger the other nodes
 
