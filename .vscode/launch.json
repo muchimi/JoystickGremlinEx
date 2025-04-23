@@ -7,7 +7,7 @@
         
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/joystick_gremlin.py",
             //"console": "internalConsole",

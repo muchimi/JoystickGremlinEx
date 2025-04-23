@@ -265,48 +265,49 @@ class HatButtonsContainer(AbstractContainer):
     def generate_callbacks(self, parent):
         """Returns a list of callback data entries.
 
-        :return list of container callback entries
-        """
-        lookup = _four_lookup
-        if self.button_count == 8:
-            lookup = _eight_lookup
-        id_to_direction = {}
-        for k, v in lookup.items():
-            id_to_direction[v] = k
+        # :return list of container callback entries
+        # """
+        # lookup = _four_lookup
+        # if self.button_count == 8:
+        #     lookup = _eight_lookup
+        # id_to_direction = {}
+        # for k, v in lookup.items():
+        #     id_to_direction[v] = k
 
-        callbacks = []
+        # callbacks = []
 
-        # For a virtual button create a callback that sends VirtualButton
-        # events and another callback that triggers of these events
-        # like a button would.
-        for i, action_set in enumerate(self.action_sets):
-            # Ignore directions with no associated actions
-            if len(action_set) == 0:
-                continue
+        # # For a virtual button create a callback that sends VirtualButton
+        # # events and another callback that triggers of these events
+        # # like a button would.
+        # for i, action_set in enumerate(self.action_sets):
+        #     # Ignore directions with no associated actions
+        #     if len(action_set) == 0:
+        #         continue
 
-            # Callback generating virtual button events
-            callbacks.append(gremlin.base_profile.CallbackData(
-                gremlin.execution_graph.VirtualButtonProcess(self, VirtualHatButton(self, [gremlin.util.hat_tuple_to_direction(id_to_direction[i])])),None))
-            # Create fake BasicContainer for each action set
-            basic_container = BasicContainer(self, parent)
-            basic_container.action_sets = [action_set]
-            basic_container.activation_condition = self.activation_condition
+        #     # Callback generating virtual button events
+        #     callbacks.append(gremlin.base_profile.CallbackData(
+        #         gremlin.execution_graph.VirtualButtonProcess(self, VirtualHatButton(self, [gremlin.util.hat_tuple_to_direction(id_to_direction[i])])),None))
+        #     # Create fake BasicContainer for each action set
+        #     basic_container = BasicContainer(self, parent)
+        #     basic_container.action_sets = [action_set]
+        #     basic_container.activation_condition = self.activation_condition
             
             
 
-            # Callback reacting to virtual button events
-            callbacks.append(gremlin.base_profile.CallbackData(
-                gremlin.execution_graph.VirtualButtonCallback(basic_container, parent),
-                gremlin.event_handler.Event(
-                    InputType.VirtualButton,
-                    callbacks[-1].callback.virtual_button.identifier,
-                    device_guid=dinput.GUID_Virtual,
-                    is_pressed=True,
-                    raw_value=True
-                )
-            ))
+        #     # Callback reacting to virtual button events
+        #     callbacks.append(gremlin.base_profile.CallbackData(
+        #         gremlin.execution_graph.VirtualButtonCallback(basic_container, parent),
+        #         gremlin.event_handler.Event(
+        #             InputType.VirtualButton,
+        #             callbacks[-1].callback.virtual_button.identifier,
+        #             device_guid=dinput.GUID_Virtual,
+        #             is_pressed=True,
+        #             raw_value=True
+        #         )
+        #     ))
 
-        return callbacks
+        #return callbacks
+        return []
 
     def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.
