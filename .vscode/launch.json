@@ -10,9 +10,8 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/joystick_gremlin.py",
-            //"console": "internalConsole",
+            "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
-            "restart": true
         },
         // {
         //     "name": "Python: Current File with profiler",

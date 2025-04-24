@@ -129,7 +129,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m73t36"
+APPLICATION_BASE = "m73t37"
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 

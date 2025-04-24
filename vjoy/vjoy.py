@@ -251,7 +251,7 @@ class Axis:
 
         el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, p_value)
-        #el.vjoy_event.emit(event)
+        el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
         el.vjoy_callback(event)
 
         self.vjoy_dev.ensure_ownership()

@@ -316,7 +316,9 @@ T36
 - Fix: some IDs were not saving properly
 - Fix: some actions not executing at all in some situations.  
 - API: added check for well formed IP address
-
+T37
+- OSC: re-added external event for custom plugins to trigger on VJOY output changes  
+- Improved: new checkboxes on Map to OSC to enable/disable value send on press/release
 
 ## 13.40.16ex (pre-release)
 ### (m72)

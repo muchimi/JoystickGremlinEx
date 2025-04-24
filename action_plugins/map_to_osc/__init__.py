@@ -45,31 +45,32 @@ syslog = logging.getLogger("system")
 class OscValueWidget(QtWidgets.QWidget):
     valueChanged = QtCore.Signal() # fires when the value changes 
     typeChanged = QtCore.Signal() # fires when integer flag changes 
+    enableValueOnPressChanged = QtCore.Signal(bool)
+    enableValueOnReleaseChanged = QtCore.Signal(bool)
+    enabledChanged = QtCore.Signal(bool) # fires when enabled changes
     
-    def __init__(self, label = "Set Value:", value = None, is_integer = False, parent = None):
+    def __init__(self, label = "Set Value:", value = None, is_integer = False, enabled = True, parent = None):
         super().__init__(parent)
 
-
-        self.main_layout = QtWidgets.QGridLayout(self)
-
-        self._frame_widget = gremlin.ui.ui_common.QBoxFrame()
-        self._frame_widget.setContentsMargins(0,0,0,0)
-        self._frame_layout = QtWidgets.QHBoxLayout(self._frame_widget)
-        self._is_axis = False # true if mapping to an axis input
-
-        self._is_integer = is_integer
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.content_layout = QtWidgets.QGridLayout()
         
 
-        self.label_widget = QtWidgets.QLabel("Value:")
-        if label:
-            self.label_widget.setText(label)
-        if not value:
-            value = 1.0
+        # self._frame_widget = gremlin.ui.ui_common.QBoxFrame()
+        # self._frame_widget.setContentsMargins(0,0,0,0)
+        # self._frame_layout = QtWidgets.QHBoxLayout(self._frame_widget)
+        self._is_axis = False # true if mapping to an axis input
+        self._enabled = enabled
 
-            
-        self.label_widget = QtWidgets.QLabel("Value:")
-        if label:
-            self.label_widget.setText(label)
+        self._is_integer = is_integer
+
+        if not label:
+            label = "Enabled"
+        self.enabled_widget = QtWidgets.QCheckBox(label)
+        self.enabled_widget.setChecked(enabled)
+        self.enabled_widget.clicked.connect(self._enabled_changed)
+
+        
         if not value:
             value = 1.0
         
@@ -93,10 +94,14 @@ class OscValueWidget(QtWidgets.QWidget):
         self._value_int_widget.valueChanged.connect(self._value_changed)
         self._value_int_widget.setMinimum(0)   
 
-        self._value_container_widget = QtWidgets.QWidget()
-        self._value_container_widget.setContentsMargins(0,0,0,0)
-        self._value_container_layout = QtWidgets.QHBoxLayout(self._value_container_widget)
-        self._value_container_layout.setContentsMargins(0,0,0,0)
+        widgets = [
+            QtWidgets.QLabel("Value:"),
+            self._value_float_widget,
+            self._value_int_widget,
+            self._is_int_widget,
+            self._is_float_widget,
+        ]
+        self._value_container_widget, self._value_container_layout = gremlin.ui.ui_common.getHContainer(widgets)
 
         self._value_container_layout.addWidget(QtWidgets.QLabel("Value:"))
         self._value_container_layout.addWidget(self._value_float_widget)
@@ -106,15 +111,19 @@ class OscValueWidget(QtWidgets.QWidget):
         self._value_container_layout.addStretch()
 
 
-        self.main_layout.addWidget(QtWidgets.QLabel(label),0,0)
-        self.main_layout.addWidget(self._value_container_widget,1,0)
-        self.main_layout.addWidget(QtWidgets.QWidget())
-        self.main_layout.setColumnStretch(1,2)
+        self.content_layout.addWidget(self._value_container_widget,0,0)
+        self.content_layout.addWidget(QtWidgets.QWidget(),0,1)
+        self.content_layout.setColumnStretch(0,2)
         
+        self.main_layout.addWidget(self.enabled_widget)
+        self.main_layout.addLayout(self.content_layout)
 
         self._update()
     
     def _update(self):
+
+        self._value_container_widget.setEnabled(self._enabled)
+
         int_visible = self._is_integer
         if int_visible:
             with QtCore.QSignalBlocker(self._is_int_widget):
@@ -130,6 +139,16 @@ class OscValueWidget(QtWidgets.QWidget):
                 self._is_float_widget.setChecked(True)
             self._value_int_widget.setVisible(False)
             self._value_float_widget.setVisible(True)
+
+    @QtCore.Slot(bool)
+    def _enabled_changed(self, enabled):
+        self._enabled = enabled
+        self.enabledChanged.emit(enabled)
+        self._update()
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
 
           
     @QtCore.Slot()
@@ -180,6 +199,8 @@ class OscInputWidget(QtWidgets.QWidget):
     enabledChanged = QtCore.Signal(bool) # fires when enabled status changes
     typePressChanged = QtCore.Signal(int) # fires when the type change
     typeReleaseChanged = QtCore.Signal(int) # fires when the type change
+    enableValueOnPressChanged = QtCore.Signal(bool) # send value on press enabled
+    enableValueOnReleaseChanged = QtCore.Signal(bool) # send value on release enabled
     
 
     def __init__(self, label = None, 
@@ -191,6 +212,8 @@ class OscInputWidget(QtWidgets.QWidget):
                  is_axis = False, 
                  min_value = 0, 
                  max_value = 1.0, 
+                 enable_press =  True,
+                 enable_release = True,
                  parent = None):
         super().__init__(parent)
 
@@ -210,7 +233,12 @@ class OscInputWidget(QtWidgets.QWidget):
         self._repeater_value = -1.0
 
         
+        # self._send_input_value_widget = QtWidgets.QRadioButton("Send input value")
+        # self._send_fixed_value_widget = QtWidgets.QRadioButton("Send fixed value")
 
+        # self._send_fixed_value_data_widget = gremlin.ui.ui_common.QFloatLineEdit()
+
+        
 
         
         self._is_enabled_widget = QtWidgets.QCheckBox("Enabled")
@@ -218,7 +246,6 @@ class OscInputWidget(QtWidgets.QWidget):
         self._is_enabled_widget.setChecked(self.enabled)
         self._is_enabled_widget.clicked.connect(self._enabled_changed)
 
-        
         self._axis_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self._axis_min_widget.setMinimum(0)
         self._axis_min_widget.setValue(min_value)
@@ -230,12 +257,7 @@ class OscInputWidget(QtWidgets.QWidget):
         self._axis_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=False,orientation=QtCore.Qt.Orientation.Horizontal, show_curve=False)
         self._axis_repeater_widget.setRange(min_value, max_value)
         
-
-        
-        self._axis_container_widget = QtWidgets.QWidget()
-        self._axis_container_widget.setContentsMargins(0,0,0,0)
-        self._axis_container_layout = QtWidgets.QHBoxLayout(self._axis_container_widget)
-
+        self._axis_container_widget, self._axis_container_layout = gremlin.ui.ui_common.getHContainer()
         
         self._axis_container_layout.addWidget(QtWidgets.QLabel("Range Min:"))
         self._axis_container_layout.addWidget(self._axis_min_widget)
@@ -244,12 +266,11 @@ class OscInputWidget(QtWidgets.QWidget):
         self._axis_container_layout.addWidget(self._axis_repeater_widget)
         self._axis_container_layout.addStretch()
 
-        self._container_widget = QtWidgets.QWidget()
-        self._container_widget.setContentsMargins(0,0,0,0)
-        self._container_layout = QtWidgets.QHBoxLayout(self._container_widget)
+        self._container_widget, self._container_layout = gremlin.ui.ui_common.getHContainer()
 
-        self._value_press_widget = OscValueWidget(label = "Press Value:", is_integer= is_press_integer)
-        self._value_release_widget = OscValueWidget(label = "Release Value:", is_integer = is_release_integer)
+
+        self._value_press_widget = OscValueWidget(label = "Press Value:", is_integer= is_press_integer, enabled = enable_press)
+        self._value_release_widget = OscValueWidget(label = "Release Value:", is_integer = is_release_integer, enabled = enable_release)
         
         self._value_press = value_press if value_press is not None else 1.0
         self._value_release = value_release if value_release is not None else 0.0
@@ -260,8 +281,12 @@ class OscInputWidget(QtWidgets.QWidget):
 
         self._value_press_widget.valueChanged.connect(self._value_press_changed)
         self._value_press_widget.typeChanged.connect(self._press_type_changed)
+        self._value_press_widget.enableValueOnPressChanged.connect(self._enable_press_changed)
         self._value_release_widget.valueChanged.connect(self._value_release_changed)
         self._value_release_widget.typeChanged.connect(self._release_type_changed)
+        self._value_press_widget.enableValueOnReleaseChanged.connect(self._enable_release_changed)
+        self._value_press_widget.enabledChanged.connect(self._enable_press_changed)
+        self._value_release_widget.enabledChanged.connect(self._enable_release_changed)
 
         self._container_layout.addWidget(self._value_press_widget)
         self._container_layout.addWidget(self._value_release_widget)
@@ -293,7 +318,7 @@ class OscInputWidget(QtWidgets.QWidget):
         self._value_press_widget.setVisible(not axis_visible)
         self._value_release_widget.setVisible(not axis_visible)
        
-        
+
         self._container_widget.setEnabled(self._is_enabled)
         self._axis_container_widget.setEnabled(self._is_enabled)
 
@@ -376,11 +401,26 @@ class OscInputWidget(QtWidgets.QWidget):
         self._update()
         self.enabledChanged.emit(checked)
 
+    @QtCore.Slot(bool)
+    def _enable_value_on_press_changed(self, checked):
+        self.enableValueOnPressChanged.emit(checked)
+
+    @QtCore.Slot(bool)
+    def _enable_value_on_release_changed(self, checked):
+        self.enableValueOnReleaseChanged.emit(checked)
             
     @QtCore.Slot()
     def _value_press_changed(self):
         ''' value changed'''
         self.valuePressChanged.emit()
+
+    @QtCore.Slot(bool)
+    def _enable_press_changed(self, enabled):
+        self.enableValueOnPressChanged.emit(enabled)
+
+    @QtCore.Slot(bool)
+    def _enable_release_changed(self, enabled):
+        self.enableValueOnReleaseChanged.emit(enabled)
 
     @QtCore.Slot()
     def _press_type_changed(self):        
@@ -483,6 +523,8 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
                                          is_axis = is_axis,
                                          min_value = self.action_data.v1_min_range,
                                          max_value = self.action_data.v1_max_range,
+                                         enable_press= self.action_data.v1_is_send_on_press_enabled,
+                                         enable_release = self.action_data.v1_is_send_on_release_enabled,
                                          )
         self._v1_widget.valuePressChanged.connect(self._v1_value_press_changed)
         self._v1_widget.valuePressChanged.connect(self._v1_value_release_changed)
@@ -490,6 +532,8 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._v1_widget.typePressChanged.connect(self._v1_press_type_changed)
         self._v1_widget.typeReleaseChanged.connect(self._v1_release_type_changed)
         self._v1_widget.rangeChanged.connect(self._v1_range_changed)
+        self._v1_widget.enableValueOnPressChanged.connect(self._v1_send_on_press_enabled_changed)
+        self._v1_widget.enableValueOnReleaseChanged.connect(self._v1_send_on_release_enabled_changed)
         
 
         self._v2_widget = OscInputWidget(label = "Parameter 2:",
@@ -501,6 +545,8 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
                                          is_axis = is_axis,
                                          min_value = self.action_data.v2_min_range,
                                          max_value = self.action_data.v2_max_range,
+                                         enable_press= self.action_data.v2_is_send_on_press_enabled,
+                                         enable_release = self.action_data.v2_is_send_on_release_enabled,
                                          )
         
 
@@ -624,6 +670,21 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _v2_release_type_changed(self, index):
         self.action_data.v2_is_release_integer = self._v2_widget.is_release_integer
       
+    @QtCore.Slot(bool)
+    def _v1_send_on_press_enabled_changed(self, enabled):
+        self.action_data.v1_is_send_on_press_enabled = enabled
+
+    @QtCore.Slot(bool)
+    def _v2_send_on_press_enabled_changed(self, enabled):
+        self.action_data.v2_is_send_on_press_enabled = enabled
+
+    @QtCore.Slot(bool)  
+    def _v1_send_on_release_enabled_changed(self, enabled):
+        self.action_data.v1_is_send_on_release_enabled = enabled
+
+    @QtCore.Slot(bool)
+    def _v2_send_on_release_enabled_changed(self, enabled):
+        self.action_data.v2_is_send_on_release_enabled = enabled        
 
     @QtCore.Slot()        
     def _v1_range_changed(self):
@@ -748,21 +809,21 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
 
             if event.is_pressed:
                 # send the command
-                if self.action_data.v1_enabled:
+                if self.action_data.v1_enabled and self.action_data.v1_is_send_on_press_enabled:
                     v1 = int(self.action_data.v1_press) if self.action_data.v1_is_press_integer else self.action_data.v1_press
                 else:
                     v1 = None
-                if self.action_data.v2_enabled:
+                if self.action_data.v2_enabled  and self.action_data.v2_is_send_on_press_enabled:
                     v2 = int(self.action_data.v2_press) if self.action_data.v2_is_press_integer else self.action_data.v1_press
                 else:
                     v2 = None
             else:
                 # send the command
-                if self.action_data.v1_enabled:
+                if self.action_data.v1_enabled and self.action_data.v1_is_send_on_release_enabled:
                     v1 = int(self.action_data.v1_release) if self.action_data.v1_is_release_integer else self.action_data.v1_release
                 else:
                     v1 = None
-                if self.action_data.v2_enabled:
+                if self.action_data.v2_enabled and self.action_data.v2_is_send_on_release_enabled:
                     v2 = int(self.action_data.v2_release) if self.action_data.v2_is_release_integer else self.action_data.v2_release
                 else:
                     v2 = None
@@ -819,6 +880,10 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
         self.v1_is_release_integer = False
         self.v2_is_press_integer = False
         self.v2_is_release_integer = False
+        self.v1_is_send_on_press_enabled = True
+        self.v2_is_send_on_press_enabled = True
+        self.v1_is_send_on_release_enabled = True
+        self.v2_is_send_on_release_enabled = True
         self.trigger_on_release = False # trigger on release
         self.v1_map_to_axis = False
         self.v2_map_to_axis = False
@@ -905,7 +970,19 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
         if "v2_min_range" in node.attrib:
             self.v2_min_range = safe_read(node,"v2_min_range", float, 0)
         if "v2_max_range" in node.attrib:
-            self.v2_max_range = safe_read(node,"v2_max_range", float, 1)            
+            self.v2_max_range = safe_read(node,"v2_max_range", float, 1)        
+
+        if "v1_send_on_press" in node.attrib:
+            self.v1_is_send_on_press_enabled = safe_read(node,"v1_send_on_press", bool, True)            
+
+        if "v2_send_on_press" in node.attrib:
+            self.v2_is_send_on_press_enabled = safe_read(node,"v2_send_on_press", bool, True)            
+
+        if "v1_send_on_release" in node.attrib:
+            self.v1_is_send_on_release_enabled = safe_read(node,"v1_send_on_release", bool, True)            
+
+        if "v2_send_on_release" in node.attrib:
+            self.v2_is_send_on_release_enabled = safe_read(node,"v2_send_on_release", bool, True)
         
 
         self.trigger_on_release = safe_read(node,"trigger_on_release", bool, False)
@@ -950,6 +1027,11 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
             node.set("v1_max_range", safe_format(self.v2_max_range, float))
         
         node.set("trigger_on_release", safe_format(self.trigger_on_release, bool))
+
+        node.set("v1_send_on_press", safe_format(self.v1_is_send_on_press_enabled, bool))
+        node.set("v2_send_on_press", safe_format(self.v2_is_send_on_press_enabled, bool))
+        node.set("v1_send_on_release", safe_format(self.v1_is_send_on_release_enabled, bool))
+        node.set("v2_send_on_release", safe_format(self.v2_is_send_on_release_enabled, bool))
 
         return node
 
