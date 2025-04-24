@@ -3115,10 +3115,13 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                 value = self.action_data.get_ranged_axis_value(value)
 
+                if value is None:
+                    value = event.value
+
                 # # syslog = logging.getLogger("system")
                 # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
 
-            action_value = gremlin.actions.Value(value)
+            action_value = gremlin.actions.Value(value = value, raw = event.raw_value, is_pressed = event.is_pressed)
 
         return self._process_event(event, action_value, extra_data)
 
@@ -3146,7 +3149,17 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
 
-            value = action_value.current
+            # read the valuy from the extra data if set
+            if extra_data is not None and "value" in extra_data:
+                value = extra_data["value"]
+            else:
+                value = action_value.current
+                if value is None:
+                    value = event.value
+
+            if value is None:
+                syslog.error("VJOYREMAP: invalid value for axis")
+                return 
 
             # axis mode
             match self.action_mode:
@@ -3583,10 +3596,11 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         ''' computes the output value for the current configuration  '''
 
         if value is None:
-            value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
-            # if self.input_is_hardware():
-            #     value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
-            # else:
+            if self.input_is_hardware():
+                value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+            else:
+                # only curve physical hardware
+                return value
             if value is None:
                 return 0
 

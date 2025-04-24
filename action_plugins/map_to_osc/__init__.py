@@ -39,7 +39,8 @@ import gremlin.sendinput
 from gremlin import input_devices
 import gremlin.ui.osc_device
 from gremlin.ui.osc_device import OscInterface, OscClient
-
+import logging
+syslog = logging.getLogger("system")
 
 class OscValueWidget(QtWidgets.QWidget):
     valueChanged = QtCore.Signal() # fires when the value changes 
@@ -694,15 +695,26 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
         self.config = action
         self.oscInterface = OscInterface()
         self.osc_client = None
+        self.valid = True
         
 
     def profile_start(self):
         ''' occurs when process starts '''
         device_name = gremlin.shared_state.get_device_name(self.action_data.hardware_device_guid)
-        self.osc_client = self.oscInterface.getClient(self.action_data.server_ip,
+        if gremlin.util.validateIp(self.action_data.server_ip):
+            self.osc_client = self.oscInterface.getClient(self.action_data.server_ip,
                                             self.action_data.server_port,                                            
                                             name=f"OSC {device_name}/{self.action_data.hardware_input_id}")
-        self.osc_client.start()
+            self.osc_client.start()
+            self.valid = True
+        else:
+            syslog.error(f"OSC SEND: invalid target IP: {self.action_data.server_ip}")
+            self.valid = False
+            return
+
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        if verbose:
+            syslog.info(f"OSC SEND: target: {self.action_data.server_ip} port: {self.action_data.server_port}")
 
     def profile_stop(self):
         if self.osc_client is not None:
@@ -710,8 +722,10 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
             self.osc_client = None
 
 
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
-
+    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None) -> bool:
+        if not self.valid:
+            return False
+        verbose = gremlin.config.Configuration().verbose_mode_osc
         is_axis = self.action_data.input_is_axis()
         if is_axis:
             # axis mode - compute the output values
@@ -753,10 +767,11 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
                 else:
                     v2 = None
 
-
+            if verbose: syslog.info(f"OSC SEND: sending {self.action_data.command}  v1: {v1:0.3f} v2: {v2:0.3f}")
             self.osc_client.send(self.action_data.command, v1, v2)
         
 
+        return True
         
 
 class MapToOsc(gremlin.base_profile.AbstractAction):

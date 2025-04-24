@@ -100,7 +100,6 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
         super().__init__()
         self.id = gremlin.util.get_guid() # unique node id, will be the container ID or the action ID for container or action nodes
         self.functors = [] # list of functors
-        self.exec_functors = None # holds a single functor, or a list of functors (any ruleset) - if a list - evaluates as a group - any member in the list can pass the whole list
         self.sequence = [] # list of sequence codes (action, condition) for the functor by index
        
         
@@ -285,12 +284,12 @@ class ExecutionGraphActionNode(ExecutionGraphNode):
     def to_string(self):
         functor : gremlin.base_profile.AbstractAction
         stub = ""
-        if isinstance(self.exec_functors, list):
-            for functor in self.exec_functors:
+        if isinstance(self.functors, list):
+            for functor in self.functors:
                 comment = f"Input: {functor.action_data.input_item.device_name} id: {functor.action_data.input_item.input_id} mode: {functor.action_data.input_item.profile_mode} {functor.action_data.comment if functor.action_data.comment else ''} | "
                 stub += f"Action: [{functor.__class__.__name__}] {comment}"
         else:
-            functor = self.exec_functors
+            functor = self.functors
             if functor is not None:
                 comment = f"Input: {functor.action_data.input_item.device_name} id: {functor.action_data.input_item.input_id} mode: {functor.action_data.input_item.profile_mode} {functor.action_data.comment if functor.action_data.comment else ''} | "
                 stub += f"Action: [{functor.__class__.__name__}] {comment}"
@@ -301,22 +300,28 @@ class ExecutionGraphActionNode(ExecutionGraphNode):
 
 class ExecutionGraphGateConditionNode(ExecutionGraphNode):
     ''' holds a gated axis gate condition in the execution graph '''
-    def __init__(self, exec_functor = None):
+    def __init__(self, functor = None):
         super().__init__(ExecutionGraphNodeType.GatedAxisGateCondition)
-        self.exec_functors = exec_functor
+        if not self.functors:
+            self.functors = []
+        self.functors.append(functor)
 
     def to_string(self):
-        stub = f"Gated Axis GATE Condition type: {self.exec_functors.condition_type.name}"
+        exec_functor = self.functors[0] if self.functors else None
+        stub = f"Gated Axis GATE Condition type: {exec_functor.condition_type.name if exec_functor else 'n/a'}"
         return f"{self.node_string()} {stub}"
     
 class ExecutionGraphRangeConditionNode(ExecutionGraphNode):
     ''' holds a gated axis gate condition in the execution graph '''
-    def __init__(self, exec_functor = None):
+    def __init__(self, functor = None):
         super().__init__(ExecutionGraphNodeType.GatedAxisRangeCondition)
-        self.exec_functors = exec_functor
+        if not self.functors:
+            self.functors = []
+        self.functors.append(functor)
 
     def to_string(self):
-        stub = f"Gated Axis GATE Condition type: {self.exec_functors.condition_type.name}"
+        exec_functor = self.functors[0] if self.functors else None
+        stub = f"Gated Axis GATE Condition type: {exec_functor.condition_type.name if exec_functor else 'n/a'}"
         return f"{self.node_string()} {stub}"      
     
 
@@ -843,7 +848,7 @@ class ExecutionContext():
                 sub_node.container = owner
                 sub_node.parent = node
                 functor = self._convert_condition(condition)
-                sub_node.exec_functors = functor
+                sub_node.functors.append(functor)
                 if not condition_nexus:
                     # all rule = nest conditions so they are all evaluated
                     node = sub_node
@@ -941,23 +946,23 @@ class ExecutionContext():
 
                 case ExecutionGraphNodeType.Condition:
                     # condition node
-                    functor_list = node.exec_functors
-                    node.functors = functor_list
+                    pass
+                    # functor_list = node.functors
+                    # node.functors = functor_list
 
                 case ExecutionGraphNodeType.GatedAxisGateCondition:
                     # gated condition node
-                    functor_list = node.exec_functors
-                    node.functors = functor_list
+                    pass
+                    # functor_list = node.functors
+                    # node.functors = functor_list
 
                 case ExecutionGraphNodeType.GatedAxisRangeCondition:
                     # gated condition node
-                    functor_list = node.exec_functors
-                    node.functors = functor_list
+                    pass
+                    # node.functors = functor_list
 
                 case ExecutionGraphNodeType.Action:
-                    functor_list = node.exec_functors
-                    node.functors = functor_list
-                    functors.append(functor_list)
+                    pass
 
             # traverse children
             for child in node.children:
@@ -1133,7 +1138,7 @@ class ExecutionContext():
 
                 action_node.container = container
                 functor = self._get_action_functor(action, action_node)
-                action_node.exec_functors = functor
+                action_node.functors.append(functor)
                 action_node.description = f"Action node: [{str(action)}]"
 
                 # build gate action execution subtree
@@ -1614,7 +1619,7 @@ class ContainerCallback:
         self.container = container
         self.node = None # entry point for this container - set on first call
         self.first_run = True
-        #self.execution_graph = ContainerExecutionGraph(container, parent)
+        self.execution_graph = ContainerExecutionGraph(container, parent)
 
     def __call__(self, event, value = None, extra_data : dict = None):
         """Executes the callback based on the event's content.
@@ -1738,419 +1743,420 @@ class VirtualButtonProcess(ContainerCallback):
         if verbose: syslog.info("VIRTUALBUTTON: execute FAIL")
 
 
-# class AbstractExecutionGraph(QtCore.QObject):
+class AbstractExecutionGraph(QtCore.QObject):
 
-#     """Abstract base class for all execution graph type classes.
+    """Abstract base class for all execution graph type classes.
 
-#     An execution graph consists of nodes which represent actions to execute and
-#     links which are transitions between nodes. Each node's execution returns
-#     a boolean value, indicating success or failure. The links allow skipping
-#     of nodes based on the outcome of a node's execution.
+    An execution graph consists of nodes which represent actions to execute and
+    links which are transitions between nodes. Each node's execution returns
+    a boolean value, indicating success or failure. The links allow skipping
+    of nodes based on the outcome of a node's execution.
 
-#     When there is no link for a given node and outcome combination the
-#     graph terminates.
-#     """
+    When there is no link for a given node and outcome combination the
+    graph terminates.
+    """
 
-#     graph_completed = QtCore.Signal(object) # fires when the process events have been all processed - parameter - the grap object just completed
+    graph_completed = QtCore.Signal(object) # fires when the process events have been all processed - parameter - the grap object just completed
 
-#     def __init__(self, instance, parent = None):
-#         """Creates a new execution graph based on the provided data.
+    def __init__(self, instance, parent = None):
+        """Creates a new execution graph based on the provided data.
 
-#         :param instance the object to use in order to generate the graph
-#         """
-#         super().__init__()
-#         self.functors = [] # functors for actions and action conditions
-#         self.transitions = {}
-#         self.current_index = 0
-#         self.run_event = Event()
-#         self.ec = ExecutionContext()
-#         self.instance = instance
-#         if parent is None:
-#             parent = self.ec.graph
-#         self._build_graph(instance, parent)
-#         el = gremlin.event_handler.EventListener()
-#         el.profile_stop.connect(self._profile_stop)
+        :param instance the object to use in order to generate the graph
+        """
+        super().__init__()
+        self.functors = [] # functors for actions and action conditions
+        self.transitions = {}
+        self.current_index = 0
+        self.run_event = Event()
+        self.ec = ExecutionContext()
+        self.instance = instance
+        if parent is None:
+            parent = self.ec.graph
+        self._build_graph(instance, parent)
+        el = gremlin.event_handler.EventListener()
+        el.profile_stop.connect(self._profile_stop)
 
-#     @QtCore.Slot()
-#     def _profile_stop(self):
-#         # abort if running
-#         self.run_event.set()
+    @QtCore.Slot()
+    def _profile_stop(self):
+        # abort if running
+        self.run_event.set()
 
 
   
 
-#     def process_event(self, event, value, extra_data : dict = None):
-#         """
+    def process_event(self, event, value, extra_data : dict = None):
+        """
         
-#         Runs the execution graph for the input.
+        Runs the execution graph for the input.
 
 
-#         #### CRITICAL EXECUTION PATH ####
+        #### CRITICAL EXECUTION PATH ####
 
-#         :param event the raw event that caused the execution of this graph
-#         :param value the possibly modified value extracted from the event
+        :param event the raw event that caused the execution of this graph
+        :param value the possibly modified value extracted from the event
 
 
-#         The list of functors is precomputed by ExecutionContext() when the profile is started as a sequence of functors that each take (event, value) as parameters and return True
-#         if the execution should continue.  A graph is used to represent all possible execution paths for a profile, including any nested items and dependencies as needed.
+        The list of functors is precomputed by ExecutionContext() when the profile is started as a sequence of functors that each take (event, value) as parameters and return True
+        if the execution should continue.  A graph is used to represent all possible execution paths for a profile, including any nested items and dependencies as needed.
 
-#         The build phase when the profile starts constructs the execution list in the correct order of evaluation for each bound input.  The hierarchy is observed, so high level conditions get evaluated before lower level conditions.
+        The build phase when the profile starts constructs the execution list in the correct order of evaluation for each bound input.  The hierarchy is observed, so high level conditions get evaluated before lower level conditions.
 
-#         Execution list contains functors, which can be grouped.  Grouped functors are evaluated as "any", or "on of" so any PASS (true) value means PASS for the whole group.
-#         The build phase constructs the groups as needed based on "any" or "all" condition states.
+        Execution list contains functors, which can be grouped.  Grouped functors are evaluated as "any", or "on of" so any PASS (true) value means PASS for the whole group.
+        The build phase constructs the groups as needed based on "any" or "all" condition states.
         
-#         If that at any point a functor returns False, the chain aborts (unless the functor is part of a group of functors, in which case all functors in the group would need to FAIL to fail the whole evaluation).
+        If that at any point a functor returns False, the chain aborts (unless the functor is part of a group of functors, in which case all functors in the group would need to FAIL to fail the whole evaluation).
 
-#         The tail end of the functor chain are the actions to execute.  
+        The tail end of the functor chain are the actions to execute.  
 
-#         This means execution follows the short-cut model if conditions fail.
+        This means execution follows the short-cut model if conditions fail.
 
-#         """
-        
-#         self.run_event.clear()
+        """
+        return True
+    
+        self.run_event.clear()
 
-#         ec = ExecutionContext()
-#         # functor_map = ec.functor_map
-#         config = gremlin.config.Configuration()
-#         verbose = config.verbose_mode_condition
-#         # validate = verbose
-#         # verbose_detailed = False
-#         if verbose:
-#             gremlin.shared_state.pushLog()
+        ec = ExecutionContext()
+        # functor_map = ec.functor_map
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_condition
+        # validate = verbose
+        # verbose_detailed = False
+        if verbose:
+            gremlin.shared_state.pushLog()
 
-#         try:
+        try:
      
             
-#             # regular functors
-#             for functor in self.functors:
+            # regular functors
+            for functor in self.functors:
 
-#                 #result = True # assume pass
+                #result = True # assume pass
 
-#                 if isinstance(functor, gremlin.actions.ActivationCondition):
-#                     # if not event.is_pressed:
-#                     #     pass
-#                     result = functor.process_event(event, value, extra_data)
-#                     if not result:
-#                         return False
-#                     continue # next functor
+                if isinstance(functor, gremlin.actions.ActivationCondition):
+                    # if not event.is_pressed:
+                    #     pass
+                    result = functor.process_event(event, value, extra_data)
+                    if not result:
+                        return False
+                    continue # next functor
 
-#                 id = functor.id
-#                 result = ec.execute_functor_id(id, event, value, extra_data)
-#                 if not result:
-#                     break
+                id = functor.id
+                result = ec.execute_functor_id(id, event, value, extra_data)
+                if not result:
+                    break
              
-#             return result
-#         finally:
-#             self.graph_completed.emit(self)
-#             if verbose:
-#                 gremlin.shared_state.popLog()
+            return result
+        finally:
+            self.graph_completed.emit(self)
+            if verbose:
+                gremlin.shared_state.popLog()
 
-#     def _build_graph(self, instance, parent_node = None):
-#         """Builds the graph structure based on the given object's content.
+    def _build_graph(self, instance, parent_node = None):
+        """Builds the graph structure based on the given object's content.
 
-#         :param instance the object to use in order to generate the graph
-#         """
-#         pass
+        :param instance the object to use in order to generate the graph
+        """
+        pass
 
-#     def _convert_condition(self, condition):
-#         ''' converts a base condition to an action condition '''
-#         if isinstance(condition, gremlin.base_conditions.KeyboardCondition):
-#                 return gremlin.actions.KeyboardCondition(
-#                         condition.scan_code,
-#                         condition.is_extended,
-#                         condition.comparison
-#                     )
+    def _convert_condition(self, condition):
+        ''' converts a base condition to an action condition '''
+        if isinstance(condition, gremlin.base_conditions.KeyboardCondition):
+                return gremlin.actions.KeyboardCondition(
+                        condition.scan_code,
+                        condition.is_extended,
+                        condition.comparison
+                    )
                 
-#         elif isinstance(condition, gremlin.base_conditions.JoystickCondition):
-#             return gremlin.actions.JoystickCondition(condition)
+        elif isinstance(condition, gremlin.base_conditions.JoystickCondition):
+            return gremlin.actions.JoystickCondition(condition)
             
-#         elif isinstance(condition, gremlin.base_conditions.VJoyCondition):
-#             return gremlin.actions.VJoyCondition(condition)
+        elif isinstance(condition, gremlin.base_conditions.VJoyCondition):
+            return gremlin.actions.VJoyCondition(condition)
             
-#         elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
-#             return gremlin.actions.InputActionCondition(condition.comparison)
+        elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
+            return gremlin.actions.InputActionCondition(condition.comparison)
         
-#         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
-        
-
-#     def _create_activation_condition(self, activation_condition, target, is_container_condition = False):
-#         """Creates activation condition objects base on the given data.
-
-#         :param activation_condition data about activation condition to be
-#             used in order to generate executable nodes
-#         """
-#         conditions = []
-#         for condition in activation_condition.conditions:
-#             if isinstance(condition, gremlin.base_conditions.ActivationCondition):
-#                 for sub_condition in condition.conditions:
-#                     conditions.append(self._convert_condition(sub_condition))
-#             else:
-#                 conditions.append(self._convert_condition(condition))
-
-#         return gremlin.actions.ActivationCondition(
-#             conditions,
-#             activation_condition.rule,
-#             target,
-#             is_container_condition =is_container_condition
-#         )
-
-#     def _contains_input_action_condition(self, activation_condition):
-#         """Returns whether or not an input action condition is present.
-
-#         :param activation_condition condition data to check for the existence
-#             of an input action
-#         :return return True if an input action is present, False otherwise
-#         """
-#         if activation_condition:
-#             return any([
-#                 isinstance(cond, gremlin.base_conditions.InputActionCondition)
-#                 for cond in activation_condition.conditions
-#             ])
-#         else:
-#             return False
-
-#     def _create_transitions(self, sequence):
-#         """Creates node transition based on the node type sequence information.
-
-#         :param sequence the sequence of nodes
-#         """
-#         seq_count = len(sequence)
-#         self.transitions = {}
-#         for i, seq in enumerate(sequence):
-#             if seq != "Action":  # container 
-#                 # On success, transition to the next node of any type in line
-#                 self.transitions[(i, True)] = i+1 if i+1 < seq_count else None
-#                 offset = i + 1
-#                 # On failure, transition to the condition node after the
-#                 # next action node
-#                 while offset < seq_count:
-#                     if sequence[offset] == "Action":
-#                         if offset+1 < seq_count:
-#                             self.transitions[(i, False)] = offset+1
-#                             break
-#                     offset += 1
-#             elif seq == "Action" and i+1 < seq_count:
-#                 # Transition to the next node irrespective of failure or success
-#                 self.transitions[(i, True)] = i+1
-#                 self.transitions[(i, False)] = i+1
-
+        assert False, f"Invalid base condition to convert: {type(condition).__name__}"
         
 
-# class ContainerExecutionGraph(AbstractExecutionGraph):
+    def _create_activation_condition(self, activation_condition, target, is_container_condition = False):
+        """Creates activation condition objects base on the given data.
 
-#     """Execution graph for the content of a single container."""
+        :param activation_condition data about activation condition to be
+            used in order to generate executable nodes
+        """
+        conditions = []
+        for condition in activation_condition.conditions:
+            if isinstance(condition, gremlin.base_conditions.ActivationCondition):
+                for sub_condition in condition.conditions:
+                    conditions.append(self._convert_condition(sub_condition))
+            else:
+                conditions.append(self._convert_condition(condition))
 
-#     def __init__(self, container, parent = None):
-#         """Creates a new instance for a specific container.
+        return gremlin.actions.ActivationCondition(
+            conditions,
+            activation_condition.rule,
+            target,
+            is_container_condition =is_container_condition
+        )
 
-#         :param container the container data from which to generate the
-#             execution graph
-#         """
-#         assert isinstance(container, gremlin.base_profile.AbstractContainer)
+    def _contains_input_action_condition(self, activation_condition):
+        """Returns whether or not an input action condition is present.
+
+        :param activation_condition condition data to check for the existence
+            of an input action
+        :return return True if an input action is present, False otherwise
+        """
+        if activation_condition:
+            return any([
+                isinstance(cond, gremlin.base_conditions.InputActionCondition)
+                for cond in activation_condition.conditions
+            ])
+        else:
+            return False
+
+    def _create_transitions(self, sequence):
+        """Creates node transition based on the node type sequence information.
+
+        :param sequence the sequence of nodes
+        """
+        seq_count = len(sequence)
+        self.transitions = {}
+        for i, seq in enumerate(sequence):
+            if seq != "Action":  # container 
+                # On success, transition to the next node of any type in line
+                self.transitions[(i, True)] = i+1 if i+1 < seq_count else None
+                offset = i + 1
+                # On failure, transition to the condition node after the
+                # next action node
+                while offset < seq_count:
+                    if sequence[offset] == "Action":
+                        if offset+1 < seq_count:
+                            self.transitions[(i, False)] = offset+1
+                            break
+                    offset += 1
+            elif seq == "Action" and i+1 < seq_count:
+                # Transition to the next node irrespective of failure or success
+                self.transitions[(i, True)] = i+1
+                self.transitions[(i, False)] = i+1
+
         
-#         super().__init__(container, parent)
 
-#     def _build_graph(self, container, parent = None):
-#         """Builds the graph structure based on the container's content.
+class ContainerExecutionGraph(AbstractExecutionGraph):
 
-#         :param container data to use in order to generate the graph
-#         """
+    """Execution graph for the content of a single container."""
+
+    def __init__(self, container, parent = None):
+        """Creates a new instance for a specific container.
+
+        :param container the container data from which to generate the
+            execution graph
+        """
+        assert isinstance(container, gremlin.base_profile.AbstractContainer)
+        
+        super().__init__(container, parent)
+
+    def _build_graph(self, container, parent = None):
+        """Builds the graph structure based on the container's content.
+
+        :param container data to use in order to generate the graph
+        """
 
 
-#         verbose = gremlin.config.Configuration().verbose_mode_details
+        verbose = gremlin.config.Configuration().verbose_mode_details
 
-#         sequence = []
+        sequence = []
 
-#         # tree node for this container
-#         node = ExecutionGraphContainerNode()
-#         node.container = container
-#         node.parent = parent
-#         node.mode = container.profile_mode
+        # tree node for this container
+        node = ExecutionGraphContainerNode()
+        node.container = container
+        node.parent = parent
+        node.mode = container.profile_mode
     
 
-#         container_plugins = gremlin.plugin_manager.ContainerPlugins()
+        container_plugins = gremlin.plugin_manager.ContainerPlugins()
 
-#         # If container based conditions exist add them before any actions
-#         if container.has_conditions: 
-#             functor = self._create_activation_condition(container.activation_condition, container, is_container_condition = True)
-#             self.functors.append(functor)
-#             node.functors.append(functor)
-#             container_plugins.register_functor(functor)
-#             sequence.append("ContainerCondition")
-#             node.sequence.append("ContainerCondition")
+        # If container based conditions exist add them before any actions
+        if container.has_conditions: 
+            functor = self._create_activation_condition(container.activation_condition, container, is_container_condition = True)
+            self.functors.append(functor)
+            node.functors.append(functor)
+            container_plugins.register_functor(functor)
+            sequence.append("ContainerCondition")
+            node.sequence.append("ContainerCondition")
 
 
-#         functor = container.functor(container, node)
-#         node.functors.append(functor)
+        functor = container.functor(container, node)
+        node.functors.append(functor)
         
-#         if verbose:
-#             syslog.info(f"Enable container functor: {type(functor).__name__}")
+        if verbose:
+            syslog.info(f"Enable container functor: {type(functor).__name__}")
 
-#         extra_inputs = functor.latch_extra_inputs()
-#         if extra_inputs:
-#             # register the extra inputs for this functor
-#             eh = gremlin.event_handler.EventHandler()
-#             mode = container.profile_mode
-#             for device_guid, input_type, input_id in extra_inputs:
+        extra_inputs = functor.latch_extra_inputs()
+        if extra_inputs:
+            # register the extra inputs for this functor
+            eh = gremlin.event_handler.EventHandler()
+            mode = container.profile_mode
+            for device_guid, input_type, input_id in extra_inputs:
                 
-#                 event = gremlin.event_handler.Event(
-#                         event_type= input_type,
-#                         device_guid = device_guid,
-#                         identifier= input_id
-#                 )
-#                 eh.add_latched_functor(device_guid, mode, event, functor)
-                
-
-#         container_plugins.register_functor(functor)
-#         self.functors.append(functor)
-#         sequence.append("Action")
-
-#         node.functors.append(functor)
-#         node.sequence.append("Action")
-
-#         self._create_transitions(sequence)
-#         # ec = ExecutionContext()
-#         # ec.registerNode(node)
-        
-
-# class ActionSetExecutionGraph(AbstractExecutionGraph):
-
-#     """Execution graph for the content of a set of actions."""
-
-#     comparison_map = {
-#         (True, True): "always",
-#         (True, False): "pressed",
-#         (False, True): "released"
-#     }
-
-#     def __init__(self, action_set, parent = None):
-#         """Creates a new instance for a specific set of actions.
-
-#         :param action_set the set of actions from which to generate the
-#             execution graph
-#         """
-#         super().__init__(action_set, parent)
-
-
-#     def _build_graph(self, action_set, parent = None):
-#         """Builds the graph structure based on the content of the action set.
-
-#         :param action_set data to use in order to generate the graph
-#         """
-#         # The action set shouldn't be empty, but in case this happens
-#         # nonetheless we abort
-#         if len(action_set) == 0:
-#             return
-        
-#         ec = ExecutionContext()
-        
-#         verbose = gremlin.config.Configuration().verbose_mode_details
-
-#         sequence = []
-
-#         add_default_activation = False
-
-#         nodes = {} # list of tree nodes at this level created for each action in the actions sets
-#         #node_list = []
-
-#         # Reorder action set entries such that if any remap action is
-#         # present it is executed last (after a curving action for example) (unless it's a mode switch action - mode switching must happen last because it changes the action list)
-#         ordered_action_set = []
-#         if verbose:
-#             syslog.info("Ordering action sets:")
-#         for action in action_set:
-
-
-#             action_set_node = ExecutionGraphActionSetNode()
-#             action_set_node.parent = parent
-
-#             # if not isinstance(action, action_plugins.remap.Remap):
-#             priority = 0
-#             if hasattr(action, "priority"):
-#                 priority = action.priority
-#             ordered_action_set.append((priority, action))
-#             if verbose:
-#                 syslog.info(f"\tadding action: {type(action)} priority: {priority} data: {str(action)}" )
-
-#             node = ExecutionGraphActionNode()
-#             node.parent = action_set_node
-#             node.action = action
-#             functor = ec._get_action_functor(action, node)
-#             node.exec_functors = functor
-#             node.priority = priority
-#             nodes[action] = node
-
-
-
-#         if len(ordered_action_set) > 1:
-#             ordered_action_set.sort(key = lambda x: x[0])
-#         ordered_action_set = [x[1] for x in ordered_action_set]
-
-
-#         if verbose:
-#             syslog.info("Action order:")
-#             for index, action in enumerate(ordered_action_set):
-#                 input_item = action.input_item # get_input_item()
-#                 input_id = input_item.input_id
-#                 input_stub = str(input_id)
-#                 syslog.info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
-
-
-#         # Create functors
-#         for action in ordered_action_set:
-#             # Create conditions for each action if needed
-#             if action.has_conditions:
-#                 functor = self._create_activation_condition(action.activation_condition,action)
-#                 self.functors.append(functor)
-#                 sequence.append("Condition")
-#                 nodes[action].functors.append(functor)
-
-#             # Create default activation condition if needed
-#             has_input_action = self._contains_input_action_condition(action.activation_condition)
-
-#             if add_default_activation and not has_input_action:
-#                 condition = gremlin.base_conditions.InputActionCondition()
-#                 condition.comparison = ActionSetExecutionGraph.comparison_map[action.default_button_activation]
-
-#                 activation_condition = gremlin.base_conditions.ActivationCondition([condition], gremlin.actions.ActivationRule.All)
-#                 functor = self._create_activation_condition(activation_condition, action)
-#                 self.functors.append(functor)
-#                 sequence.append("Condition")
-#                 nodes[action].functors.append(functor)
-#                 nodes[action].sequence.append("Condition")
+                event = gremlin.event_handler.Event(
+                        event_type= input_type,
+                        device_guid = device_guid,
+                        identifier= input_id
+                )
+                eh.add_latched_functor(device_guid, mode, event, functor)
                 
 
-#             # Create action functor
-#             functor : gremlin.base_conditions.AbstractFunctor = action.functor(action, nodes[action])
-#             extra_inputs = functor.latch_extra_inputs()
-#             if extra_inputs:
-#                 # register the extra inputs for this functor
-#                 eh = gremlin.event_handler.EventHandler()
-#                 # add_latched_functor(self, device_guid, mode, event, functor):
-#                 mode = action.profile_mode
-#                 for device_guid, input_type, input_id in extra_inputs:
+        container_plugins.register_functor(functor)
+        self.functors.append(functor)
+        sequence.append("Action")
+
+        node.functors.append(functor)
+        node.sequence.append("Action")
+
+        self._create_transitions(sequence)
+        # ec = ExecutionContext()
+        # ec.registerNode(node)
+        
+
+class ActionSetExecutionGraph(AbstractExecutionGraph):
+
+    """Execution graph for the content of a set of actions."""
+
+    comparison_map = {
+        (True, True): "always",
+        (True, False): "pressed",
+        (False, True): "released"
+    }
+
+    def __init__(self, action_set, parent = None):
+        """Creates a new instance for a specific set of actions.
+
+        :param action_set the set of actions from which to generate the
+            execution graph
+        """
+        super().__init__(action_set, parent)
+
+
+    def _build_graph(self, action_set, parent = None):
+        """Builds the graph structure based on the content of the action set.
+
+        :param action_set data to use in order to generate the graph
+        """
+        # The action set shouldn't be empty, but in case this happens
+        # nonetheless we abort
+        if len(action_set) == 0:
+            return
+        
+        ec = ExecutionContext()
+        
+        verbose = gremlin.config.Configuration().verbose_mode_details
+
+        sequence = []
+
+        add_default_activation = False
+
+        nodes = {} # list of tree nodes at this level created for each action in the actions sets
+        #node_list = []
+
+        # Reorder action set entries such that if any remap action is
+        # present it is executed last (after a curving action for example) (unless it's a mode switch action - mode switching must happen last because it changes the action list)
+        ordered_action_set = []
+        if verbose:
+            syslog.info("Ordering action sets:")
+        for action in action_set:
+
+
+            action_set_node = ExecutionGraphActionSetNode()
+            action_set_node.parent = parent
+
+            # if not isinstance(action, action_plugins.remap.Remap):
+            priority = 0
+            if hasattr(action, "priority"):
+                priority = action.priority
+            ordered_action_set.append((priority, action))
+            if verbose:
+                syslog.info(f"\tadding action: {type(action)} priority: {priority} data: {str(action)}" )
+
+            node = ExecutionGraphActionNode()
+            node.parent = action_set_node
+            node.action = action
+            functor = ec._get_action_functor(action, node)
+            node.functors.append(functor)
+            node.priority = priority
+            nodes[action] = node
+
+
+
+        if len(ordered_action_set) > 1:
+            ordered_action_set.sort(key = lambda x: x[0])
+        ordered_action_set = [x[1] for x in ordered_action_set]
+
+
+        if verbose:
+            syslog.info("Action order:")
+            for index, action in enumerate(ordered_action_set):
+                input_item = action.input_item # get_input_item()
+                input_id = input_item.input_id
+                input_stub = str(input_id)
+                syslog.info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
+
+
+        # Create functors
+        for action in ordered_action_set:
+            # Create conditions for each action if needed
+            if action.has_conditions:
+                functor = self._create_activation_condition(action.activation_condition,action)
+                self.functors.append(functor)
+                sequence.append("Condition")
+                nodes[action].functors.append(functor)
+
+            # Create default activation condition if needed
+            has_input_action = self._contains_input_action_condition(action.activation_condition)
+
+            if add_default_activation and not has_input_action:
+                condition = gremlin.base_conditions.InputActionCondition()
+                condition.comparison = ActionSetExecutionGraph.comparison_map[action.default_button_activation]
+
+                activation_condition = gremlin.base_conditions.ActivationCondition([condition], gremlin.actions.ActivationRule.All)
+                functor = self._create_activation_condition(activation_condition, action)
+                self.functors.append(functor)
+                sequence.append("Condition")
+                nodes[action].functors.append(functor)
+                nodes[action].sequence.append("Condition")
+                
+
+            # Create action functor
+            functor : gremlin.base_conditions.AbstractFunctor = action.functor(action, nodes[action])
+            extra_inputs = functor.latch_extra_inputs()
+            if extra_inputs:
+                # register the extra inputs for this functor
+                eh = gremlin.event_handler.EventHandler()
+                # add_latched_functor(self, device_guid, mode, event, functor):
+                mode = action.profile_mode
+                for device_guid, input_type, input_id in extra_inputs:
                     
-#                     event = gremlin.event_handler.Event(
-#                             event_type= input_type,
-#                             device_guid = device_guid,
-#                             identifier= input_id
-#                     )
-#                     # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-#                     # print (f"Added extra functor: {device_name} mode: {mode} event: {str(event)} ")
-#                     eh.add_latched_functor(device_guid, mode, event, functor)
+                    event = gremlin.event_handler.Event(
+                            event_type= input_type,
+                            device_guid = device_guid,
+                            identifier= input_id
+                    )
+                    # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                    # print (f"Added extra functor: {device_name} mode: {mode} event: {str(event)} ")
+                    eh.add_latched_functor(device_guid, mode, event, functor)
                 
 
-#             action.setEnabled(True)
-#             self.functors.append(functor)
-#             sequence.append("Action")
-#             nodes[action].functors.append(functor)
-#             nodes[action].sequence.append("Action")
+            action.setEnabled(True)
+            self.functors.append(functor)
+            sequence.append("Action")
+            nodes[action].functors.append(functor)
+            nodes[action].sequence.append("Action")
 
 
-#         self._create_transitions(sequence)
-#         # ec = ExecutionContext()
-#         # for node in node_list:
-#         #     ec.registerNode(node)
+        self._create_transitions(sequence)
+        # ec = ExecutionContext()
+        # for node in node_list:
+        #     ec.registerNode(node)
 
 
 

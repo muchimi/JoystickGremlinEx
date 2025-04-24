@@ -1878,3 +1878,14 @@ def valueInRange(value, r1, r2):
         # swap
         r2, r1 = r1, r2
     return value >= r1 and value <= r2
+
+
+def validateIp(ip_address : str) -> bool:
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(ip_address)
+        return True
+    except:
+        pass
+    return False
+ 

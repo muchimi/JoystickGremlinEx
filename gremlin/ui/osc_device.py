@@ -1851,7 +1851,6 @@ class OscInterface(QtCore.QObject):
         if verbose:
             # syslog = logging.getLogger("system")
             syslog.info(f"OSC: output host changed to: {value}")
-
         self.target_server = value
 
 
@@ -1895,9 +1894,14 @@ class OscInterface(QtCore.QObject):
         add_list = []
         for key, client in self._client_pool.items():
             if server is not None:
+                if not gremlin.util.validateIp(server):    
+                    continue
                 client._server_ip = server
             if port is not None:
                 client._output_port = port
+            if not gremlin.util.validateIp(key[0]):
+                remove_list.append(key)
+                continue
             new_key = (client._server_ip, client._output_port)
             if key != new_key:
                 add_list.append((new_key, client))

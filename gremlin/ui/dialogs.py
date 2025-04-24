@@ -1085,7 +1085,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         remote_host_ip_widget = ui_common.QDataIPLineEdit()
         remote_host_ip_widget.setText(self.config.osc_host)
         remote_host_ip_widget.setEnabled(self.config.osc_enabled)
-        remote_host_ip_widget.textChanged.connect(self._osc_host)
+        remote_host_ip_widget.lostFocus.connect(self._osc_host_exit)
         remote_host_ip_widget.setMinimumWidth(w)
         remote_host_ip_widget.setMaximumWidth(w)
 
@@ -1527,11 +1527,13 @@ This setting is also available on a profile by profile basis on the profile tab,
         el.osc_input_port_changed.emit()
 
     @QtCore.Slot()
-    def _osc_host(self):
+    def _osc_host_exit(self):
         widget = self.sender()
-        self.config.osc_host = widget.text()
-        el = gremlin.event_handler.EventListener()
-        el.osc_output_server_changed.emit()
+        ip = widget.text()
+        if gremlin.util.validateIp(ip):
+            self.config.osc_host = ip
+            el = gremlin.event_handler.EventListener()
+            el.osc_output_server_changed.emit()
 
 
     @QtCore.Slot(bool)

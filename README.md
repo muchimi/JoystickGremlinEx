@@ -307,12 +307,15 @@ T34
 - New: Upgrade to Pyside6 6.9
 - Fix: MSFS interface will unload the SimConnect DLL on profile stop.  This ensures any DLL settings are not persisted across sessions.
 - API: increased time to get buffer data from MSFS to 100 ms per attempt as some requests would fail.  
-
 T35
 - API: new SelfTriggerFunctor base class to handle containers that do their own execution switching.  These container functors can have multiple action groups that execute based on container options and input values.
 - API: Container node callback checks for condition parent by default.
 - Fix: refactored to use new API to Chain, Sequence, Range, SmartToggle, Switch, Tempo, Button, TempoEx and Tick containers.  This fix is intended to resolve multiple potential execution issues with the new execution graph model for complex containers and their associated conditions.
-
+T36
+- OSC: fix send and receive (was using old API)
+- Fix: some IDs were not saving properly
+- Fix: some actions not executing at all in some situations.  
+- API: added check for well formed IP address
 
 
 ## 13.40.16ex (pre-release)
