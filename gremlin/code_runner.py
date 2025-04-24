@@ -140,6 +140,7 @@ class CodeRunner:
         build_error = ec.getLastBuildError()
         if build_error:
             syslog.error("Error building execution tree - aborting start.")
+            self.stop()
             return False
 
         config = gremlin.config.Configuration()

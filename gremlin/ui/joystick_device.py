@@ -390,6 +390,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         else:
             new_container = plugin_manager.duplicate(container, self.item_data)
+            new_container.generateGuids()
             container_list.append(new_container)
 
         if container_list:
