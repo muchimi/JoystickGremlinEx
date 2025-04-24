@@ -522,7 +522,7 @@ class AbstractSelfTriggerFunctor(AbstractFunctor):
         container_node = self._ec.find(self.action_data)
 
         if not container_node:
-            syslog.error("Unable to find this action in the execution tree")
+            syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
             self._valid = False
             return
         

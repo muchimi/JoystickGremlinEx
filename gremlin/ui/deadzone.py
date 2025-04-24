@@ -425,7 +425,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         values[index] = value
         self.setValues(values)
         # print (f"index {index} value: {value} Values: {values}  left range: {self.left_slider.values} {self.left_slider.range()}  right range: {self.right_slider.values} {self.right_slider.range()}")
-
+        self.changed.emit()
         
 
             

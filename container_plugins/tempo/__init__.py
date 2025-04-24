@@ -274,7 +274,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         container_node = ec.find(self.action_data)
 
         if not container_node:
-            syslog.error("Unable to find this action in the execution tree")
+            syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
             self.valid = False
             return
 

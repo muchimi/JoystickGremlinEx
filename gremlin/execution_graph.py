@@ -1402,7 +1402,7 @@ class ExecutionContext():
                         if hasattr(callback, "id"):
                             id = callback.id
                         else:
-                            if self._verbose_exec: syslog.warning(f"EC: cannot find execution node for callback: {callback}")
+                            syslog.error(f"EXEC: cannot find execution node for callback: {callback}")
                             continue
 
                         if self._verbose_exec: syslog.info(f"Looking for id: {id}")
@@ -1620,6 +1620,10 @@ class ContainerCallback:
         self.node = None # entry point for this container - set on first call
         self.first_run = True
         self.execution_graph = ContainerExecutionGraph(container, parent)
+
+    @property
+    def id(self) -> str:
+        return self.container.id
 
     def __call__(self, event, value = None, extra_data : dict = None):
         """Executes the callback based on the event's content.
