@@ -1,0 +1,6 @@
+site_name: GremlinEx
+site_url: https://github.com/muchimi/JoystickGremlinEx
+theme:
+  name: material
+plugins:
+  - search
