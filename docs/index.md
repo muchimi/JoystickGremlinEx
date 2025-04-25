@@ -1,4 +1,4 @@
-# GremlinEx Overview
+# Overview
 
 (this documentation is a work in progress)
 

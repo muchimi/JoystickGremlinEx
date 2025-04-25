@@ -2,7 +2,19 @@ site_name: GremlinEx
 site_url: https://github.com/muchimi/JoystickGremlinEx
 theme:
   name: material
+  features:
+      - navigation.tabs
+      - navigation.tabs.sticky  
 plugins:
   - search
 markdown_extensions:
   - attr_list
+  - toc:
+      permalink: true
+      toc_depth: 3
+nav:
+  - Home: index.md
+  - Overview: overview.md
+  - Usage: usage.md
+  - Resources: resources.md
+  - Credits: credits.md

@@ -12,7 +12,7 @@
       
       
       
-        <link rel="next" href="resources/">
+        <link rel="next" href="overview/">
       
       
       <link rel="icon" href="assets/images/favicon.png">
@@ -62,7 +62,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gremlinex-overview" class="md-skip">
+        <a href="#overview" class="md-skip">
           Skip to content
         </a>
       
@@ -76,7 +76,7 @@
 
   
 
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
       
@@ -98,7 +98,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              GremlinEx Overview
+              Home
             
           </span>
         </div>
@@ -153,13 +153,119 @@
     
   </nav>
   
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
-        
-          
         
       
       <main class="md-main" data-md-component="main">
@@ -173,8 +279,10 @@
                     
 
 
+  
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
       
@@ -208,7 +316,7 @@
   
   
   <span class="md-ellipsis">
-    GremlinEx Overview
+    Home
     
   </span>
   
@@ -221,7 +329,7 @@
   
   
   <span class="md-ellipsis">
-    GremlinEx Overview
+    Home
     
   </span>
   
@@ -303,6 +411,50 @@
   
   
     <li class="md-nav__item">
+      <a href="overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="resources/" class="md-nav__link">
         
   
@@ -325,12 +477,12 @@
   
   
     <li class="md-nav__item">
-      <a href="welcome/" class="md-nav__link">
+      <a href="credits/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    What is GremlinEx?
+    Credits
     
   </span>
   
@@ -427,9 +579,9 @@
 
 
 
-<h1 id="gremlinex-overview">GremlinEx Overview</h1>
+<h1 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h1>
 <p>(this documentation is a work in progress)</p>
-<h2 id="what-is-gremlinex">What is GremlinEx?</h2>
+<h2 id="what-is-gremlinex">What is GremlinEx?<a class="headerlink" href="#what-is-gremlinex" title="Permanent link">&para;</a></h2>
 <p>GremlinEx is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.</p>
 <p>GremlinEx is independent from any controller software.  It does not require you to run any specific software from a hardware manufacturer to "map" the device.  So long as the device shows up on Windows as an HID device with axes and buttons, GremlinEx will let you map this input.  It is vendor agnostic and relies on standard APIs that are not vendor specific. GremlinEx works with any HID compliant controller device, so supports any device up to eight (8) axes, up to a hundred and twenty eight (128) buttons, and up to four (4) hats.</p>
 <p>There is no limit to the number of input devices GremlinEx supports.</p>
@@ -439,9 +591,9 @@
 <p>GremlinEx includes a number of built-in containers to solve common mapping scenarios, such as short press versus long press, axis in a certain zone, macros and chaining.</p>
 <p>GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and touch-devices on the network, and update the devices back.</p>
 <p>GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.</p>
-<h2 id="resources-and-help">Resources and help</h2>
+<h2 id="resources-and-help">Resources and help<a class="headerlink" href="#resources-and-help" title="Permanent link">&para;</a></h2>
 <p><img alt="Discord Icon" src="assets/discord_small.png" />&nbsp;Please join our  <a href="https://discord.gg/pNadcReth9">GremlinEx Discord</a> server!</p>
-<h2 id="history">History</h2>
+<h2 id="history">History<a class="headerlink" href="#history" title="Permanent link">&para;</a></h2>
 <p>GremlinEx is based on a fork from the 2019 <a href="https://whitemagic.github.io/JoystickGremlin/">Joystick Gremlin by Whitemagic</a>.  GremlinEx builds on that excellent software and its concepts, and incorporates notable modifications and enhancements:</p>
 <ul>
 <li>x64 bit support and current Python environments/libraries</li>
@@ -460,7 +612,7 @@
 <p>GremlinEx makes an attempt to keep with the philosophy of the original project as much as possible, and I am grateful to WhiteMagic and his excellent ideas and concept: Joystick Gremlin remains one of the best mapping utilities I have ever seen or used in decades of simulation and hardware input mapping to games.  The architecture is elegant and served as a launchpad for GremlinEx.</p>
 <p>GremlinEx is in active development and thus may include bugs and issues refered to as dragons.  Rather than releasing new features and fixes sporadically, I have adopted an open development model where pre-releases are posted to the dev branch for you to use as the features and fixes are implemented.  Some are more bleeding edge than others.</p>
 <p>The benefits of open development outweigh the drawbacks, it encourages feedback and input from the community. I appreciate the patience as not everything will work in every pre-release patch as expected, that is part of the process.</p>
-<h2 id="what-can-i-do-with-gremlinex">What can I do with GremlinEx?</h2>
+<h2 id="what-can-i-do-with-gremlinex">What can I do with GremlinEx?<a class="headerlink" href="#what-can-i-do-with-gremlinex" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Integrate devices from multiple vendors without the need to use proprietary software.</li>
 <li>Take input from one or more devices, physical or virtual, and remap that output to a VJOY joystick.</li>
@@ -468,7 +620,7 @@
 <li>Map a joystick axis and split it up into multiple zones or trigger specific actions when the input axis is moving or in a specific zone.</li>
 <li>Execute actions based on multiple input keys pressed concurrently</li>
 </ul>
-<h2 id="what-about-device-conflicts">What about device conflicts?</h2>
+<h2 id="what-about-device-conflicts">What about device conflicts?<a class="headerlink" href="#what-about-device-conflicts" title="Permanent link">&para;</a></h2>
 <p>To avoid input conflicts between the real inputs and the remapped ones, <a href="https://github.com/nefarius/HidHide">HIDHide</a> is recommended to "hide" the input devices from the target application.</p>
 
 
@@ -518,7 +670,7 @@
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.f8cc74c7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": ".", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "assets/javascripts/workers/search.f8cc74c7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="assets/javascripts/bundle.c8b220af.min.js"></script>
