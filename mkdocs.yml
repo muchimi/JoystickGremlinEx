@@ -4,3 +4,5 @@ theme:
   name: material
 plugins:
   - search
+markdown_extensions:
+  - attr_list

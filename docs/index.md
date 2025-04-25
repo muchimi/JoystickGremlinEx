@@ -24,7 +24,7 @@ GremlinEx supports custom Python user scripts for complete programmatic control 
 
 ## Resources and help
 
-Please join our [GremlinEx Discord](https://discord.gg/pNadcReth9) server!
+![Discord Icon](assets/discord_small.png)&nbsp;Please join our  [GremlinEx Discord](https://discord.gg/pNadcReth9) server!
 
 ## History
 
