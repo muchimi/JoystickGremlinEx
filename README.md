@@ -4,11 +4,13 @@
 
 GremlinEx is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.
 
-The documentation for GremlinEx has moved to:
+# Documentation
 
-[https://muchimi.github.io/JoystickGremlinEx](https://muchimi.github.io/JoystickGremlinEx)
+The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentation](https://muchimi.github.io/JoystickGremlinEx)
 
+# Discord
 
+Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
 
