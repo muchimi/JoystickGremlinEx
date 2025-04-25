@@ -131,7 +131,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.range_layout.addStretch()
 
 
-        self.help_button_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self.show_hint) # QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
+        self.help_button_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint) # QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
         self.help_button_widget.clicked.connect(self._show_hint)
         self.range_layout.addWidget(self.help_button_widget)
 
