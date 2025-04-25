@@ -1,10 +1,10 @@
-# GremlinEx documentation
+# GremlinEx Overview
 
 (this documentation is a work in progress)
 
 ## What is GremlinEx?
 
-GremlinEx is a controller integrator: it allows you to take input from multiple hardware devices from different manufacturers, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.
+GremlinEx is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.
 
 GremlinEx is independent from any controller software.  It does not require you to run any specific software from a hardware manufacturer to "map" the device.  So long as the device shows up on Windows as an HID device with axes and buttons, GremlinEx will let you map this input.  It is vendor agnostic and relies on standard APIs that are not vendor specific. GremlinEx works with any HID compliant controller device, so supports any device up to eight (8) axes, up to a hundred and twenty eight (128) buttons, and up to four (4) hats.
 
@@ -24,7 +24,7 @@ GremlinEx supports custom Python user scripts for complete programmatic control 
 
 ## Resources and help
 
-Please join our [Discord](https://discord.gg/pNadcReth9) server!
+Please join our [GremlinEx Discord](https://discord.gg/pNadcReth9) server!
 
 ## History
 
