@@ -52,7 +52,16 @@
     
     
     
-  </head>
+   <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+    html.glightbox-open { overflow: initial; height: 100%; }
+    .gslide-title { margin-top: 0px; user-select: text; }
+    .gslide-desc { color: #666; user-select: text; }
+    .gslide-image img { background: white; }
+    .gscrollbar-fixer { padding-right: 15px; }
+    .gdesc-inner { font-size: 0.75rem; }
+    body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+    body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+    body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="../assets/javascripts/glightbox.min.js"></script></head>
   
   
     <body dir="ltr">
@@ -3087,15 +3096,15 @@
 <p>The enable speech checkbox can be selected for GremlinEx to send a verbal mode change event whenever local/remote mode control is changed in case the GremlinEx window is not visible.</p>
 <p>GremlinEx shows what output mode is active in the status bar.</p>
 <p><sup>GremlinEx options setup for a broadcast machine:</sup></p>
-<p><img alt="server options" src="../assets/server_options.jpg" /></p>
+<p><a class="glightbox" href="../assets/server_options.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="server options" src="../assets/server_options.jpg" /></a></p>
 <h4 id="local-mode">Local mode<a class="headerlink" href="#local-mode" title="Permanent link">&para;</a></h4>
 <p>In this mode, GremlinEx sends VJOY, keyboard and mouse events to the local machine.</p>
 <p>The status bar displays</p>
-<p><img alt="local control" src="../assets/local_control.jpg" /></p>
+<p><a class="glightbox" href="../assets/local_control.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="local control" src="../assets/local_control.jpg" /></a></p>
 <h4 id="broadcast-mode">Broadcast mode<a class="headerlink" href="#broadcast-mode" title="Permanent link">&para;</a></h4>
 <p>In this mode, GremlinEx sends VJOY, keyboard and mouse events to clients on the network.    The clients must have the remote control checkbox enabled, match the port number, and have a profile running (empty profile is fine) to respond to the broadcast events.</p>
 <p>The status bar displays</p>
-<p><img alt="remote control" src="../assets/remote_control.jpg" /></p>
+<p><a class="glightbox" href="../assets/remote_control.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="remote control" src="../assets/remote_control.jpg" /></a></p>
 <h4 id="concurrent-mode">Concurrent mode<a class="headerlink" href="#concurrent-mode" title="Permanent link">&para;</a></h4>
 <p>GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command. </p>
 <h3 id="client-machine-setup">Client machine setup<a class="headerlink" href="#client-machine-setup" title="Permanent link">&para;</a></h3>
@@ -3104,14 +3113,14 @@
 <p>Clients will only output to VJOY outputs that match the master.  So if the client has the same setup for VJOY (number of VJOY devices, button counts and hat counts) as the master machine, all VJOY events will be synchronized with the master machine.   This is the recommended setup.   </p>
 <p>Clients will ignore events for devices that do not exist on the client (such as an invalid VJOY device number, or an invalid button for that defined device).</p>
 <p><sup>GremlinEx options setup for a client:</sup></p>
-<p><img alt="client options" src="../assets/client_options.jpg" /></p>
+<p><a class="glightbox" href="../assets/client_options.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="client options" src="../assets/client_options.jpg" /></a></p>
 <p>The enable remote control checkbox is checked, and the port (default 6012) must match the broadcast machine's port.</p>
 <h2 id="master-remote-control-functions">Master remote control functions<a class="headerlink" href="#master-remote-control-functions" title="Permanent link">&para;</a></h2>
 <p>Local and broadcast (sending output to remote GremlinEx instances on network machines) control can be enabled or disabled via GremlinEx commands bound to a joystick button (or in script).</p>
 <p>Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.</p>
 <h2 id="profile-mapping">Profile mapping<a class="headerlink" href="#profile-mapping" title="Permanent link">&para;</a></h2>
 <p>GremlinEx has multiple options to automate the loading and activation of profiles based on what process has the current focus (meaning, the active window).</p>
-<p><img alt="profile options" src="../assets/gremlin_ex_profile_options.png" /></p>
+<p><a class="glightbox" href="../assets/gremlin_ex_profile_options.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="profile options" src="../assets/gremlin_ex_profile_options.png" /></a></p>
 <h3 id="automatic-activation">Automatic activation<a class="headerlink" href="#automatic-activation" title="Permanent link">&para;</a></h3>
 <p>If a process (.exe) is mapped to a specific profile (.xml), GremlinEx can automatically load this profile when the process has the focus at runtime.  This only works when a GremlinEx is in "run" mode - so a profile was loaded and activated.</p>
 <p>If configured, GremlinEx will load the mapped profile corresponding to the process (.exe) automatically in the background.  Depending on the complexity of the profile, GremlinEx may take a few seconds to become active as it loads the process and activates it.</p>
@@ -3158,7 +3167,7 @@
 <p>Pasting is not possible if the container or action is not permitted for the type of input being mapped.</p>
 <p>You can persist a copy operation between GremlinEx sessions by checking the option in the options dialog.  This will save the data to the profile folder, and it will be available at the next session.</p>
 <p>If the persist option is not checked, GremlinEx will use whatever data is in the Windows clipboard from the last copy operation in GremlinEx.</p>
-<p><img alt="copy paste" src="../assets/copy_paste_operations.png" /></p>
+<p><a class="glightbox" href="../assets/copy_paste_operations.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="copy paste" src="../assets/copy_paste_operations.png" /></a></p>
 <h2 id="devices">Devices<a class="headerlink" href="#devices" title="Permanent link">&para;</a></h2>
 <h3 id="hid-devices">HID devices<a class="headerlink" href="#hid-devices" title="Permanent link">&para;</a></h3>
 <p>GremlinEx will show all detected game controllers in tabs located at the top of the UI.  These are the raw input devices, either buttons, hats or axes.</p>
@@ -3181,7 +3190,7 @@
 <p>There are always going to be a edge cases because all hardware and configurations are different.  GremlinEx will do its best to handle dynamic changes but there is only so much safeguarding and edge case handling that is a reasonable expectation.</p>
 <h2 id="joystick-axis-device">Joystick (axis) device<a class="headerlink" href="#joystick-axis-device" title="Permanent link">&para;</a></h2>
 <p>GremlinEx can map detected joystick devices to actions.  New with 13.40.15ex is the ability to apply a response curve the input directly before the value is processed by a mapping action.</p>
-<p><img alt="curve input" src="../assets/gremlin_ex_curve_input.png" /></p>
+<p><a class="glightbox" href="../assets/gremlin_ex_curve_input.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="curve input" src="../assets/gremlin_ex_curve_input.png" /></a></p>
 <p>If no curve is provided, the input is used as is, matching the behavior of prior releases for GremlinEx.  </p>
 <p>If a curve is provided, the input value will be modified based on the provided curve before being sent to a mapping action.</p>
 <p>Curves are mode specific so each mode can have its own input response curve.</p>
@@ -3196,12 +3205,12 @@
 </ul>
 <p>Starting with GremlinEx 13.40.16, calibration is done individually for each input axis as needed.</p>
 <p>The calibration button shows in the input axis toolbar for axis devices only as indicated below.</p>
-<p><img alt="calibration" src="../assets/calibration_button.png" /></p>
+<p><a class="glightbox" href="../assets/calibration_button.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="calibration" src="../assets/calibration_button.png" /></a></p>
 <p>The calibration button brings up a dialog to setup calibration for that specific input, which will be listed at the top of the dialog.</p>
 <p>When you exit the dialog, the settings are automatically saved and applied. Internally, GremlinEx saves the calibration data to an XML file located in the user profile folder.</p>
 <p>If you had a prior calibration profile setup for an input, GremlinEx will attempt to load that data into the dialog, however you should always check the data as imported and to set other options as well.</p>
 <p>If GremlinEx detects calibration data for an input that is different from the default (unfiltered) state, the button will be blue indicating a filter is being applied.</p>
-<p><img alt="calibration" src="../assets/calibration_dialog.png" /></p>
+<p><a class="glightbox" href="../assets/calibration_dialog.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="calibration" src="../assets/calibration_dialog.png" /></a></p>
 <h4 id="global-scope">Global scope<a class="headerlink" href="#global-scope" title="Permanent link">&para;</a></h4>
 <p>Any calibration options apply to the input globally across all profiles.  GremlinEx provides alternative ways, at the profile level, to setup deadzones and inversion and response curve that are profile specific.  The global calibration makes particular sense with noisy inputs so that can be setup once for each hardware input without having to repeat the configuration for each profile.</p>
 <p>Understanding the processing order is important to diagnose unexpected behaviors, or to craft the profile in a way to achieve the desired behavior. </p>
@@ -3271,7 +3280,7 @@
 <p>You can also match the center position to the physical detent position of your input if it has one, as those may not be the exact center as the input reports.</p>
 <h3 id="curve-editor">Curve Editor<a class="headerlink" href="#curve-editor" title="Permanent link">&para;</a></h3>
 <p>The curve editor dialog is used to add or edit a curve when applied to an input, the VJoy Remap action, or the standalone Response Curve Ex action.   The legacy curve mapper does not use this new editor to maintain compatibility with earlier profiles.</p>
-<p><img alt="curve editor" src="../assets/gremlin_ex_curve_editor.png" /></p>
+<p><a class="glightbox" href="../assets/gremlin_ex_curve_editor.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="curve editor" src="../assets/gremlin_ex_curve_editor.png" /></a></p>
 <p>Remember to save the profile after closing the dialog to preserve the data into  a profile.</p>
 <p>As with other data items in GremlinEx, curves are applied to a specific mode, so each mode can have its own set of response curves, or no response curves.</p>
 <h3 id="curve-types">Curve types<a class="headerlink" href="#curve-types" title="Permanent link">&para;</a></h3>
@@ -3317,10 +3326,10 @@
 <p>The curve on the input axis is applied first, followed by the curve dedicated plugins (in the order in which they appear but before other actions), and finally the curves defined in the actual action itself.</p>
 <h2 id="keyboardmouse-device">Keyboard/Mouse device<a class="headerlink" href="#keyboardmouse-device" title="Permanent link">&para;</a></h2>
 <p>GremlinEx has an updated special Keyboard device that allows you to map keyboard and mouse button as inputs to trigger actions and containers. </p>
-<p><img alt="keyboard" src="../assets/gremlin_ex_keyboard.png" /></p>
+<p><a class="glightbox" href="../assets/gremlin_ex_keyboard.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="keyboard" src="../assets/gremlin_ex_keyboard.png" /></a></p>
 <p>GremlinEx allows you to map unusual function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet), as well as mouse input buttons including mouse wheel actions. </p>
 <h4 id="keyboard-inputs">Keyboard inputs<a class="headerlink" href="#keyboard-inputs" title="Permanent link">&para;</a></h4>
-<p><img alt="keyboard input" src="../assets/keyboard_input.png" /></p>
+<p><a class="glightbox" href="../assets/keyboard_input.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="keyboard input" src="../assets/keyboard_input.png" /></a></p>
 <p>Keyboard inputs, as with joystick inputs are shown on the left panel in GremlinEx in the keyboard tab.  Inputs can be added, removed and edited (configured).  If an input is removed, it will remove any associated mappings.  A confirmation box will pop up if an input with content will be deleted.</p>
 <p>Use the action and container copy/paste feature to duplicate actions between inputs.</p>
 <h4 id="scan-codes">Scan Codes<a class="headerlink" href="#scan-codes" title="Permanent link">&para;</a></h4>
@@ -3552,7 +3561,7 @@
 <p>Mapping to a gamepad is via the <strong>map to gamepad</strong> action.  The action is no different from mapping to Vjoy and functions the same way.</p>
 <p>The action supports either joystick, hat, or any momentary input.  The action will only show mappings suitable for the input selected, so it will show gamepad axes if the input is a linear input, and button type mappings if not.</p>
 <p>It is possible to curve an axis input into the gamepad and reverse its input via the response curve action if needed.</p>
-<p><img alt="gamepad action" src="../assets/gamepad_action.png" /></p>
+<p><a class="glightbox" href="../assets/gamepad_action.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gamepad action" src="../assets/gamepad_action.png" /></a></p>
 <h3 id="gamepad-input">Gamepad input<a class="headerlink" href="#gamepad-input" title="Permanent link">&para;</a></h3>
 <p>Unlike VJOY, GremlinEx does not currently support a virtual gamepad used as input.  However a hardware gamepad (such as an X-Box One controller for example) will show up in GremlinEx as a regular joystick input in the device tabs and can be mapped like any other Joystick controller.</p>
 <h2 id="profile">Profile<a class="headerlink" href="#profile" title="Permanent link">&para;</a></h2>
@@ -3795,9 +3804,9 @@
 <p>The default action is configured with two gates at min/max and a single range in the middle.</p>
 <p>The gated axis allows you to map one or more actions when the input value crosses a gate - a specific point on the axis.  The gates axis also allows you to map one or more actions when the input enters, exits or is within a range.</p>
 <p>The gated axis action can only be associated with an axis hardware input and cannot be associated with buttons or hats.  It expects a linear input.</p>
-<p><img alt="gated axis" src="../assets/gated_axis.png" /></p>
-<p><img alt="axis gate" src="../assets/gate_axis_gate_widget.png" /></p>
-<p><img alt="axis range" src="../assets/gate_axis_range_widget.png" /></p>
+<p><a class="glightbox" href="../assets/gated_axis.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gated axis" src="../assets/gated_axis.png" /></a></p>
+<p><a class="glightbox" href="../assets/gate_axis_gate_widget.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="axis gate" src="../assets/gate_axis_gate_widget.png" /></a></p>
+<p><a class="glightbox" href="../assets/gate_axis_range_widget.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="axis range" src="../assets/gate_axis_range_widget.png" /></a></p>
 <h3 id="gates">Gates<a class="headerlink" href="#gates" title="Permanent link">&para;</a></h3>
 <p>A gate is a point along the input axis with a specific floating point value in the range -1 to +1.  </p>
 <p>Up to 20 gates can be defined.</p>
@@ -3805,7 +3814,7 @@
 <p>Gates can be moved by the mouse, or by clicking the record button which will move the gate to the live input position (the black marker on the display), or the value can be manually input.  The mouse wheel over the gate position number will also increment or decrement the gate's position.</p>
 <h3 id="gate-mappings">Gate mappings<a class="headerlink" href="#gate-mappings" title="Permanent link">&para;</a></h3>
 <p>The gate mapping configuration window is access by clicking on the gate's configure button, or right clicking a gate.</p>
-<p><img alt="gate mapping" src="../assets/gate_axis_gate_mapping.png" /></p>
+<p><a class="glightbox" href="../assets/gate_axis_gate_mapping.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gate mapping" src="../assets/gate_axis_gate_mapping.png" /></a></p>
 <p>Each gate condition has its own set of mappings.   Mappings will see the gate as a momentary (button) input so only actions suitable for a button will be available for selection.</p>
 <table>
 <thead>
@@ -3837,7 +3846,7 @@
 <h3 id="default-range">Default range<a class="headerlink" href="#default-range" title="Permanent link">&para;</a></h3>
 <p>If individual range mappings are not needed, a default range corresponding to the entire input axis is defined.  A checkbox toggles this mode on/off.</p>
 <h3 id="range-mapping">Range mapping<a class="headerlink" href="#range-mapping" title="Permanent link">&para;</a></h3>
-<p><img alt="range actions" src="../assets/gated_axis_range_action.png" /></p>
+<p><a class="glightbox" href="../assets/gated_axis_range_action.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="range actions" src="../assets/gated_axis_range_action.png" /></a></p>
 <p>A range lets you map actions whenever the input enters a range, exits a range, or is within a range.  Each as its own set of mappings.</p>
 <p>Actions mapped to a range will see it as a joystick axis input.</p>
 <table>
@@ -3950,7 +3959,7 @@
 <p>The updated keyboard mapper adds separate press (make), release (break) functionality so keys can stay pressed, or just released separately.</p>
 <p>It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.</p>
 <p>The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.</p>
-<p><img alt="keyboard mapper" src="../assets/keyboard_mapper_ex.png" /></p>
+<p><a class="glightbox" href="../assets/keyboard_mapper_ex.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="keyboard mapper" src="../assets/keyboard_mapper_ex.png" /></a></p>
 <h3 id="output-modes">Output modes<a class="headerlink" href="#output-modes" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -4296,5 +4305,7 @@
       <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
       
     
-  </body>
+  <script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(() => { lightbox.reload() });
+</script></body>
 </html>
