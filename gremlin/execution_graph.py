@@ -636,9 +636,16 @@ class ExecutionContext():
 
     
 
-    def find(self, item):
-        ''' looks for a container, action or action set in the execution tree node '''
+    def find(self, item, node_type = None):
+        ''' looks for a container, action or action set in the execution tree node 
+        
+        :param item: the data to search for, by ID
+        :param node_type: optional, the node type to look for because a match on actions or containers may yield an action node instead of the container or action
+        
+        '''
         for node in anytree.PreOrderIter(self.graph):
+            if node_type and node.nodeType != node_type:
+                continue
             if hasattr(node,"container"):
                 if node.container == item:
                     return node
@@ -1082,24 +1089,29 @@ class ExecutionContext():
 
             latched_conditions = [] # for gated axis, add latched conditions each item has to evaluate
 
+            container_parent = parent_group
+
             if container.has_virtual_button:
                 condition = gremlin.actions.VirtualButtonCondition(container.virtual_button)
                 virtual_condition_node = ExecutionGraphActivationConditionNode(condition)
                 virtual_condition_node.container = container
                 virtual_condition_node.functors = condition
-                virtual_condition_node.parent = parent_group
+                virtual_condition_node.parent = container_parent
+                container_parent = virtual_condition_node
                 return_node = virtual_condition_node
                 latched_conditions.append(virtual_condition_node)
 
             if container.has_conditions:
                 condition_node = self._get_condition_node(container)
-                container_node.parent = condition_node
+                condition_node.parent = container_parent
+                container_parent = condition_node
                 if return_node is None:
-                    condition_node.parent = parent_group
                     return_node = condition_node
-                else:
-                    condition_node.parent = virtual_condition_node
+
                 latched_conditions.append(condition_node)
+            
+
+            container_node.parent = container_parent
 
             if return_node is None:
                 return_node = container_node

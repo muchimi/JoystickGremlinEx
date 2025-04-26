@@ -114,7 +114,7 @@ Containers and actions mapped to an input will appear in this area.  In this cas
 
 ## Profiles
 
-All mappings in GremlinEx is stored in a profile.
+All mappings in GremlinEx are stored in a profile.  Profiles are stored in %user_profile%/Joystick Gremlin Ex.
 
 ![profile xml](assets/profile_xml.png)
 

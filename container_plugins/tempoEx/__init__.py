@@ -461,17 +461,20 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         
         ec = gremlin.execution_graph.ExecutionContext()
-        container_node = ec.find(self.action_data)
+        container_node = ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
 
         if not container_node:
             syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
             self.valid = False
             return
+        
+        assert container_node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container,"Logic error: Node is not a container node"
 
         group_node = container_node.children[0] # group node is the only child of the container node
         self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
         self.short_nodes = [node for node in self.action_set_nodes if node.action_set.data == "short"]
         self.long_nodes = [node for node in self.action_set_nodes if node.action_set.data == "long"]
+        pass
 
     def _trigger_short_press(self, event, value, extra_data : dict = None):
         ''' triggers a short press '''
