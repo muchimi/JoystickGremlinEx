@@ -24,8 +24,10 @@ import qtawesome as qta
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
+import gremlin.ui.ui_about
 from gremlin.util import load_icon, userprofile_path
 import gremlin.ui.input_item
+import gremlin.ui.ui_common
 import threading
 
 
@@ -51,14 +53,14 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.file_path_widget.installEventFilter(self)
         self.file_path_widget.textChanged.connect(self._file_changed)
         self.edit_path_widget = QtWidgets.QPushButton()
-        self.edit_path_widget.setIcon(load_icon("gfx/button_edit.png"))
+        self.edit_path_widget= gremlin.ui.ui_common.Buttons.getEditWidget()
         self.edit_path_widget.clicked.connect(self._new_sound_file)
         self.volume_widget = QtWidgets.QSpinBox()
         self.volume_widget.setRange(0, 100)
         self.volume_widget.valueChanged.connect(self._volume_changed)
 
         self.play_widget = QtWidgets.QPushButton("Play")
-        self.play_widget.setIcon(load_icon("ei.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
+        self.play_widget.setIcon(load_icon("ei.play", qta_color = gremlin.ui.ui_common.Color.activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._play_cb)
 

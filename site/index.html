@@ -50,7 +50,16 @@
     
     
     
-  </head>
+   <link href="assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+    html.glightbox-open { overflow: initial; height: 100%; }
+    .gslide-title { margin-top: 0px; user-select: text; }
+    .gslide-desc { color: #666; user-select: text; }
+    .gslide-image img { background: white; }
+    .gscrollbar-fixer { padding-right: 15px; }
+    .gdesc-inner { font-size: 0.75rem; }
+    body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+    body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+    body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="assets/javascripts/glightbox.min.js"></script></head>
   
   
     <body dir="ltr">
@@ -592,7 +601,7 @@
 <p>GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and touch-devices on the network, and update the devices back.</p>
 <p>GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.</p>
 <h2 id="resources-and-help">Resources and help<a class="headerlink" href="#resources-and-help" title="Permanent link">&para;</a></h2>
-<p><img alt="Discord Icon" src="assets/discord_small.png" />&nbsp;Please join our  <a href="https://discord.gg/pNadcReth9">GremlinEx Discord</a> server!</p>
+<p><a class="glightbox" href="assets/discord_small.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="Discord Icon" src="assets/discord_small.png" /></a>&nbsp;Please join our  <a href="https://discord.gg/pNadcReth9">GremlinEx Discord</a> server!</p>
 <h2 id="history">History<a class="headerlink" href="#history" title="Permanent link">&para;</a></h2>
 <p>GremlinEx is based on a fork from the 2019 <a href="https://whitemagic.github.io/JoystickGremlin/">Joystick Gremlin by Whitemagic</a>.  GremlinEx builds on that excellent software and its concepts, and incorporates notable modifications and enhancements:</p>
 <ul>
@@ -676,5 +685,7 @@
       <script src="assets/javascripts/bundle.c8b220af.min.js"></script>
       
     
-  </body>
+  <script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(() => { lightbox.reload() });
+</script></body>
 </html>

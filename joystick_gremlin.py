@@ -130,6 +130,8 @@ syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Gremlin Ex"
 APPLICATION_BASE = "m73t37e"
+
+#APPLICATION_BASE = ""
 APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
