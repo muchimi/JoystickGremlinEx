@@ -21,6 +21,10 @@ from lxml import etree
 import lxml.etree
 
 import gremlin
+import gremlin.config
+import gremlin.config
+import gremlin.config
+import gremlin.event_handler
 import gremlin.types
 import gremlin.base_conditions
 import gremlin.base_profile
@@ -2245,6 +2249,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         import gremlin.base_profile
         import gremlin.ui.ui_common
         import gremlin.shared_state
+        import gremlin.config
 
         assert isinstance(profile_data, gremlin.base_profile.AbstractContainer)
         super().__init__(parent)
@@ -2283,6 +2288,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._container_remove,
             self._container_copy,
             data = profile_data)
+        
         
         self._title_bar_widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
         
@@ -2333,9 +2339,12 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.activation_count_widget = None
         el.condition_state_changed.emit(self.container)
 
+        gremlin.util.singleShot(self._config_visible)
         
 
-    
+    def _config_visible(self):
+        config = gremlin.config.Configuration()
+        self._title_bar_widget.setIdVisible(config.show_container_id)
         
         
     @QtCore.Slot()
@@ -2917,10 +2926,15 @@ class TitleBar(QtWidgets.QFrame):
         """
         import gremlin.ui.ui_common
         import gremlin.shared_state
+        import gremlin.config
+        import gremlin.event_handler
         super().__init__(parent)
 
         is_dark = gremlin.shared_state.is_dark_theme
         border_color = gremlin.ui.ui_common.Color.borderColor()
+
+        el = gremlin.event_handler.EventListener()
+        el.show_container_id_changed.connect(self._show_container_id_changed)
         
         css = f"# frame {{border: 1px solid {border_color};}}')"
         self.setStyleSheet(css) 
@@ -2979,6 +2993,12 @@ class TitleBar(QtWidgets.QFrame):
             self.copy_button.clicked.connect(clipboard_cb)
             self.copy_button.setToolTip("Copy")
 
+        self.id_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self.id_widget.setReadOnly(True)
+        self.id_widget.data = data
+        if data is not None and hasattr(data,"id"):
+            self.id_widget.setText(data.id)
+
 
         self.comment_widget = gremlin.ui.ui_common.QDataLineEdit()
         self.comment_widget.data = data
@@ -2994,6 +3014,7 @@ class TitleBar(QtWidgets.QFrame):
         self.layout.setContentsMargins(5, 0, 5, 0)
 
         self.layout.addWidget(self.label)
+        self.layout.addWidget(self.id_widget)
         self.layout.addWidget(QtWidgets.QLabel("Notes:"))
         self.layout.addWidget(self.comment_widget)
         self.layout.addStretch()
@@ -3008,7 +3029,20 @@ class TitleBar(QtWidgets.QFrame):
 
         self.setFrameShape(QtWidgets.QFrame.Box)
         self.setObjectName("frame")
-        
+
+    def setIdVisible(self, value : bool):
+        self.id_widget.setVisible(value)
+
+    def setIdValue(self, value : str):
+        self.id_widget.setText(value)
+
+
+    @QtCore.Slot()
+    def _show_container_id_changed(self):
+        ''' display/hide container Ids on config change'''
+        config = gremlin.config.Configuration()
+        self.id_widget.setVisible(config.show_container_id)        
+
     @QtCore.Slot()
     def _comment_changed(self):
         ''' called when comment text is changed '''
@@ -3053,17 +3087,23 @@ class BasicActionWrapper(AbstractActionWrapper):
 
         mode = action_widget.action_data.get_mode()
 
-        widget = TitleBar(
+        self._titlebar_widget = TitleBar(
             f"{action_widget.action_data.name} ({mode})",
             gremlin.hints.hint.get(self.action_widget.action_data.tag, ""),
             self._remove,
             self._clipboard_copy,
             data = action_widget.action_data)
-
-        widget.setBackgroundColor(gremlin.ui.ui_common.Color.actionBackgroundColor())
-        self.setTitleBarWidget(widget)
+        
+        self._titlebar_widget.setBackgroundColor(gremlin.ui.ui_common.Color.actionBackgroundColor())
+        self.setTitleBarWidget(self._titlebar_widget)
 
         self.main_layout.addWidget(self.action_widget)
+
+        gremlin.util.singleShot(self._config_visible)
+
+    def _config_visible(self):
+        config = gremlin.config.Configuration()
+        self._titlebar_widget.setIdVisible(config.show_container_id)
 
     def _remove(self):
         """Emits the closed event when this widget is being closed."""

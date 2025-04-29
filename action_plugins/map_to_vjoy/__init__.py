@@ -4086,10 +4086,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             # curve data
 
             curve_node = util.get_xml_child(node,"curve-data")
-            if not curve_node:
+            if curve_node is None:
                 # older style
                 curve_node = util.get_xml_child(node,"response-curve-ex")
-                if not curve_node:
+                if curve_node is None:
                     curve_node = util.get_xml_child(node,"response-curve")
 
             

@@ -271,7 +271,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.event_press = None
 
         ec = gremlin.execution_graph.ExecutionContext()
-        container_node = ec.find(self.action_data)
+        container_node = ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
 
         if not container_node:
             syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")

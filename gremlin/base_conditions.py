@@ -519,7 +519,7 @@ class AbstractSelfTriggerFunctor(AbstractFunctor):
     def profile_started(self):
         super().profile_started()
         self._ec = gremlin.execution_graph.ExecutionContext()
-        container_node = self._ec.find(self.action_data)
+        container_node = self._ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
 
         if not container_node:
             syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")

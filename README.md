@@ -15,6 +15,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
+### (m75)
+
+- Improved: New configuration option to display container/action IDs - this data is to help troubleshoot logic/conditions as the IDs will match the items in the log file.
+
+### (m74)
+
+- Fix: linkage with virtual input condition without another condition - caused missing container node
+- Fix: tempo Ex container node search returning condition node.
+- Doc updates
+
+
 ### (m73)
 - Due to significant core changes, changed versioning scheme to drop original Gremlin version and restart at 1.0 as this is now a different product.  
 - EXE: name change to GremlinEx to distinguish it from the original gremlin (note, HIDHide update needed to add the EXE)

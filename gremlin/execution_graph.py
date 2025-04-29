@@ -266,6 +266,31 @@ class ExecutionGraphContainerNode(ExecutionGraphNode):
     def __init__(self, container : gremlin.base_profile.AbstractContainer = None):
         super().__init__(ExecutionGraphNodeType.Container)
         self.container : gremlin.base_profile.AbstractContainer = container
+        self._exec_node : ExecutionGraphNode = None # computed entry point on callbacks
+
+
+    def ExecutionPoint(self, reset : bool = False) -> ExecutionGraphNode:
+        ''' computes the execution node of a container node 
+        
+            if a container node has conditions, the parent nodes will be conditions until we hit a non-condition node.
+            if a container has no conditions, the current node is returned
+        '''
+        if reset or self._exec_node is None:
+            node = self
+            # walk the tree up until we find a non condition node
+            node_parent = node.parent
+            ec = ExecutionContext()
+            while node_parent is not None and ec.isConditionNode(node_parent):
+                node = node_parent
+                node_parent = node_parent.parent
+            self._exec_node = node
+            verbose = gremlin.config.Configuration().verbose_mode_exec
+            if verbose:
+                if self.id != node.id:
+                    syslog.info(f"EXEC: entry node for container [{self.id}]: [{node.id}] {str(node)}")
+                else:
+                    syslog.info(f"EXEC: entry node for container [{self.id}]: same ")
+        return self._exec_node
 
     def to_string(self):
         container = self.container
@@ -388,6 +413,8 @@ class ExecutionContext():
         self._condition_map = {} # map of node ID to conditions that have conditions
         self._functor_map = {} # map of node ID to action nodes to execute for condition checking
         self._node_map = {} # map of node ID to node
+        self._exec_map = {} # map of node ID to the computed entry node for execution graph
+
         self._processed_events = []
         self._processed_functors = {}
         config = gremlin.config.Configuration()
@@ -405,6 +432,10 @@ class ExecutionContext():
     @property
     def node_map(self) -> dict:
         return self._node_map
+    
+    @property
+    def exec_map(self) -> dict:
+        return self._exec_map
     
 
     @property
@@ -636,7 +667,7 @@ class ExecutionContext():
 
     
 
-    def find(self, item, node_type = None):
+    def find(self, item, node_type):
         ''' looks for a container, action or action set in the execution tree node 
         
         :param item: the data to search for, by ID
@@ -644,7 +675,7 @@ class ExecutionContext():
         
         '''
         for node in anytree.PreOrderIter(self.graph):
-            if node_type and node.nodeType != node_type:
+            if node.nodeType != node_type:
                 continue
             if hasattr(node,"container"):
                 if node.container == item:
@@ -1102,8 +1133,8 @@ class ExecutionContext():
                 latched_conditions.append(virtual_condition_node)
 
             if container.has_conditions:
-                condition_node = self._get_condition_node(container)
-                condition_node.parent = container_parent
+                condition_node = self._get_condition_node(container, container_parent)
+                #condition_node.parent = container_parent
                 container_parent = condition_node
                 if return_node is None:
                     return_node = condition_node
@@ -1272,6 +1303,7 @@ class ExecutionContext():
         profile = gremlin.shared_state.current_profile
         self._functor_map = {}
         self._node_map = {}
+        self._exec_map = {} # map of node id to the node's execution entry node
         verbose = gremlin.config.Configuration().verbose_mode_execution
         mode_source = gremlin.shared_state.current_profile.traverse_mode()
         mode_source.sort(key = lambda x: x[0]) # sort parent to child
@@ -1471,7 +1503,18 @@ class ExecutionContext():
         functors = self._get_node_functors(node)
         assert isinstance(functors, list),"Functors have to be a list"
         self.functor_map[node.id] = functors
-        self._node_map[node.id] = node
+
+        if node.nodeType == ExecutionGraphNodeType.Container:
+            root = node
+            node_parent = root.parent
+            while self.isConditionNode(node_parent):
+                root = node_parent
+                node_parent = node_parent.parent
+            self._exec_map[node.id] = root
+        else:
+            self._exec_map[node.id] = node    
+        
+        self._node_map[node.id] = node    
         if self._verbose_detailed: 
             logtabs = gremlin.shared_state.logTabs()
             syslog.info(f"{logtabs}Register container node functors node id {node.id} {node.description} : {len(functors)} functors")
@@ -1650,11 +1693,7 @@ class ExecutionContext():
 
         if id in functor_map:
             # cache hit
-            root = self._node_map[id]
-
-            parent_node = root.parent
-            if self.isConditionNode(parent_node):
-                root = parent_node # bump to the condition node in case we inserted a condition on the primary node
+            root = self._exec_map[id]
             result = self.execute_node(root, event, value, extra_data, manual)
         return result
     
@@ -1678,8 +1717,10 @@ class ContainerCallback:
         if parent is None:
             ec = ExecutionContext()
             parent = ec.graph
+        assert isinstance(container, gremlin.base_profile.AbstractContainer)
+
         self.container = container
-        self.node = None # entry point for this container - set on first call
+        self.container_node = None # node for this container
         self.first_run = True
         self.execution_graph = ContainerExecutionGraph(container, parent)
 
@@ -1731,17 +1772,19 @@ class ContainerCallback:
             syslog.error("Virtual button code path being used")
         else:
             ec = ExecutionContext()
-
-            if self.first_run and not self.node:
-                node = ec.find(self.container)
-                if node:
-                    # check if container node has an activation condition tied to it at the container level, and use that as the entry point.
-                    if node.parent and node.is_condition:
-                        node = node.parent
-                    self.node = node
+            verbose = gremlin.config.Configuration().verbose_mode_exec
+            if self.first_run:
+                node = ec.find(self.container, ExecutionGraphNodeType.Container)
+                assert node is not None, f"Missing container node: container: {str(self.container)}"
+                self.container_node = node
                 self.first_run = False
-            if self.node:
-                ec.execute_node(self.node, event, shared_value)
+
+            # execute at the container's execution entry point
+            node = self.container_node.ExecutionPoint()
+            if node:
+                if verbose:
+                    syslog.info(f"EXEC: Callback for container [{self.container_node.id}] executing node: [{node.id}]")
+                ec.execute_node(node, event, shared_value)
 
 
 class VirtualButtonCallback(ContainerCallback):

@@ -1982,3 +1982,15 @@ class Configuration:
         assert value > 0
         self._data["wheel_autorelease_delay"] = value
         self.save()
+
+    @property
+    def show_container_id(self) -> bool:
+        return self._data.get("show_container_id", False)
+    @show_container_id.setter
+    def show_container_id(self, value : bool):
+        if value != self.show_container_id: 
+            self._data["show_container_id"] = value
+            self.save()
+
+            el = gremlin.event_handler.EventListener()
+            el.show_container_id_changed.emit()

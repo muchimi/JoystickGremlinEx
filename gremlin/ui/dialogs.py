@@ -1009,7 +1009,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.verbose_widget.clicked.connect(self._verbose_cb)
         page_layout.addWidget(self.verbose_widget)
 
-        page_layout.addWidget(QtWidgets.QLabel("Verbose modes:"))
+
 
 
         # verbose modes
@@ -1039,12 +1039,25 @@ This setting is also available on a profile by profile basis on the profile tab,
         layout.addWidget(QtWidgets.QWidget(),0,4)
         layout.setColumnStretch(4,2)
 
+        widget = ui_common.QDataCheckbox("Show container/action IDs")
+        widget.setChecked(self.config.show_container_id)
+        widget.clicked.connect(self._show_id_changed)
+
+        page_layout.addWidget(widget)
+        page_layout.addWidget(QtWidgets.QLabel("Verbose modes:"))
         page_layout.addWidget(container)
+
+        
+
         text = "Warning: these options can degrade performance significantly due to the amount of log entries generated.  Log file size can also grow to become very large. Only use the modes to diagnose a specific subsystem.  Avoid detailed mode unless directed to."
         warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor("orange"),text= text, use_wrap=True)
         page_layout.addWidget(warning_widget)
 
         page_layout.addStretch()
+
+    @QtCore.Slot(bool)
+    def _show_id_changed(self, checked):
+        self.config.show_container_id = checked
 
     def _create_osc_page(self):
         page_widget = QtWidgets.QWidget()

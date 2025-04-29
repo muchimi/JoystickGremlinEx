@@ -498,6 +498,8 @@ class EventListener(QtCore.QObject):
 
 	# request to copy a condition or activation condition
 	copy_condition = QtCore.Signal(object) # (condition or activation condition)
+
+	show_container_id_changed = QtCore.Signal() # fires when condition ID show on/off changed in configuration - this is to update affected widgets
 	
 
 	def __init__(self):
