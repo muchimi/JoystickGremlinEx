@@ -3724,14 +3724,15 @@ class InputOscClient(QtCore.QObject):
                 
                 input_item._axis_values = normalized_args
                 index = source_index # input_item.source_index # source index of the param
-                if index < len(args):
-                    raw_value = args[input_item.source_index]
-                    value = normalized_args[input_item.source_index]
-                    syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
-                else:
-                    syslog.error(f"OSC: command [{input_item.command}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}")
-                    raw_value = args[0]
-                    value = normalized_args[0]
+                if args:
+                    if index < len(args):
+                        raw_value = args[input_item.source_index]
+                        value = normalized_args[input_item.source_index]
+                        syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
+                    else:
+                        syslog.error(f"OSC: command [{input_item.message}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}")
+                        raw_value = args[0]
+                        value = normalized_args[0]
                 
                 autorelease = False
                 

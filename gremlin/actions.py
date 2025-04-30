@@ -361,12 +361,13 @@ class JoystickCondition(AbstractCondition):
                 #value = joy.axis(self.input_id).value
             r1 = self.condition.range[0]
             r2 = self.condition.range[1]
-            if r1 > r2:
-                r1,r2 = r2,r1
-            if r1 == r2:
-                in_range = math.isclose(value, r1, 0.0001)
-            else:
-                in_range = value >= r1 and value <= r2
+            in_range = gremlin.util.valueInRange(value, r1, r2)
+            # if r1 > r2:
+            #     r1,r2 = r2,r1
+            # if r1 == r2:
+            #     in_range = math.isclose(value, r1, 0.0001)
+            # else:
+            #     in_range = value >= r1 and value <= r2
 
             if self.condition.comparison in ["inside", "outside"]:
                 retval = in_range if self.comparison == "inside" else not in_range
@@ -483,12 +484,13 @@ class VJoyCondition(AbstractCondition):
             current_value = joy.axis(self.input_id).value + 0.0
             r1 = self.condition.range[0]
             r2 = self.condition.range[1]
-            if r1 > r2:
-                r1,r2 = r2,r1
-            if r1 == r2:
-                in_range = math.isclose(current_value, r1, abs_tol = 0.0001)
-            else:
-                in_range = r1 <= current_value <= r2
+            in_range = gremlin.util.valueInRange(current_value, r1, r2)
+            # if r1 > r2:
+            #     r1,r2 = r2,r1
+            # if r1 == r2:
+            #     in_range = math.isclose(current_value, r1, abs_tol = 0.0001)
+            # else:
+            #     in_range = r1 <= current_value <= r2
 
             if self.comparison in ["inside", "outside"]:
                 retval =  in_range if self.comparison == "inside" else not in_range
@@ -802,9 +804,9 @@ class AxisButton(VirtualButton):
                 direction = AxisButtonDirection.Above
             
 
-        inside_range = v1 <= v <= v2
+        inside_range = gremlin.util.valueInRange(v, v1, v2)
         
-        last_inside_range = v1 <= last_value <= v2
+        last_inside_range = gremlin.util.valueInRange(last_value, v1, v2)
 
         if self._pressed_issued and last_inside_range != inside_range:
             # button should be released because it was pressed before

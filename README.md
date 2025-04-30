@@ -14,10 +14,22 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m74t3)
+- Added precision decimals to range computations globally via options.  The default decimal is 3 (0.001) when comparing if a floating point value is in range or not.  This is used when an axis value is compared against two range values as some tests may fail due to Python's internal floating point data representation and comparison logic, when the values are in fact close enough for axis comparison purposes.
+- Fix: some labels inheriting incorrect background color
 
-### (m75)
+
+### (m74t2)
+
+- Improved: Added VJOY verbose mode to instrument vjoy data writes in the log file.  This will add a line whenever GremlinEx does anything with VJOY at runtime to clarify what it's doing and help with general troubleshooting.
+
+
+
+### (m74t1)
 
 - Improved: New configuration option to display container/action IDs - this data is to help troubleshoot logic/conditions as the IDs will match the items in the log file.
+
+
 
 ### (m74)
 

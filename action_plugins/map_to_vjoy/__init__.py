@@ -3166,7 +3166,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 case VjoyAction.VJoyAxisToButton:
                     v1 = self.range_low
                     v2 = self.range_high
-                    if action_value.current >= v1 and action_value.current <= v2:
+                    in_range = gremlin.util.valueInRange(action_value.current, v1, v2)
+                    if in_range:
                         if not self.in_range:
                             # axis in range
                             self.in_range = True

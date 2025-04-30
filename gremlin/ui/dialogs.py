@@ -553,7 +553,6 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_button_grid_widget.clicked.connect(self._show_button_grid_cb)
 
         # split joystick repeaters raw/calibrated
-        # 
         self.split_joystick_repeater_widget = QtWidgets.QCheckBox("Show Raw/Calibrated in repeaters")
         self.split_joystick_repeater_widget.setToolTip("When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
         self.split_joystick_repeater_widget.setChecked(self.config.splitJoystickRepeater)
@@ -567,6 +566,10 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.partial_plugin_save.clicked.connect(self._partial_plugin_save)
 
 
+        # range resolution - decimal
+        self.range_precision_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 0, max_range = 8, value = self.config.range_comparison_decimals)
+        self.range_precision_widget.setToolTip("Number of decimals for floating point range comparisons")
+        self.range_precision_widget.valueChanged.connect(self._range_precision_changed)
 
 
         # global numlock
@@ -579,9 +582,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # Show message on mode change
         self.show_mode_change_message = QtWidgets.QCheckBox("Show message when changing mode")
-        self.show_mode_change_message.clicked.connect(
-            self._show_mode_change_message
-        )
+        self.show_mode_change_message.clicked.connect(self._show_mode_change_message)
         self.show_mode_change_message.setChecked(self.config.mode_change_message)
 
         # remote control section
@@ -760,6 +761,10 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         widget,_ = gremlin.ui.ui_common.getHContainer(self.highlight_input_buttons,"  ")
         column_layout.addWidget(widget, row, col)
+        row+=1
+        widget,_ = gremlin.ui.ui_common.getHContainer(self.range_precision_widget,"Range comparison decimals:")
+        column_layout.addWidget(widget, row, col)
+
 
 
         page_layout.addWidget(column_widget)
@@ -1495,6 +1500,9 @@ This setting is also available on a profile by profile basis on the profile tab,
     def _partial_plugin_save(self, checked):
         self.config.partial_plugin_save = checked
 
+    @QtCore.Slot()
+    def _range_precision_changed(self):
+        self.config.range_comparison_decimals = self.range_precision_widget.value()
 
     @QtCore.Slot(bool)
     def _verbose_cb(self, checked):

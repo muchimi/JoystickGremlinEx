@@ -598,7 +598,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
         range_layout.addWidget(self.comparison_dropdown)
         range_layout.addWidget(self.lower_widget)
         range_layout.addWidget(self.grab_low_widget)
-        range_layout.addWidget(QtWidgets.QLabel("and"))
+
+        range_layout.addWidget(gremlin.ui.ui_common.QLabel("and"))
         range_layout.addWidget(self.upper_widget)
         range_layout.addWidget(self.grab_high_widget)
         range_layout.addWidget(self.range_status_widget)
@@ -607,7 +608,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         input_label = QtWidgets.QLabel(f"<b>{self.condition.device_name} Axis {self.condition.input_id:d}</b>")
         input_label.setWordWrap(True)
         self.ui_container_layout.addWidget(input_label, 0, 1)
-        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.ui_container_layout.addWidget(gremlin.ui.ui_common.QLabel("is"), 0, 2)
         self.ui_container_layout.addLayout(range_layout, 0, 3, alignment=QtCore.Qt.AlignLeft)
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
         self.ui_container_layout.setColumnStretch(4,2)
@@ -769,17 +770,15 @@ class JoystickConditionWidget(AbstractConditionWidget):
             visible = False
             
             v1, v2 = self.condition.range
-            if v1 > v2:
-                # swap
-                v1,v2 = v2, v1
+            in_range = gremlin.util.valueInRange(value, v1, v2)
             match self.condition.comparison:
                 case "inside":
-                    if value >= v1 and value <= v2:
+                    if in_range:
                         self.range_status_widget.setText("in range")
                         visible = True
                     
                 case "outside":
-                    if value < v1 or value > v2:
+                    if not in_range:
                         self.range_status_widget.setText("outside of range")
                         visible = True
 

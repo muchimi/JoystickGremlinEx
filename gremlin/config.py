@@ -1998,3 +1998,14 @@ class Configuration:
 
             el = gremlin.event_handler.EventListener()
             el.show_container_id_changed.emit()
+
+
+    @property
+    def range_comparison_decimals(self) -> int:
+        ''' decimals to use for range comparison comparing two floating point numbers '''
+        return self._data.get("range_comparison_decimals", 3)
+    @range_comparison_decimals.setter
+    def range_comparison_decimals(self, value : int):
+        assert value >= 0
+        self._data["range_comparison_decimals"] = value
+        self.save()

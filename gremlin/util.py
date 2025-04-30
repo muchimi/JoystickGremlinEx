@@ -36,6 +36,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
 
+import gremlin.config
 import gremlin.shared_state
 import gremlin.ui
 import gremlin.ui.ui_common
@@ -1871,13 +1872,46 @@ def decode(data) -> str:
         return text.replace('\ufffd','') # remove junk characters
     return ''
 
-def valueInRange(value, r1, r2):
+def valueInRange(value : float, r1 : float, r2 : float, exclusive : bool = False) -> bool:
+    ''' true if the value is within bounds, inclusive of boundaries
+    :param value: the floating point value to compare
+    :param r1: floating point value, first bound
+    :param r2: floating point value, second bound
+    :param exclusive: include the boundaries in the comparison or not
+    :returns: true if in range, false if not
+     
+    '''
+
+
+
     if value is None or r1 is None or r2 is None:
         return False
     if r1 > r2:
         # swap
         r2, r1 = r1, r2
-    return value >= r1 and value <= r2
+    
+    if exclusive:
+        # do not include boundaries in the comparison
+        return value > r1 and value < r2
+    
+    # include boundaries in the comparison
+    
+    if value > r1 and value < r2:
+        # in range
+        return True
+    
+    # handle floating point comparison resolution at boundary conditions
+    decimals = gremlin.config.Configuration().range_comparison_decimals
+    # floating point evaluation for tolerance at boundary conditions
+    if not decimals:
+        return False
+    
+    tolerance = 1/(10**decimals)
+    low = math.isclose(value, r1, abs_tol=tolerance)
+    if low:
+        return True
+    high = math.isclose(value, r2, abs_tol=tolerance)
+    return high
 
 
 def validateIp(ip_address : str) -> bool:

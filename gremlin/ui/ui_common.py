@@ -265,7 +265,8 @@ class Color():
             QListView {{
                 border: 1px solid {border_color};
             }}
-           
+
+
             '''
         # print (css)
 
@@ -2862,6 +2863,13 @@ class QWrapableLabel(QtWidgets.QLabel):
         self.setWordWrap(True)
 
 
+class QLabel(QtWidgets.QLabel):
+    ''' styled label widget '''
+    def __init__(self, text, parent = None):
+        super().__init__(text, parent)
+        self.setStyleSheet("background: none;")
+
+
 class QIconLabel(QtWidgets.QWidget):
     ''' label with an icon using the QAWESEOME lib '''
 
@@ -2891,6 +2899,8 @@ class QIconLabel(QtWidgets.QWidget):
             self._label_widget.setWordWrap(True)
         else:
             self._label_widget = QtWidgets.QLabel(text)
+
+        self._label_widget.setStyleSheet("background: none;")
         container_layout.addWidget(self._label_widget)
         if stretch:
             container_layout.addStretch()

@@ -805,7 +805,8 @@ class RangeInfo():
     def inRange(self, value : float):
         ''' true if in range '''
         v1,v2 = self.range()
-        return value >= v1 and value <= v2
+        return gremlin.util.valueInRange(value, v1, v2)
+       
     
     
     def output_range(self):
@@ -954,17 +955,19 @@ class RangeInfo():
     def inrange(self, value : float, inclusive = True):
         ''' true if the value is within the current range,  inclusive = true if bounds are included '''
         v1,v2 = self.v1, self.v2
-        if v1 > v2:
-            # swap
-            v1, v2 = v2, v1 
-        if not inclusive:
-            return value > v1 and value < v2
-        else:
-            if value >= v1 and value <= v2:
-                return True
-            if gremlin.util.is_close(value,v1) or gremlin.util.is_close(value,v2):
-                return True
-        return False
+        return gremlin.util.valueInRange(value,v1,v2, not inclusive)
+        
+        # if v1 > v2:
+        #     # swap
+        #     v1, v2 = v2, v1 
+        # if not inclusive:
+        #     return value > v1 and value < v2
+        # else:
+        #     if value >= v1 and value <= v2:
+        #         return True
+        #     if gremlin.util.is_close(value,v1) or gremlin.util.is_close(value,v2):
+        #         return True
+        # return False
     
 
     def _swap_gates(self):

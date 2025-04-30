@@ -169,6 +169,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self._update_range_state(value)            
 
     def _update_range_state(self, value):
+        import gremlin.util
         if self.range_status_widget:
             visible = False
             
@@ -178,7 +179,8 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
             
             match self.condition_data.direction:
                 case gremlin.types.AxisButtonDirection.Anywhere:
-                    if value >= v1 and value <= v2:
+                    in_range = gremlin.util.valueInRange(value, v1, v2)
+                    if in_range:  
                         self.range_status_widget.setText("(in range)")
                         visible = True
 
