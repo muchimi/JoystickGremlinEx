@@ -24,11 +24,13 @@ import threading
 import time
 import os
 
+import gremlin.event_handler
 from vjoy.vjoy_interface import VJoyState, VJoyInterface
 from gremlin.error import VJoyError
 import gremlin.common
 import gremlin.spline
 import gremlin.types
+from gremlin.singleton_decorator import SingletonDecorator
 
 syslog = logging.getLogger("system")
 
@@ -350,7 +352,7 @@ class Button:
         el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
         el.vjoy_event.emit(event)
-
+        el.vjoy_callback(event)
 
 
 
@@ -926,3 +928,42 @@ def deadzone(value, low, low_center, high_center, high):
         return min(1, max(0, (value - high_center) / abs(high - high_center)))
     else:
         return max(-1, min(0, (value - low_center) / abs(low - low_center)))
+
+
+@SingletonDecorator
+class VjoyDebug():
+    ''' debug helper for vjoy messages - this will trigger a log entry whenever the vjoy verbose mode is enabled on gremlinEx vjoy writes '''
+    def __init__(self):
+        self._hooked = False
+
+
+    def Hook(self):
+        ''' hooks debug data '''
+        import gremlin.config
+
+        if not self._hooked and gremlin.config.Configuration().verbose_mode_vjoy:
+            import gremlin.event_handler
+            el = gremlin.event_handler.EventListener()
+            el.vjoy_event.connect(self._event_handler)
+            self._hooked = True
+            syslog.info("VJOY output: enabled")
+
+
+    def UnHook(self):
+        ''' unhook the event '''
+        if self._hooked:
+            import gremlin.event_handler
+            el = gremlin.event_handler.EventListener()
+            el.vjoy_event.disconnect(self._event_handler)
+            self._hooked = False
+            syslog.info("VJOY output: disabled")
+
+
+    def _event_handler(self, event):
+        ''' event handler:  type of event: gremlin.event_handler.VjoyEvent '''
+        syslog.info(f"VJOY output: device: {event.vjoy_id} {event.input_type.name} {event.input_id} {event.value}")
+
+
+
+# primary instance
+_vjoy_debug = VjoyDebug()

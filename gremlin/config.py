@@ -1099,7 +1099,11 @@ class Configuration:
     def verbose_mode_ui(self):
         ''' true if verbose mode is in UI mode '''
         return self.verbose and VerboseMode.UI in self.verbose_mode
-        
+    
+    @property
+    def verbose_mode_vjoy(self):
+        ''' true if verbose mode is in UI mode '''
+        return self.verbose and VerboseMode.VJoy in self.verbose_mode
     
     @property
     def verbose_mode_joystick(self):

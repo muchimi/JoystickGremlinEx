@@ -453,6 +453,10 @@ class CodeRunner:
             if verbose_detailed:
                 self.event_handler.dump_callbacks()
 
+            # hook vjoy debug data based on state
+            vjoy_debug = vjoy.VjoyDebug()
+            vjoy_debug.Hook()
+
 
             # Connect signals
             evt_listener = gremlin.event_handler.EventListener()
@@ -599,6 +603,9 @@ class CodeRunner:
         el.profile_stop.emit()
 
 
+        # unhook vjoy debug data
+        vjoy_debug = vjoy.VjoyDebug()
+        vjoy_debug.UnHook()
 
         # stop remote client
         gremlin.input_devices.remote_client.stop()

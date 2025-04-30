@@ -456,7 +456,9 @@ class VJoyCondition(AbstractCondition):
         :param value the possibly modified value
         :return True if the condition is satisfied, False otherwise
         """
-        verbose = gremlin.config.Configuration().verbose_mode_condition
+
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_condition or config.verbose_mode_vjoy
         syslog = logging.getLogger("system")
 
         if verbose:
