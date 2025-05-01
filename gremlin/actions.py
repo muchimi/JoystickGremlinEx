@@ -409,7 +409,7 @@ class JoystickCondition(AbstractCondition):
             case _:
                 state = "N/A"
         logtabs = gremlin.shared_state.logTabs()
-        return f"{logtabs}\tJoystickCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name} state: {state} "
+        return f"{logtabs}\tJoystickCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: [{info.name if info else 'ID not found:' + str(self.device_guid)}] state: {state} "
 
     def __str__(self):
         return self.condition_name()

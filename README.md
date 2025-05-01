@@ -16,6 +16,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m74t3)
 - Added precision decimals to range computations globally via options.  The default decimal is 3 (0.001) when comparing if a floating point value is in range or not.  This is used when an axis value is compared against two range values as some tests may fail due to Python's internal floating point data representation and comparison logic, when the values are in fact close enough for axis comparison purposes.
+- Fix: OSC inbound message exception in some cases (discovered through work with Open Stage Control)
 - Fix: some labels inheriting incorrect background color
 
 
