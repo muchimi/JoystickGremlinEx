@@ -16,7 +16,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 
 ### (m74t4)
-- Fix: on star
+- Fix: on start, blank input shown on start in some cases, usually at first run.
 - Improved: added option to store configurations by version number.  While this may have some advantages, it is also turns off the ability to make a change in one version and see it after an update.  For this reason this is a user selectable in option and turned off by default
 
 ### (m74t3)
