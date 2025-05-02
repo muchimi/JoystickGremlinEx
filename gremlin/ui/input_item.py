@@ -2352,7 +2352,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Container template",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "XML files (*.xml)"
         )
         if fname and os.path.isfile(fname):
@@ -2388,7 +2388,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(
             None,
             "Container template",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "XML files (*.xml)"
         )
         if fname:

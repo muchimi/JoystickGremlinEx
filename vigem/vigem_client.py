@@ -10,7 +10,9 @@ from ctypes import CDLL, POINTER, CFUNCTYPE, c_void_p, c_uint, c_ushort, c_ulong
 from .vigem_commons import XUSB_REPORT, DS4_REPORT, DS4_REPORT_EX, VIGEM_TARGET_TYPE
 import os
 import logging
-from gremlin.util import display_error, get_dll_version
+import gremlin.util 
+
+# display_error, get_dll_version
 syslog = logging.getLogger("system")
 
 class VigemClient():
@@ -43,11 +45,11 @@ class VigemClient():
                 _dll_path = os.path.join(parent, dll_file)
                 if not os.path.isfile(_dll_path):
                     msg = f"Unable to continue - missing dll: {_dll_path}"
-                    display_error(msg)
+                    gremlin.util.display_error(msg)
                     syslog.critical(msg)
                     return
                     
-            dll_version = get_dll_version(_dll_path)
+            dll_version = gremlin.util.get_dll_version(_dll_path)
             VigemClient._version = dll_version
 
             try:
@@ -61,7 +63,7 @@ class VigemClient():
                 
             except Exception as error:
                 msg = f"Unable to initialize Vigem: {_dll_path}\n{error}"
-                display_error(msg)
+                gremlin.util.display_error(msg)
                 syslog.warning(msg)
 
             VigemClient.initalized = True

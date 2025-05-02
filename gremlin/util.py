@@ -36,10 +36,6 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
 
-import gremlin.config
-import gremlin.shared_state
-import gremlin.ui
-import gremlin.ui.ui_common
 
 from . import error
 
@@ -188,6 +184,7 @@ def script_path():
 
 def userprofile_path():
     """Returns the path to the user's profile folder, %userprofile%."""
+
     path = os.path.abspath(os.path.join(os.getenv("userprofile"),"Joystick Gremlin Ex"))
     if not os.path.isdir(path):
         # profile folder does not exist - see if we can create it from the original profile
@@ -212,6 +209,24 @@ def userprofile_path():
             
 
     return os.path.normcase(path)
+
+
+
+def copy_tree_if_newer(src, dst):
+    """Copies a directory tree from src to dst, only if the source files 
+    are newer than the destination files or if the destination file does not exist.
+    """
+    if os.path.exists(dst):
+        for item in os.listdir(src):
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
+            if os.path.isdir(s):
+                copy_tree_if_newer(s, d)
+            else:
+                if not os.path.exists(d) or os.stat(s).st_mtime > os.stat(d).st_mtime:
+                    shutil.copy2(s, d) # copy with metadata
+    else:
+        shutil.copytree(src, dst)
 
 
 
@@ -415,20 +430,6 @@ def hat_direction_to_tuple(value):
     return None
 
 
-def setup_userprofile():
-    """Initializes the data folder in the user's profile folder."""
-    folder = userprofile_path()
-    if not os.path.exists(folder):
-        try:
-            os.mkdir(folder)
-        except Exception as e:
-            raise error.GremlinError(
-                f"Unable to create data folder: {str(e)}"
-            )
-    elif not os.path.isdir(folder):
-        raise error.GremlinError(
-            "Data folder exists but is not a folder"
-        )
 
 
 def clear_layout(layout):
@@ -719,7 +720,6 @@ def find_package_file(file_path):
 def _find_file(file_path, root_folder = None):
     ''' finds a file '''
 
-    
 
 
     from pathlib import Path
@@ -735,7 +735,7 @@ def _find_file(file_path, root_folder = None):
         root_folder = gremlin.shared_state.root_path
     if not os.path.isdir(root_folder):
         return None
-    
+    circuit_breaker = 1000
     if os.sep in file_path:
         # we have folders
         splits = file_path.split(os.sep)
@@ -751,7 +751,7 @@ def _find_file(file_path, root_folder = None):
             extensions = [ext]
         else:
             extensions = [".svg",".png"]
-        circuit_breaker = 1000
+        
         for dirpath, _, filenames in os.walk(root_folder):
             last = os.path.basename(dirpath)
             if last.startswith("."):
@@ -841,6 +841,7 @@ def get_icon_path(*paths):
 
 def load_pixmap(*paths):
     ''' gets a pixmap from the path '''
+    import gremlin.ui.ui_common
     the_path = get_icon_path(*paths)
     if the_path:
         pixmap = QtGui.QPixmap(the_path)
@@ -857,10 +858,10 @@ def load_pixmap(*paths):
 
 def load_icon(*paths, use_qta = False, qta_color = None):
     ''' gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search '''
-    from gremlin.config import Configuration
+    import gremlin.config 
     import gremlin.shared_state
     import gremlin.ui.ui_common
-    verbose = Configuration().verbose_mode_details
+    verbose = gremlin.config.Configuration().verbose_mode_details
 
     is_dark = gremlin.shared_state.is_dark_theme
 
@@ -961,8 +962,8 @@ def recolor_icon_pixmap(image_path, color = "red"):
 
 def load_image(*paths):
     ''' loads an image '''
-    from gremlin.config import Configuration
-    verbose = Configuration().verbose_mode_details
+    import gremlin.config 
+    verbose = gremlin.config.Configuration().verbose_mode_details
     the_path = get_icon_path(*paths)
     if the_path:
         if verbose:
@@ -1881,7 +1882,7 @@ def valueInRange(value : float, r1 : float, r2 : float, exclusive : bool = False
     :returns: true if in range, false if not
      
     '''
-
+    import gremlin.config
 
 
     if value is None or r1 is None or r2 is None:
@@ -1923,3 +1924,14 @@ def validateIp(ip_address : str) -> bool:
         pass
     return False
  
+
+def create_folder(path) -> bool:
+    ''' creates a folder if it doesn't exist - returns True on ok'''
+    if not os.path.isdir(path):    
+        try:
+            os.makedirs(path)
+        except OSError as err:
+            syslog.error('Error: Creating directory.' +  path,-1) 
+            syslog.error(">> {}".format(err))
+            return False
+    return True

@@ -2344,7 +2344,7 @@ def import_profile():
     fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Profile to import",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "XML files (*.xml)"
         )
     if fname == "":

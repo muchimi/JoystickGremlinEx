@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - GremlinEx is (C) EMCS 2025
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ import webbrowser
 import dinput
 from lxml import etree
 
-import gremlin.ui.ui_common
+
 import gremlin.util
 
 
@@ -120,30 +120,19 @@ import gremlin.ui.merge_axis
 import gremlin.ui.user_plugin_management
 import gremlin.ui.profile_creator
 import gremlin.ui.profile_settings
+import gremlin.version
 
 from PySide6 import QtCore
 
 from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
+
 syslog = logging.getLogger("system")
-
-APPLICATION_NAME = "Gremlin Ex"
-APPLICATION_BASE = "m74t4"
-
-#APPLICATION_BASE = ""
-APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
-
 
 # the main ui
 ui = None
-syslog = logging.getLogger("system")
 
-from gremlin.singleton_decorator import SingletonDecorator
-
-@SingletonDecorator
-class Version():
-    version = APPLICATION_VERSION
 
 
 class TabData:
@@ -214,7 +203,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._last_input_item = None # last selected input item
 
 
-        gremlin.shared_state.application_version = APPLICATION_BASE
+        gremlin.shared_state.application_version =gremlin.version.APPLICATION_VERSION
 
         self.config = gremlin.config.Configuration()
 
@@ -345,7 +334,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Load existing configuration or create a new one otherwise
         if self.config.last_profile and os.path.isfile(self.config.last_profile):
             # check if this was a profile swap that we load the profile from the current user folder
-            current_profile_folder = userprofile_path().lower()
+            current_profile_folder = gremlin.shared_state.data_path.casefold()
             last_profile = self.config.last_profile.lower()
             if not current_profile_folder in last_profile:
                 _, base_file = os.path.split(last_profile)
@@ -898,7 +887,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def log_edit(self):
         ''' opens the log file in the editor '''
-        log_file = os.path.join(gremlin.util.userprofile_path(), "system.log")
+        log_file = os.path.join(gremlin.shared_state.data_path, "system.log")
         if os.path.isfile(log_file):
             gremlin.util.display_file(log_file)
 
@@ -951,7 +940,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Profile to load as template",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "XML files (*.xml)"
         )
         if fname == "":
@@ -1220,7 +1209,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             fname, _ = QtWidgets.QFileDialog.getOpenFileName(
                 None,
                 "Load Profile",
-                gremlin.util.userprofile_path(),
+                gremlin.shared_state.data_path,
                 "XML files (*.xml)"
             )
 
@@ -1315,7 +1304,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(
             None,
             "Save Profile",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "XML files (*.xml)"
         )
         if fname != "":
@@ -1337,7 +1326,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def reveal_logfile(self):
         ''' opens the logfile in the current text editor '''
-        logfile = os.path.join(gremlin.util.userprofile_path(), "system.log")
+        logfile = os.path.join(gremlin.shared_state.data_path, "system.log")
         if os.path.isfile(logfile):
             webbrowser.open(logfile)
 
@@ -1354,7 +1343,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def open_gremlinex_folder(self):
         ''' opens the gremlin EX folder '''
-        path = userprofile_path()
+        path = gremlin.shared_state.data_path
         webbrowser.open(path)
 
 
@@ -1981,9 +1970,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                         # get the first input item of the tab
                         input_item = self._get_input_item(device_guid, 0)
                         if input_item:
-                            input_id = input_item.input_id
-                            input_type = input_item.input_type
-                            el.input_selection_changed.emit(device_guid, input_type, input_id)
+                            # input_id = input_item.input_id
+                            # input_type = input_item.input_type
+                            #el.input_selection_changed.emit(device_guid, input_type, input_id)
+                            self.config.last_device_guid = device_guid
                         
 
             # =======================================================
@@ -3555,7 +3545,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(
             None,
             "Save cheatsheet",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "PDF files (*.pdf)"
         )
         if len(fname) > 0:
@@ -4185,7 +4175,7 @@ def configure_logger(config):
 
     logger.debug("-" * 80)
     logger.debug(time.strftime("%Y-%m-%d %H:%M"))
-    logger.debug(f"Starting {APPLICATION_NAME} {APPLICATION_VERSION}")
+    logger.debug(f"Starting {gremlin.version.APPLICATION_NAME} {gremlin.version.APPLICATION_VERSION}")
     logger.debug("-" * 80)
 
     console = logging.StreamHandler()
@@ -4226,23 +4216,32 @@ if __name__ == "__main__":
 
     gremlin.shared_state.ui_ready = False
 
-        # Configure logging for system and user events
+    # log file configuration
+    app_path = gremlin.shared_state.data_path
+    
+    
+    system_log_path = os.path.join(app_path, "system.log")
+    user_log_path = os.path.join(app_path, "user.log")
+
+    gremlin.shared_state.app_path = app_path
+    gremlin.shared_state.system_log = system_log_path
+    gremlin.shared_state.user_log = user_log_path
     configure_logger({
         "name": "system",
         "level": logging.DEBUG,
-        "logfile": os.path.join(gremlin.util.userprofile_path(), "system.log"),
+        "logfile": system_log_path,
         "format": "%(asctime)s %(levelname)10s %(message)s"
     })
     configure_logger({
         "name": "user",
         "level": logging.DEBUG,
-        "logfile": os.path.join(gremlin.util.userprofile_path(), "user.log"),
+        "logfile": user_log_path,
         "format": "%(asctime)s %(message)s"
     })
 
-    # Path manging to ensure Gremlin starts independent of the CWD
-    sys.path.insert(0, gremlin.util.userprofile_path())
-    gremlin.util.setup_userprofile()
+    # Path mangling to ensure Gremlin starts independent of the CWD
+    sys.path.insert(0, app_path)
+    gremlin.config.Configuration().setup_userprofile()
 
     # Fix some dumb Qt bugs
     QtWidgets.QApplication.addLibraryPath(os.path.join(
@@ -4254,7 +4253,7 @@ if __name__ == "__main__":
 
     # syslog = logging.getLogger("system")
 
-    syslog.info(F"Joystick Gremlin Ex version {Version().version}  (P{gremlin.util.getPythonVersion()})")
+    syslog.info(F"Joystick Gremlin Ex version {gremlin.version.Version().version}  (P{gremlin.util.getPythonVersion()})")
 
     # Initialize the vjoy interface
     from vjoy.vjoy_interface import VJoyInterface
@@ -4320,8 +4319,8 @@ if __name__ == "__main__":
 
 
     app.setWindowIcon(load_icon("gfx/icon.png"))
-    app.setApplicationDisplayName(APPLICATION_NAME + " " + APPLICATION_VERSION)
-    app.setApplicationVersion(APPLICATION_VERSION)
+    app.setApplicationDisplayName(gremlin.version.APPLICATION_NAME + " " + gremlin.version.APPLICATION_VERSION)
+    app.setApplicationVersion(gremlin.version.APPLICATION_VERSION)
     # no longer needed in QT6
     #app.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
 

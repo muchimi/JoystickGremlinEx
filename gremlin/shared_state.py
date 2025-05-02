@@ -60,6 +60,8 @@ This is ugly but the only sane way to do this at the moment.
 
 root_path = None # root path
 
+data_path = None # application data path
+
 vjoy_enabled = True # assume vjoy enabled
 is_dark_theme = False # true if windows is in dark theme
 

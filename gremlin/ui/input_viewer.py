@@ -125,7 +125,7 @@ class VisualizationConfig():
 
 
     def get_config(sef):
-        fname = os.path.join(gremlin.util.userprofile_path(), "inputViewer.xml")
+        fname = os.path.join(gremlin.shared_state.data_path, "inputViewer.xml")
         return fname
     
     

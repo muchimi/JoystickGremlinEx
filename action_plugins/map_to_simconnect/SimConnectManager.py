@@ -518,11 +518,11 @@ class SimConnectManager(QtCore.QObject):
 
         self._aircraft_title = None # current title from aircraft.cfg
         self._aircraft_name = None # current name from aicraft cfg path
-        self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
+        self._simvars_xml =  os.path.join(gremlin.shared_state.data_path, "simconnect_simvars.xml")
         self._ensure_simvar_xml() # make srue the simvars file exists
 
         # https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/API_Reference/Events_And_Data/SimConnect_AddToDataDefinition.htm
-        self._lvars_xml = os.path.join(gremlin.util.userprofile_path(), "simconnect_lvars.xml")
+        self._lvars_xml = os.path.join(gremlin.shared_state.data_path, "simconnect_lvars.xml")
 
 
 

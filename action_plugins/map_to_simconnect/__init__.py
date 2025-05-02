@@ -297,7 +297,7 @@ class SimconnectOptions():
 
         # configuration file stored in the user's GremlinEx profile
         base_file = "simconnect_config.xml"
-        user_source = os.path.join(gremlin.util.userprofile_path(), base_file)
+        user_source = os.path.join(gremlin.shared_state.data_path, base_file)
         self._xml_source = user_source
 
         self._auto_mode_select = True # if set, autoloads the mode associated with the aircraft if such a mode exists, on by default

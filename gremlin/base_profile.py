@@ -3475,7 +3475,7 @@ class Profile():
             
             # get the backup number
             pattern = f"{base_name}.*.xml"
-            profile_path = gremlin.util.userprofile_path()
+            profile_path = gremlin.shared_state.data_path
             backup_path = os.path.join(profile_path, gremlin.shared_state.application_version)
             if not os.path.isdir(backup_path):
                 try:
@@ -4176,7 +4176,7 @@ class ProfileMap():
 
     def get_profile_map_file(self):
         ''' gets the profile file name '''
-        return os.path.join(userprofile_path(),"profile_map.xml")
+        return os.path.join(gremlin.shared_state.data_path, "profile_map.xml")
   
     def load_profile_map(self):
         ''' loads the mapping of profile xmls to processes '''

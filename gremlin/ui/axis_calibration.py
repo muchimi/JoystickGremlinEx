@@ -556,7 +556,7 @@ class CalibrationManager():
     ''' manages calibration data '''
 
     def __init__(self):
-        current_profile_folder = gremlin.util.userprofile_path().lower()
+        current_profile_folder = gremlin.shared_state.data_path
         self.calibration_file = os.path.join(current_profile_folder,"calibration.xml")
         self.calibration_map = {}
         self._load()

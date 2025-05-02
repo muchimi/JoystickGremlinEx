@@ -24,7 +24,7 @@ import threading
 import time
 
 
-from gremlin.util import deg2rad
+import gremlin.util 
 
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -208,8 +208,8 @@ class AcceleratedMouseMotion(MouseMotion):
             positive y
         :param value the length of the direction vector
         """
-        return value * math.cos(deg2rad(direction)),\
-            value * math.sin(deg2rad(direction))
+        return value * math.cos(gremlin.util.deg2rad(direction)),\
+            value * math.sin(gremlin.util.deg2rad(direction))
 
     def __call__(self):
         """Returns the change in x and y for this point in time.

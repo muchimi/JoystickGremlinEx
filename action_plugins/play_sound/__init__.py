@@ -135,7 +135,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             dir = config.last_sound_folder
             if dir is None or not os.path.isdir(dir):
-                dir = userprofile_path()
+                dir = gremlin.shared_state.data_path
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Path to sound file",

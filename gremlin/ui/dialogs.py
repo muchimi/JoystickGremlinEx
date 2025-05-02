@@ -42,7 +42,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.ui_about as ui_about
 import gremlin.ui.ui_common as ui_common
 
-from gremlin.util import load_icon, userprofile_path, load_pixmap, pushCursor, popCursor
+from gremlin.util import load_icon, load_pixmap, pushCursor, popCursor
 import logging
 from gremlin.input_types import InputType
 import gremlin.base_profile
@@ -571,6 +571,12 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.range_precision_widget.setToolTip("Number of decimals for floating point range comparisons")
         self.range_precision_widget.valueChanged.connect(self._range_precision_changed)
 
+        # use version names in log files
+        self.enable_version_log_widget = QtWidgets.QCheckBox("Version based log files")
+        self.enable_version_log_widget.setToolTip("If enabled, user and system logs are placed in folders by application version.\nThis only takes effect on application restart.")
+        self.enable_version_log_widget.setChecked(self.config.enable_log_version)
+        self.enable_version_log_widget.clicked.connect(self._enable_version_log_changed)
+
 
         # global numlock
         self.numlock_enabled = QtWidgets.QCheckBox("Force Numlock Off (global)")
@@ -764,7 +770,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         widget,_ = gremlin.ui.ui_common.getHContainer(self.range_precision_widget,"Range comparison decimals:")
         column_layout.addWidget(widget, row, col)
-
+        row+=1
+        column_layout.addWidget(self.enable_version_log_widget, row, col)
 
 
         page_layout.addWidget(column_widget)
@@ -1505,6 +1512,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.range_comparison_decimals = self.range_precision_widget.value()
 
     @QtCore.Slot(bool)
+    def _enable_version_log_changed(self, checked):
+        self.config.enable_log_version = checked
+
+    @QtCore.Slot(bool)
     def _verbose_cb(self, checked):
         ''' stores verbose setting '''
         self.config.verbose = checked
@@ -1651,7 +1662,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Path to executable",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "Profile (*.xml)"
         )
         if fname != "":
@@ -1956,7 +1967,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Select Profile",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "XML files (*.xml)"
         )
         if fname:
@@ -2197,18 +2208,11 @@ class LogWindowUi(ui_common.BaseDialogUi):
         self.main_layout.addWidget(self.tab_container)
 
         self._ui_elements = {}
-        self._create_log_display(
-            os.path.join(gremlin.util.userprofile_path(), "system.log"),
-            "System"
-        )
-        self._create_log_display(
-            os.path.join(gremlin.util.userprofile_path(), "user.log"),
-            "User"
-        )
-        self.watcher = gremlin.util.FileWatcher([
-            os.path.join(gremlin.util.userprofile_path(), "system.log"),
-            os.path.join(gremlin.util.userprofile_path(), "user.log")
-        ])
+        log_path = gremlin.shared_state.system_log
+        self._create_log_display(log_path,"System")
+        user_path = gremlin.shared_state.user_log
+        self._create_log_display(user_path, "User")
+        self.watcher = gremlin.util.FileWatcher([log_path, user_path])    
         self.watcher.file_changed.connect(self._reload)
 
     def closeEvent(self, event):

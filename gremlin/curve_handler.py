@@ -1884,7 +1884,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         xml_source, _ = QtWidgets.QFileDialog.getSaveFileName(
             None,
             "Save Preset",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "XML files (*.xml)"
         )
 
@@ -1912,7 +1912,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         xml_source, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Load Preset",
-            gremlin.util.userprofile_path(),
+            gremlin.shared_state.data_path,
             "XML files (*.xml)"
         )
 

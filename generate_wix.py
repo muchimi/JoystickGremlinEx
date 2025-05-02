@@ -244,7 +244,7 @@ def create_document():
             "Version": "13.40.14ex"
         })
     
-    # also change version number in joystick_gremlin.py line 60 APPLICATION_VERSION
+    
     
     mug = create_node("MajorUpgrade",
         {
