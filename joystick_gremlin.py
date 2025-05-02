@@ -55,6 +55,7 @@ import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
 import gremlin.ui.osc_device
 import gremlin.ui.mode_device
+import gremlin.ui.state_device
 import gremlin.ui.theme
 
 import gremlin.curve_handler
@@ -2167,6 +2168,33 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget.data = (TabDeviceType.ModeControl, device_guid, index)
             self._add_tab(device_guid, TabDeviceType.ModeControl)
 
+
+            if False and config.is_debug:
+                # =======================================================
+                # create state tab
+                guid = gremlin.shared_state.state_tab_guid
+                device_guid = str(guid)
+                device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+                if not device:
+                    device = dinput.DeviceSummary()
+                    device.name = "State"
+                    device.device_guid = guid
+                    device.device_id = device_guid
+                    device.device_type = DeviceType.State
+                    device.is_special = True
+                    gremlin.joystick_handling.registerSpecialDevice(device)
+
+                widget = self.getWidget(device_guid)
+                if not widget:
+                    widget = gremlin.ui.state_device.StateDeviceTabWidget(
+                        self.profile,
+                        self.current_mode
+                    )
+                    self.registerWidget(device_guid, widget)
+                    self._mode_device_guid = device_guid
+
+                widget.data = (TabDeviceType.State, device_guid, index)
+                self._add_tab(device_guid, TabDeviceType.State)
 
 
             # # =======================================================

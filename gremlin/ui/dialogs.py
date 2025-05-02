@@ -572,8 +572,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.range_precision_widget.valueChanged.connect(self._range_precision_changed)
 
         # use version names in log files
-        self.enable_version_log_widget = QtWidgets.QCheckBox("Version based log files")
-        self.enable_version_log_widget.setToolTip("If enabled, user and system logs are placed in folders by application version.\nThis only takes effect on application restart.")
+        self.enable_version_log_widget = QtWidgets.QCheckBox("Version based Configuration Data (restart required)")
+        self.enable_version_log_widget.setToolTip("If enabled, GremlinEx will use a versioned data folder.  Not recommended for regular users.")
         self.enable_version_log_widget.setChecked(self.config.enable_log_version)
         self.enable_version_log_widget.clicked.connect(self._enable_version_log_changed)
 

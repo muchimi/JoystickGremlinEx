@@ -34,6 +34,7 @@ class InputType(enum.IntEnum):
     OpenSoundControl = 8 # open sound control button input
     Midi = 9 # midi input
     ModeControl = 10 # mode actions
+    State = 11 # state input
 
 
     @staticmethod
@@ -100,7 +101,8 @@ _InputType_to_string_lookup = {
     InputType.KeyboardLatched: "keylatched",
     InputType.OpenSoundControl: "osc",
     InputType.Midi: "midi",
-    InputType.ModeControl : "modecontrol"
+    InputType.ModeControl : "modecontrol",
+    InputType.State: "state"
 }
 
 _InputType_to_display_lookup = {
@@ -111,7 +113,8 @@ _InputType_to_display_lookup = {
     InputType.KeyboardLatched: "Latched Key",
     InputType.OpenSoundControl: "OSC Button",
     InputType.Midi: "MIDI",
-    InputType.ModeControl: "Mode Control"
+    InputType.ModeControl: "Mode Control",
+    InputType.State: "State"
 }
 
 
@@ -124,6 +127,7 @@ _InputType_to_enum_lookup = {
     "keylatched": InputType.KeyboardLatched,
     "osc": InputType.OpenSoundControl,
     "midi": InputType.Midi,
-    "modecontrol" : InputType.ModeControl
+    "modecontrol" : InputType.ModeControl,
+    "state" : InputType.State
 }
 

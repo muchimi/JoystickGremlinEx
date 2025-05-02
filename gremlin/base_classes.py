@@ -220,7 +220,7 @@ class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
 
 
 class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
-    ''' base class for input items for MIDI, OSC and KEYBOARD items '''
+    ''' base class for input items for MIDI, OSC, KEYBOARD and STATE items '''
 
     def __init__(self):
         
@@ -259,6 +259,10 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     @property
     def description(self) -> str:
         return self._description
+    
+    @description.setter
+    def description(self, value) -> str:
+        self._description = value
     
     def setDescription(self, value : str):
         self._description = value

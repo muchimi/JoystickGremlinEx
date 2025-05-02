@@ -1091,7 +1091,8 @@ class VJoyUsageState():
             return remap_actions
 
         # List all input types
-        all_input_types = InputType.to_list()
+        all_input_types = [input_type for input_type in InputType.to_list() if input_type != InputType.State]
+        
 
         # Create list of all inputs provided by the vjoy devices
         vjoy = {}

@@ -23,7 +23,7 @@ import string
 import sys
 import time
 
-import action_plugins.map_to_simconnect
+
 import dinput
 
 import gremlin

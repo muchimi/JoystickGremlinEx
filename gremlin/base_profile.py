@@ -25,8 +25,6 @@ import copy
 import logging
 import time
 
-import gremlin.actions
-import gremlin.base_buttons
 #import gremlin.base_classes
 import gremlin.base_classes
 import gremlin.base_profile
@@ -37,6 +35,7 @@ import gremlin.execution_graph
 import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
+
 import gremlin.ui.keyboard_device
 
 from gremlin.util import *
@@ -835,11 +834,6 @@ class Device:
         :param mode_name the name of the mode being checked
         :param device a device to initialize for this mode if specified
         """
-        # if not gremlin.shared_state.global_mode in self.modes:
-        #     mode = Mode(self)
-        #     mode.name = "Global Mode (internal)"
-        #     self.modes[gremlin.shared_state.global_mode] = mode
-
         if mode_name in self.modes:
             mode = self.modes[mode_name]
         else:
@@ -2078,6 +2072,8 @@ class InputItem():
             return f"Midi {self._input_id.display_name}"
         elif self._input_type == InputType.ModeControl:
             return f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
+        elif self._input_type == InputType.State:
+            return f"State: {self._input_id}"
         return f"Unknown input: {self._input_type}"
     
 
@@ -2144,6 +2140,7 @@ class Profile():
 
     def __init__(self, parent = None):
         """Constructor creating a new instance."""
+        import gremlin.ui.state_device
 
         self._mode_tree = None # holds the mode tree (anytree, m73 and later) - this holds the profile's mode hiarchy
         self.devices : dict[Device] = {} # holds devices attached to this profile
@@ -2166,6 +2163,8 @@ class Profile():
         self._substitution_map = {} # map of device GUID to any new device GUID for the load process
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
         
+        self.state = gremlin.ui.state_device.StateData()
+        self.state.clear()
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
@@ -2324,6 +2323,9 @@ class Profile():
         new_device.device_guid = device_guid
         new_device.type = device_type
         self.devices[device_guid] = new_device
+
+        # state data
+        self.state = gremlin.ui.state_device.StateData()
 
     def modeTree(self) -> Node:
         ''' returns an anytree node - nodes contain the name of the mode '''
@@ -3143,6 +3145,16 @@ class Profile():
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
         self._profile_graph.parse_xml(fname)
 
+        # state data
+        nodes = root.xpath("//states")
+        if not nodes:
+            # not found
+            self.state.clear()
+        for node in nodes:
+            self.state.from_xml(node)
+
+
+
 
         # load the mode tree
         self.reload_modes(update_devices = True)
@@ -3293,6 +3305,11 @@ class Profile():
             plugins.append(plugin.to_xml())
         root.append(plugins)
 
+
+        # state data
+        node = self.state.to_xml()
+        root.append(node)
+
         # Serialize XML document
         tree = etree.ElementTree(root)
         if fname:
@@ -3349,7 +3366,8 @@ class Profile():
             InputType.JoystickHat,
             InputType.Keyboard,
             InputType.Midi,
-            InputType.OpenSoundControl
+            InputType.OpenSoundControl,
+            InputType.State
         ]
 
         # Process all devices

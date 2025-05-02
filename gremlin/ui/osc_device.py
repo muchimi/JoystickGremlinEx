@@ -3176,12 +3176,14 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         clear_button = ui_common.ConfirmPushButton("Clear OSC Inputs", show_callback = self._show_clear_cb)
         icon = gremlin.util.load_icon("fa6.trash-can")
         clear_button.setIcon(icon)
+        clear_button.setToolTip("Deletes all OSC inputs")
         clear_button.confirmed.connect(self._clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
         button_container_layout.addStretch(1)
 
         # Key add button
         add_button = QtWidgets.QPushButton("Add OSC Input")
+        add_button.setToolTip("Adds a new OSC message input to the profile")
         icon = gremlin.util.load_icon("fa6s.plus")
         add_button.setIcon(icon)
         add_button.clicked.connect(self._add_input_cb)

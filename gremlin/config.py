@@ -46,10 +46,7 @@ class Configuration:
     def get_config(self):
         ''' local config file (version based)'''
         return os.path.join(self.data_path(), "config.json")
-    
-    def get_global_config(self):
-        ''' global config file'''
-        return os.path.join(self._profile_path, "config.json")    
+ 
 
     def get_profile_config(self):
         ''' profile specific config file '''
@@ -62,7 +59,6 @@ class Configuration:
         """Creates a new instance, loading the current configuration."""
 
         self._data = {} # gremlin items - version specific
-        self._global_data = {} # gremlin items - not version specific
         self._profile_data = {}  # profile specific options 
         self._profile_loaded = False
         self._profile_fname = None # current profile to use for the conig
@@ -73,16 +69,9 @@ class Configuration:
         self._midi_enabled = None
         self._osc_enabled = None
 
-        global_fname = self.get_global_config()
 
-        if not os.path.isfile(global_fname):
-            self.save_global()
-        else:
-            # load global data
-            self._reload(True) # reload global data if it exists
-
-        local_fname = self.get_config()
-        if not os.path.isfile(local_fname):
+        fname = self.get_config()
+        if not os.path.isfile(fname):
             # create a stub - first time run
             self.save()
 
@@ -100,10 +89,7 @@ class Configuration:
         data_path = self.data_path()
         gremlin.shared_state.data_path = data_path
 
-        self._use_local = global_fname != local_fname
-
-        watch_list = [global_fname, local_fname] if self._use_local else [global_fname]
-        self.watcher = QtCore.QFileSystemWatcher(watch_list)
+        self.watcher = QtCore.QFileSystemWatcher([fname])
 
         self.reload()
         
@@ -163,7 +149,7 @@ class Configuration:
       
             if enable_version:
                 # store the log in a folder
-                app_path = os.path.join(user_profile_path, self._clean_version())
+                app_path = f"{user_profile_path}_{self._clean_version()}"
                 if not os.path.isdir(app_path):
                     try:
                         os.makedirs(app_path)
@@ -173,60 +159,60 @@ class Configuration:
             else:
                 app_path = user_profile_path
 
-            # write the last version file
-            version_data = []
-            xml_source = os.path.join(user_profile_path, "versions.xml")
-            if os.path.isfile(xml_source):
-                # load the prior data
-                parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-                tree = etree.parse(xml_source, parser = parser)
-                root = tree.getroot()
-                for node in root:
-                    version = node.get("version")
-                    timestamp = float(node.get("stamp"))
-                    dtstamp = datetime.datetime.fromtimestamp(timestamp)
-                    version_data.append((version, dtstamp))
-            else:
-                # blank root
-                root = etree.Element("root")
+            # # write the last version file
+            # version_data = []
+            # xml_source = os.path.join(user_profile_path, "versions.xml")
+            # if os.path.isfile(xml_source):
+            #     # load the prior data
+            #     parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
+            #     tree = etree.parse(xml_source, parser = parser)
+            #     root = tree.getroot()
+            #     for node in root:
+            #         version = node.get("version")
+            #         timestamp = float(node.get("stamp"))
+            #         dtstamp = datetime.datetime.fromtimestamp(timestamp)
+            #         version_data.append((version, dtstamp))
+            # else:
+            #     # blank root
+            #     root = etree.Element("root")
 
 
 
-            # sort by most recent
-            version_data.sort(key = lambda x: x[1], reverse = True )
-            most_recent_version = None
-            version_list = [vs for vs, dt in version_data]
+            # # sort by most recent
+            # version_data.sort(key = lambda x: x[1], reverse = True )
+            # most_recent_version = None
+            # version_list = [vs for vs, dt in version_data]
 
-            if version_list:
-                most_recent_version = version_list[0]
-                source_path = os.path.join(user_profile_path, most_recent_version)
-            else:
+            # if version_list:
+            #     most_recent_version = version_list[0]
+            #     source_path = os.path.join(user_profile_path, most_recent_version)
+            # else:
                 
-                source_path = user_profile_path
+            #     source_path = user_profile_path
 
 
-            current_version = self._clean_version()
-            if not current_version in version_list:
-                timestamp = datetime.datetime.now().timestamp()
-                node = etree.SubElement(root,"data", version = current_version, stamp = str(timestamp))
-                version_list.append((current_version, timestamp))
+            # current_version = self._clean_version()
+            # if not current_version in version_list:
+            #     timestamp = datetime.datetime.now().timestamp()
+            #     node = etree.SubElement(root,"data", version = current_version, stamp = str(timestamp))
+            #     version_list.append((current_version, timestamp))
 
-                # write out the updated version file
-                try:
-                    tree = etree.ElementTree(root)
-                    tree.write(xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
-                except Exception as ex:
-                    syslog.error(f"Failed to update version file. Error: {ex}")
+            #     # write out the updated version file
+            #     try:
+            #         tree = etree.ElementTree(root)
+            #         tree.write(xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            #     except Exception as ex:
+            #         syslog.error(f"Failed to update version file. Error: {ex}")
 
             
-            # copy the data over if needed
-            if enable_version and source_path != app_path:
-                gremlin.util.create_folder(app_path)
-                try:
-                    gremlin.util.copy_tree_if_newer(source_path, app_path)
-                    syslog.info(f"Version change detected: Merged contents from [{most_recent_version}] to new version [{current_version}]: new data folder {app_path}")
-                except Exception as ex:
-                    syslog.error(f"Failed to copy source folder: {source_path} to app folder {app_path}: rror: {ex}")
+            # # copy the data over if needed
+            # if enable_version and source_path != app_path:
+            #     gremlin.util.create_folder(app_path)
+            #     try:
+            #         gremlin.util.copy_tree_if_newer(source_path, app_path)
+            #         syslog.info(f"Version change detected: Merged contents from [{most_recent_version}] to new version [{current_version}]: new data folder {app_path}")
+            #     except Exception as ex:
+            #         syslog.error(f"Failed to copy source folder: {source_path} to app folder {app_path}: rror: {ex}")
             self._app_path = app_path
 
 
@@ -238,10 +224,7 @@ class Configuration:
         if not force and self._last_reload is not None and time.time() - self._last_reload < 1:
             return
         
-        self._reload(True) # global - load that first because it cascades values into local if not in local yet
-        if self._use_local:
-            self._reload() # version specific load
-
+        self._reload() #  load that first because it cascades values into local if not in local yet
         self._last_reload = time.time()
 
     def _init_data(self):
@@ -261,10 +244,10 @@ class Configuration:
                     
         return True
 
-    def _reload(self, is_global = False):
+    def _reload(self):
         """Loads the configuration file's content.  flag = global or local (version specific) config """
 
-        fname = self.get_global_config() if is_global else self.get_config()
+        fname = self.get_config()
     
         # Attempt to load the configuration file if this fails set
         # default empty values.
@@ -290,29 +273,7 @@ class Configuration:
             if field not in data:
                 data[field] = {}
 
-        if is_global:
-            self._global_data = data
-        else:
-            self._data = data
-
-        self._sync()        
-        
-
-    def _sync(self):
-        ''' sync global profile options to local options '''
-        # copy global data to default data
-        field_list = ["calibration", "profiles", "last_mode"]
-        for field in self._global_data:
-            if field in field_list:
-                if not field in self._data:
-                    self._data[field] = {}
-                for entry in self._global_data[field]:
-                    if not entry in self._data[field]:
-                        self._data[field][entry] = self._global_data[field][entry]
-
-            else:
-                self._data[field] = self._global_data[field]
-
+        self._data = data
         
     def _get_data(self, field, default_value = None):
         ''' gets a value field either from local or global depending where it's defined '''
@@ -320,8 +281,6 @@ class Configuration:
         # pull from local data first
         if field in self._data:
             return self._data.get(field, default_value)
-        if field in self._global_data:
-            return self._global_data.get(field, default_value)
         return default_value
 
 
@@ -357,26 +316,11 @@ class Configuration:
 
     def save(self):
         """Writes the version specific configuration file to disk."""
-        if not self._use_local:
-            self.save_global()
-            return
         fname = self.get_config() 
         with open(fname, "w") as hdl:
             encoder = json.JSONEncoder(sort_keys=True,indent=4)
             hdl.write(encoder.encode(self._data))
         pass
-
-    def save_global(self):
-        """Writes the global specific configuration file to disk."""
-        fname = self.get_global_config() 
-        if not "window_geo_size" in self._global_data:
-            pass
-        with open(fname, "w") as hdl:
-            encoder = json.JSONEncoder(sort_keys=True,indent=4)
-            hdl.write(encoder.encode(self._global_data))
-
-        
-
 
 
     def save_profile(self):
@@ -699,7 +643,7 @@ class Configuration:
 
         :param value path to the most recently used profile
         """
-        self._global_data["last_profile"] = value
+        self._data["last_profile"] = value
 
         # Update recent profiles
         if value is not None:
@@ -723,8 +667,8 @@ class Configuration:
             while data:
                 current.append(os.path.normpath(data.popleft().casefold()))
             
-            self._global_data["recent_profiles"] = current
-        self.save_global()
+            self._data["recent_profiles"] = current
+        self.save()
 
     @property
     def recent_profiles(self):
@@ -1476,8 +1420,8 @@ class Configuration:
         return self._get_data("tab_order", None)
     @tab_list.setter
     def tab_list(self, value):
-        self._global_data["tab_order"] = value
-        self.save_global()
+        self._data["tab_order"] = value
+        self.save()
 
     @property
     def show_output_vjoy(self):
@@ -2207,23 +2151,49 @@ class Configuration:
         self._data["range_comparison_decimals"] = value
         self.save()
 
+    def _get_key(self):
+        ''' gets the gremlin registry entry '''
+        import winreg
+        software_key = winreg.OpenKeyEx(winreg.HKEY_CURRENT_USER, r"SOFTWARE\\")
+        return winreg.CreateKey(software_key, "GremlinEx") 
+        
+
+    def _set_registry(self, field, value):
+        ''' writes a value to the windows registry for the app '''
+        import winreg
+        key = self._get_key()
+        winreg.SetValueEx(key, field, 0, winreg.REG_SZ, str(value))
+        winreg.CloseKey(key)
+    
+    def _get_registry(self, field, type_cast, default_value = None):
+        ''' gets a value from the windows registry for the app '''
+        import winreg
+        import gremlin.util
+        key = self._get_key()
+        try:
+            str_value, type = winreg.QueryValueEx(key, field)
+            if str_value:
+                if type_cast is bool:
+                    value = gremlin.util.str_to_bool(str_value)
+                else:
+                    value =  type_cast(str_value)
+                return value
+            return default_value
+        except:
+            # not found
+            return default_value
+        finally:
+            winreg.CloseKey(key)
+        
+
     @property
     def enable_log_version(self) -> bool:
-        value =  self._global_data.get("enable_log_version", False)
+        value = self._get_registry("enable_log_version", bool, False)
         return value
     
     @enable_log_version.setter
     def enable_log_version(self, value: bool):
-        self._global_data["enable_log_version"] = value
-        self.save_global()
-        if value:
-            self._use_local = True
-            self._app_path = None # force a data path update
-            self._reload() # load local data set
-        else:
-            # clear local data set
-            self._use_local = False
-            self._data = self._init_data()
+        self._set_registry("enable_log_version", value)
         
 
 

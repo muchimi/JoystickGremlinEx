@@ -134,11 +134,12 @@ class InputItemListModel(ui_common.AbstractModel):
 
 
 
-    def __init__(self, device_data, mode, allowed_types = None):
+    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
         :param mode the mode this model manages
+        :param custom_update_handler: handler for custom updates to the data
         """
         super().__init__()
         self._device_data = device_data
@@ -150,6 +151,7 @@ class InputItemListModel(ui_common.AbstractModel):
         else:
             # all types
             self._allowed_input_types = gremlin.base_classes.TraceableList(InputType.to_list(), self._filter_change_cb)
+        self._custom_update_handler = custom_update_handler
         self._update_data()
 
 
@@ -187,6 +189,11 @@ class InputItemListModel(ui_common.AbstractModel):
     def _update_data(self, emit_change = True):
         ''' loads into the data model all the items for the current mode and device '''
         # load the items for this mode
+
+        if self._custom_update_handler:
+            # use our custom handler to update the model data
+            self._custom_update_handler(self, emit_change)
+            return
 
         input_items = self._device_data.modes[self._mode]
         index = 0

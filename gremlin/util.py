@@ -1935,3 +1935,21 @@ def create_folder(path) -> bool:
             syslog.error(">> {}".format(err))
             return False
     return True
+
+
+def str_to_bool(str_value) -> bool:
+    ''' converts a boolean string value to a bool because for some reason bool('false') returns True in python... '''
+    if str_value:
+        str_value = str_value.casefold()
+        if str_value == "true":
+            return True
+        if str_value == "false":
+            return False
+        if str_value == "1":
+            return True
+        if str_value == "0":
+            return False
+        if str_value.isnumeric():
+            return int(str_value) > 0
+    return False
+            

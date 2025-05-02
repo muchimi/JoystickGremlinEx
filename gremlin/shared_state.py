@@ -101,18 +101,20 @@ _suspend_ui_keyinput = 0
 # list of device names to their GUID
 _virtual_device_guid_to_name_map = {}
 
-# UUID of the plugins tab
+# UUID of the plugins tab (plungins special device)
 plugins_tab_guid = gremlin.util.parse_guid('dbce0add-460c-480f-9912-31f905a84247')
-# UUID of the settings tab
+# UUID of the settings tab (settings special device)
 settings_tab_guid = gremlin.util.parse_guid('5b70b5ba-bded-41a8-bd91-d8a209b8e981')
-# UUID of the MIDI tab
+# UUID of the MIDI tab (midi device)
 midi_tab_guid = gremlin.util.parse_guid('1b56ecf7-0624-4049-b7b3-8d9b7d8ed7e0')
-# UUID of the OSC tab
+# UUID of the OSC tab (osc device)
 osc_tab_guid = gremlin.util.parse_guid('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
-# UUID of the keyboard tab
+# UUID of the keyboard tab (keyboard device)
 keyboard_tab_guid = gremlin.util.parse_guid('6f1d2b61-d5a0-11cf-bfc7-444553540000')
-# UUID of the mode tab
+# UUID of the mode tab (mode device)
 mode_tab_guid = gremlin.util.parse_guid('b3b159a0-4d06-4bd6-93f9-7583ec08b877')
+# UUID of the state tab (state special device)
+state_tab_guid = gremlin.util.parse_guid('72bbc0f4-31a8-4a41-b528-868dc7fcedfa')
 
 # holds the current selected device guid (string) for a tab
 current_tab_device_guid = None
