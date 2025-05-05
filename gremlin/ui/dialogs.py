@@ -2316,14 +2316,26 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
         self._profile : gremlin.base_profile.Profile = profile
         self.setWindowTitle("Mode Manager - Add Profile Mode")
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        widget, layout = ui_common.getHContainer()
 
-        layout.addWidget(QtWidgets.QLabel("New mode:"))
         self._edit_widget = ui_common.QDataLineEdit()
-        layout.addWidget(self._edit_widget)
-        layout.addWidget(QtWidgets.QLabel("Parent mode:"))
+        self._edit_widget.setToolTip("Name of the new mode (should be unique)")
+
+        widgets = []
+        widget, layout = ui_common.getGridContainer(["New mode:", self._edit_widget])
+        self.main_layout.addWidget(widget)
+        widgets.append(widget)
+
         self._parent_widget = gremlin.ui.ui_common.QComboBox()
-        layout.addWidget(self._parent_widget)
+        self._parent_widget.setToolTip("Select the parent mode of the new mode.\nLeave blank if the new mode is a top level mode.")
+
+        widget, layout = ui_common.getGridContainer(["Parent mode:", self._parent_widget])
+        self.main_layout.addWidget(widget)
+        widgets.append(widget)
+
+        gremlin.ui.ui_common.synchronize_grids(widgets)
+
+        
+        
         mode_list : list = self._profile.get_modes()
         self._parent_widget.addItem("")
         for name in sorted(mode_list):

@@ -2716,7 +2716,14 @@ def get_layout_widgets(layout) -> list:
 
 class QComboBox (QtWidgets.QComboBox):
     ''' a max limited combo box '''
-    def __init__(self, parent = None):
+    def __init__(self, parent = None, width = 200, maxItems = 20):
+        ''' combo box with max count 
+        
+        :param parent: the parent widget of the combo box
+        :param width: min width in pixels
+        :param maxitems: max number of items to display
+        
+        '''
         super().__init__(parent)
 
         # hack to ensure maximum items property is respected
@@ -2724,9 +2731,9 @@ class QComboBox (QtWidgets.QComboBox):
         # self.lineEdit().setFrame(False)
         # self.lineEdit().setReadOnly(True)
         self.setStyleSheet('QComboBox {combobox-popup: 0}')
+        self.setMinimumWidth(width)
 
-
-        self.setMaxVisibleItems(20)
+        self.setMaxVisibleItems(maxItems)
 
 class NoWheelComboBox (QComboBox):
     ''' implements a combo box with no-wheel scrolling to avoid inadvertent switching of entries while scolling containers '''
@@ -3063,13 +3070,14 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     valueChanged = QtCore.Signal() # fires when the text has changed AND we lost the focus
     lostFocus = QtCore.Signal() # fires when the input looses focus
 
-    def __init__(self, text = None, data = None, parent = None):
+    def __init__(self, text = None, data = None, parent = None, width = 200):
         super().__init__(text, parent)
         self._data = data
         self._text_changed = True
         self.setAlignment(Qt.AlignLeft)
         #self.setStyleSheet("QLineEdit{border: #8FBC8F;}")
         super().textChanged.connect(self._text_changed_cb)
+        self.setMinimumWidth(width)
 
 
     def _text_changed_cb(self):
@@ -6516,7 +6524,7 @@ def getRadioContainer(label_data_pairs, callback, default = None, horizontal = T
 def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False):
     ''' gets a qt H container widget 
     
-    :param widget_or_list: list of widgets, or a single widget to add to the container
+    :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically
     :param label: label to add to the container (appears first if provided)
     :param parent: parent widget if any
     :param left_stretch: adds the stretch at the start of the container to right align it on the row
@@ -6531,10 +6539,14 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
         layout.addWidget(QtWidgets.QLabel(label))
         stretch = True
     if widget_or_list:
-        if isinstance(widget_or_list, list)  or isinstance(widget_or_list, tuple):
+        if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
+                if isinstance(item, str):
+                    item = QtWidgets.QLabel(item)
                 layout.addWidget(item)
         else:
+            if isinstance(widget_or_list, str):
+                item = QtWidgets.QLabel(widget_or_list)
             layout.addWidget(widget_or_list)
         stretch = True
     if stretch:
@@ -6572,7 +6584,7 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, parent 
 def getGridContainer(widget_or_list = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None ):
     ''' gets a qt grid container widget
      
-    :param widget_or_list: the widget or widgets to add to the next row
+    :param widget_or_list: the widget or widgets to add to the next row - if the item is a string, it's converted to a label
     :param alignment: cell alignment
     :param start_col: starting column where to add the new widget, starting from the left column
     :param start_row: starting row where to add the new widgets
@@ -6601,10 +6613,14 @@ def getGridContainer(widget_or_list = None, alignment = QtCore.Qt.AlignmentFlag.
     if widget_or_list:
         if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
-                layout.addWidget(item, row, col, alignment)
+                if isinstance(item, str):
+                    item = QtWidgets.QLabel(item)
+                layout.addWidget(item, row, col)
                 col+=1
         else:
-            layout.addWidget(widget_or_list, row, col, alignment)
+            if isinstance(widget_or_list, str):
+                widget_or_list = QtWidgets.QLabel(widget_or_list)
+            layout.addWidget(widget_or_list, row, col)
             col+=1
 
     if stretch:

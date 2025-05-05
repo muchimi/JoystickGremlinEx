@@ -134,7 +134,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
 
 
-    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None):
+    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
@@ -152,6 +152,8 @@ class InputItemListModel(ui_common.AbstractModel):
             # all types
             self._allowed_input_types = gremlin.base_classes.TraceableList(InputType.to_list(), self._filter_change_cb)
         self._custom_update_handler = custom_update_handler
+        self._custom_clear_handler = custom_clear_handler
+        self._custom_remove_handler = custom_remove_handler
         self._update_data()
 
 
@@ -245,6 +247,10 @@ class InputItemListModel(ui_common.AbstractModel):
 
     def removeRow(self, index):
         ''' removes the item at the specified index '''
+
+        if self._custom_remove_handler:
+            self._custom_remove_handler(self, index)
+            return True
 
         data = self.data(index)
         if data:
@@ -346,10 +352,14 @@ class InputItemListModel(ui_common.AbstractModel):
 
     def clear(self, input_types):
         ''' removes all inputs of the specififed type '''
-        input_items = self._device_data.modes[self._mode]
-        for input_type in input_types:
-            if input_type in input_items.config:
-                input_items.config[input_type] = {}
+        if self._custom_clear_handler:
+            self._custom_clear_handler(self)
+        else:
+            input_items = self._device_data.modes[self._mode]
+            for input_type in input_types:
+                if input_type in input_items.config:
+                    input_items.config[input_type] = {}
+
         self._index_map = {}
         
 
@@ -504,6 +514,8 @@ class InputItemListView(ui_common.AbstractView):
 
                 for index in range(row_count):
                     data = self.model.data(index)
+                    if not data:
+                        continue
 
                     # true if this index should be selected because it was selected in the old list
                     selected = selected_input_id and selected_input_id == data.input_id

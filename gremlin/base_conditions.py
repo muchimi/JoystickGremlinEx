@@ -255,6 +255,50 @@ class JoystickCondition(AbstractCondition):
         return f"Joystick Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} device: {self.device_name} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[0]:0.3f}]  use calibrated: {self.use_calibrated_data}"
 
 
+class StateCondition(AbstractCondition):
+    ''' state condition '''
+    def __init__(self):
+        super().__init__()
+
+        self.key = None
+        self.description = None
+        self.comparison = "pressed"
+
+    def from_xml(self, node, data = None):
+        import gremlin.ui.state_device
+        super().from_xml(node, data)
+
+        condition_type = node.get("condition-type")
+        if condition_type != "state":
+            return
+        
+        
+        self.key = node.get("key")
+        if "description" in node.attrib:
+            self.description = node.get("description")
+        self.comparison = safe_read(node, "comparison")
+        sd =  gremlin.ui.state_device.StateData()
+        sd.register(self.key, description = self.description)
+
+    def to_xml(self):
+        node = super().to_xml() 
+        node.set("comparison", str(self.comparison))
+        node.set("condition-type", "state")
+        node.set("key", self.key)
+        if self.description:
+            node.set("description", self.description)
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return super().is_valid() and bool(self.key)
+    
+    def __str__(self):
+        return f"State Condition: [{self.key}] comparison: {self.comparison}"
+    
 class VJoyCondition(AbstractCondition):
 
     """vJoy device state based condition.
@@ -749,6 +793,7 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         "joystick": JoystickCondition,
         "vjoy": VJoyCondition,
         "action": InputActionCondition,
+        "state": StateCondition
     }
 
     def __init__(self, conditions, rule):
@@ -853,7 +898,8 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
 
         for condition in self.conditions:
             # save the condition, valid or not so the data is saved
-            node.append(condition.to_xml())
+            condition_node = condition.to_xml()
+            node.append(condition_node)
         return node
     
     def condition_name(self):

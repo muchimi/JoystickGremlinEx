@@ -1966,6 +1966,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
                     # pick a default entry for each tab if one is not currently selected
+                    device_guid = self.config.last_device_guid
                     _, last_input_id = self._get_last_input(device_guid)
                     if last_input_id is None:
                         # get the first input item of the tab
@@ -2168,33 +2169,31 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget.data = (TabDeviceType.ModeControl, device_guid, index)
             self._add_tab(device_guid, TabDeviceType.ModeControl)
 
+            # =======================================================
+            # create state tab
+            guid = gremlin.shared_state.state_tab_guid
+            device_guid = str(guid)
+            device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+            if not device:
+                device = dinput.DeviceSummary()
+                device.name = "State"
+                device.device_guid = guid
+                device.device_id = device_guid
+                device.device_type = DeviceType.State
+                device.is_special = True
+                gremlin.joystick_handling.registerSpecialDevice(device)
 
-            if False and config.is_debug:
-                # =======================================================
-                # create state tab
-                guid = gremlin.shared_state.state_tab_guid
-                device_guid = str(guid)
-                device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-                if not device:
-                    device = dinput.DeviceSummary()
-                    device.name = "State"
-                    device.device_guid = guid
-                    device.device_id = device_guid
-                    device.device_type = DeviceType.State
-                    device.is_special = True
-                    gremlin.joystick_handling.registerSpecialDevice(device)
+            widget = self.getWidget(device_guid)
+            if not widget:
+                widget = gremlin.ui.state_device.StateDeviceTabWidget(
+                    self.profile,
+                    self.current_mode
+                )
+                self.registerWidget(device_guid, widget)
+                self._state_device_guid = device_guid
 
-                widget = self.getWidget(device_guid)
-                if not widget:
-                    widget = gremlin.ui.state_device.StateDeviceTabWidget(
-                        self.profile,
-                        self.current_mode
-                    )
-                    self.registerWidget(device_guid, widget)
-                    self._mode_device_guid = device_guid
-
-                widget.data = (TabDeviceType.State, device_guid, index)
-                self._add_tab(device_guid, TabDeviceType.State)
+            widget.data = (TabDeviceType.State, device_guid, index)
+            self._add_tab(device_guid, TabDeviceType.State)
 
 
             # # =======================================================
@@ -2578,14 +2577,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         :returns: (input_type, Input_id)
 
         '''
-        input_type, input_id = gremlin.shared_state.last_input_id(device_guid)
+        
+        _, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid)
         if not input_type:
             # pick the first input for that tab
             widget = self._get_tab_widget_guid(device_guid)
             input_item: gremlin.base_profile.InputItem = self._get_input_item(device_guid, 0)
             if input_item:
                 return (input_item.input_type, input_item.input_id)
-        return (None, None)
+        return (input_type, input_id)
 
     def _get_input_item(self, device_guid : str, index : int) -> gremlin.base_profile.InputItem:
         ''' get the input item at the specified index in the device - index is 0 based '''

@@ -34,6 +34,7 @@ import gremlin.base_classes
 import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.shared_state
+import gremlin.shared_state
 import gremlin.threading
 
 from PySide6 import QtCore, QtWidgets
@@ -325,6 +326,9 @@ class EventListener(QtCore.QObject):
 
 	# signal emitted when an OSC input is received
 	osc_event = QtCore.Signal(Event)
+
+	# state event
+	state_event = QtCore.Signal(Event)
 
 	# Signal emitted when a joystick is attached or removed
 	device_change_event = QtCore.Signal()
@@ -1269,6 +1273,7 @@ class EventHandler(QtCore.QObject):
 		self.latched_callbacks = {}
 		self.midi_callbacks = {}
 		self.osc_callbacks = {}
+		self.state_callbacks = {}
 		self._event_lookup = {}
 		self.latched_functors = {}
 		self.experimental = config.experimental
@@ -1557,6 +1562,23 @@ class EventHandler(QtCore.QObject):
 					self.osc_callbacks[device_guid][mode][key] = []
 				data = self.osc_callbacks[device_guid][mode][key]
 				data.append((self._install_plugins(callback),permanent))
+
+			elif event.event_type == InputType.State:
+				verbose = gremlin.config.Configuration().verbose
+				state_input = event.identifier
+				key = state_input.message_key
+				if device_guid not in self.state_callbacks.keys():
+					self.state_callbacks[device_guid] = {}
+				# these callbacks work in multi modes
+				modes = gremlin.shared_state.current_profile.get_modes()
+				for mode in modes:
+					if mode not in self.state_callbacks[device_guid].keys():
+						self.state_callbacks[device_guid][mode] = {}
+					if not key in self.state_callbacks[device_guid][mode]:
+						self.state_callbacks[device_guid][mode][key] = []
+					data = self.state_callbacks[device_guid][mode][key]
+					data.append((self._install_plugins(callback),permanent))
+			
 
 			else:
 				# regular event - events are stored by the event key
@@ -1916,6 +1938,7 @@ class EventHandler(QtCore.QObject):
 		self.latched_callbacks = {}
 		self.midi_callbacks = {}
 		self.osc_callbacks = {}
+		self.state_callbacks = {}
 		
 
 	def execute_event(self, event : Event):
@@ -2032,6 +2055,9 @@ class EventHandler(QtCore.QObject):
 		elif event.event_type == InputType.OpenSoundControl:
 			m_list = self._matching_osc_callbacks(event)
 			if verbose and not m_list: syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
+		elif event.event_type == InputType.State:
+			m_list = self._matching_state_callbacks(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [STATE] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
 		elif event.event_type == InputType.JoystickAxis:
 			# if not self.shouldProcess(event):
 			# 	return
@@ -2151,7 +2177,27 @@ class EventHandler(QtCore.QObject):
 		else:
 			return [c[0] for c in callback_list]
 
+	def _matching_state_callbacks(self, event):
+		''' returns list of callbacks matching the event '''
+		callback_list = []
+		if event.event_type == InputType.State:
+			key = event.identifier.message_key
+			if event.device_guid in self.state_callbacks:
+				import gremlin.execution_graph
+				ec = gremlin.execution_graph.ExecutionContext() # current execution context
+				# search callbacks for mode hierarchy
+				callback_list = ec.getCallbacks(self.state_callbacks[event.device_guid], key, self.runtime_mode)
 
+			verbose = config.Configuration().verbose_mode_osc
+			if verbose and not callback_list:
+				# syslog = logging.getLogger("system")
+				syslog.info(f"STATE: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
+
+		# Filter events when the system is paused
+		if not self.process_callbacks:
+			return [c[0] for c in callback_list if c[1]]
+		else:
+			return [c[0] for c in callback_list]
 
 	def _matching_functors(self, event) -> list:
 		''' gets the list of matching functors to call when an event occurs '''	

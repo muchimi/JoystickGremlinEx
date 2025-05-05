@@ -340,8 +340,88 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         # grab a new data index as this is a new entry
         self._key_pressed_cb(self._keyboard_dialog.latched_key)
 
-        
+class StateConditionWidget(AbstractConditionWidget):
+    ''' state condition UI '''
+    def __init__(self, condition, parent=None):
+        super().__init__(condition, parent)
+        self.setTitle("State Condition")
 
+    def _create_ui(self):
+
+        self.state_selector = gremlin.ui.ui_common.QComboBox()
+        self.state_selector.currentIndexChanged.connect(self._state_changed)
+        self.state_description_widget = QtWidgets.QLabel()
+        widget,layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector])
+        self.main_layout.addWidget(widget)
+
+        widget,layout = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
+        self.main_layout.addWidget(widget)
+
+        self.comparison_dropdown = ui_common.QComboBox()
+        self.comparison_dropdown.addItem("Pressed")
+        self.comparison_dropdown.addItem("Released")
+        if self.condition.comparison:self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
+        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
+
+        self.key_label = QtWidgets.QLabel("")
+
+        self.grid_widget =  QtWidgets.QWidget()
+        self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
+        self.grid_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+        self.grid_layout.addWidget(self.key_label, 0, 1)
+        self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.grid_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+        self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+        
+        self.grid_layout.setColumnStretch(4,2)
+
+        self.main_layout.addWidget(self.grid_widget)
+
+        self.populate_selector()
+        
+        
+    def setDescription(self, value):
+        self.state_description_widget.setText(value if value else "n/a")
+
+    @QtCore.Slot()
+    def _state_changed(self):
+        data = self.state_selector.currentData()
+        description = data.description
+        self.setDescription(description)
+        self.condition.key = data.key
+        self.condition.description = description
+
+    @QtCore.Slot(str)
+    def _comparison_changed_cb(self, text):
+        """Updates the comparison operation to use.
+
+        :param text the new comparison operation name
+        """
+        self.condition.comparison = text.lower()
+
+    def populate_selector(self):
+        ''' updates the available states '''
+        import gremlin.ui.state_device
+        with QtCore.QSignalBlocker(self.state_selector):
+            self.state_selector.clear()
+            sd = gremlin.ui.state_device.StateData()
+            for key, data in sd.getStates().items():
+                self.state_selector.addItem(key, data)
+
+            key = self.condition.key
+            if key:
+                index = self.state_selector.findText(key)
+                if index >= 0:
+                    self.state_selector.setCurrentIndex(index)
+            else:
+                # pick the first as the default
+                self.condition.key = self.state_selector.currentText()
+            
+            if self.state_selector.count():
+                data = self.state_selector.currentData()
+                description = data.description
+                self.setDescription(description)        
+                self.condition.description = description
 
 class JoystickConditionWidget(AbstractConditionWidget):
 
@@ -1236,7 +1316,9 @@ class ConditionView(ui_common.AbstractView):
         "vJoy":
             [VJoyCondition, VJoyConditionWidget],
         "Action":
-            [InputActionCondition, InputActionConditionWidget]
+            [InputActionCondition, InputActionConditionWidget],
+        "State":
+            [StateCondition, StateConditionWidget],
     }
 
     # Mapping between application rule label and enumeration
@@ -1286,6 +1368,8 @@ class ConditionView(ui_common.AbstractView):
         self.condition_selector.addItem("Joystick Condition")
         self.condition_selector.addItem("vJoy Condition")
         self.condition_selector.addItem("Action Condition")
+        self.condition_selector.addItem("State Condition")
+        
         config = gremlin.config.Configuration()
         last_selector = config.condition_selector
         index = self.condition_selector.findText(last_selector)

@@ -38,6 +38,7 @@ import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
 import gremlin.plugin_manager
+import gremlin.ui.state_device
 import vjoy as vjoy_module
 from vjoy import vjoy
 import gremlin.config
@@ -49,6 +50,7 @@ import gremlin.input_devices
 import gremlin.user_plugin
 import gremlin.sendinput as sendinput
 import gremlin.execution_graph
+import gremlin.ui
 import anytree
 import traceback
 
@@ -419,6 +421,35 @@ class CodeRunner:
                     False
                 )
 
+            # setup callbacks for state data changes
+            sd = gremlin.ui.state_device.StateData()
+            state_device_guid= gremlin.shared_state.state_tab_guid
+            
+            for key, data in sd.getStates().items():
+                callbacks = []
+                input_item = data.input_item
+                for container in input_item.containers:
+                    if not container.is_valid():
+                        #test = container.is_valid()
+                        syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: Incomplete container ignored")
+                        continue
+                    callbacks.extend(container.generate_callbacks())
+                for cb_data in callbacks:
+                    event = gremlin.event_handler.Event(
+                        event_type= InputType.State,
+                        device_guid=state_device_guid,
+                        identifier= data,
+                    )
+                    self.event_handler.add_callback(
+                                            state_device_guid,
+                                            mode.name,
+                                            event,
+                                            cb_data.callback,
+                                            input_item.always_execute)
+                 
+                
+
+
 
 
             # Use inheritance to build input action lookup table
@@ -479,6 +510,9 @@ class CodeRunner:
 
             # hook osc events
             evt_listener.osc_event.connect(self.event_handler.execute_event)
+
+            # hook state events
+            evt_listener.state_event.connect(self.event_handler.execute_event)
 
             # set keyboard startup state for numlock - use global numlock or profile numlock
             numlock_off = numlock_off or profile.get_force_numlock()

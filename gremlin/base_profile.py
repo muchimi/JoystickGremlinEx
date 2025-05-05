@@ -1519,13 +1519,7 @@ class InputItem():
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
 
-        # registry = ProfileRegistry()
-        # registry.registerInputItem(self)
-
-    # def getOverrideInputType(self):
-    #     if self.device_type == DeviceType.ModeControl:
-    #         return InputType.JoystickButton
-    #     return None        
+      
 
     @property
     def message_key(self):
@@ -1824,7 +1818,7 @@ class InputItem():
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
     
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, skip_root = False):
         """Parses an InputItem node.
 
         :param node XML node to parse
@@ -1834,99 +1828,102 @@ class InputItem():
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
-        self._description = safe_read(node, "description", str)
-        self.always_execute = read_bool(node, "always-execute", False)
 
-        if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
-            from gremlin.ui.keyboard_device import KeyboardInputItem
-            from gremlin.keyboard import Key
-            input_item = KeyboardInputItem()
+        if not skip_root: # skip header processing if set
 
-            if "id" in node.attrib and node.tag == "key":
-                # legacy format
-                scan_code = safe_read(node, "id", int, 0)
-                key = Key(scan_code=scan_code, is_extended=False, is_mouse = False)
-                input_item.key = key
-            else:
-                # see if old style keyboard entry
-                if "extended" in node.attrib:
-                    scan_code = self.input_id
-                    is_extended = read_bool(node, "extended", False)
-                    is_mouse = safe_read(node,"mouse", bool, False)
-                    key = Key(scan_code=scan_code, is_extended=is_extended, is_mouse = is_mouse)
+            self._description = safe_read(node, "description", str)
+            self.always_execute = read_bool(node, "always-execute", False)
+
+            if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
+                from gremlin.ui.keyboard_device import KeyboardInputItem
+                from gremlin.keyboard import Key
+                input_item = KeyboardInputItem()
+
+                if "id" in node.attrib and node.tag == "key":
+                    # legacy format
+                    scan_code = safe_read(node, "id", int, 0)
+                    key = Key(scan_code=scan_code, is_extended=False, is_mouse = False)
                     input_item.key = key
-                    for child in node:
-                        if child.tag == "latched":
-                            latched_key = Key(scan_code=safe_read(child,"id",int), is_extended= read_bool(child,"extended"))
-                            if not latched_key in key.latched_keys:
-                                key.latched_keys.append(latched_key)
                 else:
-                    # new style
-                    for child in node:
-                        if child.tag == "input":
-                            input_item.parse_xml(child, data)
-                            break
-            self.input_type = InputType.KeyboardLatched # force new input type
-            #syslog.info(f"Loaded key input: {input_item.display_name}")
-            self.input_id = input_item
+                    # see if old style keyboard entry
+                    if "extended" in node.attrib:
+                        scan_code = self.input_id
+                        is_extended = read_bool(node, "extended", False)
+                        is_mouse = safe_read(node,"mouse", bool, False)
+                        key = Key(scan_code=scan_code, is_extended=is_extended, is_mouse = is_mouse)
+                        input_item.key = key
+                        for child in node:
+                            if child.tag == "latched":
+                                latched_key = Key(scan_code=safe_read(child,"id",int), is_extended= read_bool(child,"extended"))
+                                if not latched_key in key.latched_keys:
+                                    key.latched_keys.append(latched_key)
+                    else:
+                        # new style
+                        for child in node:
+                            if child.tag == "input":
+                                input_item.parse_xml(child, data)
+                                break
+                self.input_type = InputType.KeyboardLatched # force new input type
+                #syslog.info(f"Loaded key input: {input_item.display_name}")
+                self.input_id = input_item
 
 
 
-        elif self.input_type == InputType.Midi:
-            # midi data
-            from gremlin.ui.midi_device import MidiInputItem
-            midi_input_item = MidiInputItem()
-            for child in node:
-                if child.tag == "input":
-                    midi_input_item.parse_xml(child, data)
-            self.input_id = midi_input_item
+            elif self.input_type == InputType.Midi:
+                # midi data
+                from gremlin.ui.midi_device import MidiInputItem
+                midi_input_item = MidiInputItem()
+                for child in node:
+                    if child.tag == "input":
+                        midi_input_item.parse_xml(child, data)
+                self.input_id = midi_input_item
+                    
+
+            elif self.input_type == InputType.OpenSoundControl:
+                # OSC data
+                from gremlin.ui.osc_device import OscInputItem
+                osc_input_item = OscInputItem()
+                for child in node:
+                    if child.tag == "input":
+                        osc_input_item.parse_xml(child, data)
+                self.input_id = osc_input_item
                 
 
-        elif self.input_type == InputType.OpenSoundControl:
-            # OSC data
-            from gremlin.ui.osc_device import OscInputItem
-            osc_input_item = OscInputItem()
-            for child in node:
-                if child.tag == "input":
-                    osc_input_item.parse_xml(child, data)
-            self.input_id = osc_input_item
+            elif self.input_type == InputType.ModeControl:
+                # mode control entries - input id is the only item we need
+                self.is_axis = False
+                input_id = safe_read(node,"id",int,0)
+                self.input_id = input_id
+                
+
+
+            elif self.input_type == InputType.JoystickAxis:
+                # check for curve data
+                for child in node:
+                    if gremlin.base_profile._is_curve_tag(child.tag):
+                        self.curve_data = gremlin.curve_handler.AxisCurveData()
+                        self.curve_data._parse_xml(child)
+                        self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
+                        break
+                if "id" in node.attrib:
+                    str_id = node.get("id")
+                    if not str_id.isnumeric():
+                        self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
+                    else:
+                        self.input_id = safe_read(node,"id",int,0)
+                self.is_axis = True
+
+            elif self.input_type in (InputType.JoystickButton, InputType.JoystickHat):
+                if "id" in node.attrib:
+                    str_id = node.get("id")
+                    if not str_id.isnumeric():
+                        self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
+                    else:
+                        self.input_id = safe_read(node,"id",int,0)
             
 
-        elif self.input_type == InputType.ModeControl:
-            # mode control entries - input id is the only item we need
-            self.is_axis = False
-            input_id = safe_read(node,"id",int,0)
-            self.input_id = input_id
-            
-
-
-        elif self.input_type == InputType.JoystickAxis:
-            # check for curve data
-            for child in node:
-                if gremlin.base_profile._is_curve_tag(child.tag):
-                    self.curve_data = gremlin.curve_handler.AxisCurveData()
-                    self.curve_data._parse_xml(child)
-                    self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
-                    break
-            if "id" in node.attrib:
-                str_id = node.get("id")
-                if not str_id.isnumeric():
-                    self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
-                else:
-                    self.input_id = safe_read(node,"id",int,0)
-            self.is_axis = True
-
-        elif self.input_type in (InputType.JoystickButton, InputType.JoystickHat):
-            if "id" in node.attrib:
-                str_id = node.get("id")
-                if not str_id.isnumeric():
-                    self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
-                else:
-                    self.input_id = safe_read(node,"id",int,0)
-        
-
-        assert self.input_id is not None,"Error processing input - check types"
-            
+            assert self.input_id is not None,"Error processing input - check types"
+                
 
         
         for child in container_node:
@@ -1973,39 +1970,45 @@ class InputItem():
         return True
 
 
-    def to_xml(self):
+    def to_xml(self, parent_node = None):
         """Generates a XML node representing this object's data.
 
         :return XML node representing this object
         """
         from gremlin.keyboard import Key
-        node = etree.Element(InputType.to_string(self.input_type))
-        container_node = node # default container node to the input node
-        if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-            if isinstance(self.input_id, Key):
-                # keyboard key item
-                key : Key
-                key = self.input_id
-                node.set("id", safe_format(key.scan_code, int))
-                node.set("extended", safe_format(key.is_extended, bool))
-                for latched_key in key.latched_keys:
-                    # latched keys
-                    child = etree.Element("latched")
-                    child.set("id", safe_format(latched_key.scan_code, int))
-                    child.set("extended", safe_format(latched_key.is_extended, bool))
+        if parent_node is None:
+                
+            node = etree.Element(InputType.to_string(self.input_type))
+            container_node = node # default container node to the input node
+            if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
+                if isinstance(self.input_id, Key):
+                    # keyboard key item
+                    key : Key
+                    key = self.input_id
+                    node.set("id", safe_format(key.scan_code, int))
+                    node.set("extended", safe_format(key.is_extended, bool))
+                    for latched_key in key.latched_keys:
+                        # latched keys
+                        child = etree.Element("latched")
+                        child.set("id", safe_format(latched_key.scan_code, int))
+                        child.set("extended", safe_format(latched_key.is_extended, bool))
+                        node.append(child)
+                elif hasattr(self.input_id,"to_xml"):
+                    child = self.input_id.to_xml()
                     node.append(child)
-            elif hasattr(self.input_id,"to_xml"):
+                else:
+                    node.set("id", safe_format(self.input_id[0], int))
+                    node.set("extended", safe_format(self.input_id[1], bool))
+            elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
+                # write midi or OSC nodes
                 child = self.input_id.to_xml()
-                node.append(child)
+                if child is not None:
+                    node.append(child)
             else:
-                node.set("id", safe_format(self.input_id[0], int))
-                node.set("extended", safe_format(self.input_id[1], bool))
-        elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
-            # write midi or OSC nodes
-            child = self.input_id.to_xml()
-            node.append(child)
+                node.set("id", safe_format(self.input_id, int))
         else:
-            node.set("id", safe_format(self.input_id, int))
+            node = parent_node
+            container_node = node
 
         if self.curve_data is not None:
             curve_node = self.curve_data._generate_xml()
@@ -2326,6 +2329,14 @@ class Profile():
 
         # state data
         self.state = gremlin.ui.state_device.StateData()
+        device_guid = gremlin.shared_state.state_tab_guid
+        device_type = DeviceType.State
+        new_device = Device(self)
+        new_device.name = DeviceType.to_display_name(device_type)
+        new_device.device_guid = device_guid
+        new_device.type = device_type
+        self.devices[device_guid] = new_device
+
 
     def modeTree(self) -> Node:
         ''' returns an anytree node - nodes contain the name of the mode '''
@@ -3374,15 +3385,17 @@ class Profile():
         for dev in self.devices.values():
             for mode in dev.modes.values():
                 for input_type in all_input_types:
-                    for item in mode.config[input_type].values():
-                        is_empty &= len(item.containers) == 0
+                    if input_type in mode.config:
+                        for item in mode.config[input_type].values():
+                            is_empty &= len(item.containers) == 0
 
         # Process all vJoy devices
         for dev in self.vjoy_devices.values():
             for mode in dev.modes.values():
                 for input_type in all_input_types:
-                    for item in mode.config[input_type].values():
-                        is_empty &= len(item.containers) == 0
+                    if input_type in mode.config:
+                        for item in mode.config[input_type].values():
+                            is_empty &= len(item.containers) == 0
 
         return is_empty
 

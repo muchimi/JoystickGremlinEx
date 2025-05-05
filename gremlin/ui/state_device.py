@@ -75,12 +75,30 @@ class StateInputItem(AbstractInputItem):
     ''' holds a single state '''
     def __init__(self, key : str = None, default_value = False, description = None):
         super().__init__()
+        self._id = gremlin.util.get_guid()
         self._key = key
         self._display_name = key
         self._default_value = default_value
         self._value = default_value
         self._type_cast = type(default_value) if default_value is not None else None
         self.description = description
+        
+        item = gremlin.base_profile.InputItem() #self._custom_name_handler)
+        item.input_id = self
+        item.input_type = InputType.State
+        item.device_name = "State"
+        item.device_type = DeviceType.State
+        item.device_guid = gremlin.shared_state.state_tab_guid
+
+        self._input_item = item
+
+    @property
+    def id(self) -> str:
+        return self._id
+    @id.setter
+    def id(self, value : str):
+        self._id = value
+
 
     @property
     def value(self):
@@ -117,6 +135,77 @@ class StateInputItem(AbstractInputItem):
         # report to containers/actions as a button
         return InputType.JoystickButton 
     
+    @property
+    def input_item(self):
+        ''' holds a reference to the mapping data for this input '''
+        return self._input_item
+    # @input_item.setter
+    # def input_item(self, value):
+    #     self._input_item = value
+
+    def to_xml(self):
+        ''' write XML state node '''
+        node = ElementTree.Element("state", id = self._id, key = self._key)
+        value = self._default_value
+        description = self._description
+        if description:
+            node.set("description", description)
+        if isinstance(value, str):
+            node.set("value", value)
+            node.set("type", "str")
+        elif isinstance(value, float):
+            node.set("value", safe_format(value, float))
+            node.set("type", "float")
+        elif isinstance(value, bool):
+            node.set("value", safe_format(value, bool))
+            node.set("type", "bool")
+        else:
+            # ignore other types
+            return None
+
+        # write container data
+        self._input_item.to_xml(node)
+        
+
+        return node
+    
+    def from_xml(self, node, data = None):
+        ''' read XML state node '''
+        self._key = node.get("key")
+        if "id" in node.attrib:
+            self._id = node.get("id")
+        node_type = node.get("type")
+        
+        if "description" in node.attrib:
+            self._description = node.get("description")
+        else:
+            self._description = None
+            
+        value = None
+
+        if node_type == "str":
+            value = safe_read(node, "value", str, '')
+        elif node_type == "float":
+            value = safe_read(node, "value", float, 0.0)
+        elif node_type == "int":
+            value = safe_read(node, "value", int, 0)
+        elif node_type == "bool":
+            value = safe_read(node, "value", bool, False)
+
+        self._default_value = value
+        self._input_item.from_xml(node, data, skip_root=True)
+
+
+    def __str__(self):
+        return f"State: [{self._key}]"
+
+    def __hash__(self):
+        return hash(self._key)
+
+        
+
+    
+    
 
 @SingletonDecorator
 class StateData(QtCore.QObject):
@@ -126,8 +215,16 @@ class StateData(QtCore.QObject):
     def __init__(self):
         super().__init__()
         self._data = {}
+        self.changed.connect(self._state_changed)
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._reset)
 
-    def register(self, key : str, value = None, description = None) -> StateInputItem:
+    def _reset(self):
+        ''' reset states to default values '''
+        for data in self._data.values():
+            data.value = data.default_value
+
+    def _register(self, key : str, value = None, description = None) -> StateInputItem:
         ''' registers a new state '''
         if not key:
             return None
@@ -137,6 +234,12 @@ class StateData(QtCore.QObject):
         
         item = StateInputItem(key, value, description)    
         self._data[key] = item
+        return item
+    
+    def register(self, key : str, value = None, description = None) -> StateInputItem:
+        ''' registers a new state '''
+        item = self._register(key, value, description)
+        self._sort()
         return item
 
     def unregister(self, key: str):
@@ -153,6 +256,21 @@ class StateData(QtCore.QObject):
     def add(self, data : StateInputItem):
         if data and not data.key in self._data:
             self._data[data.key] = data
+            self._sort()
+
+    def _sort(self):
+        self._data = dict(sorted(self._data.items()))
+
+    def getStates(self):
+        ''' gets all input items '''
+        return self._data
+    
+    def getInputItems(self):
+        ''' gets a dict of input items for each state'''
+        input_items = {}
+        for key, item in self._data.items():
+            input_items[key] = item.input_item
+        return input_items
 
     
     def setValue(self, key : str, value, emit = True):
@@ -172,9 +290,7 @@ class StateData(QtCore.QObject):
     
     def sorted_keys(self) -> list:
         ''' returns the keys in the state data sorted alphabetically '''
-        key_list = [key for key in self._data]
-        key_list.sort()
-        return key_list
+        return list(self._data.keys())
     
     def setDescription(self, key : str, description : str, emit = True):
         ''' sets the description on a state '''
@@ -191,15 +307,25 @@ class StateData(QtCore.QObject):
     def clear(self):
         ''' clears all data '''
         self._data.clear()
+        
+
+    def remove(self, key : str):
+        if key in self._data:
+            del self._data[key]
     
-    def index(self, item, sorted = True):
+    def index(self, item):
         ''' gets the index of the item in the current list'''
         if item.key in self._data:
             keys = list(self._data.keys())
-            if sorted:
-                keys.sort()
             return keys.index(item.key)
         return -1
+    
+    def createDefault(self, count = 5):
+        ''' creates default states '''
+        for index in range(count):
+            key = f"Default_{index+1}"
+            self._register(key, False, f"Default state {index+1}")
+        self._sort()
 
     def __iter__(self):
         return self._data.__iter__()
@@ -222,54 +348,37 @@ class StateData(QtCore.QObject):
         for key in self._data:
             item = self._data[key]
             if item:
-                node = ElementTree.Element("state", key = key)
-                value = item.default_value
-                description = item.description
-                if description:
-                    node.set("description", description)
-                valid = True
-                if isinstance(value, str):
-                    node.set("value", value)
-                    node.set("type", "str")
-                elif isinstance(value, float):
-                    node.set("value", safe_format(value, float))
-                    node.set("type", "float")
-                elif isinstance(value, bool):
-                    node.set("value", safe_format(value, bool))
-                    node.set("type", "bool")
-                else:
-                    # ignore other types
-                    valid = False
-                if valid:
+                node = item.to_xml()
+                if node is not None:
                     root.append(node)
-
         return root
 
     def from_xml(self, root):
         ''' reads saved data '''
 
         for node in root:
-            key = node.get("key")
-            node_type = node.get("type")
-            
-            if "description" in node.attrib:
-                description = node.get("description")
-            else:
-                description = None
-                
-            value = None
+            item = StateInputItem()
+            item.from_xml(node)
+            self._data[item.key] = item
 
-            if node_type == "str":
-                value = safe_read(node, "value", str, '')
-            elif node_type == "float":
-                value = safe_read(node, "value", float, 0.0)
-            elif node_type == "int":
-                value = safe_read(node, "value", int, 0)
-            elif node_type == "bool":
-                value = safe_read(node, "value", bool, False)
-
-            item = StateInputItem(key, value, description)
-            self._data[key] = item
+    @QtCore.Slot(object)
+    def _state_changed(self, data : StateInputItem):
+        if not gremlin.shared_state.is_running:
+            return
+        event = gremlin.event_handler.Event(
+            event_type= InputType.State,
+            device_guid= gremlin.shared_state.state_tab_guid,
+            identifier= data,
+            value = data.value,
+            curved_value = None,
+            raw_value= None,
+            is_axis = False,
+            is_virtual = True,
+            is_pressed = data.value,
+            override_input_type=InputType.JoystickButton # tell actions we're a button
+        )
+        eh = gremlin.event_handler.EventHandler()
+        eh.execute_event(event)
 
 
 class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
@@ -284,10 +393,10 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         super().__init__(self.__class__.__name__,parent = parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
-        self.setWindowTitle("State Input Mapper")
+        self.setWindowTitle("State Editor")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent # list view
-        self.setMinimumWidth(200)
+        
 
         main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(main_layout)
@@ -334,7 +443,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget])
+        widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
         
         main_layout.addWidget(widget)
 
@@ -407,7 +516,9 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             device_profile,
             current_mode,
             [InputType.State], # only allow Mode inputs for this widget,
-            custom_update_handler= self._update_handler
+            custom_update_handler= self._update_handler,
+            custom_remove_handler = self._remove_handler,
+            custom_clear_handler = self._clear_handler,
 
         )
 
@@ -551,29 +662,56 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.setRightPanelWidget(widget)
             
     def _update_handler(self, model, emit_change = True):
-        ''' called when the data model for the input list needs to be updated '''
+        ''' called when the data model for the input list needs to be updated - refreshes the model view '''
         state = self.device_profile.state
         self._input_items = {}
 
         keys = [key for key in state]
         keys.sort()
+
+        model._index_map = {}
+        model._item_map = {}
+            
  
         changed = False
         for index, key in enumerate(keys):
             data = state[key]
-            item = gremlin.base_profile.InputItem() #self._custom_name_handler)
-            item.input_id = data
-            item.input_type = InputType.State
-            item.device_name = "State"
-            item.device_type = DeviceType.State
-            item.device_guid = gremlin.shared_state.state_tab_guid
+            item = data.input_item
+            # item = gremlin.base_profile.InputItem() #self._custom_name_handler)
+            # item.input_id = data
+            # item.input_type = InputType.State
+            # item.device_name = "State"
+            # item.device_type = DeviceType.State
+            # item.device_guid = gremlin.shared_state.state_tab_guid
             self._input_items[key] = item
             changed = True
             model._index_map[index] = item
             model._item_map[key] = index
+            
         
         if changed and emit_change:
             model.data_changed.emit()
+
+    def _remove_handler(self, model, index, emit_change = True):
+        ''' clears a single index '''
+        if index in model._index_map:
+            item = model._index_map[index]
+            key = item.input_id.key
+            sd = StateData()
+            sd.remove(key)
+            self._update_handler(model, emit_change)
+            
+
+    def _clear_handler(self, model, emit_change = True):
+        ''' clears all state data '''
+        model._index_map = {}
+        model._item_map = {}
+        model.data_changed.emit()
+        sd = StateData()
+        sd.clear()
+        if emit_change:
+            model.data_changed.emit()
+
     
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
@@ -657,11 +795,11 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
         widget.data = data
         widget.create_action_icons(data)
-        widget.setTitle(data.input_id.key)
+        widget.setTitle(f"State: [{data.input_id.key}]")
         widget.setInputDescription(data.input_id.description)
         # widget.disable_close()
         # widget.disable_edit()
-        widget.setIcon("fa5.edit")
+        widget.setIcon("mdi.state-machine")
 
 
 

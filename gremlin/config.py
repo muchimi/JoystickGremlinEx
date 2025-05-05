@@ -1287,17 +1287,22 @@ class Configuration:
     
     @property
     def verbose_mode_execution(self):
-        ''' true if verbose mode is in condition/execution mode '''
+        ''' true if verbose mode is in exec '''
         return self.verbose and VerboseMode.Exec in self.verbose_mode
     
     @property
     def verbose_mode_exec(self):
-        ''' true if verbose mode is in condition/execution mode '''
+        ''' true if verbose mode is in exec mode '''
         return self.verbose and VerboseMode.Exec in self.verbose_mode
     
     @property
+    def verbose_mode_state(self):
+        ''' true if verbose mode is in state mode '''
+        return self.verbose and VerboseMode.State in self.verbose_mode
+    
+    @property
     def verbose_mode_exec_detailed(self):
-        ''' true if verbose mode is in condition/execution mode '''
+        ''' true if verbose mode is in exec detailed mode '''
         return self.verbose and self.verbose_mode_exec and VerboseMode.ExecDetails in self.verbose_mode
     
     @property

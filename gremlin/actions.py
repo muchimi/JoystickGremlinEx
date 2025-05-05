@@ -280,7 +280,7 @@ class KeyboardCondition(AbstractCondition):
         else:
             state =  not key_pressed
 
-        if verbose: syslog.info(f"{logtabs}KeyboardCondition: key: {self.input_item.display_name} pressed {key_pressed} - condition return state: {"OK" if state else "FAILED"}")
+        if verbose: syslog.info(f"{logtabs}KeyboardCondition: key: {self.input_item.display_name} pressed {key_pressed} - condition return state: {"PASS" if state else "FAIL"}")
         return state
         
         
@@ -289,6 +289,63 @@ class KeyboardCondition(AbstractCondition):
     
     def __str__(self):
         return self.condition_name()
+    
+
+class StateCondition(AbstractCondition):
+
+    """ Condition verifying a state """
+
+    def __init__(self, condition):
+        """Creates a new instance.
+
+        :param key: name of the state
+        :param is_extended whether or not the key code is extended
+        :param comparison the comparison operation to perform when evaluated
+        """
+        import gremlin.ui.state_device
+        super().__init__(condition.comparison)
+
+        self.key = condition.key
+       
+    def __call__(self, event, value, extra_data = None):
+        # default call
+        return self.process_event(event, value, extra_data)
+
+    def process_event(self, event, value, extra_data = None):
+        """Evaluates the condition using the condition and provided data.
+        :param event raw event that caused the condition to be evaluated
+        :param value the possibly modified value
+        :return True if the condition is satisfied, False otherwise
+        """
+        import gremlin.ui.state_device
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        syslog = logging.getLogger("system")
+
+        if verbose:
+            logtabs = gremlin.shared_state.logTabs(True)
+
+        sd = gremlin.ui.state_device.StateData()
+        value = sd.value(self.key)
+        if value is None:
+            # success if the state is not found
+            if verbose: syslog.info(f"{logtabs}StateCondition: key: [N/A] condition return state: PASS")
+            return True
+
+        state = False
+        if self.comparison == "pressed" and value:
+            state = True
+        elif self.comparison == "released" and not value:
+            state = True
+
+        if verbose: syslog.info(f"{logtabs}StateCondition: key: [{self.key}] pressed {value} - condition return state: {"PASS" if state else "FAIL"}")
+        return state
+        
+        
+    def condition_name(self)->str:
+        return f"StateCondition: [{self.key}] "
+    
+    def __str__(self):
+        return self.condition_name()    
 
 
 class JoystickCondition(AbstractCondition):
@@ -362,16 +419,11 @@ class JoystickCondition(AbstractCondition):
             r1 = self.condition.range[0]
             r2 = self.condition.range[1]
             in_range = gremlin.util.valueInRange(value, r1, r2)
-            # if r1 > r2:
-            #     r1,r2 = r2,r1
-            # if r1 == r2:
-            #     in_range = math.isclose(value, r1, 0.0001)
-            # else:
-            #     in_range = value >= r1 and value <= r2
+
 
             if self.condition.comparison in ["inside", "outside"]:
                 retval = in_range if self.comparison == "inside" else not in_range
-            if verbose: syslog.info(f"{logtabs}JoystickCondition: Axis range comparison: [{self.comparison}]: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} read value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"{logtabs}JoystickCondition: Axis range comparison: [{self.comparison}]: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} read value: {joy.axis(self.input_id).value:0.3f} return: {"PASS" if retval else "FAIL"}")
             return retval
         
         elif self.input_type == InputType.JoystickButton:
@@ -385,13 +437,13 @@ class JoystickCondition(AbstractCondition):
             else:
                 syslog.error(f"Don't know how to handle joystick condition: {self.comparison}")
                 return False
-            if verbose: syslog.info(f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: {"PASS" if retval else "FAIL"}")
             return retval
             
         elif self.input_type == InputType.JoystickHat:
             direction = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
             retval = direction == gremlin.util.hat_direction_to_tuple(self.comparison)
-            if verbose: syslog.info(f"{logtabs}JoystickCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} direction: {direction} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"{logtabs}JoystickCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} direction: {direction} return: {"PASS" if retval else "FAIL"}")
             return retval
         else:
             syslog.warning(f"{logtabs}JoystickCondition: Invalid input_type {self.input_type} received")
@@ -494,7 +546,7 @@ class VJoyCondition(AbstractCondition):
 
             if self.comparison in ["inside", "outside"]:
                 retval =  in_range if self.comparison == "inside" else not in_range
-            if verbose: syslog.info(f"{logtabs}VjoyCondition: Axis {self.comparison}: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} read value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"{logtabs}VjoyCondition: Axis {self.comparison}: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} read value: {joy.axis(self.input_id).value:0.3f} return: {"PASS" if retval else "FAIL"}")
             return retval
 
             
@@ -508,14 +560,14 @@ class VJoyCondition(AbstractCondition):
             else:
                 syslog.error(f"{logtabs}VjoyCondition: Button {self.comparison} is not a valid condition for a button")
                 
-            if verbose: syslog.info(f"{logtabs}VjoyCondition: Button {self.comparison}: device {info.name} input: {self.input_id} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"{logtabs}VjoyCondition: Button {self.comparison}: device {info.name} input: {self.input_id} return: {"PASS" if retval else "FAIL"}")
 
             return retval
             
         elif self.input_type == InputType.JoystickHat:
             direction = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
             retval =  direction == gremlin.util.hat_direction_to_tuple(self.comparison)
-            if verbose: syslog.info(f"{logtabs}VjoyCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} direction: {direction} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"{logtabs}VjoyCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} direction: {direction} return: {"PASS" if retval else "FAIL"}")
         else:
             syslog.warning(f"VjoyCondition: Invalid input_type {self.input_type} received")
             return False

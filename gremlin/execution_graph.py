@@ -46,6 +46,8 @@ from gremlin.singleton_decorator import SingletonDecorator
 from PySide6 import QtCore
 from threading import Event
 
+import gremlin.types
+
 syslog = logging.getLogger("system")
 
 class ExecutionGraphNodeType(Enum):
@@ -168,7 +170,7 @@ class ExecutionGraphDeviceNode(ExecutionGraphNode):
 
     def to_string(self):
         stub = self.device.name
-        return f"{self.node_string()} {stub}"
+        return f"{self.node_string()} type: [{self.device.device_type.name}] name: [{stub}]"
 
 class ExecutionGraphModeNode(ExecutionGraphNode):
     ''' holds a mode in the execution graph '''
@@ -461,6 +463,9 @@ class ExecutionContext():
             
         elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
+        
+        elif isinstance(condition, gremlin.base_conditions.StateCondition):
+            return gremlin.actions.StateCondition(condition)
         
         
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
@@ -1276,6 +1281,45 @@ class ExecutionContext():
         finally:
             gremlin.shared_state.popLog()
 
+
+    def _build_input(self, device_node, input_items, parent_node, mode_name ):
+        for input_item in input_items.values():
+            # Only add callbacks for input items that actually
+            # contain actions
+
+            input_node = ExecutionGraphInputNode()
+            input_node.parent = parent_node
+            input_node.input_item = input_item
+            input_node.mode = mode_name
+
+            # setup a map of input nodes by their callback keys so they are fast to locate - the key is unique by device_id, input_id and input_type
+            input_key = input_item.callbackKey()
+            if not input_key in self.m_input_nodes:
+                m_input_node = ExecutionGraphInputNode()
+                m_input_node.parent = self.graph_input_root
+                m_input_node.input_item = input_item
+                m_input_node.mode = mode_name
+                self.m_input_nodes[input_key] = m_input_node
+            else:
+                m_input_node = self.m_input_nodes[input_key]
+
+            if len(input_item.containers) == 0:
+                # no containers = no actions = skip
+                continue
+
+            # node holding all the containers in this input - this allows a container to fail while letting the others execute
+            input_container_group = ExecutionGraphGroupNode()
+            input_container_group.parent = input_node
+
+            container : gremlin.base_profile.AbstractContainer
+            for container in input_item.containers:
+                node = self._build_container_tree(container, input_container_group, mode_name, device_node, input_item, m_input_node)
+                if not node:
+                    self._build_error = True
+                    syslog.error(f"Container build error")
+                    return None
+                node.parent = input_container_group
+
     def _build_execution_tree(self):
         ''' builds the execution tree 
         
@@ -1297,6 +1341,7 @@ class ExecutionContext():
         The condition nodes are evaluated and if the condition fails, the subtree of the condition is not executed
         
         '''
+        import gremlin.shared_state
         if self._build_error:
             return False
         
@@ -1360,7 +1405,7 @@ class ExecutionContext():
             
 
         current_profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        m_input_nodes = {} # holds the input nodes created for the input/mode hiearchy tree - keyed by the input
+        self.m_input_nodes = {} # holds the input nodes created for the input/mode hiearchy tree - keyed by the input
         self._mode_ancestors = {} # ancestor looking list, keyed by mode name
         self._mode_descendants = {} # descendant looking list, keyed by mode name
 
@@ -1386,62 +1431,37 @@ class ExecutionContext():
             device_node.device = device
             device_node.parent = self.graph
 
-            for mode in device.modes.values():
-                mode_name = mode.name
-                if not mode_name in mode_nodes:
-                    syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.name}")
-                    continue
+            if device.device_type == gremlin.types.DeviceType.State:
+                # state device (modeless)
+                import gremlin.ui.state_device
+                sd = gremlin.ui.state_device.StateData()
+                input_items = sd.getInputItems()
+                self._build_input(device_node, input_items, device_node, "")
+            else:
+                # mode mapped device
+            
+                for mode in device.modes.values():
+                    mode_name = mode.name
+                    if not mode_name in mode_nodes:
+                        syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.name}")
+                        continue
 
-                
+                    
 
-                mode_item = mode_nodes[mode_name]
-                mode_node = ExecutionGraphModeNode()
-                mode_node.mode = mode_name
+                    mode_item = mode_nodes[mode_name]
+                    mode_node = ExecutionGraphModeNode()
+                    mode_node.mode = mode_name
 
-                # build list of parent modes - contains the current mode if a root mode, or the list of current and parent modes if nested
-                if not mode_name in self._mode_ancestors:
-                    self._mode_ancestors[mode_name] = current_profile.get_mode_ancestors(mode_name)
-                    self._mode_descendants[mode_name] = current_profile.get_mode_descendants(mode_name)
+                    # build list of parent modes - contains the current mode if a root mode, or the list of current and parent modes if nested
+                    if not mode_name in self._mode_ancestors:
+                        self._mode_ancestors[mode_name] = current_profile.get_mode_ancestors(mode_name)
+                        self._mode_descendants[mode_name] = current_profile.get_mode_descendants(mode_name)
 
-                mode_node.mode = mode_name
-                mode_node.parent = device_node
-                for input_items in mode.config.values():
-                    for input_item in input_items.values():
-                        # Only add callbacks for input items that actually
-                        # contain actions
-
-                        input_node = ExecutionGraphInputNode()
-                        input_node.parent = mode_node
-                        input_node.input_item = input_item
-                        input_node.mode = mode_name
-
-                        # setup a map of input nodes by their callback keys so they are fast to locate - the key is unique by device_id, input_id and input_type
-                        input_key = input_item.callbackKey()
-                        if not input_key in m_input_nodes:
-                            m_input_node = ExecutionGraphInputNode()
-                            m_input_node.parent = self.graph_input_root
-                            m_input_node.input_item = input_item
-                            m_input_node.mode = mode_name
-                            m_input_nodes[input_key] = m_input_node
-                        else:
-                            m_input_node = m_input_nodes[input_key]
-
-                        if len(input_item.containers) == 0:
-                            # no containers = no actions = skip
-                            continue
-
-                        # node holding all the containers in this input - this allows a container to fail while letting the others execute
-                        input_container_group = ExecutionGraphGroupNode()
-                        input_container_group.parent = input_node
-
-                        container : gremlin.base_profile.AbstractContainer
-                        for container in input_item.containers:
-                            node = self._build_container_tree(container, input_container_group, mode_name, device_node, input_item, m_input_node)
-                            if not node:
-                                self._build_error = True
-                                syslog.error(f"Container build error")
-                                return None
-                            node.parent = input_container_group
+                    mode_node.mode = mode_name
+                    mode_node.parent = device_node
+                    for input_items in mode.config.values():
+                        self._build_input(device_node, input_items, mode_node, mode_name)
+                   
                                 
         if not self._build_error:
 
@@ -1455,7 +1475,7 @@ class ExecutionContext():
                     node.has_actions = True # parent branch
 
 
-            self._input_graph_map = m_input_nodes
+            self._input_graph_map = self.m_input_nodes
             
         
         if verbose:
@@ -1758,6 +1778,7 @@ class ContainerCallback:
             InputType.Mouse,
             InputType.VirtualButton,
             InputType.ModeControl,
+            InputType.State
         ]:
             value = gremlin.actions.Value(event.is_pressed)
         else:

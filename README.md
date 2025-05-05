@@ -16,13 +16,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m74t6)
 
-- Changed: if the option to store data by version number is enabled, the complete data folder will be versioned. This will in effect reset all data including configuration for every new version which may or may not be desirable but will keep a clean slate between versions.
-
+- Changed: if the option to store data by version number is enabled, the complete data folder will be versioned. This will, in effect, reset all data, including configuration, for every new version, which may or may not be desirable, but will keep a clean slate between versions.  Restart required when changing the option as it will only take effect when the application is restarted.
 
 
 ### (m74t5)
-- Interim release
-
+- Fix: blank input on GremlinEx start at first run on joystick devices with inputs.
+- Experimental: added option to store configurations attached to version numbers..  While this may have some advantages, it is also turns off the ability to make a change in one version and see it after an update.  For this reason this is a user selectable in option and turned off by default. 
 
 ### (m74t4)
 - Fix: on start, blank input shown on start in some cases, usually at first run.

@@ -179,6 +179,14 @@ GremlinEx will display a device for processing OSC and MIDI messages sent to the
 
 While MIDI and OSC are protocols associated with musical instruments, they are also sophisticated stage controllers with touch-screen surfaces or physical sliders, dials, button and touch pads.   GremlinEx can use signals from these devices to control a game.
 
+### State device
+
+GremlinEx can define user-defined states which have an on/off behavior.  States are unique to a profile.  A state has a unique, case sensitive name.  The State device is used to map actions when the associated state changes.  To actions, a state will look like a joystick button that is pressed (state on) or released (state off).  These actions are triggered regardless of the current mode of the profile so work in all modes.
+
+States can be used as conditions, so states can be used to control the execution of containers and actions.
+
+A companion "map to state" action is available to change states.  This allows inputs to manipulate states, which is how states can be turned on or off by an input.
+
 ### Reordering of devices
 
 Microsoft Windows does not currently offer a way to set the order of devices connected to a computer, and furthermore, this order may change depending on connections/disconnections, reboot status, and the order of detection by the operating system.  To this end, GremlinEx offers a way to manually re-order devices as displayed in GremlinEx for convenience via drag and drop of the device tabs.   The order only exists within GremlinEx and it does not change the device order in the operating system.
