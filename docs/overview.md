@@ -181,11 +181,11 @@ While MIDI and OSC are protocols associated with musical instruments, they are a
 
 ### State device
 
-GremlinEx can define user-defined states which have an on/off behavior.  States are unique to a profile.  A state has a unique, case sensitive name.  The State device is used to map actions when the associated state changes.  To actions, a state will look like a joystick button that is pressed (state on) or released (state off).  These actions are triggered regardless of the current mode of the profile so work in all modes.
+Starting with 1.0ex m74, GremlinEx supports user-defined states.  A state is an entity with a unique name that has an on/off behavior.  States are used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile.   States initialize to a default starting value set when a profile starts.  States can then be changed at runtime by the "map to state" action anywhere in the profile, via a macro, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
 
-States can be used as conditions, so states can be used to control the execution of containers and actions.
+Currently states are either pressed (on) or released (off) and function like a virtual joystick button (so will look like a joystick button to mapped containers/actions).
 
-A companion "map to state" action is available to change states.  This allows inputs to manipulate states, which is how states can be turned on or off by an input.
+In GremlinEx, states can be mapped via the State Device, the "map to state" action is used to clear, set, toggle or pulse a state, and the state condition is used to determine, based on state, if a container or action should execute or not.
 
 ### Reordering of devices
 
@@ -220,7 +220,7 @@ The input widget corresponds to an input for the device currently selected. For 
 
 Input widgets will show an icon for each action map found in the containers attached to the input for a quick visual review of all actions mapped to the input.  
 
-Input widgets will also have a calibration button to calibrate the input axis (global), or for setting up a curve for the input. 
+Input widgets will also have a calibration button to calibrate the input axis (global), or for setting up a curve for the input.
 
 If the input can be configured, for example, OSC or Keyboard devices, a configuration button is also visible.
 

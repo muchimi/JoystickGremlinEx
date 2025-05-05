@@ -828,6 +828,8 @@ class ExecutionContext():
         
         elif isinstance(condition, gremlin.actions.VirtualButtonCondition):
             return condition
+        elif isinstance(condition, gremlin.base_conditions.StateCondition):
+            return gremlin.actions.StateCondition(condition)
    
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
 
@@ -2005,6 +2007,8 @@ class AbstractExecutionGraph(QtCore.QObject):
             
         elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
+        elif isinstance(condition, gremlin.base_conditions.StateCondition):
+            return gremlin.actions.StateCondition(condition)
         
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
         

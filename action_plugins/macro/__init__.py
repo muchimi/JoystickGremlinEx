@@ -231,6 +231,19 @@ class Macro(gremlin.base_profile.AbstractAction):
                 remote_control_action.command = VjoyAction.from_string(cmd)
                 self.sequence.append(remote_control_action)
 
+            elif child.tag == "state":
+                state_action = gremlin.macro.StateAction()
+                key = child.get("key")
+                description = None
+                if "description" in child.attrib:
+                    description = child.get("description")
+                value = safe_read(child,"value", bool, False)
+                state_action.key = key
+                state_action.description = description
+                state_action.value = value
+                self.sequence.append(state_action)
+
+
 
     def _generate_xml(self):
         """Generates a XML node corresponding to this object.
@@ -303,6 +316,13 @@ class Macro(gremlin.base_profile.AbstractAction):
                 action_node = ElementTree.Element("remote_control")
                 action_node.set("command",entry.command.name)
                 action_list.append(action_node)
+            elif isinstance(entry, gremlin.macro.StateAction):
+                state_node = ElementTree.Element("state")
+                state_node.set("key", entry.key)
+                if entry.description:
+                    state_node.set("description", entry.description)
+                state_node.set("value", safe_format(entry.value, bool))
+                action_list.append(state_node)
 
         node.append(action_list)
         return node

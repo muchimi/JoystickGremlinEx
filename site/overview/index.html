@@ -605,6 +605,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#state-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      State device
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#reordering-of-devices" class="md-nav__link">
     <span class="md-ellipsis">
       Reordering of devices
@@ -1251,6 +1260,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#state-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      State device
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#reordering-of-devices" class="md-nav__link">
     <span class="md-ellipsis">
       Reordering of devices
@@ -1715,6 +1733,10 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <h3 id="osc-and-midi-devices">OSC and MIDI devices<a class="headerlink" href="#osc-and-midi-devices" title="Permanent link">&para;</a></h3>
 <p>GremlinEx will display a device for processing OSC and MIDI messages sent to the local machine.  The messages can originate locally or from a remote machine.</p>
 <p>While MIDI and OSC are protocols associated with musical instruments, they are also sophisticated stage controllers with touch-screen surfaces or physical sliders, dials, button and touch pads.   GremlinEx can use signals from these devices to control a game.</p>
+<h3 id="state-device">State device<a class="headerlink" href="#state-device" title="Permanent link">&para;</a></h3>
+<p>Starting with 1.0ex m74, GremlinEx supports user-defined states.  A state is an entity with a unique name that has an on/off behavior.  States are used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile.   States initialize to a default starting value set when a profile starts.  States can then be changed at runtime by the "map to state" action anywhere in the profile, via a macro, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
+<p>Currently states are either pressed (on) or released (off) and function like a virtual joystick button (so will look like a joystick button to mapped containers/actions).</p>
+<p>In GremlinEx, states can be mapped via the State Device, the "map to state" action is used to clear, set, toggle or pulse a state, and the state condition is used to determine, based on state, if a container or action should execute or not.</p>
 <h3 id="reordering-of-devices">Reordering of devices<a class="headerlink" href="#reordering-of-devices" title="Permanent link">&para;</a></h3>
 <p>Microsoft Windows does not currently offer a way to set the order of devices connected to a computer, and furthermore, this order may change depending on connections/disconnections, reboot status, and the order of detection by the operating system.  To this end, GremlinEx offers a way to manually re-order devices as displayed in GremlinEx for convenience via drag and drop of the device tabs.   The order only exists within GremlinEx and it does not change the device order in the operating system.</p>
 <h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h2>
@@ -1731,7 +1753,7 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <p><a class="glightbox" href="../assets/input_linear.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="input widget linear" src="../assets/input_linear.png" /></a></p>
 <p><a class="glightbox" href="../assets/input_button.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="input widget button" src="../assets/input_button.png" /></a></p>
 <p>Input widgets will show an icon for each action map found in the containers attached to the input for a quick visual review of all actions mapped to the input.  </p>
-<p>Input widgets will also have a calibration button to calibrate the input axis (global), or for setting up a curve for the input. </p>
+<p>Input widgets will also have a calibration button to calibrate the input axis (global), or for setting up a curve for the input.</p>
 <p>If the input can be configured, for example, OSC or Keyboard devices, a configuration button is also visible.</p>
 <p>In the example below, two keystrokes are defined as input. Alt-C and F5.  While Alt-C is not selected, the icon in the input widget indicates it is mapped to button #1.  The input box for F5 shows that it has two actions, button #1 and another joystick action.  </p>
 <p>Because the action is complex, it won't show the details but from the action configuration we can see it's setup to toggle button #2 whenever the F5 key is pressed, and to pulse button #1.</p>

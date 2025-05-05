@@ -2731,7 +2731,10 @@ class QComboBox (QtWidgets.QComboBox):
         # self.lineEdit().setFrame(False)
         # self.lineEdit().setReadOnly(True)
         self.setStyleSheet('QComboBox {combobox-popup: 0}')
-        self.setMinimumWidth(width)
+        if width is not None:
+            self.setMinimumWidth(width)
+        else:
+             self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
 
         self.setMaxVisibleItems(maxItems)
 
@@ -3052,9 +3055,11 @@ class QDataRadioButton(QtWidgets.QRadioButton):
 
 class QDataPushButton(QtWidgets.QPushButton):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None):
+    def __init__(self, text = None, data = None, parent = None, tooltip = None):
         super().__init__(text, parent)
         self._data = data
+        if tooltip:
+            self.setToolTip(tooltip)
 
     @property
     def data(self):
@@ -7820,4 +7825,11 @@ class IconGenerator():
 
         
 
-    
+class QGroupBox(QtWidgets.QGroupBox):
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        #self.setContentsMargins(0,0,0,0)
+        #self.setStyleSheet("QGroupBox {border: none;}")
+
+
+        

@@ -1068,7 +1068,24 @@ class RemoteControlAction(MacroAbstractAction):
         gremlin.input_devices.remote_state.mode = self.command
     
 
+class StateAction(MacroAbstractAction):
+    ''' state action for a macro '''
+    def __init__(self):
+        self.key = None
+        self.description = None
+        self.value = False
+        self._register_check = True
 
+    def __call__(self, is_local = True, is_remote = False, force_remote= False):
+        import gremlin.ui.state_device
+        sd = gremlin.ui.state_device.StateData()
+        if self._register_check:
+            # first time check for the state to exist
+            if not sd.exists(self.key):
+                sd.register(self.key, False, self.description)
+            self._register_check = False
+
+        sd.setValue(self.key, self.value)
 
 
 

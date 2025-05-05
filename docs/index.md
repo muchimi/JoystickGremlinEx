@@ -54,13 +54,26 @@ The benefits of open development outweigh the drawbacks, it encourages feedback 
 
 ## What can I do with GremlinEx?
 
-- Integrate devices from multiple vendors without the need to use proprietary software.
-- Take input from one or more devices, physical or virtual, and remap that output to a VJOY joystick.
-- take input from a game controller like an XBox 360 controller and map it to VJOY.
-- Map a joystick axis and split it up into multiple zones or trigger specific actions when the input axis is moving or in a specific zone.
-- Execute actions based on multiple input keys pressed concurrently
+Some examples of what GremlinEx can do:
+
+- Integrate devices from multiple vendors without the need to use any vendor specific proprietary software.  GremlinEx works with any HID compliant game input device without requiring any special software.  Most of this can be done without ever installing proprietary software from hardware vendors to "program" their devices.   GremlinEx is designed to use the default behavior of an input device and through profiles, map that to a game.
+- Take input from one or more devices, physical or virtual, local or networked, and remap that output to a VJOY joystick, and local keyboard and mouse.
+- Take input from a game controller like an XBox 360 controller and map it to VJOY.
+- If [VIGEM](https://github.com/nefarius/ViGEmBus) is installed, output to virtual game controller for games that do not support joysticks (usually because they are console ports) (VIGEM is technically retired but works well with Windows 10 and Windows 11).
+- Map a joystick axis and split it up into multiple zones or trigger specific actions when the input axis is moving, passing through specific points, or within a specific zones (Gated Axis, range container and virtual input).
+- Execute actions based on multiple input keys pressed concurrently and other conditions
+- Execute macros that combine joystick, mouse, keyboard actions.
+- Use touch-surface input (glass surface) via the OSC protocol. While OSC is used for music and stage control, GremlinEx uses OSC to work with Open Stage Control (open source) and other OSC protocol enabled touch control surfaces to map touch-screen inputs to a game over the network.  Because software like [Open Stage Control](https://openstagecontrol.ammd.net/docs/getting-started/introduction/) lets you design any control surface using buttons, faders, knobs, encoders, this becomes an extremely powerful custom touch-screen input mapped to a game via GremlinEx.   GremlinEx also supports two-way communications so that state data can be returned to the touch surface via a plugin or the "map to OSC" action.
+- Control Microsoft Flight Simulator (MSFS) 2020 or 2024 via the SimConnect API and a custom WASM module.  This enables GremlinEx to do direct control mappings in MSFS without having to map controllers in MSFS.  GremlinEx can also execute what's called "RPN expressions" and access internal commands and variables, including custom ones created by add-ons).
+- Sophisticated condition based execution
+- (as of 1.0ex m75) GremlinEx adds a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) to the behavior model.
+- Comprehensive collection of various action container types to solve common mapping problems without custom programming.
+- Custom scripting via Python if needed
+- Play audio (.wav) files, and use text to speech (TTS) to convert text to audio cues.
 
 ## What about device conflicts?
 
-To avoid input conflicts between the real inputs and the remapped ones, [HIDHide](https://github.com/nefarius/HidHide) is recommended to "hide" the input devices from the target application.
+At its core, GremlinEx takes "real" hardware input and maps it to "virtual" joystick outputs via VJOY.  
+This can create confusion with in-game control mapping utilities because the game will usually get inputs concurrently from the "real" device and from the "virtual" device.
+To avoid this, [HIDHide](https://github.com/nefarius/HidHide) is recommended to "hide" the input devices from the target application.  This is also recommended because many games unfortunately only support a limited of game controllers.
 

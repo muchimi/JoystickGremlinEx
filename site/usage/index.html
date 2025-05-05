@@ -1424,6 +1424,24 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#map-to-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to State
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      State Device
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#user-scripts-plugins" class="md-nav__link">
     <span class="md-ellipsis">
       User Scripts (plugins)
@@ -2756,6 +2774,24 @@
   <a href="#sequence-container" class="md-nav__link">
     <span class="md-ellipsis">
       Sequence Container
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-to-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to State
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      State Device
     </span>
   </a>
   
@@ -4114,6 +4150,48 @@
 <p>This experimental container executes all contained actions in sequence, similar to a macro.  The difference between this container and others is the order of execution is guaranteed and each action runs in sequence rather than in parallel.</p>
 <p>Actions execute in the order they are listed and they can be re-ordered if needed.</p>
 <p>The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.</p>
+<h2 id="map-to-state">Map to State<a class="headerlink" href="#map-to-state" title="Permanent link">&para;</a></h2>
+<p>This feature is only available in 1.0ex m75 and above.</p>
+<p>The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:</p>
+<p><a class="glightbox" href="../assets/action_state.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="action state" src="../assets/action_state.png" /></a></p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Press (On)</td>
+<td>Turns the state on</td>
+</tr>
+<tr>
+<td>Release (Off)</td>
+<td>Turns the state off</td>
+</tr>
+<tr>
+<td>Pulse</td>
+<td>Inverts the state, waits delay milliseconds, and restores the previous state</td>
+</tr>
+<tr>
+<td>Toggle</td>
+<td>Toggles the state.  If it was off, turns it on, if it was on, turns it off</td>
+</tr>
+</tbody>
+</table>
+<p>A new state can be created directly from the action by pressing the add button.</p>
+<p><a class="glightbox" href="../assets/action_state_add.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="action state add" src="../assets/action_state_add.png" /></a></p>
+<h2 id="state-device">State Device<a class="headerlink" href="#state-device" title="Permanent link">&para;</a></h2>
+<p>The state device is a special virtual device that lets you add, remove or edit states available in a profile.  Each state can also be mapped to, which will cause the containers/actions to execute when the state changes.  This is optional because the other way to use states is as conditions so not all states need to map to actions.</p>
+<p><a class="glightbox" href="../assets/state_device.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="state device" src="../assets/state_device.png" /></a></p>
+<p>A state has a unique, case sensitive name.  It also has an optional description to help document what the state does.</p>
+<p>States have to be unique.  No two states with the same name (case sensitive) can exist at the same time.</p>
+<p>States are unique to a profile.   They are not shared with other profiles, so each profile needs to define its own set of states.</p>
+<p>States are not mode specific.  States are global to a profile regardless of mode, and this is by design to allow states to be accessible from any mode.  You can absolutely use states specific to modes, in which case you would use different states named differently that you only use in specific modes.  How you use states is completely up to the logic behavior you want to achieve.</p>
+<p>States can only have an on (pressed) or off (released) value.</p>
+<p>Whenever a state changes, if it is mapped to containers/actions, these will execute and look to the mapped containers/actions as a joystick button (pressed or released).  Important: when a state changes, the events are queued immediately when the change occurs, to ensure that any actions execute on state change.</p>
+<p>Warning: By design, there are no guardrails with states, so loops are possible, and this is usually not a desired outcome as it will result in endless looping in some situations.  While some state machine designs must allow loops, but it could result in an endless loop if A toggles B, B toggles C, C toggles A.  This is allowed for the time being.  As of this writing, this is a concious design decision to allow this as the runtime performance impact and logic required to catch these would be a negative impact, so use states with loops in mind to avoid this situation currently.  If you do enter into a loop inadvertently, depending on the loop, the profile would need to be stopped.  In some cases, a hard process kill via task manager may be needed.</p>
 <h2 id="user-scripts-plugins">User Scripts (plugins)<a class="headerlink" href="#user-scripts-plugins" title="Permanent link">&para;</a></h2>
 <p>GremlinEx uses Python decorators to facilitate custom scripting and control from Python.</p>
 <h3 id="gremlininput_devicesgremlin_start">@gremlin.input_devices.gremlin_start<a class="headerlink" href="#gremlininput_devicesgremlin_start" title="Permanent link">&para;</a></h3>

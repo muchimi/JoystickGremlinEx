@@ -109,8 +109,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
     @property
     def description(self) -> str:
         return self.description_widget.text()
-
-
+    
 class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to modify a state  """
@@ -144,17 +143,18 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
  
         self.delay_widget = gremlin.ui.ui_common.QDelayWidget()
         self.delay_widget.setToolTip("Delay in milliseconds")
+        self.delay_widget.setValue(self.action_data.delay)
         self.delay_widget.valueChanged.connect(self._value_changed)
 
         mode = self.action_data.mode
         widgets = []
-        rb = gremlin.ui.ui_common.QDataCheckbox("Press",data = "press")
+        rb = gremlin.ui.ui_common.QDataCheckbox("Press (on)",data = "press")
         rb.setToolTip("Sets the state")
         if mode == "press":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataCheckbox("Release",data = "release")
+        rb = gremlin.ui.ui_common.QDataCheckbox("Release (off)",data = "release")
         rb.setToolTip("Releases the state")
         if mode == "release":
             rb.setChecked(True)
@@ -172,7 +172,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
 
-        self.mode_widget, self.mode_layout = gremlin.ui.ui_common.getHContainer(widgets,"Mode:")
+        self.mode_widget, self.mode_layout = gremlin.ui.ui_common.getHContainer(widgets,"Action:")
     
         self.main_layout.addWidget(self.mode_widget)
 
@@ -295,13 +295,14 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
 
 
-    def _fire_pulse(self, args):
+    def _fire_pulse(self, key : str, delay : int):
+        ''' pulses the state on/off '''
         self.lock.acquire()
-        key, delay = args
         sd = gremlin.ui.state_device.StateData()
-        sd.setValue(key, True)
-        time.sleep(delay)
-        sd.setValue(key, True)
+        value = sd.value(key) # current value
+        sd.setValue(key, not value)
+        time.sleep(delay/1000) # to seconds
+        sd.setValue(key, value)
         self.lock.release()
 
         
@@ -330,10 +331,10 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                         if verbose: syslog.info(f"STATE: set [{key}] TOGGLE -> {'ON' if value else 'OFF'}")
                         sd.setValue(key, value)
                     case "pulse":
-                        if verbose: syslog(f"STATE: set [{key}] PULSE")
+                        if verbose: syslog.info(f"STATE: set [{key}] PULSE")
                         if not self.lock.locked():
                             # wait for prior pulse to finish
-                            threading.Timer(0.01, self._fire_pulse, [self.action_data.key, self.action_data.delay/1000]).start()
+                            threading.Timer(0.01, lambda: self._fire_pulse(key, self.action_data.delay)).start()
                 
 
         return True
@@ -368,7 +369,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.key = None # state key
         self.description = None # state description (used to recreate the state if needed)
         self.mode = "toggle" # valid modes are "pressed", "released", "toggle", "pulse"
-        self.delay = 250 # delay for pulse mode
+        self.delay = 250 # delay for pulse mode in milliseconds
         self.exec_on_release = False # true if trigger should execute on input release event
 
     def display_name(self):
@@ -418,7 +419,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         if self.key:
             node.set("key", self.key)
             if self.description:
-                node.set("desscription", self.description)
+                node.set("description", self.description)
             node.set("mode", self.mode)
             node.set("delay", safe_format(self.delay, int))
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))

@@ -1263,6 +1263,47 @@ Actions execute in the order they are listed and they can be re-ordered if neede
 
 The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.
 
+## Map to State
+
+This feature is only available in 1.0ex m75 and above.
+
+The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:
+
+![action state](assets/action_state.png)
+
+
+| Operation      | Description |
+| ----------- | ----------- |
+| Press (On) | Turns the state on |
+| Release (Off) | Turns the state off |
+| Pulse | Inverts the state, waits delay milliseconds, and restores the previous state |
+| Toggle | Toggles the state.  If it was off, turns it on, if it was on, turns it off |
+
+A new state can be created directly from the action by pressing the add button.
+
+![action state add](assets/action_state_add.png)
+
+## State Device
+
+The state device is a special virtual device that lets you add, remove or edit states available in a profile.  Each state can also be mapped to, which will cause the containers/actions to execute when the state changes.  This is optional because the other way to use states is as conditions so not all states need to map to actions.
+
+![state device](assets/state_device.png)
+
+A state has a unique, case sensitive name.  It also has an optional description to help document what the state does.
+
+States have to be unique.  No two states with the same name (case sensitive) can exist at the same time.
+
+States are unique to a profile.   They are not shared with other profiles, so each profile needs to define its own set of states.
+
+States are not mode specific.  States are global to a profile regardless of mode, and this is by design to allow states to be accessible from any mode.  You can absolutely use states specific to modes, in which case you would use different states named differently that you only use in specific modes.  How you use states is completely up to the logic behavior you want to achieve.
+
+States can only have an on (pressed) or off (released) value.
+
+Whenever a state changes, if it is mapped to containers/actions, these will execute and look to the mapped containers/actions as a joystick button (pressed or released).  Important: when a state changes, the events are queued immediately when the change occurs, to ensure that any actions execute on state change.
+
+Warning: By design, there are no guardrails with states, so loops are possible, and this is usually not a desired outcome as it will result in endless looping in some situations.  While some state machine designs must allow loops, but it could result in an endless loop if A toggles B, B toggles C, C toggles A.  This is allowed for the time being.  As of this writing, this is a concious design decision to allow this as the runtime performance impact and logic required to catch these would be a negative impact, so use states with loops in mind to avoid this situation currently.  If you do enter into a loop inadvertently, depending on the loop, the profile would need to be stopped.  In some cases, a hard process kill via task manager may be needed.
+
+
 ## User Scripts (plugins)
 
 GremlinEx uses Python decorators to facilitate custom scripting and control from Python.

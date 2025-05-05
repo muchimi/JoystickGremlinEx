@@ -97,13 +97,20 @@ class MacroActionEditor(QtWidgets.QWidget):
                 self._remote_control_ui,
                 gremlin.macro.RemoteControlAction
             ),
+            "State" : MacroActionEditor.ActionTypeData(
+                "State",
+                self._state_ui,
+                gremlin.macro.StateAction
+            ),
         }
 
-        self.setMinimumWidth(200)
+        #self.setMinimumWidth(260)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.group_box = QtWidgets.QGroupBox("Action Settings")
+        self.main_layout.setContentsMargins(0,0,0,0)
+        self.group_box = gremlin.ui.ui_common.QGroupBox("Action Settings")
         self.group_layout = QtWidgets.QVBoxLayout(self.group_box)
+        self.group_layout.setContentsMargins(0,0,0,0)
         self.main_layout.addWidget(self.group_box)
 
         self.blank_label = QtWidgets.QLabel("Please add an action.")
@@ -123,7 +130,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         try:
             MacroActionEditor.locked = True
 
-            self.action_selector = gremlin.ui.ui_common.QComboBox()
+            self.action_selector = gremlin.ui.ui_common.QComboBox(width=None)
             for action_name in sorted(self.action_types):
                 self.action_selector.addItem(action_name)
             self.action_selector.currentTextChanged.connect(self._change_action)
@@ -132,7 +139,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
             self.action_layout = QtWidgets.QVBoxLayout()
             self.group_layout.addLayout(self.action_layout)
-            self.group_layout.addStretch(1)
+            #self.group_layout.addStretch(1)
         finally:
             MacroActionEditor.locked = False
 
@@ -220,6 +227,8 @@ class MacroActionEditor(QtWidgets.QWidget):
             )
         elif value == "Remote Control":
             self.model.set_entry(gremlin.macro.RemoteControlAction(), self.index.row())
+        elif value == "State":
+            self.model.set_entry(gremlin.macro.StateAction(), self.index.row())
 
 
         # Update the UI elements
@@ -400,6 +409,22 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements["duration_spinbox_max"].setSingleStep(0.1)
         self.ui_elements["duration_spinbox_max"].setMaximum(3600)
 
+        widgets = []
+        widget = gremlin.ui.ui_common.QDataPushButton("250",0.25,tooltip = "250 ms")
+        widget.clicked.connect(self._set_delay)
+        widgets.append(widget)
+        widget = gremlin.ui.ui_common.QDataPushButton("500",0.5,tooltip = "500 ms")
+        widget.clicked.connect(self._set_delay)
+        widgets.append(widget)
+        widget = gremlin.ui.ui_common.QDataPushButton("750",0.75,tooltip = "750 ms")
+        widget.clicked.connect(self._set_delay)
+        widgets.append(widget)
+        widget = gremlin.ui.ui_common.QDataPushButton("1",1.0,tooltip = "1 second")
+        widget.clicked.connect(self._set_delay)
+        widgets.append(widget)
+
+
+
         duration = 0.5
         duration_max = 0
         is_random = False
@@ -408,6 +433,8 @@ class MacroActionEditor(QtWidgets.QWidget):
             duration = model.duration
             duration_max = model.duration_max
             is_random = model.is_random
+
+    
 
         self.ui_elements["duration_spinbox"].setValue(duration)
         self.ui_elements["duration_spinbox"].valueChanged.connect(self._update_pause)
@@ -421,9 +448,20 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         self.action_layout.addWidget(self.ui_elements["duration_is_random"])
         self.action_layout.addWidget(self.ui_elements["duration_label"])
-        self.action_layout.addWidget(self.ui_elements["duration_spinbox"])
+        widget, layout = gremlin.ui.ui_common.getHContainer(widgets)
+        self.action_layout.addWidget(widget)
+        
+        widget, layout = gremlin.ui.ui_common.getHContainer(self.ui_elements["duration_spinbox"],"Pause (seconds):")
+        self.action_layout.addWidget(widget)
         self.action_layout.addWidget(self.ui_elements["duration_max_label"])
         self.action_layout.addWidget(self.ui_elements["duration_spinbox_max"])
+
+    @QtCore.Slot()
+    def _set_delay(self):
+        widget = self.sender()
+        delay = widget.data
+        self.ui_elements["duration_spinbox"].setValue(delay)
+        #self._update_pause(delay)
 
 
     def _vjoy_ui(self):
@@ -585,6 +623,86 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.action_layout.addWidget(self.ui_elements["remote_control_cb_label"])
         self.action_layout.addWidget(cb)
         self.action_layout.addWidget(self.ui_elements["remote_control_label"])
+
+    def _state_ui(self):
+        action = self.model.get_entry(self.index.row())
+        self.state_selector = gremlin.ui.ui_common.QComboBox(width=None)
+        self.state_selector.currentIndexChanged.connect(self._state_changed)
+        self.state_description_widget = QtWidgets.QLabel()
+        widget,layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector])
+        self.action_layout.addWidget(widget)
+        widget,layout = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
+        self.action_layout.addWidget(widget)
+
+        widgets = []
+        rb = gremlin.ui.ui_common.QDataRadioButton("Press",data = (action, True))
+        rb.setToolTip("Sets the state")
+        if action.value is None:
+            action.value = False
+        if action.value:
+            rb.setChecked(True)
+        rb.clicked.connect(self._state_mode_changed)
+        widgets.append(rb)
+        self.ui_elements["state_press"] = rb
+        
+        rb = gremlin.ui.ui_common.QDataRadioButton("Release",data = (action, False))
+        rb.setToolTip("Releases the state")
+        if not action.value:
+            rb.setChecked(True)
+        rb.clicked.connect(self._state_mode_changed)
+        widgets.append(rb)
+        self.ui_elements["state_release"] = rb
+
+        widget, layout = gremlin.ui.ui_common.getHContainer(widgets,"Action:")
+        self.action_layout.addWidget(widget)
+
+        self.populate_state_selector(action)
+
+    @QtCore.Slot()
+    def _state_mode_changed(self):
+        widget = self.sender()
+        action, value = widget.data
+        action.value = value
+        # rb_on = self.ui_elements["state_press"]
+        # rb_off = self.ui_elements["state_release"]
+        # with QtCore.QSignalBlocker(rb_on):
+        #     rb_on.setChecked(value)
+        # with QtCore.QSignalBlocker(rb_off):
+        #     rb_off.setChecked(not value)
+        self._update_model()
+
+    def populate_state_selector(self, action):
+        ''' updates the available states '''
+        import gremlin.ui.state_device
+        with QtCore.QSignalBlocker(self.state_selector):
+            self.state_selector.clear()
+            sd = gremlin.ui.state_device.StateData()
+            for key, data in sd.getStates().items():
+                self.state_selector.addItem(key, (action, data))
+
+            key = action.key
+            if key:
+                index = self.state_selector.findText(key)
+                if index >= 0:
+                    self.state_selector.setCurrentIndex(index)
+            else:
+                # pick the first as the default
+                action.key = self.state_selector.currentText()
+            
+            if self.state_selector.count():
+                action, data = self.state_selector.currentData()
+                self.setStateDescription(data.description)
+
+    def setStateDescription(self, value):
+        self.state_description_widget.setText(value if value else "n/a")
+
+    @QtCore.Slot()
+    def _state_changed(self):
+        action, data = self.state_selector.currentData()
+        self.setStateDescription(data.description)
+        action.key = data.key
+        self._update_model()
+
 
     @QtCore.Slot(bool)
     def _modify_button_state(self, state):
@@ -941,6 +1059,8 @@ class MacroListModel(QtCore.QAbstractListModel):
 
             elif isinstance(entry, gremlin.macro.RemoteControlAction):
                 display = f"Remote control: {VjoyAction.to_name(entry.command)}"
+            elif isinstance(entry, gremlin.macro.StateAction):
+                display = f"Set state [{entry.key}] {'On' if entry.value else 'Off'}"
             else:
                 raise gremlin.error.GremlinError("Unknown macro action")
             
@@ -1301,9 +1421,10 @@ class MacroSettingsWidget(QtWidgets.QWidget):
 
         self.data = action_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
-
-        self.group_box = QtWidgets.QGroupBox("Macro Settings")
+        self.main_layout.setContentsMargins(0,0,0,0)
+        self.group_box = gremlin.ui.ui_common.QGroupBox("Macro Settings")
         self.group_layout = QtWidgets.QVBoxLayout()
+        self.group_layout.setContentsMargins(0,0,0,0)
         self.group_box.setLayout(self.group_layout)
         self.main_layout.addWidget(self.group_box)
 
@@ -1487,6 +1608,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
+            # Macro toolbar setup
             # Create buttons used to modify and interact with the macro actions
             self.button_new_entry = self._create_toolbutton(
                 f"{prefix}list_add.svg",
@@ -1654,7 +1776,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             button.setIcon(icon)
         else:
             button.setIcon(load_icon(icon_path))
-        button.setToolTip(tooltip)
+        if tooltip:
+            button.setToolTip(tooltip)
         button.setCheckable(is_checkable)
         button.setChecked(is_checkable and default_on)
         return button

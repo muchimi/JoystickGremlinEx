@@ -348,11 +348,18 @@ class StateConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
 
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
+        widget, layout = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True)
+        self.main_layout.addWidget(widget)
+
         self.state_selector = gremlin.ui.ui_common.QComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
         widget,layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector])
         self.main_layout.addWidget(widget)
+
+        
+
 
         widget,layout = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
         self.main_layout.addWidget(widget)
