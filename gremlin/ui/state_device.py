@@ -73,6 +73,9 @@ class ModeInputModeType(enum.IntEnum):
     
 class StateInputItem(AbstractInputItem):
     ''' holds a single state '''
+    changed = QtCore.Signal(bool) # fires when the state changes
+    key_changed = QtCore.Signal() # fires when the key changes
+
     def __init__(self, key : str = None, default_value = False, description = None):
         super().__init__()
         self._id = gremlin.util.get_guid()
@@ -106,7 +109,9 @@ class StateInputItem(AbstractInputItem):
     
     @value.setter
     def value(self, data):
-        self._value = data
+        if self._value != data:
+            self._value = data
+            self.changed.emit(data)
 
     @property
     def default_value(self):
@@ -114,14 +119,19 @@ class StateInputItem(AbstractInputItem):
     
     @default_value.setter
     def default_value(self, data):
-        self._default_value = data        
+        if self._default_value != data:
+            self._default_value = data      
+            self._value = data  
+            self.changed.emit(data)
 
     @property
     def key(self)-> str:
         return self._key
     @key.setter
     def key(self, value : str):
-        self._key = value
+        if self._key != value:
+            self._key = value
+            self.key_changed.emit()
     
     @property
     def type_cast(self):
@@ -193,6 +203,7 @@ class StateInputItem(AbstractInputItem):
             value = safe_read(node, "value", bool, False)
 
         self._default_value = value
+        self._value = value
         self._input_item.from_xml(node, data, skip_root=True)
 
 
@@ -211,6 +222,7 @@ class StateInputItem(AbstractInputItem):
 class StateData(QtCore.QObject):
     ''' holds state information '''
     changed  = QtCore.Signal(object) # fires when the value changes (StateItem)
+    crud = QtCore.Signal() # fires when a state is added or removed
 
     def __init__(self):
         super().__init__()
@@ -234,7 +246,14 @@ class StateData(QtCore.QObject):
         
         item = StateInputItem(key, value, description)    
         self._data[key] = item
+        self.crud.emit()
+        item.key_changed.connect(self._key_changed)
         return item
+    
+    @QtCore.Slot()
+    def _key_changed(self):
+        ''' occurs on a key change'''
+        self.crud.emit()
     
     def register(self, key : str, value = None, description = None) -> StateInputItem:
         ''' registers a new state '''
@@ -257,6 +276,8 @@ class StateData(QtCore.QObject):
         if data and not data.key in self._data:
             self._data[data.key] = data
             self._sort()
+            data.key_changed.connect(self._key_changed)
+            self.crud.emit()
 
     def _sort(self):
         self._data = dict(sorted(self._data.items()))
@@ -306,12 +327,15 @@ class StateData(QtCore.QObject):
     
     def clear(self):
         ''' clears all data '''
-        self._data.clear()
+        if self._data:
+            self._data.clear()
+            self.crud.emit()
         
 
     def remove(self, key : str):
         if key in self._data:
             del self._data[key]
+            self.crud.emit()
     
     def index(self, item):
         ''' gets the index of the item in the current list'''
@@ -425,7 +449,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self._default_on_widget = gremlin.ui.ui_common.QDataRadioButton("On", True)
         self._default_off_widget = gremlin.ui.ui_common.QDataRadioButton("Off", False)
-        if data.value:
+        if data.default_value:
             self._default_on_widget.setChecked(True)
         else:
             self._default_off_widget.setChecked(True)

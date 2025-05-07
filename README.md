@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m75t2)
+- New: states on input repeater
+- Fix: Hat container not triggering contents
 
 ### (m75t1)
 - New: state machine

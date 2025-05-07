@@ -249,6 +249,13 @@ class ExecutionGraphActionSetNode(ExecutionGraphNode):
         super().__init__(ExecutionGraphNodeType.ActionSet)
         self.action_set = action_set
 
+    def containsActionId(self, id : str) -> bool:
+        ''' true if the action ID is in this node's action set '''
+        for action in self.action_set:
+            if id == action.id:
+                return True
+        return False
+
     def to_string(self):
         stub = f"Action Count: {len(self.action_set)}"
         return f"{self.node_string()} {stub}"
@@ -1659,7 +1666,7 @@ class ExecutionContext():
                 result = True
                 for functor in container_functors:
                     result = self.process_functor(functor, event, value, extra_data, manual)
-                    if isinstance(functor, gremlin.base_conditions.AbstractSelfTriggerFunctor):
+                    if isinstance(functor, gremlin.base_conditions.AbstractTriggerFunctor):
                         # do not execute other items because the functor self triggers subsequent nodes as needed
                         return True
                     if not result:

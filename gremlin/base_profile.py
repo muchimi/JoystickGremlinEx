@@ -399,6 +399,7 @@ class AbstractContainer(ProfileData):
         self.current_view_type = None
         self.parent_node = node
         self.comment = None # user comment
+        self._callbacks_enabled = True # callbacks are enabled by default for this container
 
         el = gremlin.event_handler.EventListener()
         el.virtual_button_changed.connect(self._virtual_button_changed)
@@ -584,6 +585,10 @@ class AbstractContainer(ProfileData):
 
         :return list of container callback entries
         """
+        if not self._callbacks_enabled:
+            # callbacks handled a different way by this container 
+            return []
+        
         callbacks = []
 
         # For a virtual button create a callback that sends VirtualButton
@@ -591,20 +596,7 @@ class AbstractContainer(ProfileData):
         # like a button would.
         from gremlin.event_handler import Event
 
-        # if self._virtual_button_enabled  and self._virtual_button_user_enabled and self.virtual_button is not None:
-        #     # virtual callback requires both the container/action to enable it, and the user to enable it as well
-        #     callbacks.append(CallbackData(gremlin.execution_graph.VirtualButtonProcess(self, self.virtual_button),None))
-        #     callbacks.append(CallbackData(gremlin.execution_graph.VirtualButtonCallback(self, parent),
-        #                     Event(
-        #                         InputType.VirtualButton,
-        #                         callbacks[-1].callback.virtual_button.identifier,
-        #                         device_guid=dinput.GUID_Virtual,
-        #                         is_pressed=True,
-        #                         raw_value=True
-        #                     )
-        #                  ))
-        # else:
-            # regular callback with conditions
+
         callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self, parent),None))
 
 

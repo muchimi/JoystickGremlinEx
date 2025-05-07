@@ -223,7 +223,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data : dict = None) -> bool:
         if not self.valid:
             return False
-        syslog = logging.getLogger("system")
+        
         verbose = gremlin.config.Configuration().verbose
 
         if self._macro_id is not None:

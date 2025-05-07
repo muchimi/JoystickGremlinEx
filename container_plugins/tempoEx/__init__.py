@@ -388,7 +388,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         else:
             return "TempoEx"
 
-class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
 
     def __init__(self, container : TempoExContainer, parent = None):
         super().__init__(container, parent)
@@ -474,7 +474,6 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
         self.short_nodes = [node for node in self.action_set_nodes if node.action_set.data == "short"]
         self.long_nodes = [node for node in self.action_set_nodes if node.action_set.data == "long"]
-        pass
 
     def _trigger_short_press(self, event, value, extra_data : dict = None):
         ''' triggers a short press '''

@@ -22,6 +22,7 @@ from PySide6 import QtWidgets
 import dinput
 
 import gremlin
+import gremlin.actions
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.input_types import InputType
@@ -29,8 +30,11 @@ from gremlin.base_buttons import VirtualHatButton
 from container_plugins.basic import BasicContainer
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
+import gremlin.execution_graph
+import gremlin.config
+import logging
 
-
+syslog = logging.getLogger("system")
 
 # Lookup for direction to index with 4 way hat usage
 _four_lookup = {
@@ -114,10 +118,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         elif self.profile_data.button_count == 8:
             for i, direction in enumerate(_eight_names):
                 if self.profile_data.action_sets[i] is None:
-                    self._add_action_selector(
-                        lambda x: self._add_action(i, x),
-                        direction
-                    )
+                    self._add_action_selector(lambda x: self._add_action(i, x), direction)
                 else:
                     self._create_action_widget(
                         i,
@@ -171,13 +172,14 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
 
-    def _add_action(self, action_name):
+    def _add_action(self, index, action_name):
         """Adds a new action to the container.
 
         :param action_name the name of the action to add
         """
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        action_item.data = index
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
 
@@ -220,7 +222,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
             self._create_action_ui()
 
 
-class HatButtonsContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class HatButtonsContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
 
     """Executes the contents of the associated basic container.
 
@@ -230,6 +232,41 @@ class HatButtonsContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
+        self.container = container
+
+    def profile_start(self):
+        ec = gremlin.execution_graph.ExecutionContext()
+        self.container_node = ec.find(self.container, gremlin.execution_graph.ExecutionGraphNodeType.Container)
+        self.button_count = self.container.button_count
+        self.lookup = _four_lookup
+        if self.button_count == 8:
+            self.lookup = _eight_lookup
+
+        self.action_nodes = {} # list of nodes arranged by button index
+        action_sets = {}
+        for index, action_set in enumerate(self.container.action_sets):
+            action_sets[index] = action_set
+
+        group_node = self.container_node.children[0] # group node is the only child of the container node
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
+        self.action_set_lookup = {}
+
+        for index in self.lookup.values():
+            # index of each data set
+            if index in action_sets:
+                if not index in self.action_set_lookup:
+                    self.action_set_lookup[index] = []
+                action_set = action_sets[index]
+                if action_set is not None:
+
+                    for action in action_set:
+                        action_node = [node for node in self.action_set_nodes if node.containsActionId(action.id)]
+                        self.action_set_lookup[index].append(action_node)
+
+        self.release_events = [] # release events (node, event)
+
+            
+
 
     def process_event(self, event, value, extra_data = None):
         """Executes the content with the provided data.
@@ -238,7 +275,39 @@ class HatButtonsContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         :param value the value received with the event
         :return True if execution was successful, False otherwise
         """
-        pass
+        
+        
+
+        ec = gremlin.execution_graph.ExecutionContext()
+        
+        # self.button_count = 4
+        # #self.action_sets = [[], [], [], []]
+
+        hat_value = value.current
+        if hat_value == (0,0):
+            # hat released = issue release events
+            value.is_pressed = False
+            for node, event_release in self.release_events:
+                ec.execute_node(node, event_release, value, extra_data)
+            # clear for next use
+            self.release_events.clear()
+        elif hat_value in self.lookup:
+            index = self.lookup[hat_value]
+            if index in self.action_set_lookup:
+                nodes = self.action_set_lookup[index]
+                for action_set_nodes in nodes:
+                    value.is_pressed = True                    
+                    event_press = event.fake_button(True, True)
+                    event_release = event.fake_button(False, True)
+                    for node in action_set_nodes:
+                        self.release_events.append((node, event_release))
+                        ec.execute_node(node, event_press, value, extra_data)
+
+
+
+       # self._execute(event, value, extra_data)
+        return True
+        
 
 
 class HatButtonsContainer(AbstractContainer):
@@ -262,52 +331,6 @@ class HatButtonsContainer(AbstractContainer):
         self.button_count = 4
         self.action_sets = [[], [], [], []]
 
-    def generate_callbacks(self, parent):
-        """Returns a list of callback data entries.
-
-        # :return list of container callback entries
-        # """
-        # lookup = _four_lookup
-        # if self.button_count == 8:
-        #     lookup = _eight_lookup
-        # id_to_direction = {}
-        # for k, v in lookup.items():
-        #     id_to_direction[v] = k
-
-        # callbacks = []
-
-        # # For a virtual button create a callback that sends VirtualButton
-        # # events and another callback that triggers of these events
-        # # like a button would.
-        # for i, action_set in enumerate(self.action_sets):
-        #     # Ignore directions with no associated actions
-        #     if len(action_set) == 0:
-        #         continue
-
-        #     # Callback generating virtual button events
-        #     callbacks.append(gremlin.base_profile.CallbackData(
-        #         gremlin.execution_graph.VirtualButtonProcess(self, VirtualHatButton(self, [gremlin.util.hat_tuple_to_direction(id_to_direction[i])])),None))
-        #     # Create fake BasicContainer for each action set
-        #     basic_container = BasicContainer(self, parent)
-        #     basic_container.action_sets = [action_set]
-        #     basic_container.activation_condition = self.activation_condition
-            
-            
-
-        #     # Callback reacting to virtual button events
-        #     callbacks.append(gremlin.base_profile.CallbackData(
-        #         gremlin.execution_graph.VirtualButtonCallback(basic_container, parent),
-        #         gremlin.event_handler.Event(
-        #             InputType.VirtualButton,
-        #             callbacks[-1].callback.virtual_button.identifier,
-        #             device_guid=dinput.GUID_Virtual,
-        #             is_pressed=True,
-        #             raw_value=True
-        #         )
-        #     ))
-
-        #return callbacks
-        return []
 
     def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.

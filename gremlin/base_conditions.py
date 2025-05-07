@@ -546,9 +546,14 @@ class AbstractFunctor(QtCore.QObject):
         if self.action_data:
             return str(self.action_data)
         return "Plugin Functor"
+    
+
+class AbstractTriggerFunctor(AbstractFunctor):
+    ''' functors that derive from this have the execution graph stop at that functor without processing downstream nodes further '''
+    pass
 
 
-class AbstractSelfTriggerFunctor(AbstractFunctor):
+class AbstractSelfTriggerFunctor(AbstractTriggerFunctor):
     ''' functor that has self trigger mechanisms to trigger its content '''
 
     def __init__(self, action_data, parent = None):

@@ -40,6 +40,7 @@ import gremlin.singleton_decorator
 import logging
 import gremlin.ui.ui_common
 from vigem import vigem_gamepad as vg
+import gremlin.ui.state_device
 
 syslog = logging.getLogger("system")
 
@@ -298,12 +299,17 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, True)
 
+        sd = gremlin.ui.state_device.StateData()
+        sd.crud.connect(self._state_crud)
+
         self.devices = gremlin.joystick_handling.joystick_devices()
         self.gamepad_devices = gremlin.gamepad_handling.gamepadDevices()
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.keyboard_visualizer_widget = None
+        self._keyboard_visualizer_widget = None
+        self._state_visualizer_widget = None
+        self._state_buttons = {} # map of key widget
         self.keyboard_widget = None # keyboard widget
 
         
@@ -331,10 +337,19 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_area.setWidgetResizable(True)
         self.scroll_selector_area.setWidget(self.scroll_selector_widget)
 
+        config = VisualizationConfig()
 
         self.keyboard_widget_selector = gremlin.ui.ui_common.QDataCheckbox("Keyboard")
         self.keyboard_widget_selector.setIgnoreKeyboard(True)
+        checked = config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+        self.keyboard_widget_selector.setChecked(checked)
         self.keyboard_widget_selector.clicked.connect(self._toggle_keyboard_widget)
+
+        self.state_widget_selector = gremlin.ui.ui_common.QDataCheckbox("State")
+        self.state_widget_selector.setIgnoreKeyboard(True)
+        checked = config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State)
+        self.state_widget_selector.setChecked(checked)
+        self.state_widget_selector.clicked.connect(self._toggle_state_widget)
 
 
         self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget)
@@ -344,11 +359,9 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         system_selector_widget =  QtWidgets.QGroupBox("System Inputs")
         system_selector_layout = QtWidgets.QHBoxLayout(system_selector_widget)
-        
     
-    
-
         system_selector_layout.addWidget(self.keyboard_widget_selector)
+        system_selector_layout.addWidget(self.state_widget_selector)
 
         self.scroll_selector_layout.addWidget(system_selector_widget)
         self.scroll_selector_layout.addWidget(self.vis_selector)
@@ -381,6 +394,9 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._keyboard_visible = config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
         self._toggle_keyboard_widget(self._keyboard_visible)
 
+        self._state_visible = config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State)
+        self._toggle_state_widget(self._state_visible)
+
 
         self.installEventFilter(self)
 
@@ -393,6 +409,8 @@ class InputViewerUi(ui_common.BaseDialogUi):
                 return True
         return super().eventFilter(widget, event)
         
+
+
 
     @QtCore.Slot()
     def _closed(self):
@@ -448,37 +466,91 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         
     def showKeyboard(self):
-        # keyboard device
-        if not self.keyboard_visualizer_widget:
+        ''' keyboard device '''
+        if not self._keyboard_visualizer_widget:
             
-            self.keyboard_visualizer_widget =  QtWidgets.QGroupBox("Keyboard")
-            self.keyboard_visualizer_layout = QtWidgets.QVBoxLayout(self.keyboard_visualizer_widget)
+            self._keyboard_visualizer_widget =  QtWidgets.QGroupBox("Keyboard")
+            self.keyboard_visualizer_layout = QtWidgets.QVBoxLayout(self._keyboard_visualizer_widget)
             self.keyboard_widget = gremlin.ui.virtual_keyboard.QKeyboardWidget()
             self.keyboard_widget.setReadonly(True)
             self.keyboard_visualizer_layout.addWidget(self.keyboard_widget)
             self.keyboard_widget.hook()
-            self.views.add_widget(self.keyboard_visualizer_widget)
+            self.views.add_widget(self._keyboard_visualizer_widget)
             key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
-            self._widget_storage[key] = self.keyboard_visualizer_widget
+            self._widget_storage[key] = self._keyboard_visualizer_widget
             self._keyboard_visible = True
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(True)
 
     def hideKeyboard(self):
-        if self.keyboard_visualizer_widget:
+        if self._keyboard_visualizer_widget:
             self.keyboard_widget.unhook()
-            self.views.remove_widget(self.keyboard_visualizer_widget)
+            self.views.remove_widget(self._keyboard_visualizer_widget)
             self.keyboard_widget = None
             key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
             if key in self._widget_storage:
                 del self._widget_storage[key]
-            self.keyboard_visualizer_widget = None
+            self._keyboard_visualizer_widget = None
             self._keyboard_visible = False
             
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(False)
 
         self._update_view()
+
+
+    def populateState(self, layout):
+        if self._state_visualizer_widget:
+            gremlin.util.clear_layout(layout)
+            self._state_buttons.clear()
+            sd = gremlin.ui.state_device.StateData()
+            css = gremlin.ui.ui_common.Color.cssStateButton()
+            i = 0
+            for key, data in sd.getStates().items():
+                btn = gremlin.ui.ui_common.QDataPushButton(key, data)
+                btn.setStyleSheet(css)
+                btn.setDisabled(True)
+                btn.setDown(data.value)
+                layout.addWidget(btn, int(i / 10), int(i % 10))
+                data.changed.connect(self._state_changed)
+                self._state_buttons[data.key] = btn
+                i+=1
+            layout.setColumnStretch(10,1)
+
+    def showState(self):
+        ''' state device '''
+        if not self._state_visualizer_widget:
+            self._state_visualizer_widget = QtWidgets.QGroupBox("States")
+            button_layout = QtWidgets.QGridLayout()
+            self.populateState(button_layout)
+            self._state_visualizer_widget.setLayout(button_layout)
+                
+            self.views.add_widget(self._state_visualizer_widget)
+
+    def hideState(self):
+        ''' hides the state device '''
+        if self._state_visualizer_widget:
+            self.views.remove_widget(self._state_visualizer_widget)
+        self._update_view()
+
+    def refreshState(self):
+        if self._state_visualizer_widget:
+            layout = self._state_visualizer_widget.layout()
+            self.populateState(layout)
+        
+
+    @QtCore.Slot()
+    def _state_changed(self):
+        data = self.sender()
+        key = data.key
+        if key in self._state_buttons:
+            self._state_buttons[key].setDown(data.value)
+
+    @QtCore.Slot()
+    def _state_crud(self):
+        # called on state create/add/remove/edit
+        self.refreshState()
+
     
     @QtCore.Slot(bool)
     def _toggle_keyboard_widget(self, checked):
@@ -490,7 +562,16 @@ class InputViewerUi(ui_common.BaseDialogUi):
         config = VisualizationConfig()
         config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, checked)
 
-            
+    @QtCore.Slot(bool)
+    def _toggle_state_widget(self, checked):
+        if checked:
+            self.showState()
+        else:
+            self.hideState()
+
+        config = VisualizationConfig()
+        config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, checked)
+           
 
     def _update_view(self):
         ''' rebuids the view '''

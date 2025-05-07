@@ -309,30 +309,6 @@ class Color():
     def cssButtonState():
         ''' gets a pushbutton state for the input viewer '''
 
-        # buttons = ("mdi.radiobox-blank","mdi.radiobox-marked","mdi.checkbox-blank-outline","mdi.checkbox-intermediate")
-        # colors = (
-        #     ("#AAAAAA","dark_"),
-        #     ("#111111","")
-        #     )
-
-
-        # root_folder = gremlin.shared_state.root_path
-        # icon_size = QtCore.QSize(64,64)
-        # for name in buttons:
-        #     for color, prefix in colors:
-        #         icon = load_icon(name, qta_color=color)
-        #         fname = prefix + name.replace("mdi.","").replace("-","_")
-        #         the_path = os.path.join(root_folder, "gfx", f"{fname}.png")
-        #         if os.path.isfile(the_path):
-        #             os.unlink(the_path)
-        #         the_path = the_path.replace("\\","/")
-                
-        #         # f = QtCore.QFile(the_path)
-        #         # f.open(QtCore.QIODeviceBase.OpenModeFlag.WriteOnly)
-        #         pixmap = icon.pixmap(icon_size)
-        #         pixmap.save(the_path,"PNG")
-        #         print (the_path)
-
         normal_color = Color.normalColor()
         normal_gradient_color = Color.normalGradientColor()
         background_color = Color.keyBackgroundColor()
@@ -350,6 +326,46 @@ class Color():
             min-height: 30px;
             max-width: 30px;
             max-height: 30px;
+        }}
+
+        QPushButton:pressed {{
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
+            border-color: {selected_border_color};
+        }}
+
+        QPushButton:flat {{
+            border: none; /* no border for a flat push button */
+        }}
+
+        QPushButton:!enabled
+        {{
+             color: {background_color};
+        }}
+        '''
+        return css
+    
+    @staticmethod
+    def cssStateButton():
+        ''' gets a pushbutton state for the input viewer '''
+
+        normal_color = Color.normalColor()
+        normal_gradient_color = Color.normalGradientColor()
+        background_color = Color.keyBackgroundColor()
+        
+        border_color = Color.borderColor()
+        selected_border_color = Color.selectBorderColor()
+        selected_color = Color.selectColor()
+        selected_gradient_color = Color.selectGradientColor()
+        css = f'''
+        QPushButton {{
+            border: 2px solid #8f8f91;
+            border-radius: 15px;
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {normal_color}, stop: 1 {normal_gradient_color});
+            min-width: 30px;
+            min-height: 30px;
+            max-height: 30px;
+            padding-left: 4px;
+            padding-right: 4px;
         }}
 
         QPushButton:pressed {{
@@ -4967,7 +4983,11 @@ class ButtonState(QtWidgets.QGroupBox):
         """
         if event.event_type == InputType.JoystickButton:
             state = event.is_pressed if event.is_pressed is not None else False
-            self.buttons[event.identifier].setDown(state)
+            try:
+                self.buttons[event.identifier].setDown(state)
+            except:
+                # C++ error
+                pass
             self._event_times[event.identifier] = time.time()
 
 
@@ -6090,7 +6110,7 @@ class ActionLabel(QtWidgets.QLabel):
         QtWidgets.QLabel.__init__(self, parent)
         icon = action_entry.icon()
         if icon is None:
-            icon = gremlin.util.load_icon("fa.question-circle-o")
+            icon = gremlin.util.load_icon("fa6.circle-question")
 
         self._width = 20
         if isinstance(icon, str):
@@ -6114,7 +6134,7 @@ class ActionLabel(QtWidgets.QLabel):
     def _icon_change(self, event):
         icon = self.action_entry.icon()
         if icon is None:
-            icon = gremlin.util.load_icon("fa.question-circle-o")
+            icon = gremlin.util.load_icon("fa6.circle-question")
         if isinstance(icon, QtGui.QIcon):
             self.setPixmap(QtGui.QPixmap(icon.pixmap(self._width)))
         else:

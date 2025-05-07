@@ -473,7 +473,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
         return f"Switch: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
 
 
-class SwitchContainerFunctor(gremlin.base_conditions.AbstractFunctor):
+class SwitchContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
