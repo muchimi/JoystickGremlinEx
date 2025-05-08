@@ -24,6 +24,7 @@ import os
 from typing import Optional
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
+import gremlin.actions
 import gremlin.base_classes
 import gremlin.config
 import gremlin.error
@@ -1137,6 +1138,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
                     v -= self._step * factor
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
+                return True
 
             return True # filter the wheel event
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
@@ -1262,6 +1264,13 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     def maximum(self):
         return self._max_range
+    
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self._data = value
     
 
 class QFloatLineEditEx(QtWidgets.QLineEdit):
@@ -3600,10 +3609,15 @@ _widget_cache = []
 class QProgressBar(QtWidgets.QWidget):
     ''' visualizes a vertical or horizontal progress bar '''
 
-    def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float = 0, min : float = -1.0, max : float = 1.0):
+    valueChanged = QtCore.Signal() # fires when the value changes (and widget is not in readonly mode)
+
+    def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None):
         super().__init__()
         self._value = value
         self._orientation = orientation
+        self._step = step
+        self._readOnly = readonly
+        self._data = data
         self.setRange(min, max)
         if orientation == Qt.Orientation.Vertical:
             self._desired_width = 10
@@ -3618,6 +3632,49 @@ class QProgressBar(QtWidgets.QWidget):
         self._border_color = Color.selectBorderColor()
         self._gradient_start_color = Color.selectGradientColor()
         self._gradient_end_color = Color.selectEndGradientColor()
+        
+        self.installEventFilter(self)
+        
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self._data = value                
+
+    def setReadOnly(self, value: bool):
+        self._readOnly = value
+
+    def isReadOnly(self):
+        return self._readOnly
+    
+    def value(self):
+        return self._value
+        
+    def eventFilter(self, widget, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.Wheel:
+            # handle wheel up/down change
+            if self._readOnly:
+                return True # cannot change the value if readonly
+            v = self._value
+            if v is not None:
+                # keyboard shifted state
+                eh = gremlin.event_handler.EventListener()
+                is_shifted = eh.get_shifted_state()
+                factor = 0.1 if is_shifted else 1.0
+                if event.angleDelta().y() > 0:
+                    # up
+                    v += self._step * factor
+                else:
+                    # down
+                    v -= self._step * factor
+                v = gremlin.util.clamp(v, self._min_range, self._max_range)
+                self.setValue(v)
+                self.valueChanged.emit()
+
+            return True # filter the wheel event
+        return False
 
 
     @property
@@ -3750,7 +3807,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
     deleted = QtCore.Signal(object) # indicates the item is being deleted
 
-    def __init__(self, axis_id = None, show_calibrated = False, show_percentage = True, show_value = True, show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical, min_range : float = -1.0, max_range : float = 1.0, comment = None, parent=None):
+    def __init__(self, axis_id = None, show_calibrated = False, show_percentage = True, show_value = True, show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical, min_range : float = -1.0, max_range : float = 1.0, comment = None, device = None, parent=None):
         """Creates a new instance.
 
         :param axis_id id of the axis, used in the label
@@ -3760,6 +3817,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
         self._scale_factor = 1000
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.device = device
 
         self.container_widget = QtWidgets.QWidget()
         if orientation == QtCore.Qt.Orientation.Vertical:
@@ -3819,8 +3877,9 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
             min, max = max, min
         self._min_range = min_range
         self._max_range = max_range
-        self._device_guid = None
-        self._input_id = None
+
+        self._device_guid = device.device_guid if device else None
+        self._input_id = axis_id
         self._value = 0
         self._raw_value = 0
         self._reverse = False
@@ -3840,6 +3899,16 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         el.ui_ready.connect(self._ui_ready)
 
         self._setValue(self._value)
+
+        self.installEventFilter(self)
+
+    def eventFilter(self, widget, event):
+        ''' grab mouse wheel events to avoid random scrolling '''
+        t = event.type()
+        if t == QtCore.QEvent.Type.Wheel:
+            return True
+        return False
+
 
     def hookDevice(self, device_guid, input_type, input_id):    
         ''' hooks the device '''    
@@ -3935,7 +4004,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
             self._progress_widget = None
 
         if not self._progress_widget:
-            self._progress_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range)
+            self._progress_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self._input_id)
             self._progress_widget.setFixedSize(self._progress_widget.sizeHint())
             self.progress_container_layout.addWidget(self._progress_widget, alignment = alignment)
             self._progress_widget.setValue(self._display_value)
@@ -3945,6 +4014,10 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
             else:
                 h = 2 + self._progress_widget.height()
                 self.progress_container_widget.setFixedHeight(h)
+
+            if self.device and self.device.is_virtual:
+                self._progress_widget.setReadOnly(False)
+                self._progress_widget.valueChanged.connect(self._value_changed)
 
             
                 
@@ -3959,7 +4032,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
                     # C++ exception
                     self._progress_calibrated_widget = None
                 if not self._progress_calibrated_widget:
-                    self._progress_calibrated_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range)
+                    self._progress_calibrated_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self.input_id)
                     self._progress_calibrated_widget.gradientStartColor = Color.selectGradientAltColor()
                     self._progress_calibrated_widget.gradientEndColor = Color.selectEndGradientAltColor()
                     self._progress_calibrated_widget.setFixedSize(self._progress_calibrated_widget.sizeHint())
@@ -3972,6 +4045,10 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
                         self.progress_container_widget.setFixedHeight(h)
                     
                     self._progress_calibrated_widget.setValue(self._calibrated_value)
+                    if self.device and self.device.is_virtual:
+                        self._progress_calibrated_widget.setReadOnly(False)
+                        self._progress_calibrated_widget.valueChanged.connect(self._value_changed)
+
 
         # progress bar value
         if self._show_value:
@@ -3983,7 +4060,11 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
                 # C++ exception
                 self._display_value_widget = None
             if not self._display_value_widget:
-                self._display_value_widget = QtWidgets.QLabel(self._label_value)
+                if self.device and self.device.is_virtual:
+                    self._display_value_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self._value)
+                    self._display_value_widget.valueChanged.connect(self._value_changed)
+                else:
+                    self._display_value_widget = QtWidgets.QLabel(self._label_value)
                 self.container_layout.addWidget(self._display_value_widget, alignment = alignment)
 
 
@@ -4017,8 +4098,17 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
         self.container_layout.addStretch()
 
-        
-        
+    @QtCore.Slot()
+    def _value_changed(self):
+        widget = self.sender()        
+        value = widget.value()
+        input_id = widget.data
+        device_guid = self.device.device_guid
+        gremlin.joystick_handling.set_axis(device_guid, input_id, value)
+
+
+
+    
     @QtCore.Slot()
     def _ui_ready(self):
         ''' fires when the UI is ready '''
@@ -4188,6 +4278,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         
         if display_value is not None:
             self._label_value = f"{display_value:+0.3f}"
+        else:
+            self._label_value = "n/a"
             
 
         if self._show_curve and curve_value is not None:
@@ -4359,18 +4451,23 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 axis_label = QtWidgets.QLabel(f"Axis {index}")
                 axis_id = gremlin.joystick_handling.linear_axis_index(self.device.axis_map,index)
                 self.index_map[axis_id] = index
-                axis = AxisStateWidget(index, show_value = False, show_label=False, show_percentage=False)
+                axis = AxisStateWidget(index, show_value = False, show_label=False, show_percentage=False, device = device)
                 calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(device_guid, input_id)
                 axis.setCalibrated(calibration.hasData) # enable calibrated mode dual repeater
 
                 value = gremlin.joystick_handling.get_axis(device.device_guid, index)
                 #print (f"Axis {axis_id} value: {value:0.3f}")
-                value_label = QtWidgets.QLabel(f"{value:+0.3f}")
+                if self.device.is_virtual:
+                    value_widget = QFloatLineEdit(data = index)
+                    value_widget.valueChanged.connect(self._value_changed)
+                else:
+                    value_widget = QtWidgets.QLabel(f"{value:+0.3f}")
+
                 #axis.setValue(value)
                 self.axes[index] = axis
-                self.value_labels[index] = value_label
+                self.value_labels[index] = value_widget
                 percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
-                value_label = QtWidgets.QLabel(f"{value:+0.3f}")
+                
                 percent_label = QtWidgets.QLabel(f"{percent:0.1f} %")
                 self.percent_labels[index] = percent_label
                 axis.setValue(value)
@@ -4383,20 +4480,34 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 row += 1 
                 axes_layout.addWidget(widget, row, i, alignment=QtCore.Qt.AlignCenter)
                 row += 1 
-                axes_layout.addWidget(value_label, row, i, alignment=QtCore.Qt.AlignCenter)
+                axes_layout.addWidget(value_widget, row, i, alignment=QtCore.Qt.AlignCenter)
                 row += 1 
                 axes_layout.addWidget(percent_label, row, i, alignment=QtCore.Qt.AlignCenter)
                 row += 1 
             else:
                 axes_layout.addWidget(QtWidgets.QLabel(" "), 0, i, alignment=QtCore.Qt.AlignCenter)    # spacer
-            #     value_label = QtWidgets.QLabel(" ")
-            #     percent_label = QtWidgets.QLabel(" ")
 
             
 
         #axes_layout.addStretch()
         axes_layout.setColumnStretch(i+1,2)
         self.setLayout(axes_layout)
+
+    @QtCore.Slot()
+    def _value_changed(self):
+        widget = self.sender()
+        input_id = widget.data
+        value = widget.value()
+        device_guid = self.device.device_guid
+        gremlin.joystick_handling.set_axis(device_guid, input_id, value)
+        #self._set_value(index, value)
+
+    def _set_value(self, index : int, value : float):
+        self.axes[index].setValue(value)
+        self.value_labels[index].setText(f"{value:+0.3f}")
+        percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
+        self.percent_labels[index].setText(f"{percent:0.1f} %")
+
 
     def process_event(self, event):
         """Updates state visualization based on the given event.
@@ -4410,42 +4521,123 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             )
             index = self.index_map[axis_id]
             value = event.value
-            self.axes[index].setValue(value)
-            self.value_labels[index].setText(f"{value:+0.3f}")
-            percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
-            self.percent_labels[index].setText(f"{percent:0.1f} %")
+            self._set_value(index, value)
 
 
 class HatWidget(QtWidgets.QWidget):
 
     """Widget visualizing the state of a hat."""
 
+    clicked = QtCore.Signal(tuple) # click event (direction)
+
     # Polygon path for a triangle
     triangle = QtGui.QPolygon(
         [QtCore.QPoint(-10, 0), QtCore.QPoint(10, 0), QtCore.QPoint(0, 15)]
     )
 
-    # Mapping from event values to rotation angles
-    lookup = {
-        (0, 0): -1,
-        (0, 1): 180,
-        (1, 1): 225,
-        (1, 0): 270,
-        (1, -1): 315,
-        (0, -1): 0,
-        (-1, -1): 45,
-        (-1, 0): 90,
-        (-1, 1): 135
-    }
+    # Mapping from event values to rotation angles - center and 8 positions
+    lookup = [
+        ((0, 0), -1),     # 0 center
+        ((0, 1), 0),    # 1 N
+        ((1, 1), 45),    # 2 NE
+        ((1, 0), 90),    # 3 E
+        ((1, -1), 135),   # 4 SE
+        ((0, -1), 180),      # 5 S
+        ((-1, -1), 225),   # 6 SW
+        ((-1, 0), 270),    # 7 W
+        ((-1, 1), 315),   # 8 NW
+    ]
 
-    def __init__(self, parent=None):
+    def __init__(self, direction = None, data = None, parent=None):
         """Creates a new instance.
 
         :param parent the parent of this widget
         """
         super().__init__(parent)
-
+        self.installEventFilter(self)
+        self._data = data
+        self._direction = direction
+        self._radius = 35
+        self._center = 50
+        self._box = 24
+        self._hotspots = []
         self.angle = -1
+        self._directions = []
+        self._angle_map = {}
+        self._rect_map = {}
+        self.setContentsMargins(0,0,0,0)
+
+    def _update_hotspots(self):
+        self._hotspots = []
+        self._directions = []
+        index = 0
+        for direction, angle in HatWidget.lookup:
+            if angle != -1:
+                angle = angle - 90
+                if angle < 0:
+                    angle += 360
+            rect = self._get_rect(angle)
+            self._hotspots.append(rect)
+            self._directions.append(direction)
+            self._angle_map[direction] = angle
+            # syslog.info(f"Index: [{index}] Angle: {angle} {direction} {rect}")
+            self._rect_map[rect] = direction
+            index +=1
+        pass
+                
+
+    def resizeEvent(self, event):
+        self._update_hotspots()
+        return super().resizeEvent(event)
+
+    def _get_rect(self, angle):
+        ''' computes the click hotspot angle for the widget '''
+        import math
+        s = self._box
+        s2 = s/2
+        cx = self._center
+        cy = self._center
+
+        if angle == -1:
+            # center rect
+            x = cx - s2
+            y = cy - s2
+        else:
+            rad = math.radians(angle) 
+            x = cx + math.cos(rad) * self._radius - s2
+            y = cy + math.sin(rad) * self._radius - s2 
+        rect = QtCore.QRect(x,y,s,s)
+
+        return rect
+
+
+    def eventFilter(self, widget, event):
+        ''' grab mouse wheel events to avoid random scrolling '''
+        t = event.type()
+        if t == QtCore.QEvent.Type.MouseButtonPress:
+            # mouse press
+            button = event.buttons()
+            if button == QtCore.Qt.LeftButton:
+                pos = event.pos()
+                # syslog.info(f"Click: {pos}")
+                for index, rect in enumerate(self._hotspots):
+                    if rect.contains(pos):
+                        direction = self._rect_map[rect] # self._directions[index]
+                        # syslog.info(f"\tRect [{index}]: {direction} {rect} ")
+                        self.clicked.emit(direction)
+                        return True # handled
+            
+        return False
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, value):
+        self._data = value
+
+
 
     def minimumSizeHint(self):
         """Returns the minimum size of the widget.
@@ -4459,8 +4651,12 @@ class HatWidget(QtWidgets.QWidget):
 
         :param state the direction of the hat
         """
-        self.angle = HatWidget.lookup.get(state, -1)
+
+        self.angle = self._angle_map.get(state,-1)
+        # syslog.info(f"SetAngle: {state} {self.angle}")
         self.update()
+
+
 
     def paintEvent(self, event):
         """Draws the entire hat state visualization.
@@ -4475,13 +4671,6 @@ class HatWidget(QtWidgets.QWidget):
         
         normal_color = Color.normalColor()
 
-        # pen_default = QtGui.QPen(QtGui.QColor("#8f8f91"))
-        # pen_default.setWidth(2)
-        # pen_active = QtGui.QPen(QtGui.QColor("#1f8c33"))
-        # pen_active.setWidth(2)
-        # brush_default = QtGui.QBrush(QtGui.QColor("#f6f7fa"))
-        # brush_active = QtGui.QBrush(QtGui.QColor("#69e060"))
-
         pen_default = QtGui.QPen(QtGui.QColor(normal_color))
         pen_default.setWidth(2)
         pen_active = QtGui.QPen(QtGui.QColor(active_color))
@@ -4491,12 +4680,13 @@ class HatWidget(QtWidgets.QWidget):
 
         # Prepare painter instance
         p = QtGui.QPainter(self)
-        # p.begin(self)
+        
         p.setRenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
         p.setPen(pen_default)
         p.setBrush(brush_default)
 
-        p.translate(50, 50)
+        #p.save()
+        p.translate(self._center, self._center)
 
         # Center dot
         if self.angle == -1:
@@ -4506,8 +4696,8 @@ class HatWidget(QtWidgets.QWidget):
         # Directions
         for angle in [0, 45, 90, 135, 180, 225, 270, 315]:
             p.save()
-            p.rotate(angle)
-            p.translate(0, 35)
+            p.rotate(angle - 90)
+            p.translate(0, self._radius)
 
             if angle == self.angle:
                 p.setBrush(brush_active)
@@ -4516,12 +4706,16 @@ class HatWidget(QtWidgets.QWidget):
             p.drawPolygon(HatWidget.triangle)
             p.restore()
 
+        #p.restore()
+        # for rect in self._hotspots:
+        #     p.drawRect(rect)
 
         p.end()
 
 class HatState(QtWidgets.QGroupBox):
 
     """Visualizes the sate of a device's hats."""
+
 
     def __init__(self, device, parent=None):
         """Creates a new instance.
@@ -4532,6 +4726,7 @@ class HatState(QtWidgets.QGroupBox):
         super().__init__(parent)
 
         self._event_times = {}
+        self.device = device
 
         if device.is_virtual:
             self.setTitle(f"{device.name} #{device.vjoy_id:d} - Hats")
@@ -4541,11 +4736,22 @@ class HatState(QtWidgets.QGroupBox):
         self.hats = [None]
         hat_layout = QtWidgets.QGridLayout()
         for i in range(device.hat_count):
-            hat = HatWidget()
+            hat = HatWidget(data = i+1) # data is the hat #
+            if device.is_virtual:
+                hat.clicked.connect(self._hat_clicked)
             self.hats.append(hat)
             hat_layout.addWidget(hat, int(i / 2), int(i % 2))
 
         self.setLayout(hat_layout)
+
+    @QtCore.Slot()
+    def _hat_clicked(self, direction):
+        widget = self.sender()
+        input_id = widget.data
+        #input_id = self.device.vjoy_id
+        device_guid = self.device.device_guid
+        #syslog.info(f"Set Hat: {input_id}  {direction}")
+        gremlin.joystick_handling.set_hat(device_guid, input_id, direction)
 
     def process_event(self, event):
         """Updates state visualization based on the given event.
@@ -4842,6 +5048,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             if self.device_data.is_virtual:
                 el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
+            self._unhook_buttons()
             el.joystick_event.disconnect(self._button_hat_update)
             if self.device_data.is_virtual:
                 el.unregisterVjoyCallback(self._vjoy_button_hat_update)
@@ -4872,6 +5079,12 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         for widget in self.widgets:
             self.layout().addWidget(widget)
         self.layout().addStretch(1)
+
+    def _unhook_buttons(self):
+        if self.device_data.is_virtual:
+            widgets = [widget for widget in self.widgets if isinstance(widget, ButtonState)]
+            for widget in widgets:
+                widget.unhook()
 
     def _create_current_axis(self):
         """Creates display for current axes data."""
@@ -4953,9 +5166,12 @@ class ButtonState(QtWidgets.QGroupBox):
         super().__init__(parent)
 
         self._event_times = {}
+        self._device = device
 
+        is_disabled = True
         if device.is_virtual:
             self.setTitle(f"{device.name} #{device.vjoy_id:d} - Buttons")
+            is_disabled = False
         else:
             self.setTitle(f"{device.name} - Buttons")
 
@@ -4963,9 +5179,12 @@ class ButtonState(QtWidgets.QGroupBox):
         self.buttons = [None]
         button_layout = QtWidgets.QGridLayout()
         for i in range(device.button_count):
-            btn = QtWidgets.QPushButton(str(i+1))
+            btn = gremlin.ui.ui_common.QDataPushButton(str(i+1), i+1)
             btn.setStyleSheet(css)
-            btn.setDisabled(True)
+            btn.setDisabled(is_disabled)
+            if not is_disabled:
+                btn.clicked.connect(self._button_clicked)
+
             # read the current state
             is_pressed = gremlin.joystick_handling.get_button(device.device_guid, i+1)
             btn.setDown(is_pressed)
@@ -4974,14 +5193,31 @@ class ButtonState(QtWidgets.QGroupBox):
         button_layout.setColumnStretch(10, 1)
         self.setLayout(button_layout)
 
+    
         
+    @QtCore.Slot()
+    def _button_clicked(self):
+        btn = self.sender()
+        input_id = btn.data
+        device_guid = self._device.device_guid
+        is_pressed = not gremlin.joystick_handling.get_button(device_guid, input_id)
+        gremlin.joystick_handling.set_button(device_guid, input_id, is_pressed)
+
+    def unhook(self):
+        ''' unhooks buttons '''
+        if self._device.is_virtual:
+            for btn in self.buttons:
+                if btn:
+                    btn.clicked.disconnect(self._button_clicked)
 
     def process_event(self, event):
         """Updates state visualization based on the given event.
 
         :param event the event with which to update the state display
         """
-        if event.event_type == InputType.JoystickButton:
+        input_type = event.getInputType()
+        if input_type == InputType.JoystickButton:
+            #is_pressed = event.is_pressed if event.is_pressed is not None else event.current
             state = event.is_pressed if event.is_pressed is not None else False
             try:
                 self.buttons[event.identifier].setDown(state)

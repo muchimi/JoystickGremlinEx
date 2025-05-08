@@ -126,6 +126,7 @@ class Ui_Gremlin(object):
         self.actionPDFCheatsheet.setObjectName("actionPDFCheatsheet")
         self.actionViewInput = QtGui.QAction(main_window)
         self.actionViewInput.setObjectName("actionViewInput")
+        self.actionViewInput.setCheckable(True)
         self.actionExit = QtGui.QAction(main_window)
         self.actionExit.setObjectName("actionExit")
         self.actionOptions = QtGui.QAction(main_window)

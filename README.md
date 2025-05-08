@@ -14,6 +14,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m75t3)
+- New: VJoy buttons and hats can be set from the input viewer by clicking on them either in edit mode or at runtime.
+- New: VJoy axes can be set from the input viewer by using the data entry box, or using the mouse wheel on the axis display either in edit mode or at runtime.
+
+Both features are designed to assist with testing profile and code behaviors without having to rely on a mapping or third party app.
+
+- Modified: The input viewer toolbar icon will activate when the input viewer window is visible/active.  A click on the toolbar if already active will pop the input viewer window to the front.  The toolbar icon will deactivate when the input viewer window is closed.
+
+
+
 ### (m75t2)
 - New: states on input repeater
 - Fix: Hat container not triggering contents

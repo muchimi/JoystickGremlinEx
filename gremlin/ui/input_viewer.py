@@ -417,6 +417,12 @@ class InputViewerUi(ui_common.BaseDialogUi):
         ''' save the config on close'''
         if self.keyboard_widget:
             self.keyboard_widget.unhook()
+        # unhook widgets that need unhooked
+        for key in self._widget_storage:
+            widget = self._widget_storage[key]
+            if hasattr(widget,"unhook"):
+                widget.unhook()
+
         config = VisualizationConfig()
         config.save()
 

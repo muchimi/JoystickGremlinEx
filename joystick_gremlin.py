@@ -351,6 +351,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Modal windows
         self.modal_windows = {}
+        self.modal_windows["input_viewer"] = None
 
         # Enable reloading for when a user connects / disconnects a
         # device. Sleep for a bit to avert race with devices being added
@@ -985,7 +986,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param name the name of the modal window to remove
         """
         if name in self.modal_windows:
-            del self.modal_windows[name]
+            self.modal_windows[name] = None
 
     # +---------------------------------------------------------------
     # | Action implementations
@@ -1183,21 +1184,29 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def input_viewer(self):
         """Displays the input viewer dialog."""
-        self.modal_windows["input_viewer"] = gremlin.ui.input_viewer.InputViewerUi()
-        geom = self.geometry()
-        self.modal_windows["input_viewer"].setGeometry(
-            int(geom.x() + geom.width() / 2 - 350),
-            int(geom.y() + geom.height() / 2 - 150),
-            700,
-            300
-        )
-        gremlin.shared_state.push_suspend_highlighting()
-        self.modal_windows["input_viewer"].show()
-        self.modal_windows["input_viewer"].closed.connect(self._close_input_viewer)
+        if self.modal_windows["input_viewer"]:
+            # set the focus to that window
+            self.modal_windows["input_viewer"].activateWindow()
+            self.ui.actionInputViewer.setChecked(True)
+        else:
+            self.modal_windows["input_viewer"] = gremlin.ui.input_viewer.InputViewerUi()
+            geom = self.geometry()
+            self.modal_windows["input_viewer"].setGeometry(
+                int(geom.x() + geom.width() / 2 - 350),
+                int(geom.y() + geom.height() / 2 - 150),
+                700,
+                300
+            )
+            # gremlin.shared_state.push_suspend_highlighting()
+            
+            self.ui.actionInputViewer.setChecked(True)
+            self.modal_windows["input_viewer"].show()
+            self.modal_windows["input_viewer"].closed.connect(self._close_input_viewer)
 
     def _close_input_viewer(self):
-        gremlin.shared_state.pop_suspend_highlighting()
+        # gremlin.shared_state.pop_suspend_highlighting()
         self._remove_modal_window("input_viewer")
+        self.ui.actionInputViewer.setChecked(False)
 
 
     def load_profile(self, fname = None):
@@ -2950,6 +2959,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 raise gremlin.error.GremlinError(f"Unable to find icons: {folder}")
             
         normal_color = gremlin.ui.ui_common.Color.normalColor()        
+        active_color = gremlin.ui.ui_common.Color.activeColor()
         is_dark = gremlin.shared_state.is_dark_theme    
 
         profile_icon = "gfx/dark_profile_open.svg" if is_dark else "gfx/profile_open.svg"
@@ -2991,9 +3001,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionInputRepeater.setIcon(icon)
 
 
-        input_viewer_icon = f"gfx/{prefix}input_viewer.svg"
-        icon = load_icon(input_viewer_icon)
-        self.ui.actionInputViewer.setIcon(icon)
+        # input_viewer_icon = load_icon("ei.adjust-alt")
+        # icon = load_icon(input_viewer_icon)
+        # self.ui.actionInputViewer.setIcon(icon)
 
         icon = load_icon(f"gfx/{prefix}logview.png")
         self.ui.actionLogDisplay.setIcon(icon)
@@ -3007,24 +3017,32 @@ class GremlinUi(QtWidgets.QMainWindow):
         icon = load_icon(about_icon)
         self.ui.actionAbout.setIcon(icon)
 
-        icon = load_icon("ei.adjust-alt", qta_color=normal_color)
-        self.ui.actionInputViewer.setIcon(icon)
+        # input actions
 
-
+        input_icon = load_icon("ei.adjust-alt", qta_color=normal_color)
+        input_on_icon = load_icon("ei.adjust-alt", qta_color=active_color)
+        pixmap_off = input_icon.pixmap(24,24)
+        pixmap_on = input_on_icon.pixmap(24,24)
+        viewer_icon = QtGui.QIcon()
+        viewer_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
+        viewer_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
+        self.ui.actionInputViewer.setCheckable(True)
+        self.ui.actionInputViewer.setIcon(viewer_icon)
+        
         # Toolbar actions
 
         
-        activate_icon = f"gfx/{prefix}activate.svg"
-        activate_on_icon = f"gfx/activate_on.svg"
-        pixmap_off = load_pixmap(activate_icon)
-        pixmap_on = load_pixmap(activate_on_icon)
-        if pixmap_off and pixmap_on:
-            activate_icon = QtGui.QIcon()
-            activate_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
-            activate_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
-            self.ui.actionActivate.setIcon(activate_icon)
-        else:
-            self.ui.actionActivate.setText("Run")
+        activate_icon = load_icon("fa5s.gamepad", qta_color=normal_color)
+        activate_on_icon = load_icon("fa5s.gamepad", qta_color=active_color)
+        pixmap_off = activate_icon.pixmap(24,24)
+        pixmap_on = activate_on_icon.pixmap(24,24)
+        activate_icon = QtGui.QIcon()
+        activate_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
+        activate_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
+        self.ui.actionActivate.setCheckable(True)
+        self.ui.actionActivate.setIcon(activate_icon)
+        
+
 
         
         self.ui.actionOpen.setIcon(load_icon(profile_icon))

@@ -118,8 +118,6 @@ def all_joystick_devices() -> list[DeviceSummary]:
     return _all_joystick_devices
 
 
-    
-
 def axis_input_devices() -> list[DeviceSummary]:
     ''' returns the list of input devices '''
     devices = [dev for dev in _joystick_devices if dev.axis_count]
@@ -151,6 +149,15 @@ def vjoy_devices(connected_only = True) -> list[DeviceSummary]:
         device_list = [dev for dev in _all_joystick_devices if dev.vjoy_id != -1 and dev.is_virtual]
     
     return device_list
+
+def get_device(guid) -> DeviceSummary:
+    ''' gets a device from its guid'''
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
+    if guid in _joystick_device_guid_map:
+        return _joystick_device_guid_map[guid]
+    return None
+
 
 def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
     ''' scales a value on one range to the new range
@@ -196,7 +203,6 @@ def get_axis(guid, index, normalized = True):
             return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
     return 0.0
         
-    
 
 def get_curved_axis(guid, index):
     ''' returns curved/calibrated data same as the event handler '''
@@ -218,7 +224,38 @@ def get_button(guid, index) -> bool:
         guid = gremlin.util.parse_guid(guid)
     return dinput.DILL.get_button(guid, index)
 
+def set_button(guid, index : int, is_pressed : bool):
+    ''' sets a vjoy device button if the index and guid exists '''
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
+    proxy = gremlin.joystick_handling.VJoyProxy()
+    device = get_device(guid)
+    if device and device.is_virtual:
+        vjoy_id = device.vjoy_id
+        if 0 < index <= device.button_count:
+            proxy[vjoy_id].button(index).is_pressed = is_pressed
     
+def set_axis(guid, index : int, value : float):
+    ''' sets a vjoy axis '''
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
+    proxy = gremlin.joystick_handling.VJoyProxy()
+    device = get_device(guid)
+    if device and device.is_virtual:
+        vjoy_id = device.vjoy_id
+        if 0 < index <= device.axis_count:
+            proxy[vjoy_id].axis(index).value = value
+
+def set_hat(guid, index : int, direction : tuple):
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
+    proxy = gremlin.joystick_handling.VJoyProxy()
+    device = get_device(guid)
+    if device and device.is_virtual:
+        vjoy_id = device.vjoy_id
+        if 0 < index < device.hat_count:
+            proxy[vjoy_id].hat(index).direction = direction
+
 
 
 def physical_devices():
