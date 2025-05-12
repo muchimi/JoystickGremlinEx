@@ -926,10 +926,20 @@ class AbstractAction(ProfileData):
         self._priority = 0 # default priority
         self.data = None # additional data for runtime purposes, context dependent used to tag actions at runtime for some purpose like action grouping
 
-        eh = gremlin.event_handler.EventListener()
-        eh.action_created.emit(self)
-        eh.profile_unload.connect(self._cleanup)
-        eh.action_delete.connect(self._action_delete)
+        el = gremlin.event_handler.EventListener()
+        el.action_created.emit(self)
+        el.profile_unload.connect(self._cleanup)
+        el.action_delete.connect(self._action_delete)
+        el.profile_start.connect(self.profile_start)
+        el.profile_stop.connect(self.profile_stop)
+
+    def profile_start(self):
+        ''' start event - override in subclass as needed '''
+        pass
+
+    def profile_stop(self):
+        ''' stop event - override in subclass as needed '''
+        pass
 
 
     @property

@@ -20,6 +20,7 @@ import logging
 import math
 import os
 from lxml import etree as ElementTree
+import sys
 
 from PySide6 import QtCore, QtWidgets, QtGui
 
@@ -47,19 +48,24 @@ class OscArg(QtCore.QObject):
 
     valueChanged = QtCore.Signal(object) # fires when the value changes
 
-    def __init__(self, value = True, enabled : bool = True):
+    def __init__(self, index : int, value = 0.0, device_id : str = None, input_id = None, enabled : bool = True):
         super().__init__()
         self._id = gremlin.util.get_guid()
+        self._index = index # index of the arg starting at 0
         self._value = value
+        
         self._data_type = type(value)
         self._enabled = enabled
         self._min_range = 0.0
         self._max_range = 1.0
         self._value_on_release = value
-        self._use_input = False # true if the input comes from the event (example, axis)
-        self._source_device_id = None # ID of the source device, None for none
-        self._source_axis_id = None # ID of the source axis on the source device, None for none
+        
+        self._source_device_id = device_id # ID of the source device, None for none
+        self._source_axis_id = input_id if isinstance(input_id, int) else None # ID of the source axis on the source device, None for none
         self._source_mode = "input" # possible values are "input", "device", "value"
+
+        self._send_on_press = True # if true, emits on press button
+        self._send_on_release = True # if true, emits on release button
     
     @property
     def id(self):
@@ -67,6 +73,13 @@ class OscArg(QtCore.QObject):
     @id.setter
     def id(self, value : str):
         self._id = value
+
+    @property
+    def index(self) -> int:
+        return self._index
+    @index.setter
+    def index(self, value : int):
+        self._index = value
     
     def value(self):
         ''' press or main value'''
@@ -85,6 +98,18 @@ class OscArg(QtCore.QObject):
         return self._value_on_release
     def setValueOnRelease(self, value):
         self._value_on_release = value
+
+    def setSendOnPress(self, value: bool):
+        self._send_on_press = value
+
+    def setSendOnRelease(self, value: bool):
+        self._send_on_release = value
+
+    def sendOnPress(self) -> bool:
+        return self._send_on_press
+    def sendOnRelease(self) -> bool:
+        return self._send_on_release
+        
 
     def getPressReleaseValue(self, is_pressed : bool):
         if is_pressed:
@@ -164,31 +189,36 @@ class OscArg(QtCore.QObject):
         value = self._value
         value_release = self._value_on_release
         is_number = False
-
-        if self._data_type == str:
+        data_type = type(value) if value is not None else self._data_type
+        if data_type == str:
             node.set("value", value)
             node.set("type", "str")
             node.set("value-release", value_release)
-        elif self._data_type == float:
+        elif data_type == float:
             node.set("value", safe_format(value, float))
             node.set("type", "float")
             node.set("value-release", safe_format(value_release, float))
             is_number = True
-        elif self._data_type == int:
+        elif data_type == int:
             node.set("value", safe_format(value, int))
             node.set("type", "int")
             node.set("value-release", safe_format(value_release, int))
             is_number = True
-        elif self._data_type == bool:
+        elif data_type == bool:
             node.set("value", safe_format(value, bool))
             node.set("type", "bool")
             node.set("value-release", safe_format(value_release, bool))
 
         node.set("enabled", safe_format(self._enabled, bool))
+        node.set("exec-press", safe_format(self._send_on_press, bool))
+        node.set("exec-release", safe_format(self._send_on_release, bool))
 
-        node.set("use-input", safe_format(self._use_input, bool))
         node.set("source-mode", self._source_mode)
         if self._source_mode == "device":
+            device = gremlin.joystick_handling.device_info_from_guid(self._source_device_id)
+            axis_name = device.axis_names[self._source_axis_id-1]
+            comment_node = ElementTree.Comment(f" Source device: {device.name} Source axis: {axis_name} ")
+            node.append(comment_node)
             if self._source_device_id: node.set("device-guid",self._source_device_id)
             if self._source_axis_id is not None: node.set("axis", safe_format(self._source_axis_id, int))
 
@@ -243,8 +273,10 @@ class OscArg(QtCore.QObject):
             if "axis" in node.attrib:
                 self._source_axis_id = safe_read(node,"axis", int, 1)
 
-        if "use-input" in node.attrib:
-            self._use_input = safe_read(node,"use-input",bool, False)
+        if "exec-press" in node.attrib:
+            self._send_on_press = safe_read(node,"exec-press", bool)
+        if "exec-release" in node.attrib:
+            self._send_on_release = safe_read(node,"exec-release", bool)
         
         if is_number:
             if "min-range" in node.attrib:
@@ -261,12 +293,12 @@ class OscValueWidget(QtWidgets.QWidget):
     enableValueOnReleaseChanged = QtCore.Signal(bool)
     enabledChanged = QtCore.Signal(bool) # fires when enabled changes
     
-    def __init__(self, osc_arg : OscArg, is_axis = False, parent = None):
+    def __init__(self, osc_arg : OscArg, action_data, parent = None):
         super().__init__(parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         
-        self._is_axis = is_axis # true if mapping to an axis input (only has one value - if not an axis, has a pressed value and a release value)
+        self._is_axis = action_data.input_is_axis()
         self._arg = osc_arg
         value = osc_arg.value()
         release_value = osc_arg.valueOnRelease()
@@ -274,34 +306,37 @@ class OscValueWidget(QtWidgets.QWidget):
         self.press_widget = None
         self.release_widget = None
         self.value_widget = None
+
+        self._action_data = action_data # associated input data for this arg
         
         self._arg.valueChanged.connect(self._value_changed)
 
         self._type_selector_widget = gremlin.ui.ui_common.QTypeSelectorWidget(data_type = osc_arg.dataType())
         self._type_selector_widget.valueChanged.connect(self._type_changed)
 
-        self.enabled_widget = QtWidgets.QCheckBox("Parameter Enabled")
+        self.enabled_widget = QtWidgets.QCheckBox("Enabled")
         self.enabled_widget.setChecked(osc_arg.enabled())
         self.enabled_widget.clicked.connect(self._enabled_changed)
+        self.enabled_widget.setToolTip("Enables this parameter output")
         
         self._source_widget = gremlin.ui.ui_common.QDataComboBox()
         self._source_widget.addItem("Input","input")
 
         source_mode = osc_arg.sourceMode()
-        if is_axis:
+        if self._is_axis:
             self._source_widget.addItem("Device","device")
-        else:
-            if source_mode == "device":
-                osc_arg.setSourceMode("input")
             
         self._source_widget.addItem("Fixed Value","value")
 
-        self._source_widget.setCurrentText(osc_arg.sourceMode())
+        source_mode = osc_arg.sourceMode()
+        index = self._source_widget.findData(source_mode)
+        if index != -1:
+            self._source_widget.setCurrentIndex(index)
+
         self._source_widget.currentIndexChanged.connect(self._source_mode_changed)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self.enabled_widget, self._type_selector_widget])
-
-        self.main_layout.addWidget(widget)
+        self.main_layout.addWidget(self.enabled_widget)
+        self.main_layout.addWidget(self._type_selector_widget)
 
 
         is_integer = osc_arg.is_integer
@@ -309,10 +344,13 @@ class OscValueWidget(QtWidgets.QWidget):
         is_string = osc_arg.is_string
         is_float = osc_arg.is_float
 
+        max_float = sys.float_info.max
+        min_float = sys.float_info.min
+
         # input is an axis 
-        self._scale_min_widget = gremlin.ui.ui_common.QFloatLineEdit(osc_arg.min_range, min_range= -1000, max_range = +1000)
+        self._scale_min_widget = gremlin.ui.ui_common.QFloatLineEdit(value = osc_arg.min_range, min_range= min_float, max_range = max_float)
         self._scale_min_widget.valueChanged.connect(self._scale_min_changed)
-        self._scale_max_widget = gremlin.ui.ui_common.QFloatLineEdit(osc_arg.max_range, min_range= -1000, max_range = +1000)
+        self._scale_max_widget = gremlin.ui.ui_common.QFloatLineEdit(value = osc_arg.max_range, min_range= min_float, max_range = max_float)
         self._scale_min_widget.valueChanged.connect(self._scale_max_changed)
 
         self._scale_widget, self._scale_layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel("Scale Min:"),
@@ -322,14 +360,29 @@ class OscValueWidget(QtWidgets.QWidget):
                                                                                      ])
 
    
-        # float editor 
-        self._value_float_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        self._release_float_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        # float editor for fixed value press
+        self._send_on_press_widget = QtWidgets.QCheckBox("Execute on press")
+        self._send_on_press_widget.setChecked(self._arg.sendOnPress())
+        self._send_on_press_widget.setToolTip("If checked, commands sends on a press event")
+        self._send_on_press_widget.clicked.connect(self._send_on_press_changed)
+
+
+        self._send_on_release_widget = QtWidgets.QCheckBox("Execute on release")
+        self._send_on_release_widget.setChecked(self._arg.sendOnRelease())
+        self._send_on_release_widget.setToolTip("If checked, commands sends on a release event")
+        self._send_on_release_widget.clicked.connect(self._send_on_release_changed)
+
+        self._value_float_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range= min_float, max_range = max_float)
+        self._value_float_widget.valueChanged.connect(self._press_value_changed)
+        
+        # float editor for fixed value release
+        self._release_float_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range= min_float, max_range = max_float)
+        self._release_float_widget.valueChanged.connect(self._release_value_changed)
 
         if is_float:
             self._value_float_widget.setValue(value)
             self._release_float_widget.setValue(release_value)
-            if is_axis:
+            if self._is_axis:
                 self.value_widget = self._value_float_widget
             
                 self.press_widget = self._value_float_widget
@@ -345,9 +398,15 @@ class OscValueWidget(QtWidgets.QWidget):
 
         # string editor
         self._value_string_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._value_string_widget.textChanged.connect(self._value_string_changed)
+
         self._release_string_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._release_string_widget.textChanged.connect(self._release_string_changed)
         if is_string:
             self._value_string_widget.setText(value)
+            self._release_string_widget.setText(release_value)
+
+
 
         # bool editor 
         widgets = []
@@ -362,9 +421,6 @@ class OscValueWidget(QtWidgets.QWidget):
         if is_bool:
             self._value_bool_widget.setValue(value)
             self._release_bool_widget.setValue(release_value)
-
-        self._value_string_widget = gremlin.ui.ui_common.QDataLineEdit()
-
 
     
         self._float_widget, self._float_layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel("On press:"),
@@ -388,34 +444,79 @@ class OscValueWidget(QtWidgets.QWidget):
                                                                                     self._release_bool_widget])
         
 
-        self._axis_widget = gremlin.ui.ui_common.QAxisSourceSelector()
-        self._axis_widget.setDevice(osc_arg.sourceDevice())
-        self._axis_widget.setAxis(osc_arg.sourceAxis())
-        self._axis_widget.valueChanged.connect(self._source_changed)
+        device_id = osc_arg.sourceDevice()
+        input_id = osc_arg.sourceAxis()
+        self._selector_widget = gremlin.ui.ui_common.QAxisSourceSelector(device_id = device_id, input_id = input_id, label = None)
 
+        self._selector_widget.valueChanged.connect(self._source_changed)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer(self._source_widget, "Source:")
+        self._sync_widget = QtWidgets.QPushButton("Sync")
+        self._sync_widget.setToolTip("Synchronize device with current input")
+        self._sync_widget.clicked.connect(self._sync_input)
+        self._sync_widget.setEnabled(self._action_data is not None)
+
+        self._axis_widget, _ = gremlin.ui.ui_common.getHContainer([self._selector_widget, self._sync_widget])
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(self._source_widget, "Source:")
         self.main_layout.addWidget(widget)
 
-        self._auto_widget = QtWidgets.QLabel("Auto")
+        self._auto_widget = QtWidgets.QLabel("Auto (scaled axis value 0..1)" if self._is_axis else "Auto (1 for press, 0 for release)")
         self._warning_widget = gremlin.ui.ui_common.QWarning()
 
         widgets = [ 
                    self._auto_widget,
                    self._warning_widget,
                    self._axis_widget,
-                   self._scale_widget, 
                    self._float_widget,
                    self._int_widget,
                    self._bool_widget,
                    self._string_widget
         ]
 
-        widget, layout = gremlin.ui.ui_common.getHContainer(widgets, "Value:")
-
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Output:")
         self.main_layout.addWidget(widget)
 
+        self.main_layout.addWidget(self._scale_widget)
+
+        self._send_widget, _ = gremlin.ui.ui_common.getHContainer([self._send_on_press_widget, self._send_on_release_widget])
+        self.main_layout.addWidget(self._send_widget)
+        
+
+        #self.main_layout.addWidget(QtWidgets.QLabel(f"Is axis: {self._is_axis}"))
         self._update()
+
+    @QtCore.Slot(bool)
+    def _send_on_press_changed(self, checked : bool):
+        self._arg.setSendOnPress(checked)
+
+    @QtCore.Slot(bool)
+    def _send_on_release_changed(self, checked : bool):
+        self._arg.setSendOnRelease(checked)
+
+    @QtCore.Slot()
+    def _press_value_changed(self):
+        self._arg.setValue(self._value_float_widget.value())
+
+    @QtCore.Slot()
+    def _release_value_changed(self):
+        self._arg.setValueOnRelease(self._release_float_widget.value())
+
+    @QtCore.Slot()
+    def _value_string_changed(self):
+        self._arg.setValue(self._value_string_widget.text())
+
+    @QtCore.Slot()
+    def _release_string_changed(self):
+        self._arg.setValueOnRelease(self._release_string_widget.text())                
+
+    @QtCore.Slot()
+    def _sync_input(self):
+        ''' syncs the device / axis list to the current input '''
+        if self._action_data:
+            device_id = self._action_data.hardware_device_id
+            input_id = self._action_data.hardware_input_id
+            self._selector_widget.sync(device_id, input_id)
+
 
     def _set_warning(self, warning : str):
         self._warning_widget.setText(warning)
@@ -434,6 +535,8 @@ class OscValueWidget(QtWidgets.QWidget):
             string_visible = False
             float_visible = False
             axis_visible = False
+            scale_visible = data_type == float
+            send_visible = False
             if source_mode == "device":
                 axis_visible = data_type == float
             else:
@@ -445,15 +548,16 @@ class OscValueWidget(QtWidgets.QWidget):
             bool_visible = False
             string_visible = False
             float_visible = False
+            scale_visible = False
+            send_visible = True
             if source_mode == "value":
                 int_visible = data_type == int
                 float_visible = data_type == float
                 bool_visible = data_type == bool
                 string_visible = data_type == str
 
-        auto_visible = source_mode == "input"
 
-        scale_visible = data_type == float
+        auto_visible = source_mode == "input"
 
         self._auto_widget.setVisible(auto_visible)
         self._int_widget.setVisible(int_visible)
@@ -462,6 +566,7 @@ class OscValueWidget(QtWidgets.QWidget):
         self._string_widget.setVisible(string_visible)
         self._scale_widget.setVisible(scale_visible)
         self._axis_widget.setVisible(axis_visible)
+        self._send_widget.setVisible(send_visible)
         
 
     @QtCore.Slot()
@@ -481,7 +586,7 @@ class OscValueWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _scale_max_changed(self):
-        self._arg._min_range = self._scale_max_widget.value()
+        self._arg._max_range = self._scale_max_widget.value()
 
 
     @QtCore.Slot(bool)
@@ -601,8 +706,9 @@ class OscInputWidget(QtWidgets.QWidget):
     ''' value container for an OSC message '''
 
     deleteRequested = QtCore.Signal(OscArg) # sends the ID of the arg to delete
+    moveRequested = QtCore.Signal(str) # sends a move request, passes the direction "up" "down" "top" "bottom"
 
-    def __init__(self, label : str, arg : OscArg, is_axis = False, parent = None):
+    def __init__(self, label : str, arg : OscArg,  action_data, parent = None):
         super().__init__(parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -611,7 +717,8 @@ class OscInputWidget(QtWidgets.QWidget):
         self._frame_widget = gremlin.ui.ui_common.QGroupBox()
         self._frame_widget.setContentsMargins(0,0,0,0)
         self._frame_layout = QtWidgets.QGridLayout(self._frame_widget) # QtWidgets.QGridLayout(self._frame_widget)
-        self._is_axis = is_axis # true if mapping to an axis input
+        self._is_axis = action_data.input_is_axis() # true if mapping to an axis input
+        self._action_data = action_data
 
         left_content_widget, left_content_layout = gremlin.ui.ui_common.getVContainer()
         right_content_widget, right_content_layout = gremlin.ui.ui_common.getVContainer()
@@ -629,17 +736,38 @@ class OscInputWidget(QtWidgets.QWidget):
         delete_widget.setToolTip("Delete this parameter")
         delete_widget.clicked.connect(self._delete_cb)
 
+        arg_count = len(action_data.args) if action_data else 0
+        toolbar = gremlin.ui.ui_common.QReorderToolbar(index = arg.index, count = arg_count, hide = True)
+        toolbar.moveRequested.connect(self._move_requested)
+       
+        widget, _ = gremlin.ui.ui_common.getHContainer([
+            toolbar,
+            delete_widget
+        ])
 
+        right_content_layout.addWidget(widget)
 
-        right_content_layout.addWidget(delete_widget)
-
-        self._value_widget = OscValueWidget(arg, self._is_axis)
+        self._value_widget = OscValueWidget(arg, action_data = action_data)
 
         left_content_layout.addWidget(self._value_widget)
 
         self.main_layout.addWidget(self._frame_widget)
 
         self._update()
+
+    @QtCore.Slot(str)
+    def _move_requested(self, direction : str):
+        ''' called when a parameter should move '''
+        self.moveRequested.emit(direction)
+
+    def value(self) -> OscArg:
+        return self._arg
+
+    @QtCore.Slot()
+    def _move(self):
+        widget = self.sender()
+        direction = widget.data
+        self.moveRequested.emit(direction)
 
     @QtCore.Slot()
     def _delete_cb(self):
@@ -829,11 +957,17 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._server_reset_widget.setToolTip("Resets to default")
         self._server_reset_widget.clicked.connect(self._reset_server)
 
+        self._test_widget = QtWidgets.QPushButton("Test")
+        self._test_widget.setToolTip("Test the current configuration")
+        self._test_widget.clicked.connect(self._test_command)
+
+
         self._server_container_layout.addWidget(QtWidgets.QLabel("Target IP:"))
         self._server_container_layout.addWidget(self._server_ip_widget)
         self._server_container_layout.addWidget(QtWidgets.QLabel("Target Port:"))
         self._server_container_layout.addWidget(self._server_port_widget)
         self._server_container_layout.addWidget(self._server_reset_widget)
+        self._server_container_layout.addWidget(self._test_widget)
         self._server_container_layout.addStretch()
 
         self._list_widget, self._list_layout = gremlin.ui.ui_common.getVContainer()
@@ -858,10 +992,6 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
             # hook the input
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_event_handler)
-
-        # # trigger is only used when the input is not an axis
-        # self._trigger_on_release_widget.setVisible(not is_axis)
-
 
 
         self._osc_widget = gremlin.ui.ui_common.QDataLineEdit()
@@ -888,18 +1018,35 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self._list_widget)
         self.main_layout.addWidget(self._warning_widget)            
         self.main_layout.addWidget(self._button_widget)
+
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release, label = "Command")
+        self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
+        self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
+
+        self.main_layout.addWidget(self._execute_widget)
         
         self._warning_widget.setVisible(False)
         self._update()
 
+    @QtCore.Slot(bool)
+    def _execute_on_press_changed(self, checked : bool):
+        self.action_data.exec_on_press = checked
+
+    @QtCore.Slot(bool)
+    def _execute_on_release_changed(self, checked : bool):
+        self.action_data.exec_on_release = checked
+
     def _populate_ui(self):
         gremlin.util.clear_layout(self._list_layout)
-        input_type = self._get_input_type()
-        is_axis = input_type == InputType.JoystickAxis
+        is_axis = self.action_data.input_is_axis()
         for index, arg in enumerate(self.action_data.args):
-            widget = OscInputWidget(f"Parameter {index+1}", arg, is_axis)
+            arg.index = index
+            widget = OscInputWidget(f"Parameter {index+1}", arg, self.action_data)
             widget.deleteRequested.connect(self._delete_arg)
+            widget.moveRequested.connect(self._move_requested)
             self._list_layout.addWidget(widget)
+
+        self._execute_widget.setVisible(not is_axis)
 
 
     def _update(self):
@@ -916,6 +1063,39 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.setWarning("OSC commands must start with a '/'")
             
         
+    @QtCore.Slot(str)
+    def _move_requested(self, direction):
+        widget = self.sender()
+        arg = widget.value()
+        
+        args = self.action_data.args
+        index = args.index(arg)
+        args.pop(index) # remove it from the list
+        count = len(args) # how many we have left
+        match direction:
+            case "up":
+                new_index = index-1
+                if new_index < 0:
+                    new_index = 0
+            case "down":
+                new_index = index + 1
+                if new_index > count :
+                    new_index = count
+            case "top":
+                new_index = 0
+            case "bottom":
+                new_index = len(args)
+            case _:
+                syslog.error(f"OSC: Don't know how to handle paramter move direction: [{direction}]")
+                return
+
+        # re-insert
+        args.insert(new_index, arg)
+        # redraw with new parameter order
+        self._populate_ui()
+
+
+
     @QtCore.Slot(OscArg)
     def _delete_arg(self, arg : OscArg):
         self.action_data.args.remove(arg)
@@ -942,6 +1122,27 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._v2_widget.setRepeaterValue(value)
 
     @QtCore.Slot()
+    def _test_command(self):
+        ''' sends a test command '''
+        if self.action_data.command:
+            self.action_data.profile_start()
+            is_axis = self.action_data.input_is_axis()
+            if is_axis:
+                # get current input value
+                device_id = self.action_data.hardware_device_id
+                input_id = self.action_data.hardware_input_id
+                raw = gremlin.joystick_handling.get_axis(device_id, input_id)
+                value = gremlin.actions.Value(raw, raw, True)
+                self.action_data.process_event(False, value)
+            else:
+                # on/off
+                self.action_data.process_event(True, None)
+                self.action_data.process_event(False, None)
+
+            self.action_data.profile_stop()
+            
+
+    @QtCore.Slot()
     def _reset_server(self):
         ''' reset IP and port to configured defaults '''
         msgbox = gremlin.ui.ui_common.ConfirmBox(f"Reset server data to defaults?")
@@ -954,7 +1155,9 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _add_arg(self):
         ''' adds an argument '''
-        arg = OscArg()
+        device_id = self._get_device_id()
+        input_id = self._get_input_id()
+        arg = OscArg(0.0, device_id = device_id, input_id = input_id) # default to float
         self.action_data.args.append(arg)
         self._update()
 
@@ -979,11 +1182,6 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _server_port_changed(self):
         self.action_data.server_port = self._server_port_widget.value()
-
-    # @QtCore.Slot(bool)
-    # def _trigger_on_release_cb(self, checked):
-    #     self.action_data.trigger_on_release = checked
-
 
 
 
@@ -1024,88 +1222,12 @@ class MapToOscExFunctor(gremlin.base_profile.AbstractFunctor):
         self.valid = True
         
 
-    def profile_start(self):
-        ''' occurs when process starts '''
-        device_name = gremlin.shared_state.get_device_name(self.action_data.hardware_device_guid)
-        if gremlin.util.validateIp(self.action_data.server_ip):
-            self.osc_client = self.oscInterface.getClient(self.action_data.server_ip,
-                                            self.action_data.server_port,                                            
-                                            name=f"OSC {device_name}/{self.action_data.hardware_input_id}")
-            self.osc_client.start()
-            self.valid = True
-        else:
-            syslog.error(f"OSC SEND: invalid target IP: {self.action_data.server_ip}")
-            self.valid = False
-            return
-
-        verbose = gremlin.config.Configuration().verbose_mode_osc
-        if verbose:
-            syslog.info(f"OSC SEND: target: {self.action_data.server_ip} port: {self.action_data.server_port}")
-
-    def profile_stop(self):
-        if self.osc_client is not None:
-            self.osc_client.stop()
-            self.osc_client = None
+  
 
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None) -> bool:
-        if not self.valid:
-            return False
-        verbose = gremlin.config.Configuration().verbose_mode_osc
-        is_axis = self.action_data.input_is_axis()
-        arg : OscArg
-        params = []
-        if is_axis:
-            # axis mode - compute the output values
-            raw = value.current
-            for arg in self.action_data.args:
-                data_type = arg.dataType()
-                if arg.useInput() and data_type == float:
-                    arg_value = arg.scaleValue(raw)
-                else:
-                    if data_type == int:
-                        arg_value = 0
-                    elif data_type == float:
-                        arg_value =  0.0
-                    elif data_type == bool:
-                        arg_value = False
-                    elif data_type == str:
-                        arg_value = "" 
-                
-                params.append(arg_value)
-
-        else:                                      
-            # button mode - see what to trigger       
-            
-            is_pressed = event.is_pressed
-            
-            for arg in self.action_data.args:
-                if arg.useInput():
-                    # compute the values to send based on the input 
-                    data_type = arg.dataType()
-                    if data_type == int:
-                        arg_value = 1 if is_pressed else 0
-                    elif data_type == float:
-                        arg_value = 1.0 if is_pressed else 0.0
-                    elif data_type == bool:
-                        arg_value = is_pressed
-                    elif data_type == str:
-                        arg_value = "true" if is_pressed else "false"
-                else:
-                    if event.is_pressed:
-                        arg_value = arg.getPressReleaseValue(event.is_pressed)    
-                params.append(arg_value)
-
-        if verbose:
-            stub = ""
-            for value in params:
-                stub += f"{value:0.3f} "
-            syslog.info(f"OSC SEND: sending {self.action_data.command} {stub} ")
-        self.osc_client.sendEx(self.action_data.command, params)
-        
-
-        return True
-        
+        ''' processes the event - moved to the main action so we can do testing in the UI at design time '''
+        return self.action_data.process_event(event.is_pressed, value)
 
 class MapToOscEx(gremlin.base_profile.AbstractAction):
 
@@ -1114,18 +1236,9 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
     name = "Map to OSC Ex"
     tag = "map-to-osc-ex"
 
-    # trigger condition (trigger_on_press, trigger_on_release)
+    
     default_button_activation = (True, True)
-    # override allowed input types if different from default
-    # input_types = [
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard,
-    #     InputType.KeyboardLatched,
-    #     InputType.OpenSoundControl,
-    #     InputType.Midi
-
-    # ]
+    
 
     functor = MapToOscExFunctor
     widget = MapToOscExWidget
@@ -1142,20 +1255,47 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
         self.command = None
         self.server_ip = config.osc_host
         self.server_port = config.osc_output_port
-       
-        self.trigger_on_release = False # trigger on release
+        
         self.args = [] # OSC parameters 
 
-        # create 2 by default
-        v1 = OscArg(1.0, True)
+        v1 = OscArg(0,1.0, device_id = self.hardware_device_id, input_id = self.hardware_input_id)
         self.args.append(v1)
-        # v2 = OscArg(0.0, True)
-        # self.args.append(v2)
-
-
         
+        self.valid = False
+        self.oscInterface = OscInterface()
+        self.osc_client = None
 
-    
+        self.exec_on_press = True # true if command executes on press (non axis input only)
+        self.exec_on_release = True # true if command executes on release (non axis input only)
+
+
+
+    def profile_start(self):
+        ''' called on profile start '''
+        
+        self.osc_client = None
+
+        device_name = gremlin.shared_state.get_device_name(self.hardware_device_guid)
+        if gremlin.util.validateIp(self.server_ip):
+            self.osc_client = self.oscInterface.getClient(self.server_ip,
+                                            self.server_port,                                            
+                                            name=f"OSC {device_name}/{self.hardware_input_id}")
+            self.osc_client.start()
+            self.valid = True
+        else:
+            syslog.error(f"OSC SEND: invalid target IP: {self.action_data.server_ip}")
+            self.valid = False
+            return
+
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        if verbose:
+            syslog.info(f"OSC SEND: target: {self.action_data.server_ip} port: {self.action_data.server_port}")
+
+    def profile_stop(self):
+        if self.osc_client is not None:
+            self.osc_client.stop()
+            self.osc_client = None
+
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -1190,15 +1330,22 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
         if "server_port" in node.attrib:
             self.server_port = safe_read(node, "server_port", int, 8000)
 
+        if "press-exec" in node.attrib:
+            self.exec_on_press = safe_read(node,"press-exec",bool)
+        if "release-exec" in node.attrib:
+            self.exect_on_release = safe_read(node,"release-exec",bool)
+
         self.args = []
+        index = 0
         for child in node:
             if child.tag == "args":
                 for node_arg in child:
-                    arg = OscArg()
+                    arg = OscArg(index)
                     arg.from_xml(node_arg)
                     self.args.append(arg)
+                    index +=1
 
-        self.trigger_on_release = safe_read(node,"trigger_on_release", bool, False)
+        
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -1212,6 +1359,9 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
             node.set("server_ip", self.server_ip)
         if self.server_port is not None:
             node.set("server_port", safe_format(self.server_port, int))
+        
+        node.set("press-exec", safe_format(self.exec_on_press, bool))
+        node.set("release-exec", safe_format(self.exec_on_release, bool))
 
         arg : OscArg
         if self.args:
@@ -1220,8 +1370,6 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
                 child = arg.to_xml()
                 node_args.append(child)
         
-        node.set("trigger_on_release", safe_format(self.trigger_on_release, bool))
-
         return node
 
     def _is_valid(self):
@@ -1231,6 +1379,93 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
         """
         return True
 
+
+    def process_event(self, is_pressed, value) -> bool:
+        ''' sends a command '''
+        if not self.command:
+            # command must be set
+            return False
+        
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        is_axis = self.input_is_axis()
+        arg : OscArg
+        params = []
+
+
+        if is_axis:
+            # axis mode - compute the output values
+            raw = value.current
+            for arg in self.args:
+                data_type = arg.dataType()
+                source_mode = arg.sourceMode()
+                if source_mode == "input" and data_type == float:
+                    # use the input data 
+                    arg_value = arg.scaleValue(raw) # input expected -1 to + 1
+                elif source_mode == "device":
+                    # get data from the specified axis
+                    device_id = arg.sourceDevice()
+                    input_id = arg.sourceAxis()
+
+                    axis_value = gremlin.joystick_handling.get_axis(device_id, input_id)
+                    if axis_value is None:
+                        axis_value = 0.0 # default
+                        syslog.error(f"OSC: unable to get axis data for device [{device_id}] input [{input_id}] - using 0.0")
+
+                    # scale the value to the output range - input expected -1 to +1 
+                    arg_value = arg.scaleValue(axis_value)
+
+                else:
+                    # fixed value
+                    if data_type == int:
+                        arg_value = 0
+                    elif data_type == float:
+                        arg_value =  0.0
+                    elif data_type == bool:
+                        arg_value = False
+                    elif data_type == str:
+                        arg_value = "" 
+                
+                params.append(arg_value)
+
+        else:              
+
+            if is_pressed and not self.exec_on_press:
+                # not enabled for execute on press
+                return True
+            if not is_pressed and not self.exec_on_release:
+                # not enabled for execute on release
+                return True
+
+            # button mode - see what to trigger       
+            for arg in self.args:
+                if is_pressed and not arg.sendOnPress():
+                    continue # not enabled for press
+                if not is_pressed and not arg.sendOnRelease():
+                    continue # not enabled for release
+                source_mode = arg.sourceMode()
+                if source_mode == "input":
+                    # compute the values to send based on the input 
+                    data_type = arg.dataType()
+                    if data_type == int:
+                        arg_value = 1 if is_pressed else 0
+                    elif data_type == float:
+                        arg_value = 1.0 if is_pressed else 0.0
+                    elif data_type == bool:
+                        arg_value = is_pressed
+                    elif data_type == str:
+                        arg_value = "true" if is_pressed else "false"
+                else:
+                    arg_value = arg.getPressReleaseValue(is_pressed)
+                params.append(arg_value)
+
+        if verbose:
+            stub = ""
+            for value in params:
+                stub += f"{value:0.3f} "
+            syslog.info(f"OSC SEND: sending {self.command} {stub} ")
+        self.osc_client.sendEx(self.command, params)
+
+        return True
 
 version = 1
 name = "map-to-osc-ex"

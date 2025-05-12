@@ -1086,12 +1086,6 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         self._max_range = max_range
         self._step = step
         self._decimals = decimals
-
-        #self._validator = QFloatLineEdit.FloatValidator(bottom=min_range, top=max_range)
-        # self._validator = QtGui.QDoubleValidator(bottom=min_range, top=max_range)
-        # self._validator.setLocale(self.locale()) # handle correct floating point separator
-        # self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
-        #self.setValidator(self._validator)
         self.textChanged.connect(self._validate)
         self.installEventFilter(self)
         #self.setText("0")
@@ -1175,7 +1169,11 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
     def _update_value(self, value):
         if value is None:
             return
-        s_value = f"{float(value):0.{self._decimals}f}"
+        if self._decimals:
+            s_value = f"{float(value):0.{self._decimals}f}"
+        else:
+            s_value = str(value)
+
         self.setText(s_value)
         self.valueChanged.emit(value)
 
@@ -1185,8 +1183,12 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
     def _validate(self):
         ''' called whenever the text changes '''
         text = self.text()
-        value = self._to_value(text)
-        return value is not None
+        try:
+            valid = float(text)
+            return True
+        except:
+            return False
+        
 
     def setValue(self, value : float):
         ''' sets the value '''
@@ -3098,6 +3100,97 @@ class QDataPushButton(QtWidgets.QPushButton):
     @data.setter
     def data(self, value):
         self._data = value
+
+class QIconButton(QDataPushButton):
+    def __init__(self, icon : str, icon_size = 24,  text = None, data = None, parent = None, tooltip = None):
+        super().__init__(text,data, parent, tooltip)
+        icon = load_icon(icon)
+        self.setIcon(icon)
+        size = QtCore.QSize(icon_size,icon_size)
+        self.setIconSize(size)
+        self.setStyleSheet("border: none;")
+        #self.setMinimumWidth(icon_size)
+
+
+class QReorderToolbar(QtWidgets.QWidget):
+    ''' re-order control up/down/bottom/top '''
+    moveRequested = QtCore.Signal(str) # move direction
+
+    def __init__(self, index :int, count : int,  hide = False, parent = None):
+        '''
+        _summary_
+
+        Arguments:
+            index -- index of the current toolbar
+            count -- max number of items that can move
+
+        Keyword Arguments:
+            hide -- true if the icon should hide when top or bottom (default: {False})
+            parent -- parent widget (default: {None})
+        '''
+        super().__init__(parent)
+
+        self.setContentsMargins(0,0,0,0)
+
+        self.up_widget = gremlin.ui.ui_common.QIconButton(data = "up", icon = "ph.caret-circle-up-light", tooltip="Move up")
+        self.up_widget.clicked.connect(self._move)
+        
+        self.down_widget = gremlin.ui.ui_common.QIconButton(data = "down", icon = "ph.caret-circle-down-light", tooltip = "Move down")
+        self.down_widget.clicked.connect(self._move)
+
+        self.top_widget = gremlin.ui.ui_common.QIconButton(data = "top", icon = "ph.caret-circle-double-up-light", tooltip = "Move top")
+        self.top_widget.clicked.connect(self._move)
+
+        self.bottom_widget = gremlin.ui.ui_common.QIconButton(data = "bottom", icon = "ph.caret-circle-double-down-light",  tooltip = "Move bottom")
+        self.bottom_widget.clicked.connect(self._move)
+
+        self._index = index
+        self._count = count
+        self._hide = hide
+
+        widgets = [self.up_widget, self.down_widget, self.top_widget, self.bottom_widget]
+        widget, layout = getHContainer(widgets)
+        layout.setSpacing(0)
+
+        self.setLayout(layout)
+
+        self._update(index)
+
+    
+    def _update(self, index : int):
+        self._index = index
+        count = self._count
+        up_enabled = index > 0
+        down_enabled = index < count - 1
+        top_enabled = index > 1
+        bottom_enabled = index < count - 2
+        if self._hide:
+            # visible on/off
+            self.up_widget.setVisible(up_enabled)
+            self.top_widget.setVisible(top_enabled)
+            self.down_widget.setVisible(down_enabled)
+            self.bottom_widget.setVisible(bottom_enabled)
+        else:
+            # enable/disable instead
+            self.up_widget.setEnabled(up_enabled)
+            self.top_widget.setEnabled(top_enabled)
+            self.down_widget.setEnabled(down_enabled)
+            self.bottom_widget.setEnabled(bottom_enabled)
+
+        
+    @QtCore.Slot()
+    def _move(self):
+        widget = self.sender()
+        direction = widget.data
+        self.moveRequested.emit(direction)
+    
+    def setIndex(self, index : int):
+        index = gremlin.util.clamp(index, 0, self._count-1)
+        if index != self._index:
+            self._index = index
+            self._update()
+
+        
 
 
 class QDataLineEdit(QtWidgets.QLineEdit):
@@ -8220,7 +8313,7 @@ class QAxisSourceSelector(QtWidgets.QWidget):
     ''' axis input selector - lets the user pick an input device and an axis on that input device (physical or virtual) '''
     valueChanged = QtCore.Signal(object, int)  # fires when a device is selected
 
-    def __init__(self, exclude_list = None, parent = None):
+    def __init__(self, label = "Device:", device_id = None, input_id = None, exclude_list = None, parent = None):
         ''' param: exclude_list : list of device ID (strings) to exclude from the drop down '''
 
         super().__init__(parent)
@@ -8231,11 +8324,19 @@ class QAxisSourceSelector(QtWidgets.QWidget):
         self._axis_selector_widget = QDataComboBox()
         self._axis_selector_widget.currentIndexChanged.connect(self._axis_changed)
 
+        self._refresh_widget = QDataPushButton()
+        icon = load_icon("ei.refresh")
+        self._refresh_widget.setIcon(icon)
+        self._refresh_widget.setMaximumWidth(24)
+        self._refresh_widget.setToolTip("Refresh device list")
+        self._refresh_widget.clicked.connect(self.refresh)
 
-        widgets.append(QtWidgets.QLabel("Device:"))
+        if label:
+            widgets.append(QtWidgets.QLabel(label))
         widgets.append(self._device_selector_widget)
         widgets.append(QtWidgets.QLabel("Axis:"))
         widgets.append(self._axis_selector_widget)
+        widgets.append(self._refresh_widget)
 
         widget, layout = getHContainer(widgets)
 
@@ -8244,7 +8345,37 @@ class QAxisSourceSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(widget)
         self._exclude_list = exclude_list or []
         self.refresh()
+        if device_id:
+            self.setDeviceId(device_id)
+        if input_id is not None:
+            self.setInputId(input_id)
+
+    def sync(self, device_id, input_id):
+        ''' sync the widget with the given device/input '''
+        if not isinstance(device_id, str):
+            device_id = str(device_id)
+
+        # sync device
+        device = next((device for device in gremlin.joystick_handling.all_joystick_devices() if device.device_id == device_id), None)
+        if device and device != self._device_selector_widget.currentData():
+            # change the device
+            index = self._device_selector_widget.findData(device)
+            if index != -1:
+                self._device_selector_widget.setCurrentIndex(index)
+                self._refresh_axes()
+
+        # sync axis
+        if input_id is not None:
+            index = self._axis_selector_widget.findData(input_id)
+            if index != -1:
+                self._axis_selector_widget.setCurrentIndex(index)
+            
+
+
         
+
+        
+    @QtCore.Slot()
     def refresh(self):
         ''' refreshes the device data '''
         self._refresh_devices()
@@ -8253,6 +8384,8 @@ class QAxisSourceSelector(QtWidgets.QWidget):
         
     def _refresh_devices(self):
         ''' refreshes available devices '''
+
+        device = self._device_selector_widget.currentData() if self._device_selector_widget.count() else None
         with QtCore.QSignalBlocker(self._device_selector_widget):
             self._device_selector_widget.clear()
             for device in gremlin.joystick_handling.all_joystick_devices():
@@ -8260,8 +8393,16 @@ class QAxisSourceSelector(QtWidgets.QWidget):
                     continue # skip this one
                 self._device_selector_widget.addItem(device.name, device)
 
+            if device is not None:
+                index = self._device_selector_widget.findData(device)
+                if index != -1:
+                    self._device_selector_widget.setCurrentIndex(index)
+
+
     def _refresh_axes(self):
+        ''' refresh available axes on the device '''
         if self._device_selector_widget.count() > 0:
+            input_id = self._axis_selector_widget.currentData() if self._axis_selector_widget.count() > 0 else None
             with QtCore.QSignalBlocker(self._axis_selector_widget):
                 self._axis_selector_widget.clear()
                 device : DeviceSummary
@@ -8272,24 +8413,45 @@ class QAxisSourceSelector(QtWidgets.QWidget):
                     axis_name = device.axis_names[id-1]
                     self._axis_selector_widget.addItem(f"Axis {axis_name}",id)
 
+            if input_id is not None:
+                index = self._axis_selector_widget.findData(input_id)
+                if index != -1:
+                    self._axis_selector_widget.setCurrentIndex(index)
+
 
 
     def device(self) -> DeviceSummary:
+        ''' gets the selected device '''
         if self._device_selector_widget.count() > 0:
             return self._device_selector_widget.currentData()
         return None
     
-    def setDevice(self, id : str):
-        index = self._device_selector_widget.findData(id)
-        if index != -1:
-            self._device_selector_widget.setCurrentIndex(index)
+    def deviceId(self) -> str:
+        ''' gets the selected device ID '''
+        if self._device_selector_widget.count() > 0:
+            device = self._device_selector_widget.currentData()
+            return device.device_id
+        return None
+    
+    def setDeviceId(self, device_id) -> bool:
+        ''' selects the device with the given ID '''
+        if not isinstance(device_id, str):
+            # got a guid
+            device_id = str(device_id)
+        device = next(( device for device in gremlin.joystick_handling.all_joystick_devices() if device.device_id == device_id), None)
+        if device:
+            index = self._device_selector_widget.findData(device)
+            if index != -1:
+                self._device_selector_widget.setCurrentIndex(index)
+                return True
+        return False
 
-    def axis(self) -> int:
+    def inputId(self) -> int:
         if self._axis_selector_widget.count() > 0:
             return self._axis_selector_widget.currentData()
         return None
     
-    def setAxis(self, id : int):
+    def setInputId(self, id : int):
         index = self._axis_selector_widget.findData(id)
         if index != -1:
             self._axis_selector_widget.setCurrentIndex(index)
@@ -8302,11 +8464,11 @@ class QAxisSourceSelector(QtWidgets.QWidget):
     @QtCore.Slot()
     def _device_changed(self):
         self._refresh_axes()
-        self.valueChanged.emit(self.device(), self.axis())
+        self.valueChanged.emit(self.device(), self.inputId())
 
     @QtCore.Slot()
     def _axis_changed(self):
-        self.valueChanged.emit(self.device(), self.axis())
+        self.valueChanged.emit(self.device(), self.inputId())
 
 
 
@@ -8317,3 +8479,147 @@ class QWarning(QIconLabel):
         self.setIcon(icon)
         if text:
             self.setText(text)
+
+
+class QRangeWidget(QtWidgets.QWidget):
+    ''' range widget - two values, min/max '''
+    valueChanged = QtCore.Signal(float, float) # fires when min or max changed 
+    minChanged = QtCore.Signal(float) # fires when min changes only
+    maxChanged = QtCore.Signal(float) # fires when max changes only
+
+
+    def __init__(self, min_value : float, max_value = 0,  min_range : float = -1.0, max_range : float = 1.0, label = None, parent = None):
+        '''
+        :param min_value: starting min value
+        :param max_value: starting max value
+        :param min_range: min range for the value
+        :param max_range: max range for the value
+        
+        '''
+
+
+        super().__init__(parent)
+
+
+        self._min_widget = gremlin.ui.ui_common.QFloatLineEdit(min_value, min_range = min_range, max_range = max_range)
+        self._min_widget.valueChanged.connect(self._min_changed)
+        self._max_widget = gremlin.ui.ui_common.QFloatLineEdit(max_value, min_range = min_range, max_range = max_range)
+        self._min_widget.valueChanged.connect(self._max_changed)
+
+
+        self._scale_widget, self._scale_layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel(f"{label + ' ' if label else ''}Min:"),
+                                                                                     self._min_widget,
+                                                                                     QtWidgets.QLabel("Max:"),
+                                                                                     self._max_widget,
+                                                                                     ])
+    def setRange(self, min_range : float, max_range : float):
+        ''' updates control ranges '''
+        self._min_widget.setRange(min_range, max_range)
+        self._max_widget.setRange(min_range, max_range)
+
+    def setMin(self, value : float):
+        ''' sets the min range value'''
+        self._min_widget.setValue(value)
+
+    def setMax(self, value : float):
+        ''' sets the max range value'''
+        self._max_widget.setValue(value)
+
+    def minValue(self) -> float:
+        v1 = self._min_widget.value()
+        return v1
+    
+    def maxValue(self) -> float:
+        v2 = self._max_widget.value()
+        return v2
+    
+    def value(self) -> tuple:
+        v1 = self._min_widget.value()
+        v2 = self._max_widget.value()
+        return (v1, v2)
+        
+    @QtCore.Slot()
+    def _min_changed(self):
+        v1 = self._min_widget.value()
+        v2 = self._max_widget.value()
+        self.minChanged.emit(v1)
+        self.valueChanged.emit(v1, v2)
+
+    @QtCore.Slot()
+    def _max_changed(self):
+        v1 = self._min_widget.value()
+        v2 = self._max_widget.value()
+        self.maxChanged.emit(v2)
+        self.valueChanged.emit(v1, v2)
+
+
+class QExecuteWidget(QtWidgets.QWidget):
+
+    pressChanged = QtCore.Signal(bool) # fires when press changes
+    releaseChanged = QtCore.Signal(bool) # fires when release changes
+    valueChanged = QtCore.Signal(bool, bool) # fires when either press or release changed
+
+    ''' widget presenting Execute on press, Execute on release options '''
+    def __init__(self, execute_on_press : bool = True, execute_on_release : bool = True, label = None, parent = None):
+        super().__init__(parent)
+
+        self._execute_on_press = execute_on_press
+        self._execute_on_release = execute_on_release
+
+        self._press_widget = QtWidgets.QCheckBox("Execute on press")
+        self._press_widget.setChecked(execute_on_press)
+        self._press_widget.setToolTip("If checked, commands sends on a press event")
+        self._press_widget.clicked.connect(self._press_changed)
+
+
+        self._release_widget = QtWidgets.QCheckBox("Execute on release")
+        self._release_widget.setChecked(execute_on_release)
+        self._release_widget.setToolTip("If checked, commands sends on a release event")
+        self._release_widget.clicked.connect(self._release_changed)
+
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        widget, _ = getHContainer([self._press_widget, self._release_widget], label = label)
+        self.main_layout.addWidget(widget)
+        self.main_layout.setSpacing(0)
+        
+
+    @QtCore.Slot(bool)
+    def _press_changed(self, checked : bool):
+        self._execute_on_press = checked
+        v1 = checked
+        v2 = self.execute_on_release
+        self.pressChanged.emit(v1)
+        self.valueChanged.emit(v1,v2)
+
+        
+    @QtCore.Slot(bool)
+    def _release_changed(self, checked : bool):
+        self._execute_on_release = checked
+        v1 = self.execute_on_press
+        v2 = checked
+        self.releaseChanged.emit(v2)
+        self.valueChanged.emit(v1,v2)
+
+
+    @property
+    def execute_on_press(self) -> bool:
+        return self._execute_on_press
+    
+    @execute_on_press.setter
+    def execute_on_press(self, value : bool):
+        if value != self._execute_on_press:
+            self._execute_on_press = value
+            with QtCore.QSignalBlocker(self._press_widget):
+                self._press_widget.setChecked(True)
+
+    @property
+    def execute_on_release(self) -> bool:
+        return self._execute_on_release
+    
+    @execute_on_release.setter
+    def execute_on_release(self, value : bool):
+        if value != self._execute_on_release:
+            self._execute_on_release = value
+            with QtCore.QSignalBlocker(self._release_widget):
+                self._release_widget.setChecked(True)

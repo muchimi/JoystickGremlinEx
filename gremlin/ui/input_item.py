@@ -2778,7 +2778,18 @@ class AbstractActionWidget(QtWidgets.QFrame):
 
         :return InputType corresponding to this action
         """
-        return self.action_data.hardware_input_type 
+        return self.action_data.hardware_input_type
+    
+    def _get_device_id(self):
+        ''' returns the device ID of the input associated with the action '''
+        return self.action_data.hardware_device_guid
+    
+    def _get_input_id(self):
+        ''' gets the input id for the input associated with the action '''
+        return self.action_data.hardware_input_id
+
+    
+
 
     def _get_profile_root(self):
         """Returns the root of the entire profile.
