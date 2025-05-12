@@ -20,8 +20,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 - Fix: Gated Axis: event data sent by a trigger could send the wrong data to additional triggers part of the same input trigger group preventing their containers/actions from behaving correctly.
 - Fix: Gated Axis: gate delay value no longer gets reset when pasting
 - Fix: missing OSC icon for dark mode
-- Fix: Floating point value input widget not always converting to a properly formatted float representation on some inputs.
-- New: (experimental) Map to OSC EX allows multiple arguments to be defined.  
+- Fix: Floating point value input widget not always converting to a properly formatted representation on some inputs.
+- New: (experimental) Map to OSC EX (enhanced OSC output for advanced parameter mapping)
 
 
 
