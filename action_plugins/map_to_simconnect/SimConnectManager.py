@@ -591,12 +591,15 @@ class SimConnectManager(QtCore.QObject):
     @QtCore.Slot()
     def _profile_start(self):
         ''' occurs on profile start '''
+
+        enabled = gremlin.shared_state.getSimConnectEnabled()
+        if not enabled:
+            # simconnect is not enabled
+            syslog.info("SIMCONNECT: not enabled (no mappings found)")
+            return False
+        
         self.activate()
-        # if self.process_running():
-        #     self.activate()
-        # else:
-        #     syslog.warning("SIMCONNECT MGR: MSFS process not found - start aborted")
-        #     self._stop()
+
         
     def process_running(self) -> bool:
          # verify MSFS is running if not already checked
@@ -1115,15 +1118,17 @@ class SimConnectManager(QtCore.QObject):
     
 
     def activate(self, force_retry = False):
-        # not connected
+        ''' connect to simconnect if not connected '''
 
         if self.connected:
+            # already connected
             return
         if self._connect_in_progress:
+            # already connecting
             return
         
         self._connect_in_progress = True
-        # syslog = logging.getLogger("system")
+        
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
         if verbose: syslog.info(f"SIMCONNECT MGR: reconnect...")
@@ -1134,11 +1139,6 @@ class SimConnectManager(QtCore.QObject):
             self._connect_attempts = 2
             self._connect_warning_issued = False
             self._request_abort = False
-
-            enabled = gremlin.shared_state.getSimConnectEnabled()
-            if not enabled:
-                # simconnect is not enabled
-                return False
 
          
             if not self._sm.ok:
@@ -1202,9 +1202,6 @@ class SimConnectManager(QtCore.QObject):
 
     def sim_disconnect(self):
         ''' disconnect request '''
-        # if self.mobi.connected:
-        #     self.mobi.stop()
-
         if self.bridge.connect:
             self.bridge.stop()
 

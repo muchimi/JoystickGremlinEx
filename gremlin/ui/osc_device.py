@@ -1646,6 +1646,21 @@ class OscClient():
         self._send(osc)
 
     
+
+    def sendEx(self, command : str, *args):
+        ''' sends a variable number args to OSC '''
+        builder = OscMessageBuilder(command)
+        for arg in args:
+            if isinstance(arg, list) or isinstance(arg, tuple):
+                for a in arg:
+                    self.add_arg(builder, a)
+            else:
+                self.add_arg(builder, arg)
+
+        osc = builder.build()
+        self._send(osc)
+
+    
     def _send(self, content):
         self._client.send(content)
 

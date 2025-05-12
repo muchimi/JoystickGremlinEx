@@ -201,6 +201,7 @@ class StateInputItem(AbstractInputItem):
             value = safe_read(node, "value", int, 0)
         elif node_type == "bool":
             value = safe_read(node, "value", bool, False)
+        
 
         self._default_value = value
         self._value = value

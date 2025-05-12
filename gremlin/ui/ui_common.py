@@ -334,6 +334,11 @@ class Color():
             border-color: {selected_border_color};
         }}
 
+        QPushButton:checked {{
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
+            border-color: {selected_border_color};
+        }}
+
         QPushButton:flat {{
             border: none; /* no border for a flat push button */
         }}
@@ -5179,10 +5184,12 @@ class ButtonState(QtWidgets.QGroupBox):
         self.buttons = [None]
         button_layout = QtWidgets.QGridLayout()
         for i in range(device.button_count):
-            btn = gremlin.ui.ui_common.QDataPushButton(str(i+1), i+1)
+            btn = QDataPushButton(str(i+1), i+1)
             btn.setStyleSheet(css)
+            
             btn.setDisabled(is_disabled)
             if not is_disabled:
+                btn.setCheckable(True) # set checkable for state retention
                 btn.clicked.connect(self._button_clicked)
 
             # read the current state
@@ -6782,7 +6789,7 @@ def getRadioContainer(label_data_pairs, callback, default = None, horizontal = T
     return (widget, layout)
 
    
-def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False):
+def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, alignment = None, set_alignment = True):
     ''' gets a qt H container widget 
     
     :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically
@@ -6796,6 +6803,9 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
     widget.setContentsMargins(0,0,0,0)
     layout.setContentsMargins(0,0,0,0)
     stretch = left_stretch
+    if alignment is None and set_alignment:
+        alignment = QtCore.Qt.AlignmentFlag.AlignCenter
+
     if label:
         layout.addWidget(QtWidgets.QLabel(label))
         stretch = True
@@ -6804,11 +6814,17 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
             for item in widget_or_list:
                 if isinstance(item, str):
                     item = QtWidgets.QLabel(item)
-                layout.addWidget(item)
+                if alignment:
+                    layout.addWidget(item, alignment = alignment)
+                else:
+                    layout.addWidget(item)
         else:
             if isinstance(widget_or_list, str):
                 item = QtWidgets.QLabel(widget_or_list)
-            layout.addWidget(widget_or_list)
+            if alignment:
+                layout.addWidget(widget_or_list, alignment= alignment)
+            else:
+                layout.addWidget(widget_or_list)
         stretch = True
     if stretch:
         if left_stretch:
@@ -6824,8 +6840,10 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, parent 
     layout = QtWidgets.QVBoxLayout(widget)
     widget.setContentsMargins(0,0,0,0)
     layout.setContentsMargins(0,0,0,0)
-    if alignment is not None:
-        layout.setAlignment(widget, alignment)
+    if alignment is None:
+        alignment = QtCore.Qt.AlignmentFlag.AlignTop
+
+    layout.setAlignment(widget, alignment)
     stretch = False
     if label:
         layout.addWidget(QtWidgets.QLabel(label))
@@ -8089,3 +8107,213 @@ class QGroupBox(QtWidgets.QGroupBox):
 
 
         
+
+class QTypeSelectorWidget(QtWidgets.QWidget):
+    ''' implements a type selector widget to select a data type '''
+    valueChanged = QtCore.Signal(type) # fires when the data type changes 
+
+    def __init__(self, allowed_types = [str, bool, int, float], label = "Datatype:", data_type = None, parent = None):
+        super().__init__(parent)
+
+        self._allowed_types = allowed_types
+        self._data_type = data_type
+        self._label = label
+        self._widgets = None
+
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
+
+        self._build()
+
+    def _build(self):
+        widgets = []
+        data = []
+        if str in self._allowed_types:
+            data.append(("String", str))
+        if bool in self._allowed_types:
+            data.append(("Bool", bool))
+        if int in self._allowed_types:
+            data.append(("Integer", int))
+        if float in self._allowed_types:
+            data.append(("Float", float))
+
+        for label, datatype in data:
+            widget = QDataRadioButton(label, data = datatype)
+            if self._data_type == datatype:
+                widget.setChecked(True)
+            widget.clicked.connect(self._type_changed)
+            widgets.append(widget)
+
+        gremlin.util.clear_layout(self.main_layout)
+
+        widget,_ = getHContainer(widgets, self._label)
+        self.main_layout.addWidget(widget)
+        self._widgets = widgets
+
+
+    @QtCore.Slot()
+    def _type_changed(self):
+        widget = self.sender()
+        value = widget.data
+        self.valueChanged.emit(value)
+
+    def value(self) -> type:
+        for widget in self._widgets:
+            if widget.isChecked():
+                return widget.data
+            
+    def setValue(self, datatype : type):
+        for widget in self._widgets:
+            if widget.data == datatype:
+                widget.setChecked(True)
+
+    def allowedTypes(self) -> list:
+        return self._allowed_types
+    
+    def setAllowedTypes(self, data : list):
+        self._allowed_types = data
+        self._build()
+
+
+
+
+class QOnOffWidget(QtWidgets.QWidget):
+    ''' widget that has a radio button on/off - like a checkbox but spells out the values '''
+
+    valueChanged = QtCore.Signal(bool) # fires when the value changes 
+
+    def __init__(self, value : bool = True, label = None, parent = None):
+        super().__init__(parent)
+
+        self._on_widget = QDataRadioButton("On", data = True)
+        self._on_widget.setChecked(value)
+        self._on_widget.clicked.connect(self._update)
+        self._off_widget = QDataRadioButton("Off", data = True)
+        self._off_widget.setChecked(not value)
+        self._off_widget.clicked.connect(self._update)
+
+        self._value = value
+
+        widget, layout = getHContainer([self._on_widget, self._off_widget], label = label)
+        self.setLayout(layout)
+
+
+    @QtCore.Slot()
+    def _update(self):
+        widget = self.sender()
+        self.setValue(widget.data)
+
+    def value(self):
+        return self._value
+    
+    def setValue(self, value : bool):
+        if value != self._value:
+            self._value = value
+            with QtCore.QSignalBlocker(self._on_widget):
+                self._on_widget.setChecked(value)
+            with QtCore.QSignalBlocker(self._off_widget):
+                self._off_widget.setChecked(not value)
+            self.valueChanged.emit(value)
+
+
+class QAxisSourceSelector(QtWidgets.QWidget):
+    ''' axis input selector - lets the user pick an input device and an axis on that input device (physical or virtual) '''
+    valueChanged = QtCore.Signal(object, int)  # fires when a device is selected
+
+    def __init__(self, exclude_list = None, parent = None):
+        ''' param: exclude_list : list of device ID (strings) to exclude from the drop down '''
+
+        super().__init__(parent)
+
+        widgets = []
+        self._device_selector_widget = QDataComboBox()
+        self._device_selector_widget.currentIndexChanged.connect(self._device_changed)
+        self._axis_selector_widget = QDataComboBox()
+        self._axis_selector_widget.currentIndexChanged.connect(self._axis_changed)
+
+
+        widgets.append(QtWidgets.QLabel("Device:"))
+        widgets.append(self._device_selector_widget)
+        widgets.append(QtWidgets.QLabel("Axis:"))
+        widgets.append(self._axis_selector_widget)
+
+        widget, layout = getHContainer(widgets)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.main_layout.addWidget(widget)
+        self._exclude_list = exclude_list or []
+        self.refresh()
+        
+    def refresh(self):
+        ''' refreshes the device data '''
+        self._refresh_devices()
+        self._refresh_axes()
+    
+        
+    def _refresh_devices(self):
+        ''' refreshes available devices '''
+        with QtCore.QSignalBlocker(self._device_selector_widget):
+            self._device_selector_widget.clear()
+            for device in gremlin.joystick_handling.all_joystick_devices():
+                if device.device_id in self._exclude_list or device.axis_count == 0:
+                    continue # skip this one
+                self._device_selector_widget.addItem(device.name, device)
+
+    def _refresh_axes(self):
+        if self._device_selector_widget.count() > 0:
+            with QtCore.QSignalBlocker(self._axis_selector_widget):
+                self._axis_selector_widget.clear()
+                device : DeviceSummary
+                device = self._device_selector_widget.currentData()
+                count = device.axis_count
+                self._axis_selector_widget.clear()
+                for id in range(1, count+1):
+                    axis_name = device.axis_names[id-1]
+                    self._axis_selector_widget.addItem(f"Axis {axis_name}",id)
+
+
+
+    def device(self) -> DeviceSummary:
+        if self._device_selector_widget.count() > 0:
+            return self._device_selector_widget.currentData()
+        return None
+    
+    def setDevice(self, id : str):
+        index = self._device_selector_widget.findData(id)
+        if index != -1:
+            self._device_selector_widget.setCurrentIndex(index)
+
+    def axis(self) -> int:
+        if self._axis_selector_widget.count() > 0:
+            return self._axis_selector_widget.currentData()
+        return None
+    
+    def setAxis(self, id : int):
+        index = self._axis_selector_widget.findData(id)
+        if index != -1:
+            self._axis_selector_widget.setCurrentIndex(index)
+        
+    def axisName(self) -> str:
+        if self._axis_selector_widget.count() > 0:
+            return self._axis_selector_widget.currentText()
+        return None
+
+    @QtCore.Slot()
+    def _device_changed(self):
+        self._refresh_axes()
+        self.valueChanged.emit(self.device(), self.axis())
+
+    @QtCore.Slot()
+    def _axis_changed(self):
+        self.valueChanged.emit(self.device(), self.axis())
+
+
+
+class QWarning(QIconLabel):
+    def __init__(self, text = None, parent = None):
+        super().__init__()
+        icon = load_icon("ph.shield-warning-fill",use_qta=True,qta_color=QtGui.QColor(Color.warningColor()))
+        self.setIcon(icon)
+        if text:
+            self.setText(text)

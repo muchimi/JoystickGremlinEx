@@ -1141,7 +1141,7 @@ class SimConnect():
 
 	def clear(self, request):
 		''' clears a request '''
-		if self._dll is not None:
+		if self._dll is not None and request and request.DATA_DEFINITION_ID:
 			self._dll.ClearClientDataDefinition(
 				self._hSimConnect,
 				request.DATA_DEFINITION_ID.value

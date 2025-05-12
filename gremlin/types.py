@@ -933,8 +933,9 @@ class VerboseMode(IntFlag):
     ExecDetails = auto()
     VJoy = auto()
     State = auto() # state management
+    Extra = auto() # extra info for any other mode
     
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

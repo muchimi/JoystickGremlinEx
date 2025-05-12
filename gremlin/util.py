@@ -1052,7 +1052,12 @@ def safe_read(node, key, type_cast=None, default_value=None):
                     value = 0
                 else:
                     try:
-                        value = type_cast(value)
+                        if type_cast == int and isinstance(value, str) and isNumeric(value):
+                            value = int(float(value))
+                        elif type_cast == float and isinstance(value, str) and isNumeric(value):
+                            value = float(value)
+                        else:
+                            value = type_cast(value)
                     except:
                         syslog.error(f"XML: safe read - unable to convert type: {type_cast} value: [{value}] - using default: {default_value}")
                         value = default_value
@@ -1083,9 +1088,11 @@ def safe_format(value, data_type, formatter=str):
     elif data_type is float:
         value = float(value)
         return f"{value:0.8f}"
-    # elif data_type is str:
-    #     from xml.sax.saxutils import escape, quoteattr
-    #     return escape(value)
+    elif data_type is bool:
+        if isinstance(value, str) and isNumeric(value):
+            value = float(value) != 0
+        else:
+            return formatter(bool(value))
     if isinstance(value, data_type):
         return formatter(value)
     else:
@@ -1953,3 +1960,69 @@ def str_to_bool(str_value) -> bool:
             return int(str_value) > 0
     return False
             
+
+
+def isNumeric(input_string):
+    ''' since str.isnumeric is broken, borrowed this from : https://nextjournal.com/avidrucker/detecting-valid-number-strings-in-python '''
+
+    def is_period(input_char):
+        return input_char == "."
+
+    def is_hyphen(input_char):
+        return input_char == "-"
+
+    def is_zero(input_char):
+        return input_char == "0"
+
+    def xs_in_string(pred, input_string):
+        return list(filter(pred, input_string))
+
+    def count_xs(pred, input_string):
+        return len(xs_in_string(pred, input_string))
+    
+    is_digit = str.isdigit
+  
+    if(input_string is None or len(input_string) == 0):
+        return False
+    
+    for char in input_string:
+        if ((char != "-") and (char != ".") and (not char.isdigit())):
+            return False
+        
+    
+    if (count_xs(is_hyphen, input_string) > 1):
+        return False
+    
+    
+    if ((count_xs(is_hyphen, input_string) == 1) and (input_string[0] != "-")):
+        return False
+    
+    
+    if (count_xs(is_digit, input_string) == 0): # post-refactor
+        return False
+    
+
+    if((input_string[0] == ".") or (input_string[-1] == ".")):
+        return False
+    
+    if (count_xs(is_period, input_string) > 1):
+        return False
+    
+    if((input_string[0] == "-") and (input_string[1] == ".")):
+        return False
+    
+    if((len(input_string) > 1) and 
+        (((input_string[0] == "0") and
+        (input_string[1] != ".")) # eg. "05" number starts with a zero and is followed by another digit (i.e. not a period)
+        or (len(input_string) > 2) and 
+        ((input_string[0] == "-") and
+        (input_string[1] == "0") and 
+        (input_string[2] != ".")))): # eg. -01 number starts with a hyphen, followed by a zero, followed by another digit (i.e. not a period)
+        return False
+    
+    
+    if((input_string[0] == "-") and (count_xs(is_digit, input_string) == count_xs(is_zero, input_string))):
+        return False
+    
+    
+    return True

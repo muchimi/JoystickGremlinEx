@@ -1303,6 +1303,9 @@ Whenever a state changes, if it is mapped to containers/actions, these will exec
 
 Warning: By design, there are no guardrails with states, so loops are possible, and this is usually not a desired outcome as it will result in endless looping in some situations.  While some state machine designs must allow loops, but it could result in an endless loop if A toggles B, B toggles C, C toggles A.  This is allowed for the time being.  As of this writing, this is a concious design decision to allow this as the runtime performance impact and logic required to catch these would be a negative impact, so use states with loops in mind to avoid this situation currently.  If you do enter into a loop inadvertently, depending on the loop, the profile would need to be stopped.  In some cases, a hard process kill via task manager may be needed.
 
+## State Condition
+
+The state condition is used to apply conditional execution on a container or action based on the current value of a state.  The condition will prompt for the name of the state, and whether the c
 
 ## User Scripts (plugins)
 

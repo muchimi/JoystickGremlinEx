@@ -8,6 +8,7 @@ theme:
 plugins:
   - search
   - glightbox
+  - autorefs
 markdown_extensions:
   - attr_list
   - toc:

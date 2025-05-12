@@ -381,12 +381,16 @@ class InputViewerUi(ui_common.BaseDialogUi):
         select_real_widget.clicked.connect(self.vis_selector._select_real)
 
         options_widget, _ = gremlin.ui.ui_common.getHContainer((clear_widget, select_real_widget, select_all_widget))
+        options_widget.setMaximumHeight(32)
 
         self.main_layout.addWidget(options_widget)
 
-        content_widget, _ = gremlin.ui.ui_common.getHContainer((self.scroll_selector_area, self.view_container_widget))
+        content_widget, _ = gremlin.ui.ui_common.getHContainer((self.scroll_selector_area, self.view_container_widget), set_alignment=False)
+        
+
         # Add the scroll area to the main layout
         self.main_layout.addWidget(content_widget)
+        
         self.closed.connect(self._closed)
 
 

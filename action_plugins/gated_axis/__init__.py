@@ -77,10 +77,13 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
         super().__init__(action_data, parent)
         self.manual_callback = True # indicate this functor only uses manual callbacks
 
-    # def profile_start(self):
-    #     ''' register the gated functor'''
-    #     #self.action_data.gate_data.setActionId(self.action_data.id)
-    #     pass
+    def profile_start(self):
+        ''' register the gated functor'''
+        #self.action_data.gate_data.setActionId(self.action_data.id)
+        self.action_data.gate_data.start()
+
+    def profile_stop(self):
+        self.action_data.gate_data.stop()
 
     def process_event(self, event, value, extra_data = None):
         # all the work happens in the gate widget hook function - nothing to do
@@ -140,20 +143,25 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
         
         gates = []
         gate_node = gremlin.util.get_xml_child(node,"gates")
-        profile_mode = gremlin.util.get_xml_mode(node)
-        if not profile_mode:
-            # paste operation
-            profile_mode = gremlin.shared_state.current_mode
+
+        input_item = self.get_input_item()
+        profile_mode = input_item.profile_mode
+
         if not gate_node is None:
             for child in gate_node:
                 gate_data = gremlin.gated_handler.GateData(profile_mode, action_data = self)
-                
                 gate_data.from_xml(child, data)
+                gate_data.profile_mode = profile_mode
                 gates.append(gate_data)
 
         if gates:
             self.gates = gates
             self.gate_data = gates[0]
+
+
+        # override profile mode to use current mode this action is attached to
+        self.gate_data.profile_mode = profile_mode
+
 
     def _generate_xml(self):
          # save gate data

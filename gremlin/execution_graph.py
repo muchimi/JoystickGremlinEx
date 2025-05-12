@@ -1146,21 +1146,17 @@ class ExecutionContext():
                 return_node = virtual_condition_node
                 latched_conditions.append(virtual_condition_node)
 
+            return_node = container_node
             if container.has_conditions:
                 condition_node = self._get_condition_node(container, container_parent)
                 #condition_node.parent = container_parent
                 container_parent = condition_node
-                if return_node is None:
-                    return_node = condition_node
+                return_node = condition_node
 
                 latched_conditions.append(condition_node)
-            
 
             container_node.parent = container_parent
 
-            if return_node is None:
-                return_node = container_node
-                container_node.parent = parent_group
 
             container_group = ExecutionGraphGroupNode()
             container_group.parent = container_node
@@ -1198,11 +1194,11 @@ class ExecutionContext():
                     action_node.device_link = device_node
                     action_node.input_item = input_item
 
+
+                    action_node.parent = action_set_group_node
                     if action.has_conditions:
                         action_condition_node = self._get_condition_node(action, action_set_group_node)
                         action_node.parent = action_condition_node # action node is owned by its condition node
-                    else:
-                        action_node.parent = action_set_group_node
 
                     m_action_node = ExecutionGraphActionNode(action)
                     m_action_node.id = action.id

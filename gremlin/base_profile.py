@@ -439,8 +439,8 @@ class AbstractContainer(ProfileData):
 
         tracker = ConditionTracker()
 
-        self.setId(gremlin.util.get_guid())
-
+        self._id = gremlin.util.get_guid() # unique GUID of this container
+        
         for action_set in self.get_action_sets():
             for action in action_set:
                 action.setId(gremlin.util.get_guid())

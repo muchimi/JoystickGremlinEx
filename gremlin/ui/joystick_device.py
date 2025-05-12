@@ -376,9 +376,19 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
             elif oc.encoder_type == EncoderType.MultiContainer:
                 xml = oc.data
-                root = lxml.etree.fromstring(xml)
+
+                root = etree.fromstring(xml)
+                tree = etree.ElementTree(root)
+                
+                xml_tmp = os.path.join(gremlin.util.userprofile_path(),"clip.xml")
+                tree.write(xml_tmp, pretty_print=True,xml_declaration=True,encoding="utf-8")
+                gremlin.util.display_file(xml_tmp)
+
+                
+                
                 for node in root:
                     container_type = node.get("type")
+
                     if container_type in container_tag_map:
                         container_name = container_tag_map[container_type].name
                         if container_name in valid_containers_names:

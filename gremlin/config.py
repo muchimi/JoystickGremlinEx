@@ -1336,6 +1336,10 @@ class Configuration:
         return self.verbose and VerboseMode.Gate in self.verbose_mode
     
     @property
+    def verbose_mode_extra(self):
+        return self.verbose and VerboseMode.Extra in self.verbose_mode
+    
+    @property
     def verbose_mode_outputs(self):
         ''' true if verbose mode is in output mode '''
         return self.verbose and VerboseMode.Outputs in self.verbose_mode

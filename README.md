@@ -14,6 +14,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m75t4)
+- Fix: Gated Axis runtime would fail mode match test in some situations (especially if the gated data was imported or pasted) - mode is now tied to the input mode the action belongs to regardless of what was saved.
+- Fix: Gated Axis not always re-initializing on profile restart causing random issues at runtime.
+- Fix: Gated Axis: event data sent by a trigger could send the wrong data to additional triggers part of the same input trigger group preventing their containers/actions from behaving correctly.
+- Fix: Gated Axis: gate delay value no longer gets reset when pasting
+- Fix: missing OSC icon for dark mode
+- New: (experimental) Map to OSC EX allows multiple arguments to be defined.  
+
+
+
 ### (m75t3)
 - New: VJoy buttons and hats can be set from the input viewer by clicking on them either in edit mode or at runtime.
 - New: VJoy axes can be set from the input viewer by using the data entry box, or using the mouse wheel on the axis display either in edit mode or at runtime.

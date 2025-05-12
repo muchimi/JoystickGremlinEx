@@ -181,9 +181,11 @@ While MIDI and OSC are protocols associated with musical instruments, they are a
 
 ### State device
 
-Starting with 1.0ex m74, GremlinEx supports user-defined states.  A state is an entity with a unique name that has an on/off behavior.  States are used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile.   States initialize to a default starting value set when a profile starts.  States can then be changed at runtime by the "map to state" action anywhere in the profile, via a macro, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
+Starting with 1.0ex m74, GremlinEx supports user-defined states.  A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](usage.md#map-to-state) action anywhere in the profile, via a [macro](#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
 
-Currently states are either pressed (on) or released (off) and function like a virtual joystick button (so will look like a joystick button to mapped containers/actions).
+Currently states are either pressed (on/true) or released (off/false) and function like a virtual joystick button.  When a state has mapping, the actions and containers mapped to it will see the input as a joystick button, so all containers/actions able to use momentary inputs can be mapped to a state.
+
+States are read by [conditions](#conditions) and specifically the [state condition](#state-condition).
 
 In GremlinEx, states can be mapped via the State Device, the "map to state" action is used to clear, set, toggle or pulse a state, and the state condition is used to determine, based on state, if a container or action should execute or not.
 
