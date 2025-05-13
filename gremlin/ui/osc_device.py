@@ -1527,6 +1527,11 @@ class UDPClient(object):
         """
         self._sock.sendto(content.dgram, (self._address, self._port))
 
+    def stop(self):
+        if self._sock:
+            self._sock.close()
+            self._sock = None
+
 
 class SimpleUDPClient(UDPClient):
     """Simple OSC client that automatically builds :class:`OscMessage` from arguments"""
@@ -1576,6 +1581,10 @@ class OscClient():
         :param server_port = output port
         '''
 
+        if self._started:
+            # already started
+            return
+
         if server_ip:
             self._server_ip = server_ip
         if server_port:
@@ -1591,6 +1600,7 @@ class OscClient():
 
     def stop(self):
         if self._started:
+            self._client.stop() # stop UDP client
             self._client = None
             self._started = False
             # syslog = logging.getLogger("system")

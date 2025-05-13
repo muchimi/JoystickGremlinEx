@@ -765,7 +765,15 @@ class AbstractContainer(ProfileData):
     
     def latch_extra_inputs(self):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
-        return []
+        latched_list = []
+        for actions in [a for a in self.action_sets if a is not None]:
+            for action in actions:
+                if hasattr(action, "latch_extra_inputs"):
+                    for key in action.latch_extra_inputs():
+                        if not key in latched_list:
+                            latched_list.append(key)
+
+        return latched_list
         
 
     @abstractmethod

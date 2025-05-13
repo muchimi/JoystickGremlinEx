@@ -1643,6 +1643,10 @@ class GateData():
 
                     if not gremlin.shared_state.runtime_mode in self.valid_mode_list:
                         # incorrect mode or not started yet
+                        if verbose:
+                            syslog.info(f"GATED AXIS TRIGGER: FAIL - invalid mode [{gremlin.shared_state.runtime_mode}]")
+                            for mode in self.valid_mode_list:
+                                syslog.info(f"\tAvailable modes: [{mode}]")
                         return
 
                     # profile is running - trigger the execution node for the containers

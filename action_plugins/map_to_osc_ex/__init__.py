@@ -1221,7 +1221,25 @@ class MapToOscExFunctor(gremlin.base_profile.AbstractFunctor):
         self.osc_client = None
         self.valid = True
         
+    def latch_extra_inputs(self):
+        ''' returns the list of additional latched inputs that should trigger this action 
+            list of (device_guid, input_type, input_id) to latch to this action (trigger on change) '''
+        latched_list = []
+        if self.action_data.input_is_axis():
+            device_id = self.hardware_device_id
+            input_id = self.hardware_input_id
+            arg : OscArg
+            args = [arg for arg in self.action_data.args if arg.sourceMode() == "device"]
+            for arg in args:
+                arg_device_id = arg.sourceDevice()
+                arg_input_id = arg.sourceAxis()
+                if arg_device_id == device_id and input_id == arg_input_id:
+                    continue
+                latch_pair = (arg_device_id, InputType.JoystickAxis, arg_input_id)
+                if not latch_pair in latched_list:
+                    latched_list.append(latch_pair)
 
+        return latched_list
   
 
 
@@ -1267,6 +1285,7 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
 
         self.exec_on_press = True # true if command executes on press (non axis input only)
         self.exec_on_release = True # true if command executes on release (non axis input only)
+
 
 
 

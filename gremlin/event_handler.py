@@ -195,6 +195,9 @@ class Event:
 	@property
 	def callbackKey(self):
 		''' unique key to use to identify the specific callback '''
+		device_guid = self.device_guid
+		if not isinstance(device_guid, str):
+			device_guid = str(device_guid)
 		if self.event_type == InputType.Keyboard:
 			data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
 			return (
@@ -205,7 +208,7 @@ class Event:
 			)
 		else:
 			return (
-				self.device_guid,
+				device_guid,
 				self.event_type.value,
 				self.identifier,
 				0
@@ -1397,6 +1400,10 @@ class EventHandler(QtCore.QObject):
 	def add_latched_functor(self, device_guid, mode, event, functor):
 		''' registers an extra latched functor on inputs if a functor uses multiple inputs '''
 		# regular event
+		if isinstance(device_guid, str):
+			# convert to GUID
+			device_guid = gremlin.util.parse_guid(device_guid)
+
 		if device_guid not in self.latched_functors:
 			self.latched_functors[device_guid] = {}
 		if mode not in self.latched_functors[device_guid]:
