@@ -86,11 +86,7 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
         self.action_data.gate_data.stop()
 
     def process_event(self, event, value, extra_data = None):
-        # all the work happens in the gate widget hook function - nothing to do
-        #self.action_data.gate_data.process_event(event, value)
-        #syslog.info("Gated Axis: trigger")
-        #return self.action_data.gate_data.process_event(event, value, extra_data)
-        #return True # prevent child from executing
+        # all the work happens in the gate widget hook function 
         return True
 
 class GatedAxis(gremlin.base_profile.AbstractAction):

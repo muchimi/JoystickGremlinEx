@@ -1174,7 +1174,8 @@ class GateData():
         self.condition = condition
         self.output_mode = mode
         self.profile_mode = profile_mode # profile mode this gate data applies to (can be set via reading from XML)
-        self.valid_mode_list = [] # valid mode list for runtime processing
+        self._valid_mode_list = [] # valid mode list for runtime processing
+        self._valid_mode_list_profile_mode = None # profile mode used to check mode branching
         self.fixed_value = 0
         self.range_min = range_min
         self.range_max = range_max
@@ -1253,6 +1254,15 @@ class GateData():
         eh.gate_order_changed.connect(self._update_default_range)
         self._hooked = False
         self.hook() # hook joystick events
+
+    @property
+    def valid_mode_list(self) -> list:
+        ''' gets the list of valid profile modes this gate axis can be used for '''
+        if not self._valid_mode_list or self._valid_mode_list_profile_mode != self.profile_mode:
+            # reload valid profile branches
+            self._valid_mode_list = gremlin.shared_state.current_profile.get_mode_branch(self.profile_mode)
+            self._valid_mode_list_profile_mode = self.profile_mode
+        return self._valid_mode_list
 
     def replace_gate(self, g1):
         ''' replace a given gate with a new gate'''
@@ -1382,7 +1392,6 @@ class GateData():
 
         # verify the profile mode exists
         profile_mode = self.profile_mode
-        self.valid_mode_list  = gremlin.shared_state.current_profile.get_mode_branch(self.profile_mode)
         if not profile_mode in self.valid_mode_list:
             syslog.error(f"GATE: Mode Error: gated axis is looking for mode: [{profile_mode}] - this mode does not exist in the current profile.  GatedAxis will not trigger.  To fix, call up the gated axis action in the correct mode to reset.")
 
@@ -1543,6 +1552,9 @@ class GateData():
         triggers = self.process_triggers(input_value, self._active_ranges)
         trigger: TriggerData
 
+        if triggers and gremlin.shared_state.is_running:
+            pass
+
         verbose = gremlin.config.Configuration().verbose_mode_gate
 
         
@@ -1575,12 +1587,7 @@ class GateData():
             range_event = event.clone()
             range_event.event_type = InputType.JoystickAxis # force linear
 
-            for t in triggers:
-                if t.mode == TriggerMode.GateDecrease:
-                    break
-
-
-
+  
             for trigger in triggers:
                 trigger_event = event.clone()
                 trigger_value = value.clone()
@@ -3296,9 +3303,9 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         ''' updates the icon on the setup button depending on the container state '''
 
         if self.gate.hasAnyContainers():
-            self.setup_widget.setIcon(load_icon("fa6s.gear",qta_color= gremlin.ui.ui_common.Color().activeContentColor()))
+            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color= gremlin.ui.ui_common.Color().activeContentColor()))
         else:
-            self.setup_widget.setIcon(load_icon("fa6s.gear",qta_color= gremlin.ui.ui_common.Color().inactiveColor()))
+            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color= gremlin.ui.ui_common.Color().inactiveColor()))
 
         if self.gate.isError:
             warning_color = gremlin.ui.ui_common.Color.warningColor()
@@ -3535,9 +3542,9 @@ class RangeWidgetInfo(QtWidgets.QWidget):
     def _update_icon(self):
         has_containers = self._rng.hasAnyContainers()
         if has_containers:
-            self.setup_widget.setIcon(load_icon("fa6s.gear",qta_color=gremlin.ui.ui_common.Color.activeContentColor()))
+            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color.activeContentColor()))
         else:
-            self.setup_widget.setIcon(load_icon("fa6s.gear",qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
+            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
 
     def cleanup(self):
         eh = GateEventHandler()
@@ -3693,8 +3700,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
             return
 
         self._grab_icon = load_icon("mdi.checkbox-blank-circle", qta_color = gremlin.ui.ui_common.Color.recordColor())
-        self._setup_icon = load_icon("fa6s.gear", qta_color = gremlin.ui.ui_common.Color.inactiveColor())
-        self._setup_container_icon = load_icon("fa6s.gear",qta_color = gremlin.ui.ui_common.Color.activeContentColor())
+        self._setup_icon = gremlin.ui.ui_common.Icons.gearIcon(qta_color = gremlin.ui.ui_common.Color.inactiveColor())
+        self._setup_container_icon = gremlin.ui.ui_common.Icons.gearIcon(qta_color = gremlin.ui.ui_common.Color.activeContentColor())
         
         # get the curent axis normalized value -1 to +1
         if  action_data.input_is_hardware():

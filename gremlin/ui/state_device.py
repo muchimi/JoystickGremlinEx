@@ -41,6 +41,7 @@ import gremlin.ui.input_item
 import os
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
+import gremlin.ui.ui_common
 from gremlin.util import *
 from lxml import etree as ElementTree
 import enum
@@ -85,6 +86,11 @@ class StateInputItem(AbstractInputItem):
         self._value = default_value
         self._type_cast = type(default_value) if default_value is not None else None
         self.description = description
+        self._expression = None # expression to evaluate to derive a state
+        self._expression_stack = [] # expression stack to evaluate
+        self._dirty = True # indicates the state is stale and must be recomputed (expressions only)
+        self._expression_states = [] # dependent expression states - list of states that need to be evaluated when they change
+        self._last_expression_value = False # last computed expression result
         
         item = gremlin.base_profile.InputItem() #self._custom_name_handler)
         item.input_id = self
@@ -105,13 +111,23 @@ class StateInputItem(AbstractInputItem):
 
     @property
     def value(self):
-        return self._value
+        return self.evaluate()
     
     @value.setter
     def value(self, data):
-        if self._value != data:
+        if not self._expression and self._value != data:
+            # only set value on non expression states and only if the value has changed
             self._value = data
             self.changed.emit(data)
+
+    def toggle(self):
+        ''' toggles the state '''
+        if not self._expression:
+            # only toggle non-expression states
+            self._value = not self._value
+            self.changed.emit(self._value)
+            return self._value
+        return None
 
     @property
     def default_value(self):
@@ -140,6 +156,18 @@ class StateInputItem(AbstractInputItem):
     @property
     def message_key(self):
         return self.key
+    
+    @property
+    def expression(self) -> str:
+        return self._expression
+    @expression.setter
+    def expression(self, value : str):
+        if self._expression != value:
+            self._expression = value
+            self._dirty = True
+            self._expression_stack = []
+            self.changed.emit(self.evaluate())
+    
     
     def getOverrideInputType(self):
         # report to containers/actions as a button
@@ -173,6 +201,9 @@ class StateInputItem(AbstractInputItem):
             # ignore other types
             return None
 
+        if self._expression:
+            node.set("expression", self._expression)
+
         # write container data
         self._input_item.to_xml(node)
         
@@ -202,10 +233,239 @@ class StateInputItem(AbstractInputItem):
         elif node_type == "bool":
             value = safe_read(node, "value", bool, False)
         
+        if "expression" in node.attrib:
+            self._expression = node.get("expression")
 
         self._default_value = value
         self._value = value
         self._input_item.from_xml(node, data, skip_root=True)
+
+
+    def evaluate(self, as_tuple = False, force = False) -> bool | tuple:
+        ''' evaluates the state 
+        
+            if the state is an expression, returns the expression result (False if the expression cannot be evaluated)
+            If the state is not an expression, returns the current state value
+
+        :param as_tuple: returns the value, error flag, error message if any
+        :returns: boolean or tuple (value, error, error message)
+        
+        '''
+
+        if self.key == "d":
+            pass
+        if not self._expression:
+            # no expression defined, return the curent state value
+            return (self._value, False, None) if as_tuple else self._value
+        
+        if not force and not self._dirty and self._last_expression_value is not None:
+            # nothing changed since the expression was last evaluated - use the last value
+            return self._last_expression_value
+        
+        if not self._expression_stack:
+            # not converted to postfix yet - get the precomputed evaluation stack
+            if as_tuple:
+                data = self._postfix(self._expression, as_tuple)
+                self._expression_stack = data[0]
+                if data[1]: 
+                    # error condition
+                    return data
+            else:
+                self._expression_stack = self._postfix(self._expression)
+
+        if self._expression_stack:
+            # update the data 
+            data = self._evaluate_stack(self._expression_stack, as_tuple)
+            self._last_expression_value = data[0] if as_tuple else data
+            verbose = gremlin.config.Configuration().verbose_mode_state
+            if verbose:
+                syslog.info(f"State: {self.key} new value: {self._last_expression_value}")
+            return data
+        
+        return (False, True, "Invalid expression") if as_tuple else False
+
+    def _valid_states(self):
+        # remove any state named like a boolean or self
+        sc = StateData()
+        reserved = ['and','or','not','xor', self.key]
+        return [state for state in sc.getStateNames() if not state in reserved]
+
+
+    def _postfix(self, expression, as_tuple = False) -> list | tuple:
+        ''' converts the expression to a postfix stack for evaluation 
+        
+        :returns: list (stack) or tuple (stack, is_error, error_message)
+
+        '''
+        verbose = gremlin.config.Configuration().verbose_mode_state
+
+        precedence = {'and': 2, 'or': 1, 'not': 3, 'xor': 1}
+        output = []
+        stack = []
+
+        expression = expression.replace("("," ( ").replace(")"," ) ")
+        expression = expression.strip().casefold()
+        
+
+        self._expression_states = []
+        
+        states = self._valid_states()
+
+        sc = StateData()
+        
+        if not states:
+            # nothing to evaluate if no states exist
+            msg = "no valid states available for computation. Ensure the states are not using reserved names or self-reference"
+            if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+            if as_tuple:
+                return ([],True, msg)
+            return []
+ 
+        key = self.key
+        tokens = expression.split()
+        for token in tokens:
+            if token in states:
+                # state
+                if not token in self._expression_states:
+                    # add to the dependent state list
+                    self._expression_states.append(token)
+                output.append(token)
+            elif token == '(':
+                stack.append(token)
+            elif token == ')':
+                if not stack:
+                    msg = f"grouping mismatch: [{key}]"
+                    if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+                    if as_tuple:
+                        return ([],True, msg)
+                    return []    
+                while stack and stack[-1] != '(':
+                    output.append(stack.pop())
+                if not stack:
+                    msg = f"grouping mismatch: [{key}]"
+                    if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+                    if as_tuple:
+                        return ([],True, msg)
+                    return []    
+                stack.pop()
+            elif token in precedence:
+                while stack and stack[-1] != '(' and precedence[token] <= precedence.get(stack[-1], 0):
+                    output.append(stack.pop())
+                stack.append(token)
+        while stack:
+            output.append(stack.pop())
+
+
+        # hook the dependent states
+        for key in self._expression_states:
+            state : StateInputItem
+            state = sc.getState(key)
+            if state is None:
+                msg = f"Invalid state reference: [{key}]"
+                if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+                if as_tuple:
+                    return ([],True, msg)
+                return []
+            state.changed.connect(self._state_changed)
+
+        if as_tuple:
+            return (output,False,None)
+        return output
+    
+    @QtCore.Slot(object)
+    def _state_changed(self, state : StateInputItem):
+        # indicate the state changed
+        self._dirty = True
+        self.changed.emit(self.evaluate())
+
+    def _evaluate_stack(self, postfix_stack : list, as_tuple = False) -> bool | tuple:
+        ''' evaluates the expression if it has changed 
+        
+        :param stack: the precomputed postfix expression
+        :param as_tuple: returns the value, error flag, and any error message
+        :returns: boolean, or a tuple (value, error_flag, error_message)
+        
+        '''
+
+        if not postfix_stack:
+            # no stack = False
+            return False
+        
+        stack = []
+        
+        operators = set(['and', 'or', 'not', 'xor'])
+
+        tokens = postfix_stack.copy() 
+        states = self._valid_states()
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        sc = StateData()
+        
+        if not states:
+            # nothing to evaluate if no states exist
+            msg = "Error: No valid states available for computation. Ensure the states are not using reserved names or self-reference"
+            if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+            if as_tuple:
+                return ([],False,msg)
+            return []
+
+        for token in tokens:
+            if token not in operators:
+                value = sc.value(token)
+                if value is None:
+                    msg = f"Error: unable to get value for state [{token}]"
+                    if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+                    if as_tuple:
+                        return (False,True,msg)
+                    return False
+                if not isinstance(value, bool):
+                    msg = f"Error: state [{token}] is not a boolean state."
+                    if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+                    if as_tuple:
+                        return (False,True,msg)
+                    return False
+                stack.append(value)
+            else:
+                opcount = 1 if token == "not" else 2
+                if len(stack) < opcount:
+                    msg = "Error: Invalid expression: insufficient operands for operator "
+                    if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+                    if as_tuple:
+                        return (False,True,msg)
+                    return False
+                result = None
+                if token == "not":
+                    v1 = stack.pop()
+                    result = not v1
+                else:
+                    v2 = stack.pop()
+                    v1 = stack.pop()
+                    if token == 'and':
+                        result = v1 and v2
+                    elif token == 'or':
+                        result = v1 or v2
+                    elif token == 'xor':
+                        result = v1 ^ v2
+                if result is None:
+                    msg = f"unknown operator: {token}"
+                    if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+                    if as_tuple:
+                        return (False,True,msg)
+                    return False
+
+                stack.append(result)
+
+        if len(stack) != 1:
+            msg = "Invalid postfix expression: too many operands or not enough operators"
+            if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+            if as_tuple:
+                        return (False,True,msg)
+            return False
+
+        self._dirty = False # indicate evaluation ok and no errors
+        value = stack.pop()
+        if as_tuple:
+            return (value,True,f"Result: {value}")
+        return value
 
 
     def __str__(self):
@@ -273,6 +533,13 @@ class StateData(QtCore.QObject):
             return self._data[key].value
         return None
     
+    def toggle(self, key : str):
+        ''' toggles a state '''
+        if key in self._data:
+            return self._data[key].toggle()
+        return None
+
+    
     def add(self, data : StateInputItem):
         if data and not data.key in self._data:
             self._data[data.key] = data
@@ -287,12 +554,22 @@ class StateData(QtCore.QObject):
         ''' gets all input items '''
         return self._data
     
+    def getStateNames(self):
+        ''' gets the list of states currently defined '''
+        return list(self._data.keys())
+    
     def getInputItems(self):
         ''' gets a dict of input items for each state'''
         input_items = {}
         for key, item in self._data.items():
             input_items[key] = item.input_item
         return input_items
+
+    def getState(self, key : str) -> StateInputItem:
+        ''' gets a state object for the given state name '''
+        if key in self._data:
+            return self._data[key]
+        return None
 
     
     def setValue(self, key : str, value, emit = True):
@@ -432,6 +709,18 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._name_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._name_widget.setText(data.key)
         self._name_widget.textChanged.connect(self._name_changed)
+
+
+        self._expression_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._expression_widget.setText(data.expression)
+        self._expression_widget.textChanged.connect(self._expression_changed)
+
+        self._test_widget = QtWidgets.QPushButton("Test")
+        self._test_widget.setToolTip("Tests the state expression")
+        self._test_widget.clicked.connect(self._test_expression)
+        self._test_widget.setEnabled(bool(data.expression))
+
+
         self._description_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._description_widget.setText(data.description)
         self._description_widget.textChanged.connect(self._description_changed)
@@ -444,6 +733,11 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         row += 1
         self._config_layout.addWidget(QtWidgets.QLabel("Description:"), row, col)
         self._config_layout.addWidget(self._description_widget, row, col+1)
+
+        row += 1
+        widget, layout = gremlin.ui.ui_common.getHContainer([self._expression_widget, self._test_widget])
+        self._config_layout.addWidget(QtWidgets.QLabel("Expression:"), row, col)
+        self._config_layout.addWidget(widget, row, col+1)
 
         row += 1
         self._config_layout.addWidget(QtWidgets.QLabel("Default State:"), row, col)
@@ -494,7 +788,18 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     def _description_changed(self):
         self.data.description = self._description_widget.text()
         
+    @QtCore.Slot()
+    def _expression_changed(self):
+        self.data.expression = self._expression_widget.text()
+        self._test_widget.setEnabled(bool(self.data.expression))
 
+    @QtCore.Slot()
+    def _test_expression(self):
+        value, is_error, error_msg = self.data.evaluate(as_tuple = True, force = True)
+        msg = error_msg if is_error else f"Result: {value}"
+        gremlin.ui.ui_common.MessageBox(title = "Expression Evaluation", prompt= msg, is_warning = is_error)
+
+        
 
     @QtCore.Slot(bool)
     def _default_changed(self, checked):
@@ -554,7 +859,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # clear and add buttons to add/clear all states
         clear_button = ui_common.ConfirmPushButton("Clear States", show_callback = self._show_clear_cb)
-        icon = gremlin.util.load_icon("fa6.trash-can")
+        icon = gremlin.ui.ui_common.Icons.trashIcon()
         clear_button.setIcon(icon)
         clear_button.setToolTip("Deletes all states")
         clear_button.confirmed.connect(self._clear_inputs_cb)
@@ -564,7 +869,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Key add button
         add_button = QtWidgets.QPushButton("Add State")
         add_button.setToolTip("Adds a new state to the profile")
-        icon = gremlin.util.load_icon("fa6s.plus")
+        icon = gremlin.ui.ui_common.Icons.addIcon()
         add_button.setIcon(icon)
         add_button.clicked.connect(self._add_input_cb)
 
@@ -702,12 +1007,6 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         for index, key in enumerate(keys):
             data = state[key]
             item = data.input_item
-            # item = gremlin.base_profile.InputItem() #self._custom_name_handler)
-            # item.input_id = data
-            # item.input_type = InputType.State
-            # item.device_name = "State"
-            # item.device_type = DeviceType.State
-            # item.device_guid = gremlin.shared_state.state_tab_guid
             self._input_items[key] = item
             changed = True
             model._index_map[index] = item
@@ -820,8 +1119,14 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
         widget.data = data
         widget.create_action_icons(data)
-        widget.setTitle(f"State: [{data.input_id.key}]")
-        widget.setInputDescription(data.input_id.description)
+        input_id : StateInputItem = data.input_id
+        widget.setTitle(f"State: [{input_id.key}]")
+        widget.setInputDescription(input_id.description)
+        if input_id.expression:
+            icon = gremlin.ui.ui_common.Icons.calculateIcon()
+            widget.setComment(input_id.expression, icon)
+        else:
+            widget.setComment(f"Default: {input_id.default_value}")
         # widget.disable_close()
         # widget.disable_edit()
         widget.setIcon("mdi.state-machine")

@@ -434,13 +434,20 @@ class InputViewerUi(ui_common.BaseDialogUi):
     def _clear(self):
         ''' clears all widgets '''
         widget_list = [widget for widget in self._widget_storage.values()]
+        with QtCore.QSignalBlocker(self.keyboard_widget_selector):
+            self.state_widget_selector.setChecked(False)
+        with QtCore.QSignalBlocker(self.keyboard_widget_selector):
+            self.keyboard_widget_selector.setChecked(False)
+
         for widget in widget_list:
-            if widget == self.keyboard_widget:
-                with QtCore.QSignalBlocker(self.keyboard_widget_selector):
-                    self.keyboard_widget_selector.setChecked(False)
             if hasattr(widget,"unhook"):
                 widget.unhook()
             widget.setParent(None)
+
+        self.views.clear()
+
+        self._state_visualizer_widget = None
+        self._keyboard_visualizer_widget = None
             
         self._widget_storage.clear()
         self.hideKeyboard()
@@ -515,12 +522,21 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self._state_buttons.clear()
             sd = gremlin.ui.state_device.StateData()
             css = gremlin.ui.ui_common.Color.cssStateButton()
+            cssAlternate = gremlin.ui.ui_common.Color.cssStateExpressionButton()
             i = 0
             for key, data in sd.getStates().items():
                 btn = gremlin.ui.ui_common.QDataPushButton(key, data)
-                btn.setStyleSheet(css)
-                btn.setDisabled(True)
-                btn.setDown(data.value)
+
+                if data.expression:
+                    btn.setEnabled(False)    
+                    btn.setStyleSheet(cssAlternate)
+                else:
+                    btn.setStyleSheet(css)
+
+                btn.setCheckable(True)
+                btn.setChecked(data.value)
+                syslog.info(f"viewer state: {key}  value: {data.value}")
+                btn.clicked.connect(self._state_toggle)
                 layout.addWidget(btn, int(i / 10), int(i % 10))
                 data.changed.connect(self._state_changed)
                 self._state_buttons[data.key] = btn
@@ -534,14 +550,21 @@ class InputViewerUi(ui_common.BaseDialogUi):
             button_layout = QtWidgets.QGridLayout()
             self.populateState(button_layout)
             self._state_visualizer_widget.setLayout(button_layout)
-                
             self.views.add_widget(self._state_visualizer_widget)
+            device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
+            self._widget_storage[device] = self._state_visualizer_widget
+
 
     def hideState(self):
         ''' hides the state device '''
         if self._state_visualizer_widget:
             self.views.remove_widget(self._state_visualizer_widget)
-        self._update_view()
+            self._state_visualizer_widget.setParent(None)
+            self._state_visualizer_widget = None
+            device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
+            if device in self._widget_storage:
+                del self._widget_storage[device]
+    
 
     def refreshState(self):
         if self._state_visualizer_widget:
@@ -554,7 +577,17 @@ class InputViewerUi(ui_common.BaseDialogUi):
         data = self.sender()
         key = data.key
         if key in self._state_buttons:
-            self._state_buttons[key].setDown(data.value)
+            self._state_buttons[key].setChecked(data.value)
+
+    @QtCore.Slot()
+    def _state_toggle(self):
+        widget = self.sender()
+        data = widget.data
+        key = data.key
+        sc = gremlin.ui.state_device.StateData()
+        sc.toggle(key)
+
+        
 
     @QtCore.Slot()
     def _state_crud(self):

@@ -59,7 +59,8 @@ class CycleModeModel(QtCore.QAbstractItemModel):
         
         if role == QtCore.Qt.DisplayRole:
             row = index.row()
-            return self._data[row][1]
+            if row in self._data:
+                return self._data[row][1]
         return None
     
     def swap(self, index_a, index_b):
@@ -132,14 +133,15 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # Add widgets which allow modifying the mode list
         self.mode_list_widget = gremlin.ui.ui_common.NoWheelComboBox()
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
         self.button_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback = self._add_cb)
         self.button_delete_widget =gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = self._remove_cb)
         
-        self.up = QtWidgets.QPushButton(load_icon(f"{prefix}list_up.svg"), "Up")
+        icon = gremlin.ui.ui_common.Icons.listUpIcon()
+        self.up = QtWidgets.QPushButton(icon, "Up")
         
         self.up.clicked.connect(self._up_cb)
-        self.down = QtWidgets.QPushButton(load_icon(f"{prefix}list_down.svg"), "Down")
+        icon = gremlin.ui.ui_common.Icons.listDownIcon()
+        self.down = QtWidgets.QPushButton(icon, "Down")
 
         self.down.clicked.connect(self._down_cb)
 
@@ -171,6 +173,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Saves UI state to the profile."""
         mode_list = self.model.modes()
         self.action_data.mode_list = mode_list
+        self._update_mode_list()
         # self.action_modified.emit()
 
     def _update_mode_list(self):

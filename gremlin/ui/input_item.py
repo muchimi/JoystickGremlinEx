@@ -1126,8 +1126,8 @@ class InputItemWidget(QBoxFrame):
         self._container_widget = QtWidgets.QWidget()
         self._container_layout = QtWidgets.QGridLayout(self._container_widget)
         self._container_widget.setContentsMargins(0,0,0,0)
-        self._container_layout.setContentsMargins(0,0,0,0)
-        self._container_layout.setSpacing(0)
+        #self._container_layout.setContentsMargins(0,0,0,0)
+        #self._container_layout.setSpacing(0)
 
         self._title_container_widget = QtWidgets.QWidget()
         self._title_container_layout = QtWidgets.QGridLayout(self._title_container_widget)
@@ -1195,7 +1195,7 @@ class InputItemWidget(QBoxFrame):
         size = 16
 
         # action buttons
-        icon = gremlin.ui.ui_common.load_icon("fa6s.gear")
+        icon = gremlin.ui.ui_common.Icons.gearIcon()
         self._edit_button_widget = QtWidgets.QPushButton() 
         self._edit_button_widget.setIcon(icon)
         self._edit_button_widget.setToolTip("Configure")
@@ -1271,7 +1271,7 @@ class InputItemWidget(QBoxFrame):
         self._comment_widget = gremlin.ui.ui_common.QIconLabel(use_wrap=False)
         self._comment_widget.setObjectName("comment")
         self._comment_widget.setTextMinWidth(280)
-        self._comment_widget.setContentsMargins(0,0,0,0)
+        #self._comment_widget.setContentsMargins(0,0,0,0)
         #self._comment_widget.setStyleSheet("Background: blue;")
 
         self._input_description_widget =gremlin.ui.ui_common.QIconLabel(use_wrap = False)
@@ -1731,9 +1731,10 @@ class InputItemWidget(QBoxFrame):
             layout_remove(self._container_layout, self._description_widget)
             
 
-    def setComment(self, value):
+    def setComment(self, value, icon = None):
         ''' sets the comment field of the input widget '''
         if value:
+            self._comment_widget.setIcon(icon)
             self._comment_widget.setText(f"<i>{value}</i>")
             self._container_layout.addWidget(self._comment_widget, self._row_comment,0)
         else:
@@ -2012,7 +2013,7 @@ class ContainerSelector(QtWidgets.QWidget):
 
         # delete all containers
         self.delete_button =  QtWidgets.QPushButton()
-        icon = gremlin.util.load_icon("fa6.trash-can")
+        icon = gremlin.ui.ui_common.Icons.trashIcon()
         self.delete_button.setIcon(icon)
         self.delete_button.clicked.connect(self._delete_container)
         self.delete_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)

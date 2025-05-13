@@ -355,6 +355,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         container_list = []
 
         # tracker = gremlin.base_conditions.ConditionTracker()
+        import_data = gremlin.base_profile.ProfileImportData()
 
         if isinstance(container, ObjectEncoder):
             oc = container
@@ -365,6 +366,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
                 node = lxml.etree.fromstring(xml)
                 container_type = node.get("type")
 
+               
                 # verify the container is valid for the input
                 if container_type in container_tag_map:
                     container_name = container_tag_map[container_type].name
@@ -372,20 +374,18 @@ class InputItemConfiguration(QtWidgets.QFrame):
                         new_container = container_tag_map[container_type](self.item_data)
                         new_container.from_xml(node, self.item_data)
                         new_container.generateGuids()
+                        if new_container.id in import_data.used_ids:
+                            new_id = gremlin.util.get_guid()
+                            new_container.id = new_id
+                        import_data.used_ids[new_container.id] = new_container
+
                         container_list.append(new_container)
 
             elif oc.encoder_type == EncoderType.MultiContainer:
                 xml = oc.data
 
                 root = etree.fromstring(xml)
-                tree = etree.ElementTree(root)
-                
-                xml_tmp = os.path.join(gremlin.util.userprofile_path(),"clip.xml")
-                tree.write(xml_tmp, pretty_print=True,xml_declaration=True,encoding="utf-8")
-                gremlin.util.display_file(xml_tmp)
-
-                
-                
+ 
                 for node in root:
                     container_type = node.get("type")
 
@@ -395,6 +395,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
                             new_container = container_tag_map[container_type](self.item_data)
                             new_container.from_xml(node, self.item_data)
                             new_container.generateGuids()
+                            if new_container.id in import_data.used_ids:
+                                new_id = gremlin.util.get_guid()
+                                new_container.id = new_id
+                            import_data.used_ids[new_container.id] = new_container
+
                             container_list.append(new_container)
 
 

@@ -386,14 +386,14 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # key clear button
         
         clear_keyboard_button = ui_common.ConfirmPushButton("Clear Keys", show_callback = self._show_clear_cb)
-        icon = gremlin.util.load_icon("fa6.trash-can")
+        icon = gremlin.ui.ui_common.Icons.trashIcon()
         clear_keyboard_button.setIcon(icon)
         clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
 
         virtual_keyboard_button = QtWidgets.QPushButton("Add Key")
-        icon = gremlin.util.load_icon("fa6s.keyboard")
+        icon = gremlin.ui.ui_common.Icons.keyboardIcon() 
         virtual_keyboard_button.setIcon(icon)
         virtual_keyboard_button.clicked.connect(self._add_key_dialog_cb)
         button_container_layout.addWidget(virtual_keyboard_button)

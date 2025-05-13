@@ -122,7 +122,7 @@ class CodeRunner:
         ''' enables UI '''
         self.setUIState(True)
 
-    def start(self, inheritance_tree, settings, start_mode, profile : gremlin.base_profile.Profile):
+    def start(self, inheritance_tree, settings, start_mode, profile : gremlin.base_profile.Profile) -> bool:
         """Starts listening to events and loads all existing callbacks.
 
         :param inheritance_tree tree encoding inheritance between the
@@ -130,6 +130,7 @@ class CodeRunner:
         :param settings profile settings to apply at launch
         :param start_mode the mode in which to start Gremlin
         :param profile the profile to use when generating all the callbacks
+        :returns: True on success, False if the profile did not start (various reasons)
         """
 
         el = gremlin.event_handler.EventListener()
@@ -608,6 +609,8 @@ class CodeRunner:
             el.profile_start.emit()
             el.profile_started.emit()
 
+            return True
+
 
 
         except Exception as e:
@@ -619,7 +622,7 @@ class CodeRunner:
             syslog.error(f"Traceback: {tb_msg}")
 
             gremlin.util.display_error(f"Unable to launch profile due to an error: {tb_msg}")
-            
+            return False
             
 
             

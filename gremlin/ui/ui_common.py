@@ -53,9 +53,42 @@ from dinput import DeviceSummary
 
 syslog = logging.getLogger("system")
 
-
+class Icons():
+    ''' general UI icon handling '''
+    @staticmethod
+    def listUpIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.caret-circle-up-light", qta_color)
+    def listDownIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.caret-circle-down-light", qta_color)
+    def listTopIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.caret-circle-double-up-light", qta_color)
+    def listBottomIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.caret-circle-double-down-light", qta_color)
+    def trashIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6.trash-can", qta_color)
+    def keyboardIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.keyboard", qta_color)
+    def addIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa5.plus-square", qta_color)
+    def removeIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.minus", qta_color)
+    def gearIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.gear", qta_color)
+        
+    def refreshIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ei.refresh", qta_color)
+        
+    def calculateIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.math-operations", qta_color)
+        
+    
+    def _icon(value : str, qta_color = None):
+        return load_icon(value, qta_color = qta_color) if qta_color is not None else load_icon(value)
+        
+        
 
 class Color():
+    ''' general UI color and stylesheet handling '''
     @staticmethod
     def activeColor():
         return "#51f56f" if gremlin.shared_state.is_dark_theme else "#365a75"
@@ -99,8 +132,14 @@ class Color():
     def selectColor():
         return "#658265" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
     @staticmethod
+    def alternateSelectColor():
+        return "#8a761c" if gremlin.shared_state.is_dark_theme else "#bcaf8f"
+    @staticmethod
     def selectGradientColor():
         return "#448044" if gremlin.shared_state.is_dark_theme else "#568f56"
+    @staticmethod
+    def alternateSelectGradientColor():
+        return "#754e17" if gremlin.shared_state.is_dark_theme else "#568f56"
     @staticmethod
     def selectEndGradientColor():
         return "#8ac18a" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
@@ -113,6 +152,9 @@ class Color():
     @staticmethod
     def selectBorderColor():
         return "#408540" if gremlin.shared_state.is_dark_theme else "#76c276"    
+    @staticmethod
+    def alternateSelectBorderColor():
+        return "#997e14" if gremlin.shared_state.is_dark_theme else "#c2b476"    
     @staticmethod
     def rangeColor():
         return "#8FBC8F"
@@ -202,7 +244,6 @@ class Color():
     @staticmethod
     def disconnectedColor(): # color for the disconnected device 
         return "#db6512"
-    
 
 
     @staticmethod
@@ -378,6 +419,57 @@ class Color():
             background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
             border-color: {selected_border_color};
         }}
+
+        QPushButton:checked {{
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
+            border-color: {selected_border_color};
+        }}
+
+
+        QPushButton:flat {{
+            border: none; /* no border for a flat push button */
+        }}
+
+        QPushButton:!enabled
+        {{
+             color: {background_color};
+        }}
+        '''
+        return css
+    
+    @staticmethod
+    def cssStateExpressionButton():
+        ''' gets a pushbutton state for the input viewer '''
+
+        normal_color = Color.normalColor()
+        normal_gradient_color = Color.normalGradientColor()
+        background_color = Color.keyBackgroundColor()
+        
+        selected_border_color = Color.alternateSelectBorderColor()
+        selected_color = Color.alternateSelectColor()
+        selected_gradient_color = Color.alternateSelectGradientColor()
+        css = f'''
+        QPushButton {{
+            border: 2px solid #8f8f91;
+            border-radius: 15px;
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {normal_color}, stop: 1 {normal_gradient_color});
+            min-width: 30px;
+            min-height: 30px;
+            max-height: 30px;
+            padding-left: 4px;
+            padding-right: 4px;
+        }}
+
+        QPushButton:pressed {{
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
+            border-color: {selected_border_color};
+        }}
+
+        QPushButton:checked {{
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
+            border-color: {selected_border_color};
+        }}
+
 
         QPushButton:flat {{
             border: none; /* no border for a flat push button */
@@ -2386,7 +2478,7 @@ class ModeWidget(QtWidgets.QWidget):
         )
 
         self.profile_options_button_widget = QtWidgets.QPushButton()
-        self.profile_options_button_widget.setIcon(load_icon("fa6s.gear"))
+        self.profile_options_button_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon())
         self.profile_options_button_widget.setToolTip("Profile Options")
         self.profile_options_button_widget.clicked.connect(self._profile_options_cb)
 

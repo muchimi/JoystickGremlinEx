@@ -47,6 +47,7 @@ from PySide6 import QtCore
 from threading import Event
 
 import gremlin.types
+import gremlin.ui
 
 syslog = logging.getLogger("system")
 
@@ -1104,14 +1105,18 @@ class ExecutionContext():
         gremlin.shared_state.pushLog()
         try:
 
+            verbose = gremlin.config.Configuration().verbose_mode_exec
+
             if not container.is_valid():
                 syslog.warning("Incomplete container ignored")
                 return None
 
+            # ensure container IDs are unique in the tree to avoid duplicate entries as containers are main entry points for execution keyed by ID
+            # container IDs may be duplicated when a container was pasted or the xml was manually edited and the profile was not saved/reloaded since
+            # as the load operation checks for duplicate IDs as well
             if container.id in self.used_items:
-                syslog.error(f"Container already used: {container.id}")
-                self._build_error = True
-                return None
+                if verbose:  syslog.info(f"BUILD WARNING: Container already used: {container.id} - resetting ID - this is normal if the container was just pasted")
+                container.setId(gremlin.util.get_guid())
             self.used_items[container.id] = container
 
             
@@ -1180,9 +1185,9 @@ class ExecutionContext():
                 for index, action in action_list:
 
                     if action.id in self.used_items:
-                        syslog.error(f"{logtabs}Action already used: {action.id}")
-                        self._build_error = True
-                        return False
+                        if verbose: syslog.info(f"{logtabs}BUILD WARNING: Action already used: {action.id} - setting up a new unique ID")
+                        action.setId(gremlin.util.get_guid())
+                        
                     self.used_items[action.id] = action
 
                     # action node
@@ -1320,8 +1325,9 @@ class ExecutionContext():
             for container in input_item.containers:
                 node = self._build_container_tree(container, input_container_group, mode_name, device_node, input_item, m_input_node)
                 if not node:
+                    
+                    syslog.error(f"BUILD ERROR: failed to obtain a node for container: {container.id}")
                     self._build_error = True
-                    syslog.error(f"Container build error")
                     return None
                 node.parent = input_container_group
 
@@ -1681,7 +1687,9 @@ class ExecutionContext():
                     for functor in functor_list:
                         action_result =  self.process_functor(functor, event, value, extra_data, manual)
                         description = str(functor.action_data)
-                        if verbose_exec: syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} {description} action result: {'PASS' if action_result else 'FAIL'}")
+                        if verbose_exec: 
+                            if not functor.manual_callback: # manual callbacks will always fail so skip any message for those
+                                syslog.info(f"{logTabs}>!!! Executed action {functor.__class__.__name__} {description} action result: {'PASS' if action_result else 'FAIL'}")
                             
             # execute children nodes
             if node.children and (node.nodeType != ExecutionGraphNodeType.Action or manual):

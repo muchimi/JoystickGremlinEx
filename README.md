@@ -14,14 +14,24 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m75t4)
+### (m75t5)
+- Fix: Cycle mode display model not updating in some situations.
+- Fix: Resolved an issue when a gated axis in a child mode would skip execution
+- Fix: Resolved an issue when pasting containers/actions causing duplicate IDs when building the execution graph.
+- Fix: Resolved an issue with an abort received during profile start not resetting the toolbar status.
+- Fix: Resolved an issue with the state widget disappearing in Input Viewer in some situations.
+- Fix: Resolved an issue with the state widget not being clickable in Input Viewer.
+- New: States can be defined as a boolean expression.
+
+### (m75t4 A/B)
 - Fix: Gated Axis runtime would fail mode match test in some situations (especially if the gated data was imported or pasted) - mode is now tied to the input mode the action belongs to regardless of what was saved.
 - Fix: Gated Axis not always re-initializing on profile restart causing random issues at runtime.
 - Fix: Gated Axis: event data sent by a trigger could send the wrong data to additional triggers part of the same input trigger group preventing their containers/actions from behaving correctly.
 - Fix: Gated Axis: gate delay value no longer gets reset when pasting
 - Fix: missing OSC icon for dark mode
 - Fix: Floating point value input widget not always converting to a properly formatted representation on some inputs.
-- New: (experimental) Map to OSC EX (enhanced OSC output for advanced parameter mapping)
+- New: (experimental) Map to OSC EX (enhanced OSC output for advanced parameter mapping) (patch B adds axis latching)  
+- Fix: OSC client sends duplicate messages on repeated profile starts.
 
 
 

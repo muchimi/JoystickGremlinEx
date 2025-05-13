@@ -1099,14 +1099,23 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
                 # start the profile with the specified runtime mode
-                self.runner.start(
+                result = self.runner.start(
                     self.profile.build_inheritance_tree(),
                     self.profile.settings,
                     self._last_runtime_mode(),
                     self.profile
                 )
 
-                
+                if not result:
+                    # profile start failed
+                    gremlin.shared_state.profile_state = False
+                    self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+                    with QtCore.QSignalBlocker(self.ui.actionActivate):
+                        self.ui.actionActivate.setChecked(False) # toolbar icon "off"
+
+                    gremlin.ui.ui_common.MessageBox(title = "Profile Stat Error", prompt = f"An error occured when starting the profile.\nCheck the log file for specifics.")
+
+                    return
 
                 if gremlin.shared_state.profile_state:
                     #print ("set icon ACTIVE")

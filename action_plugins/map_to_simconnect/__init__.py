@@ -1941,7 +1941,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         icon_color = gremlin.ui.ui_common.Color.normalColor()
         
-        create_mode_icon = gremlin.util.load_icon("fa5.plus-square", qta_color=icon_color)
+        create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
         
         start_index = self.paginator_widget.startIndex
         end_index = self.paginator_widget.endIndex
@@ -2171,14 +2171,14 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self.manual_map_layout.addWidget(missing)
             return
         
-        create_mode_icon = gremlin.util.load_icon("fa5.plus-square")
+        create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
 
         profile = gremlin.shared_state.current_profile
         default_mode = profile.get_default_mode()
 
         # headers
 
-        delete_icon = gremlin.util.load_icon("fa6.trash-can")
+        delete_icon = gremlin.ui.ui_common.Icons.trashIcon()
         row = 0
         for item in self.options._aircraft_manual_definitions:
 
@@ -2520,8 +2520,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.chained_input = self.action_data.input_item.is_action
 
         # mode from aircraft button - grabs the aicraft name as a mode
+        icon = gremlin.ui.ui_common.Icons.gearIcon()
         self._options_button_widget = QtWidgets.QPushButton("Simconnect Options")
-        self._options_button_widget.setIcon(gremlin.util.load_icon("fa6s.gear"))
+        self._options_button_widget.setIcon(icon)
         self._options_button_widget.clicked.connect(self._show_options_dialog_cb)
 
 

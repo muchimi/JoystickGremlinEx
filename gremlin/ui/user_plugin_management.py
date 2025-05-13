@@ -510,13 +510,9 @@ class InstanceWidget(QtWidgets.QWidget):
         self.btn_rename.setToolTip("Rename this instance")
 
         self.btn_rename.clicked.connect(self.rename_instance)
-        self.btn_configure = QtWidgets.QPushButton(
-            load_icon("fa6s.gear", qta_color=icon_color), ""
-        )
+        self.btn_configure = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.gearIcon(qta_color=icon_color), "")
         self.btn_configure.setToolTip("Configure this instance")
-        self.btn_delete = QtWidgets.QPushButton(
-             load_icon(f"gfx/{prefix}button_delete.png"), ""
-        )
+        self.btn_delete = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_delete.png"), "")
         self.btn_delete.setToolTip("Delete this instance")
         self.btn_copy = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_copy.svg"),"")
         self.btn_copy.setToolTip("Copy this instance")

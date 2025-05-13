@@ -79,7 +79,8 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
             id = node.get("condition_id")
             if id in import_data.used_ids:
                 new_id = gremlin.util.get_guid()
-                # syslog.warning(f"PROFILE: duplicate ID found - Condition: [{id}] - assigning new id: [{new_id}]")
+                verbose = gremlin.config.Configuration().verbose
+                if verbose: syslog.warning(f"PROFILE: duplicate ID found - Condition: [{id}] - assigning new id: [{new_id}]")
                 id = new_id
         else:
             id = gremlin.util.get_guid()
@@ -853,7 +854,8 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
             id = node.get("condition_id")
             if id in import_data.used_ids:
                 new_id = gremlin.util.get_guid()
-                # syslog.warning(f"PROFILE: duplicate ID found - Activation Condition: [{id}] - assigning new id: [{new_id}]")
+                verbose = gremlin.config.Configuration().verbose
+                if verbose: syslog.warning(f"PROFILE: duplicate ID found - Activation Condition: [{id}] - assigning new id: [{new_id}]")
                 id = new_id
         else:
             id = gremlin.util.get_guid()

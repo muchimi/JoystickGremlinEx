@@ -730,7 +730,7 @@ class OscInputWidget(QtWidgets.QWidget):
         self._frame_layout.addWidget(right_content_widget, 0,2, alignment = alignment)
         self._frame_layout.setColumnStretch(1,1)
 
-        icon = gremlin.util.load_icon("fa6.trash-can")
+        icon = gremlin.ui.ui_common.Icons.trashIcon() 
         delete_widget = QtWidgets.QPushButton()
         delete_widget.setIcon(icon)
         delete_widget.setToolTip("Delete this parameter")
@@ -972,14 +972,14 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._list_widget, self._list_layout = gremlin.ui.ui_common.getVContainer()
 
-        icon = gremlin.util.load_icon("fa5.plus-square")
+        icon = gremlin.ui.ui_common.Icons.addIcon()
         self.add_arg_widget = QtWidgets.QPushButton("Add Argument")
         self.add_arg_widget.setIcon(icon)
         self.add_arg_widget.setToolTip("Adds a new OSC argument")
         self.add_arg_widget.clicked.connect(self._add_arg)
 
         self.clear_args_widget = QtWidgets.QPushButton("Clear Arguments")
-        icon = gremlin.util.load_icon("fa6.trash-can")
+        icon = gremlin.ui.ui_common.Icons.trashIcon()
         self.clear_args_widget.setIcon(icon)
         self.clear_args_widget.setToolTip("Clears all argurments")
 

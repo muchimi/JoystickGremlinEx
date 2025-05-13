@@ -608,13 +608,16 @@ class AbstractContainer(ProfileData):
 
         :param node the XML node to populate fields with
         """
+        
         super().from_xml(node, data)
         import_data = gremlin.base_profile.ProfileImportData()
+
         if "container_id" in node.attrib:
             id = node.get("container_id")
             if id in import_data.used_ids:
                 new_id = gremlin.util.get_guid()
-                # syslog.warning(f"PROFILE: duplicate ID found - ActivationCondition: [{id}] - assigning new id: [{new_id}]")
+                verbose = gremlin.config.Configuration().verbose
+                if verbose: syslog.warning(f"PROFILE: duplicate ID found - Container: [{id}] - assigning new id: [{new_id}]")
                 id = new_id
         else:
             id = gremlin.util.get_guid()
@@ -1083,11 +1086,13 @@ class AbstractAction(ProfileData):
 
         # set the action ID first as it can be read by subsequent code
         import_data = gremlin.base_profile.ProfileImportData()
+
         if "action_id" in node.attrib:
             id = node.get("action_id")
             if id in import_data.used_ids:
                 new_id = gremlin.util.get_guid()
-                # syslog.warning(f"PROFILE: duplicate ID found - Action: [{id}] - assigning new id: [{new_id}]")
+                verbose = gremlin.config.Configuration().verbose
+                if verbose: syslog.warning(f"PROFILE: duplicate ID found - Action: [{id}] - assigning new id: [{new_id}]")
                 id = new_id
         else:
             id = gremlin.util.get_guid()
