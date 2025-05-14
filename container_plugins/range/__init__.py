@@ -670,7 +670,7 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
             event_clone.is_pressed = True # button press is ON
             event_clone.is_virtual_button = True # indicate this is a virtual button press
             value_clone = gremlin.actions.Value(True, True)
-            for action in self.action_sets:
+            for action in self.action_data.action_sets:
                 # execute the action
                 # action.process_event(event_clone, value_clone)
                 if not is_change_mode:

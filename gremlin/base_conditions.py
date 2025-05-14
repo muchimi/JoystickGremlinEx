@@ -51,9 +51,6 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
     @property
     def id(self):
         ''' unique ID for this condition, persisted '''
-        if not self._id:
-            import gremlin.util
-            self._id = gremlin.util.get_guid()
         return self._id
     
     def setId(self, value):
@@ -76,16 +73,15 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
         """
         import_data = gremlin.base_profile.ProfileImportData()
         if "condition_id" in node.attrib:
-            id = node.get("condition_id")
-            if id in import_data.used_ids:
-                new_id = gremlin.util.get_guid()
-                verbose = gremlin.config.Configuration().verbose
-                if verbose: syslog.warning(f"PROFILE: duplicate ID found - Condition: [{id}] - assigning new id: [{new_id}]")
-                id = new_id
-        else:
-            id = gremlin.util.get_guid()
-        import_data.used_ids[id] = self
-        self._id = id
+            self._id = node.get("condition_id")
+        
+        # if self._id in import_data.used_ids:
+        #     new_id = gremlin.util.get_guid()
+        #     verbose = gremlin.config.Configuration().verbose
+        #     if verbose: syslog.warning(f"PROFILE: duplicate ID found - Condition: [{id}] - assigning new id: [{new_id}]")
+        #     self._id = new_id
+        
+        # import_data.used_ids[self._id] = self
 
     
     def to_xml(self):
@@ -849,19 +845,18 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         import gremlin.base_profile
         import gremlin.ui.ui_common
 
-        import_data = gremlin.base_profile.ProfileImportData()
+        
         if "condition_id" in node.attrib:
-            id = node.get("condition_id")
-            if id in import_data.used_ids:
-                new_id = gremlin.util.get_guid()
-                verbose = gremlin.config.Configuration().verbose
-                if verbose: syslog.warning(f"PROFILE: duplicate ID found - Activation Condition: [{id}] - assigning new id: [{new_id}]")
-                id = new_id
-        else:
-            id = gremlin.util.get_guid()
-        import_data.used_ids[id] = self
-        self._id = id
+            self._id = node.get("condition_id")
 
+        # import_data = gremlin.base_profile.ProfileImportData()
+        # if self._id in import_data.used_ids:
+        #     new_id = gremlin.util.get_guid()
+        #     verbose = gremlin.config.Configuration().verbose
+        #     if verbose: syslog.warning(f"PROFILE: duplicate ID found - Activation Condition: [{id}] - assigning new id: [{new_id}]")
+        #     self._id = new_id
+        
+        # import_data.used_ids[self._id] = self
 
         rule = ActivationCondition.rule_lookup[safe_read(node, "rule")]
         tracker = ConditionTracker()

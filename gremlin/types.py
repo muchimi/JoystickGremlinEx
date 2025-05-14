@@ -225,6 +225,7 @@ class DeviceType(IntEnum):
     ModeControl = 6 # mode control special device
     Settings = 7 # settings special device
     State = 8 # state special device
+    Plugins = 9 # plugins special device
 
     @staticmethod
     def to_string(value):
@@ -255,7 +256,8 @@ _DeviceType_to_display_name = {
     DeviceType.Osc: "OSC",
     DeviceType.ModeControl: "Mode Control",
     DeviceType.Settings : "Settings",
-    DeviceType.State : "State"
+    DeviceType.State : "State",
+    DeviceType.Plugins : "Plugins"
 }
 
 _DeviceType_to_string_lookup = {
@@ -267,7 +269,8 @@ _DeviceType_to_string_lookup = {
     DeviceType.Osc: "osc",
     DeviceType.ModeControl: "mode",
     DeviceType.Settings: "settings",
-    DeviceType.State: "state"
+    DeviceType.State: "state",
+    DeviceType.Plugins: "plugins"
 }
 
 
@@ -280,7 +283,8 @@ _DeviceType_to_enum_lookup = {
     "osc": DeviceType.Osc,
     "mode": DeviceType.ModeControl,
     "settings": DeviceType.Settings,
-    "state" : DeviceType.State
+    "state" : DeviceType.State,
+    "plugins" : DeviceType.Plugins
 
 }
 

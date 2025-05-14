@@ -331,13 +331,12 @@ def registerSpecialDevice(dev : DeviceSummary):
     assert (_joystick_initialized)
     device_guid = dev.device_guid
     device_id = dev.device_id
+    if dev.device_type ==  DeviceType.VJoy:
+        pass
     if not device_id in _joystick_device_guid_map:
         _joystick_device_guid_map[device_guid] = dev
         _joystick_device_guid_map[device_id] = dev
-        verbose = gremlin.config.Configuration().verbose_mode_details
-        if verbose:
-            syslog.info("SYSTEM: register special device")
-            syslog.info(f"\t{dev.device_id} -> {dev.name}")
+        syslog.info(f"SPECIAL DEVICE: {dev.device_id} / {dev.device_type.name} -> {dev.name}")
 
 
 def removeDevice(dev: DeviceSummary):
@@ -433,6 +432,81 @@ def reset_devices():
     el = gremlin.event_handler.EventListener()
 
     el.device_change_event.emit()
+
+
+def registerSpecialDevices():
+    ''' registers special devices '''
+
+    # keyboard
+    device_guid = str(gremlin.shared_state.keyboard_tab_guid)
+    device = dinput.DeviceSummary()
+    device.name = "Keyboard"
+    device.device_guid = gremlin.shared_state.keyboard_tab_guid
+    device.device_id = device_guid
+    device.device_type = DeviceType.Keyboard
+    device.is_special = True
+    registerSpecialDevice(device)
+
+    # MIDI
+    device_guid = str(gremlin.shared_state.midi_tab_guid)
+    device = dinput.DeviceSummary()
+    device.name = "MIDI"
+    device.device_guid = gremlin.shared_state.midi_tab_guid
+    device.device_id = device_guid
+    device.device_type = DeviceType.Midi
+    device.is_special = True
+    registerSpecialDevice(device)
+
+    # OSC
+    device_guid = str(gremlin.shared_state.osc_tab_guid)
+    device = dinput.DeviceSummary()
+    device.name = "OSC"
+    device.device_guid = gremlin.shared_state.osc_tab_guid
+    device.device_id = device_guid
+    device.is_special = True
+    device.device_type = DeviceType.Osc
+    registerSpecialDevice(device)
+
+    # mode
+    device_guid = str(gremlin.shared_state.mode_tab_guid)
+    device = dinput.DeviceSummary()
+    device.name = "MODE"
+    device.device_guid = gremlin.shared_state.mode_tab_guid
+    device.device_id = device_guid
+    device.device_type = DeviceType.ModeControl
+    device.is_special = True
+    registerSpecialDevice(device)
+
+    # state
+    device_guid = str(gremlin.shared_state.state_tab_guid)
+    device = dinput.DeviceSummary()
+    device.name = "State"
+    device.device_guid = gremlin.shared_state.state_tab_guid
+    device.device_id = device_guid
+    device.device_type = DeviceType.State
+    device.is_special = True
+    registerSpecialDevice(device)
+
+    # plugin
+    device_guid = str(gremlin.shared_state.plugins_tab_guid)
+    device = dinput.DeviceSummary()
+    device.name = "Plugins"
+    device.device_guid = gremlin.shared_state.plugins_tab_guid
+    device.device_id = device_guid
+    device.device_type = DeviceType.Plugins
+    device.is_special = True
+    registerSpecialDevice(device)
+
+    # settings
+    device_guid = str(gremlin.shared_state.settings_tab_guid)
+    device = dinput.DeviceSummary()
+    device.name = "Settings"
+    device.device_guid = gremlin.shared_state.settings_tab_guid
+    device.device_id = device_guid
+    device.device_type = DeviceType.Settings
+    device.is_special = True
+    registerSpecialDevice(device)
+    
 
 def _scan_dinput():
     ''' rescans dinput devices '''
@@ -686,24 +760,6 @@ def joystick_devices_initialization():
     # Reset all devices so we don't hog the ones we aren't actually using
     vjoy_proxy.reset()
 
-    # # fake mode device
-    # mode_device = DeviceSummary()
-    # import gremlin.shared_state
-    # device_guid = gremlin.shared_state.mode_tab_guid
-    # mode_device.device_guid = device_guid
-    # mode_device.device_id = str(mode_device.device_guid)
-    # mode_device.device_type = DeviceType.ModeControl
-    # mode_device.axis_count = 0 
-    # mode_device.button_count = 2 # id 1 is enter, id 2 is exit
-    # mode_device.hat_count = 0
-    # mode_device.is_special = True
-    # mode_device.connected  = True
-    # mode_device.name = "Mode Device"
-    # _joystick_devices.append(mode_device)
-    # _all_joystick_devices.append(mode_device)
-    # _joystick_device_guid_map[device_guid] = mode_device
-    
-
     # device: dinput.DILL.DeviceSummary
     syslog.info("Input device summary:")
     regular_devices_list = [dev for dev in _joystick_devices if not dev.is_virtual]
@@ -718,6 +774,9 @@ def joystick_devices_initialization():
     _joystick_initialized = True
 
     syslog.info("Joystick input initialized")
+
+    # register special devices
+    registerSpecialDevices()
 
 
 def joystick_devices_update():

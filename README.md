@@ -14,6 +14,14 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m75t6)
+- Fix: Resolved an issue with vjoy remap stepped axis mode loosing track of the current step between latched and primary inputs. Note: don't copy/paste latched axis to another input if you intend them to be latched.  This will cause a desync between steps if both manage the same axis: each mapping has its own stepping data/tracking so duplicating the mapping will in effect create two data sets tracked differently.  If you intend for the up/down control of a stepped axis, use the latching option and use a single mapping.
+- Fix: Resolved an issue with vjoy remap axis input values being incorrect in some situations.
+- Fix: Resolved an issue with vjoy remap built-in range filter not processing the input value correctly, exhibited as no output at all, or always on output.  This is due to a recent API change in how axis input values are handled.  
+- Fix: Exception in Range Container.
+- Fix: Resolved an issue with duplicate execution paths when deriving the entry points in the execution graph.  Only one will be executed (the container, which is the primary).
+
+
 ### (m75t5)
 - Fix: Cycle mode display model not updating in some situations.
 - Fix: Resolved an issue when a gated axis in a child mode would skip execution

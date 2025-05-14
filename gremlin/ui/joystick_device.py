@@ -356,6 +356,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         # tracker = gremlin.base_conditions.ConditionTracker()
         import_data = gremlin.base_profile.ProfileImportData()
+        verbose = gremlin.config.Configuration().verbose
 
         if isinstance(container, ObjectEncoder):
             oc = container
@@ -376,7 +377,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
                         new_container.generateGuids()
                         if new_container.id in import_data.used_ids:
                             new_id = gremlin.util.get_guid()
-                            new_container.id = new_id
+                            if verbose: syslog.warning(f"PASTE: DUPLICATE ID:container {new_container.id} -> {new_id}")
+                            new_container._id = new_id
                         import_data.used_ids[new_container.id] = new_container
 
                         container_list.append(new_container)
@@ -397,7 +399,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
                             new_container.generateGuids()
                             if new_container.id in import_data.used_ids:
                                 new_id = gremlin.util.get_guid()
-                                new_container.id = new_id
+                                if verbose: syslog.warning(f"PASTE: DUPLICATE ID:container {new_container.id} -> {new_id}")
+                                new_container._id = new_id
                             import_data.used_ids[new_container.id] = new_container
 
                             container_list.append(new_container)

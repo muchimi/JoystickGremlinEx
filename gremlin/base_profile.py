@@ -610,20 +610,19 @@ class AbstractContainer(ProfileData):
         """
         
         super().from_xml(node, data)
-        import_data = gremlin.base_profile.ProfileImportData()
+        
 
         if "container_id" in node.attrib:
-            id = node.get("container_id")
-            if id in import_data.used_ids:
-                new_id = gremlin.util.get_guid()
-                verbose = gremlin.config.Configuration().verbose
-                if verbose: syslog.warning(f"PROFILE: duplicate ID found - Container: [{id}] - assigning new id: [{new_id}]")
-                id = new_id
-        else:
-            id = gremlin.util.get_guid()
+            self._id = node.get("container_id")
 
-        import_data.used_ids[id] = self
-        self._id = id
+        # import_data = gremlin.base_profile.ProfileImportData()    
+        # if self._id in import_data.used_ids:
+        #     new_id = gremlin.util.get_guid()
+        #     verbose = gremlin.config.Configuration().verbose
+        #     if verbose: syslog.warning(f"PROFILE: duplicate ID found - Container: [{id}] - assigning new id: [{new_id}]")
+        #     self._id = new_id
+        
+        # import_data.used_ids[self._id] = self
 
 
         comment = None
@@ -1088,17 +1087,17 @@ class AbstractAction(ProfileData):
         import_data = gremlin.base_profile.ProfileImportData()
 
         if "action_id" in node.attrib:
-            id = node.get("action_id")
-            if id in import_data.used_ids:
-                new_id = gremlin.util.get_guid()
-                verbose = gremlin.config.Configuration().verbose
-                if verbose: syslog.warning(f"PROFILE: duplicate ID found - Action: [{id}] - assigning new id: [{new_id}]")
-                id = new_id
-        else:
-            id = gremlin.util.get_guid()
+            self._id = node.get("action_id")
+
+        # if self._id in import_data.used_ids:
+        #     new_id = gremlin.util.get_guid()
+        #     verbose = gremlin.config.Configuration().verbose
+        #     if verbose: syslog.warning(f"PROFILE: duplicate ID found - Action: [{id}] - assigning new id: [{new_id}]")
+        #     self.id = new_id
     
-        import_data.used_ids[id] = self
-        self._id = id
+        # import_data.used_ids[self._id] = self
+        
+            
 
         comment = None
         if "comment" in node.attrib:

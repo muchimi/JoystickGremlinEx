@@ -1321,6 +1321,8 @@ class ExecutionContext():
             input_container_group = ExecutionGraphGroupNode()
             input_container_group.parent = input_node
 
+        
+
             container : gremlin.base_profile.AbstractContainer
             for container in input_item.containers:
                 node = self._build_container_tree(container, input_container_group, mode_name, device_node, input_item, m_input_node)

@@ -1963,7 +1963,7 @@ class EventHandler(QtCore.QObject):
 
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
-		#verbose = True
+
 
 		if verbose and event.event_type != InputType.JoystickAxis:
 			syslog.info(f"process event - mode [{mode}] event: {str(event)}")
@@ -2131,6 +2131,7 @@ class EventHandler(QtCore.QObject):
 		''' triggers callbacks '''
 		if m_list:
 			self._trigger_callbacks(m_list, event)
+			return # don't do f_list if m_list processed
 
 		if f_list:
 			self._trigger_functor_callbacks(f_list, event)

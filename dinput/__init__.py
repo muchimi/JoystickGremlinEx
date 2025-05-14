@@ -467,6 +467,7 @@ class DeviceSummary:
             self.input_enabled = False # do not allow usage as an input device
             self.vjoy_id = -1
         self.is_special = False
+        self.data={}  # tracked data for this device, example, stepped index data for an axis
 
     @property
     def device_type(self) -> DeviceType:
