@@ -74,13 +74,13 @@ class Icons():
         return Icons._icon("fa6s.minus", qta_color)
     def gearIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.gear", qta_color)
-        
+    def findIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.magnifying-glass", qta_color)
     def refreshIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ei.refresh", qta_color)
         
     def calculateIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.math-operations", qta_color)
-        
     
     def _icon(value : str, qta_color = None):
         return load_icon(value, qta_color = qta_color) if qta_color is not None else load_icon(value)

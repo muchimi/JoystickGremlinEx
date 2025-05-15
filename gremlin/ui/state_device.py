@@ -145,6 +145,7 @@ class StateInputItem(AbstractInputItem):
         return self._key
     @key.setter
     def key(self, value : str):
+        value = value.casefold().strip()
         if self._key != value:
             self._key = value
             self.key_changed.emit()
@@ -200,6 +201,9 @@ class StateInputItem(AbstractInputItem):
         else:
             # ignore other types
             return None
+        
+        if self._description:
+            node.set("description", self._description)
 
         if self._expression:
             node.set("expression", self._expression)
@@ -352,6 +356,14 @@ class StateInputItem(AbstractInputItem):
                 while stack and stack[-1] != '(' and precedence[token] <= precedence.get(stack[-1], 0):
                     output.append(stack.pop())
                 stack.append(token)
+            else:
+                # token is not known
+                msg = f"Unknown item in expression: [{token}]"
+                if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
+                if as_tuple:
+                    return ([],True, msg)
+                return []    
+
         while stack:
             output.append(stack.pop())
 
@@ -501,6 +513,7 @@ class StateData(QtCore.QObject):
         ''' registers a new state '''
         if not key:
             return None
+        key = key.casefold().strip()
         if key in self._data:
             # already in the list
             return self._data[key]
@@ -519,22 +532,26 @@ class StateData(QtCore.QObject):
     def register(self, key : str, value = None, description = None) -> StateInputItem:
         ''' registers a new state '''
         item = self._register(key, value, description)
-        self._sort()
+        if item:
+            self._sort()
         return item
 
     def unregister(self, key: str):
         ''' removes a state from the list '''
+        key = key.casefold().strip()
         if key in self._data:
             del self._data[key]
 
     def value(self, key : str):
         ''' gets the state value '''
+        key = key.casefold().strip()
         if key in self._data:
             return self._data[key].value
         return None
     
     def toggle(self, key : str):
         ''' toggles a state '''
+        key = key.casefold().strip()
         if key in self._data:
             return self._data[key].toggle()
         return None
@@ -546,6 +563,7 @@ class StateData(QtCore.QObject):
             self._sort()
             data.key_changed.connect(self._key_changed)
             self.crud.emit()
+    
 
     def _sort(self):
         self._data = dict(sorted(self._data.items()))
@@ -567,6 +585,7 @@ class StateData(QtCore.QObject):
 
     def getState(self, key : str) -> StateInputItem:
         ''' gets a state object for the given state name '''
+        key = key.casefold().strip()
         if key in self._data:
             return self._data[key]
         return None
@@ -576,6 +595,7 @@ class StateData(QtCore.QObject):
         ''' sets state value (and registers if needed) '''
         if not key:
             return
+        key = key.casefold().strip()
         trigger = not key in self._data or self._data[key].value != value
         self._data[key].value = value
         if emit and trigger:
@@ -583,6 +603,7 @@ class StateData(QtCore.QObject):
     
     def description(self, key : str) -> str:
         ''' gets the description for the state '''
+        key = key.casefold().strip()
         if key in self._data:
             return self._data[key].description
         return None
@@ -593,15 +614,26 @@ class StateData(QtCore.QObject):
     
     def setDescription(self, key : str, description : str, emit = True):
         ''' sets the description on a state '''
+        key = key.casefold().strip()
         if key in self._data:
             if self._data[key].description != description:
                 self._data[key].description = description
                 if self.emit:
                     self.changed.emit(self._data[key])
     
-    def exists(self, key: str):
+    def exists(self, key: str | StateInputItem):
         ''' true if the key exists in the state data '''
-        return key in self._data
+        if isinstance(key, str):
+            key = key.casefold().strip()
+            return key in self._data
+        
+        data : StateInputItem = key
+        if data.id in self._data.items():
+            return True
+        if data.key in self._data:
+            return True
+        return False
+        
     
     def clear(self):
         ''' clears all data '''
@@ -611,6 +643,7 @@ class StateData(QtCore.QObject):
         
 
     def remove(self, key : str):
+        key = key.casefold().strip()
         if key in self._data:
             del self._data[key]
             self.crud.emit()
@@ -625,7 +658,7 @@ class StateData(QtCore.QObject):
     def createDefault(self, count = 5):
         ''' creates default states '''
         for index in range(count):
-            key = f"Default_{index+1}"
+            key = f"default_{index+1}"
             self._register(key, False, f"Default state {index+1}")
         self._sort()
 
@@ -808,6 +841,23 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _ok_button_cb(self):
         ''' ok button pressed '''
+        # ensure the item is unique and not already used
+
+        if self.data.expression:
+            value, is_error, error_msg = self.data.evaluate(as_tuple = True, force = True)
+            if is_error:
+                gremlin.ui.ui_common.MessageBox(title = "Expression Evaluation Error", prompt= error_msg, is_warning = is_error)
+                return
+
+        key = self.data.key
+        key_low = self.data.key.casefold().strip()
+        id = self.data.id
+        sc = StateData()
+        data = sc.getStates()
+        states = [item.key for item in data.values() if item.id != id and key_low == item.key]
+        if states:
+            gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.")
+            return
         self.accept()
         
     def _cancel_button_cb(self):
@@ -864,7 +914,17 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         clear_button.setToolTip("Deletes all states")
         clear_button.confirmed.connect(self._clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
+
+        # right align
         button_container_layout.addStretch(1)
+
+        # find key button
+        find_button = QtWidgets.QPushButton()
+        icon = gremlin.ui.ui_common.Icons.findIcon()
+        find_button.setIcon(icon)
+        find_button.setToolTip("Find State")
+        find_button.clicked.connect(self._find_input_cb)
+        button_container_layout.addWidget(find_button)
 
         # Key add button
         add_button = QtWidgets.QPushButton("Add State")
@@ -928,7 +988,21 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called when configuraition has changed '''
         self.refresh()      
 
+    @QtCore.Slot()
+    def _find_input_cb(self):
+        ''' finds a state '''
+        name, ok = QtWidgets.QInputDialog.getText(self, "State Lookup", "Search for:")
+        if ok:
+            sc = StateData()
+            if sc.exists(name):
+                data = sc.getState(name)
+                index = self._index_for_key(data)
+                self.input_item_list_view.select_item(index,True)
+            else:
+                gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
 
+
+    @QtCore.Slot()
     def _add_input_cb(self):
         """Adds a new input to the inputs list  """
         input_id = StateInputItem()
@@ -968,7 +1042,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called when edit dialog closes with ok '''
         data = self._edit_dialog.data
         sd = StateData()
-        if not sd.exists(data):
+        if not sd.exists(data.key):
             sd.add(data)
             self.input_item_list_model.refresh()
 
