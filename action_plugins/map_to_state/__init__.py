@@ -148,6 +148,13 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         mode = self.action_data.mode
         widgets = []
+        rb = gremlin.ui.ui_common.QDataCheckbox("Actual",data = "actual")
+        rb.setToolTip("The state is set based on the pressed/release input state")
+        if mode == "actual":
+            rb.setChecked(True)
+        rb.clicked.connect(self._mode_changed)
+        widgets.append(rb)
+
         rb = gremlin.ui.ui_common.QDataCheckbox("Press (on)",data = "press")
         rb.setToolTip("Sets the state")
         if mode == "press":
@@ -167,6 +174,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
         rb = gremlin.ui.ui_common.QDataCheckbox("Toggle",data = "toggle")
+        rb.setToolTip("Toggles the state")
         if mode == "toggle":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
@@ -311,14 +319,21 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
 
         verbose = gremlin.config.Configuration().verbose
+
         if event.event_type == InputType.JoystickButton:
-            trigger = (event.is_pressed and not self.action_data.exec_on_release) or \
-                    (not event.is_pressed and self.action_data.exec_on_release)
+            sd = gremlin.ui.state_device.StateData()
+            key = self.action_data.key
+            mode = self.action_data.mode
+            is_pressed = event.is_pressed
+            trigger = (is_pressed and not self.action_data.exec_on_release) or \
+                    (not is_pressed and self.action_data.exec_on_release) or \
+                    mode == "actual" 
             if trigger:
-                sd = gremlin.ui.state_device.StateData()
-                key = self.action_data.key
-                mode = self.action_data.mode
+    
                 match mode:
+                    case "actual":
+                        if verbose: syslog.info(f"STATE: set [{key}] ACTUAL {is_pressed}")
+                        sd.setValue(key, is_pressed)
                     case "press":
                         if verbose: syslog.info(f"STATE: set [{key}] ON")
                         sd.setValue(key, True)
