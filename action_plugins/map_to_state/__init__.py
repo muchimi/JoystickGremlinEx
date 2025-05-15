@@ -148,32 +148,32 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         mode = self.action_data.mode
         widgets = []
-        rb = gremlin.ui.ui_common.QDataCheckbox("Actual",data = "actual")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Actual",data = "actual")
         rb.setToolTip("The state is set based on the pressed/release input state")
         if mode == "actual":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
 
-        rb = gremlin.ui.ui_common.QDataCheckbox("Press (on)",data = "press")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Press (on)",data = "press")
         rb.setToolTip("Sets the state")
         if mode == "press":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataCheckbox("Release (off)",data = "release")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Release (off)",data = "release")
         rb.setToolTip("Releases the state")
         if mode == "release":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataCheckbox("Pulse",data = "pulse")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Pulse",data = "pulse")
         rb.setToolTip("Pulses the state delay milliseconds (the state is set and released regardless of current state)")
         if mode == "pulse":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataCheckbox("Toggle",data = "toggle")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Toggle",data = "toggle")
         rb.setToolTip("Toggles the state")
         if mode == "toggle":
             rb.setChecked(True)
