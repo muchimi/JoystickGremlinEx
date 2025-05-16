@@ -387,9 +387,9 @@ class AbstractContainer(ProfileData):
 
         self.parent = parent
         self._id = gremlin.util.get_guid() # unique GUID of this container
-        self.action_sets = []
+        self._action_sets = []
         self.action_model = None # set at creation by the parent of this container
-        self.custom_action_sets = False # true if the container uses custom action sets (need a converter to product action_sets)
+        self.custom_action_sets = False # true if the container uses custom action sets (need a converter to produce action_sets)
         self._condition_enabled = True
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
         self._virtual_button_user_enabled = True # determins if callbacks use the virtual button function - user set 
@@ -545,6 +545,15 @@ class AbstractContainer(ProfileData):
 
         # Create activation condition data if needed
         self.create_or_delete_virtual_button()
+
+    @property
+    def action_sets(self):
+        ''' gets the action sets for this container '''
+        return self._action_sets
+    
+    @action_sets.setter
+    def action_sets(self, value):
+        self._action_sets = value
 
     @property
     def action_count(self):

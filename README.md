@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m75t8)
+- Fix: Resolved an issue with some containers with multiple action sets reporting no actions to execute to the execution graph.
+
 ### (m75t7)
 - New: Find state button in state tab to help locate states if you have a lot of them.  Enter the name of the state and it will "jump" to it.
 - Update: state names are no longer case sensitive to improve performance. State names may not contain whitespace nor match reserved keywords (and, or, not and xor).

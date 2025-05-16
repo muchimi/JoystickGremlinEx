@@ -1124,7 +1124,8 @@ class ExecutionContext():
             logtabs = gremlin.shared_state.logTabs()
             
             assert isinstance(container, gremlin.base_profile.AbstractContainer), f"invalid node type: {container.__class__.__name__} encountered"
-            
+
+ 
             container_node = ExecutionGraphContainerNode(container)
             container_node.id = container.id
             container_node.mode = mode_name

@@ -7134,7 +7134,31 @@ def synchronize_grids(grid_widget_list : list, fill_buttons = True):
                 widget.setMinimumWidth(width)
     
 
+def getGroupContainer(widget_or_list = None, label = None, alignment = None, parent = None):
+    ''' gets a qt H container widget '''
+    widget = QtWidgets.QGroupBox(title = label, parent=parent)
+    layout = QtWidgets.QVBoxLayout(widget)
+    widget.setContentsMargins(0,0,0,0)
+    #layout.setContentsMargins(0,0,0,0)
+    if alignment is None:
+        alignment = QtCore.Qt.AlignmentFlag.AlignTop
 
+    layout.setAlignment(widget, alignment)
+    stretch = False
+    if label:
+        layout.addWidget(QtWidgets.QLabel(label))
+        
+        stretch = True
+    if widget_or_list:
+        if isinstance(widget_or_list, list)  or isinstance(widget_or_list, tuple):
+            for item in widget_or_list:
+                layout.addWidget(item)
+        else:
+            layout.addWidget(widget_or_list)
+        stretch = True
+    if stretch:
+        layout.addStretch()
+    return (widget, layout)
     
 class QJoystickRangeWidget(QtWidgets.QWidget):
     ''' a widget that displays and collects range information for a joytick '''

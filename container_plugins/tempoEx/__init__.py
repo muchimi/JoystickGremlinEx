@@ -189,7 +189,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         for i, action_set in enumerate(self.profile_data.long_action_sets):
             widget = self._create_action_set_widget(
                 action_set if action_set is not None else [],
-                f"Chain Long Action {i:d}",
+                f"Chain Long Action {i+1:d}",
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.long_layout.addWidget(widget)
