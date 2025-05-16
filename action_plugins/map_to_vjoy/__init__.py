@@ -3140,10 +3140,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
 
             action_value = gremlin.actions.Value(value = value, raw = event.raw_value, is_pressed = event.is_pressed)
+            event.curve_value = value
 
         return self._process_event(event, action_value, extra_data)
 
-    def _process_event(self, event, action_value, extra_data):
+    def _process_event(self, event : gremlin.event_handler.Event, action_value : gremlin.actions.Value, extra_data):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
         usage_data = gremlin.joystick_handling.VJoyUsageState()
@@ -3165,7 +3166,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
 
-            
+            syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current:0.3f}  Event raw: {event.raw_value:0.3f}  value: {event.value:0.3f} curve: {event.curve_value:0.3f}")
 
             # read the valuy from the extra data if set
             if extra_data is not None and "value" in extra_data:

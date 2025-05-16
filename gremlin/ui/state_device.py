@@ -74,7 +74,7 @@ class ModeInputModeType(enum.IntEnum):
     
 class StateInputItem(AbstractInputItem):
     ''' holds a single state '''
-    changed = QtCore.Signal(bool) # fires when the state changes
+    changed = QtCore.Signal(bool) # fires when a state changes
     key_changed = QtCore.Signal() # fires when the key changes
 
     def __init__(self, key : str = None, default_value = False, description = None):
@@ -118,7 +118,7 @@ class StateInputItem(AbstractInputItem):
         if not self._expression and self._value != data:
             # only set value on non expression states and only if the value has changed
             self._value = data
-            self.changed.emit(data)
+            self._fire_changed(data)
 
     def toggle(self):
         ''' toggles the state '''
@@ -137,8 +137,9 @@ class StateInputItem(AbstractInputItem):
     def default_value(self, data):
         if self._default_value != data:
             self._default_value = data      
-            self._value = data  
-            self.changed.emit(data)
+            if data != self._value:
+                self._value = data  
+                self._fire_changed(data)
 
     @property
     def key(self)-> str:
@@ -167,7 +168,10 @@ class StateInputItem(AbstractInputItem):
             self._expression = value
             self._dirty = True
             self._expression_stack = []
-            self.changed.emit(self.evaluate())
+            derived_value = self.evaluate()
+            if derived_value != self._value:
+                self._value = derived_value
+                self._fire_changed(derived_value)
     
     
     def getOverrideInputType(self):
@@ -256,8 +260,7 @@ class StateInputItem(AbstractInputItem):
         
         '''
 
-        if self.key == "d":
-            pass
+       
         if not self._expression:
             # no expression defined, return the curent state value
             return (self._value, False, None) if as_tuple else self._value
@@ -280,13 +283,41 @@ class StateInputItem(AbstractInputItem):
         if self._expression_stack:
             # update the data 
             data = self._evaluate_stack(self._expression_stack, as_tuple)
-            self._last_expression_value = data[0] if as_tuple else data
-            verbose = gremlin.config.Configuration().verbose_mode_state
-            if verbose:
-                syslog.info(f"State: {self.key} new value: {self._last_expression_value}")
+            value = data[0] if as_tuple else data
+            is_changed =  value != self._last_expression_value
+            if is_changed:
+                self._last_expression_value = value                
+                verbose = gremlin.config.Configuration().verbose_mode_state
+                if verbose:
+                    syslog.info(f"State: {self.key} new value: {self._last_expression_value}")
+                self._fire_changed(value)
             return data
         
         return (False, True, "Invalid expression") if as_tuple else False
+    
+    def _fire_changed(self, value: bool):
+        ''' called when a state changes '''
+        self.changed.emit(value)
+
+        if not gremlin.shared_state.is_running:
+            return
+        syslog.info(f"STATE CHANGE: [{self.key}] value: {value}")
+        event = gremlin.event_handler.Event(
+            event_type= InputType.State,
+            device_guid= gremlin.shared_state.state_tab_guid,
+            identifier= self,
+            value = value,
+            curved_value = None,
+            raw_value= None,
+            is_axis = False,
+            is_virtual = True,
+            is_pressed = value,
+            override_input_type=InputType.JoystickButton # tell actions we're a button
+        )
+        eh = gremlin.event_handler.EventHandler()
+        eh.execute_event(event)
+
+
 
     def _valid_states(self):
         # remove any state named like a boolean or self
@@ -378,17 +409,17 @@ class StateInputItem(AbstractInputItem):
                 if as_tuple:
                     return ([],True, msg)
                 return []
-            state.changed.connect(self._state_changed)
+            state.changed.connect(self._dependency_changed)
 
         if as_tuple:
             return (output,False,None)
         return output
     
     @QtCore.Slot(object)
-    def _state_changed(self, state : StateInputItem):
-        # indicate the state changed
+    def _dependency_changed(self, state : StateInputItem):    
         self._dirty = True
-        self.changed.emit(self.evaluate())
+        self.evaluate()
+
 
     def _evaluate_stack(self, postfix_stack : list, as_tuple = False) -> bool | tuple:
         ''' evaluates the expression if it has changed 
@@ -506,8 +537,17 @@ class StateData(QtCore.QObject):
 
     def _reset(self):
         ''' reset states to default values '''
+        to_evaluate = []
         for data in self._data.values():
-            data.value = data.default_value
+            if data.expression:
+                # initial evaluation
+                to_evaluate.append(data)
+            else:
+                data.value = data.default_value
+
+        # evaluate expressions based on initial data values
+        for data in to_evaluate:
+            data.evaluate(force=True)
 
     def _register(self, key : str, value = None, description = None) -> StateInputItem:
         ''' registers a new state '''
@@ -698,8 +738,11 @@ class StateData(QtCore.QObject):
 
     @QtCore.Slot(object)
     def _state_changed(self, data : StateInputItem):
+        ''' called when a state changes '''
         if not gremlin.shared_state.is_running:
             return
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: syslog.info(f"STATE CHANGE: [{data.key}] value: {data.value}")
         event = gremlin.event_handler.Event(
             event_type= InputType.State,
             device_guid= gremlin.shared_state.state_tab_guid,
