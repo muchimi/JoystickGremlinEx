@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m75t9)
+- Improved: added a delete button to macro toolbar (bottom) - will delete all selected entries
+- New: Tools menu has a "reload devices" entrie to ask GremlinEx to rescan available inputs in case something wasn't detected because a device change didn't trigger a DirectInput event.  This avoids having to restart GremlinEx to do the scan.
+
 ### (m75t8)
 - Fix: Resolved an issue with some containers with multiple action sets reporting no actions to execute to the execution graph.
 

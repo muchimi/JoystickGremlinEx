@@ -1178,6 +1178,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self.setUiMode()
 
+    @QtCore.Slot()
     def input_repeater(self):
         """Enables or disables the forwarding of events to the repeater."""
         el = gremlin.event_handler.EventListener()
@@ -1191,6 +1192,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.repeater.stop()
             self.status_bar_repeater_widget.setText("")
 
+    @QtCore.Slot()
     def input_viewer(self):
         """Displays the input viewer dialog."""
         if self.modal_windows["input_viewer"]:
@@ -1211,6 +1213,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.ui.actionInputViewer.setChecked(True)
             self.modal_windows["input_viewer"].show()
             self.modal_windows["input_viewer"].closed.connect(self._close_input_viewer)
+
+    @QtCore.Slot()
+    def _reload_devices(self):
+        gremlin.joystick_handling.reset_devices()
 
     def _close_input_viewer(self):
         # gremlin.shared_state.pop_suspend_highlighting()
@@ -1396,6 +1402,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionInputRepeater.triggered.connect(self.input_repeater)
         #self.ui.actionCalibration.triggered.connect(self.calibration)
         self.ui.actionInputViewer.triggered.connect(self.input_viewer)
+
+        self.ui.actionReloadDevices.triggered.connect(self._reload_devices)
+
         self.ui.actionPDFCheatsheet.triggered.connect(lambda: self._create_cheatsheet())
         self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
         self.ui.actionOptions.triggered.connect(self.options_dialog)

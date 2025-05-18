@@ -1193,7 +1193,7 @@ class MacroListModel(QtCore.QAbstractListModel):
             self.beginRemoveRows(self.index(0, 0), index, index)
             del self._data[index]
             self.endRemoveRows()
-
+    
     def add_entry(self, index, entry):
         """Adds the given entry at the provided index.
 
@@ -1643,7 +1643,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
                     f"{prefix}macro_record.svg",
                     f"{prefix}macro_record_on.svg"
                 ],
-                "Record keyboard and joystick inputs",
+                "Start/Stop recording",
                 True,
                 False
             )
@@ -1712,13 +1712,16 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
             self.record_mouse.clicked.connect(self._update_record_settings)
 
+            # delete button
+            self.delete_button = self._create_toolbutton(gremlin.ui.ui_common.Icons.trashIcon(),"Delete selection",False)
+            self.delete_button.clicked.connect(self._delete_cb)
+
             # Toolbar
             self.toolbar = QtWidgets.QToolBar()
 
-
             background_color = gremlin.ui.ui_common.Color.backgroundColor()
             border_color = gremlin.ui.ui_common.Color.borderColor()
-            self.toolbar.setStyleSheet(f"QToolBar {{border: 1px solid {border_color}; background-color: {background_color};}}")
+            self.toolbar.setStyleSheet(f"QToolBar {{border: 1px solid {border_color}; background-color: {background_color};}} ::separator {{background-color: {border_color};}}")
             self.toolbar.setIconSize(QtCore.QSize(16, 16))
             self.toolbar.setOrientation(QtCore.Qt.Vertical)
             self.toolbar.addWidget(self.button_new_entry)
@@ -1733,6 +1736,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.toolbar.addWidget(self.record_hat)
             self.toolbar.addWidget(self.record_key)
             self.toolbar.addWidget(self.record_mouse)
+            self.toolbar.addSeparator()
+            self.toolbar.addWidget(self.delete_button)
 
             #required_height = self.toolbar.frameGeometry().height()
             self.toolbar.setMinimumHeight(260)
@@ -1753,7 +1758,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_toolbutton(self, icon_path, tooltip, is_checkable, default_on=True):
         """Creates a new toolbutton with the provided options.
 
-        :param icon_path the path or list of paths of icons
+        :param icon_path the path or list of paths of icons or an icon object
         :param tooltip the tooltip of the button
         :param is_checkable whether or not the button can be toggled
         :param default_on whether or not to toggle the button by default
@@ -1774,6 +1779,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
                 QtGui.QIcon.On
             )
             button.setIcon(icon)
+        elif isinstance(icon_path, QtGui.QIcon):
+            button.setIcon(icon_path)
         else:
             button.setIcon(load_icon(icon_path))
         if tooltip:
@@ -1903,6 +1910,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._recording_times["mouse"] = time.time()
         self._append_entry(action)
 
+    @QtCore.Slot()
     def _record_cb(self):
         """Starts the recording of key presses."""
         if self.button_record.isChecked():
@@ -1931,6 +1939,11 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Disable mouse event hooking
             gremlin.windows_event_hook.MouseHook().stop()
+
+
+
+
+
 
 
     @QtCore.Slot(bool)
@@ -1983,20 +1996,26 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         if indices:
 
             # warn box 
-            msgbox = gremlin.ui.ui_common.ConfirmBox(f"This will remove the selected macro entries.")
+            msgbox = gremlin.ui.ui_common.ConfirmBox(f"Delete selected entries?")
             result = msgbox.show()
+
             if result == QtWidgets.QMessageBox.StandardButton.Ok:
-                for model_indices in indices:
-                    idx = model_indices.row()
-                    del self.action_data.sequence[idx]
+                rows = [idx.row() for idx in indices]
+                keep = []
+                for index, item in enumerate(self.action_data.sequence):
+                    if index in rows:
+                        continue
+                    keep.append(item)
+                
+                self.action_data.sequence = keep
+                self._populate_ui()
 
-                # select the last entry
-                item_count = len(self.action_data.sequence)
-                if item_count:
-                    new_idx = min(item_count, max(0, idx - 1))
-                    self.list_view.setCurrentIndex(self.model.index(new_idx, 0, QtCore.QModelIndex()))
-                self._refresh_editor_ui()
 
+                # select the first item kept
+                if keep:
+                    self.list_view.setCurrentIndex(self.model.index(0,0))
+                
+                
     @QtCore.Slot()
     def _insert_entry_at_current_index(self, entry):
         """Adds the given entry after current selection.

@@ -147,6 +147,13 @@ class Ui_Gremlin(object):
         self.actionEmpty.setObjectName("actionEmpty")
         self.actionSwapDevices = QtGui.QAction(main_window)
         self.actionSwapDevices.setObjectName("actionSwapDevices")
+        self.actionReloadDevices = QtGui.QAction(main_window)
+        self.actionReloadDevices.setObjectName("actionReloadDevices")
+        icon = gremlin.ui.ui_common.load_icon("mdi6.reload")
+        self.actionReloadDevices.setIcon(icon)
+        
+        self.actionReloadDevices.setToolTip("Performs a fresh scan of devices and reloads them")
+
         self.actionInputViewer = QtGui.QAction(main_window)
         self.actionInputViewer.setObjectName("actionInputViewer")
         self.menuRecent.addAction(self.actionEmpty)
@@ -165,6 +172,8 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionManageModes)
         self.menuTools.addAction(self.actionInputRepeater)
         self.menuTools.addAction(self.actionDeviceInformation)
+        self.menuTools.addAction(self.actionReloadDevices)
+
         #self.menuTools.addAction(self.actionCalibration)
         self.menuTools.addAction(self.actionInputViewer)
         main_window.add_custom_tools_menu(self.menuTools)
@@ -242,6 +251,8 @@ class Ui_Gremlin(object):
         self.actionAbout.setText(_translate("GremlinEx", "&About"))
         self.actionManageCustomModules.setText(_translate("GremlinEx", "&Manage Custom Modules"))
         self.actionInputRepeater.setText(_translate("GremlinEx", "Input Repeater"))
+        self.actionReloadDevices.setText(_translate("GremlinEx","Reload Devices"))
+        
         #self.actionCalibration.setText(_translate("GremlinEx", "&Calibration"))
         self.actionManageModes.setText(_translate("GremlinEx", "Manage Modes"))
         self.actionHTMLCheatsheet.setText(_translate("GremlinEx", "HTML Cheatsheet"))
