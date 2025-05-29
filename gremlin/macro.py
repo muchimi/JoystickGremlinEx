@@ -38,7 +38,7 @@ from gremlin.input_types import InputType
 import gremlin.error
 import gremlin.keyboard
 import gremlin.sendinput
-import gremlin.input_devices
+
 import gremlin.util
 import enum
 from enum import auto

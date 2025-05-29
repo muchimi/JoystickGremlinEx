@@ -45,7 +45,7 @@ import threading
 import time
 from gremlin.util import log_info
 import gremlin.util
-import gremlin.input_devices
+from gremlin import input_devices
 
 syslog = logging.getLogger("system")
 
@@ -448,11 +448,21 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             # ensure the keys are released
             gremlin.macro.MacroManager().queue_macro(self.release)
 
+    def _manual_release(self):
+        ''' callback for manual releases '''
+        for key in self._release_keys:
+            if key.is_mouse:
+                (is_local, is_remote) = input_devices.remote_state.state
+                gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote)
+            else:
+                gremlin.keyboard.send_key_up(key)
+
+
 
     def process_event(self, event, value, extra_data = None):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
-      
+        (is_local, is_remote) = input_devices.remote_state.state
         if event.is_axis or value.current or event.is_pressed:
             # joystick values or virtual button
             # verbose = True
@@ -469,7 +479,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                     eh.autorepeat_clear.emit() # clear auto-repeats
                 else:
                     self.is_pressed = False
-                    id = gremlin.macro.MacroManager().queue_macro(self.release)
+                    id = gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote)
                     self.registerMacro(id)
             elif self.mode == KeyboardOutputMode.Press:
                 # press mode and not already triggered
@@ -477,7 +487,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                     self.is_pressed = True
                     if verbose:
                         syslog.info(f"MapToKeyboardEx: press")
-                    id = gremlin.macro.MacroManager().queue_macro(self.press)
+                    id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
                     self.registerMacro(id)
 
             elif self.mode == KeyboardOutputMode.Both:
@@ -486,7 +496,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                     if not self.is_pressed:
                         if verbose:
                             syslog.info(f"MapToKeyboardEx: both/pulse")
-                        id = gremlin.macro.MacroManager().queue_macro(self.delay_press_release)
+                        id = gremlin.macro.MacroManager().queue_macro(self.delay_press_release, is_local, is_remote)
                         self.is_pressed = True
                         self.registerMacro(id)
 
@@ -502,20 +512,37 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             syslog.info(f"MapToKeyboardEx: hold (press)")
 
                         if self.use_macros:
-                            id = gremlin.macro.MacroManager().queue_macro(self.press)
+                            id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
                             self.registerMacro(id)
                         else:
                             # send direct
                             key : gremlin.keyboard.Key
                             for key in self._press_keys:
                                 if verbose: syslog.info(f"send key press: {key}")
-                                gremlin.keyboard.send_key_down(key)
+                                if key.is_mouse:
+                                    gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
+                                else:
+                                    gremlin.keyboard.send_key_down(key)
+
 
                     if event.is_pressed and auto_release: 
-                        id = gremlin.macro.MacroManager().queue_macro(self.press)
-                        self.registerMacro(id)
-                        callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release)
-                        ButtonReleaseActions().register_callback(callback, event)
+                        if self.use_macros:
+                            id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
+                            self.registerMacro(id)
+                            callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote)
+                            ButtonReleaseActions().register_callback(callback, event)
+                        else:
+                            key : gremlin.keyboard.Key
+                            for key in self._press_keys:
+                                if verbose: syslog.info(f"send key press (autorelease): {key}")
+                                if key.is_mouse:
+                                    gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
+                                else:
+                                    gremlin.keyboard.send_key_down(key)
+
+                            callback = self._manual_release
+                            ButtonReleaseActions().register_callback(callback, event)
+
             elif self.mode == KeyboardOutputMode.AutoRepeat:
                 # setup autorepeat thread
                 if verbose:

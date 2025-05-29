@@ -846,42 +846,32 @@ class StateTracker():
 
     def _update_widget(self, device_guid, input_type, input_id, state):
         ''' updates the state of the widget'''
+        
+        from shiboken6 import Shiboken
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         # syslog = logging.getLogger("system")
-        device_name = gremlin.shared_state.get_device_name(device_guid)
+        #device_name = gremlin.shared_state.get_device_name(device_guid)
         if device_guid in self._button_cache:
             if input_type in self._button_cache[device_guid]:
                 key = self._key(input_id)
                 if key in self._button_cache[device_guid][input_type]:
                     widget = self._button_cache[device_guid][input_type][key]
-                    try:
-                        if widget.enabled:
-                            try:
-                                match input_type:
-                                    case InputType.JoystickButton:
-                                        if hasattr(widget, "_update_value"):
-                                            widget._update_value(state)
-                                    case InputType.JoystickHat:
-                                        if hasattr(widget, "_update_hat"):
-                                            widget._update_hat(state)
-                                    case InputType.OpenSoundControl:
-                                        if hasattr(widget, "_update_value"):
-                                            widget._update_value(state)
-                                    case InputType.Midi:
-                                        if hasattr(widget, "_update_value"):
-                                            widget._update_value(state)
-                            except:
-                                # C++ error - ignore garbage collected devices
-                                pass
-
-                            
-                    except:
-                        # discarded by QT - ignore
-                        pass
-                # else:
-                #     syslog.info(f"ButtonState: {device_name} type {InputType.to_display_name(event.event_type)} input {event.identifier} connect")              
-                
+                    if Shiboken.isValid(widget) and widget.enabled:
+                        match input_type:
+                            case InputType.JoystickButton:
+                                if hasattr(widget, "_update_value"):
+                                    widget._update_value(state)
+                            case InputType.JoystickHat:
+                                if hasattr(widget, "_update_hat"):
+                                    widget._update_hat(state)
+                            case InputType.OpenSoundControl:
+                                if hasattr(widget, "_update_value"):
+                                    widget._update_value(state)
+                            case InputType.Midi:
+                                if hasattr(widget, "_update_value"):
+                                    widget._update_value(state)
+        
                     
     def _store_state(self, device_guid, input_type, input_id, state):
         ''' stores the last button state for the given input '''

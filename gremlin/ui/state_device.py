@@ -1748,7 +1748,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
         
-        widget = gremlin.ui.joystick_device.InputItemConfiguration(input_data, object_name=f"STATE: {input_data.key}")
+        widget = gremlin.ui.joystick_device.InputItemConfiguration(input_data, object_name=f"STATE: {input_data.input_id.key}")
         self._item_data = widget
         self.setRightPanelWidget(widget)
 

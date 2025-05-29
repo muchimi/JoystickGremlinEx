@@ -25,6 +25,7 @@ import win32api
 import win32con
 
 # from gremlin.base_classes import TraceableList
+import gremlin.macro
 from gremlin.types import MouseButton
 # from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
@@ -130,6 +131,8 @@ class Key():
         if is_mouse is None:
             is_mouse = False
 
+        
+
         self._lookup_name = None
         self._latched_code = ""
         self._latched_name = ""
@@ -152,8 +155,15 @@ class Key():
             self._virtual_code = virtual_code            
 
 
+        if is_mouse:
+            mouse_button = scan_code - 0x1000
+            self._mouse_button = mouse_button
+
+
         self._name = name
         self._is_mouse = is_mouse
+        
+        
         self._update()
 
     @property
@@ -471,10 +481,17 @@ def send_key_down(key):
     """
     from gremlin import input_devices
     key: gremlin.keyboard.Key
+
+    is_local, is_remote = input_devices.remote_state.state
+    if key.is_mouse:
+        # special handling of virtual keys for mouse buttons
+        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
+        return
+
+
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     verbose = gremlin.config.Configuration().verbose_mode_outputs
     
-    is_local, is_remote = input_devices.remote_state.state
     if is_local:
         if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
@@ -492,12 +509,17 @@ def send_key_up(key):
     from gremlin import input_devices
     key: gremlin.keyboard.Key
     verbose = gremlin.config.Configuration().verbose_mode_outputs
+    (is_local, is_remote) = input_devices.remote_state.state
+
+    if key.is_mouse:
+        # special handling of virtual keys for mouse buttons
+        gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote)
+        return
 
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
 
-
-    (is_local, is_remote) = input_devices.remote_state.state
+    
     if is_local:
         if verbose: syslog.info(f"OUTPUT: (local) keyup {key.debug_name}")
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)

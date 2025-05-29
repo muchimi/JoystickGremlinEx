@@ -48,6 +48,7 @@ from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 
 import logging
 import lxml
+from shiboken6 import Shiboken
 
 
 
@@ -432,6 +433,7 @@ class InputItemListView(ui_common.AbstractView):
         self.name = name
         self._current_index = -1 # nothing selected
         self.custom_widget_handler = custom_widget_handler
+        self._deleted = False
 
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -453,6 +455,10 @@ class InputItemListView(ui_common.AbstractView):
         self.widget_map = {} # list of created widgets
 
 
+    def _cleanup_ui(self):
+        ''' called when item is deleted '''
+        self._deleted = True
+        
         
 
     @property
@@ -477,6 +483,8 @@ class InputItemListView(ui_common.AbstractView):
             if data.input_id != event.device_input_id:
                 continue
             self.redraw_index(index)
+
+    
 
 
 
@@ -511,7 +519,8 @@ class InputItemListView(ui_common.AbstractView):
         This creates a fake listview where a vertical container just has InputItemButton widgets
 
         """
-
+        if self._deleted:
+            return
         self.setUpdatesEnabled(False)
         try:
 
@@ -608,7 +617,8 @@ class InputItemListView(ui_common.AbstractView):
 
         :param index the index of the entry to redraw
         """
-        if self.model is None:
+
+        if self.model is None or self._deleted:
             return
 
 
@@ -677,6 +687,8 @@ class InputItemListView(ui_common.AbstractView):
 
     def select_input(self, input_type, identifier, emit = True, force_update = False):
         ''' selects an entry based on input type and ID'''
+        if self._deleted:
+            return
         for index in range(self.model.rows()):
             data = self.model.data(index)
             if input_type is not None and data.input_type != input_type:
@@ -775,6 +787,9 @@ class InputItemListView(ui_common.AbstractView):
             emitted when the item is being selected
         """
 
+        if not Shiboken.isValid(self.scroll_area):
+            return
+
         
         if index == -1:
             # always reset things if the index is the clear value of -1
@@ -814,7 +829,7 @@ class InputItemListView(ui_common.AbstractView):
         widget = self.itemAt(index)
         if widget:
             # if the list is long - bring the selected widget into view
-            QtCore.QTimer.singleShot(0, partial(self.scroll_area.ensureWidgetVisible, widget))
+            QtCore.QTimer.singleShot(0, lambda: self._scroll_to_item(widget))
             # select it
             with (QtCore.QSignalBlocker(widget)):
                 widget.selected = True
@@ -825,6 +840,9 @@ class InputItemListView(ui_common.AbstractView):
         # return the currently selected widget
         return widget
 
+    def _scroll_to_item(self, widget):
+        if Shiboken.isValid(self.scroll_area):
+            self.scroll_area.ensureWidgetVisible(widget)
 
 
 class ActionSetModel(ui_common.AbstractModel):
@@ -1400,6 +1418,7 @@ class InputItemWidget(QBoxFrame):
         el.mapping_changed.disconnect(self._mapping_changed_cb)
         el.update_input_icons.disconnect(self._update_icons)
         el.input_enabled_changed.disconnect(self._update_enabled_state)
+        gremlin.util.clear_layout(self.main_layout)
         self._deleted = True
     
     @property

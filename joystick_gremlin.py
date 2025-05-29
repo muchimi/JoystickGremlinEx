@@ -62,7 +62,7 @@ import gremlin.curve_handler
 import gremlin.gated_handler
 import gremlin.input_types
 import anytree
-
+from dinput import DeviceSummary
 from gremlin.util import InvokeUiMethod, assert_ui_thread
 
 
@@ -1937,6 +1937,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         try:
 
+
+            device : DeviceSummary
             device_guid = None
 
             midi_enabled = self.config.midi_enabled
@@ -2069,19 +2071,26 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             
             # Create vJoy as input device tabs
+            
             for device in sorted(all_vjoy_devices, key=lambda x: x.vjoy_id):
                 # Ignore vJoy as output devices
+                
+                device_guid = device.device_guid
+                device_name = device.name
                 input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
                 if not input_enabled:
+                    if verbose: syslog.info(f"VJOY TAB: {device_name} not created because input is disabled on this device.")
+                    continue
+                if not device.connected:
+                    if verbose: syslog.info(f"VJOY TAB: {device_name} not created because device is not connected.")
                     continue
 
-                device_guid = device.device_guid
-                device_name = self._get_device_name(device_guid)
+                
                 if device_name:
                     device_profile = self.profile.get_device_modes(
                         device.device_guid,
                         DeviceType.Joystick,
-                        device.name
+                        device_name
                     )
 
                     device_guid = str(device.device_guid)

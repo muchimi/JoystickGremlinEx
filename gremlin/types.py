@@ -808,7 +808,7 @@ class MouseAction(Enum):
                 
         return f"Unknown {action}"
     
-class MouseButton(Enum):
+class MouseButton(IntEnum):
 
     """Enumeration of all possible mouse buttons."""
 

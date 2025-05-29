@@ -45,6 +45,7 @@ from gremlin.util import safe_read
 import gremlin.ui.input_item as input_item
 import gremlin.ui.ui_common
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
+from shiboken6 import Shiboken
 
 
 syslog = logging.getLogger("system")
@@ -743,6 +744,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
         self.redraw_lock = False
+        self._deleted = False
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
@@ -767,9 +769,16 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
         self._widgets = []
 
+    def _cleanup_ui(self):
+        ''' widget cleanup '''
+        self._deleted = True
+
     def redraw(self):
         """Redraws the entire view."""
-
+        if not Shiboken.isValid(self.scroll_area):
+            return
+        if self._deleted:
+            return
         if not self.redraw_lock:
             try:
                 self.redraw_lock = True

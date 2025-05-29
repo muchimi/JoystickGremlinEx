@@ -383,6 +383,7 @@ class GateInfo():
             
 
 
+
     @property
     def slider_index(self) -> int:
         return self._slider_index
@@ -2900,8 +2901,8 @@ class GateData():
             if mode == GateRangeOutputMode.Fixed:
                 child.set("fixed_value", f"{range_info.fixed_value:0.{_decimals}f}")
             elif mode == GateRangeOutputMode.Ranged:
-                child.set("range_min",  f"{range_info.output_range_min:0.{_decimals}f}")
-                child.set("range_max",  f"{range_info.output_range_max:0.{_decimals}f}")
+                child.set("range_min",  safe_format(range_info.output_range_min, float))
+                child.set("range_max",  safe_format(range_info.output_range_max, float))
 
             child.set("id", range_info.id)
             if not range_info.is_default:
@@ -2928,6 +2929,8 @@ class GateData():
 
 
         return node
+    
+
     
 
     def ensure_separation(self, g1 : GateInfo, g2 : GateInfo):
@@ -2989,13 +2992,6 @@ class GateData():
 
         # read gate configurations
         node_gates = gremlin.util.get_xml_child(node, "gate", multiple=True)
-
-        # profile_mode = safe_read(node,"mode", str,"")
-        # if not profile_mode:
-        #     profile_mode = self.get_xml_mode(node)
-        
-        #self.profile_mode = profile_mode
-        # read values from file
 
         gate_map = {}
         

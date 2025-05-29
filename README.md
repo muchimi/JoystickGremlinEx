@@ -14,6 +14,43 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T1)
+- Fix: Keyboard Ex did not always send to remote clients if remote enabled.
+- API: Gated Axis: store floating point numbers for range with full precision.
+- API: forcibly unhook joystick events on UI updates.
+- New: OSC commands can now be sorted alphabetically by message. Save the profile after sort to persist.
+- New: If disconnected devices are listed in a profile, the import dialog box contains a checkbox "do not show again". This will disable further prompts (noting the profile will import if the ok button is selected).  The options also has a checkbox to re-enable the feature.
+- Fix: OSC highlight will select the correct input if the received message matches.
+- API: changed the wiring of actions and gated axis specifically to remove event handling that may get caught up in QT garbage collection, causing a QT crash.
+- Fix: description field appearing at the wrong location on some input definitions.
+- Fix: fix for mode graph nodes not necessarily being in nesting order.
+- Fix: remove empty modes created by import or convert process on profile conversions
+- Fix: Unfold recursive profile loader on profile import to avoid UI confusion  
+- Fix: Remove disconnected VJOY devices from device tabs (this could create some challenges with profile imports that include vjoy as input references - this will require more research).  The log file, if device verbose mode is enabled, will show any devices GremlinEx is looking for but cannot find, both physical and virtual.  
+- Fix: Changed a pair of icon references that no longer exist for the plugin UI in dark mode - these were missed in a prior pass on icons.
+- Device connection/disconnection logs an entry to the log file as detected by DirectInput
+- Improved: Calibration data no longer stores uncalibrated data and XML includes device information as a comment
+- Fix: calibration changes update UI icons
+- Fix: check for data folder to exist and file permissions. Display error message if configuration file cannot be saved for whatever reason.  
+- Modified: Temporary mode switch and button release mechanisms.
+- Fix: Keyboard EX special mouse keys no output.
+- Fix: Macro API not understanding special mouse keys.
+- Fix: Resolved an issue with the execution graph build process. This would cause some virtual button conditions to be ignored in some situations due to incorrect dependency nesting levels (bug introduced in a recent update).
+- Fix: UI - Macro action toolbar should display all buttons regardless of other UI content. 
+- New: States have optional categories. A category can be assigned to a state, and the category can then be used to filter the state device list, or the input viewer to make management of states simpler for profiles that define numerous states. A category can be added to a state within the state configuration dialog. Profiles states that don't have a category defined will get assigned the default category.
+- New: States on input viewer now support multiple sizes.
+- New: States on input viewer can be filtered by category.
+- New: State on state device can be filtered by category.
+- New: Macro - new restart behavior.  When enabled, will terminate a running macro on re-trigger if it was running (so resets the macro to step 1 on re-trigger). NOTE: macro pause actions cannot currently be terminated mid-pause so the termination will occur at the next step after the pause.
+- New: Macro - new stop behavior. When enabled, will abort a running macro on trigger release if it was running. NOTE: macro pause actions cannot currently be terminated mid-pause so the termination will occur at the next step after the pause.
+- API: Macros have a new property - owner - to track which action owns them.
+- API: Macros have a new property - state - to track idle, scheduled, running and abort states.
+- Improved: added a delete button to macro toolbar (bottom) - will delete all selected entries
+- New: Tools menu has a "reload devices" entry to ask GremlinEx to rescan available inputs in case something wasn't detected because a device change didn't trigger a DirectInput event.  This avoids having to restart GremlinEx to do the scan.
+- New: Find state button in state tab to help locate states if you have a lot of them.  Enter the name of the state and it will "jump" to it.
+- Update: state names are no longer case sensitive to improve performance. State names may not contain a whitespace (space or tab) nor reserved keywords (and, or, not and xor).
+- Improved: error messages when creating states or when an expression references states that do not exist.  The error message will be more descriptive.
+
 ### (m75t9)
 - Improved: added a delete button to macro toolbar (bottom) - will delete all selected entries
 - New: Tools menu has a "reload devices" entrie to ask GremlinEx to rescan available inputs in case something wasn't detected because a device change didn't trigger a DirectInput event.  This avoids having to restart GremlinEx to do the scan.
@@ -25,6 +62,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 - New: Find state button in state tab to help locate states if you have a lot of them.  Enter the name of the state and it will "jump" to it.
 - Update: state names are no longer case sensitive to improve performance. State names may not contain whitespace nor match reserved keywords (and, or, not and xor).
 - Improved: error messages when creating states or when an expression references states that do not exist.  The error message will be more descriptive.
+
 
 ### (m75t6)
 - Fix: Resolved an issue with vjoy remap stepped axis mode loosing track of the current step between latched and primary inputs. Note: don't copy/paste latched axis to another input if you intend them to be latched.  This will cause a desync between steps if both manage the same axis: each mapping has its own stepping data/tracking so duplicating the mapping will in effect create two data sets tracked differently.  If you intend for the up/down control of a stepped axis, use the latching option and use a single mapping.
