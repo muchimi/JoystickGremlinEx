@@ -2333,6 +2333,9 @@ class OscInputItem(AbstractInputItem):
             return f"{message}"
         else:
             raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
+        
+    def toSortKey(self):
+        return (self.command_mode, self._message.casefold() if self._message else "")
 
 
     def _update(self):
@@ -2425,7 +2428,7 @@ class OscInputItem(AbstractInputItem):
         target._update_display_name()
         return target
         
-
+    
 
         
 
@@ -2436,8 +2439,16 @@ class OscInputItem(AbstractInputItem):
     
     def __lt__(self, other):
         ''' used for sorting purposes '''        
-        # keep as is (don't sort)
-        return False
+        if other is None or not isinstance(other, OscInputItem): return False
+        k1 = self.toSortKey()
+        k2 = other.toSortKey()
+        return k1 < k2
+    
+    def __eq__(self, other):
+        if other is None or not isinstance(other, OscInputItem): return False
+        k1 = self.toSortKey()
+        k2 = other.toSortKey()
+        return k1 == k2
     
     def __str__(self):
         return self._title_name
@@ -3131,6 +3142,118 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._update_display()  
 
 
+# class OscData(QtCore.QObject):
+#     ''' helper class for OSC data '''
+#     def __init__(self, model):
+#         super().__init__()
+#         self._model = model
+
+#     def getSelector(self, changed_callback = None, default_value : str = None, editable = False) -> gremlin.ui.ui_common.QDataComboBox:
+#         ''' gets a selector combo box for categories '''
+#         widget = gremlin.ui.ui_common.QDataComboBox()
+#         widget.setEditable(editable)
+#         widget.setValidator(OscMessageValidator(self._model))
+        
+#         index = 0
+#         select_index = None
+#         default_id = default_value.id if default_value else None
+#         osc: OscInputItem
+#         items = [(osc, index) for index, osc in self._model.items()]
+#         items.sort(key = lambda x:x[0].message.casefold())
+#         for osc, index in items:
+#             widget.addItem(osc.message, index)
+#             if select_index is None and default_value and osc.message.casefold() == default_value:
+#                 select_index = index
+#         widget.setMinimumWidth(200)
+#         if select_index is not None:
+#             widget.setCurrentIndex(select_index)
+#         if changed_callback:
+#             widget.currentIndexChanged.connect(changed_callback)
+            
+#         return widget
+        
+# class OscMessageValidator(QtGui.QValidator):
+#     ''' validator for OSC message selection '''
+#     def __init__(self, model):
+#         super().__init__()
+#         self._messages = None
+#         self._model = model
+
+#     def _update_categories(self):
+#         self._messages = (osc.message for osc in self._model.values())
+        
+            
+        
+#     def validate(self, value, pos):
+#         if not self._messages:
+#             self._update_categories()
+
+#         if not self._messages:
+#             return QtGui.QValidator.State.Invalid    
+
+#         clean_value = value.casefold().strip() if value else None
+#         if not clean_value or clean_value in self._messages:
+#             # blank is ok
+#             return QtGui.QValidator.State.Acceptable
+#         # match all values starting with the text given
+#         try:
+#             r = re.compile(clean_value + "*")
+#             for _ in filter(r.match, self._messages):
+#                 return QtGui.QValidator.State.Intermediate
+#         except:
+#             # invalid regex - probably a special char
+#             pass
+#         return QtGui.QValidator.State.Invalid
+
+
+# class  OscFilterWidget(QtWidgets.QWidget):
+#     ''' displays a filter widget that can be enabled, and an OSC message selected '''
+#     changed = QtCore.Signal(StateCategory)  # fires when the message filter is changed
+        
+#     def __init__(self, model, parent = None):
+#         super().__init__(parent)
+
+#         self._config = gremlin.config.Configuration()
+#         self._osc_model = OscData(model)
+
+#          # filter widget
+#         self._message_filter = None
+
+#         self.filter_enabled_widget = QtWidgets.QCheckBox("Enable Filtering")
+#         self.filter_enabled_widget.setToolTip("Enables filtering on the OSC inputs by message (command)")
+#         is_filter = self._config.osc_filter_enabled
+#         self.filter_enabled_widget.setChecked(is_filter)
+#         self.filter_enabled_widget.clicked.connect(self._filter_enabled_changed)
+
+#         self.filter_widget = self._osc_model.getSelector(self._filter_changed, self._message_filter)
+#         self.filter_widget.setEnabled(is_filter)
+#         self.filter_widget.setEditable(False) # don't allow editing of categories for the main filter
+#         widget, layout = gremlin.ui.ui_common.getHContainer([self.filter_enabled_widget, QtWidgets.QLabel(" Filter:"), self.filter_widget])
+#         self.setLayout(layout)
+
+#     @QtCore.Slot(bool)
+#     def _filter_enabled_changed(self, is_filter):
+#         self._config.osc_filter_enabled = is_filter
+#         self.filter_widget.setEnabled(is_filter) 
+#         has_categories = self.filter_widget.count()
+#         index = self.filter_widget.currentData() if is_filter and has_categories else None
+#         self.changed.emit(index)
+
+#     @QtCore.Slot()
+#     def _filter_changed(self):
+#         ''' called when the state category filter is changed '''
+#         category = self.filter_widget.currentData()
+#         self._category_filter = category
+#         gremlin.config.Configuration().state_category_filter = category.id if category else ""
+#         self.changed.emit(category)
+
+#     @property
+#     def message(self) -> StateCategory:
+#         ''' current category'''
+#         return self._message_filter
+        
+
+
 
 class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
@@ -3143,6 +3266,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self,
             device_profile,
             current_mode,
+            object_name = "OSC DEVICE CONTENT",
             parent=None
     ):
         """Creates a new object instance.
@@ -3151,7 +3275,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(object_name, parent)
+
         import gremlin.ui.ui_common as ui_common
         import gremlin.ui.input_item as input_item
 
@@ -3189,8 +3314,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(self.input_item_list_view)
 
-        self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
-        self.setRightPanelWidget(self._item_data)
+       
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -3205,6 +3329,22 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         clear_button.confirmed.connect(self._clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
         button_container_layout.addStretch(1)
+
+        # # find key button
+        # find_button = QtWidgets.QPushButton()
+        # icon = gremlin.ui.ui_common.Icons.findIcon()
+        # find_button.setIcon(icon)
+        # find_button.setToolTip("Find Command")
+        # find_button.clicked.connect(self._find_input_cb)
+        # button_container_layout.addWidget(find_button)
+
+        # sort button
+        sort_button = QtWidgets.QPushButton("Sort")
+        sort_button.setToolTip("Sorts the command by message")
+        icon = gremlin.util.load_icon("fa5s.sort-alpha-down")
+        sort_button.setIcon(icon)
+        sort_button.clicked.connect(self._sort_input_cb)
+        button_container_layout.addWidget(sort_button)
 
         # Key add button
         add_button = QtWidgets.QPushButton("Add OSC Input")
@@ -3231,6 +3371,22 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._select_item_cb(selected_index)
 
 
+    def find_item(self, device_guid, input_type, input_id):
+        ''' locates the input item, returns none if not found '''
+        osc : OscInputItem
+        selected_index = None
+        item = None
+        model = self.input_item_list_model.dataModel()
+        for index, osc in model.items():
+            if osc.message == input_id:
+
+                return osc
+            
+        return None
+
+
+
+
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
         ''' occurs when a new mode is selected '''
@@ -3240,6 +3396,28 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _config_changed_cb(self):
         ''' called when configuraition has changed '''
         self.refresh()      
+
+    # @QtCore.Slot()
+    # def _find_input_cb(self):
+    #     ''' finds an input '''
+    #     name, ok = QtWidgets.QInputDialog.getText(self, "OSC Lookup", "Search for:")
+    #     if ok:
+    #         name = name.casefold()
+    #         model = self.input_item_list_model.dataModel()
+    #         osc : OscInputItem
+    #         selected_index = None
+    #         item = None
+    #         for index, osc in model.items():
+    #             if osc.message.casefold() == name:
+    #                 selected_index = index
+    #                 item = osc
+    #                 break
+
+    #         if selected_index is not None:
+    #             self.input_item_list_view.select_item(selected_index,True)
+    #         else:
+    #             gremlin.ui.ui_common.MessageBox(prompt=f"OSC command [{name}] not found.")
+
 
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
@@ -3252,6 +3430,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _show_clear_cb(self):
         return self.input_item_list_model.rows() > 0
 
+    @QtCore.Slot()
     def _clear_inputs_cb(self):
         ''' clears all input keys '''
         self.input_item_list_model.clear(input_types=[InputType.OpenSoundControl])
@@ -3259,9 +3438,10 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         
-        widget = gremlin.ui.joystick_device.InputItemConfiguration()     
+        widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="OSC Blank InputConfigItem (clear inputs)")     
         self.setRightPanelWidget(widget)
   
+    @QtCore.Slot()
     def _add_input_cb(self):
         """Adds a new input to the inputs list  """
         input_type = InputType.OpenSoundControl
@@ -3282,6 +3462,21 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # auto edit new input
         self._edit_item_cb(None, index, input_id)
 
+    @QtCore.Slot()
+    def _sort_input_cb(self):
+        self.input_item_list_model.sort(self._sort_items)
+        # data = self.input_item_list_model.dataModel()
+        # item_list = [item for item in data.values()]
+        # item_list.sort(key = lambda x: x.input_id.message.casefold())
+        # self.input_item_list_model.clear()
+        # for index, item in enumerate(item_list):
+        #     self.input_item_list_model.add(item)
+        self.input_item_list_view.redraw()
+
+    def _sort_items(self, item_list : list )-> list:
+        item_list.sort(key = lambda x: x.input_id.message.casefold())
+        return item_list
+        
 
     def _index_for_key(self, input_id):
         ''' returns the index of the selected input id'''
@@ -3308,8 +3503,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 item_data = self.input_item_list_model.data(0)    
                 index = 0
             else:
-                widget = gremlin.ui.joystick_device.InputItemConfiguration()     
-                self.setRightPanelWidget(widget)
+                self._blank_input()
                 return 
         else:
             item_data = self.input_item_list_model.data(index)
@@ -3326,7 +3520,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
             config.set_last_input(device_guid, input_type, input_id)
 
-            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data)
+            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"OSC: {input_data.display_name}")
             self.setRightPanelWidget(widget)
             
             # Create new configuration widget
@@ -3337,7 +3531,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             self.input_item_list_view.select_item(index, False)
         else:
-            widget = gremlin.ui.joystick_device.InputItemConfiguration()     
+            widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="OSC Blank InputConfigItem (no item data)")     
             self.setRightPanelWidget(widget)
 
         self._last_selected_index = index 
@@ -3352,7 +3546,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if not self.input_item_list_model.rows():
             # display blank page if no item left
-            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
+            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration(object_name="OSC Blank InputConfigItem (close item cb)")
             self.setRightPanelWidget(self._item_data)
 
         
@@ -3427,13 +3621,14 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _set_status(self, widget, icon = None, status = None, use_qta = True, color = None):
         ''' sets the status of an input widget '''
         status_widget = widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
-        if color:
-            status_widget.setIcon(icon, use_qta = use_qta, color = color)
-        else:
-            status_widget.setIcon(icon, use_qta = use_qta)
-        
-        status_widget.setText(status)
-        status_widget.setVisible(status is not None)    
+        if status_widget:
+            if color:
+                status_widget.setIcon(icon, use_qta = use_qta, color = color)
+            else:
+                status_widget.setIcon(icon, use_qta = use_qta)
+            
+            status_widget.setText(status)
+            status_widget.setVisible(status is not None)    
 
 
     def _update_input_widget(self, input_widget, container_widget):

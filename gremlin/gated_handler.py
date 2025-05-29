@@ -37,7 +37,6 @@ from gremlin.util import *
 from gremlin.types import *
 
 from enum import Enum, auto
-from gremlin.macro_handler import *
 import gremlin.util
 import gremlin.singleton_decorator
 from gremlin.util import InvokeUiMethod
@@ -5367,7 +5366,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
                 container_widget = self._cache.retrieve_by_data(item_data)        
                 if not container_widget:
                     # create the container, cache it
-                    container_widget = InputItemConfiguration(item_data, input_type = input_type)
+                    container_widget = InputItemConfiguration(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
                     self._cache.register(item_data, container_widget)
                 condition_container_layout.addWidget(container_widget)
                 

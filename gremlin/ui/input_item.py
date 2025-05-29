@@ -215,9 +215,32 @@ class InputItemListModel(ui_common.AbstractModel):
         if emit_change:
             self.data_changed.emit()
 
-    def refresh(self):
-        ''' refreshes the mode data without '''
+    def sort(self, sort_callback):
+        ''' sorts the data using a sorting callback - the callback takes a list of input items, and returns a list of input items '''
+        
+        item_list = [item for item in self._index_map.values()]
+        item_list = sort_callback(item_list)
+        input_items = self._device_data.modes[self._mode]
+        for input_type in self._allowed_input_types:
+            if input_type in input_items.config.keys():
+                saved_data = {}
+                for key in item_list:
+                    input_id = key.input_id
+                    if input_id in input_items.config[input_type]:
+                        data = input_items.config[input_type][input_id]
+                        saved_data[input_id] = data
+                        del input_items.config[input_type][input_id]
+                        
+                for key in item_list:
+                    input_id = key.input_id
+                    input_items.config[input_type][input_id] = saved_data[input_id]
+
         self._update_data()
+
+
+    def refresh(self):
+        ''' refreshes the mode data without data reload '''
+        self._update_data(emit_change = False)
 
 
     def rows(self):
@@ -228,6 +251,10 @@ class InputItemListModel(ui_common.AbstractModel):
 
         return len(self._index_map)
     
+
+    def dataModel(self):
+        ''' gets all the items'''
+        return self._index_map
 
 
     def data(self, index):
@@ -573,7 +600,7 @@ class InputItemListView(ui_common.AbstractView):
         finally:
             self.setUpdatesEnabled(True)
             self.update()
-            self.updated.emit()
+            #self.updated.emit()
 
 
     def redraw_index(self, index : int):
@@ -1141,6 +1168,8 @@ class InputItemWidget(QBoxFrame):
         self._device_guid = identifier.device_guid
         self._input_type = identifier.input_type
         
+        self._container_content_widget, self._container_content_layout = gremlin.ui.ui_common.getVContainer()
+
 
         self.data = data
         self._deleted = False
@@ -1311,6 +1340,7 @@ class InputItemWidget(QBoxFrame):
 
 
         self.main_layout.addWidget(self._container_input_state_widget)
+        self.main_layout.addWidget(self._container_content_widget)
 
         self.main_layout.addWidget(self._status_widget)
 
@@ -1377,6 +1407,11 @@ class InputItemWidget(QBoxFrame):
         # true if the cleanup function was found and the widget should be deleted
         return self._deleted
 
+
+    @property
+    def content_layout(self):
+        ''' gets the the content row '''
+        return self._container_content_layout
 
     def _update_repeater(self):
         ''' updates the repeaters based on the type of widget '''

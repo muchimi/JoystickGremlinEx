@@ -28,7 +28,7 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.keyboard
-import gremlin.macro
+
 import gremlin.ui.input_item
 import gremlin.input_devices
 from gremlin.input_devices import VjoyAction
@@ -36,6 +36,7 @@ from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.types
 import gremlin.ui.ui_common
 import gremlin.ui.ui_gremlin
+import gremlin.macro
 
 syslog = logging.getLogger("system")
 
@@ -57,6 +58,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         :param index the index of the model entry being edited
         :param parent the parent of this widget
         """
+        
         super().__init__(parent)
         self.model = model
         self.index = index
@@ -174,6 +176,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         :param value the name of the new action type for the currently selected
             entry
         """
+        
         # Clear the current editor widget ui components
         gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}
@@ -396,6 +399,8 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _pause_ui(self):
         """Creates and populates the PauseAction editor UI."""
+
+
         self.ui_elements["duration_label"] = QtWidgets.QLabel("Duration")
         self.ui_elements["duration_spinbox"] = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.ui_elements["duration_spinbox"].setSingleStep(0.1)
@@ -827,6 +832,7 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _keyboard_dialog_cb(self):
         ''' callled when the dialog completes '''
 
+        
         # grab a new data index as this is a new entry
         # index = self._keyboard_dialog.index
         # keys = self._keyboard_dialog.keys
@@ -840,6 +846,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _add_key_press(self):
+        
         key = self.model.get_entry(self.index.row()).key
         new_key = key.duplicate()
         entry = gremlin.macro.KeyAction(new_key,True)
@@ -848,6 +855,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _add_key_full(self):
+        
         key = self.model.get_entry(self.index.row()).key
         
 
@@ -870,6 +878,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _add_key_release(self):
+        
         key = self.model.get_entry(self.index.row()).key
         new_key = key.duplicate()
         entry = gremlin.macro.KeyAction(new_key,False)
@@ -877,6 +886,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
 
     def _modify_joystick(self, event):
+        
         self.model.set_entry(
             gremlin.macro.JoystickAction(
                 event.device_guid,
@@ -1000,6 +1010,7 @@ class MacroListModel(QtCore.QAbstractListModel):
         :param role the role for which the data is to be formatted
         :return data formatted for the given role at the given index
         """
+
 
         if not index.isValid():
             return None
@@ -1576,9 +1587,23 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.execute_on_release_widget = QtWidgets.QCheckBox("Release")
             self.execute_on_release_widget.setChecked(self.action_data.execute_on_release)
             self.execute_on_release_widget.clicked.connect(self._execute_on_release_changed)
+
+
+            self.autorestart_widget = QtWidgets.QCheckBox("Auto-restart")
+            self.autorestart_widget.setToolTip("When set, the macro will abort if it's executing and restart from the start on any re-trigger while it's running.\nIf not set, macro will not retrigger if it's already running.")
+            self.autorestart_widget.setChecked(self.action_data.auto_restart)
+            self.autorestart_widget.clicked.connect(self._autorestart_changed)
+
+            self.autostop_widget = QtWidgets.QCheckBox("Stop on release")
+            self.autostop_widget.setToolTip("When set, the macro will abort on an input release even if it's not finished.")
+            self.autostop_widget.setChecked(self.action_data.auto_stop)
+            self.autostop_widget.clicked.connect(self._autostop_changed)
+
             widgets = [execute_label,
                        self.execute_on_press_widget,
-                       self.execute_on_release_widget
+                       self.execute_on_release_widget,
+                       self.autorestart_widget,
+                       self.autostop_widget
                        ]
             self.execute_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
             
@@ -1740,7 +1765,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.toolbar.addWidget(self.delete_button)
 
             #required_height = self.toolbar.frameGeometry().height()
-            self.toolbar.setMinimumHeight(260)
+            height = self.toolbar.sizeHint().height()
+            self.toolbar.setMinimumHeight(height) # 260)
 
             # Assemble the entire widget
 
@@ -1953,6 +1979,14 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(bool)
     def _execute_on_release_changed(self, checked : bool):
         self.action_data.execute_on_release = checked
+
+    @QtCore.Slot(bool)
+    def _autorestart_changed(self, checked : bool):
+        self.action_data.auto_restart = checked
+
+    @QtCore.Slot(bool)
+    def _autostop_changed(self, checked : bool):
+        self.action_data.auto_stop = checked
 
     @QtCore.Slot()
     def _pause_cb(self):

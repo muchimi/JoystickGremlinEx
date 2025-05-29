@@ -84,6 +84,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self,
             device_profile,
             current_mode,
+            object_name = 'MODE DEVICE CONTENT',
             parent=None
     ):
         """Creates a new object instance.
@@ -92,7 +93,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(object_name, parent)
         import gremlin.ui.ui_common as ui_common
         import gremlin.ui.input_item as input_item
 
@@ -125,10 +126,6 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
 
         self.addLeftPanelWidget(self.input_item_list_view)
-
-        # default entry
-        self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
-        self.setRightPanelWidget(self._item_data)
 
         
         self.input_item_list_model.refresh()
@@ -263,6 +260,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if self.input_item_list_model.rows():
                 index = 0
             else:
+                self._blank_input()
                 return 
         
         with QtCore.QSignalBlocker(self.input_item_list_view):
@@ -271,7 +269,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
         
-        widget = gremlin.ui.joystick_device.InputItemConfiguration(input_data)
+        widget = gremlin.ui.joystick_device.InputItemConfiguration(input_data, object_name = f"Mode: {input_data.display_name}")
         self._item_data = widget
         self.setRightPanelWidget(widget)
 

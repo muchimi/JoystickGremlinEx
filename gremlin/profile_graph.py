@@ -591,17 +591,15 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
         if has_changes:
 
-            tmp_file = os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
-            #tmp_file = os.path.join(gremlin.util.userprofile_path(),"test_remap.xml")
-            if os.path.isfile(tmp_file):
-                os.unlink(tmp_file)
+            tmp_file = gremlin.util.getTemporaryFile(".xml") #os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
             if self._graph.to_xml(tmp_file):
                 # load it
-                gremlin.util.display_file(tmp_file)
+                config = gremlin.config.Configuration()
+                verbose =config.verbose_mode_extra and config.verbose
+                if verbose: gremlin.util.display_file(tmp_file)
+                gremlin.shared_state.ui.registerTemporaryProfileLoadFile(tmp_file)
                 el = gremlin.event_handler.EventListener()
                 el.request_profile_reload.emit(tmp_file, True)
-                # unload the temporary file
-                os.unlink(tmp_file)
 
         gremlin.util.popCursor()
         return True
@@ -816,6 +814,7 @@ class ProfileModeNode(ProfileBaseNode):
     def __init__(self, parent : ProfileDeviceNode):
         super().__init__(ProfileNodeType.Mode)
         self.name = None # mode name
+        self.inherit = None # parent mode name
         self.parent = parent
 
     def from_xml(self, node : Element, data = None):
@@ -828,6 +827,7 @@ class ProfileModeNode(ProfileBaseNode):
         name = name.strip()
         self.name = name
         self.inherit = node.get("inherit", None)
+        
 
 
         child : Element
@@ -853,7 +853,7 @@ class ProfileModeNode(ProfileBaseNode):
         return node
     
     def __str__(self):
-        return f"{self.nodeType.name}: mode: {self.name}"
+        return f"{self.nodeType.name}: mode: {self.name}  parent: {self.inherit}"
     
     
 
@@ -1239,13 +1239,17 @@ class ProfileGraph():
 
         # # prompt for mapping if a device is not found
 
-        if self.has_unknowns():
+        config = gremlin.config.Configuration()
+
+        if self.has_unknowns() and config.import_prompt_enabled:
             gremlin.util.popCursorTemporary()
             base_dir, base_file = os.path.split(source_xml)
-            msgbox = ui_common.ConfirmBox(f"Profile [{base_file}] has one or more devices that could not be found.", prompt = "Would you like to remap devices?")
-            result = msgbox.show()
+            msgbox = ui_common.ConfirmBoxEx(title = "Import profile?", prompt = f"Profile [{base_file}] has one or more devices that could not be found.\nWould you like to remap devices?", again_prompt=True)
+            result = msgbox.exec()
             gremlin.util.popCursorTemporary(False)
-            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            checked = msgbox.checked
+            config.import_prompt_enabled = not checked
+            if msgbox.result == QtWidgets.QMessageBox.StandardButton.Ok:
                 self.remap()
         
     def to_xml(self, target_xml : str) -> bool:

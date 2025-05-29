@@ -65,11 +65,11 @@ class Icons():
     def listBottomIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.caret-circle-double-down-light", qta_color)
     def trashIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6.trash-can", qta_color)
+        return Icons._icon("ei.trash", qta_color)
     def keyboardIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.keyboard", qta_color)
     def addIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa5.plus-square", qta_color)
+        return Icons._icon("msc.diff-added", qta_color)
     def removeIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.minus", qta_color)
     def gearIcon(qta_color = None) -> QtGui.QIcon:
@@ -78,14 +78,30 @@ class Icons():
         return Icons._icon("fa6s.magnifying-glass", qta_color)
     def refreshIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ei.refresh", qta_color)
+    def copyIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6.copy", qta_color)
+    def pasteIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6.paste", qta_color)
+    def configureIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.gear", qta_color)
+    def editIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("mdi6.rename-box-outline", qta_color)
+    def horizontalSeparatorIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("mdi.power-on", qta_color)
         
     def calculateIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.math-operations", qta_color)
+    def axisIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("mdi.axis", qta_color)
+    def buttonIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ri.radio-button-line", qta_color)
+    def hatIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa5s.arrows-alt", qta_color)
+
     
     def _icon(value : str, qta_color = None):
         return load_icon(value, qta_color = qta_color) if qta_color is not None else load_icon(value)
-        
-        
+       
 
 class Color():
     ''' general UI color and stylesheet handling '''
@@ -155,6 +171,9 @@ class Color():
     @staticmethod
     def alternateSelectBorderColor():
         return "#997e14" if gremlin.shared_state.is_dark_theme else "#c2b476"    
+    @staticmethod
+    def expressionColor():
+        return "#cc7d1f"
     @staticmethod
     def rangeColor():
         return "#8FBC8F"
@@ -392,27 +411,26 @@ class Color():
         return css
     
     @staticmethod
-    def cssStateButton():
-        ''' gets a pushbutton state for the input viewer '''
-
-        normal_color = Color.normalColor()
-        normal_gradient_color = Color.normalGradientColor()
-        background_color = Color.keyBackgroundColor()
-        
-        border_color = Color.borderColor()
-        selected_border_color = Color.selectBorderColor()
-        selected_color = Color.selectColor()
-        selected_gradient_color = Color.selectGradientColor()
+    def _cssStateButton(font_size,
+                        normal_color,
+                        normal_gradient_color,
+                        background_color,
+                        border_color,
+                        selected_border_color,
+                        selected_color,
+                        selected_gradient_color):
+        min_size = font_size * 2
+        radius = font_size 
         css = f'''
         QPushButton {{
             border: 2px solid #8f8f91;
-            border-radius: 15px;
+            border-radius: {radius}px;
             background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {normal_color}, stop: 1 {normal_gradient_color});
-            min-width: 30px;
-            min-height: 30px;
-            max-height: 30px;
+            min-width: {min_size}px;
+            min-height: {min_size}px;
             padding-left: 4px;
             padding-right: 4px;
+            font-size: {font_size}px;
         }}
 
         QPushButton:pressed {{
@@ -437,50 +455,50 @@ class Color():
         '''
         return css
     
+
     @staticmethod
-    def cssStateExpressionButton():
+    def cssStateButton(font_size = 16):
         ''' gets a pushbutton state for the input viewer '''
 
         normal_color = Color.normalColor()
         normal_gradient_color = Color.normalGradientColor()
         background_color = Color.keyBackgroundColor()
         
+        border_color = Color.borderColor()
+        selected_border_color = Color.selectBorderColor()
+        selected_color = Color.selectColor()
+        selected_gradient_color = Color.selectGradientColor()
+        return Color._cssStateButton(font_size, 
+                                    normal_color,
+                                    normal_gradient_color,
+                                    background_color,
+                                    border_color,
+                                    selected_border_color,
+                                    selected_color,
+                                    selected_gradient_color)
+
+    
+    @staticmethod
+    def cssStateExpressionButton(font_size = 16):
+        ''' gets a pushbutton state for the input viewer '''
+
+        normal_color = Color.normalColor()
+        normal_gradient_color = Color.normalGradientColor()
+        background_color = Color.keyBackgroundColor()
+        border_color = Color.borderColor()
         selected_border_color = Color.alternateSelectBorderColor()
         selected_color = Color.alternateSelectColor()
         selected_gradient_color = Color.alternateSelectGradientColor()
-        css = f'''
-        QPushButton {{
-            border: 2px solid #8f8f91;
-            border-radius: 15px;
-            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {normal_color}, stop: 1 {normal_gradient_color});
-            min-width: 30px;
-            min-height: 30px;
-            max-height: 30px;
-            padding-left: 4px;
-            padding-right: 4px;
-        }}
-
-        QPushButton:pressed {{
-            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
-            border-color: {selected_border_color};
-        }}
-
-        QPushButton:checked {{
-            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
-            border-color: {selected_border_color};
-        }}
-
-
-        QPushButton:flat {{
-            border: none; /* no border for a flat push button */
-        }}
-
-        QPushButton:!enabled
-        {{
-             color: {background_color};
-        }}
-        '''
-        return css
+        return Color._cssStateButton(font_size, 
+                                normal_color,
+                                normal_gradient_color,
+                                background_color,
+                                border_color,
+                                selected_border_color,
+                                selected_color,
+                                selected_gradient_color)
+ 
+    
     
     @staticmethod
     def PenColors():
@@ -509,6 +527,7 @@ class Color():
             pens[index] = QtGui.QPen(QtGui.QColor(colors[index]), 2 if index else 1)
         return pens
     
+
 
 class Buttons():
     ''' common UI button widgets '''
@@ -2812,17 +2831,18 @@ def clear_layout(layout):
 
     :param layout the layout from which to remove all items
     """
-    while layout.count() > 0:
-        child = layout.takeAt(0)
-        if child.layout():
-            clear_layout(child.layout())
-        elif child.widget():
-            widget = child.widget()
-            if hasattr(widget,"_cleanup_ui"):
-                widget._cleanup_ui()
-            widget.hide()
-            widget.deleteLater()
-        layout.removeItem(child)
+    gremlin.util.clear_layout(layout)
+    # while layout.count() > 0:
+    #     child = layout.takeAt(0)
+    #     if child.layout():
+    #         clear_layout(child.layout())
+    #     elif child.widget():
+    #         widget = child.widget()
+    #         if hasattr(widget,"_cleanup_ui"):
+    #             widget._cleanup_ui()
+    #         widget.hide()
+    #         widget.deleteLater()
+    #     layout.removeItem(child)
 
 def get_layout_widgets(layout) -> list:
     ''' returns a list of layout widgets '''
@@ -2922,6 +2942,53 @@ class ConfirmPushButton(QtWidgets.QPushButton):
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self.confirmed.emit(self)
+
+
+
+class ConfirmBoxEx(QtWidgets.QDialog):
+    def __init__(self, title = "Confirmation Required", prompt = "Are you sure?", again_prompt = False, again_prompt_text = None, parent = None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(200)
+        layout = QtWidgets.QVBoxLayout(self)
+        label = QtWidgets.QLabel(prompt)
+        layout.addWidget(label)
+        self._result =  QtWidgets.QMessageBox.StandardButton.Cancel
+        self._cb = None
+        if again_prompt:
+            self._cb = QtWidgets.QCheckBox(again_prompt_text if again_prompt_text else "Don't show this again")
+            layout.addWidget(self._cb)
+        
+
+        ok_button_widget =  QtWidgets.QPushButton("Ok")
+        ok_button_widget.clicked.connect(self._execute_cb)
+        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget.clicked.connect(self._close_cb)
+        button_container_widget, button_container_layout = getHContainer(
+            [ok_button_widget, cancel_button_widget], left_stretch=True)
+        
+        layout.addWidget(button_container_widget)
+
+    @property
+    def checked(self) -> bool:
+        if self._cb:
+            return self._cb.isChecked()
+        return False
+
+    @QtCore.Slot()
+    def _execute_cb(self):
+        self._result = QtWidgets.QMessageBox.StandardButton.Ok
+        self.setResult(QtWidgets.QDialog.DialogCode.Accepted)
+        self.close()
+
+    @QtCore.Slot()
+    def _close_cb(self):
+        self.setResult(QtWidgets.QDialog.DialogCode.Rejected)
+        self.close()        
+
+    @property
+    def result(self):
+        return self._result
 
 class ConfirmBox():
     def __init__(self, title = "Confirmation Required", prompt = "Are you sure?", parent = None):
@@ -3602,6 +3669,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setSpacing(0)
         self.main_layout.setContentsMargins(0,0,0,0)
+        self._deleted = False
 
         self._icon_size = QtCore.QSize(16,16)
         self._device_guid = None
@@ -3630,8 +3698,11 @@ class ButtonStateWidget(QtWidgets.QWidget):
         
 
     def _cleanup_ui(self):
-        self.unhookDevice()
-        self.deleted.emit()
+        if not self._deleted:
+            self._deleted = True
+            self.unhookDevice()
+            self.deleted.emit()
+
 
 
     def hookDevice(self, device_guid, input_type, input_id):
@@ -3725,6 +3796,8 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def _update_value(self, is_pressed):
         ''' updates a button position '''
+        if self._deleted:
+            return
         if is_pressed:
             self._button_widget.setPixmap(self._on_pixmap)
             # syslog.info(f"button {self.input_id} pressed")
@@ -3739,6 +3812,8 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def _update_hat(self, position):
         ''' updates a hat position '''
+        if self._deleted:
+            return
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
         if not isinstance(position,tuple):
             # convert from value to position tuple
@@ -4008,6 +4083,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         self._scale_factor = 1000
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.device = device
+        self._deleted = False
 
         self.container_widget = QtWidgets.QWidget()
         if orientation == QtCore.Qt.Orientation.Vertical:
@@ -4306,8 +4382,10 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def _cleanup_ui(self):
         ''' item is being deleted '''
-        self.unhookDevice()
-        self.deleted.emit(self)
+        if not self._deleted:
+            self._deleted = True
+            self.unhookDevice()
+            self.deleted.emit(self)
 
     @property
     def data(self):
@@ -4430,6 +4508,9 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def _setValue(self, value, calibrated_value = None, curve_value = None, percent_value = None, other_value = None):
         ''' internal set value '''
+
+        if self._deleted:
+            return
         
         if value is None:
             return
@@ -6586,8 +6667,11 @@ class QContentWidget(QtWidgets.QWidget):
 
 class QSplitTabWidget(QDataWidget):
     ''' tab content widgeth split '''
-    def __init__(self, parent = None):
+    def __init__(self, object_name, parent = None):
         super().__init__(parent)
+        self.setObjectName(object_name)
+
+        self._id = gremlin.util.get_guid() # unique ID
 
         self._lock = False
 
@@ -6602,35 +6686,17 @@ class QSplitTabWidget(QDataWidget):
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self._content_widget)
 
 
-        self._left_panel_widget = QtWidgets.QWidget()
-        #self._left_panel_widget.setStyleSheet("background: green")
-        self._left_panel_widget.setContentsMargins(0,0,0,0)
+        self._left_panel_widget, self._left_panel_layout = getVContainer()
         self._left_panel_widget.setMinimumWidth(200)
 
-        self._right_panel_widget = QtWidgets.QWidget()
-        #self._right_panel_widget.setStyleSheet("background: blue")
-        self._right_panel_widget.setContentsMargins(0,0,0,0)
-
-        self._left_panel_layout = QtWidgets.QVBoxLayout(self._left_panel_widget)
-        self._left_panel_layout.setContentsMargins(0,0,0,0)
-
-        self._right_panel_layout = QtWidgets.QVBoxLayout(self._right_panel_widget)
-        self._right_panel_layout.setContentsMargins(0,0,0,0)
-        
-
+        self._right_panel_widget, self._right_panel_layout = getVContainer()
 
         # left panel, list view on top, buttons on bottom
-        self._left_container_widget = QtWidgets.QWidget()
-        self._left_container_widget.setContentsMargins(0,0,0,0)
-        self._left_container_layout = QtWidgets.QVBoxLayout(self._left_container_widget)
-        self._left_container_layout.setContentsMargins(0,0,0,0)
+        self._left_container_widget, self._left_container_layout = getVContainer()
 
-        # right panel
-        self._right_container_widget = QtWidgets.QWidget()
-        self._right_container_widget.setContentsMargins(0,0,0,0)
-        self._right_container_layout = QtWidgets.QVBoxLayout(self._right_container_widget)
-        self._right_container_layout.setContentsMargins(0,0,0,0)
-        
+        # right panel content
+        self._right_container_widget, self._right_container_layout = getVContainer()
+
         # place items in left_container_layout or right_container_layout
         self._left_panel_layout.addWidget(self._left_container_widget)
         self._right_panel_layout.addWidget(self._right_container_widget)
@@ -6649,6 +6715,26 @@ class QSplitTabWidget(QDataWidget):
         self.main_layout.addWidget(self._content_widget)
 
         _tabsplitter_tracker.registerWidget(self)
+
+        if not self.objectName():
+            pass
+
+        syslog.info(f"Created Device content: [{self._id}] {self.objectName()}")
+
+        self._blank_input()
+
+
+    def _blank_input(self):
+        ''' sets a blank input '''
+        edit = QDataLineEdit(text = self._id)
+        edit.setReadOnly(True)
+    
+        label = QtWidgets.QLabel(f"Please select an input to configure.")
+
+        widget, _ = getHContainer([label, edit])
+        contents, _ = getVContainer(widget)
+        #widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+        self.setRightPanelWidget(contents)        
 
     def _cleanup_ui(self):
         ''' remove '''
@@ -6690,11 +6776,7 @@ class QSplitTabWidget(QDataWidget):
             self._left_container_layout.addWidget(widget)
 
     def setRightPanelWidget(self, widget : QtWidgets.QWidget):
-        ''' sets the right panel widget '''
-        #print ("set right panel")
-        widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
-        if widget in widgets:
-            return
+        ''' sets the right panel widget (only contains a single widget)'''
         self.clearRightPanel()
         self.addRightPanelWidget(widget)
 
@@ -8739,3 +8821,7 @@ class QExecuteWidget(QtWidgets.QWidget):
             self._execute_on_release = value
             with QtCore.QSignalBlocker(self._release_widget):
                 self._release_widget.setChecked(True)
+
+
+
+    

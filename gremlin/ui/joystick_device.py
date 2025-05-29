@@ -24,6 +24,7 @@ from lxml import etree
 import os
 
 import gremlin
+from dinput import DeviceSummary
 
 import gremlin.base_profile
 import gremlin.base_profile
@@ -38,6 +39,7 @@ import gremlin.shared_state
 import gremlin.types
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
+import gremlin.ui
 import gremlin.util
 from gremlin.util import safe_read
 import gremlin.ui.input_item as input_item
@@ -55,7 +57,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
     description_changed = QtCore.Signal(str) # indicates the description was changed
     description_clear = QtCore.Signal() # clear the description field
 
-    def __init__(self, item_data = None, input_type = None, parent=None):
+    def __init__(self, item_data, input_type = None, object_name : str = None, parent=None):
         """Creates a new object instance.
 
         :params:
@@ -67,11 +69,16 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """
         super().__init__(parent)
 
+        assert item_data is not None,"Item Data must be provided"
+
+        if not object_name:
+            pass
+        self.setObjectName(object_name if object_name else "(object name not provided)")
         self.id = gremlin.util.get_guid()
         self.item_data : gremlin.base_profile.InputItem = item_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.button_layout = QtWidgets.QHBoxLayout()
-        self.widget_layout = QtWidgets.QVBoxLayout()
+        # self.button_layout = QtWidgets.QHBoxLayout()
+        # self.widget_layout = QtWidgets.QVBoxLayout()
         self._input_type = InputType.NotSet
         if input_type is not None:
             # override input type
@@ -83,6 +90,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.setItemData(item_data)
 
         self._deleted = False
+
+
 
     def isBlank(self):
         ''' true if not associated with any data (blank widget)'''
@@ -98,10 +107,40 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
     def setItemData(self, item_data):
         ''' updates the item data '''
+
+        assert item_data is not None, "Item data must be provided"
         self.setUpdatesEnabled(False)
         try:
             gremlin.util.clear_layout(self.main_layout)
+
             self.item_data : gremlin.base_profile.InputItem = item_data
+
+            config = gremlin.config.Configuration()
+            if config.show_container_id:
+                name = self.objectName()
+                css = "background: green;"
+                if not name:
+                    if item_data:
+                        name = f"InputItemConfig for: {self.item_data.display_name}"
+                        css = "background: gray;"
+                if not name:
+                    name = "(name not available)"
+                    css = "background: red;"
+
+                label = QtWidgets.QLabel(name)
+
+                id_label = QtWidgets.QLabel(f"({self.id})")
+                label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+                label.setStyleSheet(css)
+
+                # hide_button = QtWidgets.QPushButton("Hide")
+                # hide_button.clicked.connect(lambda : self.setVisible(False))
+                
+                #widget, layout = gremlin.ui.ui_common.getHContainer([id_label, label, hide_button],left_stretch=True)
+                widget, layout = gremlin.ui.ui_common.getHContainer([id_label, label],left_stretch=True)
+
+            self.main_layout.addWidget(widget)
+
             if item_data is None:
                 parent = self.parent()
                 while parent and not isinstance(parent, JoystickDeviceTabWidget):
@@ -109,11 +148,10 @@ class InputItemConfiguration(QtWidgets.QFrame):
                 parent :JoystickDeviceTabWidget
                 if parent is not None:
                     item_data = parent.last_item_data_key
-            
-                label = QtWidgets.QLabel("Please select an input to configure")
-                label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
-                self.main_layout.addWidget(label)
-                return
+
+                if item_data is None:
+                    self._blank_input()
+                    return
             
             if not item_data.is_action:
                 # only draw description if not a sub action item
@@ -587,6 +625,12 @@ class InputItemConfiguration(QtWidgets.QFrame):
                     action_names.append(entry.name)
         return sorted(action_names)
 
+    def __eq__(self, other):
+        if other is None:
+            return False
+        if self.item_data and other.item_data:
+            return self.item_data.callbackKey() == other.item_data.callbackKey()
+        return self.id == other.id
 
 class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
@@ -783,9 +827,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def __init__(
             self,
-            device,
+            device : DeviceSummary,
             device_profile,
             current_mode,
+            object_name = "JOYSTICK DEVICE CONTENT",
             parent=None
     ):
         """Creates a new object instance.
@@ -795,7 +840,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(object_name, parent)
 
         import gremlin.plugin_manager
 
@@ -846,16 +891,27 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
 
         # Add modifiable device label
-        label_widget = QtWidgets.QWidget()
-        label_layout = QtWidgets.QHBoxLayout(label_widget)
-        label_layout.setContentsMargins(4,8,0,0)
-        label_layout.addWidget(QtWidgets.QLabel("<b>Device Label</b>"))
-        line_edit = QtWidgets.QLineEdit()
+        
+        label_device = QtWidgets.QLabel("Label")
+        line_edit = gremlin.ui.ui_common.QDataLineEdit()
         line_edit.setText(device_profile.label)
         line_edit.textChanged.connect(self.update_device_label)
-        label_layout.addWidget(line_edit)
 
-        self.addLeftPanelWidget(label_widget)
+        # device properties
+        
+        icon = gremlin.ui.ui_common.Icons.axisIcon()
+        label_axis = gremlin.ui.ui_common.QIconLabel(icon, f"{device.axis_count}")
+
+        icon = gremlin.ui.ui_common.Icons.buttonIcon()
+        label_button = gremlin.ui.ui_common.QIconLabel(icon, f"{device.button_count}")
+
+        icon = gremlin.ui.ui_common.Icons.hatIcon()
+        label_hat = gremlin.ui.ui_common.QIconLabel(icon, f"{device.hat_count}")
+
+        widget, _ = gremlin.ui.ui_common.getHContainer([label_axis, label_button, label_hat, label_device, line_edit])
+        self.addLeftPanelWidget(widget)
+
+        
         self.addLeftPanelWidget(self.input_item_list_view)
         
 
@@ -910,14 +966,15 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _cleanup_ui(self):
         ''' called when deleted '''
 
-        self.input_item_list_view.item_edit_curve.disconnect(self._edit_curve_item_cb)
-        self.input_item_list_view.item_delete_curve.disconnect(self._delete_curve_item_cb)
-        self.input_item_list_view.item_selected.disconnect(self._select_item_cb)
+        if gremlin.util.isSignalConnected(self.input_item_list_view, "_edit_curve_item_cb"):
+            self.input_item_list_view.item_edit_curve.disconnect(self._edit_curve_item_cb)
+            self.input_item_list_view.item_delete_curve.disconnect(self._delete_curve_item_cb)
+            self.input_item_list_view.item_selected.disconnect(self._select_item_cb)
 
-        el = gremlin.event_handler.EventListener()
-        
-        el.edit_mode_changed.disconnect(self._edit_mode_changed_cb)
-        el.config_changed.disconnect(self._config_changed_cb)
+            el = gremlin.event_handler.EventListener()
+            
+            el.edit_mode_changed.disconnect(self._edit_mode_changed_cb)
+            el.config_changed.disconnect(self._config_changed_cb)
         
 
     def _edit_curve_item_cb(self, widget, index, data):
@@ -1039,38 +1096,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return widget
     
 
-    # def _populate_axis_input_widget_ui(self, input_widget, container_widget, data):
-    #     ''' called when the repeater widget is created for an axis input  '''
 
-    #     if gremlin.config.Configuration().show_input_axis:
-    #         layout = QtWidgets.QVBoxLayout(container_widget)
-    #         widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
-    #         widget.setWidth(10)
-    #         widget.setMaximumWidth(200)
-    #         # automatically update from the joystick
-    #         widget.hookDevice(data.device_guid, data.input_id)
-    #         widget.setContentsMargins(0,0,0,0)
-    #         layout.setContentsMargins(0,0,0,0)
-    #         layout.addWidget(widget)
-    #         layout.addStretch()
-    #         widget.valueChanged.connect(self._input_value_changed) # hook value changed event on the axis repeater when displayed
-    #         return widget
-    #     return None
-    
-    # def _populate_button_input_widget_ui(self, input_widget, container_widget, data):
-    #     ''' called when the widget is created for a button input  '''
-    #     if gremlin.config.Configuration().show_input_axis:
-    #         layout = QtWidgets.QVBoxLayout(container_widget)
-    #         widget = gremlin.ui.ui_common.ButtonStateWidget()
-    #         #widget.setMaximumWidth(20)
-    #         # automatically update from the joystick
-    #         widget.hookDevice(data.device_guid, data.input_type, data.input_id)
-    #         widget.setContentsMargins(0,0,0,0)
-    #         layout.setContentsMargins(0,0,0,0)
-    #         layout.addWidget(widget)
-    #         layout.addStretch()
-    #         return widget
-        
     @property
     def running(self):
         return gremlin.shared_state.is_running
@@ -1084,7 +1110,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """
 
         try:
-        
+
             self.setUpdatesEnabled(False)
 
             config = gremlin.config.Configuration()
@@ -1103,9 +1129,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     item_data = self.input_item_list_model.data(0)
                     index = 0
                 else:
-                    # no input to select
-                    widget = InputItemConfiguration()     
-                    self.setRightPanelWidget(widget)
+                    self._blank_input()
                     return
             else:
                 item_data = self.input_item_list_model.data(index)
@@ -1145,7 +1169,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 
                 # not in cache, create it and add to cache for this device/input combination
                 if verbose: syslog.info(f"create and store in cache content widget for index: {index}  device: {self.device_guid}")
-                widget = InputItemConfiguration(item_data, parent = self)
+                widget = InputItemConfiguration(item_data, object_name = f"JOYSTICK: {item_data.display_name}")
+                device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
+                widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
                 widget.action_model.data_changed.connect(self._create_change_cb(index))
                 widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
                 widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
@@ -1175,22 +1201,21 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     self._debug_widget.setText(f"Contents for : {item_data.debug_display}")
 
 
-            else:
-                # show the empty widget
-                if self._debug_widget:
-                    self._debug_widget.setText(f"Contents for : N/A")
-                widget = InputItemConfiguration()
-                self.addRightPanelWidget(widget)
+            # else:
+            #     # show the empty widget
+            #     if self._debug_widget:
+            #         self._debug_widget.setText(f"Contents for : N/A")
+            #     widget = InputItemConfiguration()
+            #     widget.setObjectName("Blank input item NA content") 
+            #     self.addRightPanelWidget(widget)
 
             self.last_selected_index = index
             el = gremlin.event_handler.EventListener()
             el.input_selection_changed.emit(device_guid, input_type, input_id)
 
         finally:    
-            #widget.update()
             self.setUpdatesEnabled(True)
-            # if widget:
-            #     widget.setVisible(True)
+            #gremlin.util.dumpWidgets(self._right_container_layout)
             self.update()
         
 

@@ -310,6 +310,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._keyboard_visualizer_widget = None
         self._state_visualizer_widget = None
         self._state_buttons = {} # map of key widget
+        self._state_category_filter = None
         self.keyboard_widget = None # keyboard widget
 
         
@@ -337,17 +338,17 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_area.setWidgetResizable(True)
         self.scroll_selector_area.setWidget(self.scroll_selector_widget)
 
-        config = VisualizationConfig()
+        v_config = VisualizationConfig()
 
         self.keyboard_widget_selector = gremlin.ui.ui_common.QDataCheckbox("Keyboard")
         self.keyboard_widget_selector.setIgnoreKeyboard(True)
-        checked = config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+        checked = v_config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
         self.keyboard_widget_selector.setChecked(checked)
         self.keyboard_widget_selector.clicked.connect(self._toggle_keyboard_widget)
 
         self.state_widget_selector = gremlin.ui.ui_common.QDataCheckbox("State")
         self.state_widget_selector.setIgnoreKeyboard(True)
-        checked = config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State)
+        checked = v_config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State)
         self.state_widget_selector.setChecked(checked)
         self.state_widget_selector.clicked.connect(self._toggle_state_widget)
 
@@ -380,6 +381,9 @@ class InputViewerUi(ui_common.BaseDialogUi):
         select_real_widget.setToolTip("Selects all hardware inputs")
         select_real_widget.clicked.connect(self.vis_selector._select_real)
 
+       
+            
+
         options_widget, _ = gremlin.ui.ui_common.getHContainer((clear_widget, select_real_widget, select_all_widget))
         options_widget.setMaximumHeight(32)
 
@@ -394,15 +398,27 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.closed.connect(self._closed)
 
 
-        config = VisualizationConfig()
-        self._keyboard_visible = config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+        v_config = VisualizationConfig()
+        self._keyboard_visible = v_config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
         self._toggle_keyboard_widget(self._keyboard_visible)
 
-        self._state_visible = config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State)
+        self._state_visible = v_config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State)
         self._toggle_state_widget(self._state_visible)
 
 
         self.installEventFilter(self)
+
+    @QtCore.Slot()
+    def _font_size_cb(self):
+        widget = self.sender()
+        size = widget.data
+        config = gremlin.config.Configuration()
+        config.input_viewer_button_size = size
+
+    @QtCore.Slot(str, object)
+    def _config_changed(self, key, value):
+        if key == "input_viewer_button_size":
+            self.refreshState()
 
     def eventFilter(self, widget, event):
         # filter events for keys so the window hotkeys don't interfere with the keyboard repeater
@@ -520,11 +536,34 @@ class InputViewerUi(ui_common.BaseDialogUi):
         if self._state_visualizer_widget:
             gremlin.util.clear_layout(layout)
             self._state_buttons.clear()
+            font_size = gremlin.config.Configuration().input_viewer_button_size
             sd = gremlin.ui.state_device.StateData()
-            css = gremlin.ui.ui_common.Color.cssStateButton()
-            cssAlternate = gremlin.ui.ui_common.Color.cssStateExpressionButton()
-            i = 0
-            for key, data in sd.getStates().items():
+            css = gremlin.ui.ui_common.Color.cssStateButton(font_size)
+            cssAlternate = gremlin.ui.ui_common.Color.cssStateExpressionButton(font_size)
+
+        config = gremlin.config.Configuration()
+        is_filter = config.state_filter_enabled
+        verbose = config.verbose_mode_state
+
+        cm = gremlin.ui.state_device.StateCategories()
+        default_category = cm.default()
+        category = None
+        if is_filter:
+            category = self._state_category_filter 
+            if not category:
+                category = default_category
+
+        i = 0
+        items = sd.getStates().items()
+        if items:
+            for key, data in items:
+                if category:
+                    # apply filter
+                    item_category = data.category if data.category else default_category
+                    if item_category != category:
+                        continue # filter out
+                
+
                 btn = gremlin.ui.ui_common.QDataPushButton(key, data)
 
                 if data.expression:
@@ -535,24 +574,70 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
                 btn.setCheckable(True)
                 btn.setChecked(data.value)
-                syslog.info(f"viewer state: {key}  value: {data.value}")
+                if verbose: syslog.info(f"viewer state: {key}  value: {data.value}")
                 btn.clicked.connect(self._state_toggle)
                 layout.addWidget(btn, int(i / 10), int(i % 10))
                 data.changed.connect(self._state_changed)
                 self._state_buttons[data.key] = btn
                 i+=1
-            layout.setColumnStretch(10,1)
+            
+        else:
+            layout.addWidget(QtWidgets.QLabel("No states found."),0,0,1,-1)
+
+        layout.setColumnStretch(10,1)
 
     def showState(self):
         ''' state device '''
         if not self._state_visualizer_widget:
             self._state_visualizer_widget = QtWidgets.QGroupBox("States")
-            button_layout = QtWidgets.QGridLayout()
-            self.populateState(button_layout)
-            self._state_visualizer_widget.setLayout(button_layout)
+
+            layout = QtWidgets.QVBoxLayout(self._state_visualizer_widget)
+            self._state_visualizer_widget.setLayout(layout)
+
+            self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget()
+            self._state_category_filter = self._state_filter_widget.category # current category
+            self._state_filter_widget.changed.connect(self._category_filter_changed)
+            layout.addWidget(self._state_filter_widget)
+
+            config = gremlin.config.Configuration()
+            config.changed.connect(self._config_changed)
+            current_size = config.input_viewer_button_size
+            font_sizes = (("small", 12),
+                          ("medium", 16),
+                           ("large", 20))
+            widgets = []
+            for label, size in font_sizes:
+                rb = gremlin.ui.ui_common.QDataRadioButton(label, size)
+                if current_size == size:
+                    rb.setChecked(True)
+                rb.clicked.connect(self._font_size_cb)
+                widgets.append(rb)
+
+
+
+
+            widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Button size:")
+            layout.addWidget(widget)
+
+
+            self._state_button_layout = QtWidgets.QGridLayout()
+            self.populateState(self._state_button_layout)
+            
             self.views.add_widget(self._state_visualizer_widget)
             device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
             self._widget_storage[device] = self._state_visualizer_widget
+
+            layout.addLayout(self._state_button_layout)
+
+
+
+    @QtCore.Slot(object)
+    def _category_filter_changed(self, category):
+        ''' called when the state category filter is changed '''
+        self._state_category_filter = category
+        self.populateState(self._state_button_layout)
+
+
 
 
     def hideState(self):
@@ -568,8 +653,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
     def refreshState(self):
         if self._state_visualizer_widget:
-            layout = self._state_visualizer_widget.layout()
-            self.populateState(layout)
+            self.populateState(self._state_button_layout)
         
 
     @QtCore.Slot()

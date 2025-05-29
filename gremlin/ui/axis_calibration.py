@@ -249,12 +249,15 @@ class CalibrationData:
         self.device_guid = None # axis device guid this data applies to
         self.input_id = None # axis input id this data applies to
         self._is_centered = True # true if the axis is centered (has a center calibration value)
+        config = gremlin.config.Configuration()
+        config.changed.connect(self._configuration_changed)
         self.reset()
         
 
     def reset(self):
         ''' resets calibration data to defaults '''
         # do not reset center option
+        config = gremlin.config.Configuration()
         self._calibrated_min = -1.0
         self._calibrated_max = 1.0
         self._calibrated_center = 0.0 # used only if the stick is centered
@@ -263,9 +266,17 @@ class CalibrationData:
         self._deadzone_center_min = 0.0 # deadzone center left
         self._deadzone_center_max = 0.0 # deadzone center right
         self._inverted = False # true if inverted
-        self._trigger_threshold = 0.005 # trigger threshold
-        self._trigger_threshold_enabled = True
+        self._trigger_threshold_enabled = config.filter_axis_events
+        self._trigger_threshold = config.filter_axis_threshold
+        
         self._last_value = None # last value (normalized)
+
+    @QtCore.Slot(str)
+    def _configuration_changed(self, key : str, value):
+        if key == "filter_axis_events":
+            self._trigger_threshold_enabled = value
+        elif key == "filter_axis_threshold":
+            self._trigger_threshold = value
         
         
 
@@ -304,7 +315,7 @@ class CalibrationData:
         ''' compares two calibration objects to see if they map to the same object '''
         if other is None:
             return False
-        return self.device_guid == other.device_guid and self.input_id == other.input_id
+        return gremlin.util.compare_guid(self.device_guid, other.device_guid) and self.input_id == other.input_id
             
 
     @property
@@ -429,8 +440,15 @@ class CalibrationData:
             self._update()
 
 
-    def getValue(self, raw_value, normalize = True, return_process = False):
-        ''' gets the deadzoned, calibrated value for the input value -1.0 to +1.0 - if normalized is enabled, expects a dinput range value, if not, expects a -1 to +1 value'''
+    def getValue(self, raw_value, normalize = True, filter = False) -> float | tuple:
+        ''' gets the deadzoned, calibrated value for the input value -1.0 to +1.0 - if normalized is enabled, expects a dinput range value, if not, expects a -1 to +1 value
+        
+        :param raw_value: the raw input value to process
+        :param normalize: normalizes the raw input to -1 +1
+        :param filter: enables axis filtering (also requires configuration options to enable filtering)
+        :returns : single float value, or (value, should_process) flag - if the flag is set - the value exceeds the min deviation threshold
+        
+        '''
 
         should_process = True
 
@@ -443,20 +461,17 @@ class CalibrationData:
         if self.inverted:
             normalized_value = gremlin.util.scale_to_range(normalized_value, invert = self.inverted) # just handle the inversion
         
-
-        
-
-        if return_process and self._trigger_threshold != 0:
+        if self._trigger_threshold_enabled and filter and self._trigger_threshold != 0:
             if self._last_value is None:
                 self._last_value = normalized_value
             else:
+                # see if we meet the deviation required
                 should_process = abs(self._last_value - normalized_value) > self._trigger_threshold
 
         value = 0.0
 
         if should_process:
-            if not normalize:
-                normalized_value = raw_value
+            
             if self._is_centered:
                 # account for center calibration left/right
                 value = gremlin.util.axis_calibration(normalized_value, self._calibrated_min, self.calibrated_center, self._calibrated_max)
@@ -474,7 +489,7 @@ class CalibrationData:
             else:
                 value = gremlin.util.scale_to_range(value, source_min=self.deadzone_min, source_max=self.deadzone_max)
             
-        if return_process:
+        if filter:
             return (value + 0.0, should_process)
         return value + 0.0
     
@@ -488,6 +503,7 @@ class CalibrationData:
         if not device_guid or device_guid == 'None':
             return # no calibration data
         self.device_guid = parse_guid(device_guid)
+        
         input_id = safe_read(node,"input-id", str, "")
         if input_id and input_id.isnumeric():
             self.input_id = int(input_id)
@@ -564,6 +580,8 @@ class CalibrationManager():
 
     def getCalibration(self, device_guid, input_id) -> CalibrationData:
         ''' gets calibration data for a given device/axis '''
+        device_guid = gremlin.util.normalize_guid(device_guid)
+
         if not device_guid in self.calibration_map:
             self.calibration_map[device_guid] = {}
         if not input_id in self.calibration_map[device_guid]:
@@ -586,7 +604,18 @@ class CalibrationManager():
 
 
 
-            
+    def clearCalibration(self, device_guid, input_id):
+        ''' clears a calibration entry '''
+        device_guid = gremlin.util.normalize_guid(device_guid)
+        if device_guid in self.calibration_map:
+            if input_id in self.calibration_map[device_guid]:
+                calibration = self.calibration_map[device_guid][input_id]
+                calibration.reset()
+                del self.calibration_map[device_guid][input_id]
+                self._save()
+                el = gremlin.event_handler.EventListener()
+                el.calibration_changed.emit(calibration)
+                                                     
     
 
     def _load(self):
@@ -615,13 +644,19 @@ class CalibrationManager():
         
             root = etree.Element("root")
             for device_guid in self.calibration_map.keys():
+                device = gremlin.joystick_handling.device_info_from_guid(device_guid)
                 for input_id in self.calibration_map[device_guid]:
-                    data = self.calibration_map[device_guid][input_id]
-                    node = data.to_xml()
-                    root.append(node)
+                    data : CalibrationData = self.calibration_map[device_guid][input_id]
+                    if data.hasData:
+                        node_comment = etree.Comment(f"{device.name} axis {input_id}")
+                        root.append(node_comment)
+                        node = data.to_xml()
+                        root.append(node)
 
             try:
                 tree = etree.ElementTree(root)
+                if os.path.isfile(self.calibration_file):
+                    os.unlink(self.calibration_file)
                 tree.write(self.calibration_file, pretty_print=True,xml_declaration=True,encoding="utf-8")
                 syslog.info(f"Calibration data saved.")
             except Exception as ex:
@@ -933,7 +968,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         if not event.is_axis:
             return 
         
-        if event.device_guid != self.action_data.device_guid:
+        if not gremlin.util.compare_guid(event.device_guid, self.action_data.device_guid):
             return
         
         if event.identifier != self.action_data.input_id:

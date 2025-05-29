@@ -2188,7 +2188,7 @@ class Profile():
         self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
         self._substitution_map = {} # map of device GUID to any new device GUID for the load process
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
-        
+        self._loaded = False
         self.state = gremlin.ui.state_device.StateData()
         self.state.clear()
 
@@ -2196,6 +2196,29 @@ class Profile():
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         
         self.initialize_regular_devices() # non joystick devices
+
+    def unload(self):
+        ''' unloads the current profile - clears all references and unhooks events '''
+        el = gremlin.event_handler.EventListener()
+        el.edit_mode_changed.disconnect(self._edit_mode_changed_cb)
+        self.devices : dict[Device] = {} # holds devices attached to this profile
+        self.vjoy_devices = {}
+        self.merge_axes = []
+        self.plugins = []
+        self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
+        self._substitution_map = {} # map of device GUID to any new device GUID for the load process
+        self._profile_graph = gremlin.profile_graph.ProfileGraph()
+        self.state.clear()
+        self._loaded = False
+        
+    @property
+    def loaded(self) -> bool:
+        ''' true if the profile loaded ok '''
+        return self._loaded
+
+    def setLoaded(self, value: bool):
+        ''' marks the profile as loaded '''
+        self._loaded = value
 
     @property
     def graph(self) -> gremlin.profile_graph.ProfileGraph:

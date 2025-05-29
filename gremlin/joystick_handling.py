@@ -128,13 +128,20 @@ def button_input_devices() -> list[DeviceSummary]:
     return devices
 
 
+
 def  is_hardware_device(device_guid) -> bool:
     ''' true if the device is a hardware device '''
     info : DeviceSummary = device_info_from_guid(device_guid)
     if info:
         return not info.is_special
+    # not found - could be a device that is disconnected
+    if device_guid:
+        id = gremlin.util.parse_guid(device_guid)
+        if id:
+            # assume disconnected
+            return True
     return False
-    #return device_guid in _joystick_device_guid_map
+    
 
 def vjoy_devices(connected_only = True) -> list[DeviceSummary]:
     """Returns the list of vJoy devices.

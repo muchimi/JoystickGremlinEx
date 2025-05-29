@@ -16,27 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import collections
+
 import logging
-import os
-import pickle
-import time
-from PySide6 import QtCore, QtGui, QtWidgets
+
 from lxml import etree as ElementTree
 
-from PySide6.QtGui import QIcon
-
-import gremlin.base_profile
 from gremlin.input_types import InputType
-import gremlin.keyboard
-import gremlin.macro
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
-import gremlin.ui.input_item
-import gremlin.input_devices
+
 from gremlin.input_devices import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
-import gremlin.types
 from gremlin.macro_handler import *
+
 
 syslog = logging.getLogger("system")
 
@@ -46,22 +37,28 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
-        self.macro = gremlin.macro.Macro()
+        self.macro = gremlin.macro.Macro(self.id)
         for seq in action.sequence:
             self.macro.add_action(seq)
         self.macro.exclusive = action.exclusive
         self.macro.repeat = action.repeat
+        
+        
 
     def process_event(self, event, value, extra_data = None):
 
-        trigger = event.is_axis or \
-            self.action_data.execute_on_press and event.is_pressed or \
-            self.action_data.execute_on_release and not event.is_pressed
+        trigger = self.action_data.execute_on_press and event.is_pressed or \
+                  self.action_data.execute_on_release and not event.is_pressed
         
         config = gremlin.config.Configuration()
         verbose = config.verbose
         
         if verbose: syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} {str(event)}")        
+
+
+        if not event.is_pressed:
+            if self.action_data.auto_stop and self.macro.state == gremlin.macro.MacroState.Running:
+                MacroFunctor.manager.terminate_macro(self.macro) # terminate existing running macro on release
         
         if not trigger:
             # do not execute
@@ -70,12 +67,20 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         if verbose: syslog.info(f"\texecute")
         
         
+        if self.action_data.auto_restart and self.macro.state == gremlin.macro.MacroState.Running:
+            MacroFunctor.manager.terminate_macro(self.macro) # terminate existing running macro for restart
+
+        # queue the macro        
         MacroFunctor.manager.queue_macro(self.macro)
         if isinstance(self.macro.repeat, gremlin.macro.HoldRepeat):
+            # gremlin.input_devices.ButtonReleaseActions().register_callback(
+            #     lambda: MacroFunctor.manager.terminate_macro(self.macro),
+            #     event
+            # )
+            release_event = event.release_event()
             gremlin.input_devices.ButtonReleaseActions().register_callback(
-                lambda: MacroFunctor.manager.terminate_macro(self.macro),
-                event
-            )
+                lambda: self.process_event(release_event, value, extra_data),
+                event, release_event)
         return True
 
 
@@ -113,7 +118,8 @@ class Macro(gremlin.base_profile.AbstractAction):
         self.force_remote = False
         self.execute_on_press = True # true if macro executes on input press/change
         self.execute_on_release = False # true if macro executs on input release
-        
+        self.auto_restart = False # true if the macro an auto-restart if retriggered before it finishes
+        self.auto_stop = False # true if the macro should stop when the input is released
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -142,11 +148,17 @@ class Macro(gremlin.base_profile.AbstractAction):
         self.force_remote = False
         self.execute_on_press = True # true if macro executes on input press/change
         self.execute_on_release = False # true if macro executs on input release
+        self.auto_restart = False
+        self.auto_stop = False
 
         if "execute-on-press" in node.attrib:
             self.execute_on_press = safe_read(node,"execute-on-press",bool,True)
         if "execute-on-release" in node.attrib:
             self.execute_on_release = safe_read(node,"execute-on-release",bool,True)
+        if "autorestart" in node.attrib:
+            self.auto_restart = safe_read(node, "autorestart", bool, False)
+        if "autostop" in node.attrib:
+            self.auto_stop = safe_read(node, "autostop", bool, False)
 
         # Read properties
         for child in node.find("properties"):
@@ -261,8 +273,10 @@ class Macro(gremlin.base_profile.AbstractAction):
             prop_node = ElementTree.Element("force_remote")
             properties.append(prop_node)
 
-        node.set("execute-on-press",str(self.execute_on_press))
-        node.set("execute-on-release",str(self.execute_on_release))
+        node.set("execute-on-press",safe_format(self.execute_on_press, bool))
+        node.set("execute-on-release",safe_format(self.execute_on_release, bool))
+        node.set("autorestart", safe_format(self.auto_restart, bool))
+        node.set("autostop", safe_format(self.auto_stop, bool))
 
         node.append(properties)
 

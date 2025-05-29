@@ -350,8 +350,8 @@ class ModuleManagementView(QtWidgets.QSplitter):
 
 
         # Button to add a new module
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        self.btn_add_module = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}list_add.svg"), "Add Plugin")
+       
+        self.btn_add_module = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.addIcon(), "Add Plugin")
         
         self.btn_add_module.clicked.connect(self._prompt_user_for_module)
 
@@ -454,13 +454,12 @@ class ModuleWidget(QBoxFrame):
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         if self.has_variables:
-            self.btn_add_instance = QtWidgets.QPushButton(
-                load_icon(f"gfx/{prefix}button_add.png"),""
-            )
+            icon = gremlin.ui.ui_common.Icons.addIcon()
+            self.btn_add_instance = QtWidgets.QPushButton(icon,"")
             header_layout.addWidget(self.btn_add_instance)
 
-        self.btn_delete = QtWidgets.QPushButton(
-            load_icon(f"gfx/{prefix}button_delete.png"),"")
+        icon = gremlin.ui.ui_common.Icons.removeIcon()
+        self.btn_delete = QtWidgets.QPushButton(icon,"")
         header_layout.addWidget(self.btn_delete)
 
         self.instance_layout = QtWidgets.QVBoxLayout()
@@ -504,17 +503,16 @@ class InstanceWidget(QtWidgets.QWidget):
 
         self.label_name = QtWidgets.QLabel(self.name)
 
-        self.btn_rename = QtWidgets.QPushButton(
-            load_icon(f"gfx/{prefix}button_edit.png"), ""
-        )
+        self.btn_rename = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.editIcon(), "")
         self.btn_rename.setToolTip("Rename this instance")
 
         self.btn_rename.clicked.connect(self.rename_instance)
         self.btn_configure = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.gearIcon(qta_color=icon_color), "")
         self.btn_configure.setToolTip("Configure this instance")
-        self.btn_delete = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_delete.png"), "")
+        self.btn_delete = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.removeIcon(), "")
         self.btn_delete.setToolTip("Delete this instance")
-        self.btn_copy = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_copy.svg"),"")
+
+        self.btn_copy = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.copyIcon(),"")
         self.btn_copy.setToolTip("Copy this instance")
 
         self.main_layout.addWidget(self.label_name)

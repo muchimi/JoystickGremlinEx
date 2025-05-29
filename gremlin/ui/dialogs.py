@@ -456,28 +456,39 @@ class OptionsUi(ui_common.BaseDialogUi):
 
 
         self.highlight_hotkey_autoswitch = QtWidgets.QCheckBox("Allow autoswitch override on hotkey")
-        self.highlight_hotkey_autoswitch.clicked.connect(self._highlight_hotkey_autoswitch)
         self.highlight_hotkey_autoswitch.setChecked(self.config.highlight_hotkey_autoswitch)
         self.highlight_hotkey_autoswitch.setToolTip("This option enables automatic device tab switching between device if the hotkeys are pressed for the axis/button overrides even when the autoswitch option is off.")
-
+        self.highlight_hotkey_autoswitch.clicked.connect(self._highlight_hotkey_autoswitch)
 
         # Highlight input option
         self.highlight_input_axis = QtWidgets.QCheckBox("Highlight currently triggered axis")
         self.highlight_input_axis.clicked.connect(self._highlight_input_axis)
-        self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of detected axis input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a control key while moving an input.")
         self.highlight_input_axis.setChecked(self.config.highlight_input_axis)
+        self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of detected axis input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a control key while moving an input.")
+        
 
         # Highlight input option buttons
         self.highlight_input_buttons = QtWidgets.QCheckBox("Highlight currently triggered button")
+        self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
         self.highlight_input_buttons.clicked.connect(self._highlight_input_buttons)
         self.highlight_input_buttons.setToolTip("This otion will enable automatic selection and highlighting of detected button input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a shift key while pressing a button.")
-        self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
+        
 
 
         # Close to system tray option
         self.close_to_systray = QtWidgets.QCheckBox("Closing minimizes to system tray")
-        self.close_to_systray.clicked.connect(self._close_to_systray)
         self.close_to_systray.setChecked(self.config.close_to_tray)
+        self.close_to_systray.clicked.connect(self._close_to_systray)
+        
+        
+
+        # show import dialog on missing devices
+        self.import_prompt_widget = QtWidgets.QCheckBox("Import prompt on missing devices")
+        self.import_prompt_widget.setChecked(self.config.import_prompt_enabled)
+        self.import_prompt_widget.clicked.connect(self._import_prompt)
+        self.import_prompt_widget.setToolTip("When enabled, GremlinEx will prompt for profile import if a profile references a disconnected device")
+        
+        
 
         # enable ui at runtime
         self.enable_ui_runtime = QtWidgets.QCheckBox("Keep UI enabled when profile is active")
@@ -573,7 +584,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # use version names in log files
         self.enable_version_log_widget = QtWidgets.QCheckBox("Version based Configuration Data (restart required)")
-        self.enable_version_log_widget.setToolTip("If enabled, GremlinEx will use a versioned data folder.  Not recommended for regular users.")
+        self.enable_version_log_widget.setToolTip("If enabled, GremlinEx will use a versioned data folder.  Not recommended for normal usage.")
         self.enable_version_log_widget.setChecked(self.config.enable_log_version)
         self.enable_version_log_widget.clicked.connect(self._enable_version_log_changed)
 
@@ -698,6 +709,18 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
         self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
 
+
+        # axis event filtering
+        self.filter_axis_widget = QtWidgets.QCheckBox("Filter axis events")
+        self.filter_axis_widget.setChecked(self.config.filter_axis_events)
+        self.filter_axis_widget.clicked.connect(self._filter_axis_event_update)
+        self.filter_axis_widget.setToolTip("If enabled, axis inputs will be filtered and require a minimum deviation before being processed by GremlinEx")
+        self.filter_axis_threshold_widget = ui_common.QFloatLineEdit(min_range = 0.0, max_range = 1.0, step = 0.001)       
+        self.filter_axis_threshold_widget.setValue(self.config.filter_axis_threshold)
+        self.filter_axis_threshold_widget.valueChanged.connect(self._filter_axis_threshold_update)
+
+        filter_widget, _ = gremlin.ui.ui_common.getHContainer([self.filter_axis_widget, QtWidgets.QLabel("Threshold:"), self.filter_axis_threshold_widget])
+
         column_widget = QtWidgets.QWidget()
         column_widget.setContentsMargins(0,0,0,0)
         column_layout = QtWidgets.QGridLayout(column_widget)
@@ -751,6 +774,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         column_layout.addWidget(self.show_input_enable, row, col)
 
+
         # column 3
         col = 2
         row = 0
@@ -772,6 +796,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         column_layout.addWidget(widget, row, col)
         row+=1
         column_layout.addWidget(self.enable_version_log_widget, row, col)
+        row +=1
+        column_layout.addWidget(filter_widget, row, col)
+        row +=1
+        column_layout.addWidget(self.import_prompt_widget, row, col)
+        
 
 
         page_layout.addWidget(column_widget)
@@ -950,7 +979,8 @@ This setting is also available on a profile by profile basis on the profile tab,
         sort_process_widget.setToolTip("Sorts mappings by process")
 
         add_map_widget = QtWidgets.QPushButton("Add mapping")
-        add_map_widget.setIcon(load_icon("gfx/button_add.png"))
+        icon = gremlin.ui.ui_common.Icons.addIcon()
+        add_map_widget.setIcon(icon)
         add_map_widget.clicked.connect(self._add_profile_map_cb)
         add_map_widget.setToolTip("Adds a new application (process) to profile mapping entry")
 
@@ -1437,11 +1467,11 @@ This setting is also available on a profile by profile basis on the profile tab,
 
     @QtCore.Slot(bool)
     def _close_to_systray(self, checked):
-        """Stores closing to system tray preference.
-
-        :param clicked whether or not the checkbox is ticked
-        """
         self.config.close_to_tray = checked
+
+    @QtCore.Slot(bool)
+    def _import_prompt(self, checked):
+        self.config.import_prompt_enabled = checked
 
     @QtCore.Slot(bool)
     def _debug_ui(self, checked):
@@ -1716,26 +1746,30 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.default_action = value
         self.config.save()
 
-
+    @QtCore.Slot(bool)
     def _enable_remote_control(self, clicked):
         ''' updates remote control flag '''
         self.config.enable_remote_control = clicked
         self.config.save()
 
+    @QtCore.Slot(bool)
     def _enable_remote_broadcast(self, clicked):
         ''' updates remote broadcast flag '''
         self.config.enable_remote_broadcast = clicked
         self.config.save()
 
+    @QtCore.Slot(bool)
     def _enable_broadcast_speech(self, clicked):
         self.config.enable_broadcast_speech = clicked
         self.config.save()
 
-    def _remote_control_server_port(self, value):
+    @QtCore.Slot(int)
+    def _remote_control_server_port(self, value : int):
         ''' updates the remote control server port'''
         self.config.server_port = value
         self.config.save()
 
+    @QtCore.Slot(float)
     def _macro_axis_polling_rate(self, value):
         """Updates the config with the newly set polling rate.
 
@@ -1744,6 +1778,15 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.macro_axis_polling_rate = value
         self.config.save()
 
+    @QtCore.Slot(bool)
+    def _filter_axis_event_update(self, checked : bool):
+        self.config.filter_axis_events = checked
+    
+    @QtCore.Slot(float)
+    def _filter_axis_threshold_update(self, value : float):
+        self.config.filter_axis_threshold = value
+
+    @QtCore.Slot(float)
     def _macro_axis_minimum_change_value(self, value):
         """Updates the config with the newly set minimum change value.
 

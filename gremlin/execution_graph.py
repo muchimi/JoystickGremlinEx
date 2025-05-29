@@ -407,11 +407,14 @@ class ExecutionContext():
     def __init__(self):
        
         el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.connect(self.reset) # reload data on mode changes
+        el.edit_mode_changed.connect(self._edit_mode_changed) # reload data on mode changes
         #el.runtime_mode_changed.connect(self._runtime_mode_changed)
         el.profile_start.connect(self._profile_start) # reload data on profile start
         el.profile_changed.connect(self.reset) # reload data on profile change
         el.profile_modes_changed.connect(self.reset) # modes changed
+        self._reset()
+
+    def _reset(self):
 
         self._mode_tree = None
         self._mode_ancestors = {}  # map of mode branches by mode
@@ -432,6 +435,7 @@ class ExecutionContext():
         self._verbose_detailed = config.verbose_mode_exec_detailed
         self._verbose_condition = config.verbose_mode_condition
         self.used_items = {}  # nodes can only be used once
+        self._build_error = False # no error
         
 
     @property
@@ -475,12 +479,14 @@ class ExecutionContext():
         elif isinstance(condition, gremlin.base_conditions.StateCondition):
             return gremlin.actions.StateCondition(condition)
         
-        
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
         
-    def reset(self, force_rebuild = False):
+    def reset(self, force_rebuild = False, no_rebuild = False):
         ''' reloads the execution context to capture changes '''
         # syslog = logging.getLogger("system")
+
+        self._reset() # reset tracking data
+
         verbose = gremlin.config.Configuration().verbose_mode_exec
         if verbose: syslog.info("CONTEXT: reload")
         if not gremlin.shared_state.current_profile:
@@ -494,11 +500,14 @@ class ExecutionContext():
         rebuild = force_rebuild or self._last_hash is None or self._last_hash != profile_hash
 
         # builds the tree
-        if rebuild:
+        if rebuild and not no_rebuild:
             self._last_hash = profile_hash
-            self._rebuild()
+            if gremlin.shared_state.is_running or force_rebuild:
+                self._rebuild()
             
-            
+    @QtCore.Slot(str)
+    def _edit_mode_changed(self, mode):
+        pass
 
     def _rebuild(self):
         
@@ -1140,29 +1149,34 @@ class ExecutionContext():
 
             latched_conditions = [] # for gated axis, add latched conditions each item has to evaluate
 
-            container_parent = parent_group
+            return_node = None
+            container_node.parent = parent_group
 
             if container.has_virtual_button:
                 condition = gremlin.actions.VirtualButtonCondition(container.virtual_button)
                 virtual_condition_node = ExecutionGraphActivationConditionNode(condition)
                 virtual_condition_node.container = container
                 virtual_condition_node.functors = condition
-                virtual_condition_node.parent = container_parent
-                container_parent = virtual_condition_node
-                return_node = virtual_condition_node
+                virtual_condition_node.parent = container_node.parent
+                if not return_node:
+                    return_node = virtual_condition_node
                 latched_conditions.append(virtual_condition_node)
 
-            return_node = container_node
-            if container.has_conditions:
-                condition_node = self._get_condition_node(container, container_parent)
-                #condition_node.parent = container_parent
-                container_parent = condition_node
-                return_node = condition_node
+                # parent the container to the condition
+                container_node.parent = virtual_condition_node
 
+            
+            if container.has_conditions:
+                condition_node = self._get_condition_node(container, container_node.parent)
+                # parent the container to the new condition and parent the condition to the current parent
+                condition_node.parent = container_node.parent
+                container_node.parent = condition_node
+                if not return_node:
+                    return_node = condition_node
                 latched_conditions.append(condition_node)
 
-            container_node.parent = container_parent
-
+            if not return_node:
+                return_node = container_node # default return node is the container
 
             container_group = ExecutionGraphGroupNode()
             container_group.parent = container_node
@@ -1457,7 +1471,7 @@ class ExecutionContext():
                 for mode in device.modes.values():
                     mode_name = mode.name
                     if not mode_name in mode_nodes:
-                        syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.name}")
+                        syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.device.name}")
                         continue
 
                     

@@ -603,7 +603,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         self.keys = []
-        self.mode = KeyboardOutputMode.Both # pulse by default
+        self.mode = KeyboardOutputMode.Hold # hold by default
         #self._mode = KeyboardOutputMode.Both # pulse by default
         config = gremlin.config.Configuration()
         self._delay = config.last_keyboard_mapper_pulse_value # delay between make/break in milliseconds

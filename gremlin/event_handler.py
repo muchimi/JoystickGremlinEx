@@ -1127,11 +1127,10 @@ class EventListener(QtCore.QObject):
 		''' applies input curves to the input '''
 		return self._apply_curve_ex(event.device_guid, event.input_index, event.value)
 		
-	def _apply_calibration_ex(self, device_guid, input_id, value, return_process : bool = False) -> tuple:
-		''' applies calibration and deadzone data to the raw input - value -32768 to 32767, returns -1, +1 and optionally inverts the input, and the process flag '''
+	def _apply_calibration_ex(self, device_guid, input_id, value, filter : bool = False) -> tuple:
+		''' applies calibration and deadzone data to the raw input - value -32768 to 32767, returns -1, +1 and optionally inverts the input, and sets the process flag '''
 		calibration = self.calibrationManager.getCalibration(device_guid, input_id)
-		return calibration.getValue(value, return_process = return_process)
-
+		return calibration.getValue(value, filter = filter)
 
 		
 	def _apply_curve_ex(self, device_guid, input_id, value : float):

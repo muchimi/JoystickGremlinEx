@@ -336,6 +336,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self,
             device_profile,
             current_mode,
+            object_name = "KEYBOARD DEVICE CONTENT",
             parent=None
     ):
         """Creates a new object instance.
@@ -344,7 +345,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(object_name, parent)
         
 
         # Store parameters
@@ -371,12 +372,6 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
 
         self.addLeftPanelWidget(self.input_item_list_view)
-        
- 
-
-        widget = InputItemConfiguration()
-        
-        self.setRightPanelWidget(widget)
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -410,11 +405,11 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         el.config_changed.connect(self._config_changed_cb)
 
-
         # Select default entry
         selected_index = self.input_item_list_view.current_index
-        if selected_index is not None:
+        if selected_index is not None and selected_index != -1:
             self._select_item_cb(selected_index)
+
 
 
     def _reload_model(self, mode = None):
@@ -465,7 +460,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
 
-        widget = InputItemConfiguration()
+        widget = InputItemConfiguration("Blank inputconfig for keyboard device (clear keys)")
         self.setRightPanelWidget(widget)
 
     def _add_key_dialog_cb(self):
@@ -562,9 +557,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 item_data = self.input_item_list_model.data(0)
                 index = 0
             else:
-                # no input to select
-                widget = InputItemConfiguration()
-                self.setRightPanelWidget(widget)
+                self._blank_input()
                 return
         else:
             item_data = self.input_item_list_model.data(index)
@@ -578,7 +571,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             config = gremlin.config.Configuration()
             config.set_last_input(device_guid, input_type, input_id)
 
-            widget = InputItemConfiguration(item_data)
+            widget = InputItemConfiguration(item_data, object_name = f"Keyboard InputItemConfig for: {item_data.display_name}")
+            widget.setObjectName()
             self.setRightPanelWidget(widget)
             
             # Create new configuration widget
@@ -589,7 +583,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             self.input_item_list_view.select_item(index, False)
         else:
-            widget = InputItemConfiguration()
+            widget = InputItemConfiguration(object_name = "Blank inputitemconfig for keyhboard device (select item cb - no item data)")
             self.setRightPanelWidget(widget)
 
         self._last_selected_index = index           
@@ -734,6 +728,6 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         if not self.input_item_list_model.rows():
             # display blank page if no item left
-            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
+            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration(object_name="KEYBOARD Blank InputConfigItem (close_item_cb)")
             self.setRightPanelWidget(self._item_data)
 

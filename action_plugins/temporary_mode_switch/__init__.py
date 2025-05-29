@@ -47,7 +47,7 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
-        self.mode_selector_widget.activated.connect(self._mode_list_changed_cb)
+        self.mode_selector_widget.currentIndexChanged.connect(self._mode_list_changed_cb)
         self.main_layout.addWidget(self.mode_selector_widget)
         self._update_modes()
 
@@ -84,7 +84,7 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
     def _mode_list_changed_cb(self):
-        self.action_data.mode_name = self.mode_selector_widget.currentData()
+        self.action_data.mode_name = self.mode_selector_widget.currentText()
         self.action_modified.emit()
 
     def _populate_ui(self):
@@ -97,6 +97,9 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
             if index == -1:
                 index = 0
         self.mode_selector_widget.setCurrentIndex(index)
+        if not mode:
+            # set the default mode if not set
+            self.action_data.mode_name = self.mode_selector_widget.currentText()
 
 
 class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
@@ -129,9 +132,10 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
                 if verbose: syslog.info(f"Temporary mode change: saved current mode [{current_mode}] as the restore mode")
                 self.action_data.restore_mode = current_mode
                 if verbose: syslog.info(f"Temporary mode change: change mode to [{next_mode}] (the restore mode is [{current_mode}])")
-                gremlin.event_handler.EventHandler().change_mode(next_mode)
                 if verbose: syslog.info(f"Temporary mode change: register callback")
                 gremlin.input_devices.ButtonReleaseActions().register_callback(lambda : self._restore_callback(current_mode), event)
+                gremlin.event_handler.EventHandler().change_mode(next_mode)
+             
             else:
                 # nothing to come back to
                 if verbose: syslog.info(f"Temporary mode change: [{current_mode}] (no change because current mode is the same as the requested temporary mode)")
@@ -210,8 +214,7 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
         return node
 
     def _is_valid(self):
-        return len(self.mode_name) > 0
-
+        return True
 
 version = 1
 name = "temporary-mode-switch"

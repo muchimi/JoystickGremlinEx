@@ -37,11 +37,11 @@ syslog = logging.getLogger("system")
 
 import gremlin.singleton_decorator
 @gremlin.singleton_decorator.SingletonDecorator
-class Configuration:
+class Configuration(QtCore.QObject):
 
-    """Responsible for loading and saving configuration data."""
+    ''' configuration data '''
 
-
+    changed = QtCore.Signal(str, object) # fires on some configuration value changes, passes the method to get the value that has changed
 
     def get_config(self):
         ''' local config file (version based)'''
@@ -57,6 +57,8 @@ class Configuration:
 
     def __init__(self):
         """Creates a new instance, loading the current configuration."""
+        import gremlin.util
+        super().__init__()
 
         self._data = {} # gremlin items - version specific
         self._profile_data = {}  # profile specific options 
@@ -71,6 +73,12 @@ class Configuration:
 
 
         fname = self.get_config()
+        basedir = os.path.dirname(fname)
+        if not os.path.isdir(basedir):
+            if not gremlin.util.create_folder(basedir):
+                gremlin.util.display_error(f"Unable to create data folder: {basedir}.\nCheck that you have the permissions to create this folder or create it manually.")
+                
+
         if not os.path.isfile(fname):
             # create a stub - first time run
             self.save()
@@ -159,60 +167,7 @@ class Configuration:
             else:
                 app_path = user_profile_path
 
-            # # write the last version file
-            # version_data = []
-            # xml_source = os.path.join(user_profile_path, "versions.xml")
-            # if os.path.isfile(xml_source):
-            #     # load the prior data
-            #     parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-            #     tree = etree.parse(xml_source, parser = parser)
-            #     root = tree.getroot()
-            #     for node in root:
-            #         version = node.get("version")
-            #         timestamp = float(node.get("stamp"))
-            #         dtstamp = datetime.datetime.fromtimestamp(timestamp)
-            #         version_data.append((version, dtstamp))
-            # else:
-            #     # blank root
-            #     root = etree.Element("root")
-
-
-
-            # # sort by most recent
-            # version_data.sort(key = lambda x: x[1], reverse = True )
-            # most_recent_version = None
-            # version_list = [vs for vs, dt in version_data]
-
-            # if version_list:
-            #     most_recent_version = version_list[0]
-            #     source_path = os.path.join(user_profile_path, most_recent_version)
-            # else:
-                
-            #     source_path = user_profile_path
-
-
-            # current_version = self._clean_version()
-            # if not current_version in version_list:
-            #     timestamp = datetime.datetime.now().timestamp()
-            #     node = etree.SubElement(root,"data", version = current_version, stamp = str(timestamp))
-            #     version_list.append((current_version, timestamp))
-
-            #     # write out the updated version file
-            #     try:
-            #         tree = etree.ElementTree(root)
-            #         tree.write(xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
-            #     except Exception as ex:
-            #         syslog.error(f"Failed to update version file. Error: {ex}")
-
-            
-            # # copy the data over if needed
-            # if enable_version and source_path != app_path:
-            #     gremlin.util.create_folder(app_path)
-            #     try:
-            #         gremlin.util.copy_tree_if_newer(source_path, app_path)
-            #         syslog.info(f"Version change detected: Merged contents from [{most_recent_version}] to new version [{current_version}]: new data folder {app_path}")
-            #     except Exception as ex:
-            #         syslog.error(f"Failed to copy source folder: {source_path} to app folder {app_path}: rror: {ex}")
+     
             self._app_path = app_path
 
 
@@ -316,11 +271,14 @@ class Configuration:
 
     def save(self):
         """Writes the version specific configuration file to disk."""
-        fname = self.get_config() 
-        with open(fname, "w") as hdl:
-            encoder = json.JSONEncoder(sort_keys=True,indent=4)
-            hdl.write(encoder.encode(self._data))
-        pass
+        try:
+            fname = self.get_config() 
+            with open(fname, "w") as hdl:
+                encoder = json.JSONEncoder(sort_keys=True,indent=4)
+                hdl.write(encoder.encode(self._data))
+        except Exception as ex:
+            syslog.error("CONFIG: unable to save file:")
+            syslog.error(ex)
 
 
     def save_profile(self):
@@ -2205,8 +2163,74 @@ class Configuration:
         self._set_registry("enable_log_version", value)
         
 
-
-       
-
-                    
+    @property
+    def filter_axis_events(self) -> bool:     
+        ''' true if axis data filtering is enabled '''
+        return self._get_data("filter_axis_events",False)
+    @filter_axis_events.setter
+    def filter_axis_events(self, value : bool):
+        if value != self.filter_axis_events:
+            self._data["filter_axis_events"] = value
+            self.save()
+            self.changed.emit("filter_axis_events", value)
             
+
+    @property
+    def filter_axis_threshold(self) -> float:
+        ''' axis filter deviation threshold '''
+        return self._get_data("filter_axis_threshold",0.002)
+    
+    @filter_axis_threshold.setter
+    def filter_axis_threshold(self, value : float):
+        if self.filter_axis_threshold != value and value >= 0 and value <= 1.0:
+            self.filter_axis_threshold = value
+            self.save()
+            self.changed.emit("filter_axis_threshold", value)
+
+
+    @property
+    def input_viewer_button_size(self) -> int:
+        return self._get_data("input_viewer_button_size", 16)
+    @input_viewer_button_size.setter
+    def input_viewer_button_size(self, value : int):
+        self._data["input_viewer_button_size"] = value
+        self.save()
+        self.changed.emit("input_viewer_button_size", value)
+
+    @property
+    def state_category_filter(self) -> str:
+        ''' category filter for the state device '''
+        return self._get_data("state_category_filter",None)
+    @state_category_filter.setter
+    def state_category_filter(self, value : str):
+        self._data["state_category_filter"] = value
+        self.save()
+
+    @property
+    def state_filter_enabled(self) -> bool:
+        ''' enables state filtering in the state device '''
+        return self._get_data("state_filter_enabled",False)
+    @state_filter_enabled.setter
+    def state_filter_enabled(self, value : bool):
+        self._data["state_filter_enabled"] = value
+        self.save()
+
+
+    @property
+    def osc_filter_enabled(self) -> bool:
+        ''' enables osc filtering in the osc device '''
+        return self._get_data("osc_filter_enabled",False)
+    @osc_filter_enabled.setter
+    def osc_filter_enabled(self, value : bool):
+        self._data["osc_filter_enabled"] = value
+        self.save()
+
+        
+    @property
+    def import_prompt_enabled(self) -> bool:
+        ''' enables import prompt dialog box on missing devices  '''
+        return self._get_data("import_prompt_enabled",False)
+    @import_prompt_enabled.setter
+    def import_prompt_enabled(self, value : bool):
+        self._data["import_prompt_enabled"] = value
+        self.save()

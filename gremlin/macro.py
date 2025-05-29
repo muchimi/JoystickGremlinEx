@@ -40,7 +40,8 @@ import gremlin.keyboard
 import gremlin.sendinput
 import gremlin.input_devices
 import gremlin.util
-
+import enum
+from enum import auto
 
 syslog = logging.getLogger("system")
 
@@ -49,6 +50,14 @@ MacroEntry = collections.namedtuple(
     "MacroEntry",
     ["macro", "state", "is_local", "is_remote"]
 )
+
+class MacroState(enum.Enum):
+    ''' macro scheduling states '''
+    Idle = auto() # macro is not running and not scheduled
+    Running = auto() # macro is actively running
+    Scheduled = auto() # macro is schedule to run
+    Abort = auto() # macro abort
+
 
 
 def _create_function(lib_name, fn_name, param_types, return_type):
@@ -367,8 +376,17 @@ class MacroManager(QtCore.QObject):
         :param completion_callback: callback to call when the step completes, optional params(id) where ID is the macro step id returned by the call
         :returns id: a unique ID for the macro step
         """
-        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
+
+        if macro.state != MacroState.Idle:
+            if verbose: syslog.info(f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle.")
+            return
+        
+        macro.state = MacroState.Scheduled
+
+
+        # syslog = logging.getLogger("system")
+        
         if verbose:
             syslog.info(f"MACRO: queue macro ID [{macro.id}]")
             action : MacroAbstractAction
@@ -409,10 +427,20 @@ class MacroManager(QtCore.QObject):
         """
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
-        if verbose: syslog.info(f"MACRO: terminate macro [{macro.id}]")
+        if verbose: syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminate requested.")
+        
         with self._queue_lock:
             self._queue.append(MacroEntry(macro, False, macro.is_local, macro.is_remote))
+            macro.abort() # abort the macro
         self._schedule_event.set()
+
+        # wait for it to terminate
+        while macro.id in self._active:
+            time.sleep(0.01)
+
+        # mark it terminated
+        if verbose: syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminated.")
+        macro.state = MacroState.Idle
 
     def _run_scheduler(self):
         """Dispatches macros as required."""
@@ -438,6 +466,7 @@ class MacroManager(QtCore.QObject):
                             # Terminate currently running macro
                             with self._flags_lock:
                                 self._flags[entry.macro.id] = False
+                                
                             
                             # Remove all queued up macros with the same id as
                             # they should have been impossible to queue up
@@ -466,6 +495,7 @@ class MacroManager(QtCore.QObject):
                 # Remove all entries we've processed
                 for entry in entries_to_remove:
                     if entry in self._queue:
+                     
                         self._queue.remove(entry)
 
     def _dispatch_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None):
@@ -475,8 +505,9 @@ class MacroManager(QtCore.QObject):
         :param is_local true if local control, set to None to use the macro flag
         :param is_remote true if remote control, set to None to use the macro flag
         """
-        if macro.id not in self._active:
+        if macro.id not in self._active and not macro.state == MacroState.Running:
             self._active[macro.id] = macro # add the macro to the active queue
+            macro.state = MacroState.Running
             Thread(target=functools.partial(self._execute_macro, macro, is_local, is_remote)).start()
         else:
             syslog.warning(f"Attempting to dispatch an already running macro: ID: {macro.id}")
@@ -517,8 +548,9 @@ class MacroManager(QtCore.QObject):
             if isinstance(macro.repeat, CountRepeat):
                 count = 0
                 if verbose: syslog.info(f"\tMACRO: autorepeat id [{macro.id}]")
-                while count < macro.repeat.count and self._flags[macro.id]:
+                while count < macro.repeat.count and self._flags[macro.id] and not macro.aborted:
                     for action in macro.sequence:
+                        if macro.aborted: break
                         if verbose: syslog.info(f"\tAction: {str(action)}")
                         action(is_local, is_remote)
                     count += 1
@@ -526,8 +558,9 @@ class MacroManager(QtCore.QObject):
 
             # Handle continuous repeat modes
             elif type(macro.repeat) in [HoldRepeat, ToggleRepeat]:
-                while self._flags[macro.id]:
+                while self._flags[macro.id] and not macro.aborted:
                     for action in macro.sequence:
+                        if macro.aborted: break
                         action(is_local, is_remote)
                     time.sleep(delay)
 
@@ -538,10 +571,13 @@ class MacroManager(QtCore.QObject):
                 msg = "".join(f"{str(a)} " for a in macro.sequence)
                 syslog.info(f"\tMACRO: single shot: id: [{macro.id} {len(macro.sequence)} {msg}")
             for action in macro.sequence:
+                if macro.aborted:
+                    break
                 action(is_local, is_remote, macro.force_remote)
 
 
-        if verbose: syslog.info(f"MACRO: completed macro id [{macro.id}]")
+        macro.state = MacroState.Idle
+        if verbose: syslog.info(f"MACRO: [{macro.id}] owner [{macro.ownerId}] completed.")
 
         # indicate the macro is done
         if macro.completed_callback:
@@ -591,7 +627,7 @@ class Macro:
     # Unique identifier for each macro - bumps by one for each new macro
     _next_macro_id = 0
 
-    def __init__(self, is_local = None, is_remote = None, force_remote = None):
+    def __init__(self, owner_id : str = None, is_local = None, is_remote = None, force_remote = None):
         """Creates a new macro instance.
         
         :is_local: if set, sends the macro output to the local client
@@ -600,13 +636,15 @@ class Macro:
         
         """
         self._sequence = []
+        self._owner_id = owner_id # who owns this macro
         self._id = Macro._next_macro_id
         Macro._next_macro_id += 1
         self.repeat = None
         self.exclusive = False
         self.completed_callback = None # callback called when macro completes
-
+        self._state = MacroState.Idle
         
+
 
         # flag set if we're forcing remote mode execution
         if force_remote:
@@ -630,6 +668,28 @@ class Macro:
     def id(self) -> int:
         ''' unique macro id'''
         return self._id
+    
+    @property 
+    def aborted(self):
+        return self._state == MacroState.Abort
+    
+    def abort(self):
+        ''' tell the macro to abort '''
+        self._state = MacroState.Abort
+    
+    @property
+    def state(self) -> MacroState:
+        return self._state
+    @state.setter
+    def state(self, value : MacroState):
+        self._state = value
+    
+    @property
+    def ownerId(self) -> str:
+        return self._owner_id
+    @ownerId.setter
+    def ownerId(self, value : str):
+        self._owner_id = value
     
     @property
     def force_remote(self) -> bool:
@@ -835,10 +895,17 @@ class KeyAction(MacroAbstractAction):
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.is_pressed:
             if verbose: syslog.info(f"MACRO: send key make: {self.key}")
-            _send_key_down(self.key, is_local, is_remote, force_remote)
+            if self.key.is_mouse:
+                _send_mouse_button(self.key.mouse_button, True, is_local, is_remote, force_remote)
+                
+            else:
+                _send_key_down(self.key, is_local, is_remote, force_remote)
         else:
             if verbose: syslog.info(f"MACRO: send key break: {self.key}")
-            _send_key_up(self.key, is_local, is_remote, force_remote)
+            if self.key.is_mouse:
+                _send_mouse_button(self.key.mouse_button, False, is_local, is_remote, force_remote)
+            else:
+                _send_key_up(self.key, is_local, is_remote, force_remote)
 
     def __str__(self):
         if self.key:

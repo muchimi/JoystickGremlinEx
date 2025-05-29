@@ -35,6 +35,8 @@ from types import FunctionType, MethodType
 from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
+import win32gui, win32con
+
 
 
 from . import error
@@ -268,6 +270,8 @@ def display_error(msg):
         app = QtWidgets.QApplication()
         app_created = True
 
+    QtWidgets.QApplication.restoreOverrideCursor()
+
     box = QtWidgets.QMessageBox(
         QtWidgets.QMessageBox.Critical,
         "Joystick Gremlin Ex Error",
@@ -431,23 +435,58 @@ def hat_direction_to_tuple(value):
 
 
 
+_logtabs = ""
+_cleaned_widgets = []
 
 def clear_layout(layout):
     """Removes all items from the given layout.
 
     :param layout the layout from which to remove all items
     """
+    # global _logtabs,_cleaned_widgets
+    
+    # _logtabs += " "
+    
+    if isinstance(layout, QtWidgets.QWidget):
+        widget = layout
+        layout = widget.layout()
+        # if not widget in _cleaned_widgets:
+        #     _cleaned_widgets.append(widget)
+        #     has_cleanup  = hasattr(widget,"_cleanup_ui")
+        #     # syslog.info(f"{_logtabs}CLEAN: {type(widget)} cleanup: {has_cleanup}")
+            
+        #     if has_cleanup:
+        #         widget._cleanup_ui()
+        #     _cleaned_widgets.remove(widget)
+            
+    # if layout is not None:
+    #     try:
+    #         while layout.count() > 0:
+    #             child = layout.takeAt(0)
+    #             widget = child.widget()
+    #             if widget is not None:
+    #                 clear_layout(widget)
+    #             layout.removeItem(child)
+    #     except:
+    #         # QT garbage collected the object already
+    #         pass
+
+    # _logtabs = _logtabs[:-1]
+
 
     while layout.count() > 0:
         child = layout.takeAt(0)
         if child.layout():
             clear_layout(child.layout())
         elif child.widget():
-            if hasattr(child,"_cleanup_ui"):
-                child._cleanup_ui()
-            child.widget().hide()
-            child.widget().deleteLater()
+            widget = child.widget()
+            if hasattr(widget,"_cleanup_ui"):
+                widget._cleanup_ui()
+            widget.hide()
+            widget.deleteLater()
         layout.removeItem(child)
+
+    
 
 def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
     ''' returns a list of layout widgets '''
@@ -463,6 +502,26 @@ def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
         index -= 1
 
     return widgets
+
+def dumpWidgets(widget, title = None):
+        ''' outputs layout contents to the log file '''
+        layout = widget.layout() if isinstance(widget, QtWidgets.QWidget) else widget
+        if layout:
+            widgets = get_layout_widgets(layout)
+            if title:
+                syslog.info(f"---------------- widget dump for {title}--------------------")    
+            else:
+                syslog.info("---------------- widget dump --------------------")
+            if widgets:
+                for widget in widgets:
+                    w_text = widget.text() if hasattr(widget,"text") else ""
+                    w_value = str(widget.value()) if hasattr(widget,"value") else ""
+                    w_name = widget.objectName()
+                    syslog.info(f"\tWidget: [{type(widget)}] name: [{w_name}] text: [{w_text}] value: [{w_value}]")
+            else:
+                syslog.info("\tNo widgets.")
+            
+
 
 def layout_contains(layout, widget):
     ''' true if widget is contained in the given layout '''
@@ -1429,8 +1488,8 @@ _cursor_push = 0
 def pushCursor():
     global _cursor_push
     if _cursor_push == 0:
-        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
-        #QtWidgets.QApplication.processEvents()
+        #win32gui.LoadCursor(0, win32con.IDC_WAIT)
+        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
     _cursor_push+=1
 
 def popCursor(reset = False):
@@ -1439,8 +1498,9 @@ def popCursor(reset = False):
     if _cursor_push > 0:
         _cursor_push -= 1
     if _cursor_push == 0 or reset:
+        #win32gui.LoadCursor(0, win32con.IDC_ARROW)
         QtWidgets.QApplication.restoreOverrideCursor()
-        #QtWidgets.QApplication.processEvents()
+        
 
 def popCursorTemporary(pop = True):
     ''' restore cursor temporarily without changing the stack - use for dialog boxes/prompt
@@ -1453,7 +1513,7 @@ def popCursorTemporary(pop = True):
         if pop:
             QtWidgets.QApplication.restoreOverrideCursor()  
         else:
-            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
+            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
         
 
 
@@ -2026,3 +2086,27 @@ def isNumeric(input_string):
     
     
     return True
+
+
+def normalize_guid(device_guid) -> str:
+    ''' normalizes a device GUID to a string'''
+    if not isinstance(device_guid, str):
+        device_guid = str(device_guid)
+    return device_guid.casefold()
+
+def compare_guid(id1, id2) -> bool:
+    ''' compares two GUIDs and returns true if equal '''
+    id1 = normalize_guid(id1)
+    id2 = normalize_guid(id2)
+    return id1 == id2
+
+def getTemporaryFile(ext = None):
+    ''' gets a temporary file '''
+    tmp_file = os.path.join(userprofile_path(), get_guid())
+    if ext:
+        if not ext.startswith("."):
+            tmp_file += "."
+        tmp_file += ext
+    return tmp_file
+
+    
