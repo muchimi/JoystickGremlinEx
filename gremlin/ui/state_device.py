@@ -1431,7 +1431,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self,
             device_profile,
             current_mode,
-            object_name = "STATE DEVICE CONTENT",
+            object_name = "State Device",
             parent=None
     ):
         """Creates a new object instance.
@@ -1542,6 +1542,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             selected_index = -1
         self._select_item_cb(selected_index)
 
+
     def _show_clear_cb(self):
         return self.input_item_list_model.rows() > 0
 
@@ -1606,14 +1607,13 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._edit_dialog.showNormal()
         self._index = index
 
-
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
-        
+        key = self.getRegisteredKeyIndex(index)
+        self.unregisterWidget(key)
         if not self.input_item_list_model.rows():
             # display blank page if no item left
-            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration(object_name="STATE Blank InputConfigItem (no rows)")
-            self.setRightPanelWidget(self._item_data)         
+            self._blank_input()
 
     def _dialog_ok_cb(self):        
         ''' called when edit dialog closes with ok '''
@@ -1725,6 +1725,10 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sorted_keys = list(mode.config[InputType.State].keys())
         return sorted_keys.index(input_id)
     
+     
+    def getWidgetKey(self, input_id):
+        ''' gets the content widget compound key for the item / input combination'''
+        return (self.device_guid, input_id)
 
     def _select_item_cb(self, index):
         """Handles the selection of an input item.
@@ -1746,35 +1750,39 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.input_item_list_view.select_item(index, False)
         
         
-        input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        item_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        input_id = item_data.input_id
+        key = self.getWidgetKey(input_id)
+        widget = self.getRegisteredWidget(key)
+        if not widget:
+            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"STATE: {item_data.input_id.key}")
+            self.registerWidget(key, widget)
+
+        self._item_data = item_data
         
-        widget = gremlin.ui.joystick_device.InputItemConfiguration(input_data, object_name=f"STATE: {input_data.input_id.key}")
-        self._item_data = widget
-        self.setRightPanelWidget(widget)
 
         # remember the last input
         config = gremlin.config.Configuration()
         device_guid = self.device_guid
         input_type = InputType.OpenSoundControl
-        input_id = input_data.input_id if input_data else None
+        input_id = item_data.input_id if item_data else None
         
 
         config.set_last_input(device_guid, input_type, input_id)
 
-        if input_data:
-            
-            # Create new configuration widget
-            input_data.is_axis = False
-            change_cb = self._create_change_cb(index)
-            self._item_data.action_model.data_changed.connect(change_cb)
-            self._item_data.description_changed.connect(change_cb)
+        # Create new configuration widget
+        item_data.is_axis = False
+        change_cb = self._create_change_cb(index)
+        widget.action_model.data_changed.connect(change_cb)
+        widget.description_changed.connect(change_cb)
 
-            self.input_item_list_view.select_item(index,False)
+        self.input_item_list_view.select_item(index,False)
 
 
         self._last_selected_index = index
-        el = gremlin.event_handler.EventListener()
-        el.input_selection_changed.emit(device_guid, input_type, input_id)
+        self.selectRegisteredWidget(key)
+        # el = gremlin.event_handler.EventListener()
+        # el.input_selection_changed.emit(device_guid, input_type, input_id)
 
     def _custom_filter_handler(self, data) -> bool:
         ''' evaluates if the item should be included or not based on current input filters '''

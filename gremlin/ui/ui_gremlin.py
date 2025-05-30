@@ -36,11 +36,9 @@ class Ui_Gremlin(object):
         self.tab_bar_layout.addStretch(2)
 
         # content panel below the tab
-        self.tab_content_widget = QtWidgets.QWidget(self.main)
-        self.tab_content_widget.setContentsMargins(0,0,0,0)
-        #self.tab_content_widget.setStyleSheet("background: green")
-        self.tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
-        self.tab_content_layout.setContentsMargins(0,0,0,0)
+        self.tab_content_widget, layout = gremlin.ui.ui_common.getVContainer()
+        self.device_widget = QtWidgets.QStackedWidget()
+        layout.addWidget(self.device_widget)
         
         
         self.main_layout.addWidget(self.tab_bar_widget)

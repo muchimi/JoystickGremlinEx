@@ -388,7 +388,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     def _init_tab_data(self):
-        self._widget_cache = {} # map of device widgets keyed by the device GUID
+        self._widget_device_index_map = {} # map of device widgets keyed by the device GUID
+        self._widget_index_device_map = {}
 
     def _reset_tab_data(self):
         
@@ -396,7 +397,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._tab_device_map = {} # map of tab positions index mapped by device guid for the tab header (device_guid -> index)
         self._tab_name_map = {} # map fo device guid to device name for tabs
         
-        self._current_tab_widget = None # selected content widget for the current device
+        # self._current_tab_widget = None # selected content widget for the current device
         self._current_tab_device_guid = None # selected device GUID
         self._current_tab_input_id = None # selected input in the current tab
         self._joystick_device_guids = []
@@ -444,7 +445,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             return
         device_name = device.name
         if device_name == "Controller (XBOX 360 For Windows)":
-            widget = self.getWidget(device_guid)
+            widget = self.getRegisteredWidget(device_guid)
             device_profile = self.profile.get_device_modes(
                     device.device_guid,
                     DeviceType.Joystick,
@@ -455,11 +456,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                 device,
                 device_profile,
                 self.current_mode,
-                object_name= f"XBOX DEVICE: {device_name}"
+                object_name= f"Game Controller [{device_name}]"
                 )
                 widget.data = (TabDeviceType.VjoyInput, device_guid, index)
                 self.registerWidget(device_guid, widget)
-                gremlin.shared_state.device_widget_map[device.device_guid] = widget
+                #gremlin.shared_state.device_widget_map[device.device_guid] = widget
 
         if index is None:
             position = self.ui.devices.addTab(device_name)
@@ -1174,7 +1175,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._profile_auto_activated = False
                 current_index = self.ui.devices.currentIndex()
                 device_guid = self.getDeviceGuidForTabIndex(current_index)
-                widget = self.getWidget(device_guid)
+                widget = self.getRegisteredWidget(device_guid)
 
                 if widget:
                     tab_type = widget.data[0]
@@ -1749,55 +1750,140 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.tray_icon.show()
 
 
-    def registerWidget(self, device_guid, widget, hide = True):
+    def registerWidget(self, device_guid, widget, hide = True) -> int:
         ''' registers widget for cleanup - this is needed because QT doesn't tell us when widgets are discarded so we need to manually track this here 
-        so widgets cleanup correctly and remove any hooks / references '''
-        device_name = self._get_device_name(device_guid)
+        so widgets cleanup correctly and remove any hooks / references 
+        
+        :returns: index - the index of the widget
+        
+        '''
+
+        assert widget is not None, "Invalid widget"
+        
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
-        if device_guid in self._widget_cache:
-            syslog.error(f"TAB: widget already exists for tab: {device_guid} {device_name}")
-            return
-        self._widget_cache[device_guid] = widget
 
-        self.ui.tab_content_layout.addWidget(widget)
+
+        index =  self.ui.device_widget.indexOf(widget)
+        if index != -1:
+            # widget is already in the list
+            device_name = self._get_device_name(device_guid)
+            syslog.error(f"TAB: widget already exists for tab: {device_guid} {device_name}")
+            return index
         
-        if hide and widget.parent() is not None:
-            widget.setVisible(False)
+        #current_index = self.ui.device_widget.currentIndex()
         
+        self.ui.device_widget.addWidget(widget)
+        index = self.ui.device_widget.indexOf(widget)
+        self._widget_device_index_map[device_guid] = index
+        self._widget_index_device_map[index] = device_guid
+
+        if not hide:
+            # make visible
+            self.ui.device_widget.setCurrentIndex(index)
+
+        return index
         
+        # if hide and widget.parent() is not None:
+        #     widget.setVisible(False)
+        
+    def selectRegisteredWidget(self, device_guid) -> int:
+        ''' selects the content for the given device id if the content exists 
+        
+        :param device_guid: device to select
+        :returns: index, -1 if not found
+        
+        '''
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        index = -1
+        if device_guid in self._widget_device_index_map:
+            index = self._widget_device_index_map[device_guid]
+            if index == -1:
+                device_name = self._get_device_name(device_guid)
+                syslog.warning(f"Requested widget for device [{device_guid}] [{device_name}] not found.")
+            else:
+                if self.ui.device_widget.currentIndex() != index:
+                    self.ui.device_widget.setCurrentIndex(index)
+        return index
+
 
     def unregisterWidget(self, device_guid):
         ''' removes a widget from the cleanup list'''
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
-        if device_guid in self._widget_cache:
-            widget = self._widget_cache[device_guid]
-            self.ui.tab_content_layout.removeWidget(widget)
-            if hasattr(widget, "_cleanup_ui"):
-                widget._cleanup_ui()
-            del self._widget_cache[device_guid]
-        if device_guid in gremlin.shared_state.device_widget_map:
-            del gremlin.shared_state.device_widget_map[device_guid]
+        if device_guid in self._widget_device_index_map:
+            index = self._widget_device_index_map[device_guid]
+            if index != -1:
+                widget = self.ui.device_widget.widget(index)
+                if hasattr(widget, "_cleanup_ui"):
+                    widget._cleanup_ui()    
+                self.ui.device_widget.removeWidget(widget)
+                widget.deleteLater()
+            del self._widget_device_index_map[device_guid]
+            del self._widget_index_device_map[index]
+
+    def getCurrentRegisteredWidgetDevice(self):
+        ''' gets the device ID for the currently selected device widget '''
+        index = self.ui.device_widget.currentIndex()
+        if index != -1:
+            device_guid = self._widget_index_device_map[index]
+            return device_guid
+        return None
+
+
+    def clearRegisteredWidgets(self):
+        ''' cleanup all widgets '''
+        return self.unregisterAllWidgets()
 
 
     def unregisterAllWidgets(self):
-        ''' clears the widgets '''
-        for widget in self._widget_cache.values():
-            # cleanup widgets
+        ''' clears all device widgets '''
+        while self.ui.device_widget.count():
+            widget = self.ui.device_widget.widget(0)
             if hasattr(widget, "_cleanup_ui"):
-                widget._cleanup_ui()
-                widget.setParent(None)
-        self._widget_cache.clear()
-        gremlin.shared_state.device_widget_map = {}
+                # tell the widget it's being deleted
+                widget._cleanup_ui()    
+            self.ui.device_widget.removeWidget(widget)
+            widget.deleteLater()
+            
+        self._widget_device_index_map.clear()
+        self._widget_index_device_map.clear()
+
+    def getRegisteredWidget(self, device_guid) -> QtWidgets.QWidget:
+        ''' gets the widget for the given device id, None if not found'''
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._widget_device_index_map:
+            index = self._widget_device_index_map[device_guid]
+            return self.ui.device_widget.widget(index)
+        return None
+    
+    def getRegisteredWidgetIndex(self, device_guid) -> int:
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._widget_device_index_map:
+            return self._widget_device_index_map[device_guid]
+        return None
+
+
+
+
+        # for widget in self._widget_cache.values():
+        #     # cleanup widgets
+        #     if hasattr(widget, "_cleanup_ui"):
+        #         widget._cleanup_ui()
+        #         widget.setParent(None)
+        # self._widget_cache.clear()
+        #gremlin.shared_state.device_widget_map = {}
         
 
     def clearWidgets(self):
         ''' clears the device cache'''
-        self._current_tab_widget = None # remove reference to tab widget
-        gremlin.util.clear_layout(self.ui.tab_content_layout)
-        tracker = gremlin.ui.ui_common.WidgetTracker()
-        tracker.clearRegisteredWidgets()
+        # self._current_tab_widget = None # remove reference to tab widget
+        #gremlin.util.clear_layout(self.ui.tab_content_layout)
+        # tracker = gremlin.ui.ui_common.WidgetTracker()
+        # tracker.clearRegisteredWidgets()
         tracker = gremlin.ui.ui_common.StateTracker()
         tracker.clear()
         self.unregisterAllWidgets()
@@ -1844,32 +1930,16 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' gets the device widget by the tab index'''
         if index in self._tab_index_map:
             device_guid =  self._tab_index_map[index]
-            return self.getWidget(device_guid)
+            return self.getRegisteredWidget(device_guid)
         return None
 
 
 
-    def clearRegisteredWidgets(self):
-        ''' cleanup all widgets '''
-        for widget in self._widget_cache.values():
-            self.ui.tab_content_layout.removeWidget(widget)
-            if hasattr(widget, "_cleanup_ui"):
-                widget._cleanup_ui()
-        self._widget_cache.clear()
-
-    def getWidget(self, device_guid):
-        ''' gets the content widget for the given device '''
-        if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
-        if device_guid in self._widget_cache:
-            return self._widget_cache[device_guid]
-        return None
-    
 
     
     def hideTabWidgets(self):
         ''' hides all tab widgets '''
-        for widget in self._widget_cache.values():
+        for widget in self._widget_device_index_map.values():
             if widget.parent(): widget.setVisible(False)
 
             
@@ -1904,16 +1974,18 @@ class GremlinUi(QtWidgets.QMainWindow):
             with QtCore.QSignalBlocker(self.ui.devices):
                 self.ui.devices.setCurrentIndex(index)
         
-        if device_guid in self._widget_cache:
-            widget = self._widget_cache[device_guid]
-            if self._current_tab_widget:
-                # hide the old widget
-                self._current_tab_widget.setVisible(False)
+        
+        index = self.selectRegisteredWidget(device_guid)
+        if index != -1:
+            # widget = self._widget_device_index_map[device_guid]
+            # if self._current_tab_widget:
+            #     # hide the old widget
+            #     self._current_tab_widget.setVisible(False)
                 
-            # show the new widget
-            if widget.parent() is not None: widget.setVisible(True)
-            self._current_tab_widget = widget
-            self._current_tab_device_guid = device_guid
+            # # show the new widget
+            # if widget.parent() is not None: widget.setVisible(True)
+            # self._current_tab_widget = widget
+            # self._current_tab_device_guid = device_guid
 
             # tell ui a new device tab was selected
             gremlin.shared_state.current_tab_device_guid = device_guid
@@ -1925,7 +1997,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def getActiveTabWidget(self) -> gremlin.ui.ui_common.QSplitTabWidget:
         ''' gets the current tab widget '''
-        return self._current_tab_widget
+        return self.getRegisteredWidget(self._current_tab_device_guid)
     
     def getActiveTabIndex(self) -> int:
         ''' gets the current tab index '''
@@ -1968,7 +2040,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.shared_state.is_tab_loading = True
            
             # clear the widget map as it's recreated here
-            gremlin.shared_state.device_widget_map.clear()
+            #gremlin.shared_state.device_widget_map.clear()
 
             self.last_tab_index = 0
 
@@ -2025,19 +2097,19 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # this needs to be registered before widgets are created because widgets may need this data
                 gremlin.shared_state.device_profile_map[device.device_guid] = device_profile
                 gremlin.shared_state.device_type_map[device.device_guid] = DeviceType.Joystick
-                tab_label = device.name.strip()
+                #tab_label = device.name.strip()
                 
                 
                 device_guid = str(device.device_guid)
                 device_name =self._get_device_name(device_guid)
                 if device_name:
-                    widget = self.getWidget(device_guid)
+                    widget = self.getRegisteredWidget(device_guid)
                     if not widget:
                         widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
                             device,
                             device_profile,
                             self.current_mode,
-                            object_name= f"JOYSTICK DEVICE: {device_name}"
+                            object_name= f"Joystick [{device_name}]"
                         )
                         
                         self.registerWidget(device_guid, widget)
@@ -2050,7 +2122,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     if verbose:
                         syslog.info(f"Added joystick tab: {device_name} index {index}")
 
-                    gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
+                    #gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
                     widget.inputChanged.connect(self._device_input_changed_cb)
                 
                     index += 1
@@ -2100,18 +2172,18 @@ class GremlinUi(QtWidgets.QMainWindow):
                     )
 
                     device_guid = str(device.device_guid)
-                    widget = self.getWidget(device_guid)
+                    widget = self.getRegisteredWidget(device_guid)
                     if not widget:
                         widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
                             device,
                             device_profile,
                             self.current_mode,
-                            object_name= f"VJOY DEVICE: {device_name}"
+                            object_name = f"Vjoy [{device_name}]"
                         )
 
                     
                         self.registerWidget(device_guid, widget)
-                        gremlin.shared_state.device_widget_map[device.device_guid] = widget
+                        #gremlin.shared_state.device_widget_map[device.device_guid] = widget
                     
                     widget.data = (TabDeviceType.VjoyInput, device_guid, index)
                     self._add_tab(device_guid, TabDeviceType.VjoyInput)
@@ -2131,7 +2203,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             device_guid = str(gremlin.shared_state.keyboard_tab_guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
           
-            widget = self.getWidget(device_guid)
+            widget = self.getRegisteredWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.keyboard_device.KeyboardDeviceTabWidget(
                     device_profile,
@@ -2139,7 +2211,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 )
                 self.registerWidget(device_guid, widget)
                 gremlin.shared_state.device_type_map[dinput.GUID_Keyboard] = DeviceType.Keyboard
-                gremlin.shared_state.device_widget_map[dinput.GUID_Keyboard] = widget
+                #gremlin.shared_state.device_widget_map[dinput.GUID_Keyboard] = widget
 
             
             widget.data = (TabDeviceType.Keyboard, device_guid, index)
@@ -2161,7 +2233,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     DeviceType.Midi,
                     DeviceType.to_string(DeviceType.Midi)
                 )                
-                widget = self.getWidget(device_guid)
+                widget = self.getRegisteredWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.midi_device.MidiDeviceTabWidget(
                         device_profile,
@@ -2173,7 +2245,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self._midi_device_guid = device_guid
                     
                     gremlin.shared_state.device_type_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = DeviceType.Midi
-                    gremlin.shared_state.device_widget_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = widget
+                    #gremlin.shared_state.device_widget_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = widget
                 
                 widget.data = (TabDeviceType.Midi, device_guid, index)
                 
@@ -2194,7 +2266,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     DeviceType.Osc,
                     DeviceType.to_string(DeviceType.Osc)
                 )                
-                widget = self.getWidget(device_guid)
+                widget = self.getRegisteredWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.osc_device.OscDeviceTabWidget(
                         device_profile,
@@ -2207,7 +2279,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self._osc_device_guid = device_guid
                     
                     gremlin.shared_state.device_type_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = DeviceType.Osc
-                    gremlin.shared_state.device_widget_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = widget
+                    #gremlin.shared_state.device_widget_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = widget
                 
 
                 self._add_tab(device_guid,TabDeviceType.Osc)
@@ -2228,7 +2300,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     DeviceType.to_string(DeviceType.ModeControl)
                 )
             
-            widget = self.getWidget(device_guid)
+            widget = self.getRegisteredWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.mode_device.ModeDeviceTabWidget(
                     device_profile,
@@ -2245,7 +2317,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             guid = gremlin.shared_state.state_tab_guid
             device_guid = str(guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-            widget = self.getWidget(device_guid)
+            widget = self.getRegisteredWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.state_device.StateDeviceTabWidget(
                     self.profile,
@@ -2266,7 +2338,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             device_guid = str(gremlin.shared_state.settings_tab_guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-            widget = self.getWidget(device_guid)
+            widget = self.getRegisteredWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.profile_settings.ProfileSettingsWidget(self.profile.settings)
                 self.registerWidget(device_guid, widget)
@@ -2283,7 +2355,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             # Add a plugin custom modules tab
             device_guid = str(gremlin.shared_state.plugins_tab_guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-            widget = self.getWidget(device_guid)
+            widget = self.getRegisteredWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.user_plugin_management.ModuleManagementController(self.profile)
                 self.mm = widget
@@ -2465,20 +2537,25 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _get_tab_widget_guid(self, device_guid):
         ''' gets a tab by device guid '''
-        widgets = self._get_tab_widgets()
-        # widget data holds (tab_type, device_guid)
-        data = [widget for widget in widgets if widget.data[1] == device_guid]
-        if data:
-            return data[0]
-        return None
+        return self.getRegisteredWidget(device_guid)
+
+
+
+        # widgets = self._get_tab_widgets()
+        # # widget data holds (tab_type, device_guid)
+        # data = [widget for widget in widgets if widget.data[1] == device_guid]
+        # if data:
+        #     return data[0]
+        # return None
 
     def _get_tab_index(self, device_guid):
         ''' gets the tab index for the given GUID '''
-        if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
-        if device_guid in self._tab_device_map:
-            return self._tab_device_map[device_guid]
-        return None
+        return self.getRegisteredWidgetIndex(device_guid)
+        # if not isinstance(device_guid, str):
+        #     device_guid = str(device_guid)
+        # if device_guid in self._tab_device_map:
+        #     return self._tab_device_map[device_guid]
+        # return None
 
 
     def _get_tab_widgets_by_type(self, tab_type : TabDeviceType):
@@ -2498,7 +2575,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _get_tab_widgets(self):
         ''' returns the tab objects '''
-        return self._widget_cache.values()
+        widgets = [self.ui.device_widget.widget(index) for index in range(self.ui.device_widget.count())]
+        return widgets
+        #return self._widget_device_index_map.values()
     
 
     def _select_last_tab(self):
@@ -2628,8 +2707,10 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _select_input(self, device_guid, input_type : InputType = None, input_id = None, force_update = False, force_switch = False, tab_changed = False):
         if gremlin.shared_state.is_input_selection_suspended:
             return # skip if disabled
+        gremlin.util.pushCursor()
         eh = gremlin.event_handler.EventListener()
         eh.select_input.emit(device_guid, input_type, input_id, force_update, force_switch, tab_changed)
+        gremlin.util.popCursor()
 
 
     def _config_changed_cb(self):
@@ -2760,8 +2841,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             if input_id is not None: 
                 # within the inputs = select it
                 #syslog.info("ID change started")
-                widget = self.getWidget(device_guid)
+                widget = self.getRegisteredWidget(device_guid)
                 if widget:
+                    self.selectRegisteredWidget(device_guid)
                     if verbose: syslog.info(f"Select input: select widget {input_type} {input_id}")
                     if tab_changed or not hasattr(widget, "input_item_list_view"):
                         widget.refresh()
@@ -2770,7 +2852,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                         widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update or tab_changed)
                         index = widget.input_item_list_view.current_index
                         widget.input_item_list_view.redraw_index(index)
-                        widget.input_item_list_view.select_item(index, False)
+                        widget.input_item_list_view.select_item(index, True)
 
 
                     # should have contents now
@@ -2826,8 +2908,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _active_input_item(self) -> gremlin.base_profile.InputItem:
         ''' gets the current selected input item '''
-        widget = self._current_tab_widget
-        if hasattr(widget, "input_item_list_view"):
+        widget = self.getActiveTabWidget()
+        if widget and hasattr(widget, "input_item_list_view"):
             item_index = widget.input_item_list_view.current_index
             data = widget.input_item_list_view.model.data(item_index)
             return data
@@ -2878,9 +2960,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _refresh_tab(self):
         ''' refreshes the current device tab '''
-        current_widget = self._current_tab_widget
-        if current_widget and hasattr(current_widget,"refresh"):
-            current_widget.refresh()
+        widget = self.getActiveTabWidget()
+        if widget and hasattr(widget,"refresh"):
+            widget.refresh()
 
 
 
@@ -3095,9 +3177,13 @@ class GremlinUi(QtWidgets.QMainWindow):
                             for device_guid, device_name in removed_devices:
                                 syslog.info(f"\t\t{device_name} {device_guid}")
                                 if self._current_tab_device_guid == str(device_guid):
+                                    # select a different tab
+                                    self.unregisterWidget(device_guid)
                                     self._current_tab_device_guid = None
-                                    self._current_tab_widget = None
+                                    gremlin.shared_state.current_tab_device_guid = None
+                                    #self._current_tab_widget = None
 
+                    # recreate the tabs
                     self._create_tabs()
 
                     # Stop Gremlin execution

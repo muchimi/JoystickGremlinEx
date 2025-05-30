@@ -1425,7 +1425,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self,
             device_profile,
             current_mode,
-            object_name = "MIDI DEVICE CONTENT",
+            object_name = "MIDI Device",
             parent=None
     ):
         """Creates a new object instance.
@@ -1536,6 +1536,12 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' returns the input widget at the given index '''
         return self.input_item_list_view.itemAt(index)
 
+
+    def getWidgetKey(self, input_id):
+        ''' gets the content widget compound key for the item / input combination'''
+        return (self.device_guid, input_id)
+
+
     def _select_item_cb(self, index):
         """Handles the selection of an input item.
 
@@ -1563,19 +1569,21 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             
             config = gremlin.config.Configuration()
             device_guid = self.device_guid
+            key = self.getWidgetKey(input_id)
             
             config.set_last_input(device_guid, input_type, input_id)
-
-            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"MIDI: {item_data.display_name}")
-            self.setRightPanelWidget(widget)
+            widget = self.getRegisteredWidget(key)
+            if not widget:
+                widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"MIDI: {item_data.display_name}")
+                self.registerWidget(KeyboardInterrupt, widget)
             
-            # Create new configuration widget
+            self.selectRegisteredWidget(widget)
             
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
-            self.input_item_list_view.select_item(index, False)
+            #self.input_item_list_view.select_item(index, False)
 
         else:
             widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="MIDI Blank InputConfigItem (no item data)")     
@@ -1724,11 +1732,11 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
-        
+        key = self.getRegisteredKeyIndex(index)
+        self.unregisterWidget(key)
         if not self.input_item_list_model.rows():
             # display blank page if no item left
-            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration(object_name="MIDI Blank InputConfigItem (close item cb")
-            self.setRightPanelWidget(self._item_data)
+            self._blank_input()
 
         
 

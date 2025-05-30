@@ -3266,7 +3266,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self,
             device_profile,
             current_mode,
-            object_name = "OSC DEVICE CONTENT",
+            object_name = "OSC Device",
             parent=None
     ):
         """Creates a new object instance.
@@ -3484,6 +3484,10 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sorted_keys = list(mode.config[InputType.OpenSoundControl].keys())
         return sorted_keys.index(input_id)
     
+    
+    def getWidgetKey(self, input_id):
+        ''' gets the content widget compound key for the item / input combination'''
+        return (self.device_guid, input_id)
 
     def _select_item_cb(self, index):
         """Handles the selection of an input item.
@@ -3520,8 +3524,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
             config.set_last_input(device_guid, input_type, input_id)
 
-            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"OSC: {item_data.display_name}")
-            self.setRightPanelWidget(widget)
+            key = self.getWidgetKey(input_id)
+            widget = self.getRegisteredWidget(key)
+            if not widget:
+                widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"OSC: {item_data.display_name}")
+                self.registerWidget(key, widget)
             
             # Create new configuration widget
             
@@ -3529,7 +3536,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
-            self.input_item_list_view.select_item(index, False)
+            #self.input_item_list_view.select_item(index, False)
+            self.selectRegisteredWidget(key)
         else:
             item_data = OscInputItem()
             widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
@@ -3544,11 +3552,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
-
+        key = self.getRegisteredKeyIndex(index)
+        self.unregisterWidget(key)
         if not self.input_item_list_model.rows():
             # display blank page if no item left
-            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration(object_name="OSC Blank InputConfigItem (close item cb)")
-            self.setRightPanelWidget(self._item_data)
+            self._blank_input()
 
         
 

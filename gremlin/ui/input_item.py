@@ -452,14 +452,30 @@ class InputItemListView(ui_common.AbstractView):
 
         el = gremlin.event_handler.EventListener()
         el.profile_device_mapping_changed.connect(self._profile_device_mapping_changed)
-        self.widget_map = {} # list of created widgets
+        # self.widget_map = {} # list of created widgets
 
 
-    def _cleanup_ui(self):
-        ''' called when item is deleted '''
-        self._deleted = True
+    # def _cleanup_ui(self):
+    #     ''' called when item is deleted '''
+    #     if not self._deleted:
+    #         self._deleted = True
+    #     # self._clear_widgets()
+
         
         
+        
+    #def _clear_widgets(self):
+        # ''' clears all widgets from their references'''
+        # if self.widget_map:
+        #     for widget in self.widget_map.values():
+        #         if hasattr(widget,"_cleanup_ui"):
+        #             widget._cleanup_ui()
+        #         widget.hide()
+        #         widget.setParent(None)
+        #         #widget.deleteLater()
+
+        #     self.widget_map = {} # list of created widgets
+
 
     @property
     def current_index(self):
@@ -512,6 +528,18 @@ class InputItemListView(ui_common.AbstractView):
             self.select_item(new_index)
         
 
+    def getWidgets(self):
+        ''' gets the list of widgets in the list view '''
+        widgets = gremlin.util.get_layout_widgets(self.scroll_layout)
+        return widgets
+
+    def getWidgetAt(self, index):
+        ''' gets a specific widgets at the given index '''
+        widgets = self.getWidgets()
+        if index < len(widgets):
+            return widgets[index]
+        return None
+
 
     def redraw(self):
         """Redraws the entire model.
@@ -525,7 +553,7 @@ class InputItemListView(ui_common.AbstractView):
         try:
 
             verbose = gremlin.config.Configuration().verbose_mode_inputs
-            self.widget_map.clear()
+            #self._clear_widgets()
 
             if self.model is None:
                 return
@@ -582,7 +610,7 @@ class InputItemListView(ui_common.AbstractView):
                         widget.create_action_icons(data)
                         widget.setDescription(data.description)
 
-                    self.scroll_layout.addWidget(widget)    
+                    self.scroll_layout.addWidget(widget)
                     
 
                     # hook the widget
@@ -597,7 +625,7 @@ class InputItemListView(ui_common.AbstractView):
                     widget.delete_curve.connect(self._create_delete_curve_callback(index))
                     widget.closed.connect(self._create_closed_callback(index))
 
-                    self.widget_map[index] = widget
+                    #self.widget_map[index] = widget
                     
 
                     

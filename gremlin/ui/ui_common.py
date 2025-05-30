@@ -986,7 +986,7 @@ class StateTracker():
  
 
 
-_tabsplitter_tracker = WidgetTracker()
+#_tabsplitter_tracker = WidgetTracker()
 _state_tracker = StateTracker()
 
 class ContainerViewTypes(enum.Enum):
@@ -6662,6 +6662,7 @@ class QSplitTabWidget(QDataWidget):
         self.setObjectName(object_name)
 
         self._id = gremlin.util.get_guid() # unique ID
+        self._blank_input_id = "c9a484aedbab4f518e5bab7ec402df65"  # input ID to use for the blank pages
 
         self._lock = False
 
@@ -6687,6 +6688,12 @@ class QSplitTabWidget(QDataWidget):
         # right panel content
         self._right_container_widget, self._right_container_layout = getVContainer()
 
+        # input configuration content - new in m76 - have QT track the widgets itself to avoid reference problems in pyside
+        self._config_widget = QtWidgets.QStackedWidget()
+        self._right_container_layout.addWidget(self._config_widget)
+        self._widget_config_index_map = {} # map of input id to widget index
+        self._widget_config_device_map = {} # map of widget index to input id
+
         # place items in left_container_layout or right_container_layout
         self._left_panel_layout.addWidget(self._left_container_widget)
         self._right_panel_layout.addWidget(self._right_container_widget)
@@ -6704,41 +6711,153 @@ class QSplitTabWidget(QDataWidget):
         self._splitter.setCollapsible(1, False)
         self.main_layout.addWidget(self._content_widget)
 
-        _tabsplitter_tracker.registerWidget(self)
-
-        if not self.objectName():
-            pass
+        #_tabsplitter_tracker.registerWidget(self)
 
         syslog.info(f"Created Device content: [{self._id}] {self.objectName()}")
 
         self._blank_input()
 
 
-    def _blank_input(self):
-        ''' sets a blank input '''
-        edit = QDataLineEdit(text = self._id)
-        edit.setReadOnly(True)
-    
-        label = QtWidgets.QLabel(f"Please select an input to configure.")
-
-        widget, _ = getHContainer([label, edit])
-        contents, _ = getVContainer(widget)
-        #widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
-        self.setRightPanelWidget(contents)        
-
     def _cleanup_ui(self):
         ''' remove '''
-        if not self._lock:
-            self._lock = True
-            _tabsplitter_tracker.unregisterWidget(self)
-            self._lock = False
+        self.unregisterAllWidgets()
+        #_tabsplitter_tracker.unregisterWidget(self)
+
+    def registerWidget(self, key, widget) -> int:
+        ''' adds a new config input to the right panel '''
+
+        assert widget is not None, "Invalid widget"
+        
+        index =  self._config_widget.indexOf(widget)
+        if index != -1:
+            # widget is already in the list
+            return index
+        
+        self._config_widget.addWidget(widget)
+        index = self._config_widget.indexOf(widget)
+        self._widget_config_index_map[key] = index
+        self._widget_config_device_map[index] = key
+
+        return index
+    
+    def selectRegisteredWidget(self, key) -> int:
+        ''' selects the content for the given device id if the content exists 
+        
+        :param input_id: input to select
+        :returns: index, -1 if not found
+        
+        '''
+        
+        index = -1
+        if key in self._widget_config_index_map:
+            index = self._widget_config_index_map[key]
+            if index == -1:
+                syslog.warning(f"Requested widget for input[{key}] not found.")
+            else:
+                if self._config_widget.currentIndex() != index:
+                    self._config_widget.setCurrentIndex(index)
+        return index
+    
+    def unregisterWidget(self, key):
+        ''' removes a widget from the cleanup list'''
+        
+        if key in self._widget_config_index_map:
+            index = self._widget_config_index_map[key]
+            if index != -1:
+                widget = self._config_widget.widget(index)
+                if hasattr(widget, "_cleanup_ui"):
+                    widget._cleanup_ui()    
+                widget.hide()
+                self._config_widget.removeWidget(widget)
+                widget.deleteLater()
+            del self._widget_config_index_map[key]
+            del self._widget_config_device_map[index]
+
+    def getCurrentRegisteredWidgetDevice(self):
+        ''' gets the device ID for the currently selected device widget '''
+        index = self._config_widget.currentIndex()
+        if index != -1:
+            input_id = self._widget_config_device_map[index]
+            return input_id
+        return None
+
+
+    def unregisterAllWidgets(self):
+        ''' clears all device widgets '''
+        while self._config_widget.count():
+            widget = self._config_widget.widget(0)
+            if hasattr(widget, "_cleanup_ui"):
+                # tell the widget it's being deleted
+                widget._cleanup_ui()    
+            self._config_widget.removeWidget(widget)
+            widget.deleteLater()
+            
+        self._widget_config_index_map.clear()
+        self._widget_config_device_map.clear()
+
+    def getRegisteredWidget(self, key) -> QtWidgets.QWidget:
+        ''' gets the widget for the given device id, None if not found'''
+        if key in self._widget_config_index_map:
+            index = self._widget_config_index_map[key]
+            return self._config_widget.widget(index)
+        return None
+    
+    def getRegisteredWidgetIndex(self, key) -> int:
+        if key in self._widget_config_index_map:
+            return self._widget_config_index_map[key]
+        return None
+
+    def getRegisteredKeyIndex(self, index):
+        ''' gets the registerted key for the specified index, starting at 0 '''
+        keys = [k for k in self._widget_config_index_map.keys()]
+        if index < len(keys):
+            return keys[index]
+        return None
+            
+
+
+
+    def _blank_input(self):
+        ''' sets a blank input '''
+
+        widget = self.getRegisteredWidget(self._blank_input_id)
+        if not widget:
+
+            label = QtWidgets.QLabel(f"Please select an input to configure for {self.objectName()}.")
+
+            show_id = gremlin.config.Configuration().show_container_id
+            if show_id:
+                edit = QDataLineEdit(text = self._id)
+                edit.setReadOnly(True)
+                widget, _ = getHContainer([label, edit])
+            else:
+                widget = label
+
+            contents, _ = getVContainer(widget)
+
+            self.registerWidget(self._blank_input_id, contents)
+
+        # select it
+        self.selectRegisteredWidget(self._blank_input_id)
+
+
+
+
 
     def _select_item_cb(self, index):
         assert False,"Must be implemented by subclass"
 
     def select_item(self, index):
         # implemented by a subclass
-        self._select_item_cb(index)
+        if index == -1:
+            # nothing selected
+            self._blank_input()
+        else:
+            self._select_item_cb(index)
+            # select the corresponding widget
+            if index in self._widget_config_device_map:
+                key = self._widget_config_device_map[index]
+                self.selectRegisteredWidget(key)
 
 
 
@@ -6765,17 +6884,18 @@ class QSplitTabWidget(QDataWidget):
         if widget is not None:
             self._left_container_layout.addWidget(widget)
 
-    def setRightPanelWidget(self, widget : QtWidgets.QWidget):
-        ''' sets the right panel widget (only contains a single widget)'''
-        self.clearRightPanel()
-        self.addRightPanelWidget(widget)
+    # def setRightPanelWidget(self, widget : QtWidgets.QWidget):
+    #     ''' sets the right panel widget (only contains a single widget)'''
+    #     self.clearRightPanel()
+    #     self.addRightPanelWidget(widget)
+        
 
 
     def addRightPanelWidget(self, widget : QtWidgets.QWidget):
-        ''' sets the left panel widget '''
+        ''' adds a widget to the top of the right panel '''
         #print ("add right panel")
         if widget is not None:
-            self._right_container_layout.addWidget(widget)
+            self._right_container_layout.insertWidget(0, widget)
 
     def removeRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' removes a widget from the right panel '''

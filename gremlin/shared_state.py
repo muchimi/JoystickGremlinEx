@@ -214,10 +214,8 @@ def reload_device_map():
 # map of device profiles - indexed by hardware GUID
 device_profile_map = {}
 
-
-
 # map of device widgets by hardware GUID (widget)
-device_widget_map = {}
+#device_widget_map = {}
 
 # Holds the currently active profile
 current_profile = None

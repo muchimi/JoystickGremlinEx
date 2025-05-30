@@ -84,7 +84,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self,
             device_profile,
             current_mode,
-            object_name = 'MODE DEVICE CONTENT',
+            object_name = 'Mode Device',
             parent=None
     ):
         """Creates a new object instance.
@@ -242,6 +242,11 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sorted_keys = list(mode.config[InputType.ModeControl].keys())
         return sorted_keys.index(input_id)
     
+    
+
+    def getWidgetKey(self, input_id):
+        ''' gets the content widget compound key for the item / input combination'''
+        return (self.device_guid, input_id)
 
     def _select_item_cb(self, index):
         """Handles the selection of an input item.
@@ -267,28 +272,34 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.input_item_list_view.select_item(index, False)
         
         
-        input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
-        
-        widget = gremlin.ui.joystick_device.InputItemConfiguration(input_data, object_name = f"Mode: {input_data.display_name}")
-        self._item_data = widget
-        self.setRightPanelWidget(widget)
+        item_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+
+        key = self.getWidgetKey(index)
+        widget = self.getRegisteredWidget(key)
+        if not widget:
+            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name = f"Mode  [{item_data.display_name}]")
+            self.registerWidget(key, widget)
+
+        self._item_data = item_data
+
+        self.selectRegisteredWidget(key)
 
         # remember the last input
         config = gremlin.config.Configuration()
         device_guid = self.device_guid
         input_type = InputType.OpenSoundControl
-        input_id = input_data.input_id if input_data else None
+        input_id = item_data.input_id if item_data else None
         
 
         config.set_last_input(device_guid, input_type, input_id)
 
-        if input_data:
+        if item_data:
             
             # Create new configuration widget
-            input_data.is_axis = False
+            item_data.is_axis = False
             change_cb = self._create_change_cb(index)
-            self._item_data.action_model.data_changed.connect(change_cb)
-            self._item_data.description_changed.connect(change_cb)
+            widget.action_model.data_changed.connect(change_cb)
+            widget.description_changed.connect(change_cb)
 
             self.input_item_list_view.select_item(index,False)
 
@@ -310,7 +321,6 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         import gremlin.ui.input_item
 
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
-        data : ModeInputItem
         widget.data = data
         widget.create_action_icons(data)
         widget.setTitle(self._custom_name_handler(data))

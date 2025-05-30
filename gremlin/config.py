@@ -1659,8 +1659,10 @@ class Configuration(QtCore.QObject):
             elif device_type == gremlin.types.DeviceType.Osc:
                 input_type = gremlin.input_types.InputType.OpenSoundControl
 
-            if dinput_device_guid in gremlin.shared_state.device_widget_map:
-                widget = gremlin.shared_state.device_widget_map[dinput_device_guid]
+            widget = gremlin.shared_state.ui.getRegisteredWidget(dinput_device_guid)
+            # if dinput_device_guid in gremlin.ui._widget_device_index_map: # gremlin.shared_state.device_widget_map:
+            #     widget = gremlin.shared_state.device_widget_map[dinput_device_guid]
+            if widget:
                 if input_id is None:
                     item = widget.itemAt(0)
                     if item is not None:
@@ -2229,7 +2231,7 @@ class Configuration(QtCore.QObject):
     @property
     def import_prompt_enabled(self) -> bool:
         ''' enables import prompt dialog box on missing devices  '''
-        return self._get_data("import_prompt_enabled",False)
+        return self._get_data("import_prompt_enabled",True)
     @import_prompt_enabled.setter
     def import_prompt_enabled(self, value : bool):
         self._data["import_prompt_enabled"] = value
