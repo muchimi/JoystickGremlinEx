@@ -3781,14 +3781,6 @@ class GremlinUi(QtWidgets.QMainWindow):
 
                 self._sanitize_profile(new_profile)
 
-                if as_new_profile:
-                    # set as new unsaved profile
-                    new_profile.setProfileFile(None)
-
-
-
-
-
 
                 # Save the profile at this point if it was converted from a prior
                 # profile version, as otherwise the change detection logic will
@@ -3807,6 +3799,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     new_profile.setProfileFile(None)
 
                 self._profile_load_stack.pop(0)
+                syslog.info("Profile: parse completed.")
 
 
             except (KeyError, TypeError) as error:
@@ -3836,6 +3829,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             # pick the top mode if nothing was saved in the configuration
             last_edit_mode = self.profile.get_root_mode()
             gremlin.config.Configuration().set_profile_last_edit_mode(last_edit_mode)
+
+        if as_new_profile:
+            # set as new unsaved profile
+            new_profile.setProfileFile(None)
         
         modes = new_profile.get_modes()
         if last_edit_mode is None:
