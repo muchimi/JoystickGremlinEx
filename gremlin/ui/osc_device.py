@@ -3520,7 +3520,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
             config.set_last_input(device_guid, input_type, input_id)
 
-            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"OSC: {input_data.display_name}")
+            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"OSC: {item_data.display_name}")
             self.setRightPanelWidget(widget)
             
             # Create new configuration widget
