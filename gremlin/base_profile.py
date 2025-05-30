@@ -690,9 +690,7 @@ class AbstractContainer(ProfileData):
         for child in node:
             
             if child.tag not in action_name_map:
-                syslog.warning(
-                    f"Unknown node present: {child.tag}"
-                )
+                syslog.warning(f"Unknown node present: {child.tag}")
                 continue
 
             # apply any conversions

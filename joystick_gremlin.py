@@ -38,10 +38,11 @@ import webbrowser
 import dinput
 from lxml import etree
 
+''' ALL gremlin modules should be imported here to avoid packaging errors '''
 
 import gremlin.util
 
-
+import gremlin.input_types
 import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.gamepad_handling
@@ -60,7 +61,12 @@ import gremlin.ui.theme
 
 import gremlin.curve_handler
 import gremlin.gated_handler
-import gremlin.input_types
+import gremlin.macro_handler
+import gremlin.plugin_manager
+import gremlin.process_monitor
+import gremlin.user_plugin
+import gremlin.execution_graph
+
 import anytree
 from dinput import DeviceSummary
 from gremlin.util import InvokeUiMethod, assert_ui_thread
