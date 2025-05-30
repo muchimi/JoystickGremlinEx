@@ -72,8 +72,6 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         assert item_data is not None,"Item Data must be provided"
 
-        if not object_name:
-            pass
         self.setObjectName(object_name if object_name else "(object name not provided)")
         self.id = gremlin.util.get_guid()
         self.item_data : gremlin.base_profile.InputItem = item_data

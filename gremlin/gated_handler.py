@@ -43,6 +43,7 @@ from gremlin.util import InvokeUiMethod
 import gremlin.util
 from itertools import pairwise
 import gremlin.actions
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 MAX_UNDO = 20 # number of steps on the UNDO stack
@@ -1461,17 +1462,6 @@ class GateData():
     @QtCore.Slot()
     def _profile_stop_cb(self):
         ''' profile stops - cleanup '''
-
-        # if not self.hooked:        
-        #     # stop listening to hardware events
-        #     el = gremlin.event_handler.EventListener()
-        #     el.joystick_event.disconnect(self._joystick_event_handler)
-
-        # if not self._hooked:        
-        #     # stop listening to hardware events
-        #     el = gremlin.event_handler.EventListener()
-        #     el.joystick_event.connect(self._joystick_event_handler)
-        #     self._hooked = True
 
         # clean up callback map
         self._callbacks.clear()
@@ -3675,14 +3665,12 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._hooked = False
         
         self._rwi_widgets_index_map = {} # holds reference to range widgets by index
-        self._gwi_widgets_index_map = {} # holds reference to gate widgets by gate index
-        self._gate_widgets = [] # list of visible gate widgets
+        #self._gwi_widgets_index_map = {} # holds reference to gate widgets by gate index
+        
 
         self.single_step = 0.001 # amount of a single step when scrolling
         
         self._output_value = 0
-
-        self._widget_map = {} # keep track of widgets created so they don't get GC
 
         self._range_filter = set() # filter set for ranges
 
@@ -3713,22 +3701,22 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.slider_frame_layout = QtWidgets.QHBoxLayout(self.slider_frame_widget)
         background_color = gremlin.ui.ui_common.Color.sliderBackgroundColor()
         self.slider_frame_widget.setStyleSheet(f'.QFrame{{background-color: {background_color}; border-radius: 10px;}}')
-        self._slider = QSliderWidget(parent = self.slider_frame_widget) #ui_common.QMarkerDoubleRangeSlider()
+        self._slider_widget = QSliderWidget(parent = self.slider_frame_widget) #ui_common.QMarkerDoubleRangeSlider()
      
         #self._slider.setOrientation(QtCore.Qt.Horizontal)
-        self._slider.setRange(-1, 1)
-        self._slider.setMarkerValue(value)
-        self._slider.valueChanged.connect(self._slider_value_changed_cb)
-        self._slider.handleDoubleClicked.connect(self._slider_gate_configure_cb) # calls up gate actions
-        self._slider.rangeRightClicked.connect(self._slider_range_add_gate_cb) # adds a gate
-        self._slider.rangeDoubleClicked.connect(self._slider_range_configure_cb) # calls up range actions
-        self._slider.handleDragStart.connect(self._slider_drag_start_cb)
+        self._slider_widget.setRange(-1, 1)
+        self._slider_widget.setMarkerValue(value)
+        self._slider_widget.valueChanged.connect(self._slider_value_changed_cb)
+        self._slider_widget.handleDoubleClicked.connect(self._slider_gate_configure_cb) # calls up gate actions
+        self._slider_widget.rangeRightClicked.connect(self._slider_range_add_gate_cb) # adds a gate
+        self._slider_widget.rangeDoubleClicked.connect(self._slider_range_configure_cb) # calls up range actions
+        self._slider_widget.handleDragStart.connect(self._slider_drag_start_cb)
         
         warning_color = gremlin.ui.ui_common.Color.warningColor()
         self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
         self.warning_widget.setVisible(False)
 
-        self.slider_frame_layout.addWidget(self._slider)
+        self.slider_frame_layout.addWidget(self._slider_widget)
         help_button = QtWidgets.QPushButton()
         help_icon = gremlin.util.load_icon("mdi.help-circle-outline")
         help_button.setIcon(help_icon)
@@ -4035,11 +4023,11 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     @property
     def min_range(self):
-        return self._slider.minimum()
+        return self._slider_widget.minimum()
     
     @property
     def max_range(self):
-        return self._slider.maximum()
+        return self._slider_widget.maximum()
 
     
 
@@ -4064,7 +4052,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         ''' updates and sorts the gate container layout '''
 
         self._gwi_map = {} # map of gate widgets by gate
-        self._gate_widgets = [] # list of visible gate widgets
+        
         
         gremlin.ui.ui_common.clear_layout(self.container_gate_layout)
         container_widget = QtWidgets.QWidget()
@@ -4094,7 +4082,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
                                 )
             #widget.gate.slider_index = index
             self._gwi_map[gate] = widget
-            self._gwi_widgets_index_map[gate.index] = widget
+            #self._gwi_widgets_index_map[gate.index] = widget
             index += 1
             self._update_gate_icon(gate.slider_index, gate)
             layout.addWidget(widget, row, col, alignment=QtCore.Qt.AlignmentFlag.AlignLeft)
@@ -4182,7 +4170,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         rwi : RangeWidgetInfo
         if self._gate_data.use_default_range:
             # enable single range mode on the slider
-            self._slider.singleRange = True
+            self._slider_widget.singleRange = True
             # hide the ranges
             range_count = 1
             for rwi in rwi_list:
@@ -4193,14 +4181,14 @@ class GatedAxisWidget(QtWidgets.QWidget):
             
             range_count = len(rwi_list)
             # disable single range mode on the slider
-            self._slider.singleRange = False
+            self._slider_widget.singleRange = False
             self._gate_data.default_range.setUsed(False)
             
             for rwi in rwi_list:
                 rwi.range_info.setUsed(True)
                 rwi.setVisible(True)
         
-        self._slider.UseAlternateColor = range_count > 1
+        self._slider_widget.UseAlternateColor = range_count > 1
         self.range_count_widget.setText(f"Ranges ({range_count}):")
         self.container_range_layout.update()
 
@@ -4256,14 +4244,15 @@ class GatedAxisWidget(QtWidgets.QWidget):
         #range_info = self.sender()
         if range_info.id in self._rwi_widgets_index_map.keys():
             range_widget = self._rwi_widgets_index_map[range_info.id]
-            g1 : GateInfo = range_info.g1
-            g2 : GateInfo= range_info.g2
-            ''' updates the display for a range item '''
-            
-            helper = self._helper()
-            g1v = helper.to_value(g1.value)
-            g2v = helper.to_value(g2.value)
-            range_widget.setText(f"[{g1v:0.{helper.decimals}f} to {g2v:0.{helper.decimals}f}]")
+            if Shiboken.isValid(range_widget):
+                g1 : GateInfo = range_info.g1
+                g2 : GateInfo= range_info.g2
+                ''' updates the display for a range item '''
+                
+                helper = self._helper()
+                g1v = helper.to_value(g1.value)
+                g2v = helper.to_value(g2.value)
+                range_widget.setText(f"[{g1v:0.{helper.decimals}f} to {g2v:0.{helper.decimals}f}]")
         
     
 
@@ -4346,8 +4335,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
             for idx, v in enumerate(values):
                 sv += f"[{idx}] {v:0.{self._gate_data.decimals}f} "
             syslog.info(sv)
-        with QtCore.QSignalBlocker(self._slider):
-            self._slider.setValue(values)
+        with QtCore.QSignalBlocker(self._slider_widget):
+            self._slider_widget.setValue(values)
             self._update_gate_tooltips()
            
 
@@ -4358,9 +4347,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         gate : GateInfo
         gate, widget = self.sender().data  # the button's data field contains the widget to update
         gwi : GateWidgetInfo = self._gwi_map[gate]
-        value = self._axis_value
-        gwi.setValue(value)
-        self._set_slider_gate_value(gate.slider_index, value)
+        if Shiboken.isValid(gwi):
+            value = self._axis_value
+            gwi.setValue(value)
+            self._set_slider_gate_value(gate.slider_index, value)
         
 
 
@@ -4484,8 +4474,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
         ''' updates the slider value '''
         # print (f"update marker: {value} input id: {self.action_data.hardware_input_id}")
         self._axis_value = value
-        self._slider.setMarkerValue(value)
-        self._update_output_value()
+        if Shiboken.isValid(self._slider_widget):
+            self._slider_widget.setMarkerValue(value)
+            self._update_output_value()
 
     def _create_filter_widgets(self):
         gremlin.util.clear_layout(self.container_filter_layout)
@@ -4817,9 +4808,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
         ''' called when gate data values are changed '''
         if self._gate_data == gate_data:
             values = self._gate_data.getGateValues()
-            if values != self._slider.value():
+            if values != self._slider_widget.value():
                 if save_state: self._pushState() 
-                with QtCore.QSignalBlocker(self._slider):
+                with QtCore.QSignalBlocker(self._slider_widget):
                     self._update_slider(values)
                     
             
@@ -4830,8 +4821,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
         '''
         gates = self._gate_data.getGates()
         gate : GateInfo
-        for index, gate in enumerate(gates):
-            self._slider.setHandleTooltip(index, f"Gate {gate.value:0.{_decimals}f}")            
+        if Shiboken.isValid(self._slider_widget):
+            for index, gate in enumerate(gates):
+                self._slider_widget.setHandleTooltip(index, f"Gate {gate.value:0.{_decimals}f}")            
 
     def _update_gate_icons(self):
         gates = self._gate_data.getGates()
@@ -4858,20 +4850,19 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     def _update_gate_icon(self, index : int, gate : GateInfo):
         ''' updates the icon for a single gate '''
-        if gate is None:
-            self._slider.setHandleIcon(index, None)
-        elif gate.hasAnyContainers():
-            self._slider.setHandleIcon(index, 'fa6s.gear', True, gremlin.ui.ui_common.Color.activeContentColor())
-        else:
-            self._slider.setHandleIcon(index, "fa6s.gear",True,gremlin.ui.ui_common.Color.inactiveColor() )
+        if Shiboken.isValid(self._slider_widget):
+            if gate is None:
+                self._slider_widget.setHandleIcon(index, None)
+            elif gate.hasAnyContainers():
+                self._slider_widget.setHandleIcon(index, 'fa6s.gear', True, gremlin.ui.ui_common.Color.activeContentColor())
+            else:
+                self._slider_widget.setHandleIcon(index, "fa6s.gear",True,gremlin.ui.ui_common.Color.inactiveColor() )
 
         # find the widgets for the gate
         if gate in self._gwi_map:
             gwi : GateWidgetInfo = self._gwi_map[gate]
-            gwi._update_icon()
-        
-
-                
+            if Shiboken.isValid(gwi):
+                gwi._update_icon()
 
     def _update_output_value(self):
         ''' updates triggers and UI when the slider input value changes '''
@@ -4892,27 +4883,29 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     QtCore.Slot()
     def _min_changed_cb(self):
-        value = self.sb_min_widget.value()
-        self._gate_data.min = value
-        lv = list(self._slider.value())
-        lv[0] = value
-        with QtCore.QSignalBlocker(self._slider):
-            self._set_slider(lv)
+        if Shiboken.isValid(self._slider_widget):
+            value = self.sb_min_widget.value()
+            self._gate_data.min = value
+            lv = list(self._slider_widget.value())
+            lv[0] = value
+            with QtCore.QSignalBlocker(self._slider_widget):
+                self._set_slider(lv)
+                
             
-        
-        self._update_steps_cb()
-        self._update_output_value()
+            self._update_steps_cb()
+            self._update_output_value()
 
     QtCore.Slot()
     def _max_changed_cb(self):
-        value = self.sb_max_widget.value()
-        self._gate_data.max = value
-        lv = list(self._slider.value())
-        lv[1] = value
-        with QtCore.QSignalBlocker(self._slider):
-            self._set_slider(lv)
-        self._update_steps_cb()
-        self._update_output_value()
+        if Shiboken.isValid(self._slider_widget):
+            value = self.sb_max_widget.value()
+            self._gate_data.max = value
+            lv = list(self._slider_widget.value())
+            lv[1] = value
+            with QtCore.QSignalBlocker(self._slider_widget):
+                self._set_slider(lv)
+            self._update_steps_cb()
+            self._update_output_value()
 
     
     def _update_ui(self):
@@ -4920,8 +4913,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
         # update the slider configuration
         # print ("gate axis: update ui")
         #self._load_gates()
-        self._update_slider(self._gate_data.getGateValues())
-        self._update_output_value()
+        if Shiboken.isValid(self._slider_widget):
+            self._update_slider(self._gate_data.getGateValues())
+            self._update_output_value()
 
 
     def deleteGate(self, gate : GateInfo):

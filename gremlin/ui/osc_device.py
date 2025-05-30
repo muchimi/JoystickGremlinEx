@@ -3531,7 +3531,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             self.input_item_list_view.select_item(index, False)
         else:
-            widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="OSC Blank InputConfigItem (no item data)")     
+            item_data = OscInputItem()
+            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
             self.setRightPanelWidget(widget)
 
         self._last_selected_index = index 

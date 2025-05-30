@@ -27,6 +27,7 @@ import gremlin.ui.input_item
 import gremlin.gated_handler
 import gremlin.shared_state
 import logging
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -37,13 +38,14 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
     def __init__(self, action_data, parent=None):
         self.action_data = action_data
         self.gate_widget = None
+        
         super().__init__(action_data, parent=parent)
   
 
 
 
     def _create_ui(self):
-
+        self._deleted = False
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
         self.container_widget.setContentsMargins(0,0,0,0)
@@ -61,12 +63,13 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _cleanup_ui(self):
         ''' cleanup the UI and widget hooks '''
-
-        if self.gate_widget:
-            self.gate_widget.unhook()
-            self.main_layout.removeWidget(self.gate_widget)
-            self.gate_widget.deleteLater()
-            self.gate_widget = None
+        if not self._deleted:
+            self._deleted = True
+            if self.gate_widget and Shiboken.isValid(self.gate_widget):
+                self.gate_widget.unhook()
+                self.main_layout.removeWidget(self.gate_widget)
+                self.gate_widget.deleteLater()
+            
 
     
 

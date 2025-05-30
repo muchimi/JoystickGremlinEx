@@ -572,7 +572,6 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             config.set_last_input(device_guid, input_type, input_id)
 
             widget = InputItemConfiguration(item_data, object_name = f"Keyboard InputItemConfig for: {item_data.display_name}")
-            widget.setObjectName()
             self.setRightPanelWidget(widget)
             
             # Create new configuration widget
