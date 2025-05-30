@@ -1155,12 +1155,13 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: Empty content")
 
             new_key = None
-            if item_data is not None:
-                new_key = item_data.id
+            # if item_data is not None:
+            #     new_key = item_data.id
 
-                if new_key == self.last_item_data_key and not force_update:
-                    # same input - nothing to do
-                    return
+            #     if new_key == self.last_item_data_key and not force_update:
+            #         # same input - nothing to do
+            #         if verbose: syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: already displayed")
+            #         return
 
 
 
