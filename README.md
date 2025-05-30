@@ -14,7 +14,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T1)
+### (m76T1)  
+- New: Joystick devices will show axis, button and hat count in the top left.
 - Fix: Keyboard Ex did not always send to remote clients if remote enabled.
 - API: Gated Axis: store floating point numbers for range with full precision.
 - API: forcibly unhook joystick events on UI updates.
