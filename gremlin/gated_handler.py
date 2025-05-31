@@ -763,7 +763,7 @@ class RangeInfo():
     @range_min.setter
     def range_min(self, value):
         self.g1.value = value
-        # print (f"RangeInfo: set G1 value to {value:0.{_decimals}f}")
+        
     
     @property
     def range_max(self):
@@ -773,7 +773,7 @@ class RangeInfo():
     @range_max.setter
     def range_max(self, value):
         self.g2.value = value
-        # print (f"RangeInfo: set G2 value to {value:0.{_decimals}f}")
+        
 
     @property
     def output_range_min(self):
@@ -1012,7 +1012,7 @@ class RangeInfo():
         else: # percent
             decimals = 2
 
-        msg = f"[{self.v1_display:0.{decimals}f},{self.v2_display:0.{decimals}f}]"
+        msg = f"[{self.v1_display:+0.{decimals}f},{self.v2_display:+0.{decimals}f}]"
         if self._description:
             msg += f" ({self._description})"
         return msg
@@ -1906,8 +1906,13 @@ class GateData():
 
         ranges = self.getUsedRanges()
 
-        range_info_list = []
+        used_list = []
     
+        for range_info in ranges:
+            # mark any remaining range unused if we didn't use them all
+            range_info.setUsed(False)
+
+        verbose_details = gremlin.config.Configuration().verbose_mode_details
         for g1, g2 in required_ranges:
             range_info : RangeInfo = None
             range_info = self.findRange(g1, g2, used_only = False) # find the existing range
@@ -1927,20 +1932,15 @@ class GateData():
                 syslog.warning(f"Range: unable to find an available range for gates {g1} {g2}")
                 continue
             range_info.setUsed(True)
-            range_info_list.append(range_info)
-            if gremlin.config.Configuration().verbose_mode_details:
+            used_list.append(range_info)
+            if verbose_details:
                 syslog.info(f"Ranges: sync range for {range_info.range_gate_display()}  {range_info.range_display()}")
 
-        for range_info in ranges:
-            # mark any remaining range unused if we didn't use them all
-            range_info.setUsed(False)
-
-
-        self._active_ranges = range_info_list
+        self._active_ranges = used_list
 
 
         # return the list of ranges 
-        return range_info_list
+        return used_list
     
     def dumpActiveRanges(self):
         '''
@@ -3382,7 +3382,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
         self.data = gate
     
-        label_width = gremlin.shared_state.char_width * 2
+        # label_width = gremlin.shared_state.char_width * 2
 
         self.label_widget = QtWidgets.QLabel(f"Gate {gate.slider_index + 1}:") # the slider index is the ordered gate number
         #self.label_widget.setMaximumWidth(label_width)
@@ -3429,6 +3429,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         main_layout.addWidget(self.clear_widget)
         main_layout.addStretch()
 
+
     def update_warning(self):
         ''' updates the visibility of the warning - this is done out of band because visible immediatley causes a redraw causing UI artifacts '''
         self.label_warning.setVisible(self.warning_visible)
@@ -3469,7 +3470,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
         
 class RangeWidgetInfo(QtWidgets.QWidget):
-    ''' info object for the range widgets '''
+    ''' range widget '''
 
     def __init__(self, display_index, rng : RangeInfo, decimals, configure_range_handler, parent = None):
         super().__init__(parent = parent)
@@ -3477,6 +3478,10 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         self._rng : RangeInfo = rng
         self.decimals : int = decimals
         #id : str = rng.id
+
+        self.label_warning = QtWidgets.QLabel(" ")
+        self.label_warning.setMaximumWidth(20)
+        self.label_warning.setMinimumWidth(20)
 
         if rng.is_default:
             # default range
@@ -3486,6 +3491,7 @@ class RangeWidgetInfo(QtWidgets.QWidget):
 
 
         self.range_widget = gremlin.ui.ui_common.QDataLabel() #  gremlin.ui.ui_common.QDataLineEdit()
+
         #self.range_widget.setStyleSheet("background: red;")
         
         #self.range_widget.setReadOnly(True)
@@ -3501,6 +3507,7 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         main_layout = QtWidgets.QHBoxLayout(self)
         main_layout.setContentsMargins(0,0,0,0)
 
+        main_layout.addWidget(self.label_warning)
         main_layout.addWidget(self.label_widget)
         main_layout.addWidget(self.range_widget)
         main_layout.addWidget(self.setup_widget)
@@ -3508,6 +3515,8 @@ class RangeWidgetInfo(QtWidgets.QWidget):
 
 
         self.setContentsMargins(0,0,0,0)
+
+        self.setMinimumWidth(200)
 
         self.setVisible(rng.used)
 
@@ -3561,10 +3570,10 @@ class RangeWidgetInfo(QtWidgets.QWidget):
     def _gate_value_changed(self, gate):
         ''' respond to gate value changes if the range is mapped to the gate changing value '''
         if gate.index == self._rng.g1.index:
-            #syslog.info(f"RWI: Range {self.rng.range_gate_display()} Gate G1 value changed to {gate.value}")
+            
             self.update_value()
         elif gate.index == self._rng.g2.index:
-            #syslog.info(f"RWI: Range {self.rng.range_gate_display()} Gate G2 value changed to {gate.value}")
+            
             self.update_value()
 
     @QtCore.Slot(RangeInfo)
@@ -3581,7 +3590,7 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         g1v = g1.display_value
         g2v = g2.display_value
         decimals = self.decimals        
-        txt = f"[{g1v:0.{decimals}f} to {g2v:0.{decimals}f}]"
+        txt = f"[{g1v:+0.{decimals}f} to {g2v:+0.{decimals}f}]"
         self.range_widget.setText(txt)
         self.range_widget.setMinimumWidth(char_width * 8)
         self.setup_widget.setToolTip(f"Setup actions for range [{self.display_name()}]")
@@ -3663,9 +3672,11 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._gate_data : GateData = action_data.gate_data
 
         self._hooked = False
-        
-        self._rwi_widgets_index_map = {} # holds reference to range widgets by index
-        #self._gwi_widgets_index_map = {} # holds reference to gate widgets by gate index
+        self._max_col = 4 # max number of columns in range or gate tables
+        self._rwi_map = {} # map of range info objects to (row, col) in the range table
+        self._gwi_map = {} # map of gate info objects to (row, col) in the gate table
+
+        self._helper = gremlin.ui.ui_common.QHelper()
         
 
         self.single_step = 0.001 # amount of a single step when scrolling
@@ -3712,9 +3723,12 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._slider_widget.rangeDoubleClicked.connect(self._slider_range_configure_cb) # calls up range actions
         self._slider_widget.handleDragStart.connect(self._slider_drag_start_cb)
         
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
-        self.warning_widget.setVisible(False)
+        # warning_color = gremlin.ui.ui_common.Color.warningColor()
+        # self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
+        # self.warning_widget.setVisible(False)
+        # self.warning_widget = None
+        # self.container_warning_widget, self.container_warning_layout = gremlin.ui.ui_common.getHContainer()
+        
 
         self.slider_frame_layout.addWidget(self._slider_widget)
         help_button = QtWidgets.QPushButton()
@@ -3781,32 +3795,34 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.container_options_layout.addWidget(self._display_mode_widget)
         self.container_options_layout.addStretch()
 
-        self.container_gate_ui_widget = QtWidgets.QWidget()
-        
+
+        # holds gateinfo widgets
+        self.container_gate_ui_widget, self.container_gate_ui_layout = gremlin.ui.ui_common.getVContainer()
         self.container_gate_ui_widget.setContentsMargins(8,0,0,0)
-        self.container_gate_ui_layout = QtWidgets.QVBoxLayout(self.container_gate_ui_widget)
-        #self.container_gate_ui_layout.setContentsMargins(0,0,0,0)
+        
+        css_table = "QTableWidget {border: none;}"
 
-        self.container_range_count_widget = QtWidgets.QWidget()
-        self.container_range_count_layout = QtWidgets.QHBoxLayout(self.container_range_count_widget)
-                
+        self.container_gate_widget, self.container_gate_layout = gremlin.ui.ui_common.getVContainer()
+        table = QtWidgets.QTableWidget()
+        table.setStyleSheet(css_table)
+        self.gate_table_widget = table
+
+
+        self.gate_count_widget = QtWidgets.QLabel()
+        self.container_gate_layout.addWidget(self.gate_count_widget)
+        self.container_gate_layout.addWidget(self.gate_table_widget)
+        
+        self.container_range_widget, self.container_range_layout = gremlin.ui.ui_common.getVContainer()
+        table = QtWidgets.QTableWidget()
+        table.setStyleSheet(css_table)
+        self.range_table_widget = table
+        
+
         self.range_count_widget = QtWidgets.QLabel()
-        self.container_range_count_layout.addWidget(self.range_count_widget)
-
-        self.container_gate_widget = QtWidgets.QWidget()
-        self.container_gate_widget.setContentsMargins(0,0,0,0)
-        self.container_gate_layout = QtWidgets.QVBoxLayout(self.container_gate_widget)
-        self.container_gate_layout.setContentsMargins(0,0,0,0)
-
-        self.container_range_widget = QtWidgets.QWidget()
-        self.container_range_widget.setContentsMargins(0,0,0,0)
-
-
-        self.container_range_layout = QtWidgets.QVBoxLayout(self.container_range_widget)        
-        self.container_range_layout.setContentsMargins(0,0,0,0)
-
+        self.container_range_layout.addWidget(self.range_count_widget)
+        self.container_range_layout.addWidget(self.range_table_widget)
+        
         self.container_gate_ui_layout.addWidget(self.container_gate_widget)
-        self.container_gate_ui_layout.addWidget(self.container_range_count_widget)
         self.container_gate_ui_layout.addWidget(self.container_range_widget)
 
 
@@ -3827,7 +3843,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         row+=1
         self.main_layout.addWidget(self.container_output_widget,row,0,1,-1)
         row+=1
-        self.main_layout.addWidget(self.warning_widget,row,0,1,-1)
+        #self.main_layout.addWidget(self.container_warning_widget,row,0,1,-1)
         self.main_layout.setVerticalSpacing(0)
         self.main_layout.setRowStretch(row, 3)
         
@@ -3954,8 +3970,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
         gh.gatedata_stepsChanged.connect(self._update_steps_cb)
         gh.gatedata_valueChanged.connect(self._update_values_cb)
         gh.slider_marker_update.connect(self._slider_update_value_handler)
-        # eh.slider_marker_update.connect(self._slider_marker_update_handler)
-        gh.range_value_changed.connect(self._range_changed_cb)
         gh.gate_order_changed.connect(self._gate_order_changed_cb)
         gh.gate_value_changed.connect(self._gate_value_changed)
         gh.use_default_range_changed.connect(self._update_range_display)
@@ -4033,160 +4047,160 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     def _reload_widgets(self):
         ''' reloads gates and range repeater widgets'''
+        gremlin.util.assert_ui_thread()
         
-        self._reload_ranges()
         self._reload_gates()
-
-        #self._update_gate_icons()
-        self.container_range_count_layout.update()
+        self._reload_ranges()
         
 
     def _reload_gates(self):
-
+        gremlin.util.assert_ui_thread()
         # sort the gates and update the display
         self._sort_gate_layout()
 
+    
 
-
+    
     def _sort_gate_layout(self):
         ''' updates and sorts the gate container layout '''
 
-        self._gwi_map = {} # map of gate widgets by gate
+        gremlin.util.assert_ui_thread()
+
+        self._gwi_map.clear()
+        table = self.gate_table_widget
+        table.clear()
         
-        
-        gremlin.ui.ui_common.clear_layout(self.container_gate_layout)
-        container_widget = QtWidgets.QWidget()
-        container_widget.setContentsMargins(0,0,0,0)
-        #container_widget.setMinimumWidth(600)
-        layout = QtWidgets.QGridLayout(container_widget)
-        index = 0
-        container_widget.setUpdatesEnabled(False)
-        
-        max_col = 4
-        
-        # setup columns
-        layout.addWidget(QtWidgets.QLabel("Gates:"),0,0)
-        for col in range(1,max_col):
-            layout.addWidget(QtWidgets.QWidget(),0,col)
-        layout.setColumnStretch(max_col, 2)
-        row = 1
+        row = 0
         col = 0
         gate_list = self.gate_data.getUsedGates()
-        for gate in gate_list:
+        gate_count = len(gate_list)
+
+        max_col = self._max_col if gate_count > self._max_col else gate_count
+        max_row = 1 + (len(gate_list) // max_col)
+        max_col += (max_col-1) # spacer columns
+        table.setColumnCount(max_col)
+        table.setRowCount(max_row)
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+
+        if verbose: syslog.info("Gate table:")
+        for index, gate in enumerate(gate_list):
             # create a widget for this gate
             gate.slider_index = index
             widget = GateWidgetInfo(gate, self._configure_gate_cb,
                                 self._delete_gate_confirm_cb,
                                 self._grab_cb,
-                                is_container=gate.hasAnyContainers()
+                                is_container=gate.hasAnyContainers(),
+                                parent = table
                                 )
-            #widget.gate.slider_index = index
-            self._gwi_map[gate] = widget
-            #self._gwi_widgets_index_map[gate.index] = widget
-            index += 1
+            
+
             self._update_gate_icon(gate.slider_index, gate)
-            layout.addWidget(widget, row, col, alignment=QtCore.Qt.AlignmentFlag.AlignLeft)
-            #widget.update_warning()
+
+            table.setCellWidget(row, col, widget)
+            self._gwi_map[gate] = (row, col)
+            if verbose: syslog.info(f"\t{gate.to_display()} ({row},{col})")
+
             col += 1
+            table.setCellWidget(row, col, QtWidgets.QLabel(" ")) # spacer
+            col += 1
+            
+
+            
             if col >= max_col:
                 col = 0
                 row += 1
         
-        layout.addWidget(QtWidgets.QLabel(" "),0,max_col)
-        layout.setColumnStretch(max_col, 2)
+        table.resizeColumnsToContents()
+        table.resizeRowsToContents()
+        table.horizontalHeader().setVisible(False)
+        table.verticalHeader().setVisible(False)
 
-        container_widget.setUpdatesEnabled(True)
-        self.container_gate_layout.addWidget(container_widget)
-        container_widget.update()
+        self.gate_count_widget.setText(f"Gates ({gate_count}):")
 
-        
-            
             
    
     def _reload_ranges(self):
         ''' when gates change, reload ranges '''
+        gremlin.util.assert_ui_thread()
 
-        # remove existing ranges 
-
-        self._rwi_map = {} # map of range widgets by range
-        
-        self._rwi_widgets_index_map.clear()
         self._rwi_map.clear()
 
-        # remove + delete existing widgets
-        gremlin.util.clear_layout(self.container_range_layout)
+        table = self.range_table_widget
+        table.clear()
         
+        range_list = self._gate_data.updateRanges()
+        range_count = len(range_list)
+        
+        max_col = self._max_col if range_count > self._max_col else range_count
+        max_row = 1 + (len(range_list) // max_col)
+        max_col += (max_col-1) # spacer columns
+        table.setColumnCount(max_col)
+        table.setRowCount(max_row)
 
 
-        container_widget = QtWidgets.QWidget()
-        container_widget.setContentsMargins(0,0,0,0)
-        layout = QtWidgets.QGridLayout(container_widget)
-        
-        container_widget.setUpdatesEnabled(False)
-        max_col = 4
-
-        
-        ranges = self._gate_data.updateRanges()
         verbose = gremlin.config.Configuration().verbose_mode_gate
-        if verbose: syslog.info(f"Reload range: found {len(ranges)} used ranges")
+        if verbose: syslog.info(f"Reload range: found {len(range_list)} used ranges")
     
         index = 0
-        row = 1
+        row = 0
         col = 0
         decimals = self._gate_data.decimals
-        for index, rng in enumerate(ranges):
+        if verbose: syslog.info("Range table:")
+        for index, rng in enumerate(range_list):
             
             widget = RangeWidgetInfo(index + 1, 
                                 rng,
                                 decimals,
                                 self._configure_range_cb,
+                                parent = table
                                 )
             
+            table.setCellWidget(row, col, widget)
             
-            layout.addWidget(widget, row, col, alignment=QtCore.Qt.AlignmentFlag.AlignLeft)
+            if verbose: syslog.info(f"\tRange: {rng.to_display()} ({row},{col})")
+            self._rwi_map[rng] = (row, col)
             
-            self._rwi_map[rng] = widget
-            self._rwi_widgets_index_map[index] = widget
             col += 1
+            table.setCellWidget(row, col, QtWidgets.QLabel(" ")) # spacer
+            col += 1
+
             if col >= max_col:
                 col = 0
                 row += 1
 
-        layout.addWidget(QtWidgets.QLabel(" "),0,max_col)
-        layout.setColumnStretch(max_col,2)
 
-        self.container_range_layout.addWidget(container_widget)
-        container_widget.setUpdatesEnabled(True)
-        
-        container_widget.update()
+        table.resizeColumnsToContents()
+        table.resizeRowsToContents()
+        table.horizontalHeader().setVisible(False)
+        table.verticalHeader().setVisible(False)
+
         self._update_range_display()
 
     def _update_range_display(self):
         ''' called when the range display mode changes '''
-
         
-        
-        rwi_list = list(self._rwi_map.values())
-        rwi : RangeWidgetInfo
+        widgets = [self.get_range_widget(rwi) for rwi in self._rwi_map.keys()]
+        # widgets = [widget for widget in widgets if widgets is not None]
+        widget : RangeWidgetInfo
         if self._gate_data.use_default_range:
             # enable single range mode on the slider
             self._slider_widget.singleRange = True
             # hide the ranges
             range_count = 1
-            for rwi in rwi_list:
-                rwi.range_info.setUsed(False)
-                rwi.setVisible(False)
+            for widget in widgets:
+                widget.range_info.setUsed(False)
+                widget.setVisible(False)
             self._gate_data.default_range.setUsed(True)
         else:
             
-            range_count = len(rwi_list)
+            range_count = len(widgets)
             # disable single range mode on the slider
             self._slider_widget.singleRange = False
             self._gate_data.default_range.setUsed(False)
             
-            for rwi in rwi_list:
-                rwi.range_info.setUsed(True)
-                rwi.setVisible(True)
+            for widget in widgets:
+                widget.range_info.setUsed(True)
+                widget.setVisible(True)
         
         self._slider_widget.UseAlternateColor = range_count > 1
         self.range_count_widget.setText(f"Ranges ({range_count}):")
@@ -4229,31 +4243,18 @@ class GatedAxisWidget(QtWidgets.QWidget):
     def get_gate_widget(self, gate : GateInfo):
         ''' returns the widget for the corresponding gate '''
         if gate in self._gwi_map.keys():
-            return self._gwi_map[gate].widget
+            row,col = self._gwi_map[gate]
+            widget =  self.gate_table_widget.cellWidget(row, col)
+            return widget
         return None
     
     def get_range_widget(self, rng : RangeInfo):
         ''' returns the widget for the corresponding range '''
         if rng in self._rwi_map.keys():
-            return self._rwi_map[rng].widget
+            row, col  = self._rwi_map[rng]
+            widget = self.range_table_widget.cellWidget(row, col)
+            return widget
         return None
-        
-    @QtCore.Slot(RangeInfo)
-    def _range_changed_cb(self, range_info):
-        ''' called when range data changes '''
-        #range_info = self.sender()
-        if range_info.id in self._rwi_widgets_index_map.keys():
-            range_widget = self._rwi_widgets_index_map[range_info.id]
-            if Shiboken.isValid(range_widget):
-                g1 : GateInfo = range_info.g1
-                g2 : GateInfo= range_info.g2
-                ''' updates the display for a range item '''
-                
-                helper = self._helper()
-                g1v = helper.to_value(g1.value)
-                g2v = helper.to_value(g2.value)
-                range_widget.setText(f"[{g1v:0.{helper.decimals}f} to {g2v:0.{helper.decimals}f}]")
-        
     
 
     @QtCore.Slot(bool)
@@ -4860,9 +4861,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         # find the widgets for the gate
         if gate in self._gwi_map:
-            gwi : GateWidgetInfo = self._gwi_map[gate]
-            if Shiboken.isValid(gwi):
-                gwi._update_icon()
+            widget : GateWidgetInfo = self.get_gate_widget(gate)
+            if widget:
+                widget._update_icon()
 
     def _update_output_value(self):
         ''' updates triggers and UI when the slider input value changes '''

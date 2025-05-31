@@ -68,6 +68,7 @@ class BasicContainerWidget(AbstractContainerWidget):
                 )
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
+            action_selector.inputItem = self.profile_data
 
             self.action_layout.addWidget(action_selector)
 

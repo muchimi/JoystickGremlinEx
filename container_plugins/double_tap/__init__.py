@@ -136,6 +136,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
             self.profile_data.get_input_type(),
             self.profile_data,
         )
+        action_selector.inputItem = self.profile_data
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
 

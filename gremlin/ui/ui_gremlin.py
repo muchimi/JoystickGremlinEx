@@ -16,12 +16,16 @@ class Ui_Gremlin(object):
         self.main = QtWidgets.QWidget(main_window)
         self.main.setObjectName("main")
         self.main_layout = QtWidgets.QVBoxLayout(self.main)
+        
+        main_window.setCentralWidget(self.main)
 
+
+        #background_color = gremlin.ui.ui_common.Color.backgroundColor()
+        #css = f"background-color: black;"
         
         # content panel below the tab
         self.tab_bar_widget = QtWidgets.QWidget(parent=self.main)
         self.tab_bar_widget.setContentsMargins(0,0,0,0)
-        #self.tab_bar_widget.setStyleSheet("background: yellow")
         self.tab_bar_layout = QtWidgets.QVBoxLayout(self.tab_bar_widget)
         self.tab_bar_layout.setContentsMargins(0,0,0,0)
         self.tab_bar_widget.setMaximumHeight(30)
@@ -37,7 +41,12 @@ class Ui_Gremlin(object):
 
         # content panel below the tab
         self.tab_content_widget, layout = gremlin.ui.ui_common.getVContainer()
+        
+        
+        #self.tab_content_widget.setStyleSheet(css)
+
         self.device_widget = QtWidgets.QStackedWidget()
+        #self.device_widget.setStyleSheet(css)
         layout.addWidget(self.device_widget)
                 
         self.main_layout.addWidget(self.tab_bar_widget)
@@ -50,8 +59,7 @@ class Ui_Gremlin(object):
         self.statusbar_widget.setMaximumHeight(32)
 
         self.main_layout.addWidget(self.statusbar_widget)
-        
-        main_window.setCentralWidget(self.main)
+
         self.menubar = QtWidgets.QMenuBar(main_window)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
         self.menubar.setObjectName("menubar")

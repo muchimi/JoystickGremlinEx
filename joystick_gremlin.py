@@ -178,11 +178,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         gremlin.shared_state.ui = self
 
         QtWidgets.QMainWindow.__init__(self, parent)
+        
         self.ui = Ui_Gremlin()
-        #self.update_theme()
         self.ui.setupUi(self)
-        #self._recreate_tab_widget()
-
+  
+        
+        
         
 
         self._profile_load_stack = []
@@ -259,10 +260,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._reset_tab_data()
 
         self.runner = gremlin.code_runner.CodeRunner()
-        self.repeater = gremlin.repeater.Repeater(
-            [],
-            self._update_statusbar_repeater
-        )
+        self.repeater = gremlin.repeater.Repeater([],self._update_statusbar_repeater)
 
 
         self._status_bar_last_runtime_mode = None
@@ -377,8 +375,6 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         GremlinUi.ui = self
 
- 
-
         el.config_option_changed.connect(self._config_option_changed)
 
 
@@ -414,7 +410,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             with QtCore.QSignalBlocker(self.ui.devices):
                 while self.ui.devices.count():
                     self.ui.devices.removeTab(0)
-
 
     def _get_device(self, device_guid) -> dinput.DeviceSummary:
         ''' gets the device for a given GUID, connected or not '''
@@ -1785,8 +1780,6 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         return index
         
-        # if hide and widget.parent() is not None:
-        #     widget.setVisible(False)
         
     def selectRegisteredWidget(self, device_guid) -> int:
         ''' selects the content for the given device id if the content exists 
@@ -1940,8 +1933,9 @@ class GremlinUi(QtWidgets.QMainWindow):
     
     def hideTabWidgets(self):
         ''' hides all tab widgets '''
-        for widget in self._widget_device_index_map.values():
-            if widget.parent(): widget.setVisible(False)
+        if gremlin.shared_state.ui_ready:
+            for widget in self._widget_device_index_map.values():
+                if widget.parent(): widget.setVisible(False)
 
             
     def selectTabWidgetByIndex(self, index : int):
@@ -1978,16 +1972,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         index = self.selectRegisteredWidget(device_guid)
         if index != -1:
-            # widget = self._widget_device_index_map[device_guid]
-            # if self._current_tab_widget:
-            #     # hide the old widget
-            #     self._current_tab_widget.setVisible(False)
-                
-            # # show the new widget
-            # if widget.parent() is not None: widget.setVisible(True)
-            # self._current_tab_widget = widget
-            # self._current_tab_device_guid = device_guid
-
+            
             # tell ui a new device tab was selected
             gremlin.shared_state.current_tab_device_guid = device_guid
             device_name = self._get_device_name(device_guid)
@@ -2015,7 +2000,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         the different connected devices.
         """
         try:
-
 
             device : DeviceSummary
             device_guid = None
@@ -3651,7 +3635,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._set_joystick_input_highlighting(self.config.highlight_enabled)
         self._set_joystick_input_axis_highlighting(self.config.highlight_input_axis)
         self._set_joystick_input_buttons_highlighting(self.config.highlight_input_buttons)
-        if not ignore_minimize:
+        if not ignore_minimize and self.config.start_minimized:
             self.setHidden(self.config.start_minimized)
 
         if self.config.activate_on_launch:
@@ -3877,6 +3861,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         el.pop_input_selection(True) # restore input selection and reset
         #self._select_input(last_device_guid, last_input_type, last_input_id, True)
+
+        syslog.info("Profile: load completed.")
 
         # restore the mouse cursor
         popCursor()
@@ -4596,24 +4582,6 @@ if __name__ == "__main__":
 
     config = gremlin.config.Configuration()
 
-    #  parser = argparse.ArgumentParser()
-    # parser.add_argument(
-    #     "--profile",
-    #     help="Path to the profile to load on startup",
-    # )
-    # parser.add_argument(
-    #     "--enable",
-    #     help="Enable Joystick Gremlin upon launch",
-    #     action="store_true"
-    # )
-    # parser.add_argument(
-    #     "--start-minimized",
-    #     help="Start Joystick Gremlin minimized",
-    #     action="store_true"
-    # )
-
-    # args = parser.parse_args()
-
     # command line parser
     parser = QtCore.QCommandLineParser()
     parser.addOption(QtCore.QCommandLineOption(["np","noprofile"],"Do not load a profile on start"))
@@ -4685,6 +4653,12 @@ if __name__ == "__main__":
     gremlin.plugin_manager.ActionPlugins()
     gremlin.plugin_manager.ContainerPlugins()
 
+    # splash_pixmap = QtGui.QPixmap("gremlin-ex-logo.png")
+    # splash = QtWidgets.QSplashScreen(splash_pixmap)
+    # splash.show()
+    # app.processEvents()
+
+
     # Create Gremlin UI
     ui = GremlinUi()
 
@@ -4692,17 +4666,7 @@ if __name__ == "__main__":
 
     syslog.info("GremlinEx UI created")
 
-    # # Handle user provided command line arguments
-    # if args.profile is not None and os.path.isfile(args.profile):
-    #     ui._do_load_profile(args.profile)
-    # if args.enable:
-    #     ui.ui.actionActivate.setChecked(True)
-    #     ui.activate(True)
-    # if args.start_minimized:
-    #     ui.setHidden(True)
-
-
-    # state monitoring
+        # state monitoring
     profile_state_monitor = gremlin.shared_state.ProfileStateMonitor()   
 
     # automatic process monitoring check
@@ -4722,6 +4686,15 @@ if __name__ == "__main__":
 
     el.ui_ready.emit()
 
+    # for some reason QT shows the window with a white background and ignores stylesheets/background color
+    # workaround for now: show the window minimized so it doesnt' flash on the screen
+    # let it update
+    # show the window normally
+    ui.showMinimized()
+    app.processEvents()
+    ui.showNormal()
+    
+    #splash.finish(ui)
 
     # generate icons if needed
     #_icon_generator = gremlin.ui.ui_common.IconGenerator()

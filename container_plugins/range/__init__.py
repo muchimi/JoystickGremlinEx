@@ -83,6 +83,7 @@ class RangeContainerWidget(AbstractContainerWidget):
             self.profile_data,
         )
 
+        self.action_selector.inputItem = self.profile_data
         action_data: RangeContainer
         action_data = self.profile_data
 

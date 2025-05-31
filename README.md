@@ -15,6 +15,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T2)
+- fix: modified initial show parameter to avoid flashing white background
+- API: refactor of gated axis gate and range widgets to be tracked internally by QT rather than Python.
+
+
+
+
+### (m76T2)
 - API: modified UI construction to mitigate garbage collection issues with the underlying QT library.  Work in progress.
 
 

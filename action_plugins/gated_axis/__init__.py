@@ -54,6 +54,7 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                                 show_configuration=False,
                                                                 parent=self
                                                                 )
+        
         #cache.register(self.action_data, widget)
         self.main_layout.addWidget(self.gate_widget)
         

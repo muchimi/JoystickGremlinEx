@@ -92,6 +92,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
                 self.profile_data.get_input_type(),
                 self.profile_data,
             )
+            action_selector.inputItem = self.profile_data
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
             self.action_layout.addWidget(action_selector)

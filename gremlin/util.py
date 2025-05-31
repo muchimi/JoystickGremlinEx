@@ -450,30 +450,6 @@ def clear_layout(layout):
     if isinstance(layout, QtWidgets.QWidget):
         widget = layout
         layout = widget.layout()
-        # if not widget in _cleaned_widgets:
-        #     _cleaned_widgets.append(widget)
-        #     has_cleanup  = hasattr(widget,"_cleanup_ui")
-        #     # syslog.info(f"{_logtabs}CLEAN: {type(widget)} cleanup: {has_cleanup}")
-            
-        #     if has_cleanup:
-        #         widget._cleanup_ui()
-        #     _cleaned_widgets.remove(widget)
-            
-    # if layout is not None:
-    #     try:
-    #         while layout.count() > 0:
-    #             child = layout.takeAt(0)
-    #             widget = child.widget()
-    #             if widget is not None:
-    #                 clear_layout(widget)
-    #             layout.removeItem(child)
-    #     except:
-    #         # QT garbage collected the object already
-    #         pass
-
-    # _logtabs = _logtabs[:-1]
-
-
     while layout.count() > 0:
         child = layout.takeAt(0)
         if child.layout():
@@ -486,7 +462,22 @@ def clear_layout(layout):
             widget.deleteLater()
         layout.removeItem(child)
 
-    
+
+def get_layout_horizontal_size(layout : QtWidgets.QLayout) -> QtCore.QSize:
+    ''' gets the desired size of a layout '''
+    widgets = get_layout_widgets(layout)
+    size = QtCore.QSize()
+    h = 0
+    widget : QtWidgets.QWidget
+    for widget in widgets:
+        w_size = widget.sizeHint()
+        wh = w_size.height()
+        if wh > h:
+            h = wh
+        w_size.setHeight(0)
+        size += w_size
+    size.setHeight(h)
+    return size
 
 def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
     ''' returns a list of layout widgets '''
@@ -1733,7 +1724,14 @@ class InvokeUiMethod(QtCore.QObject):
         self.setParent(None)
 
 
+def is_ui_thread():
+    ''' true if the current thread is the UI thread '''
+    current_thread = QtCore.QThread.currentThread()
+    ui_thread = QtWidgets.QApplication.instance().thread() # UI thread
+    return current_thread == ui_thread
+
 def assert_ui_thread():
+    ''' throws an assertion if not running on UI thread which is needed for QT '''
     current_thread = QtCore.QThread.currentThread()
     ui_thread = QtWidgets.QApplication.instance().thread() # UI thread
     if current_thread != ui_thread:
@@ -2110,3 +2108,4 @@ def getTemporaryFile(ext = None):
     return tmp_file
 
     
+

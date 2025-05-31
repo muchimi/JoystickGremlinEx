@@ -341,7 +341,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
             self.profile_data,
         )
 
-        
+        self.action_selector.inputItem = self.profile_data
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
 
