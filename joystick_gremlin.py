@@ -341,7 +341,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._context_menu_tab_index = None
 
         # Load existing configuration or create a new one otherwise
-        if self.config.last_profile and os.path.isfile(self.config.last_profile):
+        
+        if not self.config.auto_load_disabled and self.config.last_profile and os.path.isfile(self.config.last_profile):
             # check if this was a profile swap that we load the profile from the current user folder
             current_profile_folder = gremlin.shared_state.data_path.casefold()
             last_profile = self.config.last_profile.lower()
@@ -4498,22 +4499,9 @@ def exception_hook(exception_type, value, trace):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--profile",
-        help="Path to the profile to load on startup",
-    )
-    parser.add_argument(
-        "--enable",
-        help="Enable Joystick Gremlin upon launch",
-        action="store_true"
-    )
-    parser.add_argument(
-        "--start-minimized",
-        help="Start Joystick Gremlin minimized",
-        action="store_true"
-    )
-    args = parser.parse_args()
+   
+
+
 
     gremlin.shared_state.ui_ready = False
 
@@ -4606,13 +4594,31 @@ if __name__ == "__main__":
     app.setStyle("Fusion")
     app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
 
+    config = gremlin.config.Configuration()
 
-    
-    #gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
-    #app.setStyle("Fusion")
-    #app.setStyle("windowsvista")
-  
-    
+    #  parser = argparse.ArgumentParser()
+    # parser.add_argument(
+    #     "--profile",
+    #     help="Path to the profile to load on startup",
+    # )
+    # parser.add_argument(
+    #     "--enable",
+    #     help="Enable Joystick Gremlin upon launch",
+    #     action="store_true"
+    # )
+    # parser.add_argument(
+    #     "--start-minimized",
+    #     help="Start Joystick Gremlin minimized",
+    #     action="store_true"
+    # )
+
+    # args = parser.parse_args()
+
+    # command line parser
+    parser = QtCore.QCommandLineParser()
+    parser.addOption(QtCore.QCommandLineOption(["np","noprofile"],"Do not load a profile on start"))
+    parser.process(app.arguments())
+    config.auto_load_disabled = parser.isSet("noprofile")
 
     # for now force localization to use US English until we have proper localization support
     locale = QtCore.QLocale("UnitedStates")
@@ -4686,14 +4692,14 @@ if __name__ == "__main__":
 
     syslog.info("GremlinEx UI created")
 
-    # Handle user provided command line arguments
-    if args.profile is not None and os.path.isfile(args.profile):
-        ui._do_load_profile(args.profile)
-    if args.enable:
-        ui.ui.actionActivate.setChecked(True)
-        ui.activate(True)
-    if args.start_minimized:
-        ui.setHidden(True)
+    # # Handle user provided command line arguments
+    # if args.profile is not None and os.path.isfile(args.profile):
+    #     ui._do_load_profile(args.profile)
+    # if args.enable:
+    #     ui.ui.actionActivate.setChecked(True)
+    #     ui.activate(True)
+    # if args.start_minimized:
+    #     ui.setHidden(True)
 
 
     # state monitoring

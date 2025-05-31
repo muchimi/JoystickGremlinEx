@@ -39,8 +39,7 @@ class Ui_Gremlin(object):
         self.tab_content_widget, layout = gremlin.ui.ui_common.getVContainer()
         self.device_widget = QtWidgets.QStackedWidget()
         layout.addWidget(self.device_widget)
-        
-        
+                
         self.main_layout.addWidget(self.tab_bar_widget)
         self.main_layout.addWidget(self.tab_content_widget)
 

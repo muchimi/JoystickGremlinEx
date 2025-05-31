@@ -12,6 +12,7 @@
             "program": "${workspaceFolder}/joystick_gremlin.py",
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
+            "args": ["--np"]
         },
         // {
         //     "name": "Python: Current File with profiler",

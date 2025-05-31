@@ -71,6 +71,9 @@ class Configuration(QtCore.QObject):
         self._midi_enabled = None
         self._osc_enabled = None
 
+        # commandline options
+        self._auto_load_disabled = False
+
 
         fname = self.get_config()
         basedir = os.path.dirname(fname)
@@ -2236,3 +2239,11 @@ class Configuration(QtCore.QObject):
     def import_prompt_enabled(self, value : bool):
         self._data["import_prompt_enabled"] = value
         self.save()
+
+
+    @property
+    def auto_load_disabled(self) -> bool:
+        return self._auto_load_disabled
+    @auto_load_disabled.setter
+    def auto_load_disabled(self, value):
+        self._auto_load_disabled = value
