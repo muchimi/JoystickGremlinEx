@@ -452,6 +452,7 @@ class InputItemListView(ui_common.AbstractView):
 
         el = gremlin.event_handler.EventListener()
         el.profile_device_mapping_changed.connect(self._profile_device_mapping_changed)
+        
         # self.widget_map = {} # list of created widgets
 
 
@@ -462,19 +463,6 @@ class InputItemListView(ui_common.AbstractView):
     #     # self._clear_widgets()
 
         
-        
-        
-    #def _clear_widgets(self):
-        # ''' clears all widgets from their references'''
-        # if self.widget_map:
-        #     for widget in self.widget_map.values():
-        #         if hasattr(widget,"_cleanup_ui"):
-        #             widget._cleanup_ui()
-        #         widget.hide()
-        #         widget.setParent(None)
-        #         #widget.deleteLater()
-
-        #     self.widget_map = {} # list of created widgets
 
 
     @property
@@ -615,6 +603,7 @@ class InputItemListView(ui_common.AbstractView):
 
                     # hook the widget
                     widget.selected_changed.connect(self._widget_selection_change_cb)
+                    widget.unselected.connect(self._widget_unselected_cb)
                     widget.index = index # assigned index
                     if selected:
                         # remember which item to select
@@ -665,13 +654,16 @@ class InputItemListView(ui_common.AbstractView):
                     widget.setInputDescription(data.display_name)
             
                         
-
+    @QtCore.Slot(object)
     def _widget_selection_change_cb(self, widget):
         ''' called when a widget selection changes '''
         self.select_item(widget.index, user_selected=True, force_update=False)
 
 
-
+    @QtCore.Slot(object)
+    def _widget_unselected_cb(self, widget):
+        self.unselect_item(widget.index)
+        
 
     def itemAt(self, index : int):
         ''' gets the input widget as the given index'''
@@ -852,6 +844,8 @@ class InputItemListView(ui_common.AbstractView):
             with (QtCore.QSignalBlocker(last_widget)):
                 last_widget.selected = False
 
+                
+
         self._current_index = index
 
         widget = self.itemAt(index)
@@ -921,6 +915,31 @@ class ActionSetModel(ui_common.AbstractModel):
         self.data_changed.emit()
 
 
+@SingletonDecorator
+class ActionSetViewCache():
+    def __init__(self):
+        self.cache = {} # map of action ID to widget
+
+    def registerWidget(self, key, widget):
+        self.cache[key] = widget
+
+    def unregisterWidget(self, key, widget):
+        if key in self.cache:
+            del self.cache[key]
+
+    def getWidget(self, key):
+        if key in self.cache:
+            return self.cache[key]
+        return None
+
+    def clearWidget(self, widget):
+        for key in self.cache:
+            if widget == self.cache[key]:
+                del self.cache[key]
+                
+
+_action_set_view_cache = ActionSetViewCache()
+
 class ActionSetView(ui_common.AbstractView):
 
     """View displaying the action set content."""
@@ -958,6 +977,11 @@ class ActionSetView(ui_common.AbstractView):
         # Create a group box widget in which everything else will be placed
         self.group_widget = QtWidgets.QGroupBox(self.label)
         self.main_layout.addWidget(self.group_widget)
+
+        self.setObjectName(f"ActionSetView: {label}")
+
+        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        if verbose_ui: syslog.info(f"ActionSetView: create: {self.objectName()}")
 
         
         # Create group box contents
@@ -1004,9 +1028,20 @@ class ActionSetView(ui_common.AbstractView):
 
     def redraw(self):
 
+
+        
+        cache = ActionSetViewCache()
+
+        
+        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        if verbose_ui: object_name = self.objectName()
+        if verbose_ui: syslog.info(f"ActionSet: redraw start: {object_name}")
+
         widgets = gremlin.util.get_layout_widgets(self.action_layout)
         if widgets:
+            if verbose_ui: syslog.info(f"ActionSet: redraw cleanup start: {object_name}")
             for widget in widgets:
+                cache.clearWidget(widget)
                 if hasattr(widget,"_cleanup_ui"):
                     widget._cleanup_ui()
                 widget.hide()
@@ -1014,7 +1049,7 @@ class ActionSetView(ui_common.AbstractView):
                 widget.deletelater()
             self._widgets.clear()
 
-        
+            if verbose_ui: syslog.info(f"ActionSet: redraw cleanup complete: {object_name}")
         
 
         #ui_common.clear_layout(self.action_layout)
@@ -1035,27 +1070,38 @@ class ActionSetView(ui_common.AbstractView):
         if self.view_type == ui_common.ContainerViewTypes.Action:
             for index in range(self.model.rows()):
                 data = self.model.data(index)
+                if verbose_ui: syslog.info(f"ActionSet: redraw action widget start: {object_name}")
                 widget = data.widget(data)
+                cache.registerWidget(data.id, widget)
                 widget.action_modified.connect(self.model.data_changed.emit)
                 wrapped_widget = BasicActionWrapper(widget)
                 wrapped_widget.closed.connect(self._create_closed_cb(widget))
                 self.action_layout.addWidget(wrapped_widget)
                 self._widgets.append(wrapped_widget)
+                if verbose_ui: syslog.info(f"ActionSet: redraw action widget completed: {object_name}")
                 
         elif self.view_type == ui_common.ContainerViewTypes.Conditions:
             for index in range(self.model.rows()):
+                is_cached = True
                 data = self.model.data(index)
-                widget = data.widget(data)
-                widget.action_modified.connect(self.model.data_changed.emit)
+                if verbose_ui: syslog.info(f"ActionSet: redraw condition widget start: {object_name}")
+                widget = cache.getWidget(data.id)
+                if not widget:
+                    is_cached = False
+                    widget = data.widget(data)
+                #widget.action_modified.connect(self.model.data_changed.emit)
                 wrapped_widget = ConditionActionWrapper(widget)
-                if hasattr(widget,"_cleanup_ui"):
+                if not is_cached and hasattr(widget,"_cleanup_ui"):
                     widget._cleanup_ui()
-                widget.deleteLater()
+                    widget.deleteLater()
+                if verbose_ui: syslog.info(f"ActionSet: redraw condition widget completed: {object_name}")
                 self.action_layout.addWidget(wrapped_widget)
                 self._widgets.append(wrapped_widget)
 
 
         clipboard.enable()
+
+        if verbose_ui: syslog.info(f"ActionSet: redraw complete: {object_name}")
 
     def _add_action(self, action_name):
         import gremlin.plugin_manager
@@ -1180,6 +1226,9 @@ class InputItemWidget(QBoxFrame):
 
     # Signal emitted whenever this button is pressed
     selected_changed = QtCore.Signal(InputIdentifier)
+
+    # fires when unselected
+    unselected = QtCore.Signal(InputIdentifier) 
 
     # signal when button's close button is pressed
     closed =  QtCore.Signal(InputIdentifier)
@@ -1910,6 +1959,7 @@ class InputItemWidget(QBoxFrame):
                 self.setStyleSheet(style)
             else:
                 self._default_style()
+                self.unselected.emit(self)
         
 
             
@@ -3000,6 +3050,8 @@ class TitleBarButton(QtWidgets.QAbstractButton):
 
         :param event the rendering event
         """
+
+        # syslog.info("title paint start")
         p = QtGui.QPainter(self)
         # p.begin(self)
 
@@ -3039,6 +3091,8 @@ class TitleBarButton(QtWidgets.QAbstractButton):
         )
 
         p.end()
+
+        # syslog.info("title paint end")
 
 
 class TitleBar(QtWidgets.QFrame):

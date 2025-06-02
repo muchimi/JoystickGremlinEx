@@ -18,6 +18,7 @@
 from lxml import etree as ElementTree
 
 import gremlin
+import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.base_classes
 import gremlin.ui.ui_common
@@ -28,7 +29,9 @@ from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_conditions import AbstractFunctor
+import logging
 
+syslog = logging.getLogger("system")
 class BasicContainerWidget(AbstractContainerWidget):
 
     """Basic container which holds a single action."""
@@ -41,8 +44,12 @@ class BasicContainerWidget(AbstractContainerWidget):
         """
         super().__init__(profile_data, parent)
 
+
     def _create_action_ui(self):
         """Creates the UI components."""
+
+        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        if verbose_ui: syslog.info("BasicContainerWidget: create action UI start")
         if len(self.profile_data.action_sets) > 0:
             assert len(self.profile_data.action_sets) == 1
 
@@ -71,6 +78,8 @@ class BasicContainerWidget(AbstractContainerWidget):
             action_selector.inputItem = self.profile_data
 
             self.action_layout.addWidget(action_selector)
+
+        if verbose_ui: syslog.info("BasicContainerWidget: create action UI completed")
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:

@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T5)
+- API: added additional instrumentation for log output for troubleshooting (enabled with UI verbose mode) - warning - this can output a lot of data
+- Fix: automatic input select on button highlight mode sometimes ignored.
+
 ### (m76T4)
 - API: Update to Pyside 6.9.1/Shiboken 6.9.1 for bug fixes.
 - API: Event includes extra data dictionary to pass to functors.  Will be merged with any other data if provided.  Allows events to pass additional data to execution graph or functors.

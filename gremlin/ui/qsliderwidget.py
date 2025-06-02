@@ -502,8 +502,10 @@ class QSliderWidget(QtWidgets.QWidget):
         
         '''
         # draw the widget
+        # syslog.info("slider paint start")
 
         painter = QPainter(self)
+        #painter.begin(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
 
@@ -516,6 +518,7 @@ class QSliderWidget(QtWidgets.QWidget):
         
 
         painter.end()
+        # syslog.info("slider paint end")
 
     def getBackgroundColor(self) -> QColor:
         """

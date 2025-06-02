@@ -76,8 +76,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.id = gremlin.util.get_guid()
         self.item_data : gremlin.base_profile.InputItem = item_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        # self.button_layout = QtWidgets.QHBoxLayout()
-        # self.widget_layout = QtWidgets.QVBoxLayout()
+        self.container_view = None
+        
         self._input_type = InputType.NotSet
         if input_type is not None:
             # override input type
@@ -90,6 +90,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         self._deleted = False
 
+        
+
 
 
     def isBlank(self):
@@ -99,6 +101,9 @@ class InputItemConfiguration(QtWidgets.QFrame):
     def _cleanup_ui(self):
         ''' called when widget is deleted '''
         self._deleted = True
+        if self.container_view:
+            self.container_view._cleanup_ui()
+            self.container_view = None
 
     @property
     def deleted(self):
@@ -162,10 +167,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
                 self._create_dropdowns()
 
             self.action_model = ActionContainerModel(self.item_data.containers, self.item_data, self._input_type)
-            container_view = ActionContainerView(self)
-            container_view.setContentsMargins(0,0,0,0)
-            container_view.setModel(self.action_model)
-            self.main_layout.addWidget(container_view)
+            self.container_view = ActionContainerView(self)
+            self.container_view.setContentsMargins(0,0,0,0)
+            self.container_view.setModel(self.action_model)
+            self.main_layout.addWidget(self.container_view)
+
 
             
 
@@ -174,7 +180,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             plugin_manager.set_widget(self.item_data, self)
 
       
-            container_view.redraw()
+            self.container_view.redraw()
 
             
 
@@ -910,6 +916,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
+        
 
         # Add modifiable device label
         
@@ -1134,8 +1141,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' gets the content widget compound key for the item / input combination'''
         return (self.device_guid, input_id)
 
-
-
     @QtCore.Slot(int)
     def _select_item_cb(self, index, force_update = False):
         """ Handles the loading of mappings for a given input item - handler for select_input event
@@ -1170,6 +1175,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
 
+
             
             if not item_data:
                 syslog.warning(f"JoystickDevice: Device [{device_name}] has no inputs for mode {current_mode} - this is not normal.")
@@ -1182,18 +1188,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: Empty content")
 
             new_key = None
-            # if item_data is not None:
-            #     new_key = item_data.id
-
-            #     if new_key == self.last_item_data_key and not force_update:
-            #         # same input - nothing to do
-            #         if verbose: syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: already displayed")
-            #         return
-
-
-
-            
-
                 
             self.last_item_data_key = new_key
 
@@ -1207,7 +1201,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_id = item_data.input_id
 
                 key = self.getWidgetKey(input_id)
-
                 widget = self.getRegisteredWidget(key)
                 if not widget:
                     

@@ -1686,16 +1686,24 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _toggle_axis_highlight(self):
         eh = gremlin.event_handler.EventListener()
         status = self.config.highlight_input_axis
-        self.config.highlight_input_axis = not status
-        eh.toggle_highlight.emit(None, not status, None)
+        enabled = not status
+        self.config.highlight_input_axis = enabled
+        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        if verbose_ui: syslog.info(f"Toggle axis highlight: {enabled}")
+        eh.toggle_highlight.emit(None, enabled, None)
 
 
     @QtCore.Slot()
     def _toggle_button_highlight(self, checked):
         eh = gremlin.event_handler.EventListener()
+        
         status = self.config.highlight_input_buttons
-        self.config.highlight_input_buttons = not status
-        eh.toggle_highlight.emit(None, None, not status)
+        enabled = not status
+        self.config.highlight_input_buttons = enabled
+
+        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        if verbose_ui: syslog.info(f"Toggle button highlight: {enabled}")
+        eh.toggle_highlight.emit(None, None, enabled)
 
     @QtCore.Slot()
     def _toggle_highlight_enabled(self, checked):
@@ -2763,11 +2771,6 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self._selection_locked = True
 
-            #self.push_highlighting()
-            
-            #el.push_joystick() # suspend joystick input while changing UI
-
-            
             if not isinstance(device_guid, str):
                 device_guid = str(device_guid)
 
@@ -3737,6 +3740,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             
 
         if gremlin.shared_state.current_profile:
+            el.profile_unload.emit() # fire unload start 
             current_profile = gremlin.shared_state.current_profile
             current_profile.unload()
             gremlin.shared_state.current_profile = None
@@ -3899,8 +3903,7 @@ class GremlinUi(QtWidgets.QMainWindow):
            # Attempt to load the new profile
         try:
             new_profile = gremlin.base_profile.Profile()
-            if gremlin.shared_state.current_profile:
-                el.profile_unload.emit()
+           
 
             gremlin.shared_state.current_profile = new_profile
             profile_updated = new_profile.from_xml(source_xml)
@@ -4295,7 +4298,8 @@ class GremlinUi(QtWidgets.QMainWindow):
     @property
     def is_button_highlighting(self) -> bool:
         ''' true if button highlighting is currently enabled '''
-        if not self.config.highlight_enabled:
+        if not self.config.highlight_enabled or not self.config.highlight_input_buttons:
+            # disabled
             return False
         if gremlin.shared_state.is_highlighting_suspended():
             # skip if highlighting is currently suspended
@@ -4309,7 +4313,8 @@ class GremlinUi(QtWidgets.QMainWindow):
     @property
     def is_axis_highlighting(self) -> bool:
         ''' true if button highlighting is currently enabled '''
-        if not self.config.highlight_enabled:
+        if not self.config.highlight_enabled or not self.config.highlight_input_axis:
+            # disabled
             return False
         if gremlin.shared_state.is_highlighting_suspended():
             # skip if highlighting is currently suspended

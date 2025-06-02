@@ -4019,6 +4019,8 @@ class QProgressBar(QtWidgets.QWidget):
 
     
     def paintEvent(self, event):
+
+        # syslog.info("progress paint start")
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
@@ -4058,6 +4060,8 @@ class QProgressBar(QtWidgets.QWidget):
             v = int(w * self._percent)
             painter.drawRoundedRect(x, y, x + v, h, r, r)
         painter.end()
+
+        # syslog.info("progress paint end")
 
         #syslog.info(f"X: {x} y: {y} w: {w} h: {h} v:{v} value: {self._percent:0.3f}")
 
@@ -4931,6 +4935,8 @@ class HatWidget(QtWidgets.QWidget):
         """
         # Define pens and brushes
 
+        # syslog.info("hat paint start")
+
         active_color = Color.activeColor()
         border_color = Color.borderColor()
         inactive_color = Color.inactiveColor()
@@ -4977,6 +4983,8 @@ class HatWidget(QtWidgets.QWidget):
         #     p.drawRect(rect)
 
         p.end()
+
+        # syslog.info("hat paint end")
 
 class HatState(QtWidgets.QGroupBox):
 
@@ -5142,12 +5150,14 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
         :param event the paint event
         """
+
+        # syslog.info("timeline paint start")
         p = QtGui.QPainter(self)
         
         
         p.drawPixmap(0, 0, self._pixmap)
         p.end()
-
+        # syslog.info("timeline paint end")
 
 
 
@@ -5619,6 +5629,8 @@ class QToggle(QCheckBox):
         contRect = self.contentsRect()
         handleRadius = round(0.24 * contRect.height())
 
+        # syslog.info("toggle paint start")
+
         p = QPainter(self)
         # p.begin(self)
         p.setRenderHint(QPainter.Antialiasing)
@@ -5651,6 +5663,8 @@ class QToggle(QCheckBox):
             handleRadius, handleRadius)
 
         p.end()
+
+        # syslog.info("toggle paint end")
 
     @Slot(int)
     def handle_state_change(self, value):
@@ -5722,6 +5736,8 @@ class QAnimatedToggle(QToggle):
 
     def paintEvent(self, e: QPaintEvent):
 
+        # syslog.info("animated toggle paint start")
+
         contRect = self.contentsRect()
         handleRadius = round(0.24 * contRect.height())
 
@@ -5765,6 +5781,8 @@ class QAnimatedToggle(QToggle):
             handleRadius, handleRadius)
 
         p.end()
+
+        # syslog.info("animated toggle paint end")
 
 
 
@@ -6253,6 +6271,9 @@ class DualSlider(QtWidgets.QWidget):
 
         :param evt the paint event
         """
+
+        # syslog.info("dual slider paint start")
+
         painter = QtWidgets.QStylePainter(self)
 
         common_option = self._get_common_option()
@@ -6284,6 +6305,10 @@ class DualSlider(QtWidgets.QWidget):
 
         painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_lower)
         painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_upper)
+
+        painter.end()
+
+        # syslog.info("dual slider paint end")
 
 
 
@@ -6588,13 +6613,18 @@ class QBubble(QtWidgets.QLabel):
         self.setContentsMargins(5, 5, 5, 5)
 
     def paintEvent(self, event):
+
+        # syslog.info("bubble paint start")
         p = QtGui.QPainter(self)
         # p.begin(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing, True)
         p.drawRoundedRect(
             0, 0, self.width() - 1, self.height() - 1, 5, 5)
-        super(QBubble, self).paintEvent(event)
         p.end()
+        super(QBubble, self).paintEvent(event)
+        
+
+        # syslog.info("bubble paint end")
 
 
 
