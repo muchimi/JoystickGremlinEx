@@ -62,10 +62,11 @@ class QSliderWidget(QtWidgets.QWidget):
                 self.width = 0
                 self.height = 0    
 
-    def __init__(self, parent = None):
+    def __init__(self, object_name = None, parent = None):
         import gremlin.ui.ui_common
         import gremlin.shared_state
         super().__init__(parent)
+        self._id = gremlin.util.get_guid()
 
         self._values = [-1.0, 1.0]  # position of the gates inside the range - the values must be between the slider's min/max values
         self._handle_icons = {} # icon data for handles, keyed by index
@@ -73,6 +74,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._minimum = -1.0
         self._maximum = 1.0
         self._draw_handles = True
+        self.setObjectName(object_name if object_name else "QSliderWidget")
 
         self._tick_count = 0 # no ticks
 
@@ -133,6 +135,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
         self._tick_marks = None
         self._tick_count = 0
+
+        self._value_lock = False
 
         
         #self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Expanding)
@@ -264,8 +268,14 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def setValueIndex(self, index : int, value : int | float):
         ''' sets a specific value by index '''
+        
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: gremlin.util.assert_ui_thread()
+
+        value = gremlin.util.clamp(value, self._minimum, self._maximum)
         try:
             values = self._values
+            
             values[index] = value
             self.setValue(values)
         except:
@@ -274,21 +284,38 @@ class QSliderWidget(QtWidgets.QWidget):
         
     def setValue(self, value : int | float | list | tuple):
         ''' input values expected to be -1 to +1 floating point '''
+        if self._value_lock:
+            return
+        self._value_lock = True
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: gremlin.util.assert_ui_thread()
         values = None
-        if isinstance(value, float): 
+        if isinstance(value, float):
+            value = gremlin.util.clamp(value, self._minimum, self._maximum)
             values = [value]
         elif isinstance(value, int):
+            value = gremlin.util.clamp(float(value), self._minimum, self._maximum)
             values = [float(value)]
         elif isinstance(value, list):
             values = value
+            values = [gremlin.util.clamp(v, self._minimum, self._maximum) for v in values if v is not None]
         elif isinstance(value, tuple):
             values = list(value)
-        values = [v for v in values if v is not None]
+            values = [gremlin.util.clamp(v, self._minimum, self._maximum) for v in values if v is not None]
+
+        changed = False
         if values:
             values.sort() # sort by value so the values are always in smallest to greatest
+            changed = gremlin.util.compare_float_lists(self._values, values)
+            
+
+        if changed:
+            verbose = gremlin.config.Configuration().verbose_mode_ui
+            if verbose: syslog.info(f"Slider changed: {self.objectName()} [{self._id}]: {values}")
             self._values = values # [max(min(1.0, n), -1.0) for n in values]
-        self._update_offsets()
-        self.update()
+            self._update_offsets()
+            self.update()
+        self._value_lock = False
         
             
 
@@ -412,6 +439,7 @@ class QSliderWidget(QtWidgets.QWidget):
         ''' sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers'''
         try:
             if isinstance(value, float) or isinstance(value, int):
+                value = gremlin.util.clamp(value, self._minimum, self._maximum)
                 list_value = [value]
             else:
                 list_value = value
@@ -474,11 +502,9 @@ class QSliderWidget(QtWidgets.QWidget):
         
         '''
         # draw the widget
-        # https://github.com/KhamisiKibet/QT-PyQt-PySide-Custom-Widgets/blob/main/Custom_Widgets/QFlowProgressBar.py
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        #painter.eraseRect(0,0,self.width(), self.height())
         
 
         self._draw_widget(painter)
@@ -554,11 +580,6 @@ class QSliderWidget(QtWidgets.QWidget):
         painter.drawRoundedRect(0, 0, self._widget_width, self._widget_height,self._widget_corner, self._widget_corner)
 
         # slider range - from the leftmost handle to the rightmost handle
-
-
-        
-        # painter.setBrush(finishedBrush)
-        # painter.drawRoundedRect(self._range_left, self._range_top, self._range_width, self._range_height, self._range_corner, self._range_corner)
 
         # reset computed hotspots
         self._handle_hotspots = []
@@ -915,7 +936,6 @@ class QSliderWidget(QtWidgets.QWidget):
         #print ("mouse press")
         if self._readOnly:
             # don't fire events in readonly mode
-            #print ("readonly - skip mousepress")
             return 
         
         point = event.pos()
@@ -932,10 +952,6 @@ class QSliderWidget(QtWidgets.QWidget):
                 self._drag_last_point = point
                 self._drag_x = point.x()
                 self._hover_lock = True # lock the current hover mode
-                
-                # print (f"handle drag index {index}  offset: {self._drag_x_offset}")
-                
-
 
 
     def mouseMoveEvent(self, event : QMouseEvent):
@@ -943,8 +959,6 @@ class QSliderWidget(QtWidgets.QWidget):
 
         # process mouse movement for hover
         hover_changed = self._hover_update(event)
-
-        
 
         if event.buttons() == QtCore.Qt.LeftButton:
             # left mouse drag operation

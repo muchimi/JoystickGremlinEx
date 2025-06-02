@@ -1225,7 +1225,8 @@ class SimconnectMonitor():
 
         # remove the handler for aircraft changes
         if self._options.auto_mode_select:
-            self._manager.sim_aircraft_loaded.disconnect(self._sim_aircraft_loaded)
+            if gremlin.util.isSignalConnected(self._manager, "sim_aircraft_loaded"):
+                self._manager.sim_aircraft_loaded.disconnect(self._sim_aircraft_loaded)
 
         self._manager = None
 

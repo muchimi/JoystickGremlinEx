@@ -959,10 +959,11 @@ class ActionSetView(ui_common.AbstractView):
         self.group_widget = QtWidgets.QGroupBox(self.label)
         self.main_layout.addWidget(self.group_widget)
 
+        
         # Create group box contents
         self.group_layout = QtWidgets.QGridLayout(self.group_widget)
-        self.action_widget = QtWidgets.QWidget()
-        self.action_layout = QtWidgets.QVBoxLayout(self.action_widget)
+        self.action_widget, self.action_layout = gremlin.ui.ui_common.getVContainer()
+        
 
         # Only show edit controls in the basic tab
         if self.view_type == ui_common.ContainerViewTypes.Action:
@@ -986,7 +987,6 @@ class ActionSetView(ui_common.AbstractView):
             self.action_selector.action_paste.connect(self._paste_action)
             self.group_layout.addWidget(self.action_selector, 1, 0)
 
-        # holds the widgets created in this action set
         self._widgets = []
 
     def setSelected(self, value:bool):
@@ -1004,8 +1004,28 @@ class ActionSetView(ui_common.AbstractView):
 
     def redraw(self):
 
-        self._widgets.clear()
-        ui_common.clear_layout(self.action_layout)
+        widgets = gremlin.util.get_layout_widgets(self.action_layout)
+        if widgets:
+            for widget in widgets:
+                if hasattr(widget,"_cleanup_ui"):
+                    widget._cleanup_ui()
+                widget.hide()
+                widget.setParent(None)
+                widget.deletelater()
+            self._widgets.clear()
+
+        
+        
+
+        #ui_common.clear_layout(self.action_layout)
+        self.group_layout.removeWidget(self.action_widget)
+        self.action_widget.hide()
+        self.action_widget.deleteLater()
+        
+        
+        self.action_widget, self.action_layout = gremlin.ui.ui_common.getVContainer()
+        self.group_layout.addWidget(self.action_widget, 0, 0)
+
         
         if self.model is None:
             return
@@ -1020,14 +1040,20 @@ class ActionSetView(ui_common.AbstractView):
                 wrapped_widget = BasicActionWrapper(widget)
                 wrapped_widget.closed.connect(self._create_closed_cb(widget))
                 self.action_layout.addWidget(wrapped_widget)
-                self._widgets.append(widget)
+                self._widgets.append(wrapped_widget)
+                
         elif self.view_type == ui_common.ContainerViewTypes.Conditions:
             for index in range(self.model.rows()):
                 data = self.model.data(index)
                 widget = data.widget(data)
                 widget.action_modified.connect(self.model.data_changed.emit)
                 wrapped_widget = ConditionActionWrapper(widget)
+                if hasattr(widget,"_cleanup_ui"):
+                    widget._cleanup_ui()
+                widget.deleteLater()
                 self.action_layout.addWidget(wrapped_widget)
+                self._widgets.append(wrapped_widget)
+
 
         clipboard.enable()
 
@@ -2818,7 +2844,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
         self.main_layout = layout_type(self)
 
         eh = gremlin.event_handler.EventListener()
-        eh.profile_unload.connect(self._cleanup_ui)
+        # eh.profile_unload.connect(self._cleanup_ui)
         eh.action_delete.connect(self._action_delete)
 
 
@@ -2836,10 +2862,6 @@ class AbstractActionWidget(QtWidgets.QFrame):
         ''' called before create_UI if present '''
         pass
 
-
-    def _cleanup_ui(self):
-        ''' called when a container is closing '''
-        pass
 
     def _create_ui(self):
         """Creates all the elements necessary for the widget."""
@@ -3199,6 +3221,7 @@ class BasicActionWrapper(AbstractActionWrapper):
         super().__init__(action_widget, parent)
 
         mode = action_widget.action_data.get_mode()
+        self.action_widget = action_widget
 
         self._titlebar_widget = TitleBar(
             f"{action_widget.action_data.name} ({mode})",
@@ -3221,6 +3244,12 @@ class BasicActionWrapper(AbstractActionWrapper):
     def _remove(self):
         """Emits the closed event when this widget is being closed."""
         self.closed.emit(self)
+
+    def _cleanup_ui(self):
+        ''' cleans the object '''
+        # if hasattr(self.action_widget, "_cleanup_ui"):
+        #     self.action_widget._cleanup_ui()
+        gremlin.util.clear_layout(self.main_layout)
 
     def _clipboard_copy(self, _):
         ''' clipboard copy event '''

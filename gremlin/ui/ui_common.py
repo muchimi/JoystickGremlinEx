@@ -1274,9 +1274,9 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
             s_value = f"{float(value):0.{self._decimals}f}"
         else:
             s_value = str(value)
-
-        self.setText(s_value)
-        self.valueChanged.emit(value)
+        if self.text() != s_value:
+            self.setText(s_value)
+            self.valueChanged.emit(value)
 
 
 
@@ -1293,13 +1293,18 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     def setValue(self, value : float):
         ''' sets the value '''
-        self._update_value(value)
+        current_value = self.value()
+        if not gremlin.util.is_close(current_value, value):
+            self._update_value(value)
 
     def _to_value(self, text : str = None):
         if text is None:
             text = self.text()
         try:
-            value = float(text)
+            if text:
+                value = float(text)
+            else:
+                return None
         except:
             return None
         

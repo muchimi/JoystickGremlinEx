@@ -1745,7 +1745,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.add_step_widget.setToolTip("Adds a new step")
         self.add_step_widget.clicked.connect(self._add_step)
 
-        self.slider_widget = gremlin.ui.qsliderwidget.QSliderWidget()
+        self.slider_widget = gremlin.ui.qsliderwidget.QSliderWidget(object_name = f"Slider for VjoyWidget: {self.action_data.input_display_name}")
         self.slider_widget.setRange(-1,1)   
         self.slider_widget.setReadOnly(True)
         self.slider_widget.setDrawHandles(False)
@@ -3166,7 +3166,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
 
-            syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current:0.3f}  Event raw: {event.raw_value:0.3f}  value: {event.value:0.3f} curve: {event.curve_value:0.3f}")
+            if verbose: syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current:0.3f}  Event raw: {event.raw_value:0.3f}  value: {event.value:0.3f} curve: {event.curve_value:0.3f}")
 
             # read the valuy from the extra data if set
             if extra_data is not None and "value" in extra_data:

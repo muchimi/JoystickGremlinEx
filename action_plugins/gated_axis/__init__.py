@@ -50,14 +50,19 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
         self.container_widget.setContentsMargins(0,0,0,0)
 
+        object_name = f"GatedAxisWidget: {self.action_data.input_display_name}"
+        syslog.info(f"Create gate widget for {object_name} profile mode:  {self.action_data.profile_mode}")
         self.gate_widget  = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
                                                                 show_configuration=False,
-                                                                parent=self
+                                                                parent=self,
+                                                                object_name = object_name
+
                                                                 )
+        
         
         #cache.register(self.action_data, widget)
         self.main_layout.addWidget(self.gate_widget)
-        
+  
 
     def _populate_ui(self):
         pass
@@ -67,8 +72,9 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not self._deleted:
             self._deleted = True
             if self.gate_widget and Shiboken.isValid(self.gate_widget):
-                self.gate_widget.unhook()
-                self.main_layout.removeWidget(self.gate_widget)
+                self.gate_widget._cleanup_ui()
+                self.gate_widget.hide()
+                self.gate_widget.setParent(None)
                 self.gate_widget.deleteLater()
             
 

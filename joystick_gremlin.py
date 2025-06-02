@@ -395,7 +395,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._tab_name_map = {} # map fo device guid to device name for tabs
         
         # self._current_tab_widget = None # selected content widget for the current device
-        self._current_tab_device_guid = None # selected device GUID
         self._current_tab_input_id = None # selected input in the current tab
         self._joystick_device_guids = []
         self.tab_guids = []
@@ -529,7 +528,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _tabswitch_needed(self, device_guid) -> bool:
         ''' checks to see if the device tab is the current tab or not '''
         
-        tab_device_guid = self._current_tab_device_guid
+        tab_device_guid = gremlin.shared_state.current_tab_device_guid
         if isinstance(device_guid, str):
             device_guid = str(device_guid)
         return tab_device_guid != device_guid
@@ -539,7 +538,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' checks to see if an input switch is needed '''
         if isinstance(device_guid, str):
             device_guid = str(device_guid)
-        tab_device_guid = self._current_tab_device_guid
+        tab_device_guid = gremlin.shared_state.current_tab_device_guid
         tab_input_id = self._current_tab_input_id
         return tab_device_guid != device_guid or tab_input_id != input_id
 
@@ -1953,9 +1952,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         el = gremlin.event_handler.EventListener()
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         
-        current_device_guid = self._current_tab_device_guid
+        current_device_guid = gremlin.shared_state.current_tab_device_guid
         if current_device_guid:
-            if self._current_tab_device_guid == device_guid:
+            if gremlin.shared_state.current_tab_device_guid == device_guid:
                 # already shown
                 return 
         
@@ -1973,6 +1972,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         index = self.selectRegisteredWidget(device_guid)
         if index != -1:
             
+            if not isinstance(device_guid, str):
+                device_guid = str(device_guid)
             # tell ui a new device tab was selected
             gremlin.shared_state.current_tab_device_guid = device_guid
             device_name = self._get_device_name(device_guid)
@@ -1980,10 +1981,11 @@ class GremlinUi(QtWidgets.QMainWindow):
             verbose = gremlin.config.Configuration().verbose_mode_detailed
             if verbose: syslog.info(f"TAB SELECT: {device_name}")
             el.tab_selected.emit(device_guid)
+            
 
     def getActiveTabWidget(self) -> gremlin.ui.ui_common.QSplitTabWidget:
         ''' gets the current tab widget '''
-        return self.getRegisteredWidget(self._current_tab_device_guid)
+        return self.getRegisteredWidget(gremlin.shared_state.current_tab_device_guid)
     
     def getActiveTabIndex(self) -> int:
         ''' gets the current tab index '''
@@ -2749,7 +2751,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         switch_enabled = self.is_autoswitch_highlighting
         s_device_guid = str(device_guid)
-        if not force_switch and self._current_tab_device_guid != s_device_guid and not switch_enabled:
+        if not force_switch and gremlin.shared_state.current_tab_device_guid != s_device_guid and not switch_enabled:
             if verbose:
                 syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)")
             return
@@ -2772,7 +2774,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # index of current device tab
             index = self.ui.devices.currentIndex()
-            current_device_guid = self._current_tab_device_guid
+            current_device_guid = gremlin.shared_state.current_tab_device_guid
 
             # make the content visible
             self.selectTabWidget(device_guid)
@@ -3161,10 +3163,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                             syslog.info("\tDevice removed detected:")
                             for device_guid, device_name in removed_devices:
                                 syslog.info(f"\t\t{device_name} {device_guid}")
-                                if self._current_tab_device_guid == str(device_guid):
+                                if gremlin.shared_state.current_tab_device_guid == str(device_guid):
                                     # select a different tab
                                     self.unregisterWidget(device_guid)
-                                    self._current_tab_device_guid = None
                                     gremlin.shared_state.current_tab_device_guid = None
                                     #self._current_tab_widget = None
 

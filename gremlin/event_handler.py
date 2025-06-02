@@ -91,6 +91,7 @@ class Event:
 			is_virtual = False, # true if the input is a virtual input (vjoy),
 			mode = None, # mode to fire the event on - leave null for current mode,
 			override_input_type = None,
+			extra_data : dict = None, # extra data to pass on (dict)
 	):
 		"""Creates a new Event object.
 
@@ -125,6 +126,7 @@ class Event:
 		self.mode = mode # mode to act on, should be null for default
 		self.is_repeater = False # True if the event is a repeater generated event
 		self.override_input_type = override_input_type # override input type - used as the input type for actions 
+		self.extra_data = extra_data
 		
 
 

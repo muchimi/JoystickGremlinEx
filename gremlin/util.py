@@ -326,7 +326,7 @@ def valid_python_identifier(name):
     return re.match(r"^[^\d\W]\w*\Z", name) is not None
 
 
-def clamp(value, min_val, max_val):
+def clamp(value, min_val = -1.0, max_val = 1.0):
     """Returns the value clamped to the provided range.
 
     :param value the input value
@@ -446,7 +446,8 @@ def clear_layout(layout):
     # global _logtabs,_cleaned_widgets
     
     # _logtabs += " "
-    
+    if layout is None:
+        return    
     if isinstance(layout, QtWidgets.QWidget):
         widget = layout
         layout = widget.layout()
@@ -458,6 +459,8 @@ def clear_layout(layout):
             widget = child.widget()
             if hasattr(widget,"_cleanup_ui"):
                 widget._cleanup_ui()
+            if hasattr(widget, "layout"):
+                clear_layout(widget.layout())
             widget.hide()
             widget.deleteLater()
         layout.removeItem(child)
@@ -482,15 +485,16 @@ def get_layout_horizontal_size(layout : QtWidgets.QLayout) -> QtCore.QSize:
 def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
     ''' returns a list of layout widgets '''
     widgets = []
-    index = layout.count()
-    while index >= 0:
-        child = layout.itemAt(index)
-        if child is not None:
-            if child.layout():
-                widgets.extend(get_layout_widgets(child.layout()))
-            elif child.widget():
-                widgets.append(child.widget())
-        index -= 1
+    if layout:
+        index = layout.count()
+        while index >= 0:
+            child = layout.itemAt(index)
+            if child is not None:
+                if child.layout():
+                    widgets.extend(get_layout_widgets(child.layout()))
+                elif child.widget():
+                    widgets.append(child.widget())
+            index -= 1
 
     return widgets
 
@@ -1693,6 +1697,10 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
 
 def is_close(a, b, tolerance = 0.0001):
     ''' compares two floating point numbers with approximate precision '''
+    if a is None and b is None:
+        return True
+    if a is None and b is not None:
+        return False
     return math.isclose(a, b, abs_tol=tolerance)
 
 class InvokeUiMethod(QtCore.QObject):
@@ -2107,5 +2115,18 @@ def getTemporaryFile(ext = None):
         tmp_file += ext
     return tmp_file
 
-    
-
+def compare_float_lists(l1 : list, l2 : list):
+    ''' compares two lists of floats - returns True if the lists are different '''
+    if l1 is None and l2 is None:
+        return False
+    if l1 is None or l2 is None:
+        return True
+    count = len(l1)
+    if count != len(l2):
+        return True
+    for index in range(count):
+        v1 = l1[index]
+        v2 = l2[index]
+        if not is_close(v1, v2):
+            return True
+    return False

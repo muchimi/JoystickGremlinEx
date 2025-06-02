@@ -4004,6 +4004,7 @@ class InputOscClient(QtCore.QObject):
                     value = 1 if is_pressed else 0
                     autorelease = input_item._autorelease
                     input_item.setButtonValue(is_pressed)
+                    extra_data = {"autorelease": False} # do not autorelease OSC inputs
                     event = gremlin.event_handler.Event(
                             event_type = InputType.OpenSoundControl,
                             device_guid = OscDeviceTabWidget.device_guid,
@@ -4014,7 +4015,9 @@ class InputOscClient(QtCore.QObject):
                             data = index, # source index
                             is_virtual = True, # indicate we are not a hardware input
                             is_axis = False,
-                            override_input_type=InputType.JoystickButton
+                            override_input_type=InputType.JoystickButton,
+                            extra_data = extra_data
+
                             )
 
                     self._event_listener.joystick_event.emit(event)

@@ -162,10 +162,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
                 self._create_dropdowns()
 
             self.action_model = ActionContainerModel(self.item_data.containers, self.item_data, self._input_type)
-            self.action_view = ActionContainerView(self)
-            self.main_layout.addWidget(self.action_view)
-            self.action_view.setContentsMargins(0,0,0,0)
-            self.action_view.setModel(self.action_model)
+            container_view = ActionContainerView(self)
+            container_view.setContentsMargins(0,0,0,0)
+            container_view.setModel(self.action_model)
+            self.main_layout.addWidget(container_view)
+
             
 
             # setup the container widget reference
@@ -173,7 +174,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             plugin_manager.set_widget(self.item_data, self)
 
       
-            self.action_view.redraw()
+            container_view.redraw()
 
             
 
@@ -745,52 +746,65 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         self._deleted = False
 
         self.scroll_area = QtWidgets.QScrollArea()
-        self.scroll_widget = QtWidgets.QWidget()
-        self.scroll_layout = QtWidgets.QVBoxLayout()
 
         # Configure the widget holding the layout with all the buttons
-        self.scroll_widget.setLayout(self.scroll_layout)
-        self.scroll_widget.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.Expanding
-        )
         self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         # Configure the scroll area
         self.scroll_area.setMinimumWidth(400)
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setWidget(self.scroll_widget)
+        self.scroll_widget = None
+        self.scroll_layout = None
 
         # Add the scroll area to the main layout
         self.main_layout.addWidget(self.scroll_area)
 
+        syslog.info("create actioncontainerview")
+
         self._widgets = []
+
 
     def _cleanup_ui(self):
         ''' widget cleanup '''
         self._deleted = True
+        self._clear_widgets()
+
+    def _clear_widgets(self):
+        ''' clears the widgets '''
+        widgets = gremlin.util.get_layout_widgets(self.scroll_layout)
+        if widgets:
+            for widget in widgets:
+                if hasattr(widget,"_cleanup_ui"):
+                    widget._cleanup_ui()
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
+            self._widgets.clear()
+
+        if self.scroll_widget:
+            self.scroll_widget.hide()
+            self.scroll_widget.deleteLater()
+
+        self.scroll_widget, self.scroll_layout = gremlin.ui.ui_common.getVContainer()
+        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.scroll_area.setWidget(self.scroll_widget)
+
 
     def redraw(self):
         """Redraws the entire view."""
         if not Shiboken.isValid(self.scroll_area):
             return
+        
         if self._deleted:
             return
         if not self.redraw_lock:
             try:
                 self.redraw_lock = True
                 import gremlin.ui.ui_common
-                
-                # if there is a cleanup handler defined for any actions widgets - call them before removing them
-                for container_widget in self._widgets:
-                    for action_widget in container_widget.action_widgets:
-                        for widget in action_widget._widgets:
-                            if hasattr(widget,"_cleanup_ui"):
-                                widget._cleanup_ui()
-                self._widgets.clear()
 
-                gremlin.ui.ui_common.clear_layout(self.scroll_layout)
+                self._clear_widgets()
+                
                 container_count = self.model.rows()
                 if container_count:
                     for index in range(container_count):

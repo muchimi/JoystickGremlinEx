@@ -529,11 +529,13 @@ class JoystickHook:
 
     def unhookDevice(self):
         ''' unhooks the device '''
+        
         if self._hooked:
+            el = gremlin.event_handler.EventListener()
             el.profile_start.disconnect(self._hook_profile_start)
             el.profile_stop.disconnect(self._hook_profile_stop)
             if self._hook_connected:
-                el = gremlin.event_handler.EventListener()
+                
                 el.joystick_event.disconnect(self._hook_joystick_event)
                 self._hook_connected = False
             self._hooked = False

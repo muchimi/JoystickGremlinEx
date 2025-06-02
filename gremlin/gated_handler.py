@@ -463,7 +463,8 @@ class GateInfo():
             data = self.parent.range_min
         if data > self.parent.range_max:
             data = self.parent.range_max
-        if data != self._value:
+        if not gremlin.util.is_close(data,self._value):
+            
             self._value = data
             # self.parent._update_gate_index() # re-index based on value so the gate is always in sequence
             if emit:
@@ -3642,12 +3643,12 @@ class GatedAxisWidget(QtWidgets.QWidget):
     configure_gate_requested = QtCore.Signal(object) # configure gate - data = gate object
 
 
-    def __init__(self, action_data, show_configuration = False, show_output_mode = False, parent = None):
+    def __init__(self, action_data, show_configuration = False, show_output_mode = False, object_name = None, parent = None):
         '''
         
         :param: action_data = the AbstractContainerAction derived object holding the configuration data for the action
         :param: gate_data = the gated axis configuration object
-        :param: process_callback = the optional callback executed when the gated axis receives input at runtime (similar to process_events for functors)
+        :param: process_callback = the optional callback when the gated axis receives input at runtime (similar to process_events for functors)
 
 
         The callback is necessary because the gate widget does not use the usual event handler method for GremlinEx because it has special handling of sub-actions specific to an axis input.
@@ -3662,7 +3663,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         super().__init__(parent)
 
+        self._deleted = False
         self._stack = [] # save stack for saved state
+        self.setObjectName(object_name if object_name else "GateAxisWidget")
 
         self.valid = True
 
@@ -3712,7 +3715,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.slider_frame_layout = QtWidgets.QHBoxLayout(self.slider_frame_widget)
         background_color = gremlin.ui.ui_common.Color.sliderBackgroundColor()
         self.slider_frame_widget.setStyleSheet(f'.QFrame{{background-color: {background_color}; border-radius: 10px;}}')
-        self._slider_widget = QSliderWidget(parent = self.slider_frame_widget) #ui_common.QMarkerDoubleRangeSlider()
+        self._slider_widget = QSliderWidget(parent = self.slider_frame_widget, object_name = f"Slider for {self.objectName()} [{self.id}]")
      
         #self._slider.setOrientation(QtCore.Qt.Horizontal)
         self._slider_widget.setRange(-1, 1)
@@ -4230,9 +4233,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._sort_gate_layout()
         
 
-    def _gate_order_callback(self, item : QtWidgets.QWidgetItem):
-        gate : GateInfo = item.widget().data
-        return gate.slider_index
+    # def _gate_order_callback(self, item : QtWidgets.QWidgetItem):
+    #     gate : GateInfo = item.widget().data
+    #     return gate.slider_index
 
     def get_gate_gwi(self, gate : GateInfo) -> GateWidgetInfo:
         ''' gets the gate widget info for a given gate '''
@@ -4318,9 +4321,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
             syslog.info(f"Adding new gate {index}")
             values.insert(index, value)
             
-        if value != values[index]:
-            values[index] = value
-        InvokeUiMethod(lambda: self._update_slider(values))
+        values[index] = value
+        self._update_slider(values)
 
     def _update_slider(self, values : list[float] | tuple[float]):
         '''
@@ -4510,6 +4512,13 @@ class GatedAxisWidget(QtWidgets.QWidget):
         col = 6
         self.container_filter_layout.addWidget(QtWidgets.QWidget(), row, col)        
         self.container_filter_layout.setColumnStretch(col, 2)
+
+    def _cleanup_ui(self):
+        if not self._deleted:
+            self.unhook()
+            gremlin.util.clear_layout(self.main_layout)
+            self._deleted = True
+        
 
     @QtCore.Slot()
     def _select_all_filters_cb(self):
@@ -5009,7 +5018,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self.slider_frame_widget = QtWidgets.QFrame()
             self.slider_frame_layout = QtWidgets.QVBoxLayout(self.slider_frame_widget)
             self.slider_frame_widget.setStyleSheet('.QFrame{background-color: transparent;}')
-            self.slider = QSliderWidget() 
+            self.slider = QSliderWidget(object_name = f"Slider for ActionContainer: {info_object.range_display()}") 
             self.slider.setMinimumHeight(48)
             self.slider.setRange(-1,1)
             self.slider_frame_layout.addWidget(self.slider)

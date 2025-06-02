@@ -14,6 +14,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T4)
+- API: Update to Pyside 6.9.1/Shiboken 6.9.1 for bug fixes.
+- API: Event includes extra data dictionary to pass to functors.  Will be merged with any other data if provided.  Allows events to pass additional data to execution graph or functors.
+- API: OSC button events send a no auto-release request because OSC sends a release separately.
+- API: more complex UI elements perform manual cleanup ahead of garbage collection  to disconnect events and release references.
+- API: code hardening: clamp values sent to QSliderWidget to values within range.
+- API: Custom widgets: general optimization to avoid firing unnecessary events.
+- Fix: OSC button highlight not selecting in some situations.
+
 ### (m76T3)
 - fix: modified initial show parameter to avoid flashing white background
 - API: refactor of gated axis gate and range widgets to be tracked internally by QT rather than Python.
