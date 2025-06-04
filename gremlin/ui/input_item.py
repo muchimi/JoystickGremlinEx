@@ -2905,7 +2905,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
 
     @QtCore.Slot(object)
     def _action_delete(self, input_item, container, action):
-        if self.action_data._id is not None and self.action_data._id == action._id:
+        if self.action_data._id is not None and self.action_data._id == action._id and hasattr(self, "_cleanup_ui"):
             self._cleanup_ui()
             
     def _create(self, action_data = None):

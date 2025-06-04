@@ -1019,7 +1019,7 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
             node.set("v2_press_integer", safe_format(self.v2_is_press_integer, bool))
         if self.v2_is_release_integer:
             node.set("v2_release_integer", safe_format(self.v2_is_release_integer, bool))
-        is_axis = self.hardware_input_type == InputType.JoystickAxis
+        is_axis = self.get_input_type() == InputType.JoystickAxis
         if is_axis:
             node.set("v1_min_range", safe_format(self.v1_min_range, float))
             node.set("v1_max_range", safe_format(self.v1_max_range, float))

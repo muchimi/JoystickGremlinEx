@@ -347,7 +347,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Create UI widgets for absolute / relative axis modes if the remap
             # action is being added to an axis input type
-            self.input_type = self.action_data.hardware_input_type #._get_input_type() # self.action_data.input_type
+            self.input_type = self.action_data.get_input_type() 
 
             # init default widget tracking
             self.button_grid_widget  = None
@@ -398,7 +398,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _get_selector_input_type(self):
         ''' gets a modified input type based on the current mode '''
-        input_type = self.action_data.hardware_input_type
+        input_type = self.action_data.get_input_type()
 
         if input_type in VJoyWidget.input_type_buttons and \
                         self.action_data.action_mode in (VjoyAction.VJoySetAxis,
@@ -1206,7 +1206,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         header  =  QtWidgets.QWidget()
         box = QtWidgets.QVBoxLayout(header)
         box.addWidget(QtWidgets.QLabel(state._active_device_name))
-        input_type = self.action_data.hardware_input_type # state._active_device_input_type
+        input_type = self.action_data.get_input_type() # self.action_data.hardware_input_type # state._active_device_input_type
         input_id = self.action_data.hardware_input_id  # state._active_device_input_id
         
         vjoy_device_id = self.action_data.vjoy_device_id
@@ -2861,7 +2861,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.paired = action_data.paired
 
         self.needs_auto_release = self._check_for_auto_release(action_data)
-        if self.action_data.hardware_input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl):
+        if self.action_data.get_input_type() in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl):
             self.action_data.auto_release = self.action_data.auto_release or self.action_data.auto_release
         self.thread_running = False
         self.should_stop_thread = False
@@ -3538,7 +3538,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         # automatically
         self._vjoy_device_id : int = 1
         self._vjoy_input_id : int  = 1
-        self.input_type : InputType = self.hardware_input_type
+        self.input_type : InputType = self.get_input_type()
         if self.input_type in (InputType.ModeControl, InputType.VirtualButton):
             self.input_type = InputType.JoystickButton
 

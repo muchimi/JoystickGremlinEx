@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T7)
+- Fix: API - missing cleanup check could cause an exception.
+- Fix: VJOY Remap UI called older API for input type determination.
+
 ### (m76T6)
 - Fix: minimize on start behavior and show/hide in the system tray (related to prior fix to avoid "Flashing" on start)
 
