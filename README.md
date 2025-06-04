@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T6)
+- Fix: minimize on start behavior and show/hide in the system tray (related to prior fix to avoid "Flashing" on start)
+
 ### (m76T5)
 - API: added additional instrumentation for log output for troubleshooting (enabled with UI verbose mode) - warning - this can output a lot of data
 - Fix: automatic input select on button highlight mode sometimes ignored.

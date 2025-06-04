@@ -368,7 +368,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el._init_joysticks()
         el.device_change_event.connect(self._device_change_cb)
 
-        self.apply_user_settings()
+        #self.apply_user_settings()
         self.apply_window_settings()
 
         self._profile_map = gremlin.base_profile.ProfileMap()
@@ -1737,9 +1737,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.tray_menu.addAction(self.ui.action_tray_enable)
         self.ui.tray_menu.addAction(self.ui.action_tray_quit)
 
-        self.ui.action_tray_show.triggered.connect(
-            lambda: self.setHidden(not self.isHidden())
-        )
+        self.ui.action_tray_show.triggered.connect(self._show_hide_cb)
+
         self.ui.action_tray_enable.triggered.connect(
             self.ui.actionActivate.trigger
         )
@@ -1751,6 +1750,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
         self.ui.tray_icon.setContextMenu(self.ui.tray_menu)
         self.ui.tray_icon.show()
+
+    def _show_hide_cb(self):
+        ''' show or hide the window '''
+        if self.isHidden():
+            self.setHidden(False)
+            self.showNormal()
+        else:
+            self.setHidden(True)
 
 
     def registerWidget(self, device_guid, widget, hide = True) -> int:
@@ -3641,6 +3648,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._set_joystick_input_buttons_highlighting(self.config.highlight_input_buttons)
         if not ignore_minimize and self.config.start_minimized:
             self.setHidden(self.config.start_minimized)
+   
 
         if self.config.activate_on_launch:
             self.ui.actionActivate.setChecked(True)
@@ -4698,7 +4706,11 @@ if __name__ == "__main__":
     # show the window normally
     ui.showMinimized()
     app.processEvents()
-    ui.showNormal()
+
+    ui.apply_user_settings() 
+
+    if not config.start_minimized:
+        ui.showNormal()
     
     #splash.finish(ui)
 
