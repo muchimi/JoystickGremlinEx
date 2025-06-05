@@ -379,13 +379,23 @@ class StateConditionWidget(AbstractConditionWidget):
         self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
         self.grid_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
         self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+
+        self.ignore_release_widget = QtWidgets.QCheckBox("Apply condition on press only")
+        self.ignore_release_widget.setToolTip("When enabled, the condition will only apply to a press (on) event and always succeed on a release (off) event.\nThis option only has meaning on press events.")
+        self.ignore_release_widget.setChecked(self.condition.ignore_release)
+        self.ignore_release_widget.clicked.connect(self._ignore_release_cb)
+
+        self.grid_layout.addWidget(self.ignore_release_widget, 0, 5)        
         
-        self.grid_layout.setColumnStretch(4,2)
+        self.grid_layout.setColumnStretch(5,2)
 
         self.main_layout.addWidget(self.grid_widget)
 
         self.populate_selector()
         
+    @QtCore.Slot(bool)
+    def _ignore_release_cb(self, checked):
+        self.condition.ignore_release = checked
         
     def setDescription(self, value):
         self.state_description_widget.setText(value if value else "n/a")
@@ -447,8 +457,6 @@ class JoystickConditionWidget(AbstractConditionWidget):
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
 
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-
         ui_common.clear_layout(self.main_layout)
 
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label = "Listen", callback = self._request_user_input)
@@ -460,6 +468,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
                                                              self.delete_button_widget,
                                                              ])
 
+
+
+        
 
         self.main_layout.addWidget(QtWidgets.QLabel("Activate if:"))
 
@@ -735,7 +746,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
         self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
-        self.ui_container_layout.setColumnStretch(4,2)
+
+        self.ignore_release_widget = QtWidgets.QCheckBox("Apply condition on press only")
+        self.ignore_release_widget.setToolTip("When enabled, the condition will only apply to a press (on) event and always succeed on a release (off) event.\nThis option only has meaning on press events.")
+        self.ignore_release_widget.setChecked(self.condition.ignore_release)
+        self.ignore_release_widget.clicked.connect(self._ignore_release_cb)
+
+        self.ui_container_layout.addWidget(self.ignore_release_widget, 0, 5)
+        self.ui_container_layout.setColumnStretch(5,2)
 
         if not self.condition.comparison:
             # update the comparison
@@ -762,7 +780,19 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
         self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
-        self.ui_container_layout.setColumnStretch(4,2)
+        
+
+
+
+        self.ignore_release_widget = QtWidgets.QCheckBox("Apply condition on press only")
+        self.ignore_release_widget.setToolTip("When enabled, the condition will only apply to a press (on) event and always succeed on a release (off) event.")
+        self.ignore_release_widget.setChecked(self.condition.ignore_release)
+        self.ignore_release_widget.clicked.connect(self._ignore_release_cb)
+
+        self.ui_container_layout.addWidget(self.ignore_release_widget,0,5)
+
+
+        self.ui_container_layout.setColumnStretch(6,2)
 
 
         if not self.condition.comparison:
@@ -891,6 +921,11 @@ class JoystickConditionWidget(AbstractConditionWidget):
         
         self._update_range_state(self._axis_value())
 
+
+    @QtCore.Slot(bool)
+    def _ignore_release_cb(self, checked):
+        self.condition.ignore_release = checked
+
 class VJoyConditionWidget(AbstractConditionWidget):
 
     """Widget allowing the configuration of a vJoy based condition."""
@@ -951,7 +986,10 @@ class VJoyConditionWidget(AbstractConditionWidget):
         label = QtWidgets.QLabel("Activate if:")
         label.setStyleSheet("background: none")
 
+
+        is_trigger = True
         if self.condition.input_type == InputType.JoystickAxis:
+            is_trigger = False # does not have a release mode
             self._axis_ui()
         elif self.condition.input_type == InputType.JoystickButton:
             self._button_ui()
@@ -963,9 +1001,20 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.grid_layout.addWidget(widget, 0, 3)
         self.grid_layout.setColumnStretch(2,2)
 
+        if is_trigger:
+            self.ignore_release_widget = QtWidgets.QCheckBox("Apply condition on press only")
+            self.ignore_release_widget.setToolTip("When enabled, the condition will only apply to a press (on) event and always succeed on a release (off) event.\nThis option only has meaning on press events.")
+            self.ignore_release_widget.setChecked(self.condition.ignore_release)
+            self.ignore_release_widget.clicked.connect(self._ignore_release_cb)
+
+        
+
         self.main_layout.addWidget(label)
         self.main_layout.addWidget(self.grid_widget)
         self.main_layout.addWidget(self.ui_container_widget)
+
+        if is_trigger:
+            self.main_layout.addWidget(self.ignore_release_widget)
 
         input_type = self.condition.input_type
         match input_type:
@@ -975,6 +1024,12 @@ class VJoyConditionWidget(AbstractConditionWidget):
                 self._button_ui()
             case InputType.JoystickHat:
                 self._hat_ui()
+
+
+
+    @QtCore.Slot(bool)
+    def _ignore_release_cb(self, checked):
+        self.condition.ignore_release = checked                
 
   		
     @QtCore.Slot()

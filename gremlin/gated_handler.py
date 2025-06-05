@@ -2830,7 +2830,7 @@ class GateData():
             if current is None or current.tag == 'mode':
                 break
         if current is not None:
-            mode = safe_read(current,"name")
+            mode = safe_read(current, "name")
         return mode
 
 

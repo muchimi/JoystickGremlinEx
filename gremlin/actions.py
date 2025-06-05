@@ -306,6 +306,7 @@ class StateCondition(AbstractCondition):
         super().__init__(condition.comparison)
 
         self.key = condition.key
+        self.ignore_release = condition.ignore_release
        
     def __call__(self, event, value, extra_data = None):
         # default call
@@ -332,7 +333,10 @@ class StateCondition(AbstractCondition):
             return True
 
         state = False
-        if self.comparison == "pressed" and value:
+
+        if not event.is_pressed and not value and self.ignore_release:
+            state = True
+        elif self.comparison == "pressed" and value:
             state = True
         elif self.comparison == "released" and not value:
             state = True
@@ -370,6 +374,7 @@ class JoystickCondition(AbstractCondition):
         # hat number or 0 for axis and buttons
         self.input_index = condition.input_index if hasattr(condition,"input_index") else 0
         self.condition = condition
+        self.ignore_release = condition.ignore_release
 
 
     def __call__(self, event, value, extra_data = None):
@@ -428,8 +433,14 @@ class JoystickCondition(AbstractCondition):
         
         elif self.input_type == InputType.JoystickButton:
 
-            retval = False
             is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
+            if not event.is_pressed and not is_pressed and self.ignore_release:
+                # succeed on release
+                if verbose: syslog.info(f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: PASS (ignore release mode enabled)")
+                return True 
+
+            retval = False
+            
             if self.comparison == "pressed":
                 retval = is_pressed
             elif self.comparison == "released":
@@ -441,7 +452,14 @@ class JoystickCondition(AbstractCondition):
             return retval
             
         elif self.input_type == InputType.JoystickHat:
+
             direction = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
+            if not event.is_pressed and direction == (0,0) and self.ignore_release:
+                # succeed on release
+                if verbose: syslog.info(f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: PASS (ignore release mode enabled)")
+                return True 
+            
+            
             retval = direction == gremlin.util.hat_direction_to_tuple(self.comparison)
             if verbose: syslog.info(f"{logtabs}JoystickCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} direction: {direction} return: {"PASS" if retval else "FAIL"}")
             return retval
@@ -493,10 +511,9 @@ class VJoyCondition(AbstractCondition):
                 break
         self.input_type = condition.input_type
         self.input_id = condition.input_id
-        
         self.input_index = condition.input_index if hasattr(condition,"input_index") else 0
-        
         self.condition = condition
+        self.ignore_release = condition.ignore_release
 
     def __call__(self, event, value, extra_data = None):
         # default call
@@ -551,8 +568,14 @@ class VJoyCondition(AbstractCondition):
 
             
         elif self.input_type == InputType.JoystickButton:
-            retval = False
             is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
+            if not event.is_pressed and not is_pressed and self.ignore_release:
+                # succeed on release
+                if verbose: syslog.info(f"{logtabs}VjoyCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: PASS (ignore release mode enabled)")
+                return True 
+            
+            retval = False
+            
             if self.comparison == "pressed":
                 retval = is_pressed # true if the vjoy button is pressed
             elif self.comparison == "released":
@@ -566,6 +589,12 @@ class VJoyCondition(AbstractCondition):
             
         elif self.input_type == InputType.JoystickHat:
             direction = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
+            if not event.is_pressed and direction == (0,0) and self.ignore_release:
+                # succeed on release
+                if verbose: syslog.info(f"{logtabs}VjoyCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: PASS (ignore release mode enabled)")
+                return True 
+                        
+            
             retval =  direction == gremlin.util.hat_direction_to_tuple(self.comparison)
             if verbose: syslog.info(f"{logtabs}VjoyCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} direction: {direction} return: {"PASS" if retval else "FAIL"}")
         else:

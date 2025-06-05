@@ -931,7 +931,7 @@ class EventListener(QtCore.QObject):
 				event_type= InputType.JoystickHat,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
-				is_pressed = value,
+				is_pressed = value != (0,0),
 				is_virtual = is_virtual,
 				value = value,
 				raw_value= value

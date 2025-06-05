@@ -14,6 +14,32 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T8)
+- Fix: Mode not populated in some profiles causing an exeption on some profile loads (usually manifests itself with a blank UI on profile load).
+- New: Button conditions (Joystick, Vjoy and State) have a new option to disable the condition check on an input release event.  When enabled, the condition will only be checked when the input triggers, and will always succeed/pass if the input is released, even if the condition isn't met anymore.
+
+When to use: use for scenarios when you only want to apply the condition if the input being filtered is pressed/on, but do not want the filter to apply when the input is released/off.  
+  
+The effect only applies to a given condition (will not cascade to other conditions).
+
+Example:
+
+I have a condition on button 1 of an input joystick that should only trigger an output, vjoy button 5) when button 2 of the input joystick is also pressed.  I thus added a condition on the mapping for input 1 to check for input button 2 to be pressed as well. The result is while button 2 is held, button 1 on the input will trigger the vjoy button 5 output on and off. 
+When I let go of button 2, and then release button 1, there is no release on the button 5 output because the condition prevents the execution (fails because button 2 is no longer pressed).
+
+If that's not the behavior I want, I can now enable the checkbox "Apply condition on press only" in the condition for button 2.
+
+So what happens now is when I release input 1, it no longer checks for button 2 also being pressed because it's a release action on input 1.   
+ 
+Summary:
+
+Use this option is useful whenever you have a situation where the condition should only impact the input on press, but not on release.
+
+Why is this needed?
+
+This is needed because GremlinEx uses a different approach to condition evaluation and execution from the legacy Joystick Gremlin, so the behavior for this is a bit different with release triggers, because some release triggers are now also subject to conditions (it depends on the specific wiring).
+
+- New: VjoyRemap has three new modes for hat mapping on top of hold and pulse.  The new modes are "Press", "Release" and "NoOp".  "NoOp" disables the output for that the given hat position.  "Press" sets the output on on hat trigger, "Release" sets the output off on hat trigger.  This brings the feature set to par with non-hat capabilities for VjoyRemap when it's used with a button input.
 
 ### (m76T7)
 - Fix: API - missing cleanup check could cause an exception.

@@ -1046,7 +1046,7 @@ class ActionSetView(ui_common.AbstractView):
                     widget._cleanup_ui()
                 widget.hide()
                 widget.setParent(None)
-                widget.deletelater()
+                widget.deleteLater()
             self._widgets.clear()
 
             if verbose_ui: syslog.info(f"ActionSet: redraw cleanup complete: {object_name}")

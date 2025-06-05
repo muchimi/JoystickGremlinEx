@@ -191,6 +191,7 @@ class JoystickCondition(AbstractCondition):
         self.range = [0.0, 0.0]
         self.device_name = ""
         self.use_calibrated_data = True # true if the input should use the calibrated data if any
+        self.ignore_release = False # true if the condition always succeeds on input release
 
     def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
@@ -221,6 +222,7 @@ class JoystickCondition(AbstractCondition):
             safe_read(node, "range-high", float, 0)
         ]
         self.use_calibrated_data = safe_read(node,"use-calibrated",bool,False)
+        self.ignore_release = safe_read(node,"ignore-release",bool,False)
 
     def to_xml(self):
         """Returns an XML node containing the objects data.
@@ -232,13 +234,14 @@ class JoystickCondition(AbstractCondition):
         node.set("comparison", str(self.comparison))
         node.set("condition-type", "joystick")
         node.set("input", InputType.to_string(self.input_type))
-        node.set("id", str(self.input_id))
+        node.set("id", safe_format(self.input_id, int))
         node.set("device-guid", write_guid(self.device_guid))
         node.set("device-name", str(self.device_name))
-        node.set("range-low", str(self.range[0]))
-        node.set("range-high", str(self.range[1]))
+        node.set("range-low", safe_format(self.range[0], float))
+        node.set("range-high", safe_format(self.range[1], float))
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
+        node.set("use-calibrated", safe_format(self.use_calibrated_data, bool))
         
-        node.set("use-calibrated", str(self.use_calibrated_data))
         return node
 
     def is_valid(self):
@@ -260,6 +263,7 @@ class StateCondition(AbstractCondition):
         self.key = None
         self.description = None
         self.comparison = "pressed"
+        self.ignore_release = False
 
     def from_xml(self, node, data = None):
         import gremlin.ui.state_device
@@ -274,6 +278,7 @@ class StateCondition(AbstractCondition):
         if "description" in node.attrib:
             self.description = node.get("description")
         self.comparison = safe_read(node, "comparison")
+        self.ignore_release = safe_read(node,"ignore-release",bool,False)
         sd =  gremlin.ui.state_device.StateData()
         sd.register(self.key, description = self.description)
 
@@ -282,8 +287,10 @@ class StateCondition(AbstractCondition):
         node.set("comparison", str(self.comparison))
         node.set("condition-type", "state")
         node.set("key", self.key)
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
         if self.description:
             node.set("description", self.description)
+
         return node
 
     def is_valid(self):
@@ -310,6 +317,7 @@ class VJoyCondition(AbstractCondition):
         self.input_type = None
         self.input_id = 0
         self.range = [0.0, 0.0]
+        self.ignore_release = False
 
     def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
@@ -326,6 +334,7 @@ class VJoyCondition(AbstractCondition):
         self.input_type = InputType.to_enum(safe_read(node, "input"))
         self.input_id = safe_read(node, "id", int)
         self.vjoy_id = safe_read(node, "vjoy-id", int)
+        self.ignore_release = safe_read(node,"ignore-release",bool,False)
         self.range = [
             safe_read(node, "range-low", float, 0),
             safe_read(node, "range-high", float, 0)
@@ -344,10 +353,13 @@ class VJoyCondition(AbstractCondition):
         node.set("comparison", str(self.comparison))
         node.set("condition-type", "vjoy")
         node.set("input", InputType.to_string(self.input_type))
-        node.set("id", str(self.input_id))
+        node.set("id", safe_format(self.input_id), int)
         node.set("vjoy-id", write_guid(self.vjoy_id))
-        node.set("range-low", str(self.range[0]))
-        node.set("range-high", str(self.range[1]))
+        node.set("range-low", safe_format(self.range[0], float))
+        node.set("range-high", safe_format(self.range[1], float))
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
+
+        
         
         return node
 

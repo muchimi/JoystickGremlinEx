@@ -889,6 +889,8 @@ class ProfileInputNode(ProfileBaseNode):
     
     @input_item.setter
     def input_item(self, value: gremlin.base_profile.InputItem):
+        if value and not value.profile_mode:
+            pass
         self._input_item = value
 
     @property
@@ -1029,6 +1031,8 @@ class ProfileInputNode(ProfileBaseNode):
             self.input_item = input_item
         else:
             input_item = self.input_item
+
+  
 
         # add container nodes to the input node
         child: Element

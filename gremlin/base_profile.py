@@ -1850,6 +1850,14 @@ class InputItem():
         container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
 
+        parent = node.getparent()
+        while parent is not None and parent.tag != "mode":
+            parent = parent.getparent()
+        if parent:
+            profile_mode = safe_read(parent,"name")
+            self.profile_mode = profile_mode
+        
+
         if not skip_root: # skip header processing if set
 
             self._description = safe_read(node, "description", str)
