@@ -352,7 +352,7 @@ class VJoyCondition(AbstractCondition):
         node = super().to_xml() 
         node.set("comparison", str(self.comparison))
         node.set("condition-type", "vjoy")
-        node.set("input", InputType.to_string(self.input_type))
+        node.set("input", InputType.to_string(self.input_type), int)
         node.set("id", safe_format(self.input_id), int)
         node.set("vjoy-id", write_guid(self.vjoy_id))
         node.set("range-low", safe_format(self.range[0], float))

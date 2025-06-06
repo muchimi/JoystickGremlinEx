@@ -119,7 +119,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self.slider_frame_widget = QtWidgets.QFrame()
             self.slider_frame_layout = QtWidgets.QVBoxLayout(self.slider_frame_widget)
             self.slider_frame_widget.setStyleSheet('.QFrame{background-color: transparent;}')
-            self.slider = gremlin.ui.ui_common.QSliderWidget(object_name = f"Slider for ActionContainer: {info_object.range_display()}") 
+            self.slider = gremlin.ui.qsliderwidget.QSliderWidget(object_name = f"Slider for ActionContainer: {info_object.range_display()}") 
             self.slider.setMinimumHeight(48)
             self.slider.setRange(-1,1)
             self.slider_frame_layout.addWidget(self.slider)
