@@ -49,6 +49,7 @@ import gremlin.gamepad_handling
 import gremlin.import_profile
 import gremlin.input_devices
 import gremlin.joystick_handling
+import gremlin.hid
 import gremlin.profile_graph
 import gremlin.shared_state
 import gremlin.types
@@ -4671,6 +4672,9 @@ if __name__ == "__main__":
     # splash = QtWidgets.QSplashScreen(splash_pixmap)
     # splash.show()
     # app.processEvents()
+
+    # hid test
+    #_hid = gremlin.hid.Hid()
 
 
     # Create Gremlin UI

@@ -454,6 +454,7 @@ class SimConnectManager(QtCore.QObject):
     lvars_updated = QtCore.Signal(object) # triggers when LVARs are updated (after the request to get LVARs)
     alive = QtCore.Signal() # fires when the bridge is connected and alive
     sim_state = QtCore.Signal(int, float, str) # fires when sim state data changes (depends on the state )
+    sim_aircraft_changed = QtCore.Signal(str) # fires when the aircraft title changes
     sim_aircraft_loaded = QtCore.Signal(str, str, str) # fires when aircraft title changes (folder, name, title)
     _aircraft_loaded_internal = QtCore.Signal(str, str) # fires when aircraft (folder, name)
     
@@ -542,6 +543,7 @@ class SimConnectManager(QtCore.QObject):
         self._registered_feed_blocks = {}
         self._registered_requests = {}
         self._registered_events = {}
+        self._ar_aircraft_title = None
 
         # load simconnect data
         self.reload()
@@ -761,7 +763,7 @@ class SimConnectManager(QtCore.QObject):
         else:
             self._disable_feed()
 
-    def registerRequest(self, command : str, datatype : str, settable : bool = False) -> Request:
+    def registerRequest(self, command : str, datatype : str, settable : bool = False, callback = None, key = None) -> Request:
         ''' registers a request 
         :param command: the command (variable name or expression)
         :param datatype: the MSFS simconnect datatype such as "number" "percent"
@@ -769,10 +771,11 @@ class SimConnectManager(QtCore.QObject):
 
         # see if the request is already registered
         s_command, b_command = gremlin.util.to_byte_string(command)
-        key = s_command.casefold()
         _, b_datatype = gremlin.util.to_byte_string(datatype)
+        if not key:
+            key = s_command.casefold()
         if not key in self._registered_requests:
-            request = Request(definitions = (b_command, b_datatype), sm = self.sm, settable = settable)
+            request = Request(definitions = (b_command, b_datatype), sm = self.sm, settable = settable, callback=callback)
             request._ensure_def()
             self._registered_requests[key] = request
         
@@ -792,6 +795,7 @@ class SimConnectManager(QtCore.QObject):
         request = self.registerRequest(command, datatype, True)
         request.value = value
         request.transmit()
+
 
 
 
@@ -937,8 +941,8 @@ class SimConnectManager(QtCore.QObject):
     def _stop_cb(self):
         if self.verbose:
             syslog.info(f"Simconnect Event: stopped")
-            self._is_started = False
-            self.sim_stop.emit()
+        self._is_started = False
+        self.sim_stop.emit()
 
     @QtCore.Slot()
     def _status_callback_cb(self):
@@ -1028,19 +1032,32 @@ class SimConnectManager(QtCore.QObject):
         return self._aircraft_title # use title as the name is meaningless in MSFS 2024 due to streaming AC
     
 
-    def get_aircraft_title(self, force_update = False):
-        if not self._aircraft_title or force_update:
-            self._aircraft_title = None
-            if not self._ar_title:
-                self._ar_title = self.registerRequest('TITLE','string')
+    def request_aircraft_title(self):
+        if self.verbose: syslog.info("SIMCONNECT: request aircraft title")
+        if not self._ar_aircraft_title:
+            self._ar_aircraft_title = self._get_aicraft_title_request(self._aircraft_title_changed)
+        self._ar_aircraft_title.trigger()
+        
+    def _aircraft_title_changed(self, request : Request):
+        title = request.buffer
+        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft title: {title if title else '[FAILED]'}")
+        if title:
+            self._aircraft_title = title.decode()
+            self.sim_aircraft_changed.emit(self._aircraft_title)
+
+    # def get_aircraft_title(self, force_update = False):
+    #     if not self._aircraft_title or force_update:
+    #         self._aircraft_title = None
+    #         if not self._ar_title:
+    #             self._ar_title = self.registerRequest('title','string')
             
-            title = self._ar_title.value
-            # trigger = ar.find("TITLE")
-            # title = trigger.get()
-            if title:
-                title = title.decode()
-            self._aircraft_title = title
-        return self._aircraft_title
+    #         title = self._ar_title.value
+    #         # trigger = ar.find("TITLE")
+    #         # title = trigger.get()
+    #         if title:
+    #             title = title.decode()
+    #         self._aircraft_title = title
+    #     return self._aircraft_title
     
     def _aircraft_title_cb(self):
         ''' callback for the aircraft title '''
@@ -1049,7 +1066,8 @@ class SimConnectManager(QtCore.QObject):
         ''' gets the current player aircraft in the sim '''
         try:
             if self._sm.ok:
-                self._sm.requestAircraftLoaded()
+                #self._sm.requestAircraftLoaded()
+                self.request_aircraft_title()
         except:
             pass
 
@@ -1068,7 +1086,7 @@ class SimConnectManager(QtCore.QObject):
     def _aircraft_loaded_internal_cb(self, folder : str, name : str):
         # decode the data into useful bits
         # syslog = logging.getLogger("system")
-        title = self.get_aircraft_title(True)
+        title = self.request_aircraft_title()
         self._aircraft_title = title
         self._aircraft_folder = folder
         self._aircraft_name = name
@@ -1261,23 +1279,30 @@ class SimConnectManager(QtCore.QObject):
             title = title.decode()
         return title
     
+
     def get_aicraft_position(self):
+        ''' gets the aircraft position data block '''
 
-        request_id = self._sm.new_request_id()
-        
-
+    
         definitions = [("SIM ON GROUND", "Bool", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_INT32),
                         ("PLANE LATITUDE", "Degrees", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
                         ("PLANE LONGITUDE", "Degrees", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
                         ("PLANE ALTITUDE", "Feet", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
+                        ("TITLE", "String", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRING128)
         ]
 
         request = Request(definitions, self._sm)
         
-        # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "SIM ON GROUND", "Bool", SIMCONNECT_DATATYPE_INT32)
-        # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "PLANE LATITUDE", "Degrees", SIMCONNECT_DATATYPE_FLOAT64)
-        # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "PLANE LONGITUDE", "Degrees", SIMCONNECT_DATATYPE_FLOAT64)
-        # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "PLANE ALTITUDE", "Feet", SIMCONNECT_DATATYPE_FLOAT64)
+        return request
+    
+    def _get_aicraft_title_request(self, callback = None):
+        ''' gets the aircraft aircraft title'''
+
+        #definitions = [("TITLE", "String", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRING128)]
+        request = self.registerRequest("title","string", False, callback=callback)
+        return request
+    
+    
 
     def save_flight(self, the_path : str, title : str = "", description : str = ""):
         ''' requests to save the flight data '''
@@ -1287,6 +1312,7 @@ class SimConnectManager(QtCore.QObject):
 
 
             self._sm.save_flight(the_path, title, description)
+
 
     def load_flight(self, the_path : str):
         if self._sm.ok:

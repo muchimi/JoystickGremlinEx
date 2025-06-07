@@ -17,6 +17,7 @@
 
 # Adapted from: https://github.com/odwdinc/Python-SimConnect  Credit for original code goes to the authors of the Python-SimConnect project
 
+from __future__ import annotations
 import ctypes
 from ctypes import *
 from ctypes.wintypes import *
@@ -45,12 +46,13 @@ def millis():
 
 
 class Request(object):
+	''' simconnect request object '''
 
 	
 	def __init__(self, definitions, sm, time=10, dec=None, settable=False, attempts=10, callback = None, is_client_data = False):
 		''' request 
 		
-		:param deff:  definitions (command : str, datatype : SIMCONNECT_DATATYPE)
+		:param definitions:  list of definitions as a tuple (command : str, datatype : SIMCONNECT_DATATYPE)
 		:callback : callback to call when the value of this request is set by the simulator
 		
 		'''
@@ -85,6 +87,11 @@ class Request(object):
 	@callback.setter
 	def callback(self, value):
 		self._callback = value
+
+	def trigger(self):
+		''' triggers a read '''
+		return self.value
+		
 
 	def get(self):
 		return self.value
@@ -489,6 +496,7 @@ class SimConnect():
 			syslog.info("SIMCONNECT: event: SIM START")
 		elif uEventID == self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value:
 			# aircraft request
+			if self.verbose: syslog.info(f"SIMCONNECT: event: AIRCRAFT REQUEST")
 			pass
 		elif uEventID == self._dll.EventID.EVENT_SIM_STOP.value:
 			if self.verbose:
@@ -522,8 +530,7 @@ class SimConnect():
 
 		elif uEventID == self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value:
 			aircraft_cfg = event.dwData # air file loaded
-			if self.verbose:
-				syslog.info(f"SIMCONNECT: event: AIRCRAFT LOADED: {aircraft_cfg}")
+			if self.verbose: syslog.info(f"SIMCONNECT: event: AIRCRAFT LOADED: {aircraft_cfg}")
 			self.handle_folder_event(aircraft_cfg.decode())
 
 		# else:
@@ -599,7 +606,7 @@ class SimConnect():
 
 			if _request.callback is not None:
 				''' run the request callback '''
-				_request.callback()
+				_request.callback(_request)
 			
 			return True
 		
@@ -1489,6 +1496,7 @@ class SimConnect():
 				return False
 			return True
 		return False 
+
 
 	def requestSimObjectsAndLiveries(self):
 		''' makes a request for the user flyable aircraft list '''

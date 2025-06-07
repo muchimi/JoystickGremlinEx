@@ -1259,10 +1259,10 @@ class SimconnectMonitor():
     @QtCore.Slot()
     def _sim_stop(self):
         ''' sim stop event '''
-        # syslog = logging.getLogger("system")
         if self._verbose: syslog.info(f"SCMONITOR: sim stop")
-        eh = gremlin.event_handler.EventListener()
-        eh.request_profile_stop.emit("Sim Stop")
+        if gremlin.shared_state.is_running and gremlin.config.Configuration().stop_profile_on_sim_stop:
+            eh = gremlin.event_handler.EventListener()
+            eh.request_profile_stop.emit("Sim Stop")
 
     def _mode_change_validator(self, new_mode) -> bool:
         ''' hook called when a request for a mode change is made.
@@ -1308,7 +1308,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._manager = SimConnectManager()
         self._manager.activate()
-        self._manager.sim_aircraft_loaded.connect(self._aircraft_loaded)
+        self._manager.sim_aircraft_changed.connect(self._aircraft_title_changed)
+        #self._manager.sim_aircraft_loaded.connect(self._aircraft_loaded)
         self._manager.sim_state.connect(self._sim_state)
         self._verbose = gremlin.config.Configuration().verbose_mode_simconnect
         
@@ -1316,6 +1317,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._data = None # sorted list of aircraft definitions
 
         self._handler = SimConnectEventHandler()
+        
         self._handler.AircraftDefinitionsChanged.connect(self._aircraft_list_loaded)
 
         self._current_page = 0 # page number displayed
@@ -1725,7 +1727,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         if not self._manager.connected:
             self._manager.activate()
         if self._manager.connected:
-            self._manager.request_loaded_aircraft() # will trigger the aircraft loaded callback 
+            self._manager.request_aircraft_title() # request_loaded_aircraft() # will trigger the aircraft loaded callback 
 
     def _update_aircraft_list(self):
         if not self._manager.connected:
@@ -1785,16 +1787,32 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         else:
             self._set_warning()
 
+    @QtCore.Slot(str)
+    def _aircraft_title_changed(self, title : str):
+        ''' triggered when aircraft title changed (loaded aircraft )'''
+        if self._verbose: syslog.info(f"SCUI: got title change: {title}")
+        self._update_title(title) 
+        self.current_aircraft_folder = None
+        self.current_aircraft_name = None
+
     @QtCore.Slot(str,str,str)
     def _aircraft_loaded(self, folder, name, title):
         ''' triggered when simconnect sends aircraft data '''
+        if title:
+            self._update_title(title)        
+            self.current_aircraft_folder = folder
+            self.current_aircraft_title = title
+            self.current_aircraft_name = name
+            add_enabled = bool(title)
+            self.add_current_aircraft_widget.setEnabled(add_enabled)
+
+    def _update_title(self, title):
         self.current_aircraft_widget.setText(title)
         self.current_aircraft_widget.setToolTip(title)
-        self.current_aircraft_folder = folder
         self.current_aircraft_title = title
-        self.current_aircraft_name = name
-        add_enabled = bool(title)
+        add_enabled = True if title else False
         self.add_current_aircraft_widget.setEnabled(add_enabled)
+
 
     @QtCore.Slot()
     def _aircraft_list_loaded(self):
@@ -2433,7 +2451,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                     selector.setCurrentIndex(mode_index)
                 item.mode = mode
                 profile.setSimconnectMode(key, mode)
-                print (f"set mode {mode} for {item.sim_name}")
+                if self._verbose: syslog.info(f"SCUI: set mode [{mode}] for [{item.sim_name}]")
 
 
 

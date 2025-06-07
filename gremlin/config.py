@@ -241,6 +241,10 @@ class Configuration(QtCore.QObject):
             return self._data.get(field, default_value)
         return default_value
 
+    def _set_data(self, field, value):
+        if not field in self._data or self._data[field] != value:
+            self._data[field] = value
+            self.save()
 
     def reload_profile(self):
         """Loads the profile's configuration file's content."""
@@ -2247,3 +2251,11 @@ class Configuration(QtCore.QObject):
     @auto_load_disabled.setter
     def auto_load_disabled(self, value):
         self._auto_load_disabled = value
+
+
+    @property
+    def stop_profile_on_sim_stop(self) -> bool:
+        return self._get_data("stop_profile_on_sim_stop", False)
+    @stop_profile_on_sim_stop.setter
+    def stop_profile_on_sim_stop(self, value : bool):
+        self._set_data("stop_profile_on_sim_stop", value)

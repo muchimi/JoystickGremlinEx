@@ -11,3 +11,4 @@ QtAwesome >= 1.4.0
 pyside6 >= 6.9
 anytree >=2.12.1
 python-rtmidi >= 1.5.8
+hid >= 1.0.7

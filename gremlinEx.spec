@@ -44,6 +44,7 @@ added_binaries = [
     ("dill.dll", "."),
     ("vigem/ViGEmClient.dll", "."),
     ("SimConnect.dll","."),
+    ("hidapi.dll",".")
 	
 ]
 
@@ -53,7 +54,7 @@ a = Analysis(
     pathex=['C:/JoystickGremlin-develop'],
     binaries=added_binaries,
     datas=added_files,
-    hiddenimports=['mido.backends.rtmidi',"lxml","pyttsx3"],
+    hiddenimports=['mido.backends.rtmidi','lxml','pyttsx3','hid'],
     hookspath=None,
     runtime_hooks=None,
     excludes=None,

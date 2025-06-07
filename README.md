@@ -14,7 +14,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T8)
+
+### (m76T9)
+- Fix: Obtain aircraft title from SimConnect SDK is now more reliable when the sim changes aircraft.
+- Fix: prompt only once on import when multiple internal reloads are needed.
+- Fix: Error in XML API output introduced in last patch
+- WIP: HID device interface  
+
+
+### (m76T8/A)
 - Fix: Mode not populated in some profiles causing an exeption on some profile loads (usually manifests itself with a blank UI on profile load).
 - New: Button conditions (Joystick, Vjoy and State) have a new option to disable the condition check on an input release event.  When enabled, the condition will only be checked when the input triggers, and will always succeed/pass if the input is released, even if the condition isn't met anymore.
 

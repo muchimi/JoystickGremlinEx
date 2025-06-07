@@ -1201,6 +1201,7 @@ class ProfileGraph():
     def __init__(self):
         self._root = ProfileRootNode()
         self._source_xml = None # source XML loaded 
+        self._remap_prompt_issued = False # true if remap prompt was issued 
 
     def get_device_node(self, device_guid) -> ProfileDeviceNode:
         ''' gets the profile device node for the given device_guid, None if not found '''
@@ -1245,7 +1246,8 @@ class ProfileGraph():
 
         config = gremlin.config.Configuration()
 
-        if self.has_unknowns() and config.import_prompt_enabled:
+        if self.has_unknowns() and config.import_prompt_enabled and not self._remap_prompt_issued:
+            self._remap_prompt_issued = True
             gremlin.util.popCursorTemporary()
             base_dir, base_file = os.path.split(source_xml)
             msgbox = ui_common.ConfirmBoxEx(title = "Import profile?", prompt = f"Profile [{base_file}] has one or more devices that could not be found.\nWould you like to remap devices?", again_prompt=True)
