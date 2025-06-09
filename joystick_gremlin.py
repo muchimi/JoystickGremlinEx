@@ -593,7 +593,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         self._last_input_timestamp = time.time()
-        if gremlin.shared_state.is_highlighting_suspended:
+        if gremlin.shared_state.is_highlighting_suspended():
             return
         
         is_axis = self.is_axis_highlighting
@@ -3728,6 +3728,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             return
 
         self._profile_load_stack.append(source_xml)
+        gremlin.shared_state.import_prompt_stack = 0 # reset prompt count for import remap (in profile_graph)
 
         pushCursor()
         eh = gremlin.event_handler.EventHandler()

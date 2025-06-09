@@ -1219,6 +1219,11 @@ class Configuration(QtCore.QObject):
     def verbose_mode_inputs(self):
         ''' true if verbose mode is in inputs mode '''
         return self.verbose and VerboseMode.Inputs in self.verbose_mode
+    
+    @property
+    def verbose_mode_inputs_extra(self):
+        ''' true if verbose mode is in inputs mode '''
+        return self.verbose and VerboseMode.Inputs in self.verbose_mode and VerboseMode.Extra in self.verbose_mode
 
     @property
     def verbose_mode_mouse(self):

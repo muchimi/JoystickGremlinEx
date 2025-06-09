@@ -15,6 +15,18 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
+### (m76T10) (WIP)
+- Fix: Highlight axis mode.
+- Fix: resolved a second issue with multiple prompts on older profile import.
+- Fix: VjoyRemap axis to button range - note: please revisit any mappings that use this mode to make sure the ranges are correct.
+- Improved: VjoyRemap UI for various modes  
+- New: VjoyRemap axis to button range adds output modes for hold, pulse, press, release and noOp.  This alters the behavior of Axis to Button as follows:  
+-- Hold: this is the same behavior as before, the button is on while the axis in in the range, and turns off when the axis exits the range.
+-- Pulse: the button will pulse when the range is entered (turn on, delay, turn off).
+-- Press: the button will remain pressed if the range was entered, and exited.
+-- Release: the button will remain not pressed if the range was entered, and exited.
+-- NoOp: does nothing (this is provided for some niche scenarios and testing)
+
 ### (m76T9)
 - Fix: Obtain aircraft title from SimConnect SDK is now more reliable when the sim changes aircraft.
 - Fix: prompt only once on import when multiple internal reloads are needed.

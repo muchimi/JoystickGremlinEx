@@ -97,9 +97,16 @@ class Icons():
         return Icons._icon("ri.radio-button-line", qta_color)
     def hatIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa5s.arrows-alt", qta_color)
-
+    def validIcon(qta_color = "#2abd38") -> QtGui.QIcon:
+        return Icons._icon("fa5.check-circle", qta_color = qta_color)
+    def invalidIcon(qta_color = "#b35f1b") -> QtGui.QIcon:
+        return Icons._icon("ei.remove-circle", qta_color = qta_color)
+    def recordIcon(qta_color = "#c7450e"):
+        return Icons._icon("mdi.checkbox-blank-circle", qta_color = qta_color)
     
     def _icon(value : str, qta_color = None):
+        if qta_color and isinstance(qta_color, str):
+            qta_color = QtGui.QColor(qta_color)
         return load_icon(value, qta_color = qta_color) if qta_color is not None else load_icon(value)
        
 
@@ -264,6 +271,7 @@ class Color():
     def disconnectedColor(): # color for the disconnected device 
         return "#db6512"
 
+    
 
     @staticmethod
     def cssApplication():
@@ -535,7 +543,7 @@ class Buttons():
     maxHeight = 24 # max height in pixels
 
     @staticmethod
-    def _template(label = "", icon_source : str = "", tooltip = None, callback = None, no_keyboard = True, data = None):
+    def _template(label = "", icon_source : str = "", tooltip = None, callback = None, no_keyboard = True, data = None, width : int = None):
         if no_keyboard:
             widget = NoKeyboardPushButton()
         else:
@@ -546,14 +554,22 @@ class Buttons():
             widget.setText(label)
 
         if icon_source:
-            icon = gremlin.util.load_icon(icon_source)
-            widget.setIcon(icon)
+            if isinstance(icon_source, str):
+                icon = gremlin.util.load_icon(icon_source)
+            elif isinstance(icon_source, QtGui.QIcon):
+                icon = icon_source
+            else:
+                icon = None
+            if icon:
+                widget.setIcon(icon)
         widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         if tooltip:
             widget.setToolTip(tooltip)
         if callback:
             widget.clicked.connect(callback)
         widget.setMaximumHeight(Buttons.maxHeight)
+        if width is not None:
+            widget.setMaximumWidth(width)
         return widget
 
     @staticmethod
@@ -579,6 +595,10 @@ class Buttons():
     @staticmethod
     def getHelpWidget(label = None, tooltip = "Help", callback = None, no_keyboard = True, data = None):
         return Buttons._template(label, "mdi.help", tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
+    def getGrabWidget(label = None, tooltip = "Grab Value", callback = None, no_keyboard = True, data = None, width = 24):
+        return Buttons._template(label, Icons.recordIcon(), tooltip, callback, no_keyboard, data, width = width)
         
 
     @staticmethod
@@ -3071,7 +3091,7 @@ class QIconLabel(QtWidgets.QWidget):
 
     HorizontalSpacing = 2
 
-    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = True, icon_size = 16, parent = None):
+    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = False, icon_size = 16, parent = None):
         super().__init__(parent)
 
         if text is None:
@@ -4030,9 +4050,6 @@ class QProgressBar(QtWidgets.QWidget):
         w = int(self.size().width())
         h = int(self.size().height())
 
-        
-        
-
         backgroundBrush = QBrush(self._background_color)
         borderPen = QtGui.QPen(QtGui.QColor(self._border_color))
         borderPen.setWidth(1)
@@ -4061,7 +4078,7 @@ class QProgressBar(QtWidgets.QWidget):
             painter.drawRoundedRect(x, y, x + v, h, r, r)
         painter.end()
 
-        # syslog.info("progress paint end")
+        #syslog.info("progress paint end")
 
         #syslog.info(f"X: {x} y: {y} w: {w} h: {h} v:{v} value: {self._percent:0.3f}")
 
@@ -4071,11 +4088,24 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
     deleted = QtCore.Signal(object) # indicates the item is being deleted
 
-    def __init__(self, axis_id = None, show_calibrated = False, show_percentage = True, show_value = True, show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical, min_range : float = -1.0, max_range : float = 1.0, comment = None, device = None, parent=None):
+    def __init__(self, axis_id = None, show_calibrated = False, show_percentage = True, show_value = True,
+                  show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical,
+                  min_range : float = -1.0, max_range : float = 1.0, comment = None, device = None, decimals = 3, parent=None):
         """Creates a new instance.
 
-        :param axis_id id of the axis, used in the label
+        :param axis_id: id of the axis, used in the label
+        :param show_calibrated: show calibrated data 
+        :param show_percentage: show percent label
+        :param show_value : show value label 
+        :param show_curve : show curve value label
+        :param orientation: horizontal or vertical
+        :param min_range: min range (-1)
+        :param max_range: max range (+1)
+        :param comment: comment label
+        :param device : device to use
+        :param decimals: decimals to use for value data (3)
         :param parent the parent of this widget
+
         """
         super().__init__(parent)
 
@@ -4106,6 +4136,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         self._show_label = show_label
         self._show_curve = show_curve
         self._show_calibrated = show_calibrated
+        self._decimals = decimals if decimals is not None else 3
 
         # widget references 
         self._progress_widget = None
@@ -4547,13 +4578,13 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
     
         
         if display_value is not None:
-            self._label_value = f"{display_value:+0.3f}"
+            self._label_value = f"{display_value:+0.{self._decimals}f}"
         else:
             self._label_value = "n/a"
             
 
         if self._show_curve and curve_value is not None:
-            self._label_curve = f"C{curve_value:+0.3f}"
+            self._label_curve = f"C{curve_value:+0.{self._decimals}f}"
             
         if self._show_percentage:
             if percent_value is None:
@@ -7201,7 +7232,7 @@ def getRadioContainer(label_data_pairs, callback, default = None, horizontal = T
     return (widget, layout)
 
    
-def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, alignment = None, set_alignment = True):
+def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, alignment = None, set_alignment = True, min_height = None):
     ''' gets a qt H container widget 
     
     :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically
@@ -7215,6 +7246,10 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
     widget.setContentsMargins(0,0,0,0)
     layout.setContentsMargins(0,0,0,0)
     stretch = left_stretch
+
+    if min_height is not None:
+        widget.setMinimumHeight(min_height)
+
     if alignment is None and set_alignment:
         alignment = QtCore.Qt.AlignmentFlag.AlignCenter
 

@@ -236,6 +236,9 @@ has_device_changes = False
 # previous runtime mode
 previous_runtime_mode = None
 
+# import prompt count on import
+import_prompt_stack = 0
+
 @module_property
 def _current_mode() -> str:
     if is_running:

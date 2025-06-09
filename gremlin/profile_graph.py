@@ -44,6 +44,7 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
+from gremlin.singleton_decorator import SingletonDecorator
 
 import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
@@ -1195,13 +1196,18 @@ class ProfileMergedAxisNode(ProfileBaseNode):
         return f"{self.nodeType.name}"
     
 
+
+    
+
 class ProfileGraph():
     ''' holds the profile graph '''
 
     def __init__(self):
         self._root = ProfileRootNode()
         self._source_xml = None # source XML loaded 
-        self._remap_prompt_issued = False # true if remap prompt was issued 
+        
+
+        
 
     def get_device_node(self, device_guid) -> ProfileDeviceNode:
         ''' gets the profile device node for the given device_guid, None if not found '''
@@ -1247,7 +1253,10 @@ class ProfileGraph():
         config = gremlin.config.Configuration()
 
         if self.has_unknowns() and config.import_prompt_enabled and not self._remap_prompt_issued:
-            self._remap_prompt_issued = True
+            if gremlin.shared_state.import_prompt_stack:
+                # already prompted, don't prompt again
+                return
+            gremlin.shared_state.import_prompt_stack += 1
             gremlin.util.popCursorTemporary()
             base_dir, base_file = os.path.split(source_xml)
             msgbox = ui_common.ConfirmBoxEx(title = "Import profile?", prompt = f"Profile [{base_file}] has one or more devices that could not be found.\nWould you like to remap devices?", again_prompt=True)

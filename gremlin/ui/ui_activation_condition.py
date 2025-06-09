@@ -654,7 +654,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.lower_widget.setMaximum(1.0)
 
         self.grab_low_widget = ui_common.QDataPushButton()
-        self.grab_low_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
+        self.grab_low_widget.setIcon(ui_common.Icons.recordIcon())
         self.grab_low_widget.setMaximumWidth(20)
         self.grab_low_widget.clicked.connect(self._grab_low)
         self.grab_low_widget.setToolTip("Grab axis value")
@@ -1060,7 +1060,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         )
         self.input_dialog.show()
 
-    def _filter_input(self, event):
+    def _filter_input(self, event) -> bool:
         # only accept virtual events
         return event.is_virtual
     
