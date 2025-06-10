@@ -596,7 +596,7 @@ class ProfileConverter:
                     return linear_id
 
                 device = self.dev_info[device_guid]
-                if linear_id > device.axis_count or linear_id >= len(device.axis_map):
+                if linear_id > device.axis_count or linear_id >= len(device.axismap_list):
                     syslog.error(
                         f"Invalid linear axis id received, {device.name} id = {linear_id}"
                     )

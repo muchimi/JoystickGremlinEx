@@ -85,7 +85,7 @@ _control_action_display = {
 
 class VjoyAction(enum.Enum):
     ''' defines available vjoy actions supported by the vjoy mapper plugins'''
-    VJoyButton = 0 # action on button press
+    VJoyButton = 0 # hold state
     VJoyToggle = 1 # toggle function on/off
     VJoyPulse = 2 # pulse function (pulses a button),
     VJoyInvertAxis = 3 # invert axis function
@@ -108,6 +108,8 @@ class VjoyAction(enum.Enum):
     VJoyMergeAxis = 20 # action to merge another axis
     VJoyHatToButton = 21 # action to map a hat to a button
     VJoySetAxisStepped = 22 # like VjoySetAxis but uses a list of values to bump the index
+    VJoyButtonPress = 23 # action on button press
+    
 
   
 
@@ -123,7 +125,7 @@ class VjoyAction(enum.Enum):
         for item in cls:
             if item.name.lower() == name.lower():
                 return item
-            return cls.VJoyButton
+            return cls.VJoyButtonPress
 
     
     @staticmethod
@@ -145,7 +147,7 @@ class VjoyAction(enum.Enum):
         match action:
             case VjoyAction.VJoyAxis:
                 return "Maps a vjoy axis"
-            case VjoyAction.VJoyButton:
+            case VjoyAction.VJoyButtonPress:
                 return "Press a vjoy button"
             case VjoyAction.VJoyHat:
                 return "Maps to a vjoy hat"
@@ -191,6 +193,8 @@ class VjoyAction(enum.Enum):
                 return "Merges two axes into one"
             case VjoyAction.VJoySetAxisStepped:
                 return "Steps through set axis values"
+            case VjoyAction.VJoyButton:
+                return "Presses or releases a button by input state"
 
         
         msg  = f"Unknown [{action}]"
@@ -203,7 +207,7 @@ class VjoyAction(enum.Enum):
         match action:
             case  VjoyAction.VJoyAxis:
                 return "Axis"
-            case  VjoyAction.VJoyButton:
+            case  VjoyAction.VJoyButtonPress:
                 return "Button Press"
             case  VjoyAction.VJoyHat:
                 return "Hat"
@@ -249,6 +253,8 @@ class VjoyAction(enum.Enum):
                 return "Merge Axis"
             case VjoyAction.VJoySetAxisStepped:
                 return "Stepped Axis Value"
+            case VjoyAction.VJoyButton:
+                return "Button"
 
         
         msg  = f"Unknown [{action}]"
@@ -1482,7 +1488,7 @@ class JoystickWrapper:
         :return True the specified axis exists, False otherwise
         """
         for i in range(self._info.axis_count):
-            if self._info.axis_map[i].axis_index == axis_index:
+            if self._info.axismap_list[i].axis_index == axis_index:
                 return True
         return False
 
@@ -1559,7 +1565,7 @@ class JoystickWrapper:
         """
         axes = {}
         for i in range(self._info.axis_count):
-            aid = self._info.axis_map[i].axis_index
+            aid = self._info.axismap_list[i].axis_index
             axes[aid] = JoystickWrapper.Axis(self._device_guid, aid)
         return axes
 

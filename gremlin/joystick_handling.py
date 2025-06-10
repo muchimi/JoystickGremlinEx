@@ -291,7 +291,7 @@ def select_first_valid_vjoy_input(valid_types):
             return {
                 "device_id": dev.vjoy_id,
                 "input_type": InputType.JoystickAxis,
-                "input_id": dev.axis_map[0].axis_index
+                "input_id": dev.axismap_list[0].axis_index
             }
         elif InputType.JoystickButton in valid_types and dev.button_count > 0:
             return {
@@ -714,7 +714,7 @@ def joystick_devices_initialization():
             dev.axis_count = axis_count
             dev.button_count = button_count
             dev.hat_count = hat_count
-            dev.axis_map = []
+            dev.axismap_list = []
             dev.usage_page = None
             dev.usage = None
             dev.axis_names = []
@@ -723,7 +723,7 @@ def joystick_devices_initialization():
             for i in range(8):
                 axis_map = dinput.AxisMap()
                 axis_map.axis_index = i
-                dev.axis_map.append(axis_map)
+                dev.axismap_list.append(axis_map)
                 axis_name = axis_map.getName()
                 if not axis_name:
                     axis_name = f"({i+1})"
@@ -1205,7 +1205,7 @@ class VJoyUsageState():
                 vjoy[entry.vjoy_id][InputType.to_string(input_type)] = []
             for i in range(entry.axis_count):
                 vjoy[entry.vjoy_id]["axis"].append(
-                    entry.axis_map[i].axis_index
+                    entry.axismap_list[i].axis_index
                 )
             for i in range(entry.button_count):
                 vjoy[entry.vjoy_id]["button"].append(i+1)

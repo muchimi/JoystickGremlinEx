@@ -778,12 +778,12 @@ class ProfileDeviceNode(ProfileBaseNode):
             # default to max DInput as we don't know the capabilities
             device.axis_count = 8 
             device.axis_names = gremlin.joystick_handling.AxisNames.joystick_linear_axis_names
-            device.axis_map = {}
+            device.axismap_list = {}
             for i in range(device.axis_count):
                 am = dinput.AxisMap()
                 am.axis_index = i+1
                 am.linear_index = i+1
-                device.axis_map[i] = am
+                device.axismap_list[i] = am
             device.button_count = 128
             device.hat_count = 4
             device.input_enabled = True # enable as input

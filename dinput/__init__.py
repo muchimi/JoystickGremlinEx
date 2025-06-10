@@ -428,7 +428,7 @@ class DeviceSummary:
             self.axis_count = data.axis_count
             self.button_count = data.button_count
             self.hat_count = data.hat_count
-            self.axis_map = []
+            self.axismap_list = []
             self.usage_page = data.usage_page
             self.usage = data.usage
             self.axis_names = []
@@ -436,7 +436,7 @@ class DeviceSummary:
             self.input_enabled = True # allow usage as an input device by default for special and physical devices
             for i in range(8):
                 axis_map = AxisMap(data.axis_map[i])
-                self.axis_map.append(axis_map)
+                self.axismap_list.append(axis_map)
                 axis_name = axis_map.getName()
                 if not axis_name:
                     # axis name is not reporting in via directinput
@@ -459,7 +459,7 @@ class DeviceSummary:
             self.axis_count = 0
             self.button_count = 0
             self.hat_count = 0
-            self.axis_map = []
+            self.axismap_list = []
             self.usage_page = None
             self.usage = None
             self.axis_names = []
@@ -555,8 +555,60 @@ class DeviceSummary:
     
     def axis_index_list(self) -> list:
         ''' returns the list of valid axis indices '''
-        index_list = [data.axis_index for data in self.axis_map if data.axis_index > 0]
+        index_list = [data.axis_index for data in self.axismap_list if data.axis_index > 0]
         return index_list
+    
+    def getValidLinearIndices(self):
+        ''' gets a list of valid linear axis indices for this device '''
+        if self.axismap_list:
+            return list(range(len(self.axismap_list)))
+        return []
+    
+    def getAxisInputId(self, linear_index : int):
+        ''' Gets the input for the linear index
+        :param index: index 
+        :param is_linear: true if the index is the linear axis index (range 0 to axis_count), false if the axis identifier
+        '''
+        am : AxisMap
+        for am in self.axismap_list:
+            if am.linear_index == linear_index:
+                return am.axis_index
+        return None
+    
+
+    
+    def getAxisName(self, index : int, is_linear = False):
+        ''' gets the name of the axis for a given axis index 
+        
+        :param index: index 
+        :param is_linear: true if the index is the linear axis index (range 0 to axis_count), false if the axis identifier
+        
+        '''
+        am : AxisMap
+        if is_linear:
+            for am in self.axismap_list:
+                if am.linear_index == index:
+                    return am.getName()
+        else:
+            for am in self.axismap_list:
+                if am.axis_index == index:
+                    return am.getName()
+        return None
+    
+    def getAxisData(self):
+        ''' gets the axis name pairs (input_id, axis_name, linear_index) for this device'''
+        am : AxisMap
+        pairs = []
+        for am in self.axismap_list:
+            pairs.append((am.axis_index, am.getName(), am.linear_index))
+            pairs.sort(key = lambda x:x[2]) # sort by linear index
+        return pairs
+    
+    def getValidAxisInputIds(self):
+        ''' gets the list of valid axis input IDs for the given device '''
+        return [am.axis_index for am in self.axismap_list if am.axis_index > 0]
+
+
         
 
     @property

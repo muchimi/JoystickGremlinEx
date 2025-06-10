@@ -15,23 +15,31 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
-### (m76T10) (WIP)
-- Fix: Highlight axis mode.
+### (m76T10)
+- Fix: Highlight axis mode auto-switch not selecting axis input in some situations (this may yet require some more work especially with noisy inputs).
 - Fix: resolved a second issue with multiple prompts on older profile import.
-- Fix: VjoyRemap axis to button range - note: please revisit any mappings that use this mode to make sure the ranges are correct.
-- Improved: VjoyRemap UI for various modes  
-- New: VjoyRemap axis to button range adds output modes for hold, pulse, press, release and noOp.  This alters the behavior of Axis to Button as follows:  
--- Hold: this is the same behavior as before, the button is on while the axis in in the range, and turns off when the axis exits the range.
--- Pulse: the button will pulse when the range is entered (turn on, delay, turn off).
--- Press: the button will remain pressed if the range was entered, and exited.
--- Release: the button will remain not pressed if the range was entered, and exited.
--- NoOp: does nothing (this is provided for some niche scenarios and testing)
+- Improved: UI refactor of VjoyRemap action for clarity, use of updated APIs, new features and various fixes:
+	* Fix: VjoyRemap axis to button range not using correct range - note: please revisit any mappings that use this mode to make sure the ranges are correct if you previously scaled the axis.
+	* Improved: Hide unused UI components based on current Vjoyremap options and input type and reorganize UI for clarity.
+	* Improved: Add repeater to Vjoyremap for axis output.
+	* Improved: Add range repeater to Vjoyremap when using axis to button mode, will show if the current position is in range or not.
+	* Improved: Add grab value buttons for min/max range in axis to button mode as with Gated Axis.
+	* Fix: VjoyRemap merged axis behavior not functioning in some situations.
+	* New: VjoyRemap pulse repeat option using new pulse API.  When enabled, the pulse behavior will pulse the output while the input is triggered.  The interval can be changed.
+	* New: VjoyRemap "listen" button for merged axis input selection.
+	* New: VjoyRemap "axis to button" additional output modes:
 
+		* Hold: this is the same behavior as before, the button is on while the axis in in the range, and turns off when the axis exits the range.
+		* Pulse: the button will pulse when the range is entered (turn on, delay, turn off).  Pulses can now also repeat.
+		* Press: the button will remain pressed if the range was entered, and exited.
+		* Release: the button will remain not pressed if the range was entered, and exited.
+		* NoOp: does nothing (this is provided for some niche scenarios and testing)
+	* API: New generic pulse object able to handle complex pulse scenarios.
 ### (m76T9)
-- Fix: Obtain aircraft title from SimConnect SDK is now more reliable when the sim changes aircraft.
-- Fix: prompt only once on import when multiple internal reloads are needed.
+- Fix: Obtain aircraft title from SimConnect SDK is now more reliable when the sim changes aircraft or when GremlinEx queries the current aircraft.
+- Fix: remove multiple prompts on import if internal reloads are needed.
 - Fix: Error in XML API output introduced in last patch
-- WIP: HID device interface  
+- WIP: HID device interface now available as an API (not currently used)
 
 
 ### (m76T8/A)

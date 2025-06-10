@@ -215,7 +215,7 @@ class Device(QtCore.QAbstractListModel):
         if index < axis_count:
             return (
                 InputType.JoystickAxis,
-                self._device.axis_map[index].axis_index
+                self._device.axismap_list[index].axis_index
             )
         elif index < axis_count + button_count:
             return (
@@ -352,7 +352,7 @@ class VJoyDevices(QtCore.QObject):
             for i in range(input_count[input_type](device)):
                 input_id = i+1
                 if input_type == InputType.JoystickAxis:
-                    input_id = device.axis_map[i].axis_index
+                    input_id = device.axismap_list[i].axis_index
 
                 self._input_items.append(common.input_to_ui_string(
                     input_type,
@@ -574,9 +574,9 @@ class DeviceAxisState(AbstractDeviceState):
 
     def _initialize_state(self) -> None:
         for i in range(self._device.axis_count):
-            self._identifier_map[self._device.axis_map[i].axis_index] = i
+            self._identifier_map[self._device.axismap_list[i].axis_index] = i
             self._state.append({
-                "identifier": self._device.axis_map[i].axis_index,
+                "identifier": self._device.axismap_list[i].axis_index,
                 "value": 0.0
             })
 
@@ -649,9 +649,9 @@ class DeviceAxisSeries(QtCore.QObject):
 
         self._state = []
         for i in range(self._device.axis_count):
-            self._identifier_map[self._device.axis_map[i].axis_index] = i
+            self._identifier_map[self._device.axismap_list[i].axis_index] = i
             self._state.append({
-                "identifier": self._device.axis_map[i].axis_index,
+                "identifier": self._device.axismap_list[i].axis_index,
                 "timeSeries": []
             })
         self.deviceChanged.emit()

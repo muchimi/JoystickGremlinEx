@@ -293,12 +293,12 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.profile_data.delay = value
 
     @QtCore.Slot()
-    def _autorelease_delay_changed_cb(self):
+    def _autorelease_delay_changed_cb(self, value):
         """Updates the activation delay value.
 
         :param value the value after which the long press action activates
         """
-        self.profile_data.autorelease_delay = self.autorelease_delay_widget.value() / 1000
+        self.profile_data.autorelease_delay = value / 1000
 
     
     def _activation_changed_cb(self, value):

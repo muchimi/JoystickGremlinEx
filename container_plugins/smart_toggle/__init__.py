@@ -140,8 +140,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()        
 
-    def _delay_changed_cb(self):
-        value = self.delay_widget.value()
+    def _delay_changed_cb(self, value):
         self.profile_data.delay = value / 1000 # in seconds
 
     def _activation_changed_cb(self, value):

@@ -1166,7 +1166,7 @@ class EventListener(QtCore.QObject):
 
 		from gremlin.util import create_calibration_function
 		cfg = config.Configuration()
-		for entry in device_info.axis_map:
+		for entry in device_info.axismap_list:
 			limits = cfg.get_calibration(
 				device_info.device_guid,
 				entry.axis_index

@@ -837,7 +837,7 @@ class Device:
     def device_type(self) -> DeviceType:
         return self.type        
 
-    def ensure_mode_exists(self, mode_name, device=None):
+    def ensure_mode_exists(self, mode_name, device : dinput.DeviceSummary =None):
         """Ensures that a specified mode exists, creating it if needed.
 
         :param mode_name the name of the mode being checked
@@ -852,13 +852,13 @@ class Device:
 
         if device is not None:
             for i in range(device.axis_count):
-                count = len(device.axis_map)
+                count = len(device.axismap_list)
                 if i > count:
                     syslog.error(f"{device.name} invalid axis request {device.axis_count} < {i}")
                 else:
                     mode.get_data(
                         InputType.JoystickAxis,
-                        device.axis_map[i].axis_index
+                        device.axismap_list[i].axis_index
                     )
             for idx in range(1, device.button_count + 1):
                 mode.get_data(InputType.JoystickButton, idx)
@@ -2325,14 +2325,14 @@ class Profile():
             new_mode = new_device.modes[mode]
             # Touch every input to ensure it gets default initialized
             for i in range(device.axis_count):
-                if i >= len(device.axis_map):
+                if i >= len(device.axismap_list):
                     syslog.error(
                         f"{device.name,} invalid axis request { device.axis_count} < {i}"
                     )
                 else:
                     new_mode.get_data(
                         InputType.JoystickAxis,
-                        device.axis_map[i].axis_index
+                        device.axismap_list[i].axis_index
                     )
             for i in range(1, device.button_count+1):
                 new_mode.get_data(InputType.JoystickButton, i)
@@ -2986,7 +2986,7 @@ class Profile():
             vjoy[entry.vjoy_id] = {"axis": [], "button": [], "hat": []}
             for i in range(entry.axis_count):
                 vjoy[entry.vjoy_id]["axis"].append(
-                    entry.axis_map[i].axis_index
+                    entry.axismap_list[i].axis_index
                 )
             for i in range(entry.button_count):
                 vjoy[entry.vjoy_id]["button"].append(i+1)

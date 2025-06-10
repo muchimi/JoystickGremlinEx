@@ -97,12 +97,13 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.start_mode_selector.setMinimumContentsLength(20)
         self.start_mode_selector.setToolTip("Selects the startup mode when the profile is activated and the restore last mode option is not set")
         self.start_mode_selector.currentIndexChanged.connect(self._start_mode_changed_cb)
-        self.start_container_widget = QtWidgets.QWidget()
-        self.start_container_layout = QtWidgets.QHBoxLayout(self.start_container_widget)
-
-        self.start_container_layout.addWidget(self.start_label)
-        self.start_container_layout.addWidget(self.start_mode_selector)
-        self.start_container_layout.addStretch()
+        
+        
+        widgets = [
+            self.start_mode_selector,
+        ]
+        
+        self.container_start_mode_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Start Mode:")
 
         # Restore last mode on profile activate
         self.activate_restore_mode = QtWidgets.QCheckBox("Restore last mode on start")
@@ -121,7 +122,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout.addWidget(self.numlock_widget)
         self.main_layout.addWidget(self.activate_restore_mode)
-        self.main_layout.addWidget(self.start_container_widget)
+        self.main_layout.addWidget(self.container_start_mode_widget)
         self.main_layout.addWidget(close_button_widget)
 
         self.populate_selector(mode)

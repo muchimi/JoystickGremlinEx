@@ -95,8 +95,8 @@ class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
     @QtCore.Slot()
-    def _value_changed(self):
-        self.action_data.delay = self.delay_widget.value()
+    def _value_changed(self, value):
+        self.action_data.delay = value 
 
     def _update(self):
         delay_visible = self.action_data.mode == PauseMode.Delay

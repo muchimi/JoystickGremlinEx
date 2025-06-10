@@ -266,8 +266,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
     @QtCore.Slot()
-    def _value_changed(self):
-        self.action_data.delay = self.delay_widget.value()    
+    def _value_changed(self, value):
+        self.action_data.delay = value
 
 class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 

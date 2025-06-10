@@ -1549,25 +1549,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui_statusbar_highlight_state_container_layout = QtWidgets.QHBoxLayout(self.ui_statusbar_highlight_state_container_widget)
         self.ui_statusbar_highlight_state_container_layout.setContentsMargins(0,0,0,0)
 
-
-        
-
-        #icon = gremlin.util.load_icon("fa5s.ellipsis-v")
-        icon = gremlin.ui.ui_common.Icons.horizontalSeparatorIcon()
-        pixmap = icon.pixmap(QtCore.QSize(24,24))
-
-
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Device"))                                                     
         self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_tabswitch_widget)
-        sep = QtWidgets.QLabel()
-        sep.setPixmap(pixmap)
-        self.ui_statusbar_highlight_state_container_layout.addWidget(sep)
+        
+        self.ui_statusbar_highlight_state_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalSeparator())
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Axis"))                                                     
         self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_axis_widget)
 
-        sep = QtWidgets.QLabel()
-        sep.setPixmap(pixmap)
-        self.ui_statusbar_highlight_state_container_layout.addWidget(sep)
+        
+        self.ui_statusbar_highlight_state_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalSeparator())
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Button"))
         self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_button_widget)
 
@@ -1575,9 +1565,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("<b>Highlight</b>"))
         self.ui_statusbar_highlight_container_layout.addWidget(self.ui_statusbar_highlight_state_container_widget)
 
-        sep = QtWidgets.QLabel()
-        sep.setPixmap(pixmap)
-        self.ui_statusbar_highlight_state_container_layout.addWidget(sep)
+        
+        self.ui_statusbar_highlight_state_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalSeparator())
         self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Enabled"))
         self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_enable_widget)
 

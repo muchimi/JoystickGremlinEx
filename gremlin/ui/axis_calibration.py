@@ -161,7 +161,7 @@ class CalibrationUi(ui_common.BaseDialogUi):
         if event.device_guid == self.devices[self.current_selection_id].device_guid \
                 and event.event_type == InputType.JoystickAxis:
             axis_id = gremlin.joystick_handling.linear_axis_index(
-                self.devices[self.current_selection_id].axis_map,
+                self.devices[self.current_selection_id].axismap_list,
                 event.identifier
             )
             self.axes[axis_id-1].set_current(event.raw_value)

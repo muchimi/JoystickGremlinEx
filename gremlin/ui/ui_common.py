@@ -4750,7 +4750,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 
                 input_id = index
                 axis_label = QtWidgets.QLabel(f"Axis {index}")
-                axis_id = gremlin.joystick_handling.linear_axis_index(self.device.axis_map,index)
+                axis_id = gremlin.joystick_handling.linear_axis_index(self.device.axismap_list,index)
                 self.index_map[axis_id] = index
                 axis = AxisStateWidget(index, show_value = False, show_label=False, show_percentage=False, device = device)
                 calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(device_guid, input_id)
@@ -4817,7 +4817,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         """
         if event.event_type == InputType.JoystickAxis:
             axis_id = gremlin.joystick_handling.linear_axis_index(
-                self.device.axis_map,
+                self.device.axismap_list,
                 event.identifier
             )
             index = self.index_map[axis_id]
@@ -5091,7 +5091,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         self.legend_layout.addStretch()
         colors = Color.PenColors()
         for i in range(device.axis_count):
-            index = device.axis_map[i].axis_index
+            index = device.axismap_list[i].axis_index
             label = QtWidgets.QLabel(f"Axis {index:d}")
             css = f"QLabel {{ color: {colors.get(index,"#000000")}; font-weight: bold }}"
             label.setStyleSheet(css)
@@ -5859,7 +5859,7 @@ class QToggleText(QtWidgets.QWidget):
 class QDelayWidget(QtWidgets.QWidget):
     ''' widget to collect a delay time in milliseconds '''
 
-    valueChanged = QtCore.Signal() # fired when the value changes
+    valueChanged = QtCore.Signal(int) # fired when the value changes
 
     def __init__(self, value = 250, is_seconds = False, parent = None, label = None):
         '''
@@ -5918,11 +5918,11 @@ class QDelayWidget(QtWidgets.QWidget):
         milliseconds = milliseconds = value * 1000 if self._is_seconds else value
         if milliseconds >= 0 and milliseconds != self._delay_widget.value():
             self._delay_widget.setValue(milliseconds)
-            self.valueChanged.emit()
+            self.valueChanged.emit(milliseconds)
 
     @QtCore.Slot()
     def _value_changed(self):
-        self.valueChanged.emit()
+        self.valueChanged.emit(self._delay_widget.value())
 
     @QtCore.Slot()
     def _quarter_sec_delay(self):
@@ -7231,6 +7231,16 @@ def getRadioContainer(label_data_pairs, callback, default = None, horizontal = T
     layout.addStretch()
     return (widget, layout)
 
+
+class QHorizontalSeparator(QtWidgets.QLabel):
+    ''' horizontal separator widget '''
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        icon = gremlin.ui.ui_common.Icons.horizontalSeparatorIcon()
+        pixmap = icon.pixmap(QtCore.QSize(24,24))
+        self.setPixmap(pixmap)
+
+
    
 def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, alignment = None, set_alignment = True, min_height = None):
     ''' gets a qt H container widget 
@@ -7260,7 +7270,11 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
         if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
                 if isinstance(item, str):
-                    item = QtWidgets.QLabel(item)
+                    if item == "|": 
+                        # separator
+                        item = QHorizontalSeparator()
+                    else:
+                        item = QtWidgets.QLabel(item)
                 if alignment:
                     layout.addWidget(item, alignment = alignment)
                 else:

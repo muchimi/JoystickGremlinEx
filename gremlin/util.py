@@ -1705,7 +1705,7 @@ def is_close(a, b, tolerance = 0.0001):
 
 class InvokeUiMethod(QtCore.QObject):
     ''' invokes a call on the UI thread as QT is not thread safe '''
-    def __init__(self, method: Callable):
+    def __init__(self, method: Callable, data = None):
         ''' Invokes a method on the main ui thread. 
         
         :params: method: lambda expression
@@ -1719,15 +1719,23 @@ class InvokeUiMethod(QtCore.QObject):
             self.setParent(QtWidgets.QApplication.instance())
             self.method = method
             self.called.connect(self.execute)
-            self.called.emit()
+            self.called.emit(data)
         else:
-            method()
+            if data is not None:
+                method(data)
+            else:
+                method()
 
-    called = QtCore.Signal()
+    called = QtCore.Signal(object)
 
-    @QtCore.Slot()
-    def execute(self):
-        self.method()
+    @QtCore.Slot(object)
+    def execute(self, data):
+        if data is not None:
+            self.method(data)
+        else:
+            self.method()
+    
+        
         # trigger garbage collector
         self.setParent(None)
 
