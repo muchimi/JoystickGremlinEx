@@ -30,6 +30,7 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
 from gremlin.types import DeviceType
+import gremlin.hid
 from gremlin.singleton_decorator import SingletonDecorator
 
 
@@ -563,25 +564,30 @@ def joystick_devices_initialization():
     syslog.info("INIT: Initializing joystick devices")
 
     dinput.DILL.init()
-    # give it some time to load data
-    time.sleep(0.25)
-    device_count = dinput.DILL.get_device_count()
+    _hid = gremlin.hid.Hid()
+    controller_count = _hid.get_controller_count()
+    syslog.info(f"INIT: {controller_count} HID devices detected:")
     
-    if device_count == 0:
-        # no hardware input detected
-        syslog.info("INIT: no DirectInput devices detected - waiting for data")
-        max_retries = 3
-        attempt = 1
-        while device_count == 0 and attempt <= max_retries:
-            time.sleep(0.25)
-            device_count = dinput.DILL.get_device_count()
-            syslog.info(f"INIT: attempt number {attempt}")
-            attempt += 1
+    # # give it some time to load data
+    # time.sleep(0.25)
+
+    device_count = 0 # 
+    
+    max_retries = 5
+    attempt = 1
+    while device_count != controller_count and attempt <= max_retries:
+        time.sleep(0.05)
+        device_count = dinput.DILL.get_device_count()
+        attempt += 1
 
     if device_count:
         syslog.info(f"INIT: {device_count} hardware devices detected:")
         dinput.DILL.dumpDevices()
-    else:
+
+    if device_count != controller_count:
+        syslog.warning(f"INIT: HID device count is {controller_count}, does not match DirectX controller count: {device_count}")
+    
+    if device_count == 0:
         syslog.warning(f"INIT: DirectX reports no hardware devices detected")
         
 

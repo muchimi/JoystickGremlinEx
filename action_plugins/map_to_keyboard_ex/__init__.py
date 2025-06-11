@@ -26,6 +26,7 @@ import gremlin.config
 import gremlin.config
 import gremlin.config
 import gremlin.event_handler
+import gremlin.input_devices
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.config
@@ -47,6 +48,7 @@ import gremlin.ui.virtual_keyboard
 from gremlin.util import log_info
 import gremlin.util
 from gremlin import input_devices
+import gremlin.repeater
 
 syslog = logging.getLogger("system")
 
@@ -71,113 +73,65 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.key_combination_widget = QtWidgets.QWidget() # holds the keys
         self.key_combination_layout = QtWidgets.QHBoxLayout(self.key_combination_widget)
 
-        self.action_widget = QtWidgets.QWidget()
-        self.action_layout = QtWidgets.QHBoxLayout(self.action_widget)
+        
+        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._record_keys_cb)
         
 
-        self.record_button = QtWidgets.QPushButton("Listen")
-        self.record_button.clicked.connect(self._record_keys_cb)
-
-        self._options_widget = QtWidgets.QWidget()
-        self._options_layout = QtWidgets.QHBoxLayout()
-        self._options_widget.setLayout(self._options_layout)
+        self.show_keyboard_widget = QtWidgets.QPushButton("Select Keys")
+        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color = gremlin.ui.ui_common.Color.listenColor()))
+        self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
 
 
-        self.rb_press = QtWidgets.QRadioButton("Press")
-        self.rb_release = QtWidgets.QRadioButton("Release")
-        self.rb_both = QtWidgets.QRadioButton("Pulse")
-        self.rb_autorepeat = QtWidgets.QRadioButton("Auto Repeat")
-        self.rb_hold = QtWidgets.QRadioButton("Hold")
-
-        self.delay_container_widget = QtWidgets.QWidget()
-        self.delay_container_layout = QtWidgets.QHBoxLayout()
-        self.delay_container_widget.setLayout(self.delay_container_layout)
-
-        width = gremlin.ui.ui_common.get_char_width(8)
-
-        delay_label = QtWidgets.QLabel("Delay (ms)")
-        self.delay_box = gremlin.ui.ui_common.QIntLineEdit()
-        self.delay_box.setRange(0, 20000)
-        self.delay_box.setMaximumWidth(width)
-
-        self.autorepeat_delay_label = QtWidgets.QLabel("Repeat Interval (ms)")
-        self.autorepeat_delay_box = gremlin.ui.ui_common.QIntLineEdit()
-        self.autorepeat_delay_box.setRange(0, 20000)
-        self.autorepeat_delay_box.setMaximumWidth(width)
-
-        quarter_sec_button = QtWidgets.QPushButton("1/4s")
-        half_sec_button = QtWidgets.QPushButton("1/2s")
-        sec_button = QtWidgets.QPushButton("1s")
-
-        quarter_sec_button.clicked.connect(self._quarter_sec_delay)
-        half_sec_button.clicked.connect(self._half_sec_delay)
-        sec_button.clicked.connect(self._sec_delay)
-
+        self.delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.delay) 
+        self.autorepeat_delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.autorepeat_delay,label="Interval (ms)") 
+        
         self.delay_box.setValue(self.action_data.delay)
         self.autorepeat_delay_box.setValue(self.action_data.autorepeat_delay)
 
-        if self.action_data.mode == KeyboardOutputMode.Press:
-            self.rb_press.setChecked(True)
-        elif self.action_data.mode == KeyboardOutputMode.Release:
-            self.rb_release.setChecked(True)
-        elif self.action_data.mode == KeyboardOutputMode.Hold:
-            self.rb_hold.setChecked(True)
-        elif self.action_data.mode == KeyboardOutputMode.Both:
-            self.rb_both.setChecked(True)
-        elif self.action_data.mode == KeyboardOutputMode.AutoRepeat:
-            self.rb_autorepeat.setChecked(True)
+        widgets = []
+        for mode in KeyboardOutputMode:
+            rb = gremlin.ui.ui_common.QDataRadioButton(mode.name, mode)
+            rb.setChecked(self.action_data.mode == mode)
+            rb.clicked.connect(self._mode_changed)
+            widgets.append(rb)
 
+        
         self.description_widget = QtWidgets.QLabel()
         self.description_widget.setWordWrap(True)
 
 
-        self.rb_press.clicked.connect(self._mode_changed)
-        self.rb_release.clicked.connect(self._mode_changed)
-        self.rb_both.clicked.connect(self._mode_changed)
-        self.rb_hold.clicked.connect(self._mode_changed)
-        self.rb_autorepeat.clicked.connect(self._mode_changed)
-
         self.delay_box.valueChanged.connect(self._delay_changed)
         self.autorepeat_delay_box.valueChanged.connect(self._autorepeat_changed)
 
-        self._options_layout.addWidget(QtWidgets.QLabel("Mode:"))
-        self._options_layout.addWidget(self.rb_hold)
-        self._options_layout.addWidget(self.rb_both)
-        self._options_layout.addWidget(self.rb_autorepeat)
-        self._options_layout.addWidget(self.rb_press)
-        self._options_layout.addWidget(self.rb_release)
+        self.container_options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Mode:")
 
-        self._options_layout.addStretch(1)
+        widgets = [
+            self.delay_box,
+            self.autorepeat_delay_box
+        ]
+        
+        self.container_delay_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
 
 
-        self.delay_container_layout.addWidget(delay_label)
-        self.delay_container_layout.addWidget(self.delay_box)
-        self.delay_container_layout.addWidget(quarter_sec_button)
-        self.delay_container_layout.addWidget(half_sec_button)
-        self.delay_container_layout.addWidget(sec_button)
-        self.delay_container_layout.addWidget(self.autorepeat_delay_label)
-        self.delay_container_layout.addWidget(self.autorepeat_delay_box)
-        self.delay_container_layout.addStretch()
+        widgets = [
+            self.listen_widget, 
+            self.show_keyboard_widget
+        ]
 
-        self.show_keyboard_widget = QtWidgets.QPushButton("Select Keys")
-        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline"))
-        self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
-
-        self.action_layout.addWidget(self.record_button)
-        self.action_layout.addWidget(self.show_keyboard_widget)
-        self.action_layout.addStretch(1)
+        self.container_action_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Actions:")
 
 
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.key_combination_widget)
-        self.main_layout.addWidget(self.action_widget)
-        self.main_layout.addWidget(self._options_widget)
-        self.main_layout.addWidget(self.delay_container_widget)
+        self.main_layout.addWidget(self.container_action_widget)
+        self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(self.description_widget)
+        self.main_layout.addWidget(self.container_delay_widget)
+        
 
 
         self.main_layout.addStretch()
-        self._mode_changed() # update UI based on mode
+        self._update_ui() # update UI based on mode
 
     def _select_keys_cb(self):
         ''' display the keyboard input dialog '''
@@ -208,16 +162,20 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         gremlin.util.clear_layout(self.key_combination_layout)
 
         for index, key in enumerate(self.action_data._get_keys()):
+            assert key.name,"Invalid key provided"
             if index:
                 lbl = QtWidgets.QLabel("+")
                 self.key_combination_layout.addWidget(lbl)
             widget = gremlin.ui.virtual_keyboard.QKeyWidget()
             icon = gremlin.keyboard.KeyMap.icon(key)
+            name = gremlin.keyboard.KeyMap.get_name(key)
+            tooltip = gremlin.keyboard.KeyMap.get_description(key)
             if icon:
                 widget.setIcon(icon)
-            else:
-                widget.setText(key.name)
-            widget.setToolTip(key.name)
+            if name:
+                widget.setText(name)
+            if tooltip:
+                widget.setToolTip(tooltip)
             widget.keySize = 2
             widget.autoSize = True
             
@@ -252,36 +210,34 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.keys = gremlin.keyboard.sort_keys(data)
         self.action_modified.emit()
 
-
     def _mode_changed(self):
-        delay_enabled = False
-        autorepeat_visible = False
-        if self.rb_press.isChecked():
-            mode = KeyboardOutputMode.Press
-            description = "<b>Press</b> mode will press keys() - the key(s) is not released and should be paired with a release at some point (keyboard 'make')."
-        elif self.rb_release.isChecked():
-            mode = KeyboardOutputMode.Release
-            description = "<b>Release</b> mode will release keys(s) previously pressed with the Press mode (keyboard 'break'). If no key is sent, the release mode will also clear any auto-repeat actions to cancel them."
-        elif self.rb_hold.isChecked():
-            mode = KeyboardOutputMode.Hold
-            description = "<b>Hold</b> mode will keep the key(s) pressed until the input is released."
-        elif self.rb_both.isChecked():
-            mode = KeyboardOutputMode.Both
-            delay_enabled = True
-            description = "<b>Pulse</b> mode will press the key(s), wait for the delay, then release the key(s)."
-        elif self.rb_autorepeat.isChecked():
-            mode = KeyboardOutputMode.AutoRepeat
-            delay_enabled = True
-            autorepeat_visible = True
-            description = "<b>AutoRepeat</b> mode will pulse the key(s) repeatedly. The delay is the time between a press/release, interval is the time between pulses."
-        else:
-            # default
-            mode = KeyboardOutputMode.Hold
-        self.action_data.mode = mode
-        self.delay_container_widget.setVisible(delay_enabled)
-        self.description_widget.setText(description)
+        ''' output mode changed '''
+        widget = self.sender()
+        self.action_data.mode = widget.data
+        self._update_ui()
 
-        self.autorepeat_delay_label.setVisible(autorepeat_visible)
+    def _update_ui(self):
+        ''' updates the data based on the current mode'''
+        delay_visible = False
+        autorepeat_visible = False
+        mode = self.action_data.mode
+        match mode:
+            case KeyboardOutputMode.Press:
+                description = "<b>Press</b> mode will press keys() - the key(s) is not released and should be paired with a release at some point (keyboard 'make')."
+            case KeyboardOutputMode.Release:
+                description = "<b>Release</b> mode will release keys(s) previously pressed with the Press mode (keyboard 'break'). If no key is sent, the release mode will also clear any auto-repeat actions to cancel them."
+            case KeyboardOutputMode.Hold:
+                description = "<b>Hold</b> mode will keep the key(s) pressed until the input is released."
+            case KeyboardOutputMode.Pulse:
+                delay_visible = True
+                description = "<b>Pulse</b> mode will press the key(s), wait for the delay, then release the key(s)."
+            case KeyboardOutputMode.AutoRepeat:
+                delay_visible = True
+                autorepeat_visible = True
+                description = "<b>AutoRepeat</b> mode will pulse the key(s) repeatedly. The delay is the time between a press/release, interval is the time between pulses."
+
+        self.container_delay_widget.setVisible(delay_visible)
+        self.description_widget.setText(description)
         self.autorepeat_delay_box.setVisible(autorepeat_visible)
 
     def _delay_changed(self):
@@ -354,6 +310,10 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self.use_macros = False # true to use macros, false to send direct keys
         self._press_keys = []
         self._release_keys = []
+        self.remote_client : gremlin.input_devices.RemoteClient = input_devices.remote_client
+        self.verbose = gremlin.config.Configuration().verbose_mode_keyboard
+        self.pulse_worker_map = {}  # map of (device_id, input_id) to pulse worker object
+
 
         if self.delay < 0:
             self.delay = 0
@@ -451,106 +411,173 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 gremlin.keyboard.send_key_up(key)
 
 
+    def _pulse_on(self, data):
+        ''' called when pulse is on '''
+        keys = data
+        key : gremlin.keyboard.Key
+        for key in keys:
+            if self.verbose: syslog.info(f"Pulse ON [{key.debug_name}]")
+            gremlin.keyboard.send_key_down(key) # handles local and remote and special mouse keys
+
+    def _pulse_off(self, data):
+        ''' called when pulse is off '''
+        keys = data
+        key : gremlin.keyboard.Key
+        for key in keys:
+            if self.verbose: syslog.info(f"Pulse OFF [{key.debug_name}]")
+            gremlin.keyboard.send_key_up(key) # handles local and remote and special mouse keys
+
+    def pulse_start(self, keys : list, duration : float, interval : float):
+        ''' pulse setup '''
+        if self.verbose: syslog.info(f"Pulse START keyboard [{self.id}] duration: {duration:0.3f} interval: {interval:0.3f}")
+        key = self.id
+        worker : gremlin.repeater.PulseWorker 
+        if key in self.pulse_worker_map:
+            worker = self.pulse_worker_map[key]
+            if worker.is_running:
+                # worker already running - ignore pulse request
+                if self.verbose: syslog.info(f"\talready pulsing - ignored")
+                return
+        else:
+            args = keys
+            worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = args)
+            self.pulse_worker_map[key] = worker
+
+        if self.verbose: syslog.info(f"\activate")
+        worker.start()
+
+    def pulse_stop(self):
+        ''' request a pulse abort '''
+        if self.verbose: syslog.info(f"Pulse STOP keyboard [{self.id}]")
+        key = self.id
+        if key in self.pulse_worker_map:
+            worker : gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
+            worker.stop()
+            del self.pulse_worker_map[key]
+
+
+
+
 
     def process_event(self, event, value, extra_data = None):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
         (is_local, is_remote) = input_devices.remote_state.state
-        if event.is_axis or value.current or event.is_pressed:
+        is_pressed = event.is_pressed
+        mode = self.action_data.mode
+        #if event.is_axis or value.current or is_pressed:
+        if is_pressed:
             # joystick values or virtual button
             # verbose = True
-            
-            if self.mode == KeyboardOutputMode.Release:
-                if verbose:
-                    syslog.info(f"MapToKeyboardEx: release")
-                # kill off any auto-repeat as well
-                if not self.has_keys:
-                    # clear autorepeat if no keys are provided 
+            match mode:
+                case KeyboardOutputMode.Release:
                     if verbose:
-                        syslog.info(f"MapToKeyboardEx: clear autorepeat")
-                    eh = gremlin.event_handler.EventListener()
-                    eh.autorepeat_clear.emit() # clear auto-repeats
-                else:
-                    self.is_pressed = False
-                    id = gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote)
-                    self.registerMacro(id)
-            elif self.mode == KeyboardOutputMode.Press:
-                # press mode and not already triggered
-                if self.has_keys:
-                    self.is_pressed = True
-                    if verbose:
-                        syslog.info(f"MapToKeyboardEx: press")
-                    id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
-                    self.registerMacro(id)
-
-            elif self.mode == KeyboardOutputMode.Both:
-                # make and break with delay
-                if self.has_keys:
-                    if not self.is_pressed:
+                        syslog.info(f"MapToKeyboardEx: release")
+                    # kill off any auto-repeat as well
+                    if not self.has_keys:
+                        # clear autorepeat if no keys are provided 
                         if verbose:
-                            syslog.info(f"MapToKeyboardEx: both/pulse")
-                        id = gremlin.macro.MacroManager().queue_macro(self.delay_press_release, is_local, is_remote)
+                            syslog.info(f"MapToKeyboardEx: clear autorepeat")
+                        eh = gremlin.event_handler.EventListener()
+                        eh.autorepeat_clear.emit() # clear auto-repeats
+                    else:
+                        self.is_pressed = False
+                        id = gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote)
+                        self.registerMacro(id)
+                case KeyboardOutputMode.Press:
+                    # press mode and not already triggered
+                    if self.has_keys:
                         self.is_pressed = True
+                        if verbose:
+                            syslog.info(f"MapToKeyboardEx: press")
+                        id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
                         self.registerMacro(id)
 
-            elif self.mode == KeyboardOutputMode.Hold:
-                if self.has_keys:
-                    auto_release = self.needs_auto_release
-                    if event.is_virtual_button:
-                        # if using a virtual button to trigger - disable the auto-release
-                        auto_release = False
-                    if event.is_pressed and not auto_release:
-                        # press event
-                        if verbose:
-                            syslog.info(f"MapToKeyboardEx: hold (press)")
+           
 
-                        if self.use_macros:
-                            id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
-                            self.registerMacro(id)
+                case KeyboardOutputMode.Hold:
+                    if self.has_keys:
+                        auto_release = self.needs_auto_release
+                        if event.is_virtual_button:
+                            # if using a virtual button to trigger - disable the auto-release
+                            auto_release = False
+                        if event.is_pressed and not auto_release:
+                            # press event
+                            if verbose:
+                                syslog.info(f"MapToKeyboardEx: hold (press)")
+
+                            if self.use_macros:
+                                id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
+                                self.registerMacro(id)
+                            else:
+                                # send direct
+                                key : gremlin.keyboard.Key
+                                for key in self._press_keys:
+                                    if verbose: syslog.info(f"send key press: {key}")
+                                    if key.is_mouse:
+                                        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
+                                    else:
+                                        gremlin.keyboard.send_key_down(key)
+
+
+                        if event.is_pressed and auto_release: 
+                            if self.use_macros:
+                                id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
+                                self.registerMacro(id)
+                                callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote)
+                                ButtonReleaseActions().register_callback(callback, event)
+                            else:
+                                key : gremlin.keyboard.Key
+                                for key in self._press_keys:
+                                    if verbose: syslog.info(f"send key press (autorelease): {key}")
+                                    if key.is_mouse:
+                                        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
+                                    else:
+                                        gremlin.keyboard.send_key_down(key)
+
+                                callback = self._manual_release
+                                ButtonReleaseActions().register_callback(callback, event)
+
+                case KeyboardOutputMode.Pulse:
+                    # make and break with delay
+                    if self.has_keys:
+                        if is_pressed:
+                            if verbose: syslog.info(f"MapToKeyboardEx: pulse")
+                            repeat_interval = -1 # do not repeat
+                            self.pulse_start(self.action_data.keys, self.action_data.delay/1000, repeat_interval)
                         else:
-                            # send direct
-                            key : gremlin.keyboard.Key
-                            for key in self._press_keys:
-                                if verbose: syslog.info(f"send key press: {key}")
-                                if key.is_mouse:
-                                    gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
-                                else:
-                                    gremlin.keyboard.send_key_down(key)
+                            # stop pulsing on release
+                            self.pulse_stop()
+        
+                            # id = gremlin.macro.MacroManager().queue_macro(self.delay_press_release, is_local, is_remote)
+                            # self.is_pressed = True
+                            # self.registerMacro(id)                                
+
+                case KeyboardOutputMode.AutoRepeat:
+                    # setup autorepeat thread
+                    repeat_interval =  self.action_data.autorepeat_delay/1000
+                    self.pulse_start(self.action_data.keys, self.action_data.delay/1000, repeat_interval)
+                                  
+                    # if verbose:
+                    #         syslog.info(f"MapToKeyboardEx: autorepeat")
+                    # if self.has_keys:
+
+                    #     if self._ar_thread is None:
+                    #         self._ar_thread = threading.Thread(target=self._ar_execute) #threading.Thread(target=self._ar_execute, daemon=False)
+                    #         self._ar_running = True
+                    #         self._ar_event.clear()
+                    #         self._ar_thread.start()
 
 
-                    if event.is_pressed and auto_release: 
-                        if self.use_macros:
-                            id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
-                            self.registerMacro(id)
-                            callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote)
-                            ButtonReleaseActions().register_callback(callback, event)
-                        else:
-                            key : gremlin.keyboard.Key
-                            for key in self._press_keys:
-                                if verbose: syslog.info(f"send key press (autorelease): {key}")
-                                if key.is_mouse:
-                                    gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
-                                else:
-                                    gremlin.keyboard.send_key_down(key)
 
-                            callback = self._manual_release
-                            ButtonReleaseActions().register_callback(callback, event)
 
-            elif self.mode == KeyboardOutputMode.AutoRepeat:
-                # setup autorepeat thread
-                if verbose:
-                        syslog.info(f"MapToKeyboardEx: autorepeat")
-                if self.has_keys:
-                    if self._ar_thread is None:
-                        self._ar_thread = threading.Thread(target=self._ar_execute) #threading.Thread(target=self._ar_execute, daemon=False)
-                        self._ar_running = True
-                        self._ar_event.clear()
-                        self._ar_thread.start()
+                    
 
         else:
             # release
             if self.has_keys:
-                    if self.mode == KeyboardOutputMode.Hold:
+                match mode:
+                    case KeyboardOutputMode.Hold:
                         # release keys
                         if self.use_macros:
                             gremlin.macro.MacroManager().queue_macro(self.release)
@@ -559,12 +586,15 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             for key in self._release_keys:
                                 if verbose: syslog.info(f"send key release: {key}")
                                 gremlin.keyboard.send_key_up(key)
+                    case KeyboardOutputMode.AutoRepeat:
+                        self.pulse_stop()
+                    
 
-            self._ar_running = False
-            self._ar_event.set()
-            if self._ar_thread is not None:
-                self._ar_thread.join()
-                self._ar_thread = None
+            # self._ar_running = False
+            # self._ar_event.set()
+            # if self._ar_thread is not None:
+            #     self._ar_thread.join()
+            #     self._ar_thread = None
         
         return True
     
@@ -676,6 +706,10 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
                 key = code
             else:
                 assert True, f"Don't know how to handle: {code}"
+            
+            if not key.name:
+                syslog.error(f"Invalid key: {code}")
+                continue
             keys.append(key)
         return keys
 
@@ -733,22 +767,36 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
 
         if "mode" in node.attrib:
             mode = safe_read(node, "mode", str)
-            if mode == "make":
-                self.mode = KeyboardOutputMode.Press
-            elif mode == "break":
-                self.mode = KeyboardOutputMode.Release
-            elif mode == "both":
-                self.mode = KeyboardOutputMode.Both
-            elif mode == "hold":
-                self.mode = KeyboardOutputMode.Hold
-            elif mode == "autorepeat":
-                self.mode = KeyboardOutputMode.AutoRepeat
+            match mode:
+                case  "make":
+                    # legacy
+                    self.mode = KeyboardOutputMode.Press
+                case "press":
+                    self.mode = KeyboardOutputMode.Press
+                case "break":
+                    # legacy
+                    self.mode = KeyboardOutputMode.Release
+                case "release":
+                    self.mode = KeyboardOutputMode.Release
+                case "both":
+                    # legacy
+                    self.mode = KeyboardOutputMode.Pulse
+                case "pulse":
+                    self.mode = KeyboardOutputMode.Pulse
+                case "hold":
+                    self.mode = KeyboardOutputMode.Hold
+                case "autorepeat":
+                    self.mode = KeyboardOutputMode.AutoRepeat
+                case _:
+                    # default
+                    self.mode = KeyboardOutputMode.Hold
+
 
         if "delay" in node.attrib:
-            self.delay = safe_read(node, "delay", int, 250) # delay in milliseconds
+            self.delay = safe_read(node, "delay", int, 250) # pulse delay in milliseconds
 
         if "interval" in node.attrib:
-            self.autorepeat_delay = safe_read(node, "interval", int, 250) # delay in milliseconds
+            self.autorepeat_delay = safe_read(node, "interval", int, 250) # pulse interval milliseconds
 
         for child in node.findall("key"):
             virtual_code = safe_read(child, "virtual-code", int, 0)
@@ -770,18 +818,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         :return XML node containing the information of this  instance
         """
         node = ElementTree.Element(MapToKeyboardEx.tag)
-        if self.mode == KeyboardOutputMode.Both:
-            mode = "both"
-        elif self.mode == KeyboardOutputMode.Press:
-            mode = "make"
-        elif self.mode == KeyboardOutputMode.Release:
-            mode = "break"
-        elif self.mode == KeyboardOutputMode.Hold:
-            mode = "hold"
-        elif self.mode == KeyboardOutputMode.AutoRepeat:
-            mode = "autorepeat"
-
-        node.set("mode",safe_format(mode, str) )
+        node.set("mode",safe_format(self.mode.name.casefold(), str) )
 
         node.set("delay",safe_format(self.delay, int))
         node.set("interval", safe_format(self.autorepeat_delay, int))
@@ -806,13 +843,14 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
             else:
                 assert True, f"Don't know how to handle: {code}"
 
-            key_node = ElementTree.Element("key")
-            key_node.set("virtual-code", str(virtual_code))
-            key_node.set("scan-code", str(scan_code))
-            key_node.set("extended", str(is_extended))
-            # useful for xml readability purposes = what scan code is this
-            key_node.set("description", key.name)
-            node.append(key_node)
+            if key.name:
+                key_node = ElementTree.Element("key")
+                key_node.set("virtual-code", str(virtual_code))
+                key_node.set("scan-code", str(scan_code))
+                key_node.set("extended", str(is_extended))
+                # useful for xml readability purposes = what scan code is this
+                key_node.set("description", key.name)
+                node.append(key_node)
         return node
 
     def _is_valid(self):

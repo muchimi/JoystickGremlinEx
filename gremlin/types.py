@@ -25,6 +25,8 @@ from typing import Tuple, Union
 import gremlin.error
 
 import logging
+
+
 syslog = logging.getLogger("system")
 
 class VisualizationType(IntEnum):
@@ -37,12 +39,14 @@ class VisualizationType(IntEnum):
     Keyboard = 4 
     State = 5
 
-class KeyboardOutputMode(Enum):
-    Both = 0 # keyboard make and break (press/release) (pulse mode)
-    Press = 1 # keyboard make only
-    Release = 2 # keyboard release only
-    Hold = 3 # press while held (default GremlinEx behavior)
-    AutoRepeat = 4 # repeated pulse mode - key pulses while the input is held
+class KeyboardOutputMode(Enum): # order is that of the display order for keyboard mapper options
+    Pulse = 0 # keyboard make and break (press/release) (pulse mode)
+    AutoRepeat = 1 # pulse mode - key pulses while the input is held
+    Press = 2 # keyboard make only
+    Release = 3 # keyboard release only
+    Hold = 4 # press while held (default GremlinEx behavior)
+    
+    
 
     
 class ActivationRule(Enum):
@@ -815,12 +819,16 @@ class MouseButton(IntEnum):
     Left = 1
     Right = 2
     Middle = 3
+    DoubleLeft = 0x101 # add 0x100
+    DoubleRight = 0x002 # add 0x100
+    DoubleMiddle = 0x103 # add 0x100
     Forward = 4
     Back = 5
     WheelUp = 10
     WheelDown = 11
     WheelLeft = 12
     WheelRight = 13
+
 
     @staticmethod
     def to_string(value):
@@ -854,6 +862,17 @@ class MouseButton(IntEnum):
             return _MouseButton_lookup_to_button_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
+        
+    def to_short_name(value):
+        if value in _MouseButton_lookup_to_button_lookup:
+            value = _MouseButton_lookup_to_button_lookup[value] # to enum
+        if value in _MouseButton_to_short_string_lookup:
+            return _MouseButton_to_short_string_lookup[value] # to short name
+        return value
+        
+    def is_lookup_valid(value):
+        # true if the enum is a mouse button
+        return value in _MouseButton_lookup_to_button_lookup
 
 
 
@@ -866,7 +885,25 @@ _MouseButton_to_string_lookup = {
     MouseButton.WheelUp: "Wheel Up",
     MouseButton.WheelDown: "Wheel Down",
     MouseButton.WheelLeft: "Wheel Left",
-    MouseButton.WheelRight: "Wheel Right"
+    MouseButton.WheelRight: "Wheel Right",
+    MouseButton.DoubleLeft: "Mouse DClick Left",
+    MouseButton.DoubleRight: "Mouse DClick Right",
+    MouseButton.DoubleMiddle: "Mouse DClick Middle",
+}
+
+_MouseButton_to_short_string_lookup = {
+    MouseButton.Left: "M1",
+    MouseButton.Right: "M2",
+    MouseButton.Middle: "M3",
+    MouseButton.Forward: "M4",
+    MouseButton.Back: "M5",
+    MouseButton.WheelUp: "MWU",
+    MouseButton.WheelDown: "MWD",
+    MouseButton.WheelLeft: "MWL",
+    MouseButton.WheelRight: "MWR",
+    MouseButton.DoubleLeft: "DC1",
+    MouseButton.DoubleRight: "DC2",
+    MouseButton.DoubleMiddle: "DC3",
 }
 
 _MouseButton_to_lookup_string_lookup = {
@@ -878,7 +915,10 @@ _MouseButton_to_lookup_string_lookup = {
     MouseButton.WheelUp: "wheel_up",
     MouseButton.WheelDown: "wheel_down",
     MouseButton.WheelLeft: "wheel_left",
-    MouseButton.WheelRight: "wheel_right"
+    MouseButton.WheelRight: "wheel_right",
+    MouseButton.DoubleLeft: "mouse_d_1",
+    MouseButton.DoubleRight: "mouse_d_2",
+    MouseButton.DoubleMiddle: "mouse_d_3",
 }
 
 
@@ -899,7 +939,10 @@ _MouseButton_to_enum_lookup = {
     "Wheel Up": MouseButton.WheelUp,
     "Wheel Down": MouseButton.WheelDown,
     "Wheel Left": MouseButton.WheelLeft,
-    "Wheel Right": MouseButton.WheelRight
+    "Wheel Right": MouseButton.WheelRight,
+    "mouse_d_1" : MouseButton.DoubleLeft,
+    "mouse_d_2" : MouseButton.DoubleRight,
+    "mouse_d_3" :MouseButton.DoubleMiddle,
 }
 
 _MouseButton_lookup_to_button_lookup = {
@@ -911,8 +954,12 @@ _MouseButton_lookup_to_button_lookup = {
     "wheel_up": MouseButton.WheelUp,
     "wheel_down": MouseButton.WheelDown,
     "wheel_left": MouseButton.WheelLeft,
-    "wheel_right": MouseButton.WheelRight
+    "wheel_right": MouseButton.WheelRight,
+    "mouse_d_1" : MouseButton.DoubleLeft,
+    "mouse_d_2" : MouseButton.DoubleRight,
+    "mouse_d_3" :MouseButton.DoubleMiddle,
 }
+
 
 
 @unique

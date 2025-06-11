@@ -47,45 +47,46 @@ class HidDevice():
 class Hid():
     def __init__(self):
 
+        self._devices = []
+        self._all_devices = []
+        index = 0
         for device_map in hid.enumerate():
             keys = list(device_map.keys())
             keys.sort()
-            hd = HidDevice()
+            device = HidDevice()
             for key in keys:
                 data = device_map[key]
                 match key:
                     case "bus_type":
-                        hd.BusType = data
+                        device.BusType = data
                     case "interface_number":
-                        hd.InterfaceNumber = data
+                        device.InterfaceNumber = data
                     case "path":
-                        hd.Path = data
+                        device.Path = data
                     case "vendor_id":
-                        hd.VendorId = data
+                        device.VendorId = data
                     case "product_id":
-                        hd.ProductId = data
+                        device.ProductId = data
                     case "release_number":
-                        hd.ReleaseNumber = data
+                        device.ReleaseNumber = data
                     case "manufacturer_string":
-                        hd.Manufacturer = data
+                        device.Manufacturer = data
                     case "serial_number":
-                        hd.Serial = data
+                        device.Serial = data
                     case "usage":
-                        hd.Usage = data
+                        device.Usage = data
                     case "usage_page":
-                        hd.UsagePage = data
+                        device.UsagePage = data
                         
+            if device.Usage in (4, 5) and device.UsagePage == 1:
+                # devices 4,5 are controllers, require usage page 1
+                syslog.info(f"HID device: [{index}] Manufacturer: {device.Manufacturer} Product: {device.ProductString} VendorID: 0x{device.VendorId:X} ProductID: 0x{device.ProductId:X} Usage: {device.Usage} Page: {device.UsagePage} Interface: {device.InterfaceNumber}")
+                index +=1
+                self._devices.append(device)
+            self._all_devices.append(device)
 
-            syslog.info(f"HID device: Manufacturer: {hd.Manufacturer} Product: {hd.ProductString} VendorID: 0x{hd.VendorId:X} ProductID: 0x{hd.ProductId:X} Usage: {hd.Usage} Page: {hd.UsagePage} Interface: {hd.InterfaceNumber}")
-            
-                
-                
-        pass
+    def get_controller_count(self):
+        ''' returns the number of visible controllers (HID device type 4) '''
 
-        # vid = 0x046d	# Change it for your device
-        # pid = 0xc534	# Change it for your device
-
-        # with hid.Device(vid, pid) as h:
-        #     syslog.info(f'Device manufacturer: {h.manufacturer}')
-        #     syslog.info(f'Product: {h.product}')
-        #     syslog.info(f'Serial Number: {h.serial}')
+        # HID usage pages: https://www.usb.org/sites/default/files/hut1_6.pdf
+        return len(self._devices)

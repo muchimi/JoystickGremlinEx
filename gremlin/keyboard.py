@@ -152,11 +152,15 @@ class Key():
             self._key_id = (scan_code, is_extended)   
             self._scan_code = scan_code
             self._is_extended = is_extended
-            self._virtual_code = virtual_code            
+            self._virtual_code = virtual_code     
+
+        self._lookup_name = name
 
 
         if is_mouse:
             mouse_button = scan_code - 0x1000
+            if mouse_button > 0x100:
+                mouse_button -= 0x100 # convert double click
             self._mouse_button = mouse_button
 
 
@@ -196,7 +200,7 @@ class Key():
     
     @property
     def is_mouse(self):
-        return self._is_mouse
+        return self._is_mouse or MouseButton.is_lookup_valid(self._lookup_name)
 
 
     def _load(self, scan_code : int, is_extended : bool, virtual_code : int, is_mouse : bool):
@@ -327,10 +331,9 @@ class Key():
 
     @property
     def lookup_name(self):
-        if self._lookup_name is not None:
+        if self._lookup_name:
             return self._lookup_name
-        else:
-            return self._name    
+        return self._name
 
     @property
     def latched(self):
@@ -409,7 +412,9 @@ class Key():
         return self.name > other.name
     
     def __str__(self):
-        return self.name
+        if self.name:
+            return self.name
+        return ""
     
 
     
@@ -449,7 +454,11 @@ class Key():
         Modifiers will be a lower index than normal character which will be lower than special keys
            
         '''
-        lookup_name = self.lookup_name.lower()
+        
+        lookup_name = self.lookup_name
+        if not lookup_name:
+            return -1
+        
         if lookup_name in KeyMap._keyboard_modifiers:
             return self.modifier_order()
         
@@ -485,7 +494,8 @@ def send_key_down(key):
     is_local, is_remote = input_devices.remote_state.state
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
-        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
+        dbl_click = "_d_" in key.lookup_name
+        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, dbl_click = dbl_click)
         return
 
 
@@ -1024,7 +1034,60 @@ class KeyMap:
         lookup_names = [name for name in KeyMap._g_name_map.keys() if name.startswith("media")]
         keys = [KeyMap.find_by_name(name) for name in lookup_names]
         return keys
-                        
+
+    @staticmethod
+    def get_mouse_keys() -> list:
+        ''' gets the mouse keys '''
+        keys = []
+        for button in MouseButton:
+            lookup_name = MouseButton.to_lookup_string(button)
+            key = KeyMap.find_by_name(lookup_name)
+            keys.append(key)
+        return keys
+    
+    @staticmethod
+    def get_name(key : Key):
+        ''' gets a translated or short name for a key '''
+        short_name = key.name
+        if key.is_mouse:
+            short_name = MouseButton.to_short_name(key.lookup_name)
+        return short_name
+
+    @staticmethod
+    def get_description(key : Key) -> str:
+        ''' gets a description for the key '''
+        name = key.lookup_name
+        if name in KeyMap._key_description_lookup:
+            return KeyMap._key_description_lookup[name]
+        return key.name
+        
+
+
+    _key_description_lookup = {
+        "mouse_1": "Left Button (1)",
+        "mouse_2": "Right Button (2)",
+        "mouse_3": "Middle Button (3)",
+        "mouse_4": "Forward Button (4)",
+        "mouse_5": "Back Button (5)",
+        "wheel_up": "Mouse Wheel Up",
+        "wheel_down": "Mouse Wheel Down",
+        "wheel_left": "Mouse Wheel Left",
+        "wheel_right": "Mouse Wheel Right",
+        "mouse_d_1" : "Left Doubleclick (1)",
+        "mouse_d_2" : "Right Doubleclick (2)",
+        "mouse_d_3" : "Middle Doubleclick (3)",
+        "mediaprevtrack": "Previous Track",
+        "mediaplay" : "Play",
+        "medianexttrack": "Next Track",
+        "mediavolmute" : "Volume Mute Toggle",
+        "mediavolup" : "Volume Increase",
+        "mediavoldn" : "Volume Decrease",
+
+
+
+    }
+    
+        
 
     @staticmethod
     def unicode_to_key(character):
@@ -1329,6 +1392,20 @@ class KeyMap:
         "mediavoldn": "mdi.volume-minus",
         "mediaplay": "ei.play-alt",
         "mediapause": "ei.pause-alt",
+        "mouse_1": "mdi.mouse",
+        "mouse_2": "mdi.mouse",
+        "mouse_3": "mdi.mouse",
+        "mouse_d_1": "mdi.mouse",
+        "mouse_d_2": "mdi.mouse",
+        "mouse_d_3": "mdi.mouse",
+        "mouse_4": "mdi.mouse",
+        "mouse_5": "mdi.mouse",
+        "wheel_up": "mdi.mouse",
+        "wheel_down": "mdi.mouse",
+        "wheel_left": "mdi.mouse",
+        "wheel_right": "mdi.mouse",
+
+
     }
 
     _keyboard_special = list(_g_name_map.keys())
@@ -1336,8 +1413,11 @@ class KeyMap:
 
 # populate special mouse keys
 for mouse_button in MouseButton:
-    code = mouse_button.value
-    scan_code = 0x1000 + code
+    # double click adds 0x100 to the code
+    # mouse codes add 0x1000 to the code
+
+    code = mouse_button.value 
+    scan_code = 0x1000 + code # button code
     is_extended = False
     name = MouseButton.to_string(mouse_button)
     lookup_name = MouseButton.to_lookup_string(mouse_button)

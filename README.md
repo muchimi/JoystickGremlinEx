@@ -14,13 +14,22 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T11) (WIP)
+### (m76T11)
+- New: Keyboard/Mouse output gains support for Windows media keys and double-click
+	* Play/Stop, Pause, Previous Track, Next Track
+	* Volume mute toggle, Volume up, Volume down
+	* Double click of left, right and middle buttons
++ New: media keys and double click support for virtual keyboard.
+- API: Keyboard EX uses new pulse API for pulse and auto-repeat modes:
+	* pulse mode always releases, as do double clicks
+	* this is particularly useful for mouse wheel
+	* aborts on release regardless of intervals specified
 - Improved: handling of hat to button mode in VjoyRemap:
 	* added center button triggers
 	* reworked tracking logic which eliminates the "sticky" option
 	* hat state will be read on profile start
 - Fix: issue with VJOY keepalive thread
-- Fix: issue with DInput device count reporting partial count
+- Fix: issue with DInput device count reporting partial count on DInput API initialization.  DInput API initially reports a lower count as it's apparently not fully loaded yet). This is a likely cause of random missing devices.
 
 ### (m76T10)
 - Fix: Highlight axis mode auto-switch not selecting axis input in some situations (this may yet require some more work especially with noisy inputs).

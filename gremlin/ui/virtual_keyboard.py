@@ -666,8 +666,13 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         self._key_map = {} # map of (scancode, extended) to keys  (scancode, extended) -> key
         self._key_widget_map = {} # map of keys to widgets  key -> widget
-        self.keyboard_widget = self._create_keyboard_widget() # populate the two maps 
-        self.media_widget = self._create_media_widget()
+        self.keyboard_widget = self._get_keyboard_widget() # populate the two maps 
+        self.mouse_widget = self._get_mouse_widget()
+        self.media_widget = self._get_media_widget()
+        
+
+        #self.container_extra, _ = gremlin.ui.ui_common.getHContainer([self.mouse_widget, "||", self.media_widget])
+
         self._keys = None # return data
         self._display_shifted = False # true if displayed shifted
 
@@ -725,6 +730,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
 
         main_layout.addWidget(self.keyboard_widget)
+        main_layout.addWidget(self.mouse_widget)
         main_layout.addWidget(self.media_widget)
         main_layout.addWidget(gremlin.ui.ui_common.QHLine())
         main_layout.addWidget(self.button_widget)
@@ -763,6 +769,8 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                 if isinstance(item, Key):
                     # key object
                     lookup = item.index_tuple()
+                    if not lookup in self._key_map:
+                        continue
                     key_name = self._key_map[lookup]
                     widget = self._key_widget_map[key_name]
                     widget.selected = True
@@ -924,17 +932,20 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         for widget in self._key_widget_map.values():
             widget.selected = False
 
-    def _create_media_widget(self, parent = None):
-        # media keys
-        widgets= []
-
-        keys = gremlin.keyboard.KeyMap.get_media_keys()
-        key : gremlin.keyboard.Key
+    def _get_widget_bar(self, keys : list[Key], label_enabled = True):
+        key : Key
+        widgets = []
         for key in keys:
             widget = QKeyWidget()
             icon = gremlin.keyboard.KeyMap.icon(key)
-            widget.setIcon(icon)
-            widget.setToolTip(key.name)
+            name = gremlin.keyboard.KeyMap.get_name(key)
+            tooltip = gremlin.keyboard.KeyMap.get_description(key)
+            if icon:
+                widget.setIcon(icon)
+            if label_enabled:
+                widget.setText(name)
+            if tooltip:
+                widget.setToolTip(tooltip)
             widget.key = key
             widgets.append(widget)
 
@@ -943,22 +954,37 @@ class InputKeyboardDialog(QtWidgets.QDialog):
             self._key_map[(key.scan_code, key.is_extended)] = key.lookup_name
             self._key_widget_map[key.lookup_name] = widget
                         
-        media_bar, _ = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True)
-        return media_bar
+        container, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        return container            
 
+    def _get_media_widget(self, parent = None):
+        # media keys
+        keys = gremlin.keyboard.KeyMap.get_media_keys()
+        return self._get_widget_bar(keys, False)
 
-    def _create_keyboard_widget(self, parent = None):
+    def _get_mouse_widget(self, parent = None):
+        # mouse keys
+        keys = gremlin.keyboard.KeyMap.get_mouse_keys()
+        return self._get_widget_bar(keys)
+    
+
+        
+
+    def _get_keyboard_widget(self, parent = None):
         ''' creates a full keyboard widget for manual data entry '''
         
         grid_layout = QtWidgets.QGridLayout()
+        grid_layout.setContentsMargins(0,0,0,0)
         grid_layout.setSpacing(2)
         # grid_layout.setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetFixedSize)
         
         # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
 
         # first row = QUERTY object
-        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","wheel_up","wheel_down"]
+        #row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","wheel_up","wheel_down"]
+        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24"]
         row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"],"","","","wheel_left","wheel_right"]
+        row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"]]
         row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
         row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
         row_4 = [["CpLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
@@ -1034,41 +1060,55 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                     if key == "mouse_1":
                         key = "M1"
                         icon = "mdi.mouse"
-                        toolltip = "Left Mouse Button"
+                        tooltip = "Left Mouse Button"
                     elif key == "mouse_2":
                         key = "M2"
                         icon = "mdi.mouse"
-                        toolltip = "Middle Mouse Button"
+                        tooltip = "Middle Mouse Button"
                     elif key == "mouse_3":
                         key = "M3"
                         icon = "mdi.mouse"
-                        toolltip = "Right Mouse Button"
+                        tooltip = "Right Mouse Button"
+                    if key == "mouse_d_1":
+                        key = "MD1"
+                        icon = "mdi.mouse"
+                        tooltip = "Left Mouse Button Double Click"
+                    elif key == "mouse_d_2":
+                        key = "MD2"
+                        icon = "mdi.mouse"
+                        tooltip = "Middle Mouse Button Double Click"
+                    elif key == "mouse_d_3":
+                        key = "MD3"
+                        icon = "mdi.mouse"
+                        tooltip = "Right Mouse Button Double Click"                        
                     elif key == "mouse_4":
                         key = "M4"
                         icon = "mdi.mouse"
-                        toolltip = "Forward Mouse Button"
+                        tooltip = "Forward Mouse Button"
                     elif key == "mouse_5":
                         key = "M5"
                         icon = "mdi.mouse"
-                        toolltip = "Back Mouse Button"
+                        tooltip = "Back Mouse Button"
                     elif key == "wheel_up":
                         key = "MWU"
                         icon = "mdi.mouse"
-                        toolltip = "Wheel Up"
+                        tooltip = "Wheel Up"
                     elif key == "wheel_down":
                         key = "MWD"
                         icon = "mdi.mouse"
-                        toolltip = "Wheel Down"
+                        tooltip = "Wheel Down"
                     elif key == "wheel_left":
                         key = "MWL"
                         icon = "mdi.mouse"    
-                        toolltip = "Tilt Left"  
+                        tooltip = "Tilt Left"  
                     elif key == "wheel_right":
                         key = "MWR"
                         icon = "mdi.mouse"
-                        toolltip = "Tilt Right"   
+                        tooltip = "Tilt Right"   
                     
                     widget = QKeyWidget(key)
+                    if tooltip:
+                        widget.setToolTip(tooltip)
                     if icon:
                         widget.setIcon(load_icon(icon))
                         widget.setIconSize(QtCore.QSize(14,14))

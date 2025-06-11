@@ -58,52 +58,75 @@ class Icons():
     @staticmethod
     def listUpIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.caret-circle-up-light", qta_color)
+    @staticmethod
     def listDownIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.caret-circle-down-light", qta_color)
+    @staticmethod
     def listTopIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.caret-circle-double-up-light", qta_color)
+    @staticmethod
     def listBottomIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.caret-circle-double-down-light", qta_color)
+    @staticmethod
     def trashIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ei.trash", qta_color)
+    @staticmethod
     def keyboardIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.keyboard", qta_color)
+    @staticmethod
     def addIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("msc.diff-added", qta_color)
+    @staticmethod
     def removeIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6s.minus", qta_color)
+        return Icons._icon("fa6s.minus", qta_color
+    @staticmethod)
     def gearIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.gear", qta_color)
+    @staticmethod
     def findIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.magnifying-glass", qta_color)
+    @staticmethod
     def refreshIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ei.refresh", qta_color)
+    @staticmethod
     def copyIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6.copy", qta_color)
+    @staticmethod
     def pasteIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6.paste", qta_color)
+    @staticmethod
     def configureIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.gear", qta_color)
+    @staticmethod
     def editIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("mdi6.rename-box-outline", qta_color)
+    @staticmethod
     def horizontalSeparatorIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("mdi.power-on", qta_color)
-        
+    @staticmethod
     def calculateIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.math-operations", qta_color)
+    @staticmethod
     def axisIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("mdi.axis", qta_color)
+    @staticmethod
     def buttonIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ri.radio-button-line", qta_color)
+    @staticmethod
     def hatIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa5s.arrows-alt", qta_color)
+    @staticmethod
     def validIcon(qta_color = "#2abd38") -> QtGui.QIcon:
         return Icons._icon("fa5.check-circle", qta_color = qta_color)
+    @staticmethod
     def invalidIcon(qta_color = "#b35f1b") -> QtGui.QIcon:
         return Icons._icon("ei.remove-circle", qta_color = qta_color)
+    @staticmethod
     def recordIcon(qta_color = "#c7450e"):
         return Icons._icon("mdi.checkbox-blank-circle", qta_color = qta_color)
-    
+    @staticmethod
+    def listenIcon(qta_color = "#34b7eb"):
+        return Icons._icon("fa6s.microphone", qta_color = qta_color)
     def _icon(value : str, qta_color = None):
         if qta_color and isinstance(qta_color, str):
             qta_color = QtGui.QColor(qta_color)
@@ -270,7 +293,9 @@ class Color():
     @staticmethod
     def disconnectedColor(): # color for the disconnected device 
         return "#db6512"
-
+    @staticmethod
+    def listenColor(): # color used for listen type buttons
+        return "#34b7eb"
     
 
     @staticmethod
@@ -599,6 +624,10 @@ class Buttons():
     @staticmethod
     def getGrabWidget(label = None, tooltip = "Grab Value", callback = None, no_keyboard = True, data = None, width = 24):
         return Buttons._template(label, Icons.recordIcon(), tooltip, callback, no_keyboard, data, width = width)
+    
+    @staticmethod
+    def getListenWidget(label = "Listen", tooltip = "Listen for input", callback = None, no_keyboard = True, data = None, width = None):
+        return Buttons._template(label, Icons.listenIcon(), tooltip, callback, no_keyboard, data, width = width)
         
 
     @staticmethod
@@ -7245,7 +7274,7 @@ class QHorizontalSeparator(QtWidgets.QLabel):
 def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, alignment = None, set_alignment = True, min_height = None):
     ''' gets a qt H container widget 
     
-    :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically
+    :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically, use "|" for separator, "||" to insert a stretch
     :param label: label to add to the container (appears first if provided)
     :param parent: parent widget if any
     :param left_stretch: adds the stretch at the start of the container to right align it on the row
@@ -7273,6 +7302,9 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
                     if item == "|": 
                         # separator
                         item = QHorizontalSeparator()
+                    elif item == "||":
+                        layout.addStretch(1)
+                        continue
                     else:
                         item = QtWidgets.QLabel(item)
                 if alignment:
