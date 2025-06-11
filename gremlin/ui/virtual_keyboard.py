@@ -32,6 +32,8 @@ class QKeyWidget(QtWidgets.QPushButton):
     
     key_clicked = QtCore.Signal()
 
+
+
     ''' custom key label '''
     def __init__(self, text = None, parent = None) -> None:
         super().__init__(text= text, parent = parent)
@@ -40,6 +42,21 @@ class QKeyWidget(QtWidgets.QPushButton):
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
         #self.clicked.connect(self._clicked)
 
+
+
+        
+
+        # border-style: outset;
+        self._key_size = 1
+        self.normal_key = None # what to display normally
+        self.shifted_key = None # what to display when shifted
+        self._auto_size = False
+
+        self.installEventFilter(self)
+        self._update_style()
+    
+
+    def _update_style(self):
         Color = gremlin.ui.ui_common.Color
         foreground_color = Color.keyForegroundColor()
         background_color = Color.keyBackgroundColor()
@@ -48,26 +65,33 @@ class QKeyWidget(QtWidgets.QPushButton):
         hover_border = Color.keyHoverBorderColor()
         hover_background_color = Color.keyHoverBackgroundColor()
         hover_selected_background_color = Color.keyHoverSelectedBackgroundColor()
-        self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-        self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-        self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-        self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+        if self._auto_size:
+            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-        # border-style: outset;
-        self._key_size = 1
+            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"    
+        else:
+            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-        self.setStyleSheet(self._default_style)
-        
-        self.normal_key = None # what to display normally
-        self.shifted_key = None # what to display when shifted
-        self.installEventFilter(self)
-        
+            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-    # @QtCore.Slot()
-    # def _clicked(self):
-    #     syslog.info("clicked")
-    #     self.key_clicked.emit()
+        if self._key_size == 1:
+            default_style = self._default_style
+            selected_style = self._selected_style
+        else:
+            default_style = self._x2_default_style
+            selected_style = self._x2_selected_style
+
+        if self._selected:
+            self.setStyleSheet(selected_style)
+        else:
+            self.setStyleSheet(default_style)
+
+
 
     @property
     def key(self) -> Key:
@@ -80,12 +104,16 @@ class QKeyWidget(QtWidgets.QPushButton):
     @keySize.setter
     def keySize(self, value : int):
         self._key_size = value
-        match value:
-            case 1:
-                self.setStyleSheet(self._default_style)
-            case 2:
-                self.setStyleSheet(self._x2_default_style)
+        self._update_style()
     
+    @property
+    def autoSize(self) -> bool:
+        return self._auto_size
+    @autoSize.setter
+    def autoSize(self, value : bool):
+        if self._auto_size != value:
+            self._auto_size = value
+            self._update_style()
     
     @key.setter
     def key(self, value : Key):
@@ -163,10 +191,14 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self.installEventFilter(self)  # capture keys so the window doesn't go nuts when we hit special keys
 
         main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(0,0,0,0)
+
+        keyboard_layout = QtWidgets.QVBoxLayout()
+        keyboard_layout.setContentsMargins(0,0,0,0)
         grid_layout = QtWidgets.QGridLayout()
         grid_layout.setSpacing(2)
-        main_layout.addLayout(grid_layout)
+        keyboard_layout.addLayout(grid_layout)
+
+        main_layout.addLayout(keyboard_layout)
 
         self.config = gremlin.config.Configuration()
 
@@ -174,7 +206,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self.repeater_container_widget = widget
         self.repeater_container_layout= layout
         
-        main_layout.addWidget(self.repeater_container_widget)
+        keyboard_layout.addWidget(self.repeater_container_widget)
         self._show_repeater = self.config.keyboard_repeater_show
         self._repeater_lines = 30 # number of lines displayed in the repeater
         self._repeater_list = []
@@ -218,6 +250,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         row_4 = [["CpsLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
         row_5 = [["LShift","leftshift"],"Z","X","C","V","B","N","M",",",".","/",["RShift","rightshift"],"","","","","up","","",["1","np1"],["2","np2"],["3","np3"],["Enter","npenter",1,2]]
         row_6 = [["LCtrl","leftcontrol"],["LWin","leftwin"],["LAlt","leftalt"],["Spacebar","space",6],["RAlt","rightalt2"],["RWin","rightwin"],["RCtrl","rightcontrol"],"","","","left","down","right","",["0/Ins","np0",2],["./Del","npdelete"]]
+        
 
         shifted_list = [
             ("`","~"),("1","!"),("2","@"),("3","#"),("4","$"),("5","%"),("6","^"),
@@ -290,42 +323,45 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     icon = None
                     # handle special key names
                     tooltip = ""
-                    if key == "mouse_1":
-                        key = "M1"
-                        icon = "mdi.mouse"
-                        toolltip = "Left Mouse Button"
-                    elif key == "mouse_2":
-                        key = "M2"
-                        icon = "mdi.mouse"
-                        toolltip = "Middle Mouse Button"
-                    elif key == "mouse_3":
-                        key = "M3"
-                        icon = "mdi.mouse"
-                        toolltip = "Right Mouse Button"
-                    elif key == "mouse_4":
-                        key = "M4"
-                        icon = "mdi.mouse"
-                        toolltip = "Forward Mouse Button"
-                    elif key == "mouse_5":
-                        key = "M5"
-                        icon = "mdi.mouse"
-                        toolltip = "Back Mouse Button"
-                    elif key == "wheel_up":
-                        key = "MWU"
-                        icon = "mdi.mouse"
-                        toolltip = "Wheel Up"
-                    elif key == "wheel_down":
-                        key = "MWD"
-                        icon = "mdi.mouse"
-                        toolltip = "Wheel Down"
-                    elif key == "wheel_left":
-                        key = "MWL"
-                        icon = "mdi.mouse"    
-                        toolltip = "Tilt Left"  
-                    elif key == "wheel_right":
-                        key = "MWR"
-                        icon = "mdi.mouse"
-                        toolltip = "Tilt Right"   
+                    match key:
+                        case  "mouse_1":
+                            key = "M1"
+                            icon = "mdi.mouse"
+                            toolltip = "Left Mouse Button"
+                        case "mouse_2":
+                            key = "M2"
+                            icon = "mdi.mouse"
+                            toolltip = "Middle Mouse Button"
+                        case "mouse_3":
+                            key = "M3"
+                            icon = "mdi.mouse"
+                            toolltip = "Right Mouse Button"
+                        case "mouse_4":
+                            key = "M4"
+                            icon = "mdi.mouse"
+                            toolltip = "Forward Mouse Button"
+                        case "mouse_5":
+                            key = "M5"
+                            icon = "mdi.mouse"
+                            toolltip = "Back Mouse Button"
+                        case "wheel_up":
+                            key = "MWU"
+                            icon = "mdi.mouse"
+                            toolltip = "Wheel Up"
+                        case "wheel_down":
+                            key = "MWD"
+                            icon = "mdi.mouse"
+                            toolltip = "Wheel Down"
+                        case "wheel_left":
+                            key = "MWL"
+                            icon = "mdi.mouse"    
+                            toolltip = "Tilt Left"  
+                        case "wheel_right":
+                            key = "MWR"
+                            icon = "mdi.mouse"
+                            toolltip = "Tilt Right"
+                      
+
                     
                     widget = QKeyWidget(key)
                     if icon:
@@ -603,7 +639,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
 
 
-class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
+class InputKeyboardDialog(QtWidgets.QDialog):
     ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
     
     closed = QtCore.Signal() # sent when the dialog closes
@@ -614,7 +650,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         :param select_single - if set, only can select a single key
         :param allow_modifiers - if set - modifier keys along with regular keys are allowed
         '''
-        super().__init__(self.__class__.__name__,parent = parent)
+        super().__init__(parent = parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Keyboard & Mouse Input Mapper")
@@ -631,6 +667,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         self._key_map = {} # map of (scancode, extended) to keys  (scancode, extended) -> key
         self._key_widget_map = {} # map of keys to widgets  key -> widget
         self.keyboard_widget = self._create_keyboard_widget() # populate the two maps 
+        self.media_widget = self._create_media_widget()
         self._keys = None # return data
         self._display_shifted = False # true if displayed shifted
 
@@ -688,6 +725,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
         main_layout.addWidget(self.keyboard_widget)
+        main_layout.addWidget(self.media_widget)
         main_layout.addWidget(gremlin.ui.ui_common.QHLine())
         main_layout.addWidget(self.button_widget)
 
@@ -721,18 +759,11 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                 widget.selected = False
 
             for item in sequence:
-                # if item in self._key_map.keys():
-                #     key_name = self._key_map[item]
-                #     widget = self._key_widget_map[key_name]
-                #     widget.selected = True
+                
                 if isinstance(item, Key):
                     # key object
                     lookup = item.index_tuple()
-                    # if not lookup in self._key_map:
-                    #     lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
-                    # if lookup in self._key_map:
                     key_name = self._key_map[lookup]
-                    #key_name = self._key_map[lookup]
                     widget = self._key_widget_map[key_name]
                     widget.selected = True
                     # else:
@@ -862,15 +893,11 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
     def _ok_button_cb(self):
         ''' ok button pressed '''
         
-        # keys = [Key(scan_code = widget.key.scan_code, is_extended = widget.key.is_extended, is_mouse=widget.key.is_mouse, virtual_code=widget.key.virtual_code) for widget in self._key_widget_map.values() if widget.selected]
+        
         selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
         keys = []
         for widget in selected_widgets:
             key = widget.key.duplicate()
-            # if widget.key.virtual_code > 0:
-            #     key = gremlin.keyboard.KeyMap.find_virtual(widget.key.virtual_code)
-            # else:
-            #     key = gremlin.keyboard.KeyMap.find(widget.key.scan_code, widget.key.is_extended)
             keys.append(key)
             # print (f"returning key: {key} ")
 
@@ -896,6 +923,29 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' clear button pressed - clear all entries  '''
         for widget in self._key_widget_map.values():
             widget.selected = False
+
+    def _create_media_widget(self, parent = None):
+        # media keys
+        widgets= []
+
+        keys = gremlin.keyboard.KeyMap.get_media_keys()
+        key : gremlin.keyboard.Key
+        for key in keys:
+            widget = QKeyWidget()
+            icon = gremlin.keyboard.KeyMap.icon(key)
+            widget.setIcon(icon)
+            widget.setToolTip(key.name)
+            widget.key = key
+            widgets.append(widget)
+
+            widget.clicked.connect(self._widget_clicked_cb)
+            widget.hover.connect(self._key_hover_cb)
+            self._key_map[(key.scan_code, key.is_extended)] = key.lookup_name
+            self._key_widget_map[key.lookup_name] = widget
+                        
+        media_bar, _ = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True)
+        return media_bar
+
 
     def _create_keyboard_widget(self, parent = None):
         ''' creates a full keyboard widget for manual data entry '''

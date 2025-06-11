@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T11) (WIP)
+- Improved: handling of hat to button mode in VjoyRemap:
+	* added center button triggers
+	* reworked tracking logic which eliminates the "sticky" option
+	* hat state will be read on profile start
+- Fix: issue with VJOY keepalive thread
+- Fix: issue with DInput device count reporting partial count
 
 ### (m76T10)
 - Fix: Highlight axis mode auto-switch not selecting axis input in some situations (this may yet require some more work especially with noisy inputs).

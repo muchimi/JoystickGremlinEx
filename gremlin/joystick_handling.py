@@ -101,8 +101,6 @@ class VJoyProxy:
             device.invalidate()
         VJoyProxy.vjoy_devices = {}
 
-        
-
       
 def joystick_devices() -> list[DeviceSummary]:
     """Returns the list of connected joystick like devices 
@@ -565,7 +563,10 @@ def joystick_devices_initialization():
     syslog.info("INIT: Initializing joystick devices")
 
     dinput.DILL.init()
+    # give it some time to load data
+    time.sleep(0.25)
     device_count = dinput.DILL.get_device_count()
+    
     if device_count == 0:
         # no hardware input detected
         syslog.info("INIT: no DirectInput devices detected - waiting for data")

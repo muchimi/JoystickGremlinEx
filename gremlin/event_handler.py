@@ -566,6 +566,8 @@ class EventListener(QtCore.QObject):
 
 		self._vjoy_callbacks = []
 
+		self._hat_state = {} # list of map positions (device_id, input_id), position_tuple, if blank - not set
+
 		self.shutdown.connect(self._shutdown_handler)
 
 	def registerVjoyCallback(self, callback):
@@ -603,6 +605,41 @@ class EventListener(QtCore.QObject):
 
 		return self._calibrationManager
 	
+	def _fire_event_list(self, event_list):
+		''' fires a series of events '''
+		for event in event_list:
+			self.joystick_event.emit(event)
+	
+	def _load_hat_states(self):
+		''' loads current hats '''
+		from gremlin.util import dill_hat_lookup
+		self._hat_state = {}
+		device_list = [dev for dev in joystick_handling.joystick_devices() if dev.hat_count]
+		event_list = []
+		for device in device_list:
+			for input_id in range(1, device.hat_count+1):
+				key = (device.device_id, input_id)
+				value = joystick_handling.get_hat(device.device_guid, input_id)
+				value = dill_hat_lookup[value]
+				self._hat_state[key] = value
+	
+				event = Event(
+					event_type= InputType.JoystickHat,
+					device_guid= device.device_guid,
+					identifier = input_id,
+					is_pressed = True,
+					is_virtual = device.is_virtual,
+					value = value,
+					raw_value= value
+				)
+				event_list.append(event)
+
+
+		gremlin.util.singleShot(lambda: self._fire_event_list(event_list))
+
+
+
+	
 	def _profile_started_cb(self):
 		''' occurs on profile start '''
 		device_guid = gremlin.shared_state.mode_tab_guid
@@ -622,6 +659,9 @@ class EventListener(QtCore.QObject):
 						is_pressed=False,
 						mode = new_mode)
 		
+
+		# read the starting hat states
+		self._load_hat_states()
 		
 		# fire mode change for mode enter (press + release)
 		eh = EventHandler()
@@ -921,27 +961,68 @@ class EventListener(QtCore.QObject):
 			)
 			
 			if not gremlin.shared_state.is_running:
+				# wrap event so it fires on UI thread
 				gremlin.util.singleShot(lambda : self.button_state_change.emit(event))
+				#self.button_state_change.emit(event)
 
+			# wrap event so it fires on UI thread
 			gremlin.util.singleShot(lambda: self.joystick_event.emit(event))
+			#self.joystick_event.emit(event)
 			
 		elif event.input_type == dinput.InputType.Hat:
+
+			# hats trigger two events, one for the changed from the original position (release)
+			# and the other for the move to the new position (press)
+
+			device_id = str(event.device_guid)
+			input_id = event.input_index
 			value = dill_hat_lookup[event.value]
-			event = Event(
-				event_type= InputType.JoystickHat,
-				device_guid=event.device_guid,
-				identifier=event.input_index,
-				is_pressed = value != (0,0),
-				is_virtual = is_virtual,
-				value = value,
-				raw_value= value
-			)
+
+			key = (device_id, input_id)
+
+			event_list = []
+
+			if not key in self._hat_state:
+				self._hat_state[key] = value
+
+			current = self._hat_state[key]
+			if current != value:
+
+				# update the new state
+				self._hat_state[key] = value
+
+				# release the old value
+				new_event = Event(
+					event_type= InputType.JoystickHat,
+					device_guid = event.device_guid,
+					identifier = event.input_index,
+					is_pressed = False,
+					is_virtual = is_virtual,
+					value = current,
+					raw_value= current
+				)
+
+				event_list.append(new_event)
+
+				# press the new value
+				new_event = Event(
+					event_type= InputType.JoystickHat,
+					device_guid = event.device_guid,
+					identifier = event.input_index,
+					is_pressed = True,
+					is_virtual = is_virtual,
+					value = value ,
+					raw_value= value
+				)
+
+				event_list.append(new_event)
+				
+				if not gremlin.shared_state.is_running:
+					gremlin.util.singleShot(lambda : self.button_state_change.emit(new_event))
+
+				
+				gremlin.util.singleShot(lambda: self._fire_event_list(event_list))
 			
-			if not gremlin.shared_state.is_running:
-				gremlin.util.singleShot(lambda : self.button_state_change.emit(event))
-
-			gremlin.util.singleShot(lambda: self.joystick_event.emit(event))
-
 
 	def _joystick_device_handler(self, data, action):
 		"""Callback for device change events.
@@ -1234,11 +1315,15 @@ class EventHandler(QtCore.QObject):
 	@QtCore.Slot()
 	def _profile_start(self):
 		self._update_mode_change(gremlin.shared_state.runtime_mode)
+		el = gremlin.event_handler.EventListener()
+		el.joystick_event.connect(self.execute_event)
 
 	@QtCore.Slot()
 	def _profile_stop(self):
 		self._last_tts_notify = None
 		self._last_tts_notify_time = None
+		el = gremlin.event_handler.EventListener()
+		el.joystick_event.disconnect(self.execute_event)
 
 	def registerModeValidator(self, callback):
 		assert callable(callback)

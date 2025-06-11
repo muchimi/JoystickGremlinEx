@@ -896,6 +896,18 @@ class KeyMap:
         return None
     
     @staticmethod
+    def icon(key : Key):
+        ''' gets an icon for the given key if the key has one'''
+        lookup_name = key.lookup_name
+        if lookup_name in KeyMap._g_icon_map:
+            data = KeyMap._g_icon_map[lookup_name]
+            if isinstance(data, str):
+                return gremlin.util.load_icon(data)
+            icon_name, icon_color = data
+            return gremlin.util.load_icon(icon_name, icon_color)
+        return None
+    
+    @staticmethod
     def find_virtual(virtual_code):
         if virtual_code in KeyMap._g_virtual_code_to_key.keys():
             return KeyMap._g_virtual_code_to_key[virtual_code].duplicate()
@@ -908,7 +920,7 @@ class KeyMap:
         if name in KeyMap._key_map:
             return KeyMap._key_map[name].duplicate()
         return None
-    
+        
     @staticmethod
     def from_event(event):
         ''' returns a key based on a keyboard event '''
@@ -1006,6 +1018,13 @@ class KeyMap:
             return Key(name, scan_code, is_extended, virtual_code)
         return None
         
+    @staticmethod
+    def get_media_keys() -> list:
+        ''' gets the media keys '''
+        lookup_names = [name for name in KeyMap._g_name_map.keys() if name.startswith("media")]
+        keys = [KeyMap.find_by_name(name) for name in lookup_names]
+        return keys
+                        
 
     @staticmethod
     def unicode_to_key(character):
@@ -1285,7 +1304,31 @@ class KeyMap:
         "rightalt2": ("Right Alt", 0x38, True, win32con.VK_RMENU),
         "apps": ("Apps", 0x5d, True, win32con.VK_APPS),
         "enter": ("Enter", 0x1c, False, win32con.VK_RETURN),
-        "esc": ("Esc", 0x01, False, win32con.VK_ESCAPE)
+        "esc": ("Esc", 0x01, False, win32con.VK_ESCAPE),
+
+
+        "mediaprevtrack": ("Prev Track", 0x23, True, win32con.VK_MEDIA_PREV_TRACK),
+        "mediaplay": ("Play", 0x22, True, win32con.VK_PLAY),
+        "mediapause": ("Pause", 0x22, True, win32con.VK_MEDIA_PLAY_PAUSE),
+        "medianexttrack": ("Next Track", 0x21, True, win32con.VK_MEDIA_NEXT_TRACK),
+        
+        "mediavolmute": ("Mute", 0x20, True, win32con.VK_VOLUME_MUTE),
+        "mediavolup": ("Volume Up", 0x30, True, win32con.VK_VOLUME_UP),
+        "mediavoldn": ("Volume Down", 0x1e, True, win32con.VK_VOLUME_DOWN),
+        
+
+    }
+
+    # icons to use for a key, (lookup_name, (icon, icon_color))
+    _g_icon_map = {
+
+        "medianexttrack": "mdi.skip-next",
+        "mediaprevtrack": "mdi.skip-previous",
+        "mediavolmute": "mdi.volume-mute",
+        "mediavolup": "mdi.volume-plus",
+        "mediavoldn": "mdi.volume-minus",
+        "mediaplay": "ei.play-alt",
+        "mediapause": "ei.pause-alt",
     }
 
     _keyboard_special = list(_g_name_map.keys())

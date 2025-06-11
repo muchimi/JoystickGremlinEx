@@ -614,10 +614,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.hat_unmap_widget.clicked.connect(self._clear_map)
         self.hat_map_widget.clicked.connect(self._auto_map)
 
-        self.hat_stick_widget = QtWidgets.QCheckBox("Sticky mode")
-        self.hat_stick_widget.setToolTip("When enabled, all pressed hat positions will stick until the hat returns to the center position")
-        self.hat_stick_widget.setChecked(self.action_data.hat_sticky)
-        self.hat_stick_widget.clicked.connect(self._hat_sticky_changed)
+        # self.hat_stick_widget = QtWidgets.QCheckBox("Sticky mode")
+        # self.hat_stick_widget.setToolTip("When enabled, all pressed hat positions will stick until the hat returns to the center position")
+        # self.hat_stick_widget.setChecked(self.action_data.hat_sticky)
+        # self.hat_stick_widget.clicked.connect(self._hat_sticky_changed)
 
 
         self.container_hat_options_layout.addWidget(self.hat_hold_widget)
@@ -627,7 +627,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_hat_options_layout.addWidget(self.hat_noop_widget)
         self.container_hat_options_layout.addWidget(self.hat_unmap_widget)
         self.container_hat_options_layout.addWidget(self.hat_map_widget)
-        self.container_hat_options_layout.addWidget(self.hat_stick_widget)
+        #self.container_hat_options_layout.addWidget(self.hat_stick_widget)
         self.container_hat_options_layout.addStretch()
 
 
@@ -3821,17 +3821,18 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             position = action_value.current
 
             pressed_positions = list(self.pressed_hat_buttons.keys())
-            is_pressed = position != (0,0)
+            is_pressed = event.is_pressed # position != (0,0)
+            if not is_pressed:
+                pass
             mode = self.action_data.hat_mode_map[position]
 
             input_id = self.action_data.hat_map[position]
-            sticky = self.action_data.hat_sticky
+            device_id =self.vjoy_device_id
+            # sticky = self.action_data.hat_sticky
             if input_id > 0:
 
                 match mode:
                     case ButtonOutputMode.Pulse:
-                        input_id = self.vjoy_input_id
-                        device_id = self.vjoy_device_id
                         if is_pressed:
                             if verbose: syslog.info(f"VJOY: trigger start pulse vjoy {device_id} hat {input_id}")
                             repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
@@ -3844,19 +3845,18 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             # threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
                     case ButtonOutputMode.Hold:
                         if is_pressed:
-                            if not sticky:
-                                # release the prior buttons
-                                for pressed_position in pressed_positions:
-                                    if position == pressed_position:
-                                        continue
-                                    release_input_id = self.pressed_hat_buttons[pressed_position]
-                                    if release_input_id > 0:
-                                        if is_local:
-                                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(release_input_id).is_pressed = False
-                                        if is_remote:
-                                            self.remote_client.send_button(self.vjoy_device_id, release_input_id, False)
+                            # release the prior buttons
+                            for pressed_position in pressed_positions:
+                                if position == pressed_position:
+                                    continue
+                                release_input_id = self.pressed_hat_buttons[pressed_position]
+                                if release_input_id > 0:
+                                    if is_local:
+                                        joystick_handling.VJoyProxy()[device_id].button(release_input_id).is_pressed = False
+                                    if is_remote:
+                                        self.remote_client.send_button(device_id, release_input_id, False)
 
-                                    del self.pressed_hat_buttons[pressed_position]
+                                del self.pressed_hat_buttons[pressed_position]
                     case ButtonOutputMode.Press:
                         pass # no auto-release
                     case ButtonOutputMode.Release:
@@ -3869,9 +3869,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if is_pressed:
                     self.pressed_hat_buttons[position] = input_id
                 if is_local:
-                    joystick_handling.VJoyProxy()[self.vjoy_device_id].button(input_id).is_pressed = is_pressed
+                    joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = is_pressed
                 if is_remote:
-                    self.remote_client.send_button(self.vjoy_device_id, input_id, is_pressed)
+                    self.remote_client.send_button(device_id, input_id, is_pressed)
 
 
             else:
@@ -4157,14 +4157,18 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         # default hat map table setup and default mapping for new hats
         self.hat_map = {} # map of button id keyed by hat position tuple
         self.hat_positions = list(vjoy.vjoy.Hat.to_continuous_direction.keys())
-        self.hat_positions.remove((0,0)) # remove center position
+        #self.hat_positions.remove((0,0)) # remove center position
         self.hat_mode_map = {} # bool table keyed by hat position
         self.hat_sticky = False # determines if hats are sticky or not - sticky means all positions are active until all returns to the center position
         button_id = 1
         for position in self.hat_positions:
             self.hat_map[position] = button_id
+            if position == (0,0):
+                self.hat_mode_map[position] = ButtonOutputMode.NoOp # center do nothing
+            else:
+                
+                self.hat_mode_map[position] = ButtonOutputMode.Hold # hold by default
             button_id += 1
-            self.hat_mode_map[position] = ButtonOutputMode.Hold # hold by default
 
         self.vjoy_axis_id = 1
         self.vjoy_button_id = 1
@@ -4850,25 +4854,24 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 for node_hat in hat_nodes:
                     name = safe_read(node_hat,"name",str)
                     position = vjoy.vjoy.Hat.name_to_direction[name]
-                    if position != (0,0):
-                        button_id = safe_read(node_hat,"input",int,1)
-                        self.hat_map[position] = button_id
-                        mode = safe_read(node_hat,"mode", str, "")
-                        match mode:
-                            case "hold":
-                                mode = ButtonOutputMode.Hold
-                            case "pulse":
-                                mode = ButtonOutputMode.Pulse
-                            case "press":
-                                mode = ButtonOutputMode.Press
-                            case "release":
-                                mode = ButtonOutputMode.Release
-                            case _:
-                                # legacy mode
-                                is_pulse = safe_read(node_hat,"pulse",bool, False)
-                                mode = ButtonOutputMode.Pulse if is_pulse else ButtonOutputMode.Hold
+                    button_id = safe_read(node_hat,"input",int,1)
+                    self.hat_map[position] = button_id
+                    mode = safe_read(node_hat,"mode", str, "")
+                    match mode.casefold():
+                        case "hold":
+                            mode = ButtonOutputMode.Hold
+                        case "pulse":
+                            mode = ButtonOutputMode.Pulse
+                        case "press":
+                            mode = ButtonOutputMode.Press
+                        case "release":
+                            mode = ButtonOutputMode.Release
+                        case _:
+                            # legacy mode
+                            is_pulse = safe_read(node_hat,"pulse",bool, False)
+                            mode = ButtonOutputMode.Pulse if is_pulse else ButtonOutputMode.Hold
 
-                        self.hat_mode_map[position] = mode
+                    self.hat_mode_map[position] = mode
 
                 if "hat_sticky" in node.attrib:
                     self.hat_sticky = safe_read(node,"hat_sticky",bool, False)

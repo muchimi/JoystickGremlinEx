@@ -604,8 +604,11 @@ class VJoy:
         # Timestamp of the last time the device was used
         self._last_active = time.time()
         self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
+        self._keep_alive_timer.daemon = True
         self._keep_alive_timer.setName(f"VJOY{self.vjoy_id} keepalive")
         self._keep_alive_timer.start()
+
+        
 
         # Reset all controls
         self.reset()
@@ -627,29 +630,34 @@ class VJoy:
         """
         if self.vjoy_id is None:
             return
-
+        
         if self.pid != VJoyInterface.GetOwnerPid(self.vjoy_id):
-            if not VJoyInterface.AcquireVJD(self.vjoy_id):
-                syslog.error(
-                    f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
-                raise VJoyError(
-                    f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}"
-                )
-            self._acquired = True # indicate we own this
+            retry_count = 5
+            while retry_count:
+                if VJoyInterface.AcquireVJD(self.vjoy_id):
+                    self._acquired = True # indicate we own this
+                    return
+                retry_count -= 1
+                time.sleep(0.01)
+                    
+            syslog.error(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
+            raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
+            
             
     def ensure_released(self):
         ''' ensures the VJOY device is not acquired '''
         vjoy_id = self.vjoy_id
+        if vjoy_id == 1:
+            pass
+        if self._keep_alive_timer:
+            self._keep_alive_timer.cancel()
+            self._keep_alive_timer.join()
+            self._keep_alive_timer = None
         if VJoyInterface.vJoyEnabled():
-            if self._keep_alive_timer:
-                self._keep_alive_timer.cancel()
-                self._keep_alive_timer = None
             VJoyInterface.RelinquishVJD(vjoy_id)
             self.reset()
             self._acquired = False
             
-
-
 
     @property
     def axis_count(self):
@@ -847,6 +855,7 @@ class VJoy:
         if self._last_active + VJoy.keep_alive_timeout < time.time():
             self.reset()
         self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
+        self._keep_alive_timer.daemon = True
         self._keep_alive_timer.setName(f"VJOY{self.vjoy_id} keepalive")
         self._keep_alive_timer.start()
 
