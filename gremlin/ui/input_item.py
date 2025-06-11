@@ -707,7 +707,10 @@ class InputItemListView(ui_common.AbstractView):
 
     def select_input(self, input_type, identifier, emit = True, force_update = False):
         ''' selects an entry based on input type and ID'''
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        if verbose: syslog.info(f"InputItem: select type: {input_type.name} input: {identifier}")
         if self._deleted:
+            if verbose: syslog.info("\tdeleted")
             return
         for index in range(self.model.rows()):
             data = self.model.data(index)
@@ -807,7 +810,11 @@ class InputItemListView(ui_common.AbstractView):
             emitted when the item is being selected
         """
 
+
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        if verbose: syslog.info(f"InputItem: select input: {index}")
         if not Shiboken.isValid(self.scroll_area):
+            if verbose: syslog.warning("\tshiboken invalid")
             return
 
         
@@ -816,6 +823,7 @@ class InputItemListView(ui_common.AbstractView):
             force_update = True
 
         if not force_update and self._current_index == index:
+            if verbose: syslog.warning("\tnothing to do")
             return # nothing to do if the current index is the same as the new index
         
         # If the index is actually an event we have to correctly translate the
@@ -855,6 +863,9 @@ class InputItemListView(ui_common.AbstractView):
             # select it
             with (QtCore.QSignalBlocker(widget)):
                 widget.selected = True
+                if verbose: 
+                    data = self.model.data(index)
+                    syslog.warning(f"\tselected: {data.debug_display}")
 
         if emit and index != -1:
             self.item_selected.emit(index, force_update) # load the mapped content for the given index

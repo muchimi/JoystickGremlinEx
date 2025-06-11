@@ -2775,6 +2775,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             # index of current device tab
             index = self.ui.devices.currentIndex()
             current_device_guid = gremlin.shared_state.current_tab_device_guid
+            current_input_type, current_input_id = self._get_last_input(current_device_guid)
+
+            if verbose:
+                syslog.info(f"Select input: current input: {current_device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(current_input_type)} input ID: {current_input_id} current mode: {gremlin.shared_state.current_mode}")
 
             # make the content visible
             self.selectTabWidget(device_guid)
@@ -2790,12 +2794,12 @@ class GremlinUi(QtWidgets.QMainWindow):
                 input_id = input_item.input_id
 
             if verbose:
-                syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}  current mode: {gremlin.shared_state.current_mode}")
+                syslog.info(f"Select input: new input: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}  current mode: {gremlin.shared_state.current_mode}")
 
 
             # guid of current device tab
 
-            if not current_device_guid or current_device_guid.casefold() != device_guid.casefold():
+            if not current_device_guid or not gremlin.util.compare_guid(current_device_guid, device_guid):
                 # change tabs
                 if verbose: syslog.info("Tab change requested")
                 index = self._find_tab_index(device_guid)
@@ -2826,20 +2830,19 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
             if input_id is not None: 
-                # within the inputs = select it
-                #syslog.info("ID change started")
+                # select a particular input within a tab
                 widget = self.getRegisteredWidget(device_guid)
                 if widget:
                     self.selectRegisteredWidget(device_guid)
                     if verbose: syslog.info(f"Select input: select widget {input_type} {input_id}")
                     if tab_changed or not hasattr(widget, "input_item_list_view"):
                         widget.refresh()
-                    else:
-                        
-                        widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update or tab_changed)
-                        index = widget.input_item_list_view.current_index
-                        widget.input_item_list_view.redraw_index(index)
-                        widget.input_item_list_view.select_item(index, True)
+                    if not force_update:
+                        force_update = current_input_id != input_id or current_input_type != current_input_id or gremlin.util.compare_guid(current_device_guid, device_guid)
+                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update)
+                    index = widget.input_item_list_view.current_index
+                    widget.input_item_list_view.redraw_index(index)
+                    widget.input_item_list_view.select_item(index, True)
 
 
                     # should have contents now

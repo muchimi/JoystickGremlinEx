@@ -78,8 +78,8 @@ class Icons():
         return Icons._icon("msc.diff-added", qta_color)
     @staticmethod
     def removeIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6s.minus", qta_color
-    @staticmethod)
+        return Icons._icon("fa6s.minus", qta_color)
+    @staticmethod
     def gearIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.gear", qta_color)
     @staticmethod

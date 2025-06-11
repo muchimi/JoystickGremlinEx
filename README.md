@@ -29,7 +29,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 	* reworked tracking logic which eliminates the "sticky" option
 	* hat state will be read on profile start
 - Fix: issue with VJOY keepalive thread
-- Fix: issue with DInput device count reporting partial count on DInput API initialization.  DInput API initially reports a lower count as it's apparently not fully loaded yet). This is a likely cause of random missing devices.
+- Fix: issue with DInput device count reporting partial count on DInput API initialization. DInput API initially reported a lower device count (apparently not fully loaded yet). GremlinEx now has a new HID interface and queries the device count using HID to flag a discrepancy in counts. This is a likely cause of random missing devices.
+- Fix: Broken in T10, selection of devices/inputs not always showing the correct UI.
 
 ### (m76T10)
 - Fix: Highlight axis mode auto-switch not selecting axis input in some situations (this may yet require some more work especially with noisy inputs).
