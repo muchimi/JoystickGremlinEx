@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T11B)
+- Fix: (WIP) import remap would load empty devices if more than one mapping was selected due to empty nodes duplicated in the XML profile data.
+- Fix: After a remap, UI would show disconnected device as connected.  
+- Fix: Load error in some cases due to API change and forcing defaults to be provided on all XML inputs to guard against bad data.
+
 ### (m76T11)
 - New: Keyboard/Mouse output gains support for Windows media keys and double-click
 	* Play/Stop, Pause, Previous Track, Next Track

@@ -98,9 +98,7 @@ class DescriptionAction(gremlin.base_profile.AbstractAction):
         return False
 
     def _parse_xml(self, node, data = None):
-        self.description = gremlin.profile.safe_read(
-            node, "description", str, ""
-        )
+        self.description = gremlin.profile.safe_read(node, "description", str, "")
 
     def _generate_xml(self):
         node = ElementTree.Element("description")

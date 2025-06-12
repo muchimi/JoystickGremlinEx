@@ -53,84 +53,7 @@ from dinput import DeviceSummary
 
 syslog = logging.getLogger("system")
 
-class Icons():
-    ''' general UI icon handling '''
-    @staticmethod
-    def listUpIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("ph.caret-circle-up-light", qta_color)
-    @staticmethod
-    def listDownIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("ph.caret-circle-down-light", qta_color)
-    @staticmethod
-    def listTopIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("ph.caret-circle-double-up-light", qta_color)
-    @staticmethod
-    def listBottomIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("ph.caret-circle-double-down-light", qta_color)
-    @staticmethod
-    def trashIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("ei.trash", qta_color)
-    @staticmethod
-    def keyboardIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6s.keyboard", qta_color)
-    @staticmethod
-    def addIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("msc.diff-added", qta_color)
-    @staticmethod
-    def removeIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6s.minus", qta_color)
-    @staticmethod
-    def gearIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6s.gear", qta_color)
-    @staticmethod
-    def findIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6s.magnifying-glass", qta_color)
-    @staticmethod
-    def refreshIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("ei.refresh", qta_color)
-    @staticmethod
-    def copyIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6.copy", qta_color)
-    @staticmethod
-    def pasteIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6.paste", qta_color)
-    @staticmethod
-    def configureIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa6s.gear", qta_color)
-    @staticmethod
-    def editIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("mdi6.rename-box-outline", qta_color)
-    @staticmethod
-    def horizontalSeparatorIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("mdi.power-on", qta_color)
-    @staticmethod
-    def calculateIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("ph.math-operations", qta_color)
-    @staticmethod
-    def axisIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("mdi.axis", qta_color)
-    @staticmethod
-    def buttonIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("ri.radio-button-line", qta_color)
-    @staticmethod
-    def hatIcon(qta_color = None) -> QtGui.QIcon:
-        return Icons._icon("fa5s.arrows-alt", qta_color)
-    @staticmethod
-    def validIcon(qta_color = "#2abd38") -> QtGui.QIcon:
-        return Icons._icon("fa5.check-circle", qta_color = qta_color)
-    @staticmethod
-    def invalidIcon(qta_color = "#b35f1b") -> QtGui.QIcon:
-        return Icons._icon("ei.remove-circle", qta_color = qta_color)
-    @staticmethod
-    def recordIcon(qta_color = "#c7450e"):
-        return Icons._icon("mdi.checkbox-blank-circle", qta_color = qta_color)
-    @staticmethod
-    def listenIcon(qta_color = "#34b7eb"):
-        return Icons._icon("fa6s.microphone", qta_color = qta_color)
-    def _icon(value : str, qta_color = None):
-        if qta_color and isinstance(qta_color, str):
-            qta_color = QtGui.QColor(qta_color)
-        return load_icon(value, qta_color = qta_color) if qta_color is not None else load_icon(value)
+    
        
 
 class Color():
@@ -559,6 +482,91 @@ class Color():
         for index in colors.keys():
             pens[index] = QtGui.QPen(QtGui.QColor(colors[index]), 2 if index else 1)
         return pens
+    
+
+
+class Icons():
+    ''' general UI icon handling '''
+    @staticmethod
+    def listUpIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.caret-circle-up-light", qta_color)
+    @staticmethod
+    def listDownIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.caret-circle-down-light", qta_color)
+    @staticmethod
+    def listTopIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.caret-circle-double-up-light", qta_color)
+    @staticmethod
+    def listBottomIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.caret-circle-double-down-light", qta_color)
+    @staticmethod
+    def trashIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ei.trash", qta_color)
+    @staticmethod
+    def keyboardIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.keyboard", qta_color)
+    @staticmethod
+    def addIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("msc.diff-added", qta_color)
+    @staticmethod
+    def removeIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.minus", qta_color)
+    @staticmethod
+    def gearIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.gear", qta_color)
+    @staticmethod
+    def findIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.magnifying-glass", qta_color)
+    @staticmethod
+    def refreshIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ei.refresh", qta_color)
+    @staticmethod
+    def copyIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6.copy", qta_color)
+    @staticmethod
+    def pasteIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6.paste", qta_color)
+    @staticmethod
+    def configureIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa6s.gear", qta_color)
+    @staticmethod
+    def editIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("mdi6.rename-box-outline", qta_color)
+    @staticmethod
+    def horizontalSeparatorIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("mdi.power-on", qta_color)
+    @staticmethod
+    def calculateIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.math-operations", qta_color)
+    @staticmethod
+    def axisIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("mdi.axis", qta_color)
+    @staticmethod
+    def buttonIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ri.radio-button-line", qta_color)
+    @staticmethod
+    def hatIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("fa5s.arrows-alt", qta_color)
+    @staticmethod
+    def validIcon(qta_color = "#2abd38") -> QtGui.QIcon:
+        return Icons._icon("fa5.check-circle", qta_color = qta_color)
+    @staticmethod
+    def invalidIcon(qta_color = "#b35f1b") -> QtGui.QIcon:
+        return Icons._icon("ei.remove-circle", qta_color = qta_color)
+    @staticmethod
+    def recordIcon(qta_color = "#c7450e"):
+        return Icons._icon("mdi.checkbox-blank-circle", qta_color = qta_color)
+    @staticmethod
+    def listenIcon(qta_color = "#34b7eb"):
+        return Icons._icon("fa6s.microphone", qta_color = qta_color)
+    @staticmethod
+    def disconnectedIcon(qta_color = Color.disconnectedColor()):
+        return Icons._icon("mdi.power-plug-off", qta_color = qta_color)
+
+    def _icon(value : str, qta_color = None):
+        if qta_color and isinstance(qta_color, str):
+            qta_color = QtGui.QColor(qta_color)
+        return load_icon(value, qta_color = qta_color) if qta_color is not None else load_icon(value)
     
 
 
@@ -2024,7 +2032,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
                 for i in range(item_count):
                     input_id = i+1
                     if input_type == InputType.JoystickAxis:
-                        input_id = device.axis_map[i].axis_index
+                        input_id = device.axismap_list[i].axis_index
                         s_ui = f"Axis {device.axis_names[i]}"
                     else:
                         s_ui = gremlin.common.input_to_ui_string(

@@ -483,10 +483,21 @@ class DeviceSummary:
             # special devices are always connected
             return True 
         return self._connected
-    @connected.setter
-    def connected(self, value : bool):
+    
+    def setConnected(self, value: bool):
         self._connected = value
-            
+    
+    def refreshConnected(self) -> bool:
+        ''' checks if the device is connected '''
+        if self.device_guid:
+            device_count = DILL.get_device_count()
+            connected_list = []
+            for device_index in range(device_count):
+                dev = DILL.get_device_information_by_index(device_index)
+                connected_list.append(dev.device_id)
+
+            self._connected = self.device_id in connected_list
+            return self._connected
         
         
 

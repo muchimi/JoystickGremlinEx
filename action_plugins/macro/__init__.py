@@ -1950,11 +1950,9 @@ class Macro(gremlin.base_profile.AbstractAction):
             if child.tag == "joystick":
                 joy_action = gremlin.macro.JoystickAction(
                     parse_guid(child.get("device-guid")),
-                    InputType.to_enum(
-                        safe_read(child, "input-type")
-                    ),
-                    safe_read(child, "input-id", int),
-                    safe_read(child, "value"),
+                    InputType.to_enum(safe_read(child, "input-type", str, "")),
+                    safe_read(child, "input-id", int, 1),
+                    safe_read(child, "value", str, ""),
                 )
                 self._str_to_joy_value(joy_action)
                 self.sequence.append(joy_action)
@@ -1989,12 +1987,12 @@ class Macro(gremlin.base_profile.AbstractAction):
                 )
             elif child.tag == "vjoy":
                 vjoy_action = gremlin.macro.VJoyMacroAction(
-                    safe_read(child, "vjoy-id", int),
+                    safe_read(child, "vjoy-id", int, 1),
                     InputType.to_enum(
-                        safe_read(child, "input-type")
+                        safe_read(child, "input-type", str, "")
                     ),
-                    safe_read(child, "input-id", int),
-                    safe_read(child, "value"),
+                    safe_read(child, "input-id", int, 1),
+                    safe_read(child, "value", str, ""),
                     safe_read(child, "axis-type", str, "absolute")
                 )
                 self._str_to_joy_value(vjoy_action)

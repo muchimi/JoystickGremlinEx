@@ -710,7 +710,7 @@ def joystick_devices_initialization():
             hash_wheel_value = (axis_count+1,button_count,hat_count)
             syslog.warning(f"vjoy id {vjoy_index:d}: {hash_value} vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted.  This device cannot be used as input.")
             dev = DeviceSummary()
-            dev.connected = False
+            dev.setConnected(False)
             dev.device_guid = gremlin.util.get_dinput_guid() # bogus ID
             dev.device_id = str(dev.device_guid)
             dev.device_type = DeviceType.VJoy

@@ -197,8 +197,11 @@ class ProfileRootNode(ProfileBaseNode):
 
     def to_xml(self):
         ''' writes a profile node '''
+
         node = etree.Element("profile")
         node.set("version", str(gremlin.profile.ProfileConverter.current_version))
+        if not self.start_mode:
+            self.start_mode = gremlin.shared_state.edit_mode
         node.set("start_mode", self.start_mode)
         node.set("default_mode", self.default_start_mode)
         node.set("restore_last", str(self.restore_last_mode))
@@ -684,11 +687,8 @@ class ProfileDeviceNode(ProfileBaseNode):
     def connected(self) -> bool:
         ''' true if the device is connected '''
         return self._device.connected
-    @connected.setter
-    def connected(self, value : bool):
-        self._device.connected = value
     
-    
+
 
     def remap(self, device : DeviceSummary):
         ''' changes the device to another device '''
@@ -724,10 +724,7 @@ class ProfileDeviceNode(ProfileBaseNode):
             self.label = safe_read(node, "label", str, "")
         else:
             self.label = None
-        if device_type in (DeviceType.Joystick, DeviceType.VJoy):
-            self.connected = gremlin.joystick_handling.is_device_connected(self.device_guid)
-        else:
-            self.connected = True # special devices are always connected
+        #self.connected = gremlin.joystick_handling.is_device_connected(self.device_guid)
             
         self.modes = []
  
@@ -1243,7 +1240,6 @@ class ProfileGraph():
         for device in active_devices:
             if not self.get_device_node(device.device_guid):
                 device_node = ProfileDeviceNode(device = device, parent = self._root)
-                device_node.connected = True
 
 
         if verbose: self._dump()
@@ -1270,6 +1266,18 @@ class ProfileGraph():
     def to_xml(self, target_xml : str) -> bool:
         ''' writes the profile graph to XML'''
         root = self._root.to_xml()
+        # strip singleton devices that have no nodes
+        device_nodes = root.xpath("//device")
+        remove_nodes = []
+        for node in device_nodes:
+            children = node.getchildren()
+            if not len(children):
+                remove_nodes.append(node)
+
+        for node in remove_nodes:
+            node.getparent().remove(node)
+
+
         try:
             # save the file
             tree = etree.ElementTree(root)

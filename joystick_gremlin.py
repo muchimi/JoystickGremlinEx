@@ -460,14 +460,15 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         if index is None:
             position = self.ui.devices.addTab(device_name)
-            if not device.connected:
-                # indicate device is disconnected
-                color = gremlin.ui.ui_common.Color().disconnectedColor()
-                icon = gremlin.ui.ui_common.load_icon("mdi.power-plug-off", qta_color = color)
-                self.ui.devices.setTabIcon(position, icon)
-                self.ui.devices.setTabTextColor(position, color)
         else:
             position = self.ui.devices.insertTab(index, device_name)
+
+        if not device.connected:
+            # indicate device is disconnected
+            color = gremlin.ui.ui_common.Color().disconnectedColor()
+            icon = gremlin.ui.ui_common.Icons.disconnectedIcon() #.load_icon("mdi.power-plug-off", qta_color = color)
+            self.ui.devices.setTabIcon(position, icon)
+            self.ui.devices.setTabTextColor(position, color)                            
     
         self._tab_device_map[device_guid] = position
         self._tab_index_map[position] = device_guid
@@ -663,8 +664,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' adds custom tools to the menu '''
         self._actionTabSort = QtGui.QAction("Sort Devices", self, triggered = self._tab_sort_cb)
         self._actionTabSort.setToolTip("Sorts input hardware devices in alphabetical order")
-        self._actionTabSubstitute = QtGui.QAction("Device Remap...", self, triggered = self._tab_substitute_cb)
-        self._actionTabSubstitute.setToolTip("Remap the device to another device")
+        self._actionTabSubstitute = QtGui.QAction("Device Swap...", self, triggered = self._tab_substitute_cb)
+        self._actionTabSubstitute.setToolTip("Swap one device ID for another device ID")
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered = self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
         self._actionTabRemoveDevice  = QtGui.QAction("Remove device", self, triggered = self._tab_remove_device_cb)
@@ -688,10 +689,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         tab_type = data.tab_type
         #device_guid = data.device_guid
         # substitution is only available if the profile has been saved (a new profile matches the current devices by definition)
-        is_enabled = tab_type == TabDeviceType.Joystick \
-            and self.profile is not None\
-            and self.profile.profile_file is not None\
-            and os.path.isfile(self.profile.profile_file)
+        is_enabled = tab_type == TabDeviceType.Joystick
+        #     and self.profile is not None\
+        #     and self.profile.profile_file is not None\
+        #     and os.path.isfile(self.profile.profile_file)
         self._actionTabSubstitute.setEnabled(is_enabled)
         menu = QtWidgets.QMenu(self)
         menu.addAction(self._actionTabSort)

@@ -89,9 +89,7 @@ class VirtualAxisButton(AbstractVirtualButton):
         from gremlin.types import AxisButtonDirection
         self.lower_limit = safe_read(node, "lower-limit", float, -1.0)
         self.upper_limit = safe_read(node, "upper-limit", float, 1.0)
-        self.direction = AxisButtonDirection.to_enum(
-            safe_read(node, "direction", default_value="anywhere")
-        )
+        self.direction = AxisButtonDirection.to_enum(safe_read(node, "direction", str, "anywhere"))
         self.enabled = safe_read(node,"enabled", bool, True)
 
     def to_xml(self):

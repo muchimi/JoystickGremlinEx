@@ -602,7 +602,7 @@ class ProfileConverter:
                     )
                     return linear_id
 
-                return device.axis_map[linear_id].axis_index
+                return device.axismap_list[linear_id].axis_index
 
             def lookup(self, hardware_id, name=None):
                 """Returns the GUID for the provided hardware id.

@@ -511,22 +511,22 @@ class Remap(gremlin.base_profile.AbstractAction):
         """
         try:
             
-            self.vjoy_device_id = safe_read(node, "vjoy", int)
+            self.vjoy_device_id = safe_read(node, "vjoy", int, 1)
             
             if "axis" in node.attrib:
                 self.input_type = InputType.JoystickAxis
-                self.vjoy_input_id = safe_read(node, "axis", int)
+                self.vjoy_input_id = safe_read(node, "axis", int, 1)
             elif "button" in node.attrib:
                 self.input_type = InputType.JoystickButton
-                self.vjoy_input_id = safe_read(node, "button", int)
+                self.vjoy_input_id = safe_read(node, "button", int, 1)
                 usage_data = gremlin.joystick_handling.VJoyUsageState()
                 usage_data.set_usage_state(self.vjoy_device_id, self.vjoy_input_id, state = True, action = self, emit = False)
             elif "hat" in node.attrib:
                 self.input_type = InputType.JoystickHat
-                self.vjoy_input_id = safe_read(node, "hat", int)
+                self.vjoy_input_id = safe_read(node, "hat", int, 1)
             elif "keyboard" in node.attrib:
                 self.input_type = InputType.Keyboard
-                self.vjoy_input_id = safe_read(node, "button", int)
+                self.vjoy_input_id = safe_read(node, "button", int, 1)
             else:
                 raise gremlin.error.GremlinError(
                     f"Invalid remap type provided: {node.attrib}"
