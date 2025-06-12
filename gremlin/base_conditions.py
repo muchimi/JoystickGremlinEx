@@ -330,10 +330,20 @@ class VJoyCondition(AbstractCondition):
 
         super().from_xml(node, data)
         self.comparison = safe_read(node, "comparison")
-
+        if not "input" in node.attrib:
+            syslog.error("VJOY XML: invalid input in XML - NULL ")
+            return
+        
         self.input_type = InputType.to_enum(safe_read(node, "input"))
-        self.input_id = safe_read(node, "id", int)
-        self.vjoy_id = safe_read(node, "vjoy-id", int)
+
+        input_id = safe_read(node, "id", int, 0)
+        vjoy_id = safe_read(node, "vjoy-id", int, 0)
+
+        if input_id == 0 or vjoy_id == 0:
+            syslog.error(f"VJOY XML: invalid input in XML: device: {vjoy_id}  input: {input_id}")
+            return
+        self.input_id = input_id
+        self.vjoy_id = vjoy_id
         self.ignore_release = safe_read(node,"ignore-release",bool,False)
         self.range = [
             safe_read(node, "range-low", float, 0),
@@ -349,18 +359,30 @@ class VJoyCondition(AbstractCondition):
             XML node containing the object's data
         """
         #node = ElementTree.Element("condition")
+
+        
         node = super().to_xml() 
         node.set("comparison", str(self.comparison))
         node.set("condition-type", "vjoy")
-        node.set("input", InputType.to_string(self.input_type))
-        node.set("id", safe_format(self.input_id, int))
-        node.set("vjoy-id", write_guid(self.vjoy_id))
-        node.set("range-low", safe_format(self.range[0], float))
-        node.set("range-high", safe_format(self.range[1], float))
-        node.set("ignore-release", safe_format(self.ignore_release, bool))
+        
+        is_error = False
+        if self.input_type is None:
+            syslog.error("VJOY CONDITION: invalid data: bad input type (NULL)")
+            is_error = True
+        if self.input_id == 0:
+            syslog.error("VJOY CONDITION: invalid data: bad input 0")
+            is_error = True
+        if self.vjoy_id == 0:
+            syslog.error("VJOY CONDITION: invalid data: bad device ID 0")
+            is_error = True
 
-        
-        
+        if not is_error:
+            node.set("input", InputType.to_string(self.input_type))
+            node.set("id", safe_format(self.input_id, int))
+            node.set("vjoy-id", write_guid(self.vjoy_id))
+            node.set("range-low", safe_format(self.range[0], float))
+            node.set("range-high", safe_format(self.range[1], float))
+            node.set("ignore-release", safe_format(self.ignore_release, bool))
         return node
 
     def is_valid(self):
@@ -368,7 +390,7 @@ class VJoyCondition(AbstractCondition):
 
         :return True if the condition is properly specified, False otherwise
         """
-        return super().is_valid() and self.input_type is not None
+        return super().is_valid() and self.input_type is not None and self.vjoy_id > 0 and self.input_id > 0
 
     def __str__(self):
         return f"Vjoy Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} vjoy device: {self.vjoy_id} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[0]:0.3f}]"
@@ -870,7 +892,7 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         
         # import_data.used_ids[self._id] = self
 
-        rule = ActivationCondition.rule_lookup[safe_read(node, "rule")]
+        rule = ActivationCondition.rule_lookup[safe_read(node, "rule", str, "")]
         tracker = ConditionTracker()
         mode_node = node
         while mode_node is not None and mode_node.tag != "mode":
@@ -891,7 +913,7 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         #     return
         
         for cond_node in node.findall("condition"):
-            condition_type = safe_read(cond_node, "condition-type")
+            condition_type = safe_read(cond_node, "condition-type", str, "")
             condition = ActivationCondition.condition_lookup[condition_type]()
             condition.from_xml(cond_node, data)
             self.conditions.append(condition)

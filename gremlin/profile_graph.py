@@ -174,9 +174,9 @@ class ProfileRootNode(ProfileBaseNode):
             self.vjoy_devices[device_node.device_guid] = device_node    
 
         for child in node.iter("simconnect"):
-            key_cp = safe_read(child,"key_cp",str)
-            key_ap = safe_read(child,"key_ap",str)
-            mode = safe_read(child,"mode")
+            key_cp = safe_read(child,"key_cp", str, "")
+            key_ap = safe_read(child,"key_ap", str, "")
+            mode = safe_read(child,"mode", str, "")
             key = (key_cp, key_ap)
             self.simconnect_modes[key] = mode
 
@@ -714,14 +714,14 @@ class ProfileDeviceNode(ProfileBaseNode):
         device_guid = parse_guid(device_guid_str)
         #device_id = str(self.device_guid)
         
-        dt = safe_read(node, "type", str)
+        dt = safe_read(node, "type", str, "")
         if not dt:
             dt = DeviceType.NotSet
         device_type = DeviceType.to_enum(dt)
         self._device = self._get_device(device_name, device_guid, device_type)
         
         if "label" in node.attrib:
-            self.label = safe_read(node, "label", str)
+            self.label = safe_read(node, "label", str, "")
         else:
             self.label = None
         if device_type in (DeviceType.Joystick, DeviceType.VJoy):
@@ -824,10 +824,10 @@ class ProfileModeNode(ProfileBaseNode):
         :param node XML node to parse
         """
         from gremlin.base_profile import InputItem
-        name = safe_read(node, "name", str)
+        name = safe_read(node, "name", str, "")
         name = name.strip()
         self.name = name
-        self.inherit = node.get("inherit", None)
+        self.inherit = safe_read(node, "inherit", str, "")
         
 
 
@@ -924,7 +924,7 @@ class ProfileInputNode(ProfileBaseNode):
     def from_xml(self, node : Element, data = None):
         ''' reads an input node '''
         self.input_type = InputType.to_enum(node.tag)
-        self.description = safe_read(node, "description", str)
+        self.description = safe_read(node, "description", str, "")
         self.always_execute = read_bool(node, "always-execute", False)
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
@@ -954,7 +954,7 @@ class ProfileInputNode(ProfileBaseNode):
                     input_entry.key = key
                     for child in node:
                         if child.tag == "latched":
-                            latched_key = Key(scan_code=safe_read(child,"id",int), is_extended= read_bool(child,"extended"))
+                            latched_key = Key(scan_code=safe_read(child,"id",int,0), is_extended= read_bool(child,"extended"))
                             if not latched_key in key.latched_keys:
                                 key.latched_keys.append(latched_key)
                 else:

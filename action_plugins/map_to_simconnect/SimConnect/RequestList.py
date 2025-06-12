@@ -962,7 +962,7 @@ class AircraftRequests():
 			"ATC_ID": ["ID used by ATC", b'ATC ID', b'String', 'Y'],
 			"ATC_AIRLINE": ["Airline used by ATC", b'ATC AIRLINE', b'String', 'Y'],
 			"ATC_FLIGHT_NUMBER": ["Flight Number used by ATC", b'ATC FLIGHT NUMBER', b'String', 'Y'],
-			"TITLE": ["Title from aircraft.cfg", b'TITLE', b'String', 'N'],
+			#"TITLE": ["Title from aircraft.cfg", b'TITLE', b'String', 'N'],
 			"HSI_STATION_IDENT": ["Tuned station identifier", b'HSI STATION IDENT', b'String', 'N'],
 			"GPS_WP_PREV_ID": ["ID of previous GPS waypoint", b'GPS WP PREV ID', b'String', 'N'],
 			"GPS_WP_NEXT_ID": ["ID of next GPS waypoint", b'GPS WP NEXT ID', b'String', 'N'],

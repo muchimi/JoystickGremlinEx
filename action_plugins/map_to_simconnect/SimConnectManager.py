@@ -2372,7 +2372,7 @@ class SimConnectBlock():
             
         elif node.tag == "block":
 
-            command = gremlin.util.safe_read(node,"command", str)
+            command = gremlin.util.safe_read(node,"command", str, "")
             if not command:
                 command = SimConnectManager().get_default_command()
             self.command = command

@@ -871,20 +871,23 @@ class Device:
         :param node the xml node to parse to populate this device
         """
         self.name = node.get("name")
-        self.label = safe_read(node, "label", default_value=self.name)
-        dt = safe_read(node, "type", str)
+        self.label = safe_read(node, "label", str, self.name)
+        dt = safe_read(node, "type", str, "")
         if not dt:
             dt = DeviceType.NotSet
         self.type = DeviceType.to_enum(dt)
-        device_guid = node.get("device-guid")
-        if not device_guid:
-            syslog=syslog
-            syslog.error(f"Device XML: unable to parse device GUID: [{device_guid}]")
+        device_id = node.get("device-guid")
+        if not device_id:
+            syslog.error(f"Device XML: unable to parse device GUID: [{device_id}]")
             sys.exit(-1)
             
-    
-        self.device_guid = parse_guid(device_guid)
+        
+        self.device_guid = parse_guid(device_id)
         self.connected = gremlin.joystick_handling.is_device_connected(self.device_guid)
+
+        verbose = gremlin.config.Configuration().verbose_mode_device
+        if verbose:
+            syslog.info(f"XML Device: read [{device_id}] Device currently connected: {self.connected}")
 
         for child in node:
             mode = Mode(self)
@@ -1853,14 +1856,14 @@ class InputItem():
         parent = node.getparent()
         while parent is not None and parent.tag != "mode":
             parent = parent.getparent()
-        if parent:
-            profile_mode = safe_read(parent,"name")
+        if parent is not None:
+            profile_mode = safe_read(parent,"name",str, "")
             self.profile_mode = profile_mode
         
 
         if not skip_root: # skip header processing if set
 
-            self._description = safe_read(node, "description", str)
+            self._description = safe_read(node, "description", str, "")
             self.always_execute = read_bool(node, "always-execute", False)
 
             if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
@@ -3093,9 +3096,9 @@ class Profile():
         # parse simconnect startup entries
         self._simconnect_modes = {}
         for child in root.iter("simconnect"):
-            key_cp = safe_read(child,"key_cp",str)
-            key_ap = safe_read(child,"key_ap",str)
-            mode = safe_read(child,"mode")
+            key_cp = safe_read(child,"key_cp",str, "")
+            key_ap = safe_read(child,"key_ap",str, "")
+            mode = safe_read(child,"mode", str, "")
             key = (key_cp, key_ap)
             self._simconnect_modes[key] = mode
 
@@ -3663,7 +3666,7 @@ class Mode:
         :param node XML node to parse
         """
         from gremlin.base_profile import InputItem
-        name = safe_read(node, "name", str)
+        name = safe_read(node, "name", str, "")
         name = name.strip()
         self._name = name
 

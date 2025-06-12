@@ -20,7 +20,6 @@ import ctypes
 from ctypes import wintypes
 import threading
 import time
-import gremlin.config
 from gremlin.singleton_decorator import SingletonDecorator
 
 

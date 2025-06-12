@@ -3029,7 +3029,7 @@ class GateData():
             gate_info : GateInfo = self.getUnusedGate()
             gate_info.value = gate_value
             if "index" in child.attrib:
-                gate_index = safe_read(child,"index",int)
+                gate_index = safe_read(child,"index",int, 0)
                 gate_info.slider_index = gate_index
 
             gate_info.profile_mode = profile_mode

@@ -897,7 +897,9 @@ def load_pixmap(*paths):
     ''' gets a pixmap from the path '''
     import gremlin.ui.ui_common
     the_path = get_icon_path(*paths)
+    
     if the_path:
+        #syslog.info(f"load_pixmap(): {the_path}")
         pixmap = QtGui.QPixmap(the_path)
         if pixmap.isNull():
             syslog.warning(f"load_pixmap(): pixmap failed: {the_path}")
@@ -998,18 +1000,22 @@ def recolor_icon_pixmap(image_path, color = "red"):
     ''' recolors non-transparent pixels in an icon image 
     :Returns: pixmap of the recolored item
     '''
+    syslog.info(f"Recolor pixmap: {image_path}")
     the_path = get_icon_path(image_path)
     if the_path:
         tmp = QtGui.QImage(the_path)
-        tmp = tmp.convertToFormat(QtGui.QImage.Format.Format_ARGB32)
-        c = QtGui.QColor(color)
-        for y in range(tmp.height()):
-            for x in range (tmp.width()):
-                c.setAlpha(tmp.pixelColor(x,y).alpha())
-                tmp.setPixelColor(x,y,color)
+        if tmp:
+            tmp = tmp.convertToFormat(QtGui.QImage.Format.Format_ARGB32)
+            if tmp:
+                c = QtGui.QColor(color)
+                for y in range(tmp.height()):
+                    for x in range (tmp.width()):
+                        c.setAlpha(tmp.pixelColor(x,y).alpha())
+                        tmp.setPixelColor(x,y,color)
 
-        pixmap = QtGui.QPixmap.fromImage(tmp)    
-        return pixmap
+                pixmap = QtGui.QPixmap.fromImage(tmp)    
+                syslog.info("Recolor complete")            
+                return pixmap
     return None
 
             
@@ -1057,7 +1063,7 @@ def write_guid(guid):
     return str(guid)
 
 
-def safe_read(node, key, type_cast=None, default_value=None):
+def safe_read(node, key, type_cast, default_value):
     """Safely reads an attribute from an XML node.
 
     If the attempt at reading the attribute fails, due to the attribute not

@@ -1518,6 +1518,8 @@ class UDPClient(object):
             self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._address = address
         self._port = port
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.stop)
 
     def send(self, content) -> None:
         """Sends an :class:`OscMessage` or :class:`OscBundle` via UDP
@@ -1598,13 +1600,16 @@ class OscClient():
         else:
             syslog.error(f"OSC client: {self._name} Invalid OSC configuration, provide server IP and port #")
 
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.stop)
+
     def stop(self):
         if self._started:
+            self._started = False
             self._client.stop() # stop UDP client
             self._client = None
-            self._started = False
             # syslog = logging.getLogger("system")
-            syslog.info("OSC client stop")
+            syslog.info(f"OSC: client stop: ip: {self._server_ip} port: {self._output_port}")
         
 
     def add_arg(self, builder, value):
@@ -2358,7 +2363,7 @@ class OscInputItem(AbstractInputItem):
             csv = safe_read(node, "data", str,"")
             self._message_data = csv_to_list(csv)
             self._mode_from_string(safe_read(node, "mode", str, ""))
-            self._command_mode = OscInputItem.command_mode_from_string(safe_read(node,"cmd_mode", str))
+            self._command_mode = OscInputItem.command_mode_from_string(safe_read(node,"cmd_mode", str, ""))
             self._min_range = safe_read(node,"min",float, 0.0)
             self._max_range = safe_read(node,"max",float, 1.0)
             self.source_index = safe_read(node,"source_index", int, 0)

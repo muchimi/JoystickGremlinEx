@@ -4584,8 +4584,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             self._update_from_output()
         else:
             # read data
-            norm_min = safe_read(node,"norm_min_range", float) if "norm_min_range" in node.attrib else -1.0
-            norm_max = safe_read(node,"norm_max_range", float) if "norm_max_range" in node.attrib else 1.0
+            norm_min = safe_read(node,"norm_min_range", float, -1.0) if "norm_min_range" in node.attrib else -1.0
+            norm_max = safe_read(node,"norm_max_range", float, 1.0) if "norm_max_range" in node.attrib else 1.0
 
             if norm_min == norm_max or \
                 not gremlin.util.valueInRange(norm_min,-1,1) or \
@@ -4599,8 +4599,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             self._normalized_max_range = norm_max
 
         
-        min_value = safe_read(node,"command_min_range", float) if "command_min_range" in node.attrib else -16383
-        max_value = safe_read(node,"command_max_range", float) if "command_max_range" in node.attrib else 16384
+        min_value = safe_read(node,"command_min_range", float, -16383) if "command_min_range" in node.attrib else -16383
+        max_value = safe_read(node,"command_max_range", float, 16384) if "command_max_range" in node.attrib else 16384
         self.command_min_range = min_value
         self.command_max_range = max_value
 

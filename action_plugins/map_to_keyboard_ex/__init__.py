@@ -766,7 +766,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         keys = []
 
         if "mode" in node.attrib:
-            mode = safe_read(node, "mode", str)
+            mode = safe_read(node, "mode", str, "")
             match mode:
                 case  "make":
                     # legacy

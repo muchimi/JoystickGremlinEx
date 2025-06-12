@@ -4642,7 +4642,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         try:
 
 
-            vjoy_id = safe_read(node, "vjoy", int)
+            vjoy_id = safe_read(node, "vjoy", int, 1)
             if not vjoy_id in self.vjoy_map:
                 self.refresh_vjoy() # ensure we have the latest device list
 

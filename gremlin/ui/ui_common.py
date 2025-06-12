@@ -8579,6 +8579,7 @@ class IconGenerator():
     def gen(self, text : str, name : str,  is_dark = False):
         ''' creates the background for the image'''
         size = 64
+        
         image = QtGui.QImage(size,size,QtGui.QImage.Format.Format_ARGB32)
         painter = QtGui.QPainter(image)
         background_color = QtGui.QColor(0x00, 0x00, 0x00, 0x00)

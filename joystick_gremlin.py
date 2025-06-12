@@ -4692,9 +4692,10 @@ if __name__ == "__main__":
     gremlin.shared_state.char_width = gremlin.ui.ui_common.get_text_width("M")
 
     # Run UI
-    syslog.info("GremlinEx UI launching")
+    
     gremlin.shared_state.ui_ready = True
 
+    syslog.info("Init completed...")
     el.ui_ready.emit()
 
     # for some reason QT shows the window with a white background and ignores stylesheets/background color
@@ -4703,7 +4704,7 @@ if __name__ == "__main__":
     # show the window normally
     ui.showMinimized()
     app.processEvents()
-
+    syslog.info("Apply settings...")
     ui.apply_user_settings() 
 
     if not config.start_minimized:
@@ -4714,6 +4715,7 @@ if __name__ == "__main__":
     # generate icons if needed
     #_icon_generator = gremlin.ui.ui_common.IconGenerator()
 
+    syslog.info("GremlinEx UI launching")
     try:
         app.exec()
     except Exception as err:

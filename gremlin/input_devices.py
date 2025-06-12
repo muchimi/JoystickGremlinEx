@@ -30,6 +30,7 @@ from PySide6 import QtCore
 
 import gremlin.base_classes
 import gremlin.config
+import gremlin.event_handler
 import gremlin.gamepad_handling
 import gremlin.joystick_handling
 from gremlin.types import GamePadOutput
@@ -907,11 +908,14 @@ class RPCGremlin():
         self._server_thread = None
         self._keep_running = False
 
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.stop)
+
         
 
     def _run(self):
         import struct
-        syslog.debug("Starting gremlin listener...")
+        syslog.info("Starting gremlin listener...")
         self._server = GremlinServer(('', self._port),GremlinSocketHandler)
         self._server_thread = threading.Thread(target=self._server.serve_forever, daemon=False)
         self._server_thread.daemon = True
@@ -921,7 +925,7 @@ class RPCGremlin():
             group = socket.inet_aton(RPCGremlin.MULTICAST_GROUP)
             mreq = struct.pack('4sL', group, socket.INADDR_ANY)
             self._server.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-            syslog.debug(f"Starting gremlin server listener:  multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
+            syslog.info(f"Starting gremlin server listener:  multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
             self._keep_running = True
             self._running = True
             while self._keep_running:
@@ -932,7 +936,7 @@ class RPCGremlin():
         self._server.shutdown()
         self._server.server_close()
         self._running = False
-        syslog.debug("Gremlin listener stopped.")
+        syslog.info("Gremlin listener stopped.")
         proxy = gremlin.joystick_handling.VJoyProxy()
         # release any locks on devices
         proxy.reset()
@@ -958,7 +962,7 @@ class RPCGremlin():
         for key in vjoyid_list:
             try:
                 device = gremlin.joystick_handling.VJoyProxy()[key]
-                syslog.debug(f"Remote proxy VJOY [{key}] ok")
+                syslog.info(f"Remote proxy VJOY [{key}] ok")
             except:
                 pass
         self._thread = threading.Thread(target=self._run, daemon=False)
@@ -977,7 +981,7 @@ class RPCGremlin():
             self._thread.join()
         self._thread = None
 
-        syslog.debug("Gremlin RPC server stopped...")
+        syslog.info("Gremlin RPC server stopped...")
 
 
 
