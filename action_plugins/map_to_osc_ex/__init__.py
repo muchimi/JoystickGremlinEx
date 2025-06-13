@@ -1350,9 +1350,9 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
             self.server_port = safe_read(node, "server_port", int, 8000)
 
         if "press-exec" in node.attrib:
-            self.exec_on_press = safe_read(node,"press-exec",bool)
+            self.exec_on_press = safe_read(node,"press-exec",bool, False)
         if "release-exec" in node.attrib:
-            self.exect_on_release = safe_read(node,"release-exec",bool)
+            self.exect_on_release = safe_read(node,"release-exec",bool, False)
 
         self.args = []
         index = 0

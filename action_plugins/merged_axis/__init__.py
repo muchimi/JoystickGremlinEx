@@ -633,12 +633,12 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
             operation_str = safe_read(entry_node, "operation", str, "")
             operation = gremlin.types.MergeAxisOperation.to_enum(operation_str)
 
-            joy1_guid = safe_read(entry_node, "joy1_device_id", str, None )
+            joy1_guid = safe_read(entry_node, "joy1_device_id", str, '' )
             if joy1_guid:
                 self.joy1_guid = gremlin.util.parse_guid(joy1_guid)
             self.joy1_input_id = safe_read(entry_node, "joy1_axis_id",int,0)
 
-            joy2_guid = safe_read(entry_node, "joy2_device_id", str, None )
+            joy2_guid = safe_read(entry_node, "joy2_device_id", str, '')
             if joy2_guid:
                 self.joy2_guid = gremlin.util.parse_guid(joy2_guid)
             self.joy2_input_id = safe_read(entry_node, "joy2_axis_id",int,0)

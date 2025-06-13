@@ -320,11 +320,11 @@ class MidiInputItem(AbstractInputItem):
         ''' reads an input item from xml '''
         if node.tag == "input":
             self.id = read_guid(node, "guid")
-            self.port_name = safe_read(node, "port", str)
-            mode = self.mode_from_string(safe_read(node, "mode", str))
+            self.port_name = safe_read(node, "port", str, "")
+            mode = self.mode_from_string(safe_read(node, "mode", str, ""))
             if mode is not None:
                 self.setMode(mode)
-            data = safe_read(node, "data", str)
+            data = safe_read(node, "data", str, "")
             bytes = byte_string_to_list(data)
             self.message = mido.Message.from_bytes(bytes) if bytes else None
 

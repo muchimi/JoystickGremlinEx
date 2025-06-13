@@ -1967,7 +1967,7 @@ class Macro(gremlin.base_profile.AbstractAction):
                 self.sequence.append(key_action)
             elif child.tag == "mouse":
                 mouse_action = gremlin.macro.MouseButtonAction(
-                    gremlin.types.MouseButton(safe_read(child, "button", int)),
+                    gremlin.types.MouseButton(safe_read(child, "button", int, 1)),
                     gremlin.profile.parse_bool(child.get("press"))
                 )
                 self.sequence.append(mouse_action)

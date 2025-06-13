@@ -1159,13 +1159,13 @@ class ProfileMergedAxisNode(ProfileBaseNode):
         }
         for tag in ["vjoy"]:
             entry[tag] = {
-                "vjoy_id": safe_read(node.find(tag), "vjoy-id", int),
-                "axis_id": safe_read(node.find(tag), "axis-id", int),
+                "vjoy_id": safe_read(node.find(tag), "vjoy-id", int, 1),
+                "axis_id": safe_read(node.find(tag), "axis-id", int, 1),
             }
         for tag in ["lower", "upper"]:
             entry[tag] = {
                 "device_guid": parse_guid(node.find(tag).get("device-guid")),
-                "axis_id": safe_read(node.find(tag), "axis-id", int)
+                "axis_id": safe_read(node.find(tag), "axis-id", int, 1)
             }
         self.entry = entry
 

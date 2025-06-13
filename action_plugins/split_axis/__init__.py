@@ -230,18 +230,18 @@ class SplitAxis(gremlin.base_profile.AbstractAction):
 
     def _parse_xml(self, node, data = None):
         self.center_point = float(node.get("center-point"))
-        self.device_low_vjoy_id = safe_read(node, "device-low-vjoy-id", int)
-        self.device_high_vjoy_id = safe_read(node, "device-high-vjoy-id", int)
-        self.device_low_axis = safe_read(node, "device-low-axis", int)
-        self.device_high_axis = safe_read(node, "device-high-axis", int)
+        self.device_low_vjoy_id = safe_read(node, "device-low-vjoy-id", int, 1)
+        self.device_high_vjoy_id = safe_read(node, "device-high-vjoy-id", int, 1)
+        self.device_low_axis = safe_read(node, "device-low-axis", int, 1)
+        self.device_high_axis = safe_read(node, "device-high-axis", int, 1)
 
     def _generate_xml(self):
         node = ElementTree.Element("split-axis")
-        node.set("center-point", safe_format(self.center_point, float))
-        node.set("device-low-vjoy-id", safe_format(self.device_low_vjoy_id, int))
-        node.set("device-high-vjoy-id", safe_format(self.device_high_vjoy_id, int))
-        node.set("device-low-axis", safe_format(self.device_low_axis, int))
-        node.set("device-high-axis", safe_format(self.device_high_axis, int))
+        node.set("center-point", safe_format(self.center_point, float, 0))
+        node.set("device-low-vjoy-id", safe_format(self.device_low_vjoy_id, int, 1))
+        node.set("device-high-vjoy-id", safe_format(self.device_high_vjoy_id, int, 1))
+        node.set("device-low-axis", safe_format(self.device_low_axis, int, 1))
+        node.set("device-high-axis", safe_format(self.device_high_axis, int, 1))
 
         return node
 

@@ -1390,16 +1390,16 @@ class Settings:
         # vJoy as input settings
         self.vjoy_as_input = {}
         for vjoy_node in node.findall("vjoy-input"):
-            vid = safe_read(vjoy_node, "id", int)
+            vid = safe_read(vjoy_node, "id", int, 0)
             self.vjoy_as_input[vid] = True
 
         # vjoy initialization values
         self.vjoy_initial_values = {}
         for vjoy_node in node.findall("vjoy"):
-            vid = safe_read(vjoy_node, "id", int)
+            vid = safe_read(vjoy_node, "id", int, 0)
             self.vjoy_initial_values[vid] = {}
             for axis_node in vjoy_node.findall("axis"):
-                aid = safe_read(axis_node, "id", int)
+                aid = safe_read(axis_node, "id", int, 0)
                 value = safe_read(axis_node, "value", float, 0.0)
                 self.vjoy_initial_values[vid][aid] = value
 
@@ -1886,7 +1886,7 @@ class InputItem():
                         input_item.key = key
                         for child in node:
                             if child.tag == "latched":
-                                latched_key = Key(scan_code=safe_read(child,"id",int), is_extended= read_bool(child,"extended"))
+                                latched_key = Key(scan_code=safe_read(child,"id",int,0), is_extended= read_bool(child,"extended"))
                                 if not latched_key in key.latched_keys:
                                     key.latched_keys.append(latched_key)
                     else:
@@ -3953,8 +3953,8 @@ class PluginVariable:
                 self.value = {
                     "device_id": parse_guid(node.attrib["device-guid"]),
                     "device_name": safe_read(node, "device-name", str, ""),
-                    "input_id": safe_read(node, "input-id", int, None),
-                    "input_type": InputType.to_enum(safe_read(node, "input-type", str, None))
+                    "input_id": safe_read(node, "input-id", int, 1),
+                    "input_type": InputType.to_enum(safe_read(node, "input-type", str, ""))
                 }
 
         elif self.type == PluginVariableType.VirtualInput:
@@ -3967,9 +3967,9 @@ class PluginVariable:
                   }
             else:
                 self.value = {
-                    "device_id": safe_read(node, "vjoy-id", int, None),
-                    "input_id": safe_read(node, "input-id", int, None),
-                    "input_type": InputType.to_enum(safe_read(node, "input-type", str, None))}
+                    "device_id": safe_read(node, "vjoy-id", int, 1),
+                    "input_id": safe_read(node, "input-id", int, 1),
+                    "input_type": InputType.to_enum(safe_read(node, "input-type", str, ""))}
 
     def to_xml(self):
         ''' read user plugin saved variable data '''

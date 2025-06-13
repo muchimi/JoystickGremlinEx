@@ -125,9 +125,9 @@ class KeyboardCondition(AbstractCondition):
         """
 
         super().from_xml(node, data)
-        self.comparison = safe_read(node, "comparison")
-        self.scan_code = safe_read(node, "scan-code", int)
-        self.is_extended = parse_bool(safe_read(node, "extended"))
+        self.comparison = safe_read(node, "comparison", str, "")
+        self.scan_code = safe_read(node, "scan-code", int, 0)
+        self.is_extended = parse_bool(safe_read(node, "extended", str, ""))
         input_item = None
         for child in node:
             if child.tag=="input":
@@ -277,7 +277,7 @@ class StateCondition(AbstractCondition):
         self.key = node.get("key")
         if "description" in node.attrib:
             self.description = node.get("description")
-        self.comparison = safe_read(node, "comparison")
+        self.comparison = safe_read(node, "comparison", str, "")
         self.ignore_release = safe_read(node,"ignore-release",bool,False)
         sd =  gremlin.ui.state_device.StateData()
         sd.register(self.key, description = self.description)
@@ -329,12 +329,12 @@ class VJoyCondition(AbstractCondition):
         """
 
         super().from_xml(node, data)
-        self.comparison = safe_read(node, "comparison")
+        self.comparison = safe_read(node, "comparison", str, "")
         if not "input" in node.attrib:
             syslog.error("VJOY XML: invalid input in XML - NULL ")
             return
         
-        self.input_type = InputType.to_enum(safe_read(node, "input"))
+        self.input_type = InputType.to_enum(safe_read(node, "input", str, ""))
 
         input_id = safe_read(node, "id", int, 0)
         vjoy_id = safe_read(node, "vjoy-id", int, 0)
@@ -416,7 +416,7 @@ class InputActionCondition(AbstractCondition):
         :param node the XML node to parse for data
         """
         super().from_xml(node, data)
-        self.comparison = safe_read(node, "comparison")
+        self.comparison = safe_read(node, "comparison", str, "")
         
 
     def to_xml(self):
@@ -1001,7 +1001,7 @@ class ConditionHelper:
                 xml = oc.data
                 node = lxml.etree.fromstring(xml)
                 if node.tag == 'condition':
-                    condition_type = safe_read(node, "condition-type")
+                    condition_type = safe_read(node, "condition-type",str, "")
                     condition = gremlin.base_conditions.ActivationCondition.condition_lookup[condition_type]()
                     condition.from_xml(node, data)
                     condition.setId(gremlin.util.get_guid())

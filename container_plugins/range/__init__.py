@@ -756,21 +756,21 @@ class RangeContainer(AbstractContainer):
         ''' reads configuration '''
         try:
             if "any" in node.attrib:
-                self.any_change_mode = safe_read(node, "any", bool)
+                self.any_change_mode = safe_read(node, "any", bool, False)
             if "delta" in node.attrib:
-                self.any_change_delta = safe_read(node, "delta", int)
+                self.any_change_delta = safe_read(node, "delta", int, 0)
             if "min" in node.attrib:
-                self.range_min = safe_read(node, "min", float)
+                self.range_min = safe_read(node, "min", float, -1)
             if "max" in node.attrib:
-                self.range_max = safe_read(node, "max", float)
+                self.range_max = safe_read(node, "max", float, 1)
             if "min_inc" in node.attrib:
-                self.range_min_included = safe_read(node, "min_inc", bool)
+                self.range_min_included = safe_read(node, "min_inc", bool, False)
             if "max_inc" in node.attrib:
-                self.range_min_included = safe_read(node, "max_inc", bool)
+                self.range_min_included = safe_read(node, "max_inc", bool, False)
             if "sym" in node.attrib:
-                self.symmetrical = safe_read(node, "sym",bool)
+                self.symmetrical = safe_read(node, "sym",bool, False)
             if "direction" in node.attrib:
-                self.any_change_direction = safe_read(node,"direction",int)
+                self.any_change_direction = safe_read(node,"direction",int, 0)
             if "autorelease" in node.attrib:
                 self.autorelease = safe_read(node,"autorelease", bool, False)
             

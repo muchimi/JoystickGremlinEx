@@ -4852,7 +4852,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             if self.action_mode == VjoyAction.VJoyHatToButton:
                 hat_nodes = util.get_xml_child(node,"hat_to_button", multiple = True)
                 for node_hat in hat_nodes:
-                    name = safe_read(node_hat,"name",str)
+                    name = safe_read(node_hat,"name",str, "")
                     position = vjoy.vjoy.Hat.name_to_direction[name]
                     button_id = safe_read(node_hat,"input",int,1)
                     self.hat_map[position] = button_id
