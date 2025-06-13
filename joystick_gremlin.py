@@ -34,6 +34,8 @@ import traceback
 import threading
 from threading import Lock
 import webbrowser
+import faulthandler
+
 
 import dinput
 from lxml import etree
@@ -4498,6 +4500,7 @@ if __name__ == "__main__":
 
 
 
+
     gremlin.shared_state.ui_ready = False
 
     # log file configuration
@@ -4506,6 +4509,12 @@ if __name__ == "__main__":
     
     system_log_path = os.path.join(app_path, "system.log")
     user_log_path = os.path.join(app_path, "user.log")
+
+    fault_log_path = os.path.join(app_path,"fault.log")
+    if os.path.isfile(fault_log_path):
+        os.unlink(fault_log_path)
+    with open(fault_log_path,"w") as fl:
+        faulthandler.enable(file=fl)
 
     gremlin.shared_state.app_path = app_path
     gremlin.shared_state.system_log = system_log_path
@@ -4648,6 +4657,8 @@ if __name__ == "__main__":
             QtWidgets.QMessageBox.Ok
         )
         error_display.show()
+
+
         app.exec_()
 
         gremlin.joystick_handling.VJoyProxy.reset()
