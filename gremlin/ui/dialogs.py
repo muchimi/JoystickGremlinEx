@@ -722,6 +722,12 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         filter_widget, _ = gremlin.ui.ui_common.getHContainer([self.filter_axis_widget, QtWidgets.QLabel("Threshold:"), self.filter_axis_threshold_widget])
 
+
+        self.tts_enabled_widget = QtWidgets.QCheckBox("Enable Voice (TTS)")
+        self.tts_enabled_widget.setChecked(self.config.tts_enabled)
+        self.tts_enabled_widget.clicked.connect(self._tts_changed)
+        self.tts_enabled_widget.setToolTip("Enables or disables voice (text to speech)")
+
         column_widget = QtWidgets.QWidget()
         column_widget.setContentsMargins(0,0,0,0)
         column_layout = QtWidgets.QGridLayout(column_widget)
@@ -749,6 +755,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         widget, layout = gremlin.ui.ui_common.getHContainer(self.mouse_wheel_delay_widget,"Mouse Wheel Release:")
         column_layout.addWidget(widget, row, col)
+        row+=1
+        column_layout.addWidget(self.tts_enabled_widget, row, col)
 
 
         # column 2
@@ -1782,6 +1790,13 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _filter_axis_event_update(self, checked : bool):
         self.config.filter_axis_events = checked
+
+    @QtCore.Slot(bool)
+    def _tts_changed(self, checked : bool):
+        self.config.tts_enabled = checked
+        el = gremlin.event_handler.EventListener()
+        el.tts_change.emit(checked)
+
     
     @QtCore.Slot(float)
     def _filter_axis_threshold_update(self, value : float):

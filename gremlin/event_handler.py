@@ -509,6 +509,8 @@ class EventListener(QtCore.QObject):
 	copy_condition = QtCore.Signal(object) # (condition or activation condition)
 
 	show_container_id_changed = QtCore.Signal() # fires when condition ID show on/off changed in configuration - this is to update affected widgets
+
+	tts_change = QtCore.Signal(bool) # fires when TTS enable/disabled changes
 	
 
 	def __init__(self):

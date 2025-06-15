@@ -27,6 +27,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 import threading
 import gremlin.threading
+import multiprocessing
 from . import event_handler, util
 import pyttsx3
 import gremlin.singleton_decorator
@@ -46,22 +47,26 @@ class TextToSpeech:
         # syslog = logging.getLogger("system")
         self.valid = False
         el = gremlin.event_handler.EventListener()
+        el.tts_change.connect(self._tts_changed)
         el.shutdown.connect(self.end)
         self._lock = threading.Lock()
 
         self._current_rate  = 100 # default rate (global)
+
+        config = gremlin.config.Configuration()
+        verbose = config.verbose
 
         try:
             self.engine = pyttsx3.init()
             self.voices = self.engine.getProperty('voices')
             self.default_voice = next((voice for voice in self.voices if "David Desktop" in voice.name), None)
             self._started = False
-            self.valid = True
+            self.valid = config.tts_enabled
             self._tts_thread = None
             self._queue_thread = None
             self._queue = []
 
-            verbose = gremlin.config.Configuration().verbose
+            
             if verbose:
                 syslog.info(f"TTS voice listing:")
                 for voice in self.voices:
@@ -69,8 +74,8 @@ class TextToSpeech:
                 if self.default_voice:
                     syslog.info(f"TTS default voice: {self.default_voice.name}  (id: {self.default_voice.id})")
 
-
-            self.start()
+            if self.valid:
+                self.start()
 
 
         except Exception as err:
@@ -78,7 +83,14 @@ class TextToSpeech:
                 
 
         
-
+    @QtCore.Slot(bool)
+    def _tts_changed(self, enabled : bool):
+        self.valid = enabled
+        if enabled:
+            self.start()
+        else:
+            self.stop()
+        
 
 
     def getVoices(self):
@@ -132,7 +144,7 @@ class TextToSpeech:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
     def speak_single(self, text, rate = None, threaded = True):        
-        if text:
+        if text and self.valid:
             # syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose
             if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
@@ -169,13 +181,19 @@ class TextToSpeech:
 
     def stop(self):
         ''' stops any speech '''
-        if not self.valid:
+        if not self._started:
             return
         try:
+            syslog.info("TTS: stop")
+            self._queue_thread.stop()
+            self._queue_thread.join()
+            self._tts_thread.stop()
+            self._tts_thread.join()
             self.engine.stop()
             self._lock.acquire_lock()
             self._queue.clear()
             self._lock.release_lock()
+            self._started = False
 
         except Exception as err:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
@@ -185,6 +203,7 @@ class TextToSpeech:
         if not self.valid:
             return
         if not self._started:
+            syslog.info("TTS: start")
             self._tts_thread = gremlin.threading.AbortableThread(target = self._tts_runner)
             self._tts_thread.start()
             self._queue_thread = gremlin.threading.AbortableThread(target= self._queue_runner)
@@ -198,7 +217,7 @@ class TextToSpeech:
         threading.current_thread().reset()
         self.engine.startLoop(False)
         while not self._tts_thread.stopped():
-            time.sleep(0.1)
+            time.sleep(0.05)
             self.engine.iterate()
             
         self.engine.endLoop()
@@ -216,7 +235,7 @@ class TextToSpeech:
                 self._lock.release_lock()
                 if verbose: syslog.info("TTS: POP queue")
                 functor()
-            time.sleep(0.1)
+            time.sleep(0.05)
 
         # terminate any remaining queue items
         self._queue.clear()

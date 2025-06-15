@@ -2264,3 +2264,12 @@ class Configuration(QtCore.QObject):
     @stop_profile_on_sim_stop.setter
     def stop_profile_on_sim_stop(self, value : bool):
         self._set_data("stop_profile_on_sim_stop", value)
+
+    @property
+    def tts_enabled(self) -> bool:
+        return self._get_data("tts_enabled", True)
+    @tts_enabled.setter
+    def tts_enabled(self, value : bool):
+        self._set_data("tts_enabled", value)
+
+        
