@@ -307,12 +307,8 @@ class SequenceContainer(AbstractContainer):
     input_types = [
         InputType.JoystickButton,
         InputType.JoystickHat,
-        InputType.Keyboard,
-        InputType.KeyboardLatched,
-        InputType.OpenSoundControl,
-        InputType.Midi,
-        InputType.Mouse
     ]
+    
     interaction_types = [
         gremlin.ui.input_item.ActionSetView.Interactions.Up,
         gremlin.ui.input_item.ActionSetView.Interactions.Down,

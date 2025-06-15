@@ -119,9 +119,8 @@ class SwitchWidget(QtWidgets.QWidget):
         device_layout.addWidget(QtWidgets.QLabel("Button:"))
         device_layout.addWidget(self.selector_input_widget)
 
-        self.listen_widget = gremlin.ui.ui_common.QDataPushButton("Listen")
+        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb)
         self.listen_widget.data = data
-        self.listen_widget.clicked.connect(self._listen_cb)
         device_layout.addWidget(self.listen_widget)
 
         
@@ -602,6 +601,7 @@ class SwitchContainer(AbstractContainer):
     # override default allowed inputs here
     input_types = [
         InputType.JoystickButton,
+        InputType.JoystickHat
     ]
 
     interaction_types = [

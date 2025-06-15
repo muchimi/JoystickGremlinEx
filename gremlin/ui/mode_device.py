@@ -71,6 +71,20 @@ class ModeInputModeType(enum.IntEnum):
         return f"Unknown mode: {value}"
 
        
+class ModeInputItem(gremlin.base_profile.InputItem):
+    ''' Input Item for mode entries '''
+    def __init__(self, custom_name_handler):
+        super().__init__(custom_name_handler)
+        self.device_name = "Mode"
+        self.input_type = InputType.ModeControl
+        self.device_guid = gremlin.shared_state.mode_tab_guid
+        self.description = "Enter mode actions"
+        self.descriptionReadOnly = True
+
+    def getOverrideInputType(self):
+        ''' override type '''
+        return InputType.JoystickButton
+
 
 
 class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
@@ -124,6 +138,28 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
+
+        config = gremlin.config.Configuration()
+        if config.show_container_id:
+            device = gremlin.joystick_handling.get_device(self.device_guid)
+            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.device_id)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            self.addLeftPanelWidget(widget)
+            w1 = widget
+
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.name)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            self.addLeftPanelWidget(widget)
+            w2 = widget
+
+            gremlin.ui.ui_common.synchronize_grids([w1, w2])        
 
         self.addLeftPanelWidget(self.input_item_list_view)
 
@@ -197,25 +233,16 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         changed = False
 
         if not ModeInputModeType.ModeEnter in config[InputType.ModeControl]:
-            modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler)
+            modeEnter = ModeInputItem(self._custom_name_handler)
             modeEnter.input_id = ModeInputModeType.ModeEnter
-            modeEnter.device_name = "Mode"
-            modeEnter.input_type = InputType.ModeControl
-            modeEnter.device_guid = gremlin.shared_state.mode_tab_guid
-            modeEnter.description="Enter mode actions"
             config[InputType.ModeControl][ModeInputModeType.ModeEnter] = modeEnter
             changed = True
         config[InputType.ModeControl][ModeInputModeType.ModeEnter].descriptionReadOnly = True
 
         
         if not ModeInputModeType.ModeExit in config[InputType.ModeControl]:
-            modeExit = gremlin.base_profile.InputItem(self._custom_name_handler)
-            modeExit.device_name = "Mode"
-            modeExit.device_guid = gremlin.shared_state.mode_tab_guid
-            modeExit.input_type = InputType.ModeControl
+            modeExit = ModeInputItem(self._custom_name_handler)
             modeExit.input_id = ModeInputModeType.ModeExit
-            modeExit.description="Exit mode actions"
-            modeExit.descriptionReadonly = True
             config[InputType.ModeControl][ModeInputModeType.ModeExit] = modeExit
             changed = True
         config[InputType.ModeControl][ModeInputModeType.ModeExit].descriptionReadOnly = True

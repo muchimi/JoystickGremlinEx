@@ -139,6 +139,11 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     functor = SwitchModeFunctor
     widget = SwitchModeWidget
 
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]    
+
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent

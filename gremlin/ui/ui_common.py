@@ -4581,6 +4581,9 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         
         if value is None:
             return
+        if isinstance(value, list) and value:
+            value = value[0]
+
         
         if calibrated_value is None:
             calibrated_value = value
@@ -5637,11 +5640,15 @@ class QRowSelectorFrame(QtWidgets.QFrame):
         self._data = value
 
 
-def get_text_width(text):
+def get_text_width(text, percent = 30):
     ''' gets the average text width '''
-    lbl = QtWidgets.QLabel("M")
+    lbl = QtWidgets.QLabel("W")
+    #width = lbl.sizeHint().width()
     char_width = lbl.fontMetrics().averageCharWidth()
-    return char_width * (len(text) if text else 1)
+    width =  char_width * (len(text) if text else 1)
+    if percent:
+        width += int(width * percent / 100)
+    return width
 
 def get_text_height(text = None):
     ''' gets the average text width '''
@@ -5653,7 +5660,7 @@ def get_text_height(text = None):
 
 
 def get_char_width(count = 1):
-    return get_text_width("w") * count
+    return get_text_width("W") * count
 
 
 
@@ -6987,10 +6994,21 @@ class QSplitTabWidget(QDataWidget):
         if widget is not None:
             self._left_container_layout.addWidget(widget)
 
-    # def setRightPanelWidget(self, widget : QtWidgets.QWidget):
-    #     ''' sets the right panel widget (only contains a single widget)'''
-    #     self.clearRightPanel()
-    #     self.addRightPanelWidget(widget)
+    def setRightPanelWidget(self, widget : QtWidgets.QWidget):
+        ''' sets the right panel widget (only contains a single widget)'''
+        pass
+        # widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
+        # found = False
+        # for w in widgets:
+        #     if w == widget:
+        #         w.setVisible(True)
+        #         found = True
+        #     w.setVisible(False)
+
+        # if not found and widget is not None:
+        #     self._right_container_layout.addWidget(widget)
+        #     widget.setVisible(True)
+        
         
 
 
@@ -7361,10 +7379,13 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, parent 
         layout.addStretch()
     return (widget, layout)
 
-def getGridContainer(widget_or_list = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None ):
+
+
+
+def getGridContainer(widget_or_list = None, label = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None ):
     ''' gets a qt grid container widget
      
-    :param widget_or_list: the widget or widgets to add to the next row - if the item is a string, it's converted to a label
+    :param widget_or_list: the widget or widgets to add to the next row - if the item is a string, it's converted to a label, use "|" for a separator
     :param alignment: cell alignment
     :param start_col: starting column where to add the new widget, starting from the left column
     :param start_row: starting row where to add the new widgets
@@ -7391,16 +7412,28 @@ def getGridContainer(widget_or_list = None, alignment = QtCore.Qt.AlignmentFlag.
     
     
     if widget_or_list:
-        if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
-            for item in widget_or_list:
-                if isinstance(item, str):
+        if isinstance(widget_or_list, tuple):
+            widget_or_list = [item for item in widget_or_list]
+        elif not isinstance(widget_or_list, list):
+            widget_or_list = [widget_or_list]
+        
+        if label:
+            if isinstance(label, str):
+                if label == "|": 
+                    # separator
+                    item = QHorizontalSeparator()
+                else:
+                    item = QtWidgets.QLabel(label)
+                widget_or_list.insert(0, item)
+
+        for item in widget_or_list:
+            if isinstance(item, str):
+                if item == "|": 
+                    # separator
+                    item = QHorizontalSeparator()
+                else:
                     item = QtWidgets.QLabel(item)
-                layout.addWidget(item, row, col)
-                col+=1
-        else:
-            if isinstance(widget_or_list, str):
-                widget_or_list = QtWidgets.QLabel(widget_or_list)
-            layout.addWidget(widget_or_list, row, col)
+            layout.addWidget(item, row, col)
             col+=1
 
     if stretch:
@@ -7442,6 +7475,7 @@ def synchronize_grids(grid_widget_list : list, fill_buttons = True):
                                 # push button with text
                                 widgets.append(widget)
                         width = max(width, widget_item.minimumSize().width())
+                        #width = max(width, widget.sizeHint().width())
 
         for g in layouts:
             g.setColumnMinimumWidth(col, width)
@@ -8185,8 +8219,8 @@ class QVjoySelector(QtWidgets.QWidget):
 
         self.selector_device_widget = NoWheelComboBox()
         self.selector_input_widget = NoWheelComboBox()
-        listen_widget = QtWidgets.QPushButton("Listen")
-        listen_widget.clicked.connect(self._stepped_listen)
+        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._stepped_listen)
+        
 
         device_widget = QtWidgets.QWidget()
         device_layout = QtWidgets.QGridLayout(device_widget)

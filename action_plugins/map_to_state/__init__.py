@@ -373,6 +373,11 @@ class MapToState(gremlin.base_profile.AbstractAction):
     functor = MapToStateFunctor
     widget = MapToStateWidget
 
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
+
     def __init__(self, parent):
         """Creates a new instance.
 

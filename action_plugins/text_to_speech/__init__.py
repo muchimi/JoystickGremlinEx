@@ -191,6 +191,11 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     #     InputType.Keyboard
     # ]
 
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
+
     functor = TextToSpeechFunctor
     widget = TextToSpeechWidget
 

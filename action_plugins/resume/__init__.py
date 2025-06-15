@@ -69,6 +69,11 @@ class ResumeAction(gremlin.base_profile.AbstractAction):
     #     InputType.Keyboard
     # ]
 
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
+
     functor = ResumeActionFunctor
     widget = ResumeActionWidget
 

@@ -684,8 +684,8 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self.clear_widget.clicked.connect(self._clear_button_cb)
         self.clear_widget.setToolTip("Clears the selection")
 
-        self.listen_widget = QtWidgets.QPushButton("Listen")
-        self.listen_widget.clicked.connect(self._listen_cb)
+        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb)
+        
 
         widgets = [gremlin.ui.ui_common.QDataRadioButton("Small",1),
                    gremlin.ui.ui_common.QDataRadioButton("Large",2)

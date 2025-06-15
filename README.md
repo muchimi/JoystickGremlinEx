@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T12)
+- Fix: resolved multiple UI issues due to recent API changes.
+- Fix: resolved an issue with invert settinmg on vjoyremap not observed due to API change.
+- Fix: Action and container list incompatible with current input no longer displayed (this was suspended a while back as new devices that can change their input types were introduced)  
+- Improved: OSC inputs functional with Vjoyremap repeaters.
+
+
 ### (m76T11B)
 - Fix: (WIP) import remap would load empty devices if more than one mapping was selected due to empty nodes duplicated in the XML profile data.
 - Fix: After a remap, UI would show disconnected device as connected.  

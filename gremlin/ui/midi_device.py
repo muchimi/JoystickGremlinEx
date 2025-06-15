@@ -182,16 +182,23 @@ class MidiInputItem(AbstractInputItem):
             if isinstance(value, int) or isinstance(value, str):
                 value = MidiInputItem.InputMode(value)
 
-            if value == MidiInputItem.InputMode.Axis:
-                return "Axis"
-            if value == MidiInputItem.InputMode.Button:
-                return "Button"
-            if value == MidiInputItem.InputMode.OnChange:
-                return "Change"
+            match value:
+                case MidiInputItem.InputMode.Axis:
+                    return "Axis"
+                case MidiInputItem.InputMode.Button:
+                    return "Button"
+                case MidiInputItem.InputMode.OnChange:
+                    return "Change"
+                
+            return "Button"
             
-        
-        
-
+    def getOverrideInputType(self):
+        ''' override type '''
+        match self._mode:
+            case MidiInputItem.InputMode.Axis:
+                return InputType.JoystickAxis
+            case _:
+                return InputType.JoystickButton
 
     def __init__(self):
         super().__init__()
@@ -852,8 +859,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         
 
         # listen all ports button 
-        self.listen_widget = QtWidgets.QPushButton("Listen (All)")
-        self.listen_widget.clicked.connect(self._listen_cb)
+        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb)
 
         # listen current port button
         self.listen_filter_widget = QtWidgets.QPushButton("Listen")
@@ -1471,6 +1477,28 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         self._last_selected_index = -1 # last index selected, -1 = none
 
+        config = gremlin.config.Configuration()
+        if config.show_container_id:
+            device = gremlin.joystick_handling.get_device(self.device_guid)
+            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.device_id)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            self.addLeftPanelWidget(widget)
+            w1 = widget
+
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.name)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            self.addLeftPanelWidget(widget)
+            w2 = widget
+
+            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+
 
         self.addLeftPanelWidget(self.input_item_list_view)
 
@@ -1528,8 +1556,9 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         
-        widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="MIDI Blank InputConfigItem (clear inputs)")     
-        self.setRightPanelWidget(widget)
+        # widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="MIDI Blank InputConfigItem (clear inputs)")     
+        # self.setRightPanelWidget(widget)
+        self._blank_input()
 
 
     def itemAt(self, index):
@@ -1566,28 +1595,23 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_type = InputType.Midi
 
         if item_data:
-            
-            config = gremlin.config.Configuration()
             device_guid = self.device_guid
             key = self.getWidgetKey(input_id)
-            
-            config.set_last_input(device_guid, input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
                 widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"MIDI: {item_data.display_name}")
-                self.registerWidget(KeyboardInterrupt, widget)
-            
-            self.selectRegisteredWidget(widget)
-            
+                self.registerWidget(key, widget)
+
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
-            #self.input_item_list_view.select_item(index, False)
+            self.selectRegisteredWidget(key)
 
         else:
-            widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="MIDI Blank InputConfigItem (no item data)")     
-            self.setRightPanelWidget(widget)
+            item_data = MidiInputItem()
+            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name="MIDI Blank InputConfigItem (no item data)")     
+            
 
         self._last_selected_index = index            
         self._item_data = widget
@@ -1727,7 +1751,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.update_item(index)
 
         #self.input_item_list_view.update_item(index)
-        self._select_item_cb(self._index) # forces update and redraw if mode changed
+        #self._select_item_cb(self._index) # forces update and redraw if mode changed
 
 
     def _close_item_cb(self, widget, index, data):
@@ -1816,7 +1840,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         icon = None
         if is_warning:
-            icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color="red")
+            icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=gremlin.ui.ui_common.Color.warningColor())
 
 
         input_widget.setStatus(status_text, icon)

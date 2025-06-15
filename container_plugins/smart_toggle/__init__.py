@@ -22,7 +22,7 @@ import logging
 import threading
 import time
 from lxml import etree as ElementTree
-
+from gremlin.input_types import InputType
 from PySide6 import QtWidgets, QtCore
 
 
@@ -320,6 +320,11 @@ class SmartToggleContainer(AbstractContainer):
     #     InputType.JoystickHat,
     #     InputType.Keyboard
     # ]
+    
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
     interaction_types = []
 
     functor = SmartToggleContainerFunctor

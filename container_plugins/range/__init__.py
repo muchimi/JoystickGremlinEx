@@ -699,7 +699,7 @@ class RangeContainer(AbstractContainer):
     tag = "range"
 
     # this container only works with axis inputs
-    input_types = [InputType.JoystickAxis, InputType.OpenSoundControl, InputType.Midi]
+    input_types = [InputType.JoystickAxis]
 
     # allowed interactions with this container
     interaction_types = [

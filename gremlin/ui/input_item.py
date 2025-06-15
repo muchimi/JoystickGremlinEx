@@ -24,6 +24,7 @@ import gremlin
 import gremlin.config
 import gremlin.config
 import gremlin.config
+import gremlin.config
 import gremlin.event_handler
 import gremlin.types
 import gremlin.base_conditions
@@ -597,6 +598,7 @@ class InputItemListView(ui_common.AbstractView):
                             widget.setIcon("ei.fullscreen")
                         widget.create_action_icons(data)
                         widget.setDescription(data.description)
+                    widget._update_container_id()
 
                     self.scroll_layout.addWidget(widget)
                     
@@ -1381,6 +1383,8 @@ class InputItemWidget(QBoxFrame):
 
         self._title_container_layout.addWidget(self._input_button_widget, data_row, 1)
         self._title_container_layout.addWidget(self._edit_button_widget, data_row, 2)
+  
+
 
 
         # axis only control buttons
@@ -1502,6 +1506,13 @@ class InputItemWidget(QBoxFrame):
         self.setMinimumWidth(200)
         self.main_layout.addWidget(self._container_widget)
 
+        # container IDs associated with input for diagnostics purposes
+        config = gremlin.config.Configuration()
+        if config.show_container_id:
+            self._container_id_widget, self._container_id_layout = gremlin.ui.ui_common.getVContainer()
+            self.main_layout.addWidget(self._container_id_widget)
+            self._update_container_id()
+
 
         el = gremlin.event_handler.EventListener()
         el.action_created.connect(self._action_changed_cb)
@@ -1522,6 +1533,22 @@ class InputItemWidget(QBoxFrame):
 
         self._ui_loaded = True
         self.update_display()
+
+
+
+    def _update_container_id(self):
+        ''' updates container ID display for associated containers with this input '''
+        config = gremlin.config.Configuration()
+        if config.show_container_id:
+            gremlin.util.clear_layout(self._container_id_layout)
+            if self.data:
+                for index, container in enumerate(self.data.containers):
+                    line_edit = gremlin.ui.ui_common.QDataLineEdit()
+                    line_edit.setText(container.id)
+                    line_edit.setReadOnly(True)
+                    widget, _ = gremlin.ui.ui_common.getHContainer(line_edit, f"[{index}] {container.name}")
+                    self._container_id_layout.addWidget(widget)
+
 
     def _cleanup_ui(self):
         ''' called when widget is removed '''
@@ -1705,9 +1732,8 @@ class InputItemWidget(QBoxFrame):
 
     @QtCore.Slot(object)
     def _mapping_changed_cb(self, item_data):
-        pass
-        # # if item_data == self.data:
-        #     self.create_action_icons(self.data)
+        if item_data == self.data:
+            self._update_container_id()
         
                 
 

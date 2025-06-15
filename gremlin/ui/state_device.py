@@ -323,6 +323,10 @@ class StateInputItem(AbstractInputItem):
 
         self._input_item = item
 
+    def getOverrideInputType(self):
+        ''' override type '''
+        return InputType.JoystickButton
+    
     @property
     def id(self) -> str:
         return self._id
@@ -1458,6 +1462,28 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.filter_widget = StateFilterWidget()
         self.filter_widget.changed.connect(self._category_filter_changed)
         self._category_filter = self.filter_widget.category # current category
+
+        config = gremlin.config.Configuration()
+        if config.show_container_id:
+            device = gremlin.joystick_handling.get_device(self.device_guid)
+            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.device_id)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            self.addLeftPanelWidget(widget)
+            w1 = widget
+
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.name)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            self.addLeftPanelWidget(widget)
+            w2 = widget
+
+            gremlin.ui.ui_common.synchronize_grids([w1, w2])        
         
         self.addLeftPanelWidget(self.filter_widget)
 
@@ -1639,9 +1665,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.redraw()
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        
-        widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="STATE Blank InputConfigItem (clear inputs)")     
-        self.setRightPanelWidget(widget)
+        self._blank_input()
             
     def _update_handler(self, model, emit_change = True):
         ''' called when the data model for the input list needs to be updated - refreshes the model view '''

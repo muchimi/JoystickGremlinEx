@@ -27,6 +27,7 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.input_devices
 import gremlin.input_devices
+import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.shared_state
 from gremlin.types import DeviceType
@@ -1790,7 +1791,7 @@ class OscServer():
     
 @SingletonDecorator
 class OscInterface(QtCore.QObject):
-    ''' GremlinEX Open Sound Control interface '''
+    ''' GremlinEX Open Sound Control/Open Stage Control interface '''
 
     osc_message = QtCore.Signal(str, object) # signal on receiving an osc message
 
@@ -1813,6 +1814,7 @@ class OscInterface(QtCore.QObject):
         
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
         config = gremlin.config.Configuration()
+
         self._started = False
         self._input_port = config.osc_input_port
         self._output_port = config.osc_output_port # self._input_port + 1
@@ -1833,6 +1835,7 @@ class OscInterface(QtCore.QObject):
         
 
         self._started = False
+
  
     def setHostIp(self, host_ip):
         ''' sets a new host IP for the OSC server '''
@@ -2008,6 +2011,7 @@ class OscInterface(QtCore.QObject):
             return
         self.osc_message.emit(address, args)
 
+
     def start(self):
         ''' starts listening to OSC messages '''
 
@@ -2097,6 +2101,14 @@ class OscInputItem(AbstractInputItem):
         tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self.getCompoundMessageKey(), self._guid)
         client = InputOscClient()
         client.registerInput(self)
+
+    def getOverrideInputType(self):
+        match self._mode:
+            case OscInputItem.InputMode.Button:
+                return InputType.JoystickButton
+            case OscInputItem.InputMode.Axis:
+                return InputType.JoystickAxis
+        return self._input_type
 
     def getCompoundMessageKey(self):
         return f"{self._message_key}_{self._source_index}"
@@ -2726,8 +2738,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         
 
         # listen all ports button 
-        self.listen_widget = QtWidgets.QPushButton("Listen")
-        self.listen_widget.clicked.connect(self._listen_cb)
+        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb)
 
         self.button_layout.addWidget(self.listen_widget)
         self.button_layout.addStretch(1)
@@ -3147,117 +3158,6 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._update_display()  
 
 
-# class OscData(QtCore.QObject):
-#     ''' helper class for OSC data '''
-#     def __init__(self, model):
-#         super().__init__()
-#         self._model = model
-
-#     def getSelector(self, changed_callback = None, default_value : str = None, editable = False) -> gremlin.ui.ui_common.QDataComboBox:
-#         ''' gets a selector combo box for categories '''
-#         widget = gremlin.ui.ui_common.QDataComboBox()
-#         widget.setEditable(editable)
-#         widget.setValidator(OscMessageValidator(self._model))
-        
-#         index = 0
-#         select_index = None
-#         default_id = default_value.id if default_value else None
-#         osc: OscInputItem
-#         items = [(osc, index) for index, osc in self._model.items()]
-#         items.sort(key = lambda x:x[0].message.casefold())
-#         for osc, index in items:
-#             widget.addItem(osc.message, index)
-#             if select_index is None and default_value and osc.message.casefold() == default_value:
-#                 select_index = index
-#         widget.setMinimumWidth(200)
-#         if select_index is not None:
-#             widget.setCurrentIndex(select_index)
-#         if changed_callback:
-#             widget.currentIndexChanged.connect(changed_callback)
-            
-#         return widget
-        
-# class OscMessageValidator(QtGui.QValidator):
-#     ''' validator for OSC message selection '''
-#     def __init__(self, model):
-#         super().__init__()
-#         self._messages = None
-#         self._model = model
-
-#     def _update_categories(self):
-#         self._messages = (osc.message for osc in self._model.values())
-        
-            
-        
-#     def validate(self, value, pos):
-#         if not self._messages:
-#             self._update_categories()
-
-#         if not self._messages:
-#             return QtGui.QValidator.State.Invalid    
-
-#         clean_value = value.casefold().strip() if value else None
-#         if not clean_value or clean_value in self._messages:
-#             # blank is ok
-#             return QtGui.QValidator.State.Acceptable
-#         # match all values starting with the text given
-#         try:
-#             r = re.compile(clean_value + "*")
-#             for _ in filter(r.match, self._messages):
-#                 return QtGui.QValidator.State.Intermediate
-#         except:
-#             # invalid regex - probably a special char
-#             pass
-#         return QtGui.QValidator.State.Invalid
-
-
-# class  OscFilterWidget(QtWidgets.QWidget):
-#     ''' displays a filter widget that can be enabled, and an OSC message selected '''
-#     changed = QtCore.Signal(StateCategory)  # fires when the message filter is changed
-        
-#     def __init__(self, model, parent = None):
-#         super().__init__(parent)
-
-#         self._config = gremlin.config.Configuration()
-#         self._osc_model = OscData(model)
-
-#          # filter widget
-#         self._message_filter = None
-
-#         self.filter_enabled_widget = QtWidgets.QCheckBox("Enable Filtering")
-#         self.filter_enabled_widget.setToolTip("Enables filtering on the OSC inputs by message (command)")
-#         is_filter = self._config.osc_filter_enabled
-#         self.filter_enabled_widget.setChecked(is_filter)
-#         self.filter_enabled_widget.clicked.connect(self._filter_enabled_changed)
-
-#         self.filter_widget = self._osc_model.getSelector(self._filter_changed, self._message_filter)
-#         self.filter_widget.setEnabled(is_filter)
-#         self.filter_widget.setEditable(False) # don't allow editing of categories for the main filter
-#         widget, layout = gremlin.ui.ui_common.getHContainer([self.filter_enabled_widget, QtWidgets.QLabel(" Filter:"), self.filter_widget])
-#         self.setLayout(layout)
-
-#     @QtCore.Slot(bool)
-#     def _filter_enabled_changed(self, is_filter):
-#         self._config.osc_filter_enabled = is_filter
-#         self.filter_widget.setEnabled(is_filter) 
-#         has_categories = self.filter_widget.count()
-#         index = self.filter_widget.currentData() if is_filter and has_categories else None
-#         self.changed.emit(index)
-
-#     @QtCore.Slot()
-#     def _filter_changed(self):
-#         ''' called when the state category filter is changed '''
-#         category = self.filter_widget.currentData()
-#         self._category_filter = category
-#         gremlin.config.Configuration().state_category_filter = category.id if category else ""
-#         self.changed.emit(category)
-
-#     @property
-#     def message(self) -> StateCategory:
-#         ''' current category'''
-#         return self._message_filter
-        
-
 
 
 class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
@@ -3316,6 +3216,29 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
+        
+        config = gremlin.config.Configuration()
+        if config.show_container_id:
+            device = gremlin.joystick_handling.get_device(self.device_guid)
+            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.device_id)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            self.addLeftPanelWidget(widget)
+            w1 = widget
+
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.name)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            self.addLeftPanelWidget(widget)
+            w2 = widget
+
+            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+            
 
         self.addLeftPanelWidget(self.input_item_list_view)
 
@@ -3442,9 +3365,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.redraw()
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        
-        widget = gremlin.ui.joystick_device.InputItemConfiguration(object_name="OSC Blank InputConfigItem (clear inputs)")     
-        self.setRightPanelWidget(widget)
+        self._blank_input()
   
     @QtCore.Slot()
     def _add_input_cb(self):
@@ -3523,12 +3444,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_type = InputType.OpenSoundControl
 
         if item_data:
-            
-            config = gremlin.config.Configuration()
             device_guid = self.device_guid
-        
-            config.set_last_input(device_guid, input_type, input_id)
-
             key = self.getWidgetKey(input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
@@ -3541,12 +3457,12 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
-            #self.input_item_list_view.select_item(index, False)
             self.selectRegisteredWidget(key)
         else:
             item_data = OscInputItem()
             widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
-            self.setRightPanelWidget(widget)
+
+        #self.setRightPanelWidget(widget)
 
         self._last_selected_index = index 
         self._item_data = widget
@@ -3584,6 +3500,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.enable_close()
         widget.enable_edit()
         widget.setIcon("mdi.surround-sound")
+        
 
         # remember what widget is at what index
         widget.index = index
@@ -3709,15 +3626,12 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item._autorelease_delay = autorelease_delay
         input_item._source_index = self._edit_dialog.source_index
 
-        is_axis = mode == OscInputItem.InputMode.Axis
-
-        self._item_data.is_axis = is_axis
-        self._item_data.item_data.is_axis = is_axis
+        self._item_data.is_axis = input_item.is_axis
+        self._item_data.item_data.is_axis =  input_item.is_axis
 
         input_item._update() # refresh other properties
         self.input_item_list_view.update_item(index)
         
-        self._select_item_cb(self._index)
 
     def _index_for_key(self, input_id):
         ''' returns the index of the selected input id'''
@@ -3775,6 +3689,7 @@ class InputOscClient(QtCore.QObject):
         self._event_listener.options_changed.connect(self._options_changed)
         self._osc_map = {}  # map of message keys to inputs 
         self._started = False
+        self._state_data = {} # holds the state data from received messages
 
     @QtCore.Slot()            
     def _options_changed(self):
@@ -3865,7 +3780,10 @@ class InputOscClient(QtCore.QObject):
 
 
         # build a list of input items to OSC messages
+        if self._started:
+            return
         self._update_messages()
+        self._start()
        
         
 
@@ -3902,6 +3820,12 @@ class InputOscClient(QtCore.QObject):
             self._interface.osc_message.disconnect(self._osc_message_cb)
             self._interface = None
         self._started = False
+
+    def getData(self, address : str):
+        if self._started:
+            if address in self._state_data:
+                return self._state_data[address]
+        return None
         
 
     def _osc_message_cb(self, message, args):
@@ -3916,21 +3840,6 @@ class InputOscClient(QtCore.QObject):
         # look for the the message
         message_key = OscInputItem.toMessageKey(command, message, args)
         is_running = gremlin.shared_state.is_running
-
-
-        # look for the repeater widgets 
-        #widget_map = {}
-        #cache_hits = [key for key in cache if key.startswith(message)]
-        # for cache_key in cache_hits:
-        #     for key in cache[cache_key]:
-        #         widget = cache[cache_key][key]
-        #         if widget.guid == key:
-        #             if cache_key == message_key:
-        #                 source = 0
-        #             else:
-        #                 source = cache_key[:len(message_key)]
-        #             widget_map[source] = widget
-
         
         verbose = gremlin.config.Configuration().verbose_mode_osc
         normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args]
@@ -3944,7 +3853,7 @@ class InputOscClient(QtCore.QObject):
                 source_index = 0
 
             syslog.info(f"OSC: runtime: processing {message_key}  hit key: {hit_key}  source index: {source_index}")
-
+            input_item : OscInputItem
             for input_item in self._osc_map[hit_key]:
 
                 if input_item.source_index != source_index:
@@ -3990,6 +3899,8 @@ class InputOscClient(QtCore.QObject):
                         is_axis = True, 
                         override_input_type= InputType.JoystickAxis
                         )
+                    
+                    self._state_data[input_item.message] = normalized_args
 
                     self._event_listener.joystick_event.emit(event)
 

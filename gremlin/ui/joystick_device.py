@@ -30,6 +30,7 @@ import gremlin.base_profile
 import gremlin.base_profile
 import gremlin.config
 import gremlin.config
+import gremlin.config
 import gremlin.event_handler
 import gremlin.event_handler
 import gremlin.joystick_handling
@@ -40,12 +41,15 @@ import gremlin.types
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.ui
+import gremlin.ui.osc_device
 import gremlin.util
 from gremlin.util import safe_read
 import gremlin.ui.input_item as input_item
 import gremlin.ui.ui_common
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 from shiboken6 import Shiboken
+
+import gremlin.util
 
 
 syslog = logging.getLogger("system")
@@ -83,7 +87,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             # override input type
             self._input_type = input_type
         else:
-            if item_data is not None:
+            if item_data is not None and hasattr(item_data,"input_type"):
                 self._input_type = item_data.input_type
 
         self.setItemData(item_data)
@@ -157,10 +161,29 @@ class InputItemConfiguration(QtWidgets.QFrame):
                     self._blank_input()
                     return
             
+
+
+            if config.show_container_id:
+                # debug containter type
+                if self.item_data:
+                    if hasattr(self.item_data.input_id, "getOverrideInputType"):
+                        input_type = self.item_data.input_id.getOverrideInputType()
+                        label_name = f"Input Type: (override) {input_type.name}"
+                    else:
+                        input_type = self.item_data.input_type
+                        label_name = f"Input Type: {input_type.name}"
+                else:
+                    label_name = f"Input Type: N/A"
+                    
+                label = QtWidgets.QLabel(label_name)
+                self.main_layout.addWidget(label)
+
+            
             if not item_data.is_action:
                 # only draw description if not a sub action item
                 self._create_description()
-            
+
+
             if self.item_data.device_type == DeviceType.VJoy:
                 self._create_vjoy_dropdowns()
             else:
@@ -542,15 +565,18 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.dropdown_widget = QtWidgets.QWidget()
         self.dropdown_layout = QtWidgets.QHBoxLayout(self.dropdown_widget)
 
-        self.action_selector = ui_common.ActionSelector(
-            self._input_type,
-            None
-        )
+        # default input type
+        input_type = self._input_type
+        # check for an override for the inputs that can change types (such as OSC)
+        if hasattr(self.item_data.input_id, "getOverrideInputType"):
+            input_type = self.item_data.input_id.getOverrideInputType()
+
+        self.action_selector = ui_common.ActionSelector(input_type,None)
         self.action_selector.inputItem = self.item_data
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
 
-        self.container_selector = input_item.ContainerSelector(self._input_type, self.item_data.is_axis)
+        self.container_selector = input_item.ContainerSelector(input_type, self.item_data.is_axis)
         self.container_selector.container_added.connect(self._add_container)
         self.container_selector.container_copy.connect(self._copy_container)
         self.container_selector.container_paste.connect(self._paste_container)
@@ -634,8 +660,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
     def __eq__(self, other):
         if other is None:
             return False
-        if self.item_data and other.item_data:
-            return self.item_data.callbackKey() == other.item_data.callbackKey()
+        if hasattr(self,"item_data"):
+            if not hasattr(other,"item_data"):
+                return False
+            if self.item_data and other.item_data:
+                return self.item_data.callbackKey() == other.item_data.callbackKey()
         return self.id == other.id
 
 class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
@@ -870,6 +899,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         super().__init__(object_name, parent)
 
         import gremlin.plugin_manager
+        import gremlin.config
+        import gremlin.ui.ui_common 
+
+        config = gremlin.config.Configuration()
 
         # Store parameters
         
@@ -939,7 +972,28 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget, _ = gremlin.ui.ui_common.getHContainer([label_axis, label_button, label_hat, label_device, line_edit])
         self.addLeftPanelWidget(widget)
 
-        
+        if config.show_container_id:
+
+
+            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.device_id)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            self.addLeftPanelWidget(widget)
+            w1 = widget
+
+            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit.setText(device.name)
+            line_edit.setReadOnly(True)
+            line_edit.setMinimumWidth(width)
+            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            self.addLeftPanelWidget(widget)
+            w2 = widget
+
+            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+
         self.addLeftPanelWidget(self.input_item_list_view)
         
 
@@ -966,10 +1020,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._debug_widget = QtWidgets.QLabel("Debug widget")
             self._debug_widget.setMaximumHeight(32)
             self.addRightPanelWidget(self._debug_widget)
-
-        
-        
-        
 
         el = gremlin.event_handler.EventListener()
         # update on an edit mode change so we update the display

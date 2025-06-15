@@ -298,6 +298,11 @@ class CycleModes(gremlin.base_profile.AbstractAction):
         
     # ]
 
+    input_types = [
+        InputType.JoystickButton,
+        InputType.JoystickHat
+    ]
+
     functor = CycleModesFunctor
     widget = CycleModesWidget
 

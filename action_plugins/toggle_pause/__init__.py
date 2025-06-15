@@ -67,6 +67,10 @@ class TogglePauseAction(gremlin.base_profile.AbstractAction):
     #     InputType.JoystickHat,
     #     InputType.Keyboard
     # ]
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
 
     functor = TogglePauseActionFunctor
     widget = TogglePauseActionWidget

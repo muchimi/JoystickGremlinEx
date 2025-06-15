@@ -331,13 +331,9 @@ class Control(gremlin.base_profile.AbstractAction):
     
     input_types = [
         InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard,
-        InputType.KeyboardLatched,
-        InputType.OpenSoundControl,
-        InputType.Midi,
-        
+        InputType.JoystickHat
     ]
+
 
     def __init__(self, parent):
         super().__init__(parent)

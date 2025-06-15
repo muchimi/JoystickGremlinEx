@@ -834,6 +834,11 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
     #     InputType.Keyboard
     # ]
 
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
+
     functor = MapToMouseExFunctor
     widget = MapToMouseExWidget
 

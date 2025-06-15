@@ -493,6 +493,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         if self.action_data.input_is_axis():
             if value is None:
                 value = self.get_axis_value()
+
+            if value is None:
+                return # nothing to update
             match self.action_data.action_mode:
                 case VjoyAction.VJoyAxisToButton:
                     range_widget_visible = True
@@ -885,6 +888,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.reverse_checkbox = QtWidgets.QCheckBox("Reverse Axis")
         self.reverse_checkbox.setToolTip("When enabled, inverts the input")
+        self.reverse_checkbox.setChecked(self.action_data.reverse)
+        self.reverse_checkbox.clicked.connect(self._axis_reverse_changed)
 
 
 
@@ -953,7 +958,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.main_layout.addWidget(self.container_relative_widget)
         
-        self.reverse_checkbox.clicked.connect(self._axis_reverse_changed)
         self.absolute_checkbox.clicked.connect(self._axis_mode_changed)
         self.relative_checkbox.clicked.connect(self._axis_mode_changed)
         self.relative_scaling_widget.valueChanged.connect(self._axis_scaling_changed)
@@ -1258,7 +1262,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         dialog = gremlin.curve_handler.AxisCurveDialog(self.action_data.curve_data)
         util.centerDialog(dialog, dialog.width(), dialog.height())
         self.curve_update_handler = dialog.curve_update_handler
-        self._update_axis_widget(self._current_input_axis())
+        self._update_axis_widget()
 
         # disable highlighting
         gremlin.shared_state.push_suspend_highlighting()
@@ -1422,22 +1426,14 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         else:
-            if event.device_guid != self.action_data.hardware_device_guid:
+            if event.device_id != self.action_data.hardware_device_id:
+                # event not for us
                 return
             if event.identifier != self.action_data.hardware_input_id:
+                # event not for us
                 return
 
-
-        
-        if self.action_data.is_scaled() or self.action_data.reverse:
-            value = scale_to_range(value,
-                    target_min=self.action_data.output_range_min,
-                    target_max=self.action_data.output_range_max,
-                    invert = self.action_data.reverse)
-
-        if self.verbose_details: syslog.info(f"VJOY REMAP: Axis input: {event.value:0.3f}  Filtered: {value:0.3f}")
-
-        self._update_axis_widget(value)
+        self._update_axis_widget()
 
 
     def _current_input_axis(self):
@@ -1446,7 +1442,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                   self.action_data.hardware_input_id)
 
 
-    def _update_axis_widget(self, value : float = None):
+    def _update_axis_widget(self):
         ''' updates the axis output repeater with the value
 
         :param value: the floating point input value, if None uses the cached value
@@ -1454,29 +1450,14 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         '''
         # always read the current input as the value could be from another device for merged inputs
         if self.action_data.input_is_axis(): # == InputType.JoystickAxis:
-            raw_value = self.action_data.get_raw_axis_value()
-            if value is None:
-                # filter and merge the data
-                    
-                filtered_value = self.action_data.get_filtered_axis_value(raw_value)
-                value = filtered_value
-
-            if self.action_data.curve_data is not None:
-                # curve the data
-                value = self.action_data.curve_data.curve_value(value)
-                #self._repeater_axis_widget.show_curved = True
-            else:
-                #self._repeater_axis_widget.show_curved = False
-                pass
-
-            value = self.action_data.get_ranged_axis_value(value)
-
-
+            curves = [self.action_data.curve_data] if self.action_data.curve_data else None
+            value = self.action_data.get_filtered_axis_value(curves = curves)
+            
             # update the curved window if displayed
             if self.curve_update_handler is not None:
-                self.curve_update_handler(raw_value) # use the current axis input value, not the curved value
+                self.curve_update_handler(value) # use the current axis input value, not the curved value
 
-            self._update_repeater(value)
+            self._update_repeater()
 
 
 
@@ -2315,7 +2296,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def get_axis_value(self):
         ''' gets the current axis value'''
-        return gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+        #value = gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+        value = self.action_data.get_filtered_axis_value()
+        return value
     
     def _update_start_value(self):
         ''' updates the start value widget repeater '''
@@ -3170,9 +3153,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
             syslog.error(str(e))
 
-    @QtCore.Slot()
-    def _axis_reverse_changed(self):
-        self.action_data.reverse = self.reverse_checkbox.isChecked()
+    @QtCore.Slot(bool)
+    def _axis_reverse_changed(self, checked):
+        self.action_data.reverse = checked
 
     @QtCore.Slot()
     def _axis_mode_changed(self):
@@ -4288,23 +4271,42 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     def get_filtered_axis_value(self, value : float = None, curves : list = None) -> float:
         ''' computes the output value for the current configuration - applies curves if curves are provided  '''
 
-        if value is None:
-            if self.input_is_hardware():
-                value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
-            else:
-                # only curve physical hardware
-                return value
-            if value is None:
-                return 0
+        verbose_details = gremlin.config.Configuration().verbose_mode_inputs_extra
 
-            if curves:
-                for curve_data in curves:
-                    value = curve_data.curve_value(value)
+        axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+
+        if axis_value is None:
+            # not an axis type 
+            return None
+        
+        if isinstance(axis_value, list) and axis_value:
+            axis_value = axis_value[0]
+        
+        value = axis_value
+
+        if curves:
+            for curve_data in curves:
+                value = curve_data.curve_value(value)
+
         if self.action_mode == VjoyAction.VJoyAxis:
             # plain axis 
             if curves:
                 for curve_data in curves:
                     value = curve_data.curve_value(value)
+
+            # apply scale or invert to input
+            is_scaled = self.is_scaled()
+            is_reverse = self.reverse
+            if is_scaled or is_reverse:
+                value = scale_to_range(value,
+                        target_min=self.output_range_min,
+                        target_max=self.output_range_max,
+                        invert = is_reverse)
+                if verbose_details: syslog.info(f"VJOY REMAP: Axis input: {axis_value:0.3f}  scaled: {is_scaled} reversed: {is_reverse} Filtered: {value:0.3f}")    
+            else:
+                if verbose_details: syslog.info(f"VJOY REMAP: Axis input: {axis_value:0.3f} Filtered: {value:0.3f}")
+                
+
 
 
         elif self.action_mode == VjoyAction.VJoyMergeAxis and self.merge_mode != MergeOperationType.NotSet:
@@ -4370,6 +4372,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     
     def get_ranged_axis_value(self, value : float) -> float:
         ''' get scaled and ranged and inverted axis value'''
+        if value is None:
+            return value
         v1 = self.output_range_min
         v2 = self.output_range_max
         if v1 > v2:

@@ -56,8 +56,8 @@ class OscValueWidget(QtWidgets.QWidget):
         self.content_layout = QtWidgets.QGridLayout()
         
 
-        # self._frame_widget = gremlin.ui.ui_common.QBoxFrame()
         # self._frame_widget.setContentsMargins(0,0,0,0)
+        # self._frame_widget = gremlin.ui.ui_common.QBoxFrame()
         # self._frame_layout = QtWidgets.QHBoxLayout(self._frame_widget)
         self._is_axis = False # true if mapping to an axis input
         self._enabled = enabled

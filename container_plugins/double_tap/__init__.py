@@ -366,6 +366,12 @@ class DoubleTapContainer(AbstractContainer):
     #     InputType.JoystickHat,
     #     InputType.Keyboard
     # ]
+
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
+
     interaction_types = [
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,
     ]

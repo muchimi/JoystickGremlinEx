@@ -237,6 +237,12 @@ class ChainContainer(AbstractContainer):
     #     InputType.JoystickHat,
     #     InputType.Keyboard
     # ]
+
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
+
     interaction_types = [
         gremlin.ui.input_item.ActionSetView.Interactions.Up,
         gremlin.ui.input_item.ActionSetView.Interactions.Down,

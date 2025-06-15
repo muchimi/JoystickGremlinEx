@@ -1960,8 +1960,6 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
     # override default allowed input types here if not all
     input_types = [
         InputType.JoystickAxis,
-        InputType.OpenSoundControl,
-        InputType.Midi
     ]
 
     functor = GatedAxisFunctor

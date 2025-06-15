@@ -24,6 +24,7 @@ import dinput
 import time
 
 import gremlin.base_classes
+import gremlin.config
 import gremlin.event_handler
 import gremlin.input_types
 import gremlin.joystick_handling
@@ -210,13 +211,38 @@ def get_axis(guid, index, normalized = True):
     return 0.0
         
 
-def get_curved_axis(guid, index):
+def get_curved_axis(guid, identifier):
     ''' returns curved/calibrated data same as the event handler '''
+    import gremlin.ui.osc_device
+    import gremlin.ui.midi_device
+    import gremlin.config
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
-    eh = gremlin.event_handler.EventListener()
-    value = dinput.DILL.get_axis(guid, index)
-    return eh.apply_transforms(guid, index, value)
+
+    device = get_device(guid)
+    if not device.is_special:
+        eh = gremlin.event_handler.EventListener()
+        value = dinput.DILL.get_axis(guid, identifier)
+        return eh.apply_transforms(guid, identifier, value)
+    else:
+        if device.device_type == DeviceType.Osc and isinstance(identifier, gremlin.ui.osc_device.OscInputItem) and identifier.is_axis:
+            osc = gremlin.ui.osc_device.InputOscClient()
+            osc.start()
+            data = osc.getData(identifier.message) # gets data arguments or None if no data
+            return data
+        
+    return None
+            
+            
+
+
+
+            
+
+
+             
+
+    
 
 def get_hat(guid, index):
     ''' gets the current hat value '''

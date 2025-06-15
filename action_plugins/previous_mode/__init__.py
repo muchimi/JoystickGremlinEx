@@ -69,6 +69,11 @@ class PreviousMode(gremlin.base_profile.AbstractAction):
     #     InputType.Keyboard
     # ]
 
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
+
     functor = PreviousModeFunctor
     widget = PreviousModeWidget
 

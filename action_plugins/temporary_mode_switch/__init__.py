@@ -170,6 +170,11 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
     widget = TemporaryModeSwitchWidget
     functor = TemporaryModeSwitchFunctor
 
+    input_types = [
+         InputType.JoystickButton,
+         InputType.JoystickHat,
+    ]
+
     def __init__(self, parent):
         super().__init__(parent)
         self.setPriority(999)
