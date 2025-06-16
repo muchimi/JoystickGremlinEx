@@ -23,13 +23,15 @@ import threading
 import time
 from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore
 
 import gremlin
+import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
+from gremlin.util import safe_read, safe_format
 from gremlin.input_types import InputType
 
 syslog = logging.getLogger("system")
@@ -56,9 +58,18 @@ class ButtonContainerWidget(AbstractContainerWidget):
         """Creates the UI components."""
         self.profile_data.create_or_delete_virtual_button()
 
-        self.options_layout = QtWidgets.QHBoxLayout()
+        self.autorelease_widget = QtWidgets.QCheckBox("Auto-release")
+        self.autorelease_widget.setChecked(self.profile_data.autorelease)
+        self.autorelease_widget.clicked.connect(self._autorelease_changed)
+        self.autorelease_widget.setToolTip("When enabled, the actions will automatically receive a release trigger after the specified delay.")
 
-        self.action_layout.addLayout(self.options_layout)
+        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Autorelease Delay (ms):")
+        self.delay_widget.setValue(self.profile_data.autorelease_delay)
+        self.delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
+
+        widget, _ = gremlin.ui.ui_common.getHContainer([self.autorelease_widget, self.delay_widget],"Options")
+
+        self.action_layout.addWidget(widget)
 
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
@@ -87,6 +98,22 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 self.action_layout,
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
+
+        self._update_visible()
+
+    def _update_visible(self):
+        delay_visible = self.profile_data.autorelease
+        self.delay_widget.setVisible(delay_visible)
+            
+    @QtCore.Slot(bool)
+    def _autorelease_changed(self, checked):
+        self.profile_data.autorelease = checked
+        self._update_visible()
+
+    @QtCore.Slot(int)
+    def _autorelease_delay_changed_cb(self, value):
+        ''' Updates the autorelease delay '''
+        self.profile_data.autorelease_delay = value
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
@@ -195,27 +222,54 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
+        self.profile_data = container
+        self.last_trigger = None
+        self.autorelease = container.autorelease
+        self.verbose = gremlin.config.Configuration().verbose
+        self.release_timer = None
+
+    def profile_stop(self):
+        if self.release_timer:
+            self.release_timer.cancel()
 
     def process_event(self, event, value, extra_data = None):
 
         if event.event_type == InputType.JoystickHat:
-            is_hat = True
             is_pressed = value.current != (0,0)
-        elif not isinstance(value.current, bool):
-            syslog.warning(f"Invalid data type received in Button container: {type(event.value)}")
-            return False
         else:
-            is_hat = False
-            is_pressed = value.current
+            is_pressed = event.is_pressed
 
         if is_pressed:
             # button press
+            if self.verbose: syslog.info("trigger 0")
             self._trigger(0, event, value, extra_data)
+            if self.autorelease:
+                # setup autorelease trigger
+                event_r = event.clone()
+                event_r.is_pressed = False
+                if self.release_timer:
+                    self.release_timer.cancel()
+                self.release_timer = threading.Timer(self.profile_data.autorelease_delay/1000, lambda: self._trigger(0, event_r, value, extra_data))
+                self.release_timer.start()
+                self.last_trigger = 0
+
             #self.press_set.process_event(event, value)
         else:
             # button release
-            value.current = (0,0) if is_hat else True
+            event.is_pressed = True
+            if self.verbose: syslog.info("trigger 1")
             self._trigger(1, event, value, extra_data)
+            if self.autorelease:
+                # setup autorelease trigger
+                event_r = event.clone()
+                event_r.is_pressed = False
+                if self.release_timer:
+                    self.release_timer.cancel()
+                self.release_timer = threading.Timer(self.profile_data.autorelease_delay/1000, lambda: self._trigger(1, event_r, value, extra_data))
+                self.release_timer.start()
+            self.last_trigger = 1                
+
+
             #self.release_set.process_event(event, value)
 
         return False # stop execution as the logic is internal to trigger the other nodes
@@ -257,6 +311,8 @@ class ButtonContainer(AbstractContainer):
         self.action_sets = [[], []]
         self.delay = 0.5
         self.activate_on = "release"
+        self.autorelease = True
+        self.autorelease_delay = 250 # delay for autorelease trigger if in autorelease mode
 
     def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.
@@ -265,6 +321,11 @@ class ButtonContainer(AbstractContainer):
         """
         self.action_sets = []
         super()._parse_xml(node, data)
+        if "autorelease" in node.attrib:
+            self.autorelease = safe_read(node,"autorelease",bool, True)
+        if "delay" in node.attrib:
+            self.autorelease_delay = safe_read(node,"delay",int, 250)
+
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -273,6 +334,9 @@ class ButtonContainer(AbstractContainer):
         """
         node = ElementTree.Element("container")
         node.set("type", ButtonContainer.tag)
+        node.set("autorelease", safe_format(self.autorelease,bool))
+        node.set("delay", safe_format(self.autorelease_delay, int))
+
         for actions in self.action_sets:
             as_node = ElementTree.Element("action-set")
             for action in actions:

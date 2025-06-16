@@ -197,7 +197,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         """
         self.profile_data.delay = value / 1000
 
-    @QtCore.Slot()
+    @QtCore.Slot(int)
     def _autorelease_delay_changed_cb(self, value):
         """Updates the activation delay value.
 

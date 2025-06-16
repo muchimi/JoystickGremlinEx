@@ -1850,11 +1850,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         # button to axis value widget
         self.target_value_container_widget = QtWidgets.QWidget()
         self.target_value_container_layout = QtWidgets.QHBoxLayout(self.target_value_container_widget)
-        self.sb_button_to_axis_value = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.sb_button_to_axis_value.setMinimum(-1.0)
-        self.sb_button_to_axis_value.setMaximum(1.0)
-        self.sb_button_to_axis_value.setDecimals(3)
-        self.sb_button_to_axis_value.setValue(self.action_data.target_value)
+        self.button_to_axis_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self.button_to_axis_value_widget.setValue(self.action_data.target_value)
+        self.button_to_axis_value_widget.valueChanged.connect(self._button_to_axis_value_changed)
+
         
         self.target_is_relative = QtWidgets.QCheckBox("Relative")
         self.target_is_relative.setToolTip("When enabled, the value is added to the current axis (relative value)")
@@ -1863,7 +1862,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self.target_value_container_layout.addWidget(QtWidgets.QLabel("Set Value:"))
-        self.target_value_container_layout.addWidget(self.sb_button_to_axis_value)
+        self.target_value_container_layout.addWidget(self.button_to_axis_value_widget)
         self.target_value_container_layout.addWidget(self.target_is_relative)
         self.target_value_container_layout.addStretch()
 
@@ -1888,7 +1887,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.start_button_group.buttonClicked.connect(self._start_changed)
         self.sb_button_range_low.valueChanged.connect(self._button_range_low_changed)
         self.sb_button_range_high.valueChanged.connect(self._button_range_high_changed)
-        self.sb_button_to_axis_value.valueChanged.connect(self._button_to_axis_value_changed)
+        self.button_to_axis_value_widget.valueChanged.connect(self._button_to_axis_value_changed)
 
 
         self.b_range_reset.clicked.connect(self._b_range_reset_clicked)
@@ -3099,8 +3098,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.sb_button_range_high):
                     self.sb_button_range_high.setValue(self.action_data.button_range_max)
 
-                with QtCore.QSignalBlocker(self.sb_button_to_axis_value):
-                    self.sb_button_to_axis_value.setValue(self.action_data.target_value)
+                with QtCore.QSignalBlocker(self.button_to_axis_value_widget):
+                    self.button_to_axis_value_widget.setValue(self.action_data.target_value)
 
             if is_button_mode:
                 #self.pulse_widget.setValue(self.action_data.pulse_delay)
@@ -3196,7 +3195,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _button_to_axis_value_changed(self):
-        self.action_data.target_value = self.sb_button_to_axis_value.value()
+        self.action_data.target_value = self.button_to_axis_value_widget.value()
     
     @QtCore.Slot()
     def _b_range_reset_clicked(self, value):

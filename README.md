@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T13)
+- New: Button container has autorelease option.  This container lets you trigger a series of actions on press or release.  The auto-release just means that the contained actions will get a "press" and a "release" after the delay has lapsed.
+
 ### (m76T12/A)
 - Fix: resolved multiple UI issues due to recent API changes.
 - Fix: resolved an issue with invert settinmg on vjoyremap not observed due to API change.
