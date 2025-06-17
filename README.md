@@ -16,7 +16,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T13/A)
 - Fix: duplicated joystick event triggers in some situations due to changes in T12.  
-- Fix: One more attempt to or
+- Fix: Minor UI fixes.
 
 ### (m76T13)
 - New: Button container has autorelease option.  This container lets you trigger a series of actions on press or release.  The auto-release just means that the contained actions will get a "press" and a "release" after the delay has lapsed.

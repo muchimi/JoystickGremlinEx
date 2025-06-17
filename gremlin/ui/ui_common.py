@@ -2301,16 +2301,16 @@ class ActionSelector(QtWidgets.QWidget):
     def _paste_action(self):
         ''' handle paste action '''
         import gremlin.plugin_manager
-        container = self.container
-        if container is None:
-            # find the container if we can
-            parent = self
-            while parent is not None:
-                if hasattr(parent,"profile_data"):
-                    if isinstance(parent.profile_data, gremlin.base_profile.AbstractContainer):
-                        container = parent.profile_data
-                        break
-                parent = parent.parent()
+
+        container = None
+        # find the container if we can
+        parent = self
+        while parent is not None:
+            if hasattr(parent,"profile_data"):
+                if isinstance(parent.profile_data, gremlin.base_profile.AbstractContainer):
+                    container = parent.profile_data
+                    break
+            parent = parent.parent()
 
         if container is None:
             if self.inputItem is None:
@@ -2334,7 +2334,7 @@ class ActionSelector(QtWidgets.QWidget):
             if action.name in valid_actions:
                 # valid action - clone it and add it
                 # syslog.info("Clipboard paste action trigger...")
-                self.action_paste.emit(action, self.container)
+                self.action_paste.emit(action, container)
             else:
                 warning = True
 
