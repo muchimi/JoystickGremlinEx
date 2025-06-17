@@ -653,9 +653,10 @@ class EventListener(QtCore.QObject):
 					raw_value= value
 				)
 				event_list.append(event)
-
-
-		gremlin.util.singleShot(lambda: self._fire_event_list(event_list))
+		if event_list:
+			for event in event_list:
+				self.joystick_event.emit(event)
+		#gremlin.util.singleShot(lambda: self._fire_event_list(event_list))
 
 
 
@@ -933,7 +934,9 @@ class EventListener(QtCore.QObject):
 		
 		event = dinput.InputEvent(data)
 
-		#syslog.info(f"joystick event: {str(event)}")
+		event_list = []
+
+		# syslog.info(f"joystick event: {str(event)}")
 		
 		#breakpoint()
 		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
@@ -965,11 +968,13 @@ class EventListener(QtCore.QObject):
 				is_virtual = is_virtual
 			)
 
+			event_list.append(event)
+
 			# notify axis change for tab switches
 			if not gremlin.shared_state.is_running:
 				self.axis_state_change.emit(event)
 
-			self.joystick_event.emit(event)
+			
 
 		elif event.input_type == dinput.InputType.Button:
 			event = Event(
@@ -983,11 +988,9 @@ class EventListener(QtCore.QObject):
 			if not gremlin.shared_state.is_running:
 				# wrap event so it fires on UI thread
 				gremlin.util.singleShot(lambda : self.button_state_change.emit(event))
-				#self.button_state_change.emit(event)
 
-			# wrap event so it fires on UI thread
-			gremlin.util.singleShot(lambda: self.joystick_event.emit(event))
-			#self.joystick_event.emit(event)
+			event_list.append(event)
+
 			
 		elif event.input_type == dinput.InputType.Hat:
 
@@ -999,8 +1002,6 @@ class EventListener(QtCore.QObject):
 			value = dill_hat_lookup[event.value]
 
 			key = (device_id, input_id)
-
-			event_list = []
 
 			if not key in self._hat_state:
 				self._hat_state[key] = value
@@ -1040,8 +1041,9 @@ class EventListener(QtCore.QObject):
 				if not gremlin.shared_state.is_running:
 					gremlin.util.singleShot(lambda : self.button_state_change.emit(new_event))
 
-				
-				gremlin.util.singleShot(lambda: self._fire_event_list(event_list))
+		if event_list:		
+			for event in event_list:
+				self.joystick_event.emit(event)
 			
 
 	def _joystick_device_handler(self, data, action):
@@ -1317,6 +1319,7 @@ class EventHandler(QtCore.QObject):
 		el.profile_start.connect(self._profile_start)
 		el.profile_stop.connect(self._profile_stop)
 		el.runtime_mode_changed.connect(self._update_mode_change)
+		self._started = False
 		self.reset()
 
 	def shouldProcess(self, event):
@@ -1334,16 +1337,23 @@ class EventHandler(QtCore.QObject):
 
 	@QtCore.Slot()
 	def _profile_start(self):
-		self._update_mode_change(gremlin.shared_state.runtime_mode)
-		el = gremlin.event_handler.EventListener()
-		el.joystick_event.connect(self.execute_event)
+		if not self._started:
+			self._started = True
+			self._update_mode_change(gremlin.shared_state.runtime_mode)
+			# el = gremlin.event_handler.EventListener()
+			# syslog.info("EVENT: listen to joystick events ON")
+			# el.joystick_event.connect(self.execute_event)   # this is connected in coderunner
+			
 
 	@QtCore.Slot()
 	def _profile_stop(self):
-		self._last_tts_notify = None
-		self._last_tts_notify_time = None
-		el = gremlin.event_handler.EventListener()
-		el.joystick_event.disconnect(self.execute_event)
+		if self._started:
+			self._started = False
+			self._last_tts_notify = None
+			self._last_tts_notify_time = None
+			# el = gremlin.event_handler.EventListener()
+			# el.joystick_event.disconnect(self.execute_event) # this is disconnected in coderunner
+			# syslog.info("EVENT: listen to joystick events OFF")
 
 	def registerModeValidator(self, callback):
 		assert callable(callback)
@@ -2189,8 +2199,8 @@ class EventHandler(QtCore.QObject):
 			f_list = self._matching_functors(event)
 			if verbose and not m_list: syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
-		
-		self._execute_callbacks(event, m_list, f_list)
+		if m_list or f_list:
+			self._execute_callbacks(event, m_list, f_list)
 
 		# if m_list:
 		# 	if verbose:

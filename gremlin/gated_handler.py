@@ -1329,11 +1329,12 @@ class GateData():
     def unhook(self):
         ''' unhook events '''
         if self._hooked:
+            self._hooked = False
             verbose = gremlin.config.Configuration().verbose_mode_gate
             if verbose: syslog.info("GATE: hook disabled")
             el = gremlin.event_handler.EventListener()
             el.joystick_event.disconnect(self._joystick_event_handler)
-            self._hooked = False
+            
 
 
     @property
@@ -1493,10 +1494,10 @@ class GateData():
         for callback in self._trigger_callbacks:
             callback(trigger)
 
-    def process_event(self, event, value, extra_data  : dict = None):
-        ''' handles functor execution '''
-        syslog.info("gate data: process handler")
-        self._joystick_event_handler(event)
+    # def process_event(self, event, value, extra_data  : dict = None):
+    #     ''' handles functor execution '''
+    #     syslog.info("gate data: process handler")
+    #     self._joystick_event_handler(event)
     
 
     @QtCore.Slot(object)
@@ -1507,15 +1508,18 @@ class GateData():
         For gate crossings, we mimic a button push (for now) so functors get both a press and release call
         
         '''
+
+        if not self._hooked:
+            return False
         
         if not event.is_axis:
             # ignore if not an axis event
             return False
         
-        if not hasattr(self,"_action_data"):
-            # this happens at shutdown usually as objects are removed
-            # syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
-            return False
+        # if not hasattr(self,"_action_data"):
+        #     # this happens at shutdown usually as objects are removed
+        #     # syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
+        #     return False
         
         if not self._action_data:
             # not initialized yet

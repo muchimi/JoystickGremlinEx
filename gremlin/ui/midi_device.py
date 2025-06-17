@@ -862,10 +862,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb)
 
         # listen current port button
-        self.listen_filter_widget = QtWidgets.QPushButton("Listen")
-        self.listen_filter_widget.clicked.connect(self._listen_port_cb)
-
-
+        self.listen_filter_widget  = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_port_cb)
 
         self.button_layout.addWidget(self.listen_widget)
         self.button_layout.addWidget(self.listen_filter_widget)

@@ -877,8 +877,8 @@ class InputItemListView(ui_common.AbstractView):
         return widget
 
     def _scroll_to_item(self, widget):
+        QtWidgets.QApplication.processEvents()
         if Shiboken.isValid(self.scroll_area):
-            QtWidgets.QApplication.processEvents()
             self.scroll_area.ensureWidgetVisible(widget)
 
 

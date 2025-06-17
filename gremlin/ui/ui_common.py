@@ -530,7 +530,7 @@ class Icons():
     def configureIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.gear", qta_color)
     @staticmethod
-    def editIcon(qta_color = None) -> QtGui.QIcon:
+    def editIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
         return Icons._icon("mdi6.rename-box-outline", qta_color)
     @staticmethod
     def horizontalSeparatorIcon(qta_color = None) -> QtGui.QIcon:

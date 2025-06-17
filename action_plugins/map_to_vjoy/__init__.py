@@ -2194,8 +2194,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.stepped_selector_device_widget = gremlin.ui.ui_common.NoWheelComboBox()
         self.stepped_selector_input_widget = gremlin.ui.ui_common.NoWheelComboBox()
 
-        listen_widget = QtWidgets.QPushButton("Listen")
-        listen_widget.clicked.connect(self._stepped_listen)
+        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._stepped_listen)
 
         self.latched_device_widget = QtWidgets.QWidget()
         device_layout = QtWidgets.QGridLayout(self.latched_device_widget)
@@ -3548,10 +3547,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         key = (device_id, input_id)
         if key in self.pulse_worker_map:
             worker : gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
-            worker.stop()
             del self.pulse_worker_map[key]
-
-
+            worker.stop()
 
         
 
