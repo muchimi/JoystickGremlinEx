@@ -860,14 +860,15 @@ class InputItemListView(ui_common.AbstractView):
 
         widget = self.itemAt(index)
         if widget:
-            # if the list is long - bring the selected widget into view
-            QtCore.QTimer.singleShot(0, lambda: self._scroll_to_item(widget))
             # select it
             with (QtCore.QSignalBlocker(widget)):
                 widget.selected = True
                 if verbose: 
                     data = self.model.data(index)
-                    syslog.warning(f"\tselected: {data.debug_display}")
+                    syslog.info(f"\tselected: {data.debug_display}")
+
+            # if the list is long - bring the selected widget into view
+            QtCore.QTimer.singleShot(0, lambda: self._scroll_to_item(widget))
 
         if emit and index != -1:
             self.item_selected.emit(index, force_update) # load the mapped content for the given index
@@ -877,6 +878,7 @@ class InputItemListView(ui_common.AbstractView):
 
     def _scroll_to_item(self, widget):
         if Shiboken.isValid(self.scroll_area):
+            QtWidgets.QApplication.processEvents()
             self.scroll_area.ensureWidgetVisible(widget)
 
 
@@ -2171,8 +2173,7 @@ class ContainerSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(QtWidgets.QLabel("Container"))
 
         self.container_dropdown = ui_common.QComboBox()
-        for name in self._valid_container_list():
-            self.container_dropdown.addItem(name)
+        self.refresh(input_type)
         self.add_container_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds a container", callback = self._add_container)
 
         self.load_template_widget =  QtWidgets.QPushButton()
@@ -2224,6 +2225,17 @@ class ContainerSelector(QtWidgets.QWidget):
         eh = gremlin.event_handler.EventHandler()
         eh.last_container_changed.connect(self._last_container_changed)
 
+    def refresh(self, input_type):
+        ''' reloads the selector based on the input '''
+        self.input_type = input_type
+        with QtCore.QSignalBlocker(self.container_dropdown):
+            self.container_dropdown.clear()
+            for name in self._valid_container_list(input_type):
+                self.container_dropdown.addItem(name)
+            config = gremlin.config.Configuration()
+            self.container_dropdown.setCurrentText(config.last_container)
+    
+
     @QtCore.Slot(object, str)
     def _last_container_changed(self, widget, name):
         if widget != self.container_dropdown:
@@ -2239,14 +2251,14 @@ class ContainerSelector(QtWidgets.QWidget):
             eh = gremlin.event_handler.EventHandler()
             eh.last_container_changed.emit(self.container_dropdown, name)
 
-    def _valid_container_list(self):
+    def _valid_container_list(self, input_type : InputType):
         """Returns a list of valid actions for this InputItemWidget.
 
         :return list of valid action names
         """
         container_list = []
         for entry in gremlin.plugin_manager.ContainerPlugins().repository.values():
-            if self.input_type in entry.input_types:
+            if not entry.input_types or input_type in entry.input_types:
                 if entry.axis_only:
                     # container requires an axis
                     if not self.is_axis:

@@ -56,16 +56,8 @@ import gremlin.base_profile
 import gremlin.shared_state
 import gremlin.curve_handler
 
+from gremlin.types import ButtonOutputMode
 
-
-
-class ButtonOutputMode (enum.IntEnum):
-    ''' modes for input hats '''
-    Hold = 0
-    Pulse = 1
-    Press = 2
-    Release = 3
-    NoOp = 4 # do nothing
 
 
 
@@ -617,12 +609,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.hat_unmap_widget.clicked.connect(self._clear_map)
         self.hat_map_widget.clicked.connect(self._auto_map)
 
-        # self.hat_stick_widget = QtWidgets.QCheckBox("Sticky mode")
-        # self.hat_stick_widget.setToolTip("When enabled, all pressed hat positions will stick until the hat returns to the center position")
-        # self.hat_stick_widget.setChecked(self.action_data.hat_sticky)
-        # self.hat_stick_widget.clicked.connect(self._hat_sticky_changed)
-
-
         self.container_hat_options_layout.addWidget(self.hat_hold_widget)
         self.container_hat_options_layout.addWidget(self.hat_pulse_widget)
         self.container_hat_options_layout.addWidget(self.hat_press_widget)
@@ -630,7 +616,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_hat_options_layout.addWidget(self.hat_noop_widget)
         self.container_hat_options_layout.addWidget(self.hat_unmap_widget)
         self.container_hat_options_layout.addWidget(self.hat_map_widget)
-        #self.container_hat_options_layout.addWidget(self.hat_stick_widget)
         self.container_hat_options_layout.addStretch()
 
 
@@ -839,24 +824,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             rb = self.rb_hat_list[position][int(mode)]
             with QtCore.QSignalBlocker(rb):
                 rb.setChecked(True)
-
-            # match mode:
-            #     case HatButtonMode.Pulse:
-            #         rb = self.rb_hat_pulse_list[index]
-            #     case HatButtonMode.Hold:
-            #         rb_pulse = self.rb_hat_pulse_list[index]
-            #         with QtCore.QSignalBlocker(rb_pulse):
-            #             rb_pulse.setChecked(True)
-            #     case 
-            # is_pulsed = self.action_data.hat_pulse_map[position]
-            # if is_pulsed:
-            #     rb_pulse = self.rb_hat_pulse_list[index]
-            #     with QtCore.QSignalBlocker(rb_pulse):
-            #         rb_pulse.setChecked(True)
-            # else:
-            #     rb_hold = self.rb_hat_list[index]
-            #     with QtCore.QSignalBlocker(rb_hold):
-            #         rb_hold.setChecked(True)
 
         self._load_hat_mapping()
 
@@ -2128,7 +2095,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.step_start_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.step_start_value_widget.setReadOnly(True)
         value = self.action_data.target_step_list[self.action_data.target_step_start_index]
-        self.step_start_value_widget.setText(f"{value:0.3f}")
+        self.step_start_value_widget.setValue(value)
 
         # self.step_direction_widget = QtWidgets.QCheckBox("Invert direction")
         # self.step_direction_widget.setToolTip("When set, inverts the direction of the stepping so up becomes down, and down becomes up.")
@@ -2303,7 +2270,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' updates the start value widget repeater '''
         index = self.action_data.target_step_start_index
         value = self.action_data.target_step_list[index]
-        self.step_start_value_widget.setText(f"{value:0.3f}")
+        self.step_start_value_widget.setValue(value)
 
 
         # check the correct widget
@@ -3804,8 +3771,6 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             pressed_positions = list(self.pressed_hat_buttons.keys())
             is_pressed = event.is_pressed # position != (0,0)
-            if not is_pressed:
-                pass
             mode = self.action_data.hat_mode_map[position]
 
             input_id = self.action_data.hat_map[position]
@@ -3840,16 +3805,19 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                                 del self.pressed_hat_buttons[pressed_position]
                     case ButtonOutputMode.Press:
-                        pass # no auto-release
+                        is_pressed = True
+                        if input_id in self.pressed_hat_buttons:
+                            del self.pressed_hat_buttons[input_id]
                     case ButtonOutputMode.Release:
-                        is_pressed = False # force a release on trigger
+                        is_pressed = False
+                        if input_id in self.pressed_hat_buttons:
+                            del self.pressed_hat_buttons[input_id]
                     case ButtonOutputMode.NoOp:
                         # do nothing
                         return True
                     
                 # press the new button
-                if is_pressed:
-                    self.pressed_hat_buttons[position] = input_id
+                self.pressed_hat_buttons[position] = input_id
                 if is_local:
                     joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = is_pressed
                 if is_remote:
@@ -3857,6 +3825,17 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
             else:
+                # release
+                match mode:
+                    case ButtonOutputMode.NoOp:
+                        # do nothing
+                        return True
+                    case ButtonOutputMode.Press:
+                        return True
+                    case ButtonOutputMode.Release:
+                        return True
+
+
                 for pressed_position in pressed_positions:
                     input_id = self.pressed_hat_buttons[pressed_position]
                     if input_id > 0:
@@ -4184,7 +4163,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.merged = False
 
         # default mode
-        self._action_mode = VjoyAction.VJoyButtonPress
+        self._action_mode = VjoyAction.VJoyButton
 
         self.button_range_min = -1.0 # axis to button range min
         self.button_range_max = 1.0 # axis to button range max
@@ -4198,7 +4177,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 # input is setup as an axis
                 self._action_mode = VjoyAction.VJoyAxis
         elif self.input_type in VJoyRemapWidget.input_type_buttons:
-            self._action_mode = VjoyAction.VJoyButtonPress
+            self._action_mode = VjoyAction.VJoyButton
         elif self.input_type == InputType.JoystickHat:
             self._action_mode = VjoyAction.VJoyHat
 
@@ -4739,6 +4718,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 mode = safe_read(node,"range_mode", str, "")
                 mode = mode.casefold()
                 match mode:
+                    case "noop":
+                        mode = ButtonOutputMode.NoOp
                     case "hold":
                         mode = ButtonOutputMode.Hold
                     case "pulse":

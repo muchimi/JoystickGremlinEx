@@ -571,7 +571,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         if hasattr(self.item_data.input_id, "getOverrideInputType"):
             input_type = self.item_data.input_id.getOverrideInputType()
 
-        self.action_selector = ui_common.ActionSelector(input_type,None)
+        self.action_selector = ui_common.ActionSelector(input_type, self.item_data)
         self.action_selector.inputItem = self.item_data
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
@@ -592,6 +592,12 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.dropdown_layout.addWidget(self.container_selector)
         self.dropdown_layout.addWidget(self.always_execute)
         self.main_layout.addWidget(self.dropdown_widget)
+
+
+    def updateSelectors(self, input_type, item_data):
+        self.action_selector.refresh(input_type, item_data)
+        self.container_selector.refresh(input_type, item_data)
+    
 
     def _create_vjoy_dropdowns(self):
         """Creates the action drop down selection for vJoy devices."""

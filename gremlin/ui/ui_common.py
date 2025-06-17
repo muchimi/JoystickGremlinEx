@@ -1228,7 +1228,7 @@ class NoKeyboardPushButton(QtWidgets.QPushButton):
 
 
 
-class QFloatLineEdit(QtWidgets.QLineEdit):
+class QFloatLineEdit(QtWidgets.QWidget):
     ''' double input validator with optional range limits for input axis
 
         this line edit behaves like a spin box so it's interchangeable
@@ -1244,7 +1244,15 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         self._max_range = max_range
         self._step = step
         self._decimals = decimals
-        self.textChanged.connect(self._validate)
+        self._value = None
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
+
+        self._widget = QtWidgets.QLineEdit()
+        self._widget.textChanged.connect(self._validate)
+
+        self.main_layout.addWidget(self._widget)
+
         self.installEventFilter(self)
         #self.setText("0")
         self.setValue(value)
@@ -1255,6 +1263,10 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         else:
             self.chars = 0
 
+
+    def setReadOnly(self, value : bool):
+        ''' sets or clears readonly state '''
+        self._widget.setReadOnly(value)
 
     @property
     def chars(self) -> int:
@@ -1280,7 +1292,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
-            if self.isReadOnly():
+            if self._widget.isReadOnly():
                 return True # cannot change the value if readonly
             v = self._to_value()
             if v is not None:
@@ -1324,15 +1336,20 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         return super().keyPressEvent(event)
 
 
-    def _update_value(self, value):
+    def _update_value(self, value, format = True):
         if value is None:
             return
+        current_value = self._value
+
         if self._decimals:
             s_value = f"{float(value):0.{self._decimals}f}"
         else:
             s_value = str(value)
-        if self.text() != s_value:
-            self.setText(s_value)
+        if format and self._widget.text() != s_value:
+            with QtCore.QSignalBlocker(self):
+                self._widget.setText(s_value)
+        if current_value is None or current_value != value:
+            self._value = value
             self.valueChanged.emit(value)
 
 
@@ -1340,9 +1357,10 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
     @QtCore.Slot()
     def _validate(self):
         ''' called whenever the text changes '''
-        text = self.text()
+        text = self._widget.text()
         try:
-            valid = float(text)
+            value = float(text)
+            self._update_value(value, format = False)
             return True
         except:
             return False
@@ -1350,13 +1368,12 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     def setValue(self, value : float):
         ''' sets the value '''
-        current_value = self.value()
-        if not gremlin.util.is_close(current_value, value):
+        if not gremlin.util.is_close(self._value, value):
             self._update_value(value)
 
     def _to_value(self, text : str = None):
         if text is None:
-            text = self.text()
+            text = self._widget.text()
         try:
             if text:
                 value = float(text)
@@ -1367,21 +1384,15 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         
         if value < self._min_range:
             value = self._min_range
-            with QtCore.QSignalBlocker(self):
-                self.setText(f"{value:0.{self._decimals}f}")
         elif value > self._max_range:
             value = self._max_range
-            with QtCore.QSignalBlocker(self):
-                self.setText(f"{value:0.{self._decimals}f}")
+        
         return value
         
 
     def value(self) -> float:
         ''' current value, None if not a valid input'''
-        value = self._to_value()
-        if value is not None:
-            return value
-        return None
+        return self._value
 
     def isValid(self):
         ''' true if the input in the box is currently valid'''
@@ -2173,7 +2184,7 @@ class ActionSelector(QtWidgets.QWidget):
     action_paste = QtCore.Signal(object, object) # paste button pressed
 
 
-    def __init__(self, input_type, container, parent=None):
+    def __init__(self, input_type, input_item, parent=None):
         """Creates a new selector instance.
 
         :param input_type the input type for which the action selector is being created
@@ -2182,21 +2193,17 @@ class ActionSelector(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
-        self.input_type = input_type
-        self._input_item = None
+
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.action_label = QtWidgets.QLabel("Action")
         self.main_layout.addWidget(self.action_label)
-        self._container = container
+
 
         self.action_dropdown = QComboBox()
-        
-        for name in self._valid_action_list():
-            self.action_dropdown.addItem(name)
-        config = gremlin.config.Configuration()
-        self.action_dropdown.setCurrentText(config.last_action)
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
+        self.refresh(input_type)
+        
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_action)
 
@@ -2219,6 +2226,16 @@ class ActionSelector(QtWidgets.QWidget):
         eh.last_action_changed.connect(self._last_action_changed)
         self._container = None
 
+    def refresh(self, input_type):
+        ''' reloads the selector based on the input '''
+        self.input_type = input_type
+        with QtCore.QSignalBlocker(self.action_dropdown):
+            self.action_dropdown.clear()
+            for name in self._valid_action_list(input_type):
+                self.action_dropdown.addItem(name)
+            config = gremlin.config.Configuration()
+            self.action_dropdown.setCurrentText(config.last_action)
+        
 
     @property
     def inputItem(self):
@@ -2227,14 +2244,6 @@ class ActionSelector(QtWidgets.QWidget):
     def inputItem(self, value):
         self._input_item = value
 
-
-
-    @property
-    def container(self):
-        return self._container
-    # @container.setter
-    # def container(self, container):
-    #     self._container = container
 
     @QtCore.Slot(object, str)
     def _last_action_changed(self, widget, name):
@@ -2251,7 +2260,7 @@ class ActionSelector(QtWidgets.QWidget):
             eh = gremlin.event_handler.EventHandler()
             eh.last_action_changed.emit(self.action_dropdown, name)
 
-    def _valid_action_list(self):
+    def _valid_action_list(self, input_type: InputType):
         """Returns a list of valid actions for this InputItemWidget.
 
         :return list of valid action names
@@ -2268,7 +2277,9 @@ class ActionSelector(QtWidgets.QWidget):
 
         #all_entries = [entry.name for entry in gremlin.plugin_manager.ActionPlugins().repository.values()]
         for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
-            if self.input_type in entry.input_types:
+            if entry.tag == "map_to_state":
+                pass
+            if not entry.input_types or input_type in entry.input_types:
                 if convert_vjoy and entry.name == "Remap":
                     continue
                 elif convert_curve and entry.name == "Response Curve":
@@ -2316,7 +2327,8 @@ class ActionSelector(QtWidgets.QWidget):
         if not action_list:
             return
         
-        valid_actions = self._valid_action_list()
+
+        valid_actions = self._valid_action_list(self.input_type)
         warning = False
         for action in action_list:
             if action.name in valid_actions:

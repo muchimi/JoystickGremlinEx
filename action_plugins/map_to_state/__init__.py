@@ -8,7 +8,7 @@ import math
 import os
 from lxml import etree as ElementTree
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets, QtGui
 
 import gremlin.base_profile
 import gremlin.config
@@ -19,12 +19,15 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 
 from gremlin import input_devices
-
+from gremlin.types import ButtonOutputMode
+import vjoy.vjoy
+from gremlin.input_devices import VjoyAction, remote_state
+import gremlin.joystick_handling
 
 import enum, threading,time, random
 
 import gremlin.util
-
+from gremlin.util import *
 
 syslog = logging.getLogger("system")
 
@@ -126,7 +129,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
         
-
+        
         self.state_selector = gremlin.ui.ui_common.QComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
@@ -135,45 +138,64 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.add_widget.setToolTip("Adds a new state")
         self.add_widget.clicked.connect(self._add_state)
 
-        widget,layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector, self.add_widget])
-        self.main_layout.addWidget(widget)
+        self.state_selector_widget,layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector, self.add_widget])
+        self.main_layout.addWidget(self.state_selector_widget)
 
         widget,layout = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
         self.main_layout.addWidget(widget)
  
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget()
-        self.delay_widget.setToolTip("Delay in milliseconds")
-        self.delay_widget.setValue(self.action_data.delay)
-        self.delay_widget.valueChanged.connect(self._value_changed)
+        self.button_pulse_widget = gremlin.ui.ui_common.QDelayWidget()
+        self.button_pulse_widget.setToolTip("Delay in milliseconds")
+        self.button_pulse_widget.setValue(self.action_data.pulse_delay)
+        self.button_pulse_widget.valueChanged.connect(self._value_changed)
+
+        self.button_pulse_repeat_widget = gremlin.ui.ui_common.QDelayWidget()
+        self.button_pulse_repeat_widget.setToolTip("Repeat delay in milliseconds")
+        self.button_pulse_repeat_widget.setValue(self.action_data.pulse_repeat_delay)
+        self.button_pulse_repeat_widget.valueChanged.connect(self._pulse_repeat_value_changed)
+
+        self.button_repeat_widget = QtWidgets.QCheckBox("Pulse repeat")
+        self.button_repeat_widget.setToolTip("When enabled, pulses are repeated while the input is triggered.")
+        self.button_repeat_widget.setChecked(self.action_data.pulse_repeat)
+        self.button_repeat_widget.clicked.connect(self._pulse_repeat_mode_changed)
+
+        widgets = [
+            self.button_pulse_widget,
+            self.button_repeat_widget,
+            self.button_pulse_repeat_widget,
+        ]
+
+        self.container_pulse_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Pulse Options:")
+        
 
         mode = self.action_data.mode
         widgets = []
-        rb = gremlin.ui.ui_common.QDataRadioButton("Actual",data = "actual")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Hold",data = "actual")
         rb.setToolTip("The state is set based on the pressed/release input state")
         if mode == "actual":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
 
-        rb = gremlin.ui.ui_common.QDataRadioButton("Press (on)",data = "press")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Press (on)", data = "press")
         rb.setToolTip("Sets the state")
         if mode == "press":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton("Release (off)",data = "release")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Release (off)", data = "release")
         rb.setToolTip("Releases the state")
         if mode == "release":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton("Pulse",data = "pulse")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Pulse", data = "pulse")
         rb.setToolTip("Pulses the state delay milliseconds (the state is set and released regardless of current state)")
         if mode == "pulse":
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton("Toggle",data = "toggle")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Toggle", data = "toggle")
         rb.setToolTip("Toggles the state")
         if mode == "toggle":
             rb.setChecked(True)
@@ -184,7 +206,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
     
         self.main_layout.addWidget(self.mode_widget)
 
-        self.main_layout.addWidget(self.delay_widget)
+        self.main_layout.addWidget(self.container_pulse_widget)
 
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
         self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
@@ -194,7 +216,20 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.populate_selector()
 
+        self.container_hat_widget = None
+        self._create_hat_mapping()
+
         gremlin.util.singleShot(self._update_ui)
+
+    @QtCore.Slot(bool)
+    def _pulse_repeat_mode_changed(self, checked : bool):
+        self.action_data.pulse_repeat = checked
+        self._update_ui()
+
+    def _pulse_repeat_value_changed(self, value):
+        ''' called when the pulse value changes '''
+        if value >= 0:
+            self.action_data.pulse_repeat_delay = value      
 
     @QtCore.Slot()
     def _add_state(self):
@@ -257,7 +292,25 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_ui()
 
     def _update_ui(self):
-        self.delay_widget.setVisible(self.action_data.mode == "pulse")
+        
+        input_type = self._get_input_type()
+        hat_visible = input_type == InputType.JoystickHat
+        state_visible = not hat_visible
+        repeat_visible = self.action_data.pulse_repeat
+        pulse_visible = hat_visible or self.action_data.mode == "pulse"
+
+        self.state_selector_widget.setVisible(state_visible)
+        # self.button_pulse_widget.setVisible(state_visible and self.action_data.mode == "pulse")
+        self.mode_widget.setVisible(state_visible)
+        if self.container_hat_widget:
+            self.container_hat_widget.setVisible(hat_visible)
+            self.container_hat_options_widget.setVisible(hat_visible)
+            self.container_hat_grid_widget.setVisible(hat_visible)
+
+
+        self.container_pulse_widget.setVisible(pulse_visible)
+
+        self.button_pulse_repeat_widget.setVisible(repeat_visible)
 
 
     @QtCore.Slot(bool)
@@ -268,6 +321,302 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _value_changed(self, value):
         self.action_data.delay = value
+
+
+
+    def _create_hat_mapping(self):
+
+
+        if self._get_input_type() != InputType.JoystickHat:
+            return
+
+        ''' creates the 8 way hat inputs based on the hat input value '''
+        self.container_hat_widget = QtWidgets.QWidget()
+        self.container_hat_widget.setContentsMargins(0,0,0,0)
+
+        self.container_hat_layout = QtWidgets.QVBoxLayout(self.container_hat_widget)
+        self.container_hat_layout.setContentsMargins(0,0,0,0)
+
+        self.container_hat_grid_widget = QtWidgets.QWidget()
+        self.container_hat_grid_layout = QtWidgets.QGridLayout(self.container_hat_grid_widget)
+
+        self.container_hat_options_widget = QtWidgets.QWidget()
+        self.container_hat_options_widget.setContentsMargins(0,0,0,0)
+        self.container_hat_options_layout = QtWidgets.QHBoxLayout(self.container_hat_options_widget)
+
+        self.main_layout.addWidget(self.container_hat_widget)
+
+
+
+        self.cb_hat_list = []
+        self.rb_hat_list = {}
+        #self.rb_hat_pulse_list = []
+
+        self.hat_pulse_widget = QtWidgets.QPushButton("All Pulse")
+        self.hat_pulse_widget.setToolTip("Sets all mappings to pulse mode")
+        self.hat_hold_widget = QtWidgets.QPushButton("All Hold")
+        self.hat_hold_widget.setToolTip("Sets all mappings to hold mode")
+
+        self.hat_press_widget = QtWidgets.QPushButton("All Press")
+        self.hat_press_widget.setToolTip("Sets all mappings to press mode")
+
+        self.hat_release_widget = QtWidgets.QPushButton("All Release")
+        self.hat_release_widget.setToolTip("Sets all mappings to release mode")
+
+        self.hat_noop_widget = QtWidgets.QPushButton("All NoOp")
+        self.hat_noop_widget.setToolTip("Sets all mappings to NoOp (do nothing) mode")
+
+
+        self.hat_unmap_widget =  QtWidgets.QPushButton("Clear Buttons")
+        self.hat_unmap_widget.setToolTip("Clears all mappings")
+        self.hat_map_widget =  QtWidgets.QPushButton("Map Buttons")
+        self.hat_map_widget.setToolTip("Maps all positions sequentially using the first button as the reference if set.")
+
+        self.hat_hold_widget.clicked.connect(self._set_all_hold)
+        self.hat_pulse_widget.clicked.connect(self._set_all_pulse)
+        self.hat_press_widget.clicked.connect(self._set_all_press)
+        self.hat_release_widget.clicked.connect(self._set_all_release)
+        self.hat_noop_widget.clicked.connect(self._set_all_noop)
+
+        self.hat_unmap_widget.clicked.connect(self._clear_map)
+        self.hat_map_widget.clicked.connect(self._auto_map)
+
+        self.container_hat_options_layout.addWidget(self.hat_hold_widget)
+        self.container_hat_options_layout.addWidget(self.hat_pulse_widget)
+        self.container_hat_options_layout.addWidget(self.hat_press_widget)
+        self.container_hat_options_layout.addWidget(self.hat_release_widget)
+        self.container_hat_options_layout.addWidget(self.hat_noop_widget)
+        self.container_hat_options_layout.addWidget(self.hat_unmap_widget)
+        self.container_hat_options_layout.addWidget(self.hat_map_widget)
+        self.container_hat_options_layout.addStretch()
+
+
+        positions = self.action_data.hat_positions
+
+
+        self.container_hat_layout.addWidget(self.container_hat_options_widget)
+        self.container_hat_layout.addWidget(self.container_hat_grid_widget)
+
+        row = 0
+        for position in positions: # 9 positions - 8 cardinal and center push
+            cb = gremlin.ui.ui_common.NoWheelComboBox()
+            cb.data = position
+            
+            name = vjoy.vjoy.Hat.direction_to_name[position]
+            icon = vjoy.vjoy.Hat.direction_to_icon[position]
+            lbl = gremlin.ui.ui_common.QIconLabel(icon_path=icon, text = f"{name}:", use_wrap= False, icon_color=QtGui.QColor(gremlin.ui.ui_common.Color.activeColor()),icon_size=32, use_qta=True)
+
+            lbl.setIcon(icon)
+            self.container_hat_grid_layout.addWidget(lbl, row, 0)
+            self.container_hat_grid_layout.addWidget(cb, row,1)
+            self.cb_hat_list.append(cb)
+            cb.currentIndexChanged.connect(self._hat_mapping_changed)
+
+            mode_container_widget = QtWidgets.QWidget()
+            mode_container_widget.setContentsMargins(0,0,0,0)
+            mode_container_layout = QtWidgets.QHBoxLayout(mode_container_widget)
+
+            rb_hold = gremlin.ui.ui_common.QDataRadioButton("Hold")
+            rb_hold.setToolTip("Output will match the current state of the input.")
+            rb_hold.data = position
+            rb_pulse = gremlin.ui.ui_common.QDataRadioButton("Pulse")
+            rb_pulse.setToolTip("Output will pulse on (pressed), wait a delay, and turn off (released) when triggered.")
+            rb_pulse.data = position
+            rb_press = gremlin.ui.ui_common.QDataRadioButton("Press")
+            rb_press.setToolTip("Output will be turned on (pressed) when triggered.")
+            rb_press.data = position
+            rb_release = gremlin.ui.ui_common.QDataRadioButton("Release")
+            rb_release.setToolTip("Output will be turned off (released) when triggered.")
+            rb_release.data = position
+            rb_noop = gremlin.ui.ui_common.QDataRadioButton("NoOp")
+            rb_noop.setToolTip("No output.")
+            rb_noop.data = position
+
+            rb_hold.clicked.connect(self._hat_hold_changed)
+            rb_pulse.clicked.connect(self._hat_pulse_changed)
+            rb_press.clicked.connect(self._hat_press_changed)
+            rb_release.clicked.connect(self._hat_release_changed)
+            rb_noop.clicked.connect(self._hat_noop_changed)
+
+            mode_container_layout.addWidget(rb_hold)
+            mode_container_layout.addWidget(rb_pulse)
+            mode_container_layout.addWidget(rb_press)
+            mode_container_layout.addWidget(rb_release)
+            mode_container_layout.addWidget(rb_noop)
+
+            self.container_hat_grid_layout.addWidget(mode_container_widget, row, 2)
+
+            # must match enum sequence
+            self.rb_hat_list[position] = [rb_hold, rb_pulse, rb_press, rb_release, rb_noop]
+
+
+            row += 1
+
+
+        self.container_hat_grid_layout.addWidget(QtWidgets.QLabel(), 0, 4)
+        self.container_hat_grid_layout.setColumnStretch(4,3)
+        self._update_hat_mapping()
+
+
+    @QtCore.Slot(bool)
+    def _hat_sticky_changed(self, checked : bool):
+        self.action_data.hat_sticky = checked
+
+    @QtCore.Slot(bool)
+    def _pulse_repeat_mode_changed(self, checked : bool):
+        self.action_data.pulse_repeat = checked
+        self._update_ui()
+
+    def _set_all_mode(self, mode : ButtonOutputMode):
+        positions = self.action_data.hat_positions
+        for position in positions:
+            self.action_data.hat_mode_map[position] = mode
+        self._update_hat_mapping()
+
+    @QtCore.Slot()
+    def _set_all_hold(self):
+        ''' sets all mappings to hold mode '''
+        self._set_all_mode(ButtonOutputMode.Hold)
+        
+
+    @QtCore.Slot()
+    def _set_all_pulse(self):
+        ''' sets all mappings to pulse mode '''
+        self._set_all_mode(ButtonOutputMode.Pulse)
+
+    @QtCore.Slot()
+    def _set_all_press(self):
+        ''' sets all mappings to pulse mode '''
+        self._set_all_mode(ButtonOutputMode.Press)
+
+    @QtCore.Slot()
+    def _set_all_release(self):
+        ''' sets all mappings to pulse mode '''
+        self._set_all_mode(ButtonOutputMode.Release)        
+
+    @QtCore.Slot()
+    def _set_all_noop(self):
+        ''' sets all mappings to pulse mode '''
+        self._set_all_mode(ButtonOutputMode.NoOp)                
+
+
+    @QtCore.Slot()
+    def _clear_map(self):
+        ''' sets all mappings to pulse mode '''
+        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Clear all hat button mappings?")
+        result = msgbox.show()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            positions = self.action_data.hat_positions
+            for position in positions:
+                self.action_data.hat_map[position] = 0
+            self._update_hat_mapping()
+
+    @QtCore.Slot()
+    def _auto_map(self):
+        ''' sets all mappings to pulse mode '''
+        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Remap all hat button mappings?")
+        result = msgbox.show()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            positions = self.action_data.hat_positions
+            dev = self.action_data.vjoy_map[self.action_data.vjoy_device_id]
+            button_count = dev.button_count
+            for index, position in enumerate(positions):
+                if index == 0:
+                    button_id = self.action_data.hat_map[position]
+                    if button_id == 0:
+                        # default if first button is not set
+                        button_id = 1
+
+                self.action_data.hat_map[position] = button_id
+
+                button_id += 1
+                if button_id > button_count:
+                    # wrap around
+                    button_id = 1
+
+            self._update_hat_mapping()
+
+
+    @QtCore.Slot()
+    def _hat_mapping_changed(self):
+        ''' updates a hat button mapping selection '''
+        cb = self.sender()
+        position = cb.data
+        state_name = cb.currentData()
+        self.action_data.hat_map[position] = state_name
+
+    def _hat_mode_changed(self, widget, mode : ButtonOutputMode):
+        if widget.isChecked():
+            position = widget.data
+            self.action_data.hat_mode_map[position] = mode
+
+
+    @QtCore.Slot()
+    def _hat_hold_changed(self):
+        ''' updates a hat button mapping selection '''
+        self._hat_mode_changed(self.sender(), ButtonOutputMode.Hold)
+        
+
+    @QtCore.Slot()
+    def _hat_pulse_changed(self):
+        ''' updates a hat button mapping selection '''
+        self._hat_mode_changed(self.sender(), ButtonOutputMode.Pulse)
+
+    @QtCore.Slot()
+    def _hat_press_changed(self):
+        ''' updates a hat button mapping selection '''
+        self._hat_mode_changed(self.sender(), ButtonOutputMode.Press)
+        
+    @QtCore.Slot()
+    def _hat_release_changed(self):
+        ''' updates a hat button mapping selection '''
+        self._hat_mode_changed(self.sender(), ButtonOutputMode.Release)
+        
+    @QtCore.Slot()
+    def _hat_noop_changed(self):
+        ''' updates a hat button mapping selection '''
+        self._hat_mode_changed(self.sender(), ButtonOutputMode.NoOp)
+                
+
+
+    def _update_hat_mapping(self):
+        ''' updates the hat button options for hat to button mapping '''
+        
+        sd = gremlin.ui.state_device.StateData()
+        state_names = sd.getStateNames()
+        positions = self.action_data.hat_positions
+        for index, position in enumerate(positions):  # 9 positions - 8 cardinal and center push
+            cb = self.cb_hat_list[index]
+            with QtCore.QSignalBlocker(cb):
+                cb.clear()
+                cb.addItem("Not mapped", "")
+                for state in state_names:
+                    cb.addItem(state, state)
+
+            mode = self.action_data.hat_mode_map[position]
+
+            rb = self.rb_hat_list[position][int(mode)]
+            with QtCore.QSignalBlocker(rb):
+                rb.setChecked(True)
+
+        self._load_hat_mapping()
+
+    def _load_hat_mapping(self):
+        ''' loads the hat data into the UI '''
+        positions = self.action_data.hat_positions
+        for index, position in enumerate(positions):  # 9 positions - 8 cardinal and center push
+            state_name = self.action_data.hat_map[position] # 0 means disabled
+            cb = self.cb_hat_list[index]
+            state_index = cb.findData(state_name)
+            if state_index != -1:
+                with QtCore.QSignalBlocker(cb):
+                    cb.setCurrentIndex(state_index)
+
+
+
+
+
+
 
 class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
@@ -293,26 +642,72 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         """
         super().__init__(action, parent)
         self.lock = threading.Lock()
-
+        
         # create the state if it doesn't exist
-        sd = gremlin.ui.state_device.StateData()
+        self.sd = gremlin.ui.state_device.StateData()
         key = self.action_data.key
-        if key and not sd.exists(key):
+        if key and not self.sd.exists(key):
             description = self.action_data.description
-            sd.register(key,False, description if description else "auto-created state")
+            self.sd.register(key,False, description if description else "auto-created state")
+
+
+    def profile_start(self):
+        self.verbose = gremlin.config.Configuration().verbose_mode_outputs
+        device_guid = self.action_data.hardware_device_guid
+        input_id = self.action_data.hardware_input_id
+        value = gremlin.joystick_handling.get_hat(device_guid, input_id)
+        if value in vjoy.vjoy.Hat.to_continuous_position:
+            self.hat_position = vjoy.vjoy.Hat.to_continuous_position[value]
+        else:
+            self.hat_position = (0,0)
+        self.pressed_hat_buttons = {}
+        self.pulse_worker_map = {}  # map of (state_name) to pulse worker object
+        
+
+        
+    def _pulse_on(self, data):
+        ''' called when pulse is off '''
+        state_name = data
+        if self.verbose: syslog.info(f"Pulse ON {state_name}")
+        self.sd.setValue(state_name, True)
+
+
+    def _pulse_off(self, data):
+        ''' called when pulse is off '''
+        state_name = data
+        if self.verbose: syslog.info(f"Pulse OFF {state_name}")
+        self.sd.setValue(state_name, False)
+        
+
+    def pulse_start(self, key : str, duration : float, interval : float):
+        ''' pulse setup '''
+        if self.verbose: syslog.info(f"Pulse START state {key}duration: {duration:0.3f} interval: {interval:0.3f}")
+        worker : gremlin.repeater.PulseWorker 
+        if key in self.pulse_worker_map:
+            worker = self.pulse_worker_map[key]
+            if worker.is_running:
+                # worker already running - ignore pulse request
+                if self.verbose: syslog.info(f"\talready pulsing - ignored")
+                return
+        else:
+            args = key
+            worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = args)
+            self.pulse_worker_map[key] = worker
+
+        if self.verbose: syslog.info(f"\activate")
+        worker.start()
+
+    def pulse_stop(self, key: str):
+        ''' request a pulse abort '''
+        if self.verbose: syslog.info(f"Pulse STOP {key}")
+        if key in self.pulse_worker_map:
+            worker : gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
+            worker.stop()
+            del self.pulse_worker_map[key]
 
 
 
-    def _fire_pulse(self, key : str, delay : int):
-        ''' pulses the state on/off '''
-        self.lock.acquire()
-        sd = gremlin.ui.state_device.StateData()
-        value = sd.value(key) # current value
-        sd.setValue(key, not value)
-        time.sleep(delay/1000) # to seconds
-        sd.setValue(key, value)
-        self.lock.release()
-
+        
         
 
     def process_event(self, event, value, extra_data = None):
@@ -321,36 +716,106 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         verbose = gremlin.config.Configuration().verbose
 
         if event.event_type == InputType.JoystickButton:
-            sd = gremlin.ui.state_device.StateData()
             key = self.action_data.key
             mode = self.action_data.mode
             is_pressed = event.is_pressed
             trigger = (is_pressed and not self.action_data.exec_on_release) or \
                     (not is_pressed and self.action_data.exec_on_release) or \
-                    mode == "actual" 
+                    mode in ("actual","pulse")
             if trigger:
     
                 match mode:
                     case "actual":
                         if verbose: syslog.info(f"STATE: set [{key}] ACTUAL {is_pressed}")
-                        sd.setValue(key, is_pressed)
+                        self.sd.setValue(key, is_pressed)
                     case "press":
                         if verbose: syslog.info(f"STATE: set [{key}] ON")
-                        sd.setValue(key, True)
+                        self.sd.setValue(key, True)
                         
                     case "release":
                         if verbose: syslog.info(f"STATE: set [{key}] OFF")
-                        sd.setValue(key, False)
+                        self.sd.setValue(key, False)
                     case "toggle":
-                        value = not sd.value(key)
+                        is_pressed = not self.sd.value(key)
                         if verbose: syslog.info(f"STATE: set [{key}] TOGGLE -> {'ON' if value else 'OFF'}")
-                        sd.setValue(key, value)
+                        self.sd.setValue(key, is_pressed)
                     case "pulse":
-                        if verbose: syslog.info(f"STATE: set [{key}] PULSE")
-                        if not self.lock.locked():
-                            # wait for prior pulse to finish
-                            threading.Timer(0.01, lambda: self._fire_pulse(key, self.action_data.delay)).start()
-                
+                        if is_pressed:
+                            if verbose: syslog.info(f"STATE: trigger start range pulse state {key}")
+                            repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
+                            self.pulse_start(key, self.action_data.pulse_delay/1000, repeat_interval)
+                        else:
+                            self.pulse_stop(key)
+
+        elif event.event_type == InputType.JoystickHat:
+            # hat button handling
+            position = event.raw_value
+            pressed_positions = list(self.pressed_hat_buttons.keys())
+            is_pressed = event.is_pressed
+            mode = self.action_data.hat_mode_map[position]
+
+            state_name = self.action_data.hat_map[position]
+            self.hat_position = position
+            
+            if state_name:
+                match mode:
+                    case ButtonOutputMode.Pulse:
+                        if is_pressed:
+                            if verbose: syslog.info(f"VJOY: trigger start pulse state {state_name} hat {position}")
+                            repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
+                            self.pulse_start(state_name, self.action_data.pulse_delay/1000, repeat_interval)
+                            
+                        else:
+                            if verbose: syslog.info(f"VJOY: trigger stop pulse state {state_name} hat {position}")
+                            self.pulse_stop(state_name)
+
+                            # threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
+                    case ButtonOutputMode.Hold:
+                        if is_pressed:
+                            # release the prior buttons
+                            for pressed_position in pressed_positions:
+                                if position == pressed_position:
+                                    continue
+                                release_input_id = self.pressed_hat_buttons[pressed_position]
+                                if release_input_id > 0:
+                                        self.sd.setValue(state_name, False)
+                                del self.pressed_hat_buttons[pressed_position]
+
+                    case ButtonOutputMode.Press:
+                        is_pressed = True
+                        if position in self.pressed_hat_buttons:
+                            del self.pressed_hat_buttons[position]
+                    case ButtonOutputMode.Release:
+                        is_pressed = False # force a release on trigger
+                        if position in self.pressed_hat_buttons:
+                            del self.pressed_hat_buttons[position]
+                    case ButtonOutputMode.NoOp:
+                        # do nothing
+                        return True
+                    
+                # set the new button
+                self.pressed_hat_buttons[position] = state_name
+                self.sd.setValue(state_name, is_pressed)
+
+
+            else:
+                # release
+                match mode:
+                    case ButtonOutputMode.NoOp:
+                        # do nothing
+                        return True
+                    case ButtonOutputMode.Press:
+                        return True
+                    case ButtonOutputMode.Release:
+                        return True
+
+                for pressed_position in pressed_positions:
+                    state_name = self.pressed_hat_buttons[pressed_position]
+                    if state_name:
+                        self.sd.setValue(state_name, False)
+
+                    del self.pressed_hat_buttons[pressed_position]
+
 
         return True
     
@@ -389,8 +854,22 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.key = None # state key
         self.description = None # state description (used to recreate the state if needed)
         self.mode = "toggle" # valid modes are "pressed", "released", "toggle", "pulse"
-        self.delay = 250 # delay for pulse mode in milliseconds
+        self.pulse_delay = 250 # delay for pulse mode in milliseconds
+        self.pulse_repeat = False # true if the pulse repeats while down
+        self.pulse_repeat_delay  = 250 # repeat delay for pulse mode in milliseconds
         self.exec_on_release = False # true if trigger should execute on input release event
+        self.hat_map = {} # map of button id keyed by hat position tuple
+        self.hat_positions = list(vjoy.vjoy.Hat.to_continuous_direction.keys())
+        self.hat_mode_map = {} # bool table keyed by hat position
+
+        for position in self.hat_positions:
+            self.hat_map[position] = "" # not mapped by default
+            if position == (0,0):
+                self.hat_mode_map[position] = ButtonOutputMode.NoOp # center do nothing
+            else:
+                self.hat_mode_map[position] = ButtonOutputMode.Hold # hold by default
+            
+
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -410,7 +889,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
             action instance, False otherwise
         """
         # Need virtual buttons for button inputs on axes and hats
-        return True
+        return False
 
     def _parse_xml(self, node, data = None):
         """Reads the contents of an XML node to populate this instance.
@@ -425,9 +904,42 @@ class MapToState(gremlin.base_profile.AbstractAction):
         if "mode" in node.attrib:
             self.mode = node.get("mode")
         if "delay" in node.attrib:
-            self.delay = safe_read(node,"delay",int, 250)
+            self.pulse_delay = safe_read(node,"delay",int, 250)
         if "exec_on_release" in node.attrib:
             self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+        if "repeat" in node.attrib:
+            self.pulse_repeat = safe_read(node,"repeat",bool, False)
+        if "repeat-delay" in node.attrib:
+            self.pulse_repeat_delay = safe_read(node, "repeat-delay", int, 250)
+
+
+
+        input_type = self.get_input_type()
+        if input_type == InputType.JoystickHat:
+            hat_nodes = gremlin.util.get_xml_child(node,"hat_to_button", multiple = True)
+            for node_hat in hat_nodes:
+                name = safe_read(node_hat,"name",str, "")
+                position = vjoy.vjoy.Hat.name_to_direction[name]
+                state_name = safe_read(node_hat,"input",str,"")
+                self.hat_map[position] = state_name
+                mode = safe_read(node_hat,"mode", str, "")
+                match mode.casefold():
+                    case "noop":
+                        mode = ButtonOutputMode.NoOp
+                    case "hold":
+                        mode = ButtonOutputMode.Hold
+                    case "pulse":
+                        mode = ButtonOutputMode.Pulse
+                    case "press":
+                        mode = ButtonOutputMode.Press
+                    case "release":
+                        mode = ButtonOutputMode.Release
+                    case _:
+                        # legacy mode
+                        is_pulse = safe_read(node_hat,"pulse",bool, False)
+                        mode = ButtonOutputMode.Pulse if is_pulse else ButtonOutputMode.Hold
+
+                self.hat_mode_map[position] = mode        
 
 
     def _generate_xml(self):
@@ -441,8 +953,28 @@ class MapToState(gremlin.base_profile.AbstractAction):
             if self.description:
                 node.set("description", self.description)
             node.set("mode", self.mode)
-            node.set("delay", safe_format(self.delay, int))
+            node.set("delay", safe_format(self.pulse_delay, int))
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))
+            if self.pulse_repeat:
+                node.set("repeat", safe_format(self.pulse_repeat, bool))
+                node.set("repeat-delay", safe_format(self.pulse_repeat_delay, int))
+
+
+            input_type = self.get_input_type()
+            if input_type == InputType.JoystickHat:
+                for position, state_name in self.hat_map.items():
+                    node_hat = ElementTree.Element("hat_to_button")
+                    name = vjoy.vjoy.Hat.direction_to_name[position]
+                    node_hat.set("name",name)
+                    if state_name:
+                        node_hat.set("input", safe_format(state_name, str))
+                    else:
+                        node_hat.set("input", "")
+                    mode = self.hat_mode_map[position]
+                    node_hat.set("mode", mode.name)
+                    #node_hat.set("pulse", safe_format(is_pulse, bool)) # legacy
+                    node.append(node_hat)
+                    
         return node
 
     def _is_valid(self):

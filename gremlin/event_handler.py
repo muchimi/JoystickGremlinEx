@@ -25,11 +25,6 @@ import anytree
 from threading import Thread, Timer
 from typing import Callable
 import math
-
-
-
-
-
 import gremlin.base_classes
 import gremlin.event_handler
 import gremlin.joystick_handling
@@ -107,11 +102,13 @@ class Event:
 			is pressed
 		"""
 		self._id = gremlin.util.get_guid() # unique ID for this event
+		#self._event_type = event_type
 		self.event_type = event_type
 		self._identifier = identifier
 		self.device_guid = device_guid
-		#self._is_pressed = is_pressed
-		self.is_pressed = is_pressed
+		self._is_pressed = is_pressed
+		#self.is_pressed = is_pressed
+		#self._value = value
 		self.value = value
 		self.raw_value = raw_value
 		self.curve_value = curved_value
@@ -128,6 +125,34 @@ class Event:
 		self.override_input_type = override_input_type # override input type - used as the input type for actions 
 		self.extra_data = extra_data
 		
+
+	# @property
+	# def event_type(self):
+	# 	return self._event_type
+	# @event_type.setter
+	# def event_type(self, value):
+	# 	if self._event_type == InputType.JoystickHat and value != InputType.JoystickHat:
+	# 		pass
+	# 	self._event_type = value
+
+	# @property
+	# def value(self):
+	# 	return self._value
+	# @value.setter
+	# def value(self, data):
+	# 	if not data and self.event_type == InputType.JoystickHat:
+	# 		pass
+	# 	self._value = data
+
+	@property
+	def is_pressed(self):
+		return self._is_pressed
+	
+	@is_pressed.setter
+	def is_pressed(self, value):
+		if not value and self.event_type == InputType.JoystickHat:
+			pass
+		self._is_pressed = value
 
 
 	def clone(self):
@@ -162,23 +187,16 @@ class Event:
 			return self.override_input_type
 		return self.event_type
 
-	# @property
-	# def is_pressed(self):
-	# 	return self._is_pressed
-	
-	# @is_pressed.setter
-	# def is_pressed(self, value):
-	# 	if value:
-	# 		pass
-	# 	self._is_pressed = value
+
 
 	def fake_button(self, is_pressed = True, clone = False):
 		''' converts the event to a fake button '''
 		e = self.clone() if clone else self
-		e.event_type = InputType.JoystickButton
+		if e.event_type == InputType.JoystickAxis:
+			e.event_type = InputType.JoystickButton 
+			#e.value = gremlin.actions.Value()
 		e.identifier = 1
 		e.is_axis = False # range exit is a button type event
-		e.value = is_pressed
 		e.is_pressed = is_pressed
 		return e
 		

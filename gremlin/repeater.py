@@ -272,6 +272,11 @@ class PulseWorker(QtCore.QObject):
         ''' request a stop '''
         
         if self._thread:
+
+            if self._off_callback:
+                # fire the pulse off callback (or abort)
+                self._off_callback(self.data) # fire on UI thread to avoid issues
+            
             self._keep_running = False # tell the worker to stop whatever it's doing
             # wait for the thread to terminate
             self._thread.join()
@@ -321,6 +326,7 @@ class PulseWorker(QtCore.QObject):
                 while self._keep_running and time.time() < time_lapsed:
                     time.sleep(0.01)
                 if verbose: syslog.info("Stop wait")
+
 
         if verbose: syslog.info("End pulse worker")
 

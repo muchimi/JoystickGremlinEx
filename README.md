@@ -17,10 +17,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T13)
 - New: Button container has autorelease option.  This container lets you trigger a series of actions on press or release.  The auto-release just means that the contained actions will get a "press" and a "release" after the delay has lapsed.
+- New: Map to state hat input support (similar to VjoyRemap hat to button mode)
+- New: Map to state uses new pulsing API and gains repeat mode for pulse.
+- Fix: UI Floating point input should now always trigger on typed entry if the entry is valid (this would prevent a data update when the value was changed in some situations).
+- Fix: Hat to button modes press/release behaviors.  
+- New: VjoyRemap now defaults to Button (not ButtonPress)
+
 
 ### (m76T12/A)
 - Fix: resolved multiple UI issues due to recent API changes.
-- Fix: resolved an issue with invert settinmg on vjoyremap not observed due to API change.
+- Fix: resolved an issue with invert setting on vjoyremap not observed due to API change.
 - Fix: Action and container list incompatible with current input no longer displayed (this was suspended a while back as new devices that can change their input types were introduced)  
 - Improved: OSC inputs functional with Vjoyremap repeaters.  
 - New: TTS engine enable/disable option
