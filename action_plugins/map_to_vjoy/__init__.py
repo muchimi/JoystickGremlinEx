@@ -3710,7 +3710,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 value = extra_data["value"]
             else:
                 # use curve value if any
-                value = event.curve_value
+                value = self.action_data.get_filtered_axis_value() # event.curve_value
                 if value is None:
                     # use regular value if any
                     value = event.value
