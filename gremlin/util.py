@@ -42,7 +42,7 @@ import win32gui, win32con
 
 from . import error
 
-from gremlin.singleton_decorator import SingletonDecorator
+
 
 
 
@@ -674,7 +674,7 @@ def grouped(iterable, n):
     ''' returns n items for a given iterable item '''
     return zip(*[iter(iterable)]*n)
 
-def get_dinput_guid() -> dinput.GUID:
+def get_dinput_guid():
     ''' gets a DirectInput compatible GUID'''
     return parse_guid(get_guid(strip=False,no_brackets=True))
 
@@ -735,9 +735,9 @@ def find_folders(root_folder, source_pattern = "*") -> list:
     folders = os.listdir(root_folder)
     return [os.path.join(root_folder, folder) for folder in folders]
     
+import gremlin.singleton_decorator
 
-
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class SearchCache():
     ''' file search cache service '''
     def __init__(self):
@@ -1284,6 +1284,7 @@ def parse_guid(value):
     :param value the string representation of the GUID
     :param dinput.GUID object representing the provided value
     """
+    import dinput
     if value is None or value == "None" or not value:
         return None
     if isinstance(value, dinput.GUID):

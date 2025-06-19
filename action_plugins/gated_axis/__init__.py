@@ -330,8 +330,9 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText("This will delete this entry.\nAre you sure?")
-        pixmap = gremlin.util.load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        #pixmap = gremlin.util.load_pixmap("warning.svg")
+        #pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         message_box.setIconPixmap(pixmap)
         message_box.setStandardButtons(
             QtWidgets.QMessageBox.StandardButton.Ok |
@@ -403,7 +404,6 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
     def _update_ui(self):
         ''' updates controls based on the options '''
-        from gremlin.ui.joystick_device import InputItemConfiguration
         if self._is_range:
             # range conditions
             fixed_visible = self._range_info.mode == GateRangeOutputMode.Fixed
@@ -428,7 +428,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         with QtCore.QSignalBlocker(self._condition_tab):     
-            from gremlin.ui.joystick_device import InputItemConfiguration
+            
             self._condition_tab.clear()
             for condition in conditions:
                 condition_container_widget = gremlin.ui.ui_common.QDataWidget()
@@ -469,7 +469,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
                 container_widget = self._cache.retrieve_by_data(item_data)        
                 if not container_widget:
                     # create the container, cache it
-                    container_widget = InputItemConfiguration(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
+                    container_widget = gremlin.ui.input_item.InputItemConfiguration(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
                     self._cache.register(item_data, container_widget)
                 condition_container_layout.addWidget(container_widget)
                 
@@ -497,8 +497,8 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             has_condition = self._range_info.hasContainers(condition) if self._is_range else self._gate_info.hasContainers(condition)
             self._condition_tab.setTabIcon(index, self._icon_enabled if has_condition else self._icon_disabled)
                 
-    QtCore.Slot(gremlin.ui.joystick_device.InputItemConfiguration)
-    def _mapping_changed_cb(self, item_data : gremlin.ui.joystick_device.InputItemConfiguration):
+    QtCore.Slot(object)
+    def _mapping_changed_cb(self, item_data : gremlin.ui.input_item.InputItemConfiguration):
         ''' hooks a mapping change '''
         item_data_map = self._range_info.item_data_map if self._is_range else self._gate_info.item_data_map
         if item_data in item_data_map.values():
@@ -1237,21 +1237,25 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
     def _set_slider_gate_value(self, index, value):
         ''' sets a gate value on the slider '''
-        values = self.gate_data.getGateValues()
+        values = self.gate_data.getGateValues(as_dict = True)
         #values = list(self._slider.value())
-        if index >= len(values):
-            syslog.info(f"Adding new gate {index}")
-            values.insert(index, value)
-            
         values[index] = value
         self._update_slider(values)
 
-    def _update_slider(self, values : list[float] | tuple[float]):
+    def _convert(self, values):
+        ''' converts values to a list '''
+        if isinstance(values, dict):
+            keys = [index for index in values.keys()]
+            keys.sort()
+            values = [values[index] for index in keys]
+        return values
+
+    def _update_slider(self, values : list[float] | tuple[float] | dict):
         '''
         Updates the slider handle values (gates)
 
         Arguments:
-            values -- tuple of values -1.0 to 1.0
+            values -- tuple of values -1.0 to 1.0, list of values, or dict of values indexed by gate position (zero based)
         '''
         if self._deleted:
             return
@@ -1261,6 +1265,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             if verbose_ui: syslog.info(f"GATE Widget: update slider : {self.objectName()} values: {values}")
             gremlin.util.assert_ui_thread()
             verbose = gremlin.config.Configuration().verbose_mode_details
+            values = self._convert(values)
             if verbose:
                 sv = "Slider: "
                 for idx, v in enumerate(values):
@@ -1306,8 +1311,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText("This will delete this gate.\nAre you sure?")
-        pixmap = gremlin.util.load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        # pixmap = gremlin.util.load_pixmap("warning.svg")
+        # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
         message_box.setIconPixmap(pixmap)
         message_box.setStandardButtons(
             QtWidgets.QMessageBox.StandardButton.Ok |
@@ -1549,8 +1555,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             # display a warning a gate is already there
             message_box = QtWidgets.QMessageBox()
             message_box.setText("A gate already exists at this location")
-            pixmap = gremlin.util.load_pixmap("warning.svg")
-            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            # pixmap = gremlin.util.load_pixmap("warning.svg")
+            # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
             message_box.setIconPixmap(pixmap)
             message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
             message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
@@ -1683,8 +1690,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             message_box = QtWidgets.QMessageBox()
             message_box.setText("Reduce gate confirmation")
             message_box.setInformativeText("This will reduce gates, delete gate configurations and normalize gates.\nAre you sure?")
-            pixmap = load_pixmap("warning.svg")
-            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            # pixmap = gremlin.util.load_pixmap("warning.svg")
+            # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
             message_box.setIconPixmap(pixmap)
             message_box.setStandardButtons(
                 QtWidgets.QMessageBox.StandardButton.Ok |

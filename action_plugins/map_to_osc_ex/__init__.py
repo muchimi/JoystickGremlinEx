@@ -274,15 +274,15 @@ class OscArg(QtCore.QObject):
                 self._source_axis_id = safe_read(node,"axis", int, 1)
 
         if "exec-press" in node.attrib:
-            self._send_on_press = safe_read(node,"exec-press", bool)
+            self._send_on_press = safe_read(node,"exec-press", bool, True)
         if "exec-release" in node.attrib:
-            self._send_on_release = safe_read(node,"exec-release", bool)
+            self._send_on_release = safe_read(node,"exec-release", bool, False)
         
         if is_number:
             if "min-range" in node.attrib:
-                self._min_range = safe_read(node, "min-range", float)
+                self._min_range = safe_read(node, "min-range", float, -1.0)
             if "max-range" in node.attrib:
-                self._max_range = safe_read(node, "max-range", float)
+                self._max_range = safe_read(node, "max-range", float, 1.0)
 
 
 

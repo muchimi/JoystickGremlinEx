@@ -40,7 +40,7 @@ from gremlin.input_types import InputType
 import gremlin.shared_state
 
 import gremlin.util
-from . import config, joystick_handling, windows_event_hook
+
 
 import gremlin.keyboard
 import gremlin.ui
@@ -533,8 +533,9 @@ class EventListener(QtCore.QObject):
 
 	def __init__(self):
 		"""Creates a new instance."""
+		import gremlin.windows_event_hook
 		QtCore.QObject.__init__(self)
-		self.keyboard_hook = windows_event_hook.KeyboardHook()
+		self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
 		self.keyboard_hook.register(self._keyboard_handler)
 
 		config = gremlin.config.Configuration()
@@ -633,13 +634,14 @@ class EventListener(QtCore.QObject):
 	def _load_hat_states(self):
 		''' loads current hats '''
 		from gremlin.util import dill_hat_lookup
+		import gremlin.joystick_handling
 		self._hat_state = {}
-		device_list = [dev for dev in joystick_handling.joystick_devices() if dev.hat_count]
+		device_list = [dev for dev in gremlin.joystick_handling.joystick_devices() if dev.hat_count]
 		event_list = []
 		for device in device_list:
 			for input_id in range(1, device.hat_count+1):
 				key = (device.device_id, input_id)
-				value = joystick_handling.get_hat(device.device_guid, input_id)
+				value = gremlin.joystick_handling.get_hat(device.device_guid, input_id)
 				value = dill_hat_lookup[value]
 				self._hat_state[key] = value
 	
@@ -710,9 +712,10 @@ class EventListener(QtCore.QObject):
 	
 	def enableMouse(self):
 		if self.enable_mouse_hook:
+			import gremlin.windows_event_hook
 			syslog.info("MOUSE HOOK: enabled")
 			if self.mouse_hook is None:
-				self.mouse_hook = windows_event_hook.MouseHook()
+				self.mouse_hook = gremlin.windows_event_hook.MouseHook()
 				self.mouse_hook.register(self._mouse_handler)
 				self.mouse_hook.start()
 		else:
@@ -930,7 +933,7 @@ class EventListener(QtCore.QObject):
 			return
 
 		from gremlin.util import dill_hat_lookup
-		verbose = config.Configuration().verbose_mode_joystick
+		verbose = gremlin.config.Configuration().verbose_mode_joystick
 		
 		event = dinput.InputEvent(data)
 
@@ -1258,7 +1261,7 @@ class EventListener(QtCore.QObject):
 
 	def _init_joysticks(self):
 		"""Initializes joystick devices."""
-		for dev_info in joystick_handling.joystick_devices():
+		for dev_info in gremlin.joystick_handling.joystick_devices():
 			self._load_calibrations(dev_info)
 
 	def _load_calibrations(self, device_info):
@@ -1268,7 +1271,7 @@ class EventListener(QtCore.QObject):
 		"""
 
 		from gremlin.util import create_calibration_function
-		cfg = config.Configuration()
+		cfg = gremlin.config.Configuration()
 		for entry in device_info.axismap_list:
 			limits = cfg.get_calibration(
 				device_info.device_guid,
@@ -2077,9 +2080,9 @@ class EventHandler(QtCore.QObject):
 		# mode to act on
 		mode = event.mode if event.mode else self.runtime_mode  
 
-		
-		verbose = gremlin.config.Configuration().verbose_mode_inputs
-
+		config =  gremlin.config.Configuration()
+		verbose = config.verbose_mode_inputs
+		verbose_detailed = verbose and config.verbose_mode_extra
 
 		if verbose and event.event_type != InputType.JoystickAxis:
 			syslog.info(f"process event - mode [{mode}] event: {str(event)}")
@@ -2173,31 +2176,31 @@ class EventHandler(QtCore.QObject):
 						
 		elif event.event_type ==InputType.Midi:
 			m_list = self._matching_midi_callbacks(event)
-			if verbose and not m_list: syslog.info(f"EVENT: [MIDI] no matching inputs for {str(event.identifier.message_key)} mode: {self.runtime_mode}")
+			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [MIDI] no matching inputs for {str(event.identifier.message_key)} mode: {self.runtime_mode}")
 					
 		elif event.event_type == InputType.OpenSoundControl:
 			m_list = self._matching_osc_callbacks(event)
-			if verbose and not m_list: syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
+			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
 		elif event.event_type == InputType.State:
 			m_list = self._matching_state_callbacks(event)
-			if verbose and not m_list: syslog.info(f"EVENT: [STATE] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
+			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [STATE] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
 		elif event.event_type == InputType.JoystickAxis:
 			# if not self.shouldProcess(event):
 			# 	return
 
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
-			if verbose and not m_list: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 		elif event.event_type in (InputType.JoystickButton, InputType.JoystickHat):
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
-			if verbose and not m_list: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 		else:
 			# other inputs including control inputs
-			verbose = gremlin.config.Configuration().verbose_mode_inputs
+			
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
-			if verbose and not m_list: syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
 		if m_list or f_list:
 			self._execute_callbacks(event, m_list, f_list)

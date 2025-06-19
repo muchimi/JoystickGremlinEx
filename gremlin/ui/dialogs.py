@@ -1073,7 +1073,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         row = 0
         col = 0
 
-        for mode in gremlin.types.VerboseMode:
+        modes = [mode for mode in gremlin.types.VerboseMode]
+        modes.sort(key = lambda x: x.name.casefold())
+
+        for mode in modes:
             if mode in (gremlin.types.VerboseMode.NotSet, gremlin.types.VerboseMode.All):
                 continue
             widget = ui_common.QDataCheckbox(mode.name, mode)
@@ -2052,13 +2055,15 @@ This setting is also available on a profile by profile basis on the profile tab,
 
     def _mapping_delete_cb(self):
         import gremlin.util
+        import gremlin.ui.ui_common
         widget = self.sender()
         item = widget.data
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText("This will delete this profile association.\nAre you sure?")
-        pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        # pixmap = load_pixmap("warning.svg")
+        # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         message_box.setIconPixmap(pixmap)
         message_box.setStandardButtons(
             QtWidgets.QMessageBox.StandardButton.Ok |
@@ -2785,8 +2790,9 @@ The setting can be overriden by the global mode reload option set in Options for
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText(f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?")
-        pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        # pixmap = load_pixmap("warning.svg")
+        # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         message_box.setIconPixmap(pixmap)
         message_box.setStandardButtons(
             QtWidgets.QMessageBox.StandardButton.Ok |

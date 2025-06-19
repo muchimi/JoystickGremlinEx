@@ -4565,19 +4565,19 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         update_from_output = False
         if "min_range" in node.attrib:
             # old profile 
-            self.output_min_range = safe_read(node,"min_range", float)
+            self.output_min_range = safe_read(node,"min_range", float, -1.0)
             update_from_output = True
         else:
-            self.output_min_range = safe_read(node,"output_min_range", float) if "output_min_range" in node.attrib else -16383
+            self.output_min_range = safe_read(node,"output_min_range", float, -16383) if "output_min_range" in node.attrib else -16383
 
         
 
         if "max_range" in node.attrib:
             # old profile
-            self.output_max_range = safe_read(node,"max_range", float)
+            self.output_max_range = safe_read(node,"max_range", float, 1.0)
             update_from_output = True
         else:
-            self.output_max_range = safe_read(node,"output_max_range", float) if "output_max_range" in node.attrib else 16384
+            self.output_max_range = safe_read(node,"output_max_range", float, 16384) if "output_max_range" in node.attrib else 16384
 
         if update_from_output:
             # old profile

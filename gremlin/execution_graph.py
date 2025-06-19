@@ -29,7 +29,7 @@ import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
-import gremlin.gated_handler
+
 from gremlin.input_types import InputType
 import gremlin.actions
 import gremlin.error
@@ -45,7 +45,7 @@ from enum import Enum,auto
 from gremlin.singleton_decorator import SingletonDecorator
 from PySide6 import QtCore
 from threading import Event
-
+import gremlin.gated_handler
 import gremlin.types
 import gremlin.ui
 

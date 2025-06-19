@@ -2360,7 +2360,7 @@ class SimConnectBlock():
 
         if node.tag == "command":
             # lvar type
-            self.command = gremlin.util.safe_read(node,"command", str)
+            self.command = gremlin.util.safe_read(node,"command", str, "")
             self.type = SimConnectCommandType.to_enum(node.get("type"))
             if "datatype" in node.attrib:
                 self.output_data_type = node.get("datatype")

@@ -31,8 +31,7 @@ import gremlin.shared_state
 import gremlin.util
 from . import input_item, ui_common
 from gremlin.keyboard import Key
-from .joystick_device import InputItemConfiguration
-from .input_item import InputItemWidget, InputIdentifier, InputItemListView
+from .input_item import InputItemWidget, InputIdentifier, InputItemListView, InputItemConfiguration
 import uuid
 from gremlin.util import *
 from gremlin.input_types import InputType
@@ -345,7 +344,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        super().__init__(object_name, parent)
+        super().__init__(object_name, gremlin.shared_state.keyboard_tab_guid, parent)
         
 
         # Store parameters
@@ -566,11 +565,11 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             syslog.info(f"Final item index {index} {input_id.display_name}")
         
  
-    def getWidgetKey(self, input_id):
-        ''' gets the content widget compound key for the item / input combination'''
-        return (self.device_guid, input_id)
+    # def getWidgetKey(self, input_id):
+    #     ''' gets the content widget compound key for the item / input combination'''
+    #     return (self.device_guid, input_id)
 
-    def _select_item_cb(self, index):
+    def _select_item_cb(self, index, emit = True):
         ''' called when a key has been selected - refreshes the view panel '''
 
         if index == -1:
@@ -615,8 +614,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._last_selected_index = index           
 
-        el = gremlin.event_handler.EventListener()
-        el.input_selection_changed.emit(device_guid, input_type, input_id)
+        if emit:
+            el = gremlin.event_handler.EventListener()
+            el.input_selection_changed.emit(device_guid, input_type, input_id)
 
 
     def _index_for_key(self, key_or_index):
@@ -659,9 +659,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
 
-    def refresh(self):
+    def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
-        self._select_item_cb(self.input_item_list_view.current_index)
+        self._select_item_cb(self.input_item_list_view.current_index, emit)
 
 
     def _custom_widget_handler(self, list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None):

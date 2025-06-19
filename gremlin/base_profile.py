@@ -31,7 +31,7 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.curve_handler
 import gremlin.event_handler
-import gremlin.execution_graph
+
 import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
@@ -60,6 +60,7 @@ import anytree
 from anytree import Node
 from PySide6.QtWidgets import QMessageBox
 import gremlin.profile_graph
+import gremlin.execution_graph
 
 syslog = logging.getLogger("system")
 
@@ -273,6 +274,10 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         return self.input_item.input_id if self.input_item else None
     
     @property
+    def hardware_raw_input_type(self) -> InputType:
+        return self._input_item.input_type if self._input_item else None
+    
+    @property
     def hardware_input_type(self) -> InputType :
         ''' gets the type of hardware device attached to this '''
         if self._input_item:
@@ -289,7 +294,8 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
                 self.override_input_type = input_type
         if self.override_input_type is not None:
             return self.override_input_type
-        return self.input_item.input_type if self.input_item else None
+        return self._input_item.input_type if self._input_item else None
+
     
     @property
     def hardware_input_type_name(self) -> str:
@@ -1360,10 +1366,12 @@ class Settings:
         for vid, data in self.vjoy_initial_values.items():
             vjoy_node = etree.Element("vjoy")
             vjoy_node.set("id", safe_format(vid, int))
-            for aid, value in data.items():
+            for aid in data:
+                enabled, value = data[aid]
                 axis_node = etree.Element("axis")
                 axis_node.set("id", safe_format(aid, int))
                 axis_node.set("value", safe_format(value, float))
+                axis_node.set("enabled", safe_format(enabled, bool))
                 vjoy_node.append(axis_node)
             node.append(vjoy_node)
 
@@ -1401,8 +1409,46 @@ class Settings:
             for axis_node in vjoy_node.findall("axis"):
                 aid = safe_read(axis_node, "id", int, 0)
                 value = safe_read(axis_node, "value", float, 0.0)
-                self.vjoy_initial_values[vid][aid] = value
+                enabled = False
+                if "enabled" in axis_node.attrib:
+                    enabled = safe_read(axis_node, "enabled", bool, True)
 
+
+                self.vjoy_initial_values[vid][aid] = (enabled, value)
+
+
+    def get_vjoy_axis_enabled(self, vid, aid) -> bool:
+        ''' true if the value is enabled for this axis '''
+        if vid in self.vjoy_initial_values:
+            if aid in self.vjoy_initial_values[vid]:
+                enabled, value = self.vjoy_initial_values[vid][aid]
+                return enabled
+        return False
+    
+    def set_vjoy_axis_enabled(self, vid, aid, value = None) -> bool:
+        ''' true if the value is enabled for this axis '''
+        if not vid in self.vjoy_initial_values:
+            self.vjoy_initial_values[vid] = {}
+        if not aid in self.vjoy_initial_values[vid]:
+            self.vjoy_initial_values[vid][aid] = (True, value if value is not None else 0.0)
+        else:
+            if value is None:
+                self.vjoy_initial_values[vid][aid][0] = True
+            else:
+                self.vjoy_initial_values[vid][aid][0] = (True, value)
+    
+
+    def get_initial_vjoy_axis_value_list(self):
+        ''' gets all defined default values as a triplet (vjoy_id, axis_id, value)'''
+        data = []
+        for vid in self.vjoy_initial_values:
+            for aid in self.vjoy_initial_values[vid]:
+                enabled, value = self.vjoy_initial_values[vid][aid]
+                if enabled:
+                    data.append((vid, aid, value))
+
+        return data
+            
 
 
     def get_initial_vjoy_axis_value(self, vid, aid):
@@ -1412,11 +1458,12 @@ class Settings:
         :param aid the id of the axis
         :return default value for the specified axis
         """
-        value = 0.0
         if vid in self.vjoy_initial_values:
             if aid in self.vjoy_initial_values[vid]:
-                value = self.vjoy_initial_values[vid][aid]
-        return value
+                enabled, value = self.vjoy_initial_values[vid][aid]
+                if enabled:
+                    return value
+        return 0.0
 
     def set_initial_vjoy_axis_value(self, vid, aid, value):
         """Sets the default value for a particular vJoy axis.
@@ -3469,13 +3516,13 @@ class Profile():
         # TODO: apply safe reading to these
         for tag in ["vjoy"]:
             entry[tag] = {
-                "vjoy_id": safe_read(node.find(tag), "vjoy-id", int),
-                "axis_id": safe_read(node.find(tag), "axis-id", int),
+                "vjoy_id": safe_read(node.find(tag), "vjoy-id", int, 1),
+                "axis_id": safe_read(node.find(tag), "axis-id", int, 1),
             }
         for tag in ["lower", "upper"]:
             entry[tag] = {
                 "device_guid": parse_guid(node.find(tag).get("device-guid")),
-                "axis_id": safe_read(node.find(tag), "axis-id", int)
+                "axis_id": safe_read(node.find(tag), "axis-id", int, 1)
             }
 
         return entry

@@ -1,6 +1,7 @@
 {
     "python.REPL.enableREPLSmartSend": false,
     "python.terminal.activateEnvironment": false,
+    "python.analysis.autoImportCompletions": false,
     "yaml.schemas": {
     "https://squidfunk.github.io/mkdocs-material/schema.json": "mkdocs.yml"
   },

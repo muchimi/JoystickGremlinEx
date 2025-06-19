@@ -272,6 +272,7 @@ class Axis:
             self._deadzone_fn(min(1.0, max(-1.0, p_value)))
         )
 
+
         if not VJoyInterface.SetAxis(
                 int(self._half_range + self._half_range * self._value),
                 self.vjoy_id,

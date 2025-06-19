@@ -471,7 +471,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         assert container_node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container,"Logic error: Node is not a container node"
 
         group_node = container_node.children[0] # group node is the only child of the container node
-        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set]
         self.short_nodes = [node for node in self.action_set_nodes if node.action_set.data == "short"]
         self.long_nodes = [node for node in self.action_set_nodes if node.action_set.data == "long"]
 
@@ -663,8 +663,8 @@ class TempoExContainer(AbstractContainer):
         self.delay = float(node.get("delay", 0.5))
         self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
         self.activate_on = node.get("activate-on", "release")
-        self.chain_long = safe_read(node, "chain_long", bool)
-        self.chain_short = safe_read(node, "chain_short", bool)
+        self.chain_long = safe_read(node, "chain_long", bool, False)
+        self.chain_short = safe_read(node, "chain_short", bool, False)
         self.timeout = float(node.get("timeout", 0.0))
         # custom read of action sets
         for as_node in node:

@@ -44,6 +44,8 @@ from qtpy.QtCore import (
 
 from qtpy.QtWidgets import QCheckBox
 from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter, QStandardItemModel, QStandardItem, QLinearGradient
+
+
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
 import gremlin.ui.ui_common
@@ -216,6 +218,9 @@ class Color():
     @staticmethod
     def disconnectedColor(): # color for the disconnected device 
         return "#db6512"
+    @staticmethod
+    def unmappedColor(): # color for the unmapped device 
+        return "#a1a1a1" if gremlin.shared_state.is_dark_theme else "#5a5a5a"
     @staticmethod
     def listenColor(): # color used for listen type buttons
         return "#34b7eb"
@@ -562,13 +567,24 @@ class Icons():
     @staticmethod
     def disconnectedIcon(qta_color = Color.disconnectedColor()):
         return Icons._icon("mdi.power-plug-off", qta_color = qta_color)
+    @staticmethod
+    def warningIcon():
+        return Icons._icon("ph.shield-warning-fill",qta_color=QtGui.QColor(Color.warningColor()))
+    @staticmethod
+    def mappedIcon():
+        return Icons._icon("fa5.map")
 
     def _icon(value : str, qta_color = None):
         if qta_color and isinstance(qta_color, str):
             qta_color = QtGui.QColor(qta_color)
         return load_icon(value, qta_color = qta_color) if qta_color is not None else load_icon(value)
     
-
+    def to_pixmap(icon : QtGui.QIcon, pixels = 24):
+        ''' convers an icon to a pixmap'''
+        #icon : QtGui.QIcon = Icons.warningIcon()
+        return icon.pixmap(QtCore.QSize(pixels, pixels))
+        
+        
 
 class Buttons():
     ''' common UI button widgets '''
@@ -2992,8 +3008,9 @@ class ConfirmPushButton(QtWidgets.QPushButton):
 
         from gremlin.util import load_pixmap
         message_box = QtWidgets.QMessageBox()
-        pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        # pixmap = load_pixmap("warning.svg")
+        # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
         message_box.setIconPixmap(pixmap)
         message_box.setText(self.title)
         message_box.setInformativeText(self.prompt)
@@ -3059,8 +3076,9 @@ class ConfirmBox():
 
         from gremlin.util import load_pixmap
         self._message_box = QtWidgets.QMessageBox(parent = parent)
-        pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        # pixmap = load_pixmap("warning.svg")
+        # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
         self._message_box.setIconPixmap(pixmap)
         self._message_box.setText(title)
         self._message_box.setInformativeText(prompt)
@@ -3093,8 +3111,9 @@ class MessageBox():
         self._message_box = QMessageBox(parent = parent)
 
         if is_warning:
-            pixmap = load_pixmap("warning.svg")
-            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            # pixmap = load_pixmap("warning.svg")
+            # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
             self._message_box.setIconPixmap(pixmap)
         self._message_box.setText(title)
         self._message_box.setInformativeText(prompt)
@@ -6779,12 +6798,14 @@ class QContentWidget(QtWidgets.QWidget):
 
 class QSplitTabWidget(QDataWidget):
     ''' tab content widgeth split '''
-    def __init__(self, object_name, parent = None):
+    def __init__(self, object_name, device_guid, parent = None):
         super().__init__(parent)
         self.setObjectName(object_name)
 
         self._id = gremlin.util.get_guid() # unique ID
         self._blank_input_id = "c9a484aedbab4f518e5bab7ec402df65"  # input ID to use for the blank pages
+        self._device_guid = device_guid
+        self._device_id = str(device_guid)
 
         self._lock = False
 
@@ -6870,15 +6891,20 @@ class QSplitTabWidget(QDataWidget):
         
         '''
         
-        index = -1
-        if key in self._widget_config_index_map:
-            index = self._widget_config_index_map[key]
-            if index == -1:
-                syslog.warning(f"Requested widget for input[{key}] not found.")
-            else:
-                if self._config_widget.currentIndex() != index:
-                    self._config_widget.setCurrentIndex(index)
-        return index
+        #index = -1
+        widget = self.getRegisteredWidget(key)
+        assert widget is not None,f"Error: logic error, content widget does not exist for key ({key}) "
+        self._config_widget.setCurrentWidget(widget)
+
+
+        # if key in self._widget_config_index_map:
+        #     index = self._widget_config_index_map[key]
+        #     if index == -1:
+        #         syslog.warning(f"Requested widget for input[{key}] not found.")
+        #     else:
+        #         if self._config_widget.currentIndex() != index:
+        #             self._config_widget.setCurrentIndex(index)
+        # return index
     
     def unregisterWidget(self, key):
         ''' removes a widget from the cleanup list'''
@@ -6935,8 +6961,28 @@ class QSplitTabWidget(QDataWidget):
         if index < len(keys):
             return keys[index]
         return None
-            
+    
 
+    def getContentWidget(self):
+        ''' returns configuration items currently displayed in the UI '''
+        import gremlin.ui.input_item
+        widget =  self._config_widget.currentWidget()
+        if isinstance(widget, gremlin.ui.input_item.InputItemConfiguration):
+            return widget
+        return None
+    
+    def getWidgetKey(self, input_id):
+        ''' gets the content widget compound key for the item / input combination'''
+        return (self._device_id, input_id)
+    
+    def setContentWidget(self, input_id):
+        key = self.getWidgetKey(input_id)
+        widget = self.getRegisteredWidget(key)
+        if widget:
+            self._config_widget.setCurrentWidget(widget)
+        
+    def refresh(self, emit = True):
+        assert False,"Required method Refresh() not implemented by derived class"
 
 
     def _blank_input(self):
@@ -8954,8 +9000,7 @@ class QAxisSourceSelector(QtWidgets.QWidget):
 class QWarning(QIconLabel):
     def __init__(self, text = None, parent = None):
         super().__init__()
-        icon = load_icon("ph.shield-warning-fill",use_qta=True,qta_color=QtGui.QColor(Color.warningColor()))
-        self.setIcon(icon)
+        self.setIcon(Icons.warningIcon())
         if text:
             self.setText(text)
 

@@ -24,8 +24,8 @@ import os
 import time
 import uuid
 import logging
-from gremlin.singleton_decorator import SingletonDecorator
-from gremlin.types import DeviceType
+import gremlin.types
+
 
 syslog = logging.getLogger("system")
 
@@ -419,7 +419,7 @@ class DeviceSummary:
         if data is not None:    
             self.device_guid = GUID(data.device_guid)
             self.device_id = str(self.device_guid)
-            self._device_type = DeviceType.Joystick
+            self._device_type = gremlin.types.DeviceType.Joystick
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id
             self.joystick_id = data.joystick_id
@@ -451,7 +451,7 @@ class DeviceSummary:
         else:
             self.device_guid = None
             self.device_id = None
-            self._device_type = DeviceType.Joystick # assume it's joystick by default
+            self._device_type = gremlin.types.DeviceType.Joystick # assume it's joystick by default
             self.vendor_id = None
             self.product_id = None
             self.joystick_id = None
@@ -470,10 +470,10 @@ class DeviceSummary:
         self.data={}  # tracked data for this device, example, stepped index data for an axis
 
     @property
-    def device_type(self) -> DeviceType:
+    def device_type(self):
         return self._device_type
     @device_type.setter
-    def device_type(self, value : DeviceType):
+    def device_type(self, value):
         self._device_type = value
 
     @property

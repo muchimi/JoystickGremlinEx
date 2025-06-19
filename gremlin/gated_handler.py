@@ -1058,7 +1058,7 @@ class RangeInfo():
     
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class TriggerTracking():
     ''' class that holds trigger information for previously generated triggers by category '''
 
@@ -1431,7 +1431,7 @@ class GateData():
         # build allowed mode list
    
 
-        item_data: gremlin.ui.joystick_device.InputItemConfiguration
+        item_data: gremlin.ui.input_item.InputItemConfiguration
 
         eh = gremlin.event_handler.EventHandler()
         ec = gremlin.execution_graph.ExecutionContext()
@@ -1806,7 +1806,7 @@ class GateData():
         ''' gets the number of used gates '''
         return len(self._get_used_gates())
 
-    def getGateValues(self):
+    def getGateValues(self, as_dict = False):
         ''' gets a list of gate values in slider order - the slider order should be set whenever the slider is first populated so we know which index is what gate  '''
         gates = self._get_used_gates(include_default=False)
         if not gates:
@@ -1818,7 +1818,16 @@ class GateData():
             gates = [g1, g2]
         data = [(info.slider_index, info.value) for info in gates]
         data.sort(key = lambda x: x[0])
-        return [d[1] for d in data]
+        gate_values = [d[1] for d in data]
+        
+        if as_dict:
+            values = {}
+            for index, value in enumerate(gate_values):
+                values[index] = value
+        else:
+            values = gate_values
+        return values
+        
     
     def updateGateSliderIndices(self):
         ''' updates slider indices'''

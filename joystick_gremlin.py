@@ -35,22 +35,26 @@ import threading
 from threading import Lock
 import webbrowser
 import faulthandler
-
-
 import dinput
+
+
+
 from lxml import etree
 
 ''' ALL gremlin modules should be imported here to avoid packaging errors '''
 
-import gremlin.util
 
+import gremlin.util
+import gremlin.config
 import gremlin.input_types
 import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.gamepad_handling
 import gremlin.import_profile
 import gremlin.input_devices
+import gremlin.config
 import gremlin.joystick_handling
+
 import gremlin.hid
 import gremlin.profile_graph
 import gremlin.shared_state
@@ -62,13 +66,10 @@ import gremlin.ui.mode_device
 import gremlin.ui.state_device
 import gremlin.ui.theme
 
-import gremlin.curve_handler
-import gremlin.gated_handler
-import gremlin.macro_handler
 import gremlin.plugin_manager
 import gremlin.process_monitor
-import gremlin.user_plugin
 import gremlin.execution_graph
+import gremlin.windows_event_hook # reference needed for packaging
 
 import anytree
 from dinput import DeviceSummary
@@ -442,6 +443,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             syslog.error(f"Unknown device GUID found in tabs: {device_guid}")
             return
         device_name = device.name
+        has_mapping = self._has_mapping(device_guid)
         if device_name == "Controller (XBOX 360 For Windows)":
             widget = self.getRegisteredWidget(device_guid)
             device_profile = self.profile.get_device_modes(
@@ -470,23 +472,46 @@ class GremlinUi(QtWidgets.QMainWindow):
             color = gremlin.ui.ui_common.Color().disconnectedColor()
             icon = gremlin.ui.ui_common.Icons.disconnectedIcon() #.load_icon("mdi.power-plug-off", qta_color = color)
             self.ui.devices.setTabIcon(position, icon)
-            self.ui.devices.setTabTextColor(position, color)                            
+            self.ui.devices.setTabTextColor(position, color)   
+        else:
+            if not has_mapping:
+                # icon = gremlin.ui.ui_common.Icons.mappedIcon()
+                # self.ui.devices.setTabIcon(position, icon)
+                color = gremlin.ui.ui_common.Color().unmappedColor()
+                self.ui.devices.setTabTextColor(position, color)   
+
     
         self._tab_device_map[device_guid] = position
         self._tab_index_map[position] = device_guid
         self._tab_name_map[device_guid] = device_name
         
-        self.ui.devices.setTabData(position, TabData(device_guid, tab_type, device))
+        self.ui.devices.setTabData(position, TabData(device.device_id, tab_type, device))
 
         if tab_type == TabDeviceType.Joystick:
             self._joystick_device_guids.append(device_guid)
         
         verbose = gremlin.config.Configuration().verbose_mode_device
-        if verbose: syslog.info(f"Add tab: {position} {device_name} {device_guid}")
+        if verbose: syslog.info(f"Add tab: {position} {device_name} {device_guid}  tab data: {self.ui.devices.tabData(position)}")
 
         return position
     
-    
+    def _has_mapping(self, device_guid) -> bool:
+        ''' true if the device has mappings '''
+        if isinstance(device_guid, str):
+            device_guid = gremlin.util.parse_guid(device_guid)
+        profile = gremlin.shared_state.current_profile
+        edit_mode = gremlin.shared_state.edit_mode
+        devices = profile.devices
+        if device_guid in devices:
+            device_data = devices[device_guid]
+            if edit_mode in device_data.modes:
+                mode_data = device_data.modes[edit_mode]
+                for input_type, input_items in mode_data.config.items():
+                    for input_item in input_items.values():
+                        if input_item.containers:
+                            return True
+        return False
+
     def _get_tab_map(self):
         ''' gets tab configuration data as a dictionary indexed by tab index holding device id, device name and device widget type
 
@@ -2461,10 +2486,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                         selected = True
                         self._select_input(device_guid, force_switch=True)
                         
-
-                if device_guid is not None and device and not selected and device.device_type != DeviceType.NotSet:
-                    _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
-                    self._select_input(device_guid, restore_input_type, restore_input_id, force_update = True, force_switch=True)
+                # restore last profile selection
+                # if device_guid is not None and device and not selected and device.device_type != DeviceType.NotSet:
+                #     _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
+                #     self._select_input(device_guid, restore_input_type, restore_input_id, force_update = True, force_switch=True)
                 
             except Exception as err:
                 pass
@@ -2617,7 +2642,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             if input_id is None:
                 input_id = default_input_id
                 
-            self._select_input(device_guid, input_type, input_id)
+            # self._select_input(device_guid, input_type, input_id)
         if verbose:
             device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
             syslog.info(f"UI: startup selection: {device_name} {gremlin.input_types.InputType.to_string(input_type)} {input_id}") 
@@ -2726,8 +2751,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         '''
-
-      
+        
+        import gremlin.config
+        import gremlin.event_handler
+        import gremlin.ui.input_item
+        import gremlin.util
+        import gremlin.shared_state
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
         
@@ -2758,8 +2787,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         input_type = restore_input_type
 
         switch_enabled = self.is_autoswitch_highlighting
-        s_device_guid = str(device_guid)
-        if not force_switch and gremlin.shared_state.current_tab_device_guid != s_device_guid and not switch_enabled:
+        if not force_switch and gremlin.util.compare_guid(gremlin.shared_state.current_tab_device_guid,device_guid) and not switch_enabled:
             if verbose:
                 syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)")
             return
@@ -2777,7 +2805,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # index of current device tab
             index = self.ui.devices.currentIndex()
-            current_device_guid = gremlin.shared_state.current_tab_device_guid
+            tabdata = self.ui.devices.tabData(index)
+            current_device_guid = tabdata.device_guid
             current_input_type, current_input_id = self._get_last_input(current_device_guid)
 
             if verbose:
@@ -2802,14 +2831,16 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # guid of current device tab
 
-            if not current_device_guid or not gremlin.util.compare_guid(current_device_guid, device_guid):
-                # change tabs
+            if not gremlin.util.compare_guid(current_device_guid, device_guid):
+                # change tab if not on the correct device tab
                 if verbose: syslog.info("Tab change requested")
                 index = self._find_tab_index(device_guid)
-                if index is not None:
-                    with QtCore.QSignalBlocker(self.ui.devices):
-                        self.ui.devices.setCurrentIndex(index)
-                    if verbose: syslog.info("Tab change complete")
+                if verbose: assert index is not None,f"SELECT: sync issue: no device tab found for device {str(device_guid)}"
+                with QtCore.QSignalBlocker(self.ui.devices):
+                    self.ui.devices.setCurrentIndex(index)
+                    gremlin.shared_state.current_tab_device_guid = device_guid
+                    current_device_guid = device_guid
+                if verbose: syslog.info(f"Tab change complete: device {str(device_guid)}")
 
             if input_id is None:
                 # get the default item to select
@@ -2839,13 +2870,22 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self.selectRegisteredWidget(device_guid)
                     if verbose: syslog.info(f"Select input: select widget {input_type} {input_id}")
                     if tab_changed or not hasattr(widget, "input_item_list_view"):
-                        widget.refresh()
+                        widget.refresh(emit = False)
                     if not force_update:
                         force_update = current_input_id != input_id or current_input_type != current_input_id or gremlin.util.compare_guid(current_device_guid, device_guid)
-                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update)
+                    
+                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = False)
                     index = widget.input_item_list_view.current_index
                     widget.input_item_list_view.redraw_index(index)
-                    widget.input_item_list_view.select_item(index, True)
+                    widget.refresh(False)
+                    item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
+                    # if not item:
+                    #     item = widget.input_item_list_view.select_item(index, emit = False)
+                    if verbose: assert item is not None, f"SELECT: sync issue: no selection"
+                    item = widget.input_item_list_view.selected_item()
+                    if verbose: assert item is not None, f"SELECT: sync issue: no selection"
+                    
+                    widget.setContentWidget(input_id)
 
 
                     # should have contents now
@@ -2864,9 +2904,43 @@ class GremlinUi(QtWidgets.QMainWindow):
             
 
         finally:
+            
+            # allow UI to refresh / update
+            QtWidgets.QApplication.processEvents()
+
+            
+
+            # validation check
+            if verbose:
+                
+
+                # current tab
+                position = self.ui.devices.currentIndex()
+                tabdata = self.ui.devices.tabData(position)
+                current_tab_device_guid = tabdata.device_guid
+                assert gremlin.util.compare_guid(current_tab_device_guid,device_guid), "SELECT: sync issue: tab device mismatch"
+
+                # current widget
+                widget : gremlin.ui.ui_common.QSplitTabWidget = self.getRegisteredWidget(device_guid)
+                assert widget is not None, f"SELECT: sync issue: no widget found for the given device: {device_guid}"
+
+                # current input 
+                if hasattr(widget,"input_item_list_view"):
+                    lv : gremlin.ui.input_item.InputItemListView = widget.input_item_list_view
+                    item : gremlin.base_profile.InputItem = lv.selected_item()
+                    assert item is not None, f"SELECT: sync issue: no selection"
+                    assert item.input_id == restore_input_id, f"SELECT: sync issue: input id mismatch: expected {restore_input_id} got {item.input_id}"
+                
+                    # current input mapping
+                    if item.containers:
+                        input_item_config = widget.getContentWidget()
+                        if input_item_config:
+                            assert input_item_config.item_data == item, f"SELECT: sync issue: input id content mismatch: expected {restore_input_id} got {input_item_config.input_id}"
+                    
+                    
+
             self._selection_locked = False
             gremlin.util.popCursor()
-
 
             
     @QtCore.Slot(object, object, object)
@@ -2883,11 +2957,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _find_tab_index(self, search_guid : str):
         tab_map = self._get_tab_map()
-        if not isinstance(search_guid, str):
-            search_guid = str(search_guid)
-        for device_guid, device_name, device_class, tab_index in tab_map.values():
-            if device_guid.casefold() == search_guid.casefold():
-                # print (f"Found tab index {tab_index} for guid {search_guid} {device_name}")
+        for device_guid, _, _, tab_index in tab_map.values():
+            if gremlin.util.compare_guid(device_guid, search_guid):
                 return tab_index
         return None
 

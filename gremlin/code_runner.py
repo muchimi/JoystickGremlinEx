@@ -469,17 +469,6 @@ class CodeRunner:
                     vjoy_proxy = gremlin.joystick_handling.VJoyProxy()[vid]
                     vjoy_proxy.ensure_released()
 
-            
-
-
-            # Set vJoy axis default values
-            for vid, data in settings.vjoy_initial_values.items():
-                input_enabled = vid in input_vids
-                vjoy_proxy = gremlin.joystick_handling.VJoyProxy()[vid]
-                if not input_enabled:
-                    for aid, value in data.items():
-                        vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
-
 
 
             if verbose_detailed:
@@ -590,8 +579,6 @@ class CodeRunner:
                 self.event_handler.change_mode(mode)
 
 
-           
-
             # tell listener profiles are starting
             # start listen
             evt_listener.start()
@@ -607,6 +594,16 @@ class CodeRunner:
 
             # tell GremlinEx the profile started
             el.profile_start.emit()
+
+            
+            # load profile vjoy axis settings and apply them
+            remote_client = gremlin.input_devices.RemoteClient()
+            for vjoy_device_id, vjoy_input_id, value in profile.settings.get_initial_vjoy_axis_value_list():
+                gremlin.joystick_handling.VJoyProxy()[vjoy_device_id].axis(vjoy_input_id).value = value
+                remote_client.send_axis(vjoy_device_id, vjoy_input_id, value)
+           
+
+
             el.profile_started.emit()
 
             return True

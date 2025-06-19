@@ -221,7 +221,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
 
     """UI widget allowing modification of axis initialization values."""
 
-    def __init__(self, device, profile_data, parent=None):
+    def __init__(self, device, settings, parent=None):
         """Creates a new UI widget.
 
         :param joy_data JoystickDeviceData object containing device information
@@ -233,7 +233,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         assert device.is_virtual and device.vjoy_id > 0,"Device provided is not a VJOY device"
         self.device = device
         
-        self.profile_data = profile_data
+        self.settings = settings
         self.main_layout = QtWidgets.QGridLayout(self)
         self.main_layout.setColumnMinimumWidth(0, 100)
         self.main_layout.setColumnStretch(2, 1)
@@ -247,6 +247,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         vjoy_proxy = gremlin.joystick_handling.VJoyProxy()
         self._spin_boxes.clear()
         row = 0
+        vjoy_id = self.device.vjoy_id
         for input_id in self.device.axis_index_list():
             axis_name = self.device.get_axis_name(input_id)
             self.main_layout.addWidget(QtWidgets.QLabel(axis_name), row, 0)
@@ -256,16 +257,24 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
 
             box = gremlin.ui.ui_common.QFloatLineEdit()
             box.setRange(-1, 1)
-            box.setValue(self.profile_data.get_initial_vjoy_axis_value(self.device.vjoy_id, input_id))
+            box.setValue(self.settings.get_initial_vjoy_axis_value(self.device.vjoy_id, input_id))
             box.valueChanged.connect(self._create_value_cb(input_id))
             self._spin_boxes.append(box)
 
             frame.layout().addWidget(box)
 
+            is_enabled = self.settings.get_vjoy_axis_enabled(vjoy_id, input_id)
+            enabled_widget = gremlin.ui.ui_common.QDataCheckbox("Enabled")
+            enabled_widget.data = input_id
+            enabled_widget.setChecked(is_enabled)
+            enabled_widget.clicked.connect(self._enabled_changed)
+            
+
             presets = [-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1]
 
             container_widget = QtWidgets.QWidget()
             container_layout = QtWidgets.QHBoxLayout(container_widget)
+            container_layout.addWidget(enabled_widget)
             for value in presets:
                 widget = gremlin.ui.ui_common.QDataPushButton(f"{value:0.3f}")
                 widget.data = (row, value) # (axis_id, value)
@@ -280,6 +289,12 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(QtWidgets.QWidget(), 0, 3)
         self.main_layout.setColumnStretch(3,2)
         vjoy_proxy.reset()
+
+    @QtCore.Slot(bool)
+    def _enabled_changed(self, checked):
+        widget = self.sender()
+        input_id = widget.data
+        self.settings.set_vjoy_axis_enabled(self.device.vjoy_id, input_id)
 
     @QtCore.Slot()
     def _handle_preset(self):
@@ -303,7 +318,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         :param axis_id id of the axis to update
         :param value the value to update the axis to
         """
-        self.profile_data.set_initial_vjoy_axis_value(
+        self.settings.set_initial_vjoy_axis_value(
             self.device.vjoy_id,
             axis_id,
             value

@@ -23,13 +23,12 @@ import re
 import sys
 
 from PySide6 import QtCore
-import gremlin.base_classes
+
 import gremlin.event_handler
 import gremlin.input_types
-import gremlin.joystick_handling
+
 import gremlin.shared_state
 from gremlin.types import VerboseMode
-import gremlin.types
 
 from collections import deque
 
@@ -1550,6 +1549,8 @@ class Configuration(QtCore.QObject):
 
     def set_last_input(self, device_guid, input_type : gremlin.input_types.InputType, input_id ):
         ''' stores the last input '''
+
+        import gremlin.joystick_handling
         if gremlin.shared_state.is_tab_loading:
             # don't save while tabs are loading
             return 
@@ -1629,6 +1630,7 @@ class Configuration(QtCore.QObject):
         (input_type, save_input_id, input_id)  # input type, the save input ID is a configuration "save" value for saving data, input_id is the object
         
         '''
+        import gremlin.joystick_handling
         save_input_id = input_id
         input_type = None
         # syslog = logging.getLogger("system")

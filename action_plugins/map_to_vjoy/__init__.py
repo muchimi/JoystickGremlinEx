@@ -31,6 +31,8 @@ import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.repeater
+import gremlin.singleton_decorator
+import gremlin.ui.osc_device
 import gremlin.ui.qsliderwidget
 from gremlin.util import load_icon
 
@@ -63,7 +65,7 @@ from gremlin.types import ButtonOutputMode
 
 syslog = logging.getLogger("system")
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class StepWidgetGroup():
     def __init__(self):
         self.group = QtWidgets.QButtonGroup()
@@ -3435,6 +3437,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         # setup initial state
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_outputs
+        device_guid = self.action_data.hardware_device_guid
+        input_id = self.action_data.hardware_input_id
+        raw_input_type = self.action_data.hardware_raw_input_type
+        
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # set start button state
             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = self.start_pressed
@@ -3450,43 +3456,83 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             match self.action_mode:
                 case VjoyAction.VJoyAxis:
                     # straight axis
+                    value = None
                     if self.action_data.axis_start_value_enabled:
                         value = self.axis_start_value
                     else:
                         # read the current value
-                        fake_event = gremlin.event_handler.Event(self.hardware_input_type, self.hardware_input_id, device_guid = self.hardware_device_guid,value = 0,is_axis = True)
-                        action_value = gremlin.actions.Value(0)
-                        curves = self.getCurveData(fake_event, action_value)
-                        value = self.action_data.get_filtered_axis_value(curves = curves)
-                        value = self.action_data.get_ranged_axis_value(value)
+                        raw_value = None
+                        if raw_input_type == InputType.JoystickAxis:
+                            raw_value = joystick_handling.get_axis(device_guid, input_id)
+                        elif raw_input_type == InputType.OpenSoundControl:
+                            message = input_id.message_key
+                            raw_value = gremlin.ui.osc_device.osc_client.getData(message)
+                        if raw_value is not None:
+                            fake_event = gremlin.event_handler.Event(self.hardware_input_type, self.hardware_input_id, device_guid = self.hardware_device_guid,value = raw_value,is_axis = True)
+                            action_value = gremlin.actions.Value(raw_value)
+                            curves = self.getCurveData(fake_event, action_value)
+                            value = self.action_data.get_filtered_axis_value(raw_value, curves = curves)
+                            value = self.action_data.get_ranged_axis_value(value)
 
-                    joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
-                    self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
+                    if value is not None:
+                        if verbose: syslog.info(f"Profile start - sync axis: vjoy ID: [{self.vjoy_device_id}] axis [{self.vjoy_input_id}] value: {value:0.3f}")
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+                        self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
 
                 case VjoyAction.VJoyAxisToButton:
-                    device_guid = self.action_data.hardware_device_guid
-                    input_id = self.action_data.hardware_input_id
                     value = joystick_handling.get_curved_axis(device_guid, input_id)
                     action_value = gremlin.actions.Value(value)
-                    event = gremlin.event_handler.Event(gremlin.input_types.InputType.JoystickAxis,
+                    event = gremlin.event_handler.Event(self.input_type,
                                                         device_guid = device_guid,
                                                         identifier=input_id,
                                                         is_axis=True,
                                                         value = action_value)
                     self.process_event(event, action_value)
+
         elif self.input_type == InputType.JoystickHat and self.action_mode == VjoyAction.VJoyHatToButton:
-            device_guid = self.action_data.hardware_device_guid
-            input_id = self.action_data.hardware_input_id
+            
             value = joystick_handling.get_hat(device_guid, input_id)
             if value in vjoy.vjoy.Hat.to_continuous_position:
                 self.hat_position = vjoy.vjoy.Hat.to_continuous_position[value]
             else:
                 self.hat_position = (0,0)
             self.pressed_hat_buttons = {}
+            event = gremlin.event_handler.Event(self.input_type,
+                                                device_guid = device_guid,
+                                                identifier = input_id,
+                                                raw_value=self.hat_position,
+                                                value = self.hat_position,
+                                                )
+            
+            self.process_event(event, action_value)
+
+        elif self.input_type == InputType.JoystickButton:
+            is_pressed = None
+            match self.action_mode:
+                case VjoyAction.VJoyButton:
+                    is_pressed = joystick_handling.get_button(device_guid, input_id)
+                case VjoyAction.VJoyButton.VJoyButtonPress:
+                    is_pressed = True
+                case VjoyAction.VJoyButton.VJoyButtonRelease:
+                    is_pressed = False
+
+            if is_pressed is not None:
+                action_value = gremlin.actions.Value(0,0,is_pressed = is_pressed)
+                if verbose: syslog.info(f"Profile start - sync button: vjoy ID: [{self.vjoy_device_id}] axis [{self.vjoy_input_id}] pressed: {is_pressed}")
+                event = gremlin.event_handler.Event(self.input_type,
+                                            device_guid = device_guid,
+                                            identifier = input_id,
+                                            is_pressed=is_pressed,
+                                            value = is_pressed
+                )
+                
+                
+                self.process_event(event, action_value)
+            
 
         if self.action_mode == VjoyAction.VJoySetAxisStepped:
             # initial stepped axis value
-            
+
             self.step_index = self.action_data.target_step_start_index
             value = self.action_data.target_step_list[self.step_index]
             syslog.info(f"VJOY: step mode initial value: {value:0.3f}")

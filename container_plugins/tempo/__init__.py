@@ -81,7 +81,8 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addLayout(self.options_layout)
         self.action_layout.addLayout(self.options2_layout)
-
+        if not self.profile_data.action_sets:
+            self.profile_data.action_sets = [None, None]
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),

@@ -512,7 +512,7 @@ class CalibrationData:
         
         self.inverted = safe_read(node,"inverted",bool, False)
         
-        self.centered = safe_read(node,"centered",bool)
+        self.centered = safe_read(node,"centered",bool, False)
         self.calibrated_min = safe_read(node,"calibrate-min", float,-1.0)
         
         self.calibrated_max = safe_read(node,"calibrate-max", float, 1.0)

@@ -14,9 +14,19 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T13/A)
+### (m76T14)
+- Fix: Desync of UI device/input/mapped content in some situations - usually on profile load or import.  This caused mappings or inputs to not correspond to the selected tab or input.  
+- Fix: Tempo/TempoEx exception in some situations.
+- New: Device tabs headers will be dimmed if they have no mappings.  This is to quickly see in the UI which devices are mapped, and which are not.
+- New: Initial vjoy axis values have an new enabled flag on the settings page.  Only enabled axes will be set.
+- New: VjoyRemap will synchronize vjoy axes and buttons with physical joystick state on start, unless the profile defines a default start value for that axis.
+- Upgrade to pyinstaller 6.14.1
+
+
+### (m76T13/B)
 - Fix: duplicated joystick event triggers in some situations due to changes in T12.  
 - Fix: Minor UI fixes.
+- Fix: Invalid reference due to API change on paste action.
 
 ### (m76T13)
 - New: Button container has autorelease option.  This container lets you trigger a series of actions on press or release.  The auto-release just means that the contained actions will get a "press" and a "release" after the delay has lapsed.

@@ -3180,7 +3180,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        super().__init__(object_name, parent)
+        super().__init__(object_name, gremlin.shared_state.osc_tab_guid, parent)
 
         import gremlin.ui.ui_common as ui_common
         import gremlin.ui.input_item as input_item
@@ -3415,11 +3415,12 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' gets the content widget compound key for the item / input combination'''
         return (self.device_guid, input_id)
 
-    def _select_item_cb(self, index):
+    def _select_item_cb(self, index, emit = True):
         """Handles the selection of an input item.
 
         :param index the index of the selected item
         """
+        import gremlin.ui.input_item
 
         # self._last_selected_index = index
         item_data = None
@@ -3448,7 +3449,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             key = self.getWidgetKey(input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name=f"OSC: {item_data.display_name}")
+                widget = gremlin.ui.input_item.InputItemConfiguration(item_data, object_name=f"OSC: {item_data.display_name}")
                 self.registerWidget(key, widget)
             
             # Create new configuration widget
@@ -3460,15 +3461,16 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.selectRegisteredWidget(key)
         else:
             item_data = OscInputItem()
-            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
+            widget = gremlin.ui.input_item.InputItemConfiguration(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
 
         #self.setRightPanelWidget(widget)
 
         self._last_selected_index = index 
         self._item_data = widget
 
-        el = gremlin.event_handler.EventListener()
-        el.input_selection_changed.emit(device_guid, input_type, input_id)
+        if emit:
+            el = gremlin.event_handler.EventListener()
+            el.input_selection_changed.emit(device_guid, input_type, input_id)
     
 
     def _close_item_cb(self, widget, index, data):
@@ -3662,9 +3664,9 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
 
-    def refresh(self):
+    def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
-        self._select_item_cb(self.input_item_list_view.current_index)
+        self._select_item_cb(self.input_item_list_view.current_index, emit)
 
 
 
