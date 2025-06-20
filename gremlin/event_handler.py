@@ -2293,7 +2293,7 @@ class EventHandler(QtCore.QObject):
 				# search callbacks for mode hierarchy
 				callback_list = ec.getCallbacks(self.osc_callbacks[event.device_guid], key, self.runtime_mode)
 
-			verbose = config.Configuration().verbose_mode_osc
+			verbose = gremlin.config.Configuration().verbose_mode_osc
 			if verbose and not callback_list:
 				# syslog = logging.getLogger("system")
 				syslog.info(f"OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
@@ -2315,7 +2315,7 @@ class EventHandler(QtCore.QObject):
 				# search callbacks for mode hierarchy
 				callback_list = ec.getCallbacks(self.state_callbacks[event.device_guid], key, self.runtime_mode)
 
-			verbose = config.Configuration().verbose_mode_osc
+			verbose = gremlin.config.Configuration().verbose_mode_osc
 			if verbose and not callback_list:
 				# syslog = logging.getLogger("system")
 				syslog.info(f"STATE: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
