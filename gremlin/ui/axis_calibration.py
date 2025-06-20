@@ -446,7 +446,7 @@ class CalibrationData:
         :param raw_value: the raw input value to process
         :param normalize: normalizes the raw input to -1 +1
         :param filter: enables axis filtering (also requires configuration options to enable filtering)
-        :returns : single float value, or (value, should_process) flag - if the flag is set - the value exceeds the min deviation threshold
+        :returns : single float value, or (value, should_process) flag - if the filter is set - the value exceeds the min deviation threshold
         
         '''
 
@@ -594,7 +594,7 @@ class CalibrationManager():
         return self.calibration_map[device_guid][input_id]
     
     def saveCalibration(self, calibration : CalibrationData):
-        device_guid = calibration.device_guid
+        device_guid =  gremlin.util.normalize_guid(calibration.device_guid)
         input_id = calibration.input_id
         if not device_guid in self.calibration_map:
             self.calibration_map[device_guid] = {}
@@ -629,7 +629,7 @@ class CalibrationManager():
                 for node in nodes:
                     data = CalibrationData()
                     data.from_xml(node)
-                    device_guid = data.device_guid
+                    device_guid = gremlin.util.normalize_guid(data.device_guid)
                     input_id = data.input_id
 
                     if not device_guid in self.calibration_map:
@@ -643,7 +643,7 @@ class CalibrationManager():
     def _save(self):
         
             root = etree.Element("root")
-            for device_guid in self.calibration_map.keys():
+            for device_guid in self.calibration_map:
                 device = gremlin.joystick_handling.device_info_from_guid(device_guid)
                 for input_id in self.calibration_map[device_guid]:
                     data : CalibrationData = self.calibration_map[device_guid][input_id]

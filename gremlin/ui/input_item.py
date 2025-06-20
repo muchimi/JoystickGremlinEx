@@ -1542,13 +1542,18 @@ class InputItemWidget(QBoxFrame):
         config = gremlin.config.Configuration()
         if config.show_container_id:
             gremlin.util.clear_layout(self._container_id_layout)
+            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+            grids = []
             if self.data:
                 for index, container in enumerate(self.data.containers):
                     line_edit = gremlin.ui.ui_common.QDataLineEdit()
+                    line_edit.setMinimumWidth(width)
                     line_edit.setText(container.id)
                     line_edit.setReadOnly(True)
-                    widget, _ = gremlin.ui.ui_common.getHContainer(line_edit, f"[{index}] {container.name}")
+                    widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, f"[{index}] {container.name}")
                     self._container_id_layout.addWidget(widget)
+                    grids.append(widget)
+            gremlin.ui.ui_common.synchronize_grids(grids)
 
 
     def _cleanup_ui(self):
@@ -3466,6 +3471,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
     def setItemData(self, item_data):
         ''' updates the item data '''
 
+        from gremlin.ui.joystick_device import JoystickDeviceTabWidget
         assert item_data is not None, "Item data must be provided"
         self.setUpdatesEnabled(False)
         try:
@@ -3515,18 +3521,34 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
             if config.show_container_id:
                 # debug containter type
+                input_id = None
                 if self.item_data:
+                    input_id = self.item_data.input_id
                     if hasattr(self.item_data.input_id, "getOverrideInputType"):
                         input_type = self.item_data.input_id.getOverrideInputType()
                         label_name = f"Input Type: (override) {input_type.name}"
                     else:
                         input_type = self.item_data.input_type
                         label_name = f"Input Type: {input_type.name}"
+
+                    
                 else:
                     label_name = f"Input Type: N/A"
-                    
+                
+
                 label = QtWidgets.QLabel(label_name)
-                self.main_layout.addWidget(label)
+                widgets = [label]
+                if input_id is not None:
+                    width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+                    line_edit = gremlin.ui.ui_common.QDataLineEdit()
+                    line_edit.setMinimumWidth(width)
+                    line_edit.setText(str(input_id) if isinstance(input_id, int) else gremlin.util.normalize_guid(input_id.id))
+                    line_edit.setReadOnly(True)
+                    widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Input Id:")
+                    widgets.append(widget)
+                
+                widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+                self.main_layout.addWidget(widget)
 
             
             if not item_data.is_action:

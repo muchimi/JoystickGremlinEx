@@ -2462,7 +2462,11 @@ class OscInputItem(AbstractInputItem):
         return k1 < k2
     
     def __eq__(self, other):
-        if other is None or not isinstance(other, OscInputItem): return False
+
+        if other is None: return False
+        if isinstance(other, str):
+            return gremlin.util.compare_guid(self.id, other) 
+        if not isinstance(other, OscInputItem): return False
         k1 = self.toSortKey()
         k2 = other.toSortKey()
         return k1 == k2

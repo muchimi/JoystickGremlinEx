@@ -2786,6 +2786,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         input_id = restore_input_id
         input_type = restore_input_type
 
+        switch_tabs = False # true if tabs switched
+        switch_input = force_switch # true if inputs are switched or forcing refresh
+
         switch_enabled = self.is_autoswitch_highlighting
         if not force_switch and gremlin.util.compare_guid(gremlin.shared_state.current_tab_device_guid,device_guid) and not switch_enabled:
             if verbose:
@@ -2841,6 +2844,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                     gremlin.shared_state.current_tab_device_guid = device_guid
                     current_device_guid = device_guid
                 if verbose: syslog.info(f"Tab change complete: device {str(device_guid)}")
+                switch_tabs = True # we are switching tabs
+                switch_input = True # we are switching inputs
 
             if input_id is None:
                 # get the default item to select
@@ -2859,11 +2864,12 @@ class GremlinUi(QtWidgets.QMainWindow):
                         if verbose: syslog.info(f"Select input: defaulting to first item on list {last_device_guid} {last_input_type} {input_id} ")
 
                         self._last_input_item = input_item
+                switch_input = True # we are switching inputs
                         
             self._update_highlight_toolbar_enabled()
 
 
-            if input_id is not None: 
+            if input_id is not None and switch_input:
                 # select a particular input within a tab
                 widget = self.getRegisteredWidget(device_guid)
                 if widget:

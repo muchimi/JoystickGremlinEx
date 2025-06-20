@@ -517,7 +517,7 @@ class JoystickHook:
             if self._calibrate:
                 # get calibrated value
                 calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
-                value, should_process = calibration.getValue(event.value, normalize = False, return_process = True) # input is already normalized
+                value, should_process = calibration.getValue(event.value, normalize = False, filter = True) # input is already normalized
                 self._hook_calibrated_value = value
             else:
                 self._hook_calibrated_value = self._hook_value

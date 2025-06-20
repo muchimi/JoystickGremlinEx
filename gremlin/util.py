@@ -2114,10 +2114,12 @@ def normalize_guid(device_guid) -> str:
     ''' normalizes a device GUID to a string'''
     if not isinstance(device_guid, str):
         device_guid = str(device_guid)
-    return device_guid.casefold()
+    return device_guid.casefold().replace("-","")
 
 def compare_guid(id1, id2) -> bool:
     ''' compares two GUIDs and returns true if equal '''
+    if id1 is None and id2 is None: return True
+    if id1 is None or id2 is None: return False
     id1 = normalize_guid(id1)
     id2 = normalize_guid(id2)
     return id1 == id2

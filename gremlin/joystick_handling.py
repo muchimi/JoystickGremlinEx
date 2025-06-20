@@ -33,6 +33,7 @@ import gremlin.types
 from gremlin.types import DeviceType
 import gremlin.hid
 from gremlin.singleton_decorator import SingletonDecorator
+import gremlin.util
 
 
 
@@ -406,6 +407,8 @@ def known_devices() -> list:
 def device_info_from_guid(device_guid): # -> DeviceSummary:
     ''' gets physical device information '''
     assert (_joystick_initialized)
+    if isinstance(device_guid, str):
+        device_guid = gremlin.util.parse_guid(device_guid)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
     joystick_devices_update()

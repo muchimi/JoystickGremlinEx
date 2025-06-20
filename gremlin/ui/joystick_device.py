@@ -133,7 +133,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Add modifiable device label
         
-        label_device = QtWidgets.QLabel("Label")
         line_edit = gremlin.ui.ui_common.QDataLineEdit()
         line_edit.setText(device_profile.label)
         line_edit.textChanged.connect(self.update_device_label)
@@ -149,20 +148,28 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         icon = gremlin.ui.ui_common.Icons.hatIcon()
         label_hat = gremlin.ui.ui_common.QIconLabel(icon, f"{device.hat_count}")
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([label_axis, label_button, label_hat, label_device, line_edit])
+        widget, _ = gremlin.ui.ui_common.getHContainer([label_axis, label_button, label_hat])
         self.addLeftPanelWidget(widget)
+
+        width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+
+        grids = []
+
+        widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Label:")
+        line_edit.setMinimumWidth(width)
+        self.addLeftPanelWidget(widget)
+
+        grids.append(widget)
 
         if config.show_container_id:
 
-
-            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
             line_edit = gremlin.ui.ui_common.QDataLineEdit()
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
             self.addLeftPanelWidget(widget)
-            w1 = widget
+            grids.append(widget)
 
             line_edit = gremlin.ui.ui_common.QDataLineEdit()
             line_edit.setText(device.name)
@@ -170,9 +177,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setMinimumWidth(width)
             widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
             self.addLeftPanelWidget(widget)
-            w2 = widget
+            grids.append(widget)
 
-            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+        gremlin.ui.ui_common.synchronize_grids(grids)
 
         self.addLeftPanelWidget(self.input_item_list_view)
         

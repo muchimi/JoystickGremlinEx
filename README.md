@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T15)
+- Fix: calibration data primary key not normalized preventing data load due to format mismatch.
+- Fix: axis curves applied twice in some situations.
+- General UI tweaks
+
+
 ### (m76T14)
 - Fix: Desync of UI device/input/mapped content in some situations - usually on profile load or import.  This caused mappings or inputs to not correspond to the selected tab or input.  
 - Fix: Tempo/TempoEx exception in some situations.

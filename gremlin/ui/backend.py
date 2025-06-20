@@ -175,6 +175,7 @@ class Backend(QtCore.QObject):
         Returns:
             List of recently used profiles
         """
+
         return config.Configuration().value("global", "common", "recent_profiles")
 
     @Slot()
