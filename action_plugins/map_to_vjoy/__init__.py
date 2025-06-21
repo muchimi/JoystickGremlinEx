@@ -4294,6 +4294,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         ''' computes the output value for the current configuration - applies curves if curves are provided  '''
 
         verbose_details = gremlin.config.Configuration().verbose_mode_inputs_extra
+        # verbose_details = True
 
         axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
 
@@ -4397,7 +4398,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         return value
     
     def get_ranged_axis_value(self, value : float) -> float:
-        ''' get scaled and ranged and inverted axis value'''
+        ''' get scaled and ranged  ** NO INVERSION ** '''
         if value is None:
             return value
         v1 = self.output_range_min
@@ -4405,11 +4406,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         if v1 > v2:
             v1, v2 = v2, v1
         s = self.axis_scaling
-        inverted = self.reverse
         if v1 != -1.0 or v2 != 1.0 or s != 1.0:
-            value = gremlin.util.scale_to_range(value*s,target_min=v1,target_max=v2, invert=inverted)        
-        elif inverted:
-            value = gremlin.util.scale_to_range(value, invert=True)
+            value = gremlin.util.scale_to_range(value*s,target_min=v1,target_max=v2)
         return value
 
     @property

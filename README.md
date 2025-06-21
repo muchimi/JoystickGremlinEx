@@ -14,10 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T15)
+### (m76T15/A)
+- Fix: VJoyRemap runtime inversion applied twice in some situations.
 - Fix: calibration data primary key not normalized preventing data load due to format mismatch.
 - Fix: axis curves applied twice in some situations.
 - General UI tweaks
+
 
 
 ### (m76T14)
