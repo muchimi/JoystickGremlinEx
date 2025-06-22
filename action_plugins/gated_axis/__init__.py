@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
+import threading
 
 import gremlin.base_profile
 import gremlin.config
@@ -578,6 +579,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         if verbose_ui: syslog.info(f"GATE Widget: init : {object_name}")
 
         self.valid = True
+        self.lock = threading.Lock()
 
         
 
@@ -1260,26 +1262,32 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         if self._deleted:
             return
         
-        if Shiboken.isValid(self._slider_widget):
-            verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-            if verbose_ui: syslog.info(f"GATE Widget: update slider : {self.objectName()} values: {values}")
-            gremlin.util.assert_ui_thread()
-            verbose = gremlin.config.Configuration().verbose_mode_details
-            values = self._convert(values)
-            if verbose:
-                sv = "Slider: "
-                for idx, v in enumerate(values):
-                    sv += f"[{idx}] {v:0.{self._gate_data.decimals}f} "
-                syslog.info(sv)
-            with QtCore.QSignalBlocker(self._slider_widget):
-                self._slider_widget.setValue(values)
-                self._update_gate_tooltips()
-           
-            if verbose_ui: syslog.info(f"GATE Widget: update slider completed")
+        self.lock.acquire() # critical path
+        try:
+        
+            if Shiboken.isValid(self._slider_widget):
+                verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+                if verbose_ui: syslog.info(f"GATE Widget: update slider : {self.objectName()} values: {values}")
+                gremlin.util.assert_ui_thread()
+                verbose = gremlin.config.Configuration().verbose_mode_details
+                values = self._convert(values)
+                if verbose:
+                    sv = "Slider: "
+                    for idx, v in enumerate(values):
+                        sv += f"[{idx}] {v:0.{self._gate_data.decimals}f} "
+                    syslog.info(sv)
+                with QtCore.QSignalBlocker(self._slider_widget):
+                    self._slider_widget.setValue(values)
+                    self._update_gate_tooltips()
+
+                if verbose_ui: syslog.info(f"GATE Widget: update slider completed")
+        finally:
+            self.lock.release()
 
     @QtCore.Slot()
     def _grab_cb(self):
         ''' grab the min value from the axis position '''
+
 
         gate : GateInfo
         gate, widget = self.sender().data  # the button's data field contains the widget to update
@@ -1404,17 +1412,22 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             if verbose_ui: syslog.info(f"GATE Widget: update slider marker : {self.objectName()} ignored - object marked deleted ")
             return
         
-        self._axis_value = value
-        if Shiboken.isValid(self._slider_widget):
-            verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-            if verbose_ui: syslog.info(f"GATE Widget: update slider marker : {self.objectName()} value: {value:0.3f}")
-            gremlin.util.assert_ui_thread()
+        self.lock.acquire()
+        try:
+            
+            self._axis_value = value
+            if Shiboken.isValid(self._slider_widget):
+                verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+                if verbose_ui: syslog.info(f"GATE Widget: update slider marker : {self.objectName()} value: {value:0.3f}")
+                gremlin.util.assert_ui_thread()
 
-            with QtCore.QSignalBlocker(self._slider_widget):
-                self._slider_widget.setMarkerValue(value)
-                self._update_output_value()
+                with QtCore.QSignalBlocker(self._slider_widget):
+                    self._slider_widget.setMarkerValue(value)
+                    self._update_output_value()
 
-            if verbose_ui: syslog.info(f"GATE Widget: update slider marker completed")
+                if verbose_ui: syslog.info(f"GATE Widget: update slider marker completed")
+        finally:
+            self.lock.release()
 
     def _create_filter_widgets(self):
         gremlin.util.clear_layout(self.container_filter_layout)

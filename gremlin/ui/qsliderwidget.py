@@ -77,7 +77,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self.setObjectName(object_name if object_name else "QSliderWidget")
 
         self._tick_count = 0 # no ticks
-
+        self.lock = threading.Lock()
 
         self.handleColor = QColor(gremlin.ui.ui_common.Color.sliderHandleColor()) #QColor("#a7b59e")
         self.tickColor = QColor(gremlin.ui.ui_common.Color.sliderTickColor()) #QColor("#232323")
@@ -189,9 +189,14 @@ class QSliderWidget(QtWidgets.QWidget):
         return self._single_range
     @singleRange.setter
     def singleRange(self, value):
-        self._single_range = value
-        self._update_offsets()
-        self.update()
+        if self._single_range != value:
+            self.lock.acquire()
+            try:
+                self._single_range = value
+                self._update_offsets()
+                self.update()
+            finally:
+                self.lock.release()
 
     def setTickCount(self, value : int): 
         ''' sets the number of ticks '''
@@ -212,8 +217,12 @@ class QSliderWidget(QtWidgets.QWidget):
     def setDrawHandles(self, value: bool):
         ''' enable/disables the drawing of handles '''
         if self._draw_handles != value:
-            self._draw_handles = value
-            self.update()
+            self.lock.acquire()
+            try:
+                self._draw_handles = value
+                self.update()
+            finally:
+                self.lock.release()
 
     def setHandleIcon(self, index, icon, use_qta = False, color = "#a0a0a0"):
         ''' sets the handle icon - to clear an icon, set it to None
@@ -223,17 +232,21 @@ class QSliderWidget(QtWidgets.QWidget):
         :param use_qta: set to true if the icon is a QTA icon
         :param color: icon color (qta icons only), None if default color
 
-          '''
-        if icon is None:
-            # clear the entry
-            if index in self._handle_icons:
-                del self._handle_icons[index]
+        '''
+        self.lock.acquire()
+        try:
+            if icon is None:
+                # clear the entry
+                if index in self._handle_icons:
+                    del self._handle_icons[index]
+                    self.update()
+            else:
+                hid = QSliderWidget.HandleIconData(index, icon, use_qta, color)
+                self._handle_icons[index] = hid
+                self._update_handle_pixmaps(hid)
                 self.update()
-        else:
-            hid = QSliderWidget.HandleIconData(index, icon, use_qta, color)
-            self._handle_icons[index] = hid
-            self._update_handle_pixmaps(hid)
-            self.update()
+        finally:
+            self.lock.release()
 
 
     def setHandleTooltip(self, index : int, message : str):
@@ -284,50 +297,61 @@ class QSliderWidget(QtWidgets.QWidget):
         
     def setValue(self, value : int | float | list | tuple):
         ''' input values expected to be -1 to +1 floating point '''
-        if self._value_lock:
-            return
-        self._value_lock = True
-        verbose = gremlin.config.Configuration().verbose
-        if verbose: gremlin.util.assert_ui_thread()
-        values = None
-        if isinstance(value, float):
-            value = gremlin.util.clamp(value, self._minimum, self._maximum)
-            values = [value]
-        elif isinstance(value, int):
-            value = gremlin.util.clamp(float(value), self._minimum, self._maximum)
-            values = [float(value)]
-        elif isinstance(value, list):
-            values = value
-            values = [gremlin.util.clamp(v, self._minimum, self._maximum) for v in values if v is not None]
-        elif isinstance(value, tuple):
-            values = list(value)
-            values = [gremlin.util.clamp(v, self._minimum, self._maximum) for v in values if v is not None]
+        self.lock.acquire()
+        try:
+            if self._value_lock:
+                return
+            self._value_lock = True
+            verbose = gremlin.config.Configuration().verbose
+            if verbose: gremlin.util.assert_ui_thread()
+            values = None
+            if isinstance(value, float):
+                value = gremlin.util.clamp(value, self._minimum, self._maximum)
+                values = [value]
+            elif isinstance(value, int):
+                value = gremlin.util.clamp(float(value), self._minimum, self._maximum)
+                values = [float(value)]
+            elif isinstance(value, list):
+                values = value
+                values = [gremlin.util.clamp(v, self._minimum, self._maximum) for v in values if v is not None]
+            elif isinstance(value, tuple):
+                values = list(value)
+                values = [gremlin.util.clamp(v, self._minimum, self._maximum) for v in values if v is not None]
 
-        changed = False
-        if values:
-            values.sort() # sort by value so the values are always in smallest to greatest
-            changed = gremlin.util.compare_float_lists(self._values, values)
-            
+            changed = False
+            if values:
+                values.sort() # sort by value so the values are always in smallest to greatest
+                changed = gremlin.util.compare_float_lists(self._values, values)
+                
 
-        if changed:
-            verbose = gremlin.config.Configuration().verbose_mode_ui
-            if verbose: syslog.info(f"Slider changed: {self.objectName()} [{self._id}]: {values}")
-            self._values = values # [max(min(1.0, n), -1.0) for n in values]
-            self._update_offsets()
-            self.update()
-        self._value_lock = False
-        
+            if changed:
+                verbose = gremlin.config.Configuration().verbose_mode_ui
+                if verbose: syslog.info(f"Slider changed: {self.objectName()} [{self._id}]: {values}")
+                self._values = values # [max(min(1.0, n), -1.0) for n in values]
+                self._update_offsets()
+                self.update()
+            self._value_lock = False
+        finally:
+            self.lock.release()
             
 
     def value(self) -> list:
         ''' gets the list of values in the slider - a single value is returned as a list of one'''
-        return self._values
+        self.lock.acquire()
+        try:
+            return self._values
+        finally:
+            self.lock.release()
     
     
     
     def setMarkerVisible(self, value : bool):
-        self._marker_visible = value
-        self.update()
+        self.lock.acquire()
+        try:
+            self._marker_visible = value
+            self.update()
+        finally:
+            self.lock.release()
 
     @property
     def marker_size(self):
@@ -336,10 +360,14 @@ class QSliderWidget(QtWidgets.QWidget):
     @marker_size.setter
     def marker_size(self, value):
         if value > 0:
-            self.marker_size = value
-            self._update_pixmaps()
-            self._update_marker_offsets()
-            self.update()
+            self.lock.acquire()
+            try:
+                self.marker_size = value
+                self._update_pixmaps()
+                self._update_marker_offsets()
+                self.update()
+            finally:
+                self.lock.release()
 
     def setReadOnly(self, value : bool):
         self._readOnly = value
@@ -437,6 +465,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def setMarkerValue(self, value):
         ''' sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers'''
+        self.lock.acquire()
         try:
             if isinstance(value, float) or isinstance(value, int):
                 value = gremlin.util.clamp(value, self._minimum, self._maximum)
@@ -448,8 +477,8 @@ class QSliderWidget(QtWidgets.QWidget):
             # update geometry + repaint
             self._update_offsets() 
             self.update()
-        except:
-            pass
+        finally:
+            self.lock.release()
 
     def minimum(self) -> float:  # type: ignore
         ''' gets the slider's minimum value '''

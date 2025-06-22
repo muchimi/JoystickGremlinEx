@@ -1542,18 +1542,19 @@ class InputItemWidget(QBoxFrame):
         config = gremlin.config.Configuration()
         if config.show_container_id:
             gremlin.util.clear_layout(self._container_id_layout)
-            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
-            grids = []
-            if self.data:
-                for index, container in enumerate(self.data.containers):
-                    line_edit = gremlin.ui.ui_common.QDataLineEdit()
-                    line_edit.setMinimumWidth(width)
-                    line_edit.setText(container.id)
-                    line_edit.setReadOnly(True)
-                    widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, f"[{index}] {container.name}")
-                    self._container_id_layout.addWidget(widget)
-                    grids.append(widget)
-            gremlin.ui.ui_common.synchronize_grids(grids)
+            if config.show_container_id:
+                width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+                grids = []
+                if self.data:
+                    for index, container in enumerate(self.data.containers):
+                        line_edit = gremlin.ui.ui_common.QDataLineEdit()
+                        line_edit.setMinimumWidth(width)
+                        line_edit.setText(container.id)
+                        line_edit.setReadOnly(True)
+                        widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, f"[{index}] {container.name}")
+                        self._container_id_layout.addWidget(widget)
+                        grids.append(widget)
+                gremlin.ui.ui_common.synchronize_grids(grids)
 
 
     def _cleanup_ui(self):

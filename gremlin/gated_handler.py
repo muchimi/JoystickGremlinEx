@@ -45,6 +45,7 @@ import gremlin.util
 from itertools import pairwise
 import gremlin.actions
 from shiboken6 import Shiboken
+import gremlin.repeater
 
 syslog = logging.getLogger("system")
 MAX_UNDO = 20 # number of steps on the UNDO stack
@@ -1194,7 +1195,9 @@ class GateData():
         import gremlin.execution_graph
 
         #assert profile_mode is not None, "profile mode must be provided"
+        
         self._process_trigger_lock = threading.Lock()
+        self._lock = threading.Lock()
         self._action_data = action_data
         self._ec = gremlin.execution_graph.ExecutionContext()
         self.condition = condition
@@ -1314,26 +1317,34 @@ class GateData():
     def hook(self):
         ''' hook events '''
         if not self._hooked:
-            self._hooked = True
-            verbose = gremlin.config.Configuration().verbose_mode_gate
-            if verbose: syslog.info("GATE: hook enabled")
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self._joystick_event_handler)
-            if self._action_data.input_is_hardware():
-                self._axis_value = gremlin.joystick_handling.get_axis(self._action_data.hardware_device_guid, self._action_data.hardware_input_id)
-            else:
-                self._axis_value = self._action_data.hardware_input_id.axis_value
+            self._lock.acquire()
+            try:
+                self._hooked = True
+                verbose = gremlin.config.Configuration().verbose_mode_gate
+                if verbose: syslog.info("GATE: hook enabled")
+                el = gremlin.event_handler.EventListener()
+                el.joystick_event.connect(self._joystick_event_handler)
+                if self._action_data.input_is_hardware():
+                    self._axis_value = gremlin.joystick_handling.get_axis(self._action_data.hardware_device_guid, self._action_data.hardware_input_id)
+                else:
+                    self._axis_value = self._action_data.hardware_input_id.axis_value
+            finally:
+                self._lock.release()
             
 
 
     def unhook(self):
         ''' unhook events '''
         if self._hooked:
-            self._hooked = False
-            verbose = gremlin.config.Configuration().verbose_mode_gate
-            if verbose: syslog.info("GATE: hook disabled")
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.disconnect(self._joystick_event_handler)
+            self._lock.acquire()
+            try:
+                self._hooked = False
+                verbose = gremlin.config.Configuration().verbose_mode_gate
+                if verbose: syslog.info("GATE: hook disabled")
+                el = gremlin.event_handler.EventListener()
+                el.joystick_event.disconnect(self._joystick_event_handler)
+            finally:
+                self._lock.release()
             
 
 
@@ -1484,21 +1495,16 @@ class GateData():
         self._callbacks.clear()
         
 
-    # def _fire_value_callbacks(self, value : float):
-    #     '''' fires the value callbacks '''
-    #     for callback in self._value_changed_callbacks:
-    #         callback(value)
-
-    def _fire_trigger_callbacks(self, trigger: TriggerData):
+    def _fire_trigger_callbacks_ui(self, trigger: TriggerData):
         ''' fires the trigger callbacks '''
+        gremlin.util.assert_ui_thread()
         for callback in self._trigger_callbacks:
             callback(trigger)
 
-    # def process_event(self, event, value, extra_data  : dict = None):
-    #     ''' handles functor execution '''
-    #     syslog.info("gate data: process handler")
-    #     self._joystick_event_handler(event)
-    
+    def _fire_trigger_callbacks(self, trigger: TriggerData):
+        ''' fires the trigger callbackes'''
+        gremlin.util.InvokeUiMethod(self._fire_trigger_callbacks_ui, trigger) # trigger on the UI thread
+   
 
     @QtCore.Slot(object)
     def _joystick_event_handler(self, event):
@@ -1509,197 +1515,206 @@ class GateData():
         
         '''
 
-        if not self._hooked:
-            return False
-        
-        if not event.is_axis:
-            # ignore if not an axis event
-            return False
-        
-        # if not hasattr(self,"_action_data"):
-        #     # this happens at shutdown usually as objects are removed
-        #     # syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
-        #     return False
-        
-        if not self._action_data:
-            # not initialized yet
-            return  False
-        
-        if self._action_data.hardware_device_guid != event.device_guid:
-            # ignore if a different input device
-            return False
-        
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_gate
-        verbose_ui = config.verbose_mode_ui
+        self._lock.acquire()
+
+        try:
+
+            if not self._hooked:
+                return False
+            
+            if not event.is_axis:
+                # ignore if not an axis event
+                return False
+            
+            # if not hasattr(self,"_action_data"):
+            #     # this happens at shutdown usually as objects are removed
+            #     # syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
+            #     return False
+            
+            if not self._action_data:
+                # not initialized yet
+                return  False
+            
+            if self._action_data.hardware_device_guid != event.device_guid:
+                # ignore if a different input device
+                return False
+            
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_gate
+            verbose_ui = config.verbose_mode_ui
 
 
-        is_runtime = gremlin.shared_state.is_running
-        if is_runtime:
-            runtime_mode = gremlin.shared_state.runtime_mode
-            if self.profile_mode != runtime_mode:
-                # wrong mode
-                if verbose: syslog.info(f"GATE Event: ignore joystick input: profile mode: [{self.profile_mode}] current mode: [{runtime_mode}]")
+            is_runtime = gremlin.shared_state.is_running
+            if is_runtime:
+                runtime_mode = gremlin.shared_state.runtime_mode
+                if self.profile_mode != runtime_mode:
+                    # wrong mode
+                    if verbose: syslog.info(f"GATE Event: ignore joystick input: profile mode: [{self.profile_mode}] current mode: [{runtime_mode}]")
 
+                    return False
+                
+
+                
+            if hasattr(self._action_data.hardware_input_id, "message_key"):
+                if self._action_data.hardware_input_id.message_key != event.identifier.message_key:
+                    # ignore if a different input axis on the input device
+                    return False
+                
+            elif self._action_data.hardware_input_id != event.identifier:
                 return False
             
 
+            # process curved intput
+            if not event.is_virtual:
+                input_value = gremlin.joystick_handling.get_curved_axis(self._action_data.hardware_device_guid, 
+                                                            self._action_data.hardware_input_id)
+            else:
+                input_value = event.raw_value
+
+
+            # run mode - execute the functors with the gate data
             
-        if hasattr(self._action_data.hardware_input_id, "message_key"):
-            if self._action_data.hardware_input_id.message_key != event.identifier.message_key:
-                # ignore if a different input axis on the input device
-                return False
+            triggers = self.process_triggers(input_value, self._active_ranges)
+            trigger: TriggerData
+
+            if triggers and gremlin.shared_state.is_running:
+                pass
+
+            verbose = gremlin.config.Configuration().verbose_mode_gate
+
             
-        elif self._action_data.hardware_input_id != event.identifier:
-            return False
-        
+            # if verbose:
+            #     syslog.info(f"Trigger: raw value: {input_value}  trigger value: {value}")
 
-        # process curved intput
-        if not event.is_virtual:
-            input_value = gremlin.joystick_handling.get_curved_axis(self._action_data.hardware_device_guid, 
-                                                        self._action_data.hardware_input_id)
-        else:
-            input_value = event.raw_value
-
-
-        # run mode - execute the functors with the gate data
-        
-        triggers = self.process_triggers(input_value, self._active_ranges)
-        trigger: TriggerData
-
-        if triggers and gremlin.shared_state.is_running:
-            pass
-
-        verbose = gremlin.config.Configuration().verbose_mode_gate
-
-        
-        # if verbose:
-        #     syslog.info(f"Trigger: raw value: {input_value}  trigger value: {value}")
-
-        if not gremlin.shared_state.is_running:
-            # raw input value updates
-            self._axis_value = input_value
-            #remove_callbacks = []
-            gh = GateEventHandler()
-            gh.fireValueChangedCallbacks(input_value)
+            if not gremlin.shared_state.is_running:
+                # raw input value updates
+                self._axis_value = input_value
+                #remove_callbacks = []
+                gh = GateEventHandler()
+                gh.fireValueChangedCallbacks(input_value)
 
 
-        
-        if triggers:
-            value = gremlin.actions.Value(event.value)
-            # button_press_event = event.clone()
-            # button_press_event.fake_button()
-            # button_action_value = gremlin.actions.Value(input_value, True)
-            # button_action_value.current = True
-            range_event = event.clone()
-            range_event.event_type = InputType.JoystickAxis # force linear
+            
+            if triggers:
+                value = gremlin.actions.Value(event.value)
+                # button_press_event = event.clone()
+                # button_press_event.fake_button()
+                # button_action_value = gremlin.actions.Value(input_value, True)
+                # button_action_value.current = True
+                range_event = event.clone()
+                range_event.event_type = InputType.JoystickAxis # force linear
 
-  
-            for trigger in triggers:
-                trigger_event = event.clone()
-                trigger_value = value.clone()
-                short_press = False
-                delay = trigger.delay
-                match trigger.mode:
-                    case TriggerMode.FixedValue:
-                        if verbose: syslog.info(f"Exec Trigger: fixed value: {trigger.range.range_display() if trigger.range else trigger.gate.slider_index} : value {input_value:0.3f}")
-                        value.current = trigger.value
-                    case TriggerMode.ValueInRange:
-                        if verbose: syslog.info(f"Exec Trigger: value in range: {trigger.range.range_display()} : value {input_value:0.3f}")
-                        value.current = trigger.value
-                        trigger_event.is_pressed = True
-                        trigger_value.is_pressed = True
-                    case TriggerMode.ValueOutOfRange:
-                        if verbose: syslog.info(f"Exec Trigger: value out of range: {trigger.range.range_display()} : value {input_value:0.3f}")
-                        trigger_value.current = trigger.value
-                        trigger_value.is_pressed = False
-                        trigger_event.is_pressed = False
-                    case TriggerMode.GateCrossed:
-                        # mimic a joystick button press for a gate crossing
-                        if verbose: syslog.info(f"Exec Trigger: gate crossing : {trigger.gate.slider_index} : value {input_value:0.3f} ")
-                        trigger_event.fake_button()
-                        trigger_event.is_pressed = True
-                        trigger_value.is_pressed = True
+    
+                for trigger in triggers:
+                    trigger_event = event.clone()
+                    trigger_value = value.clone()
+                    short_press = False
+                    delay = trigger.delay
+                    match trigger.mode:
+                        case TriggerMode.FixedValue:
+                            if verbose: syslog.info(f"Exec Trigger: fixed value: {trigger.range.range_display() if trigger.range else trigger.gate.slider_index} : value {input_value:0.3f}")
+                            value.current = trigger.value
+                        case TriggerMode.ValueInRange:
+                            if verbose: syslog.info(f"Exec Trigger: value in range: {trigger.range.range_display()} : value {input_value:0.3f}")
+                            value.current = trigger.value
+                            trigger_event.is_pressed = True
+                            trigger_value.is_pressed = True
+                        case TriggerMode.ValueOutOfRange:
+                            if verbose: syslog.info(f"Exec Trigger: value out of range: {trigger.range.range_display()} : value {input_value:0.3f}")
+                            trigger_value.current = trigger.value
+                            trigger_value.is_pressed = False
+                            trigger_event.is_pressed = False
+                        case TriggerMode.GateCrossed:
+                            # mimic a joystick button press for a gate crossing
+                            if verbose: syslog.info(f"Exec Trigger: gate crossing : {trigger.gate.slider_index} : value {input_value:0.3f} ")
+                            trigger_event.fake_button()
+                            trigger_event.is_pressed = True
+                            trigger_value.is_pressed = True
+                            
+                        case TriggerMode.GateIncrease:
+                            # mimic a joystick button press for a gate crossing (increase)
+                            if verbose: syslog.info(f"Exec Trigger: gate crossing (inc): {trigger.gate.slider_index} : value {input_value:0.3f} ")
+                            trigger_event.fake_button()
+                            trigger_event.is_pressed = True
+                            trigger_value.is_pressed = True
+                            
+                        case TriggerMode.GateDecrease:
+                            # mimic a joystick button press for a gate crossing (increase)
+                            if verbose: syslog.info(f"Exec Trigger: gate crossing (dec): {trigger.gate.slider_index} : value {input_value:0.3f} ")
+                            trigger_event.fake_button()
+                            trigger_event.is_pressed = True
+                            trigger_value.is_pressed = True
+                            
+                        case TriggerMode.RangeEnter:
+                            # enter range
+                            if verbose: syslog.info(f"Exec Trigger: range enter: {trigger.range.range_display()} value {input_value:0.3f}")
+                            trigger_event.fake_button()
+                            trigger_event.is_pressed = True
+                            trigger_value.is_pressed = True
+                        case TriggerMode.RangeExit:
+                            # exit range
+                            if verbose: syslog.info(f"Exec Trigger: range exit:  {trigger.range.range_display()} value {input_value:0.3f}")
+                            trigger_event.fake_button()
+                            trigger_event.is_pressed = True
+                            trigger_value.is_pressed = True
                         
-                    case TriggerMode.GateIncrease:
-                        # mimic a joystick button press for a gate crossing (increase)
-                        if verbose: syslog.info(f"Exec Trigger: gate crossing (inc): {trigger.gate.slider_index} : value {input_value:0.3f} ")
-                        trigger_event.fake_button()
-                        trigger_event.is_pressed = True
-                        trigger_value.is_pressed = True
-                        
-                    case TriggerMode.GateDecrease:
-                        # mimic a joystick button press for a gate crossing (increase)
-                        if verbose: syslog.info(f"Exec Trigger: gate crossing (dec): {trigger.gate.slider_index} : value {input_value:0.3f} ")
-                        trigger_event.fake_button()
-                        trigger_event.is_pressed = True
-                        trigger_value.is_pressed = True
-                        
-                    case TriggerMode.RangeEnter:
-                        # enter range
-                        if verbose: syslog.info(f"Exec Trigger: range enter: {trigger.range.range_display()} value {input_value:0.3f}")
-                        trigger_event.fake_button()
-                        trigger_event.is_pressed = True
-                        trigger_value.is_pressed = True
-                    case TriggerMode.RangeExit:
-                        # exit range
-                        if verbose: syslog.info(f"Exec Trigger: range exit:  {trigger.range.range_display()} value {input_value:0.3f}")
-                        trigger_event.fake_button()
-                        trigger_event.is_pressed = True
-                        trigger_value.is_pressed = True
-                    
 
-                if not gremlin.shared_state.is_running:
-                    # non-runtime trigger updates for the UI
-                    if verbose_ui: syslog.info("GATE Event: before trigger callbacks")
-                    self._fire_trigger_callbacks(trigger)
-                    if verbose_ui: syslog.info("GATE Event: after trigger callbacks")
-                    return True
-                else:
-
-                    if not gremlin.shared_state.runtime_mode in self.valid_mode_list:
-                        # incorrect mode or not started yet
-                        if verbose:
-                            syslog.info(f"GATED AXIS TRIGGER: FAIL - invalid mode [{gremlin.shared_state.runtime_mode}]")
-                            for mode in self.valid_mode_list:
-                                syslog.info(f"\tAvailable modes: [{mode}]")
-                        return
-
-                    # profile is running - trigger the execution node for the containers
-                    # the extra data contains the trigger condition type so the correct execution path is taken
-                    if verbose: syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name}")
-                    extra_data = {}
-                    extra_data["condition_type"] = trigger.condition
-                    extra_data["trigger"] = trigger
-                    if trigger.is_range:
-                     
-                        if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
-                        action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
-                        self._ec.execute_functor_id(self._action_data.id, trigger_event, action_value, extra_data, True)
+                    if not gremlin.shared_state.is_running:
+                        # non-runtime trigger updates for the UI
+                        if verbose_ui: syslog.info("GATE Event: before trigger callbacks")
+                        self._fire_trigger_callbacks(trigger)
+                        if verbose_ui: syslog.info("GATE Event: after trigger callbacks")
+                        return True
                     else:
-                        # non range trigger (gate crossing or range enter/exit)
-                        # use a fake button for momentary event
-                        self._ec.execute_functor_id(self._action_data.id, trigger_event, trigger_value, extra_data, True)
-                        autorelease = False
-                        if trigger.condition in (GateConditionType.OnCross, GateConditionType.OnCrossDecrease, GateConditionType.OnCrossIncrease):
-                            # gate condition
-                            autorelease = trigger.gate.autorelease_map[trigger.condition]
-                        elif trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange):
-                            # range condition
-                            autorelease = trigger.range.autorelease_map[trigger.condition]
-                        if autorelease:
-                            # handle autorelease based on trigger delay
-                            if verbose: syslog.info(f"GATED AXIS AUTORELEASE TRIGGER: {trigger.mode.name}")
-                            button_release_event = trigger_event.clone()
-                            button_release_event.is_pressed = False
-                            button_release_value = gremlin.actions.Value(input_value, False)
-                            delay = trigger.delay/1000 # delay in seconds
-                            timer = threading.Timer(delay, lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, extra_data, True))
-                            timer.start()
-                    
-            
-        # if verbose:
-        #     syslog.info("Trigger: end")
+
+                        if not gremlin.shared_state.runtime_mode in self.valid_mode_list:
+                            # incorrect mode or not started yet
+                            if verbose:
+                                syslog.info(f"GATED AXIS TRIGGER: FAIL - invalid mode [{gremlin.shared_state.runtime_mode}]")
+                                for mode in self.valid_mode_list:
+                                    syslog.info(f"\tAvailable modes: [{mode}]")
+                            return
+
+                        # profile is running - trigger the execution node for the containers
+                        # the extra data contains the trigger condition type so the correct execution path is taken
+                        if verbose: syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name}")
+                        extra_data = {}
+                        extra_data["condition_type"] = trigger.condition
+                        extra_data["trigger"] = trigger
+                        if trigger.is_range:
+                        
+                            if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
+                            action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
+                            self._ec.execute_functor_id(self._action_data.id, trigger_event, action_value, extra_data, True)
+                        else:
+                            # non range trigger (gate crossing or range enter/exit)
+                            # use a fake button for momentary event
+                            self._ec.execute_functor_id(self._action_data.id, trigger_event, trigger_value, extra_data, True)
+                            autorelease = False
+                            if trigger.condition in (GateConditionType.OnCross, GateConditionType.OnCrossDecrease, GateConditionType.OnCrossIncrease):
+                                # gate condition
+                                autorelease = trigger.gate.autorelease_map[trigger.condition]
+                            elif trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange):
+                                # range condition
+                                autorelease = trigger.range.autorelease_map[trigger.condition]
+                            if autorelease:
+                                # handle autorelease based on trigger delay
+                                if verbose: syslog.info(f"GATED AXIS AUTORELEASE TRIGGER: {trigger.mode.name}")
+                                button_release_event = trigger_event.clone()
+                                button_release_event.is_pressed = False
+                                button_release_value = gremlin.actions.Value(input_value, False)
+                                delay = trigger.delay/1000 # delay in seconds
+                                release = lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, extra_data, True)
+                                worker = gremlin.repeater.PulseWorker(delay, -1, None, release)
+                                worker.start()
+                                # timer = threading.Timer(delay, lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, extra_data, True))
+                                # timer.start()
+                        
+                
+            # if verbose:
+            #     syslog.info("Trigger: end")
+        finally:
+            self._lock.release()
 
     def _short_press(self, functor, event, value, delay = 250):
         ''' triggers a short press of a trigger (gate crossing)'''

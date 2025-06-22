@@ -1558,7 +1558,7 @@ class InputItem():
         self.always_execute = False
         self._description = ""
         self._description_readonly = False # true if description is read/only (cannot be changed)
-        #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
+        
         self._containers = []
         self._selected = False # true if the item is selected
         self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)

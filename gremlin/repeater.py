@@ -233,8 +233,8 @@ class PulseWorker(QtCore.QObject):
 
         :param pulse_duration: duration in seconds of the pulse
         :param repeat_interval: duration in seconds of the interval between pulses - send a negative value to disable - value of 0 means no delay (not recommended)
-        :param on_callback: function to call when the pulse is on
-        :param off_callback: function to call when the pusle if off (optional)
+        :param on_callback: function to call when the pulse is on - if data is provided, that will be passed as an argument
+        :param off_callback: function to call when the pusle if off (optional) - if data is provided, that will be passed as an argument
         """
         QtCore.QObject.__init__(self)
         self.is_running = False
@@ -262,7 +262,7 @@ class PulseWorker(QtCore.QObject):
         if self._thread and self._thread.is_alive():
             return
         self._thread = threading.Thread(target=self._run, daemon=False)
-        self._thread.setName("PulseRepeater")
+        self._thread.name = "PulseRepeater"
         self._keep_running = True
         self._thread.start()
         
@@ -275,7 +275,10 @@ class PulseWorker(QtCore.QObject):
 
             if self._off_callback:
                 # fire the pulse off callback (or abort)
-                self._off_callback(self.data) # fire on UI thread to avoid issues
+                if self.data:
+                    self._off_callback(self.data)
+                else:
+                    self._off_callback()
             
             self._keep_running = False # tell the worker to stop whatever it's doing
             # wait for the thread to terminate
@@ -301,19 +304,28 @@ class PulseWorker(QtCore.QObject):
             #if verbose: syslog.info("Start pulse")
 
             #if verbose: syslog.info("Fire on callback")
-            self._on_callback(self.data) # fire on UI thread to avoid issues
+            if self._on_callback:
+                if self.data:
+                    self._on_callback(self.data)
+                else:
+                    self._on_callback()
 
             # start the pulse timer
-            time_lapsed = time.time() + self._pulse_duration
-            while self._keep_running and time.time() < time_lapsed:
-                time.sleep(0.01)
+            if self._pulse_duration:
+                time_lapsed = time.time() + self._pulse_duration
+                while self._keep_running and time.time() < time_lapsed:
+                    time.sleep(0.01)
+                    
             self._is_pulse = False
 
             #if verbose: syslog.info("Stop pulse")
             if self._off_callback:
                 # fire the pulse off callback (or abort)
                 if verbose: syslog.info("Fire off callback")
-                self._off_callback(self.data) # fire on UI thread to avoid issues
+                if self.data:
+                    self._off_callback(self.data)
+                else:
+                    self._off_callback()
 
             if not self._keep_running or self._repeat_interval < 0:
                 if verbose: syslog.info("End pulse worker")
@@ -326,6 +338,7 @@ class PulseWorker(QtCore.QObject):
                 while self._keep_running and time.time() < time_lapsed:
                     time.sleep(0.01)
                 if verbose: syslog.info("Stop wait")
+            
 
 
         if verbose: syslog.info("End pulse worker")

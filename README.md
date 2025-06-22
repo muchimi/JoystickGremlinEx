@@ -14,6 +14,21 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T16)
+- Fix: Packaging error (macro module not included in distribution).  
+- Fix: Button grid visibility behavior
+- New: Vjoy Remap has a new relative axis mode behavior when adjusting an axis with another axis. In relative mode, it is now possible to adjust the output dynamically based on the deviation of the input.  This is setup specifically for thumbsticks.  The mode adds two parameters: offset (a value 0 to 1), and repeat delay (ms).
+	+ The offset is the max relative value added or removed from the output axis.
+	+ The offset is added if the input axis is positive.  The offset is substracted if the input is negative.
+	+ The reverse option flips this direction if needed.
+	+ The applied offset is scaled based on the input's deviation from center.  This is a linear scale 0 to 1, with 0 being no deviation, and 1 being the maximum deviation.  So with small deviations, the offset is very small, up to the full value at full deviation.
+	+ The delay is the delay in milliseconds between pulses.  While the input is deviated (so not zero), the offset will be applied continuously based on that delay. 
+	+ Different effects can be achieved by varying the delay and the offset.  It's recommended for most setups to use a small offset (0.05) with a small delay such as 100 ms.
+	+ This mode is very useful for thumbsticks, because of the small travel it can be difficult to achieve precision.  In this mode, a high level of precision can be achieved using the thumbstick to control the output and the effect is dynamic.
+	+ The mode requires the input to be an axis, the output to be an axis, the mode must be set to axis, and the relative checkbox has to be checked.
+	
+- Other: continued work to add instrumentation and threading checks to ensure internal calls don't run into Pyside6/QT gotchas.
+
 ### (m76T15/A)
 - Fix: VJoyRemap runtime inversion applied twice in some situations.
 - Fix: calibration data primary key not normalized preventing data load due to format mismatch.

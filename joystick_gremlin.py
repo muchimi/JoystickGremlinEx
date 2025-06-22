@@ -70,6 +70,7 @@ import gremlin.plugin_manager
 import gremlin.process_monitor
 import gremlin.execution_graph
 import gremlin.windows_event_hook # reference needed for packaging
+import gremlin.macro_handler # reference needed for packaging
 
 import anytree
 from dinput import DeviceSummary
@@ -1373,6 +1374,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         self._update_status_bar()
+        self._select_last_tab()
+        
         
         popCursor()
 
