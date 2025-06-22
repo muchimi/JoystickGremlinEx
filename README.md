@@ -13,6 +13,9 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T16/A)
+- Input selection tweak
+- Fix: TempoEx delay input value incorrect scale
 
 ### (m76T16)
 - Fix: Packaging error (macro module not included in distribution).  

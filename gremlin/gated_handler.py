@@ -1197,6 +1197,7 @@ class GateData():
         #assert profile_mode is not None, "profile mode must be provided"
         
         self._process_trigger_lock = threading.Lock()
+        self._hooked = False
         self._lock = threading.Lock()
         self._action_data = action_data
         self._ec = gremlin.execution_graph.ExecutionContext()
@@ -1281,7 +1282,7 @@ class GateData():
         # update the default range when the order of gates changes
         eh = GateEventHandler()
         eh.gate_order_changed.connect(self._update_default_range)
-        self._hooked = False
+        
         self.hook() # hook joystick events
 
     @property

@@ -2702,6 +2702,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             return None
         return widget.input_item_list_model.data(index)
     
+    
     def _get_input_items(self, device_guid : str) -> list[gremlin.base_profile.InputItem]:
         ''' gets the list of all input items for a given device '''
         widget = self._get_tab_widget_guid(device_guid)
@@ -2830,6 +2831,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             if input_item:
                 input_type = input_item.input_type
                 input_id = input_item.input_id
+                switch_input = not input_item.selected # switch inputs if the input is not currently selected
+
 
             if verbose:
                 syslog.info(f"Select input: new input: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}  current mode: {gremlin.shared_state.current_mode}")

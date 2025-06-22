@@ -990,7 +990,8 @@ class EventListener(QtCore.QObject):
 			
 			if not gremlin.shared_state.is_running:
 				# wrap event so it fires on UI thread
-				gremlin.util.singleShot(lambda : self.button_state_change.emit(event))
+				#gremlin.util.singleShot(lambda : self.button_state_change.emit(event))
+				self.button_state_change.emit(event)
 
 			event_list.append(event)
 
