@@ -34,6 +34,7 @@ from shiboken6 import Shiboken
 from gremlin.gated_handler import GateInfo, RangeInfo, DisplayMode, GateData, GateEventHandler, GateWidgetInfo, RangeWidgetInfo, GateConditionType,TriggerData, TriggerMode, GateRangeOutputMode
 import gremlin.ui.qsliderwidget
 import gremlin.ui.ui_common
+import gremlin.util
 
 syslog = logging.getLogger("system")
 
@@ -1993,11 +1994,14 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
 
         # gate data
         self.gate_data = gremlin.gated_handler.GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
+        self.gate_data.id = self.id # use the same ID as the action so it's unique
         self.gates = [self.gate_data]
  
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
         if verbose_ui: syslog.info(f"GatedAxis Action: cleanup: [{self.id}]")
+
+        gremlin.util.singleShot(self.gate_data.hook)
     
 
     def _cleanup_ui(self):

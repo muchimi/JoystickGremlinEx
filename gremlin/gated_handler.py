@@ -1144,12 +1144,51 @@ class GateEventHandler(QtCore.QObject):
 
     unhook_gate = QtCore.Signal(object) # fires when the gate is unhooked, object = the gate data object
 
+
+
+
     
 
     def __init__(self):
         super().__init__()
         self._value_changed_callbacks = {} # tracks value change callbacks
 
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self._joystick_event_handler)
+        self._lock = threading.Lock()
+
+        self._joystick_event_callbacks = {} # tracks callbacks for event changes
+
+        el.shutdown.connect(self._shutdown)
+
+
+    def _joystick_event_handler(self, event):        
+        self._lock.acquire() # make sure we only process one event at a time
+        try:
+            for callback in self._joystick_event_callbacks.values():
+                callback(event)
+
+        finally:
+            self._lock.release()
+
+
+    def registerJoystickCallback(self, key, callback):
+        ''' registers a joystick callback '''
+        self._joystick_event_callbacks[key] = callback
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+        if verbose: 
+            syslog.info(f"GATE: register callback for action [{key}] callback count: {len(self._joystick_event_callbacks)}")
+
+    def unregisterJoystickCallback(self, key):
+        ''' unregisters a joystick callback '''
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+        if key in self._joystick_event_callbacks:
+            del self._joystick_event_callbacks[key]
+            if verbose: 
+                syslog.info(f"GATE: unregister callback for action [{key}] callback count: {len(self._joystick_event_callbacks)}")
+        else:
+            syslog.warning(f"GATE: unregister callback for action [{key}]: key not registered.")
+        
 
     def registerValueChangedCallback(self, key, callback):
         ''' registers a value callback '''
@@ -1168,6 +1207,14 @@ class GateEventHandler(QtCore.QObject):
         for key in self._value_changed_callbacks:
             for callback in self._value_changed_callbacks[key]:
                 callback(value)
+
+    def _shutdown(self):
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.disconnect(self._joystick_event_handler)
+
+        self._joystick_event_callbacks.clear()
+
+
 
 
 class GateData():
@@ -1282,8 +1329,6 @@ class GateData():
         # update the default range when the order of gates changes
         eh = GateEventHandler()
         eh.gate_order_changed.connect(self._update_default_range)
-        
-        self.hook() # hook joystick events
 
     @property
     def valid_mode_list(self) -> list:
@@ -1323,8 +1368,14 @@ class GateData():
                 self._hooked = True
                 verbose = gremlin.config.Configuration().verbose_mode_gate
                 if verbose: syslog.info("GATE: hook enabled")
-                el = gremlin.event_handler.EventListener()
-                el.joystick_event.connect(self._joystick_event_handler)
+
+                gh = GateEventHandler()
+                gh.registerJoystickCallback(self.id, self._joystick_event_handler)
+
+                # el = gremlin.event_handler.EventListener()
+                # el.joystick_event.connect(self._joystick_event_handler)
+
+
                 if self._action_data.input_is_hardware():
                     self._axis_value = gremlin.joystick_handling.get_axis(self._action_data.hardware_device_guid, self._action_data.hardware_input_id)
                 else:
@@ -1342,8 +1393,12 @@ class GateData():
                 self._hooked = False
                 verbose = gremlin.config.Configuration().verbose_mode_gate
                 if verbose: syslog.info("GATE: hook disabled")
-                el = gremlin.event_handler.EventListener()
-                el.joystick_event.disconnect(self._joystick_event_handler)
+
+                gh = GateEventHandler()
+                gh.unregisterJoystickCallback(self.id)
+
+                # el = gremlin.event_handler.EventListener()
+                # el.joystick_event.disconnect(self._joystick_event_handler)
             finally:
                 self._lock.release()
             
