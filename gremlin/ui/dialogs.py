@@ -611,22 +611,22 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.remote_control_label = QtWidgets.QLabel("Remote control")
 
-        self.enable_remote_control_widget = QtWidgets.QCheckBox("Enable remote control")
+        self.enable_remote_control_widget = QtWidgets.QCheckBox("Enable remote control (client)")
         self.enable_remote_control_widget.setChecked(self.config.enable_remote_control)
         self.enable_remote_control_widget.clicked.connect(self._enable_remote_control)
-        self.enable_remote_control_widget.setToolTip("When set, Joystick Gremlin Ex will enable the remote control feature.  This allows this instance of JGEX to control the master instance on another network computer.")
+        self.enable_remote_control_widget.setToolTip("When set, this instance will accepts commands from a master computer on the local network when a profile runs.")
 
 
-        self.enable_remote_broadcast_widget = QtWidgets.QCheckBox("Enable broadcast")
+        self.enable_remote_broadcast_widget = QtWidgets.QCheckBox("Enable master control broadcast (server)")
         self.enable_remote_broadcast_widget.setChecked(self.config.enable_remote_broadcast)
         self.enable_remote_broadcast_widget.clicked.connect(self._enable_remote_broadcast)
-        self.enable_remote_control_widget.setToolTip("When set, Joystick Gremlin Ex will enable the remote broadcast feature.  This allows this instance of JGEX to broadcast control messages to other instances on the network.")
+        self.enable_remote_broadcast_widget.setToolTip("When set, this instance is a master control instance and sends data to local network clients")
 
 
-        self.enable_broadcast_speech_widget = QtWidgets.QCheckBox("Enable TTS cue on remote control mode changes")
+        self.enable_broadcast_speech_widget = QtWidgets.QCheckBox("Enable TTS mode change cue on remote clients")
         self.enable_broadcast_speech_widget.setChecked(self.config.enable_broadcast_speech)
         self.enable_broadcast_speech_widget.clicked.connect(self._enable_broadcast_speech)
-        self.enable_remote_control_widget.setToolTip("When set, output an audio cue via TTS when the broadcast mode is changed, which can be changed by an action.")
+        self.enable_broadcast_speech_widget.setToolTip("When set, output an audio cue via TTS when the broadcast mode is changed, which can be changed by an action.")
 
         self.remote_control_label = QtWidgets.QLabel("Port:")
 

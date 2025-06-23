@@ -33,6 +33,7 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.gamepad_handling
 import gremlin.joystick_handling
+import gremlin.shared_state
 from gremlin.types import GamePadOutput
 
 import gremlin.keyboard
@@ -343,12 +344,12 @@ class RemoteControl():
             return
         
         self._mode = value
-        syslog.info(f"SYSTEM: Remote control status: local: {self._is_local} remote: {self._is_remote}")
 
         if self._is_local != is_local or self._is_remote != is_remote:
             # status changed
             self._is_local = is_local
             self._is_remote = is_remote
+            
             
             el = gremlin.event_handler.EventListener()
             el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
@@ -362,6 +363,8 @@ class RemoteControl():
                 msg = "Paired mode disabled"
             syslog.debug(f"Paired mode changed: {msg}")
             threading.Thread(target = self.say, args=(msg,), daemon=False).start()
+
+        syslog.info(f"SYSTEM: Remote control status: local: {self._is_local} remote: {self._is_remote}")            
 
     def _config_changed(self):
         ''' called when broadcast config item changes '''
@@ -404,7 +407,7 @@ class RemoteControl():
         return self._is_local
     @property
     def is_remote(self):
-        ''' status of remote control '''
+        ''' status of remote control - requires both remote and broadcast to be enabled '''
         return self._is_remote and self._is_broadcast
     
     @property
@@ -1105,7 +1108,7 @@ class RemoteClient(QtCore.QObject):
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
             self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-            syslog.debug("Gremlin RPC client started...")
+            syslog.debug(f"Gremlin RPC client started... port: {self._port}")
 
     def stop(self):
         ''' closes the client socket'''
