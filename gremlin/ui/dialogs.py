@@ -728,6 +728,14 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.tts_enabled_widget.clicked.connect(self._tts_changed)
         self.tts_enabled_widget.setToolTip("Enables or disables voice (text to speech)")
 
+
+        self.tts_mode_switch_enabled_widget = QtWidgets.QCheckBox("Enable voice on mode switch (TTS)")
+        self.tts_mode_switch_enabled_widget.setChecked(self.config.tts_mode_switch_enabled)
+        self.tts_mode_switch_enabled_widget.clicked.connect(self._tts_mode_switch_changed)
+        self.tts_mode_switch_enabled_widget.setToolTip("Enables or disables the audible mode cue when a profile mode is changed at runtime.")
+
+
+
         column_widget = QtWidgets.QWidget()
         column_widget.setContentsMargins(0,0,0,0)
         column_layout = QtWidgets.QGridLayout(column_widget)
@@ -757,6 +765,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         column_layout.addWidget(widget, row, col)
         row+=1
         column_layout.addWidget(self.tts_enabled_widget, row, col)
+        row+=1
+        column_layout.addWidget(self.tts_mode_switch_enabled_widget, row, col)
 
 
         # column 2
@@ -1067,7 +1077,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         container = QtWidgets.QWidget()
         container.setContentsMargins(8,0,0,0)
         layout = QtWidgets.QGridLayout()
-        layout.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0,0,0,0) 
         container.setLayout(layout)
         self._verbose_mode_widgets = {}
         row = 0
@@ -1075,6 +1085,8 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         modes = [mode for mode in gremlin.types.VerboseMode]
         modes.sort(key = lambda x: x.name.casefold())
+
+        max_col = 6
 
         for mode in modes:
             if mode in (gremlin.types.VerboseMode.NotSet, gremlin.types.VerboseMode.All):
@@ -1085,13 +1097,13 @@ This setting is also available on a profile by profile basis on the profile tab,
             widget.clicked.connect(self._verbose_set_cb)
             layout.addWidget(widget, row, col)
             col += 1
-            if col > 3:
+            if col >= max_col:
                 col = 0
                 row +=1
             self._verbose_mode_widgets[mode] = widget
 
-        layout.addWidget(QtWidgets.QWidget(),0,4)
-        layout.setColumnStretch(4,2)
+        layout.addWidget(QtWidgets.QWidget(),0,max_col)
+        layout.setColumnStretch(max_col,2)
 
         widget = ui_common.QDataCheckbox("Show container/action IDs")
         widget.setChecked(self.config.show_container_id)
@@ -1800,6 +1812,9 @@ This setting is also available on a profile by profile basis on the profile tab,
         el = gremlin.event_handler.EventListener()
         el.tts_change.emit(checked)
 
+    @QtCore.Slot(bool)
+    def _tts_mode_switch_changed(self, checked : bool):
+        self.config.tts_mode_switch_enabled = checked
     
     @QtCore.Slot(float)
     def _filter_axis_threshold_update(self, value : float):

@@ -912,10 +912,15 @@ The commands are only available to button bindings at this time.
 | Axis     | Maps source axis to a VJOY output axis. Options:    | |
 | | Reverse | Inverts the output of the axis |
 | | Absolute | The value of the output matches the raw input value  |
-| | Relative | The value of the output is relative to the raw input value  |
+| | Relative | The value of the output is relative to the raw input value |
 | | Start Value | The default axis position on profile start |
 | | Scale | Scaling factor applied to the raw input.  Use case: increase sensitivity. |
 | | Min/Max Range | Sets the default output min/max range.  The raw input is calibrated to only output between the two values (scale is computed automatically) |
+
+### VJoyRemap relative mode
+
+In relative mode when the input is also an axis, the value of the offset depends on the deviation of the input.  An input of 0 (center) means no deviation.
+The offset applied is scaled based on the deviation, so maximum deviation of the input is the full offset value.
 
 &nbsp;
 

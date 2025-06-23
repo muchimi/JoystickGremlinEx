@@ -1847,7 +1847,8 @@ class EventHandler(QtCore.QObject):
 
 	@QtCore.Slot(str)
 	def _update_mode_change(self, mode):
-		if gremlin.config.Configuration().initial_load_mode_tts:
+		config = gremlin.config.Configuration()
+		if config.initial_load_mode_tts and config.tts_mode_switch_enabled:
 			# output verbal notification if requested
 			data = self._last_tts_data
 			profile = gremlin.shared_state.current_profile
@@ -1856,12 +1857,12 @@ class EventHandler(QtCore.QObject):
 				self._last_tts_data.profile = profile
 				tts = gremlin.tts.TextToSpeech()
 				rate = gremlin.config.Configuration().initial_load_rate_tts
-				tts.speak(f"Mode change to {mode}", rate) # default rate is 100
+				tts.speak(f"New mode {mode}", rate) # default rate is 100
 
 	def TTSNotify(self, text):
 			''' outputs a notification only if TTS notifications are enabled and the profile/mode is different from the last message issued'''
 			config = gremlin.config.Configuration()
-			if config.initial_load_mode_tts:
+			if config.initial_load_mode_tts and config.tts_mode_switch_enabled:
 				data = self._last_tts_data
 				profile = gremlin.shared_state.current_profile
 				mode = gremlin.shared_state.current_mode

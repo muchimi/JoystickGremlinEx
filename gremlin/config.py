@@ -1316,6 +1316,12 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_output(self):
         return self.verbose_mode_outputs
+
+    @property
+    def verbose_mode_remote(self):
+        ''' true if verbose mode is in output mode '''
+        return self.verbose and VerboseMode.Remote in self.verbose_mode
+        
     
     @property
     def midi_enabled(self):
@@ -1326,6 +1332,9 @@ class Configuration(QtCore.QObject):
     def midi_enabled(self, value):
         self._data["midi_enabled"] = value
         self.save()
+
+
+
 
 
     @property
@@ -2274,4 +2283,12 @@ class Configuration(QtCore.QObject):
     def tts_enabled(self, value : bool):
         self._set_data("tts_enabled", value)
 
-        
+
+    @property
+    def tts_mode_switch_enabled(self) -> bool:
+        return self._get_data("tts_mode_switch_enabled", True)
+    @tts_enabled.setter
+    def tts_mode_switch_enabled(self, value : bool):
+        self._set_data("tts_mode_switch_enabled", value)
+
+                

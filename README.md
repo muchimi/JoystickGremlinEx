@@ -13,6 +13,10 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T17)
+- New: Remote verbose mode
+- New: Option to disable TTS on mode change only
+
 ### (m76T16/A)
 - Input selection tweak
 - Fix: TempoEx delay input value incorrect scale

@@ -584,7 +584,7 @@ def key_from_name(name, validate = False) -> Key:
         return key    
 
     # Attempt to located the key in our database and return it if successful
-    key_name = name.lower().replace(" ", "")
+    key_name = name.casefold().replace(" ", "")
 
        
     key = KeyMap.find_by_name(key_name)
