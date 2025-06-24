@@ -70,7 +70,7 @@ class BasicContainerWidget(AbstractContainerWidget):
                 )
             else:
                 action_selector = gremlin.ui.ui_common.ActionSelector(
-                    self.profile_data.parent.input_type,
+                    self.profile_data.parent.getInputType(),
                     self.profile_data,
                 )
             action_selector.action_added.connect(self._add_action)

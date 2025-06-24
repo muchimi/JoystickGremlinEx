@@ -60,7 +60,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         
-        self.container_widget = gremlin.ui.input_item.InputItemConfiguration(action_data.item_data, object_name = f"MERGE")
+        self.container_widget = gremlin.ui.input_item.InputItemConfigurationWidget(action_data.item_data, object_name = f"MERGE")
         self.container_widget.setObjectName(f"ActionContainerUI for {self.action_data}")
         self.main_layout.addWidget(self.container_widget)
 

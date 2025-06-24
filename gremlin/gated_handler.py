@@ -1498,7 +1498,7 @@ class GateData():
         # build allowed mode list
    
 
-        item_data: gremlin.ui.input_item.InputItemConfiguration
+        item_data: gremlin.ui.input_item.InputItemConfigurationWidget
 
         eh = gremlin.event_handler.EventHandler()
         ec = gremlin.execution_graph.ExecutionContext()

@@ -2831,7 +2831,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             if input_item:
                 input_type = input_item.input_type
                 input_id = input_item.input_id
-                switch_input = not input_item.selected # switch inputs if the input is not currently selected
+                switch_input = not input_item.selected or not input_item.containers # switch inputs if the input is not currently selected
 
 
             if verbose:
@@ -2886,24 +2886,22 @@ class GremlinUi(QtWidgets.QMainWindow):
                     if not force_update:
                         force_update = current_input_id != input_id or current_input_type != current_input_id or gremlin.util.compare_guid(current_device_guid, device_guid)
                     
-                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = False)
+                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = True)
                     index = widget.input_item_list_view.current_index
                     widget.input_item_list_view.redraw_index(index)
-                    widget.refresh(False)
+                    #widget.refresh(False)
+
                     item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
                     # if not item:
                     #     item = widget.input_item_list_view.select_item(index, emit = False)
                     if verbose: assert item is not None, f"SELECT: sync issue: no selection"
                     item = widget.input_item_list_view.selected_item()
                     if verbose: assert item is not None, f"SELECT: sync issue: no selection"
-                    
+
+                  
                     widget.setContentWidget(input_id)
 
-
-                    # should have contents now
-                    #has_content = widget.hasRightContent()
-                    #assert has_content,"Device widget has no content to display"
-
+          
                     if verbose: syslog.info(f"Select input: selected widget {input_type} {input_id}")
 
                 # remember the last input id
@@ -3936,9 +3934,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._create_tabs()
 
         
-        # mode to restore post-load if possible
-        last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
-
 
         # select the new mode
         eh.change_mode(last_edit_mode, force_update = True)
@@ -3956,6 +3951,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         #self._select_input(last_device_guid, last_input_type, last_input_id, True)
 
         syslog.info("Profile: load completed.")
+
+        # mode to restore post-load if possible
+        last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
+        self._select_input(last_device_guid, last_input_type, last_input_id)
 
         # restore the mouse cursor
         popCursor()

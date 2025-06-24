@@ -6883,28 +6883,21 @@ class QSplitTabWidget(QDataWidget):
 
         return index
     
-    def selectRegisteredWidget(self, key) -> int:
+    def selectRegisteredWidget(self, key):
         ''' selects the content for the given device id if the content exists 
         
-        :param input_id: input to select
-        :returns: index, -1 if not found
+        returns: the widget selected
         
         '''
         
         #index = -1
         widget = self.getRegisteredWidget(key)
-        assert widget is not None,f"Error: logic error, content widget does not exist for key ({key}) "
+        assert widget is not None,f"Logic error - widget not found for key [{key}]"
         self._config_widget.setCurrentWidget(widget)
+        return widget
 
 
-        # if key in self._widget_config_index_map:
-        #     index = self._widget_config_index_map[key]
-        #     if index == -1:
-        #         syslog.warning(f"Requested widget for input[{key}] not found.")
-        #     else:
-        #         if self._config_widget.currentIndex() != index:
-        #             self._config_widget.setCurrentIndex(index)
-        # return index
+    
     
     def unregisterWidget(self, key):
         ''' removes a widget from the cleanup list'''
@@ -6967,19 +6960,27 @@ class QSplitTabWidget(QDataWidget):
         ''' returns configuration items currently displayed in the UI '''
         import gremlin.ui.input_item
         widget =  self._config_widget.currentWidget()
-        if isinstance(widget, gremlin.ui.input_item.InputItemConfiguration):
+        if isinstance(widget, gremlin.ui.input_item.InputItemConfigurationWidget):
             return widget
         return None
     
     def getWidgetKey(self, input_id):
         ''' gets the content widget compound key for the item / input combination'''
-        return (self._device_id, input_id)
+        return (gremlin.shared_state.edit_mode, self._device_id, input_id)
     
     def setContentWidget(self, input_id):
         key = self.getWidgetKey(input_id)
         widget = self.getRegisteredWidget(key)
+        if not widget:
+            self._ensure_blank_widget()
+            key = self.getWidgetKey(self._blank_input_id)
+            widget = self.getRegisteredWidget(key)
+            
         if widget:
             self._config_widget.setCurrentWidget(widget)
+
+        return widget
+        
         
     def refresh(self, emit = True):
         assert False,"Required method Refresh() not implemented by derived class"
@@ -6987,7 +6988,13 @@ class QSplitTabWidget(QDataWidget):
 
     def _blank_input(self):
         ''' sets a blank input '''
+        self._ensure_blank_widget()
+        
+        # select it
+        self.selectRegisteredWidget(self._blank_input_id)
 
+
+    def _ensure_blank_widget(self):
         widget = self.getRegisteredWidget(self._blank_input_id)
         if not widget:
 
@@ -7004,11 +7011,6 @@ class QSplitTabWidget(QDataWidget):
             contents, _ = getVContainer(widget)
 
             self.registerWidget(self._blank_input_id, contents)
-
-        # select it
-        self.selectRegisteredWidget(self._blank_input_id)
-
-
 
 
 

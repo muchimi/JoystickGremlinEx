@@ -38,6 +38,7 @@ import gremlin.shared_state
 
 import gremlin.ui.keyboard_device
 
+import gremlin.ui.mode_device
 from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
@@ -283,14 +284,9 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         if self._input_item:
             input_id = self._input_item.input_id
             input_type = None
-            device_type = self.get_device_type()
-            if device_type == DeviceType.ModeControl:
-                input_type = InputType.JoystickButton
+            if hasattr(input_id, "getOverrideInputType"):
+                self.override_input_type = input_id.getOverrideInputType()
             else:
-                if hasattr(input_id, "getOverrideInputType"):
-                    input_type = input_id.getOverrideInputType()
-                
-            if input_type:
                 self.override_input_type = input_type
         if self.override_input_type is not None:
             return self.override_input_type
@@ -1548,8 +1544,10 @@ class InputItem():
         :param parent: the parent mode of this input item
         """
         self._id = gremlin.util.get_guid() # unique ID of this object
-        self.parent = parent
+        
+        self.parent = parent # mode object
         self._input_type = None
+        self._override_input_type = None # override input type for some types that are different
         self._device_guid = None # hardware input ID
         self._name = None # device name
         self._input_id = None # input Id on the hardware
@@ -1725,9 +1723,35 @@ class InputItem():
     def input_type(self):
         return self._input_type
     @input_type.setter
-    def input_type(self, value):
-        self._input_type = value
+    def input_type(self, input_type):
+        # override mode/state inputs for legacy profiles
+        if self._device_type == DeviceType.ModeControl:
+            input_type = InputType.ModeControl
+        elif self._device_type == DeviceType.State:
+            input_type = InputType.State
+        self._input_type = input_type
         self._update_input()
+
+    def getInputType(self):
+        ''' gets the input type or the override input type'''
+        if self._override_input_type:
+            return self._override_input_type
+        return self.input_type
+    
+    def getRawInputType(self):
+        ''' gets the input type or the override input type'''
+        return self.input_type
+    
+    def setOverrideInputType(self, input_type):
+        ''' sets the override input type '''
+        self._override_input_type = input_type
+        self._update_input()
+
+    def getOverrideInputType(self):
+        ''' gets the override input type - which defaults to the regular input type if no override is set '''
+        if self._override_input_type:
+            return self._override_input_type
+        return self._input_type
 
 
     @property
@@ -1913,6 +1937,7 @@ class InputItem():
             self._description = safe_read(node, "description", str, "")
             self.always_execute = read_bool(node, "always-execute", False)
 
+
             if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
                 from gremlin.ui.keyboard_device import KeyboardInputItem
                 from gremlin.keyboard import Key
@@ -1972,7 +1997,13 @@ class InputItem():
                 # mode control entries - input id is the only item we need
                 self.is_axis = False
                 input_id = safe_read(node,"id",int,0)
-                self.input_id = input_id
+                self.input_id = gremlin.ui.mode_device.ModeInputModeType(input_id)
+                self.setOverrideInputType(InputType.JoystickButton)
+                self.descriptionReadOnly = True
+
+            elif self.input_type == InputType.State:
+                # state defaults to a button type
+                self.setOverrideInputType(InputType.JoystickButton)
                 
 
 
@@ -2056,6 +2087,8 @@ class InputItem():
         """
         from gremlin.keyboard import Key
         if parent_node is None:
+            if self.input_type == InputType.ModeControl:
+                pass
                 
             node = etree.Element(InputType.to_string(self.input_type))
             container_node = node # default container node to the input node
@@ -2133,6 +2166,8 @@ class InputItem():
 
         :return Type of this input
         """
+        if hasattr(self,"getOverrideInputType"):
+            return self.getOverrideInputType()
         return self.input_type
 
     @property

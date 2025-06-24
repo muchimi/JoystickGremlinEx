@@ -1786,7 +1786,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         key = self.getWidgetKey(input_id)
         widget = self.getRegisteredWidget(key)
         if not widget:
-            widget = gremlin.ui.input_item.InputItemConfiguration(item_data, object_name=f"STATE: {item_data.input_id.key}")
+            widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name=f"STATE: {item_data.input_id.key}")
             self.registerWidget(key, widget)
 
         self._item_data = item_data

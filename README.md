@@ -13,6 +13,13 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+
+### (m76T18)
+- Fix: Mode device not tracking profile mode correctly.
+- Fix: Filtering of available mode actions linked to recent API changes.
+
+
+
 ### (m76T17)
 - New: Remote verbose mode
 - New: Option to disable TTS on mode change only

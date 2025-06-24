@@ -70,21 +70,7 @@ class ModeInputModeType(enum.IntEnum):
         
         return f"Unknown mode: {value}"
 
-       
-class ModeInputItem(gremlin.base_profile.InputItem):
-    ''' Input Item for mode entries '''
-    def __init__(self, custom_name_handler):
-        super().__init__(custom_name_handler)
-        self.device_name = "Mode"
-        self.input_type = InputType.ModeControl
-        self.device_guid = gremlin.shared_state.mode_tab_guid
-        self.description = "Enter mode actions"
-        self.descriptionReadOnly = True
-
-    def getOverrideInputType(self):
-        ''' override type '''
-        return InputType.JoystickButton
-
+      
 
 
 class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
@@ -233,21 +219,33 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         changed = False
 
         if not ModeInputModeType.ModeEnter in config[InputType.ModeControl]:
-            modeEnter = ModeInputItem(self._custom_name_handler)
+            modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler)
+            modeEnter.input_type = InputType.ModeControl
+            modeEnter.setOverrideInputType(InputType.JoystickButton)
             modeEnter.input_id = ModeInputModeType.ModeEnter
+            modeEnter.description = "Mode Enter Actions"
+            modeEnter.descriptionReadOnly = True
             config[InputType.ModeControl][ModeInputModeType.ModeEnter] = modeEnter
             changed = True
-        config[InputType.ModeControl][ModeInputModeType.ModeEnter].descriptionReadOnly = True
+        else:
+            modeEnter = config[InputType.ModeControl][ModeInputModeType.ModeEnter]
 
         
         if not ModeInputModeType.ModeExit in config[InputType.ModeControl]:
-            modeExit = ModeInputItem(self._custom_name_handler)
+            modeExit = gremlin.base_profile.InputItem(self._custom_name_handler)
+            modeExit.input_type = InputType.ModeControl
+            modeExit.setOverrideInputType(InputType.JoystickButton)
             modeExit.input_id = ModeInputModeType.ModeExit
+            modeExit.description = "Mode Exit Actions"
+            modeExit.descriptionReadOnly = True
             config[InputType.ModeControl][ModeInputModeType.ModeExit] = modeExit
             changed = True
-        config[InputType.ModeControl][ModeInputModeType.ModeExit].descriptionReadOnly = True
-
-
+        else:
+            modeExit = config[InputType.ModeControl][ModeInputModeType.ModeExit]
+        
+        modeEnter.profile_mode = current_mode
+        modeExit.profile_mode = current_mode
+        
         if changed or refresh:
             self.input_item_list_model.refresh()    
 
@@ -304,17 +302,17 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         key = self.getWidgetKey(index)
         widget = self.getRegisteredWidget(key)
         if not widget:
-            widget = gremlin.ui.input_item.InputItemConfiguration(item_data, object_name = f"Mode  [{item_data.display_name}]")
+            widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name = f"Mode  [{item_data.display_name}]")
             self.registerWidget(key, widget)
 
         self._item_data = item_data
 
-        self.selectRegisteredWidget(key)
+        widget = self.selectRegisteredWidget(key)
 
         # remember the last input
         config = gremlin.config.Configuration()
         device_guid = self.device_guid
-        input_type = InputType.OpenSoundControl
+        input_type = InputType.ModeControl
         input_id = item_data.input_id if item_data else None
         
 
@@ -428,5 +426,6 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
         self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
+        
         #self._select_item_cb(self.input_item_list_view.current_index)
 

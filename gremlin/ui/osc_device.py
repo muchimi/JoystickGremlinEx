@@ -3453,7 +3453,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             key = self.getWidgetKey(input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = gremlin.ui.input_item.InputItemConfiguration(item_data, object_name=f"OSC: {item_data.display_name}")
+                widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name=f"OSC: {item_data.display_name}")
                 self.registerWidget(key, widget)
             
             # Create new configuration widget
@@ -3465,7 +3465,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.selectRegisteredWidget(key)
         else:
             item_data = OscInputItem()
-            widget = gremlin.ui.input_item.InputItemConfiguration(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
+            widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
 
         #self.setRightPanelWidget(widget)
 

@@ -471,7 +471,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
                 container_widget = self._cache.retrieve_by_data(item_data)        
                 if not container_widget:
                     # create the container, cache it
-                    container_widget = gremlin.ui.input_item.InputItemConfiguration(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
+                    container_widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
                     self._cache.register(item_data, container_widget)
                 condition_container_layout.addWidget(container_widget)
                 
@@ -500,7 +500,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self._condition_tab.setTabIcon(index, self._icon_enabled if has_condition else self._icon_disabled)
                 
     QtCore.Slot(object)
-    def _mapping_changed_cb(self, item_data : gremlin.ui.input_item.InputItemConfiguration):
+    def _mapping_changed_cb(self, item_data : gremlin.ui.input_item.InputItemConfigurationWidget):
         ''' hooks a mapping change '''
         item_data_map = self._range_info.item_data_map if self._is_range else self._gate_info.item_data_map
         if item_data in item_data_map.values():

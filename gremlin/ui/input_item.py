@@ -711,7 +711,8 @@ class InputItemListView(ui_common.AbstractView):
         if verbose: syslog.info(f"InputItem: select type: {input_type.name} input: {identifier}")
         if self._deleted:
             if verbose: syslog.info("\tdeleted")
-            return
+            return False
+        
         for index in range(self.model.rows()):
             data = self.model.data(index)
             if input_type is not None and data.input_type != input_type:
@@ -719,10 +720,16 @@ class InputItemListView(ui_common.AbstractView):
             if hasattr(data.input_id, "message_key"):
                 if data.input_id.message_key == identifier.message_key:
                     self.select_item(index, emit, force_update)    
+                    return True
             
             elif data.input_id == identifier:
                 self.select_item(index, emit, force_update)
-                return
+                
+                return True
+
+        return False
+            
+        
 
     def selected_item(self):
         ''' returns the currently selected input in the list view '''
@@ -1017,7 +1024,7 @@ class ActionSetView(ui_common.AbstractView):
         if self.view_type == ui_common.ContainerViewTypes.Action and \
                 self.profile_data.get_device_type() != DeviceType.VJoy:
             self.action_selector = gremlin.ui.ui_common.ActionSelector(
-                profile_data.parent.input_type,
+                profile_data.parent.getInputType(),
                 profile_data
             )
             self.action_selector.inputItem = profile_data.parent
@@ -1540,12 +1547,12 @@ class InputItemWidget(QBoxFrame):
     def _update_container_id(self):
         ''' updates container ID display for associated containers with this input '''
         config = gremlin.config.Configuration()
+        gremlin.util.clear_layout(self._container_id_layout)
         if config.show_container_id:
-            gremlin.util.clear_layout(self._container_id_layout)
-            if config.show_container_id:
-                width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
-                grids = []
-                if self.data:
+            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+            grids = []
+            if self.data:
+                if self.data.containers:
                     for index, container in enumerate(self.data.containers):
                         line_edit = gremlin.ui.ui_common.QDataLineEdit()
                         line_edit.setMinimumWidth(width)
@@ -1554,7 +1561,17 @@ class InputItemWidget(QBoxFrame):
                         widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, f"[{index}] {container.name}")
                         self._container_id_layout.addWidget(widget)
                         grids.append(widget)
-                gremlin.ui.ui_common.synchronize_grids(grids)
+                else:
+                    # no container
+                    line_edit = gremlin.ui.ui_common.QDataLineEdit()
+                    line_edit.setMinimumWidth(width)
+                    line_edit.setText("No container found")
+                    line_edit.setReadOnly(True)
+                    widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Mapping:")
+                    self._container_id_layout.addWidget(widget)
+                    grids.append(widget)
+                    
+            gremlin.ui.ui_common.synchronize_grids(grids)
 
 
     def _cleanup_ui(self):
@@ -3410,7 +3427,7 @@ class ConditionActionWrapper(AbstractActionWrapper):
 
 
 
-class InputItemConfiguration(QtWidgets.QFrame):
+class InputItemConfigurationWidget(QtWidgets.QFrame):
 
     """ mapping viewer for a selected input item (this is the right side of the device tab) """
 
@@ -3436,7 +3453,9 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.id = gremlin.util.get_guid()
         self.item_data : gremlin.base_profile.InputItem = item_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
+
         self.container_view = None
+        self.profile_mode = self.item_data.profile_mode
         
         self._input_type = InputType.NotSet
         if input_type is not None:
@@ -3468,6 +3487,10 @@ class InputItemConfiguration(QtWidgets.QFrame):
     @property
     def deleted(self):
         return self._deleted
+    
+    
+    
+
 
     def setItemData(self, item_data):
         ''' updates the item data '''
@@ -3482,6 +3505,42 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
             config = gremlin.config.Configuration()
             if config.show_container_id:
+
+                # debug containter type
+                widgets = []
+                label = QtWidgets.QLabel(f"Mode: [{self.item_data.profile_mode if self.item_data.profile_mode else "N/A"}]")
+                widgets.append(label)
+
+                input_id = None
+                if self.item_data:
+                    input_id = self.item_data.input_id
+                    raw_input_type = self.item_data.getRawInputType()
+                    input_type = self.item_data.getInputType()
+                    if raw_input_type != input_type:
+                        # override used
+                        label_name = f"Input Type: (override) {input_type.name}"
+                    else:
+                        label_name = f"Input Type: {input_type.name}"
+
+                    
+                else:
+                    label_name = f"Input Type: N/A"
+                
+
+                label = QtWidgets.QLabel(label_name)
+                widgets.append(label)
+                if input_id is not None:
+                    width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
+                    line_edit = gremlin.ui.ui_common.QDataLineEdit()
+                    line_edit.setMinimumWidth(width)
+                    line_edit.setText(str(input_id) if isinstance(input_id, int) else gremlin.util.normalize_guid(input_id.id))
+                    line_edit.setReadOnly(True)
+                    widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Input Id:")
+                    widgets.append(widget)
+                
+                widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+
+
                 name = self.objectName()
                 css = "background: green;"
                 if not name:
@@ -3492,17 +3551,15 @@ class InputItemConfiguration(QtWidgets.QFrame):
                     name = "(name not available)"
                     css = "background: red;"
 
-                label = QtWidgets.QLabel(name)
+                label_name = QtWidgets.QLabel(name)
 
                 id_label = QtWidgets.QLabel(f"({self.id})")
-                label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
-                label.setStyleSheet(css)
-
-                # hide_button = QtWidgets.QPushButton("Hide")
-                # hide_button.clicked.connect(lambda : self.setVisible(False))
+                label_name.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+                label_name.setStyleSheet(css)
+                widgets.append(label_name)
+                widgets.append(id_label)
                 
-                #widget, layout = gremlin.ui.ui_common.getHContainer([id_label, label, hide_button],left_stretch=True)
-                widget, layout = gremlin.ui.ui_common.getHContainer([id_label, label],left_stretch=True)
+                widget, layout = gremlin.ui.ui_common.getHContainer(widgets)
 
                 self.main_layout.addWidget(widget)
 
@@ -3520,37 +3577,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             
 
 
-            if config.show_container_id:
-                # debug containter type
-                input_id = None
-                if self.item_data:
-                    input_id = self.item_data.input_id
-                    if hasattr(self.item_data.input_id, "getOverrideInputType"):
-                        input_type = self.item_data.input_id.getOverrideInputType()
-                        label_name = f"Input Type: (override) {input_type.name}"
-                    else:
-                        input_type = self.item_data.input_type
-                        label_name = f"Input Type: {input_type.name}"
-
-                    
-                else:
-                    label_name = f"Input Type: N/A"
-                
-
-                label = QtWidgets.QLabel(label_name)
-                widgets = [label]
-                if input_id is not None:
-                    width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
-                    line_edit = gremlin.ui.ui_common.QDataLineEdit()
-                    line_edit.setMinimumWidth(width)
-                    line_edit.setText(str(input_id) if isinstance(input_id, int) else gremlin.util.normalize_guid(input_id.id))
-                    line_edit.setReadOnly(True)
-                    widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Input Id:")
-                    widgets.append(widget)
-                
-                widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
-                self.main_layout.addWidget(widget)
-
+         
             
             if not item_data.is_action:
                 # only draw description if not a sub action item
@@ -3941,8 +3968,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
         # default input type
         input_type = self._input_type
         # check for an override for the inputs that can change types (such as OSC)
-        if hasattr(self.item_data.input_id, "getOverrideInputType"):
-            input_type = self.item_data.input_id.getOverrideInputType()
+        
+        input_type = self.item_data.getInputType()
 
         self.action_selector = ui_common.ActionSelector(input_type, self.item_data)
         self.action_selector.inputItem = self.item_data
@@ -4050,11 +4077,11 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
     """Stores action containers for display using the corresponding view."""
 
-    def __init__(self, containers, item_data : InputItemConfiguration = None, input_type: InputType = None, parent=None):
+    def __init__(self, containers, item_data : InputItemConfigurationWidget = None, input_type: InputType = None, parent=None):
         """Creates a new instance.
 
         :param containers: the container instances of this model
-        :param item_data: the input mapping data (InputItemConfiguration)
+        :param item_data: the input mapping data (InputItemConfigurationWidget)
         :param input_type: the override input type if different from the input item configuration
         :param parent: the parent of this widget
         """
@@ -4064,7 +4091,7 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
         self._input_type = input_type if input_type is not None else item_data._input_type
 
     @property
-    def item_data(self) -> InputItemConfiguration:
+    def item_data(self) -> InputItemConfigurationWidget:
         ''' get the item data associated with this action container '''
         return self._item_data
     

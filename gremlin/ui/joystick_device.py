@@ -393,7 +393,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         :param index the index of the selected item
         """
-        from gremlin.ui.input_item import InputItemConfiguration
+        from gremlin.ui.input_item import InputItemConfigurationWidget
 
         try:
 
@@ -453,7 +453,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     
                     # not in cache, create it and add to cache for this device/input combination
                     if verbose: syslog.info(f"create and store in cache content widget for index: {index}  device: {self.device_guid}")
-                    widget = InputItemConfiguration(item_data, object_name = f"Joystick [{item_data.display_name}]")
+                    widget = InputItemConfigurationWidget(item_data, object_name = f"Joystick [{item_data.display_name}]")
                     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
                     widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
                     widget.action_model.data_changed.connect(self._create_change_cb(index))
