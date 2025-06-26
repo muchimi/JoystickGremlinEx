@@ -222,6 +222,9 @@ class Color():
     def unmappedColor(): # color for the unmapped device 
         return "#a1a1a1" if gremlin.shared_state.is_dark_theme else "#5a5a5a"
     @staticmethod
+    def mappedColor(): # color for the unmapped device 
+        return "#ffffff" #if gremlin.shared_state.is_dark_theme else "#5a5a5a"
+    @staticmethod
     def listenColor(): # color used for listen type buttons
         return "#34b7eb"
     
@@ -741,8 +744,9 @@ class DeviceWidgetTracker():
             for mode in self._widget_cache[device_guid]:
                 if input_type in self._widget_cache[device_guid][mode]:
                     if input_id in self._widget_cache[device_guid][mode][input_type]:
-                        if key in self._widget_cache[device_guid][mode][input_type][input_id]:
-                            self._widget_cache[device_guid][mode][input_type][input_id] = None
+                        if self._widget_cache[device_guid][mode][input_type][input_id]:
+                            if key in self._widget_cache[device_guid][mode][input_type][input_id]:
+                                self._widget_cache[device_guid][mode][input_type][input_id][key] = None
 
 
     def clear(self):
@@ -4876,7 +4880,11 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
     def _set_value(self, index : int, value : float):
         self.axes[index].setValue(value)
-        self.value_labels[index].setText(f"{value:+0.3f}")
+        widget = self.value_labels[index]
+        if hasattr(widget, "setValue"):
+            widget.setValue(value)
+        else:
+            widget.setText(f"{value:+0.3f}")
         percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
         self.percent_labels[index].setText(f"{percent:0.1f} %")
 
@@ -5378,7 +5386,12 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self.setLayout(layout)
         self.vis_type = vis_type
         self._hooked = False
-        
+        self._supended = True # suspend by default
+
+
+    def setSuspended(self, value : bool):
+        ''' suspends processing '''
+        self._supended = value
 
         
 
@@ -5496,6 +5509,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             widget.process_event(event)
 
     def _current_axis_update(self, event):
+        if self._supended:
+            return
         if self.device_guid != event.device_guid:
             return
 
@@ -5503,6 +5518,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             widget.process_event(event)
 
     def _vjoy_current_axis_update(self, event : gremlin.event_handler.VjoyEvent):
+        if self._supended:
+            return
         if self.device_data.vjoy_id != event.vjoy_id:
             return
         
@@ -5516,6 +5533,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
         :param event the event to use in the update
         """
+        if self._supended:
+            return
         if self.device_guid != event.device_guid:
             return
 
@@ -5524,6 +5543,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                 widget.add_point(event.value, event.identifier)
 
     def _vjoy_temporal_axis_update(self, event : gremlin.event_handler.VjoyEvent):
+        if self._supended:
+            return
         if self.device_data.vjoy_id != event.vjoy_id:
             return
         

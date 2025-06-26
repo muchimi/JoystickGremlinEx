@@ -360,7 +360,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # last index selected, -1 means none
         self._last_selected_index = -1 
 
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, parent=self)
+        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, parent=self, device_id = self._device_id)
         self.input_item_list_view.setMinimumWidth(350)
 
         self._reload_model()
@@ -446,6 +446,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.redraw()
         self._select_item_cb(self._last_selected_index)
 
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
+
 
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
@@ -479,6 +482,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model.clear(input_types=[InputType.Keyboard, InputType.KeyboardLatched])
         self.input_item_list_view.redraw()
 
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
+
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
 
         self._blank_input()
@@ -507,6 +513,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         keys = self._keyboard_dialog.keys
         latched_key = self._keyboard_dialog.latched_key
         self._process_input_keys(keys, index, latched_key)
+
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
 
     def _process_input_keys(self, keys, index, root_key = None):
         ''' processes input keys

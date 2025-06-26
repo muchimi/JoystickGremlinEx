@@ -93,7 +93,9 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        super().__init__(object_name, gremlin.shared_state.mode_tab_guid, parent)
+        self._device_guid =gremlin.shared_state.mode_tab_guid
+        self._device_id = str(self._device_guid)
+        super().__init__(object_name, self.device_guid , parent)
         import gremlin.ui.ui_common as ui_common
         import gremlin.ui.input_item as input_item
 
@@ -115,7 +117,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # update the display names 
 
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler)
+        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -267,11 +269,6 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sorted_keys = list(mode.config[InputType.ModeControl].keys())
         return sorted_keys.index(input_id)
     
-    
-
-    # def getWidgetKey(self, input_id):
-    #     ''' gets the content widget compound key for the item / input combination'''
-    #     return (self.device_guid, input_id)
 
     def _select_item_cb(self, index):
         """Handles the selection of an input item.

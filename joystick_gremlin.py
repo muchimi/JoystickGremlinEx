@@ -234,6 +234,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.refresh_devices.connect(self._create_tabs) # refresh device list
         el.request_profile_reload.connect(self._reload_profile) # reload the profile from a temporary file
         el.request_reload.connect(self._reload)
+        el.device_mapping_changed.connect(self._update_tab)
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
@@ -475,11 +476,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.ui.devices.setTabIcon(position, icon)
             self.ui.devices.setTabTextColor(position, color)   
         else:
-            if not has_mapping:
-                # icon = gremlin.ui.ui_common.Icons.mappedIcon()
-                # self.ui.devices.setTabIcon(position, icon)
-                color = gremlin.ui.ui_common.Color().unmappedColor()
-                self.ui.devices.setTabTextColor(position, color)   
+            # tab color based on mapping
+            color = gremlin.ui.ui_common.Color().mappedColor() if has_mapping else gremlin.ui.ui_common.Color().unmappedColor()
+            self.ui.devices.setTabTextColor(position, color)   
 
     
         self._tab_device_map[device_guid] = position
@@ -503,13 +502,33 @@ class GremlinUi(QtWidgets.QMainWindow):
         profile = gremlin.shared_state.current_profile
         edit_mode = gremlin.shared_state.edit_mode
         devices = profile.devices
+        look_for_containers = True
+        # special devices
+        if device_guid == gremlin.shared_state.state_tab_guid:
+            # state
+            sd = gremlin.ui.state_device.StateData()
+            names = sd.getStateNames()
+            return len(names) > 0
+        elif device_guid == gremlin.shared_state.settings_tab_guid:
+            return True
+        elif device_guid == gremlin.shared_state.plugins_tab_guid:
+            # plugins
+            plugins = gremlin.shared_state.current_profile.plugins
+            return len(plugins) > 0
+        elif device_guid == gremlin.shared_state.keyboard_tab_guid:
+            look_for_containers = False
+
         if device_guid in devices:
             device_data = devices[device_guid]
             if edit_mode in device_data.modes:
                 mode_data = device_data.modes[edit_mode]
                 for input_type, input_items in mode_data.config.items():
                     for input_item in input_items.values():
-                        if input_item.containers:
+                        if look_for_containers:
+                            if input_item.containers:
+                                return True
+                        else:
+                            # input count indicates content
                             return True
         return False
 
@@ -1986,7 +2005,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             device_guid = str(device_guid)
 
         el = gremlin.event_handler.EventListener()
-        verbose = gremlin.config.Configuration().verbose_mode_detailed
+        verbose = gremlin.config.Configuration().verbose_mode_extra
         
         current_device_guid = gremlin.shared_state.current_tab_device_guid
         if current_device_guid:
@@ -2014,7 +2033,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.shared_state.current_tab_device_guid = device_guid
             device_name = self._get_device_name(device_guid)
 
-            verbose = gremlin.config.Configuration().verbose_mode_detailed
+            verbose = gremlin.config.Configuration().verbose_mode_extra
             if verbose: syslog.info(f"TAB SELECT: {device_name}")
             el.tab_selected.emit(device_guid)
             
@@ -2031,6 +2050,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         index = self.ui.devices.currentIndex()
         data : TabData = self.ui.devices.tabData(index)
         return  TabDeviceType(data.tab_type)
+    
+    def _update_tab(self, device_id: str):
+        ''' updates the given tab for mapping '''
+        position = self.getTabIndexForDevice(device_id)
+        if position is not None:
+            has_mapping = self._has_mapping(device_id)
+            color = gremlin.ui.ui_common.Color().mappedColor() if has_mapping else gremlin.ui.ui_common.Color().unmappedColor()
+            self.ui.devices.setTabTextColor(position, color)
         
 
     def _create_tabs(self, activate_tab=None):
@@ -2038,6 +2065,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         the different connected devices.
         """
         try:
+
+            config = gremlin.config.Configuration()
+            verbose_detailed = config.verbose_mode_extra
+            verbose = config.verbose_mode_device
+
+            if verbose_detailed: syslog.info("CREATE TAB: start")
 
             device : DeviceSummary
             device_guid = None
@@ -2055,9 +2088,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             # reload device list in case it changed
             gremlin.shared_state.reload_device_map()
 
-            config = gremlin.config.Configuration()
-            verbose_detailed = config.verbose_mode_detailed
-            verbose = config.verbose_mode_device
+            
 
 
             gremlin.shared_state.is_tab_loading = True
@@ -2473,7 +2504,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.shared_state.is_tab_loading = False
       
         except Exception as err:
-            pass
+            syslog.error(f"CREATE DEVICE TABS: (step 1) failed: {err}")
+            tb_msg = traceback.format_exc()
+            syslog.error(tb_msg)
+            
 
 
         finally:
@@ -2495,7 +2529,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                 #     self._select_input(device_guid, restore_input_type, restore_input_id, force_update = True, force_switch=True)
                 
             except Exception as err:
-                pass
+                syslog.error(f"CREATE DEVICE TABS (step 2): failed: {err}")
+                tb_msg = traceback.format_exc()
+                syslog.error(tb_msg)
+                
 
             self.pop_highlighting()
             self._update_highlight_toolbar_enabled()
@@ -2509,6 +2546,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                     else:
                         device_name = "(unknown)"
                     syslog.info(f"\t[{index}] {self.ui.devices.tabText(index)} {device_name}  {device_guid}")
+
+            if verbose_detailed:
+                syslog.info("CREATE TABS: complete")
 
 
 
@@ -2822,6 +2862,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             # make the content visible
             self.selectTabWidget(device_guid)
 
+            has_containers = False
+
             # see if the request input is found
             input_item = self._find_input_item(device_guid, input_type, input_id)
             if input_item is None:
@@ -2831,7 +2873,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             if input_item:
                 input_type = input_item.input_type
                 input_id = input_item.input_id
-                switch_input = not input_item.selected or not input_item.containers # switch inputs if the input is not currently selected
+                has_containers = len(input_item.containers) > 0
+                switch_input = not input_item.selected or not has_containers # switch inputs if the input is not currently selected
 
 
             if verbose:
@@ -2867,6 +2910,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                         input_type = input_item.input_type
                         last_device_guid = device_guid
                         last_input_type = input_type
+                        has_containers = len(input_item.containers) > 0
                         if verbose: syslog.info(f"Select input: defaulting to first item on list {last_device_guid} {last_input_type} {input_id} ")
 
                         self._last_input_item = input_item
@@ -2885,8 +2929,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                         widget.refresh(emit = False)
                     if not force_update:
                         force_update = current_input_id != input_id or current_input_type != current_input_id or gremlin.util.compare_guid(current_device_guid, device_guid)
+
+                    emit = gremlin.shared_state.profile_loading #True #not has_containers
                     
-                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = True)
+                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
                     index = widget.input_item_list_view.current_index
                     widget.input_item_list_view.redraw_index(index)
                     #widget.refresh(False)
@@ -3798,221 +3844,124 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Disable the program if it is running when we're loading a
         # new profile
 
+                    
         # trap recursive call
         if self._profile_load_stack:
             self._profile_load_stack.append(source_xml)
             return
+        
+        try:
 
-        self._profile_load_stack.append(source_xml)
-        gremlin.shared_state.import_prompt_stack = 0 # reset prompt count for import remap (in profile_graph)
+            gremlin.shared_state.profile_loading = True
 
-        pushCursor()
-        eh = gremlin.event_handler.EventHandler()
-        el = gremlin.event_handler.EventListener()
-
-        last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
-
-
-        # clear any old data
-        self._reset_tab_data()
-        self.clearWidgets()
-
-        # reset execution context
-        ec = gremlin.execution_graph.ExecutionContext()
-        ec.reset(no_rebuild = True)
-
-        self.ui.actionActivate.setChecked(False)
-        self.activate(False)
+            self._profile_load_stack.append(source_xml)
+            gremlin.shared_state.import_prompt_stack = 0 # reset prompt count for import remap (in profile_graph)
+            
             
 
-        if gremlin.shared_state.current_profile:
-            el.profile_unload.emit() # fire unload start 
-            current_profile = gremlin.shared_state.current_profile
-            current_profile.unload()
-            gremlin.shared_state.current_profile = None
-            el.profile_unloaded.emit() # tell the UI we're about to load a new profile
-        el.push_input_selection() # suspend input selection            
-
-        while self._profile_load_stack:
-            source_xml = self._profile_load_stack[0]
-
-            import_data = gremlin.base_profile.ProfileImportData()
-            import_data.used_ids.clear()
-
-
-
-
-            # Attempt to load the new profile
-            try:
-                new_profile = gremlin.base_profile.Profile()
-
-
-                gremlin.shared_state.current_profile = new_profile
-                profile_updated = new_profile.from_xml(source_xml)
-
-                profile_folder = os.path.dirname(source_xml)
-                if profile_folder not in sys.path:
-                    sys.path = list(self._base_path)
-                    sys.path.insert(0, profile_folder)
-
-                self._sanitize_profile(new_profile)
-
-
-                # Save the profile at this point if it was converted from a prior
-                # profile version, as otherwise the change detection logic will
-                # trip over insignificant input item additions.
-                if profile_updated:
-                    new_profile.to_xml(source_xml)
-
-
-
-                
-                # next file
-
-                if source_xml in self._profile_load_temporary_files:
-                    # clean up the temporary file once loaded
-                    os.unlink(source_xml)
-                    new_profile.setProfileFile(None)
-
-                self._profile_load_stack.pop(0)
-                syslog.info("Profile: parse completed.")
-
-
-            except (KeyError, TypeError) as error:
-                # An error occurred while parsing an existing profile,
-                # creating an empty profile instead
-                syslog.exception(f"Invalid profile content:\n{error}")
-                self.new_profile()
-                self._profile_load_stack.clear()
-
-            except gremlin.error.ProfileError as error:
-                # Parsing the profile went wrong, stop loading and start with an
-                # empty profile
-                cfg = gremlin.config.Configuration()
-                cfg.last_profile = None
-                self.new_profile()
-                gremlin.util.display_error(f"Failed to load the profile {source_xml} due to:\n\n{error}")
-                self._profile_load_stack.clear()
-
-            except Exception as err:
-                syslog.error("Profile load error (generic):")
-                syslog.error(traceback.format_exc())
-                gremlin.util.display_error(f"Failed to load the profile {source_xml} (see log for details)")
-                self._profile_load_stack.clear()
-
-
-        if not last_edit_mode:
-            # pick the top mode if nothing was saved in the configuration
-            last_edit_mode = self.profile.get_root_mode()
-            gremlin.config.Configuration().set_profile_last_edit_mode(last_edit_mode)
-
-        if as_new_profile:
-            # set as new unsaved profile
-            new_profile.setProfileFile(None)
-        
-        modes = new_profile.get_modes()
-        if last_edit_mode is None:
-            last_edit_mode = modes[0]
-
-        if not last_edit_mode in modes:
-            # no longer in the current mode list
-            last_edit_mode = new_profile.get_default_mode()
-
-        # Make the first root node the default active mode
-        self.mode_selector.populate_selector(new_profile, last_edit_mode, emit = False)
-
-        gremlin.shared_state.edit_mode = last_edit_mode
-        gremlin.shared_state.runtime_mode = new_profile.get_default_start_mode()                
-
-
-        # indicate profile was loaded
-        new_profile.setLoaded(True)            
-
-        # update the hash value
-        self._profile_hash = new_profile.getMappingHash()
-
-        self._create_tabs()
-
-        
-
-        # select the new mode
-        eh.change_mode(last_edit_mode, force_update = True)
-        
-        el.profile_loaded.emit()
-
-        # ask the UI to update input curve icons
-        el.update_input_icons.emit()
-
-        # update the status bar
-        self._update_mode_status_bar()
-        self._update_window_title()
-
-        el.pop_input_selection(True) # restore input selection and reset
-        #self._select_input(last_device_guid, last_input_type, last_input_id, True)
-
-        syslog.info("Profile: load completed.")
-
-        # mode to restore post-load if possible
-        last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
-        self._select_input(last_device_guid, last_input_type, last_input_id)
-
-        # restore the mouse cursor
-        popCursor()
-
-        
-    def _do_load_profile_old(self, source_xml : str, as_new_profile = False):
-        """Load the profile with the given filename.
-
-        :param source_xml: the name of the profile file to load
-        :param as_new_profile: if set, loads the new profile as an unsaved profile
-
-        """
-        # Disable the program if it is running when we're loading a
-        # new profile
-
-        pushCursor()
-        import_data = gremlin.base_profile.ProfileImportData()
-        import_data.used_ids.clear()
-
-
-        self.ui.actionActivate.setChecked(False)
-        self.activate(False)
-
-        el = gremlin.event_handler.EventListener()
-        el.profile_unloaded.emit() # tell the UI we're about to load a new profile
-
-        el.push_input_selection() # suspend input selection
-
-
-        # mode to restore post-load if possible
-        last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
-
-           # Attempt to load the new profile
-        try:
-            new_profile = gremlin.base_profile.Profile()
-           
-
-            gremlin.shared_state.current_profile = new_profile
-            profile_updated = new_profile.from_xml(source_xml)
-
-            profile_folder = os.path.dirname(source_xml)
-            if profile_folder not in sys.path:
-                sys.path = list(self._base_path)
-                sys.path.insert(0, profile_folder)
-
-            self._sanitize_profile(new_profile)
-
-            if as_new_profile:
-                # set as new unsaved profile
-                new_profile.setProfileFile(None)
-
-
+            pushCursor()
+            eh = gremlin.event_handler.EventHandler()
+            el = gremlin.event_handler.EventListener()
 
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
+
+
+            # clear any old data
+            self._reset_tab_data()
+            self.clearWidgets()
+
+            # reset execution context
+            ec = gremlin.execution_graph.ExecutionContext()
+            ec.reset(no_rebuild = True)
+
+            self.ui.actionActivate.setChecked(False)
+            self.activate(False)
+                
+
+            if gremlin.shared_state.current_profile:
+                el.profile_unload.emit() # fire unload start 
+                current_profile = gremlin.shared_state.current_profile
+                current_profile.unload()
+                gremlin.shared_state.current_profile = None
+                el.profile_unloaded.emit() # tell the UI we're about to load a new profile
+            el.push_input_selection() # suspend input selection            
+
+            while self._profile_load_stack:
+                source_xml = self._profile_load_stack[0]
+
+                import_data = gremlin.base_profile.ProfileImportData()
+                import_data.used_ids.clear()
+
+
+
+
+                # Attempt to load the new profile
+                try:
+                    new_profile = gremlin.base_profile.Profile()
+
+
+                    gremlin.shared_state.current_profile = new_profile
+                    profile_updated = new_profile.from_xml(source_xml)
+
+                    profile_folder = os.path.dirname(source_xml)
+                    if profile_folder not in sys.path:
+                        sys.path = list(self._base_path)
+                        sys.path.insert(0, profile_folder)
+
+                    self._sanitize_profile(new_profile)
+
+
+                    # Save the profile at this point if it was converted from a prior
+                    # profile version, as otherwise the change detection logic will
+                    # trip over insignificant input item additions.
+                    if profile_updated:
+                        new_profile.to_xml(source_xml)
+
+
+
+                    
+                    # next file
+
+                    if source_xml in self._profile_load_temporary_files:
+                        # clean up the temporary file once loaded
+                        os.unlink(source_xml)
+                        new_profile.setProfileFile(None)
+
+                    self._profile_load_stack.pop(0)
+                    syslog.info("Profile: parse completed.")
+
+
+                except (KeyError, TypeError) as error:
+                    # An error occurred while parsing an existing profile,
+                    # creating an empty profile instead
+                    syslog.exception(f"Invalid profile content:\n{error}")
+                    self.new_profile()
+                    self._profile_load_stack.clear()
+
+                except gremlin.error.ProfileError as error:
+                    # Parsing the profile went wrong, stop loading and start with an
+                    # empty profile
+                    cfg = gremlin.config.Configuration()
+                    cfg.last_profile = None
+                    self.new_profile()
+                    gremlin.util.display_error(f"Failed to load the profile {source_xml} due to:\n\n{error}")
+                    self._profile_load_stack.clear()
+
+                except Exception as err:
+                    syslog.error("Profile load error (generic):")
+                    syslog.error(traceback.format_exc())
+                    gremlin.util.display_error(f"Failed to load the profile {source_xml} (see log for details)")
+                    self._profile_load_stack.clear()
+
+
             if not last_edit_mode:
                 # pick the top mode if nothing was saved in the configuration
                 last_edit_mode = self.profile.get_root_mode()
                 gremlin.config.Configuration().set_profile_last_edit_mode(last_edit_mode)
+
+            if as_new_profile:
+                # set as new unsaved profile
+                new_profile.setProfileFile(None)
             
             modes = new_profile.get_modes()
             if last_edit_mode is None:
@@ -4022,58 +3971,168 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # no longer in the current mode list
                 last_edit_mode = new_profile.get_default_mode()
 
-
-            eh = gremlin.event_handler.EventHandler()
-            eh.set_edit_mode(last_edit_mode)
-
-            gremlin.shared_state.edit_mode = last_edit_mode
-
-            self._create_tabs()
-
             # Make the first root node the default active mode
             self.mode_selector.populate_selector(new_profile, last_edit_mode, emit = False)
 
+            gremlin.shared_state.edit_mode = last_edit_mode
+            gremlin.shared_state.runtime_mode = new_profile.get_default_start_mode()                
 
-            # Save the profile at this point if it was converted from a prior
-            # profile version, as otherwise the change detection logic will
-            # trip over insignificant input item additions.
-            if profile_updated:
-                new_profile.to_xml(source_xml)
 
-            # ask the UI to update input curve icons
-            el.update_input_icons.emit()
+            # indicate profile was loaded
+            new_profile.setLoaded(True)            
 
             # update the hash value
             self._profile_hash = new_profile.getMappingHash()
 
-
-        except (KeyError, TypeError) as error:
-            # An error occurred while parsing an existing profile,
-            # creating an empty profile instead
-            syslog.exception(f"Invalid profile content:\n{error}")
-            self.new_profile()
-        except gremlin.error.ProfileError as error:
-            # Parsing the profile went wrong, stop loading and start with an
-            # empty profile
-            cfg = gremlin.config.Configuration()
-            cfg.last_profile = None
-            self.new_profile()
-            gremlin.util.display_error(f"Failed to load the profile {source_xml} due to:\n\n{error}")
-
-        finally:
+            self._create_tabs()
 
             
+
+            # select the new mode
+            eh.change_mode(last_edit_mode, force_update = True)
+            
             el.profile_loaded.emit()
+
+            # ask the UI to update input curve icons
+            el.update_input_icons.emit()
 
             # update the status bar
             self._update_mode_status_bar()
             self._update_window_title()
 
+            el.pop_input_selection(True) # restore input selection and reset
+            #self._select_input(last_device_guid, last_input_type, last_input_id, True)
+
+            syslog.info("Profile: load completed.")
+
+            # mode to restore post-load if possible
+            last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
+            self._select_input(last_device_guid, last_input_type, last_input_id)
+
+
+        finally:
+        
+            
+            gremlin.shared_state.profile_loading = False # done loading
+
             # restore the mouse cursor
             popCursor()
 
-            el.pop_input_selection(True) # restore input selection and reset
-            self._select_input(last_device_guid, last_input_type, last_input_id, True)
+        
+    # def _do_load_profile_old(self, source_xml : str, as_new_profile = False):
+    #     """Load the profile with the given filename.
+
+    #     :param source_xml: the name of the profile file to load
+    #     :param as_new_profile: if set, loads the new profile as an unsaved profile
+
+    #     """
+    #     # Disable the program if it is running when we're loading a
+    #     # new profile
+
+    #     pushCursor()
+    #     import_data = gremlin.base_profile.ProfileImportData()
+    #     import_data.used_ids.clear()
+
+
+    #     self.ui.actionActivate.setChecked(False)
+    #     self.activate(False)
+
+    #     el = gremlin.event_handler.EventListener()
+    #     el.profile_unloaded.emit() # tell the UI we're about to load a new profile
+
+    #     el.push_input_selection() # suspend input selection
+
+
+    #     # mode to restore post-load if possible
+    #     last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
+
+    #        # Attempt to load the new profile
+    #     try:
+    #         new_profile = gremlin.base_profile.Profile()
+           
+
+    #         gremlin.shared_state.current_profile = new_profile
+    #         profile_updated = new_profile.from_xml(source_xml)
+
+    #         profile_folder = os.path.dirname(source_xml)
+    #         if profile_folder not in sys.path:
+    #             sys.path = list(self._base_path)
+    #             sys.path.insert(0, profile_folder)
+
+    #         self._sanitize_profile(new_profile)
+
+    #         if as_new_profile:
+    #             # set as new unsaved profile
+    #             new_profile.setProfileFile(None)
+
+
+
+    #         last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
+    #         if not last_edit_mode:
+    #             # pick the top mode if nothing was saved in the configuration
+    #             last_edit_mode = self.profile.get_root_mode()
+    #             gremlin.config.Configuration().set_profile_last_edit_mode(last_edit_mode)
+            
+    #         modes = new_profile.get_modes()
+    #         if last_edit_mode is None:
+    #             last_edit_mode = modes[0]
+
+    #         if not last_edit_mode in modes:
+    #             # no longer in the current mode list
+    #             last_edit_mode = new_profile.get_default_mode()
+
+
+    #         eh = gremlin.event_handler.EventHandler()
+    #         eh.set_edit_mode(last_edit_mode)
+
+    #         gremlin.shared_state.edit_mode = last_edit_mode
+
+    #         self._create_tabs()
+
+    #         # Make the first root node the default active mode
+    #         self.mode_selector.populate_selector(new_profile, last_edit_mode, emit = False)
+
+
+    #         # Save the profile at this point if it was converted from a prior
+    #         # profile version, as otherwise the change detection logic will
+    #         # trip over insignificant input item additions.
+    #         if profile_updated:
+    #             new_profile.to_xml(source_xml)
+
+    #         # ask the UI to update input curve icons
+    #         el.update_input_icons.emit()
+
+    #         # update the hash value
+    #         self._profile_hash = new_profile.getMappingHash()
+
+
+    #     except (KeyError, TypeError) as error:
+    #         # An error occurred while parsing an existing profile,
+    #         # creating an empty profile instead
+    #         syslog.exception(f"Invalid profile content:\n{error}")
+    #         self.new_profile()
+    #     except gremlin.error.ProfileError as error:
+    #         # Parsing the profile went wrong, stop loading and start with an
+    #         # empty profile
+    #         cfg = gremlin.config.Configuration()
+    #         cfg.last_profile = None
+    #         self.new_profile()
+    #         gremlin.util.display_error(f"Failed to load the profile {source_xml} due to:\n\n{error}")
+
+    #     finally:
+
+            
+    #         el.profile_loaded.emit()
+
+    #         # update the status bar
+    #         self._update_mode_status_bar()
+    #         self._update_window_title()
+
+    #         # restore the mouse cursor
+    #         popCursor()
+
+    #         el.pop_input_selection(True) # restore input selection and reset
+    #         self._select_input(last_device_guid, last_input_type, last_input_id, True)
 
 
 

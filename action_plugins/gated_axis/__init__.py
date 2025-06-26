@@ -43,6 +43,69 @@ MAX_UNDO = 20 # number of steps on the UNDO stack
 _decimals = 5
 _single_step = 0.001
 
+
+@gremlin.singleton_decorator.SingletonDecorator
+class InputConfigurationWidgetCache():
+    ''' caches the joystick input widget for each device/input combination  '''
+    def __init__(self):
+        self._widget_map = {}
+
+
+    def register(self, key, widget):
+        if not key in self._widget_map:
+            self._widget_map[key] = widget
+            
+            
+    def clear(self):
+        ''' clears the cache '''
+        self._widget_map.clear()
+
+
+    def retrieve(self, key):
+        if key in self._widget_map:
+            return self._widget_map[key]
+        return None
+    
+    def retrieve_by_data(self,item_data):
+        if item_data:
+            key = item_data.id
+            return self.retrieve(key)
+        return None
+
+    def remove(self, key):
+        if key in self._widget_map:
+            del self._widget_map[key]
+
+    def dump(self):
+        ''' dumps the cache content to the log for debug purposes '''
+        # syslog = logging.getLogger("system")
+        items = list(self._widget_map.values())
+        items.sort(key = lambda x: (x.item_data.profile_mode, x.item_data.device_guid, x.item_data.input_type, x.item_data.input_id))
+        current_device_guid = None
+        current_mode = None
+        current_input_type = None
+        
+        syslog.info("-"*50)
+        syslog.info("UI widget cache dump")
+        for index, input_item_config in enumerate(items):
+            item: gremlin.base_profile.InputItem = input_item_config.item_data
+            if not current_mode or current_mode != item.profile_mode:
+                current_mode = item.profile_mode
+                syslog.info(f"Mode {current_mode}:")
+            if not current_device_guid or current_device_guid != item.device_guid:
+                device_name = gremlin.shared_state.get_device_name(item.device_guid)
+                current_device_guid = item.device_guid
+                syslog.info(f"\tDevice {device_name} id {str(item.device_guid)}:")
+            if not current_input_type or current_input_type != item.input_type:
+                current_input_type = item.input_type
+                syslog.info(f"\t\tInput Type: {InputType.to_display_name(item.input_type)}")
+            syslog.info(f"\t\t\tInput Id: {item.display_name} cache index [{index:,}]")
+
+            
+
+# primary cache instantiation to prevent GC
+_cache = InputConfigurationWidgetCache()
+
 class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to setup the individual action trigger containers and sub actions """
 
@@ -54,7 +117,6 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         
         '''
 
-        from gremlin.ui.joystick_device import InputConfigurationWidgetCache
         
         super().__init__(self.__class__.__name__, parent = parent)
 

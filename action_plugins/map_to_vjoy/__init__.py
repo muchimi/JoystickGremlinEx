@@ -54,6 +54,8 @@ from functools import partial
 
 IdMapToButton = -2 # map to button special ID
 import gremlin.ui.input_item
+import gremlin.ui.osc_device
+import gremlin.ui.midi_device
 import gremlin.base_profile
 import gremlin.shared_state
 import gremlin.curve_handler
@@ -928,11 +930,16 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         # self.container_absolute_widget, _ = gremlin.ui.ui_common.getHContainer(min_height = self.container_height)
         # self.main_layout.addWidget(self.container_absolute_widget)
 
-        # relative mode options
         widgets = [
             self._axis_start_value_enabled_widget,
-            "Start Value:",
-            self.sb_start_value,
+            self.sb_start_value
+        ]
+
+        self.container_start_value_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height)
+        self.main_layout.addWidget(self.container_start_value_widget)
+
+        # relative mode options
+        widgets = [
             "Min:",
             self.b_min_value,
             "Center:",
@@ -2819,6 +2826,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_axis_to_button_range_widget.setVisible(button_range_visible)
         self.container_button_mode_widget.setVisible(button_range_visible)
         #self.container_absolute_widget.setVisible(absolute_visible)
+        self.container_start_value_widget.setVisible(axis_visible)
         self.container_relative_widget.setVisible(relative_visible)
         self.container_output_range_widget.setVisible(output_range_visible)
         self.container_output_curve_widget.setVisible(output_curve_visible)
@@ -3525,6 +3533,13 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     value = None
                     if self.action_data.axis_start_value_enabled:
                         value = self.axis_start_value
+                        if raw_input_type == InputType.OpenSoundControl:
+                            # sync the OSC with the start value
+                            message = input_id.message
+                            osc_value = gremlin.util.scale_to_range(value, target_min = 0, target_max = 1)
+                            gremlin.ui.osc_device.osc_client.sendData(message, osc_value)
+
+
                     else:
                         # read the current value
                         raw_value = None
@@ -3573,14 +3588,42 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             self.process_event(event, action_value)
 
         elif self.input_type == InputType.JoystickButton:
+            # button presses
             is_pressed = None
-            match self.action_mode:
-                case VjoyAction.VJoyButton:
-                    is_pressed = joystick_handling.get_button(device_guid, input_id)
-                case VjoyAction.VJoyButton.VJoyButtonPress:
-                    is_pressed = True
-                case VjoyAction.VJoyButton.VJoyButtonRelease:
-                    is_pressed = False
+            # input is a virtual stick (MIDI or OSC or MODE)
+            match raw_input_type:
+                case InputType.JoystickButton:
+                    # input is a physical stick
+                    match self.action_mode:
+                        case VjoyAction.VJoyButton:
+                            is_pressed = joystick_handling.get_button(device_guid, input_id)
+                        case VjoyAction.VJoyButton.VJoyButtonPress:
+                            is_pressed = True
+                        case VjoyAction.VJoyButton.VJoyButtonRelease:
+                            is_pressed = False
+                case InputType.OpenSoundControl:
+                    message = self.action_data.input_item.input_id.message_key
+                    match self.action_mode:
+                        case VjoyAction.VJoyButton:
+                            is_pressed = gremlin.ui.osc_device.osc_client.getData(message) 
+                        case VjoyAction.VJoyButton.VJoyButtonPress:
+                            is_pressed = True
+                        case VjoyAction.VJoyButton.VJoyButtonRelease:
+                            is_pressed = False
+                case InputType.Midi:
+                    message = self.action_data.input_item.input_id.message_key
+                    match self.action_mode:
+                        case VjoyAction.VJoyButton:
+                            is_pressed = gremlin.ui.midi_device.midi_client.getData(message)
+                        case VjoyAction.VJoyButton.VJoyButtonPress:
+                            is_pressed = True
+                        case VjoyAction.VJoyButton.VJoyButtonRelease:
+                            is_pressed = False
+
+
+
+
+
 
             if is_pressed is not None:
                 action_value = gremlin.actions.Value(0,0,is_pressed = is_pressed)

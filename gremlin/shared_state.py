@@ -85,12 +85,14 @@ ui_ready = False
 # profile state status = ok - all components loaded, false an error occured
 profile_state = True
 
+# true if profile is loading
+profile_loading = False
+
 # holds the main UI reference
 ui = None
 
 # width of a single chart (this can be expensive to compute so we store it here once)
 char_width = 10 
-
 
 # true if a profile is running
 is_running = False

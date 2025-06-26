@@ -1593,6 +1593,8 @@ class InputItem():
     @property
     def message_key(self):
         # joystick inputs only - returns id of axis or button
+        if self._input_id is not None and hasattr(self._input_id,"message_key"):
+            return self._input_id.message_key
         return self._input_id
     
     def callbackKey(self):
@@ -1729,6 +1731,10 @@ class InputItem():
             input_type = InputType.ModeControl
         elif self._device_type == DeviceType.State:
             input_type = InputType.State
+        elif self._device_type == DeviceType.Osc:
+            input_type = InputType.OpenSoundControl
+        elif self._device_type == DeviceType.Midi:
+            input_type = InputType.Midi
         self._input_type = input_type
         self._update_input()
 
@@ -1981,6 +1987,10 @@ class InputItem():
                     if child.tag == "input":
                         midi_input_item.parse_xml(child, data)
                 self.input_id = midi_input_item
+                if midi_input_item.is_axis:
+                    self.setOverrideInputType(InputType.JoystickAxis)
+                else:
+                    self.setOverrideInputType(InputType.JoystickButton)                
                     
 
             elif self.input_type == InputType.OpenSoundControl:
@@ -1991,6 +2001,10 @@ class InputItem():
                     if child.tag == "input":
                         osc_input_item.parse_xml(child, data)
                 self.input_id = osc_input_item
+                if osc_input_item.is_axis:
+                    self.setOverrideInputType(InputType.JoystickAxis)
+                else:
+                    self.setOverrideInputType(InputType.JoystickButton)
                 
 
             elif self.input_type == InputType.ModeControl:
@@ -2004,6 +2018,7 @@ class InputItem():
             elif self.input_type == InputType.State:
                 # state defaults to a button type
                 self.setOverrideInputType(InputType.JoystickButton)
+            
                 
 
 

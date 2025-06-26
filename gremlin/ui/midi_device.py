@@ -1459,7 +1459,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         )
         
         # create a list view with custom input widgets
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler)
+        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -1550,6 +1550,9 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' clears all input keys '''
         self.input_item_list_model.clear(input_types=[InputType.Midi])
         self.input_item_list_view.redraw()
+
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
         
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         
@@ -1748,8 +1751,8 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
  
         self.input_item_list_view.update_item(index)
 
-        #self.input_item_list_view.update_item(index)
-        #self._select_item_cb(self._index) # forces update and redraw if mode changed
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
 
 
     def _close_item_cb(self, widget, index, data):
@@ -1759,6 +1762,9 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if not self.input_item_list_model.rows():
             # display blank page if no item left
             self._blank_input()
+
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
 
         
 
@@ -1877,6 +1883,7 @@ class MidiClient(QtCore.QObject):
         self._event_listener.profile_start.connect(self._profile_start)
         self._event_listener.shutdown.connect(self.stop)
         self._event_listener.options_changed.connect(self._options_changed)
+        self._state_data = {} # holds the state data from received messages
 
         # start on initialization
         self.start()
@@ -2014,6 +2021,12 @@ class MidiClient(QtCore.QObject):
             pass
         self._started = False
 
+    def getData(self, address : str):
+        if self._started:
+            if address in self._state_data:
+                return self._state_data[address]
+        return None        
+
     def _midi_message_cb(self, port_name : str, port_index : int,  message):
         ''' called when a midi messages is provided by the listener  '''
         from gremlin.ui.midi_device import MidiInputItem, MidiDeviceTabWidget, MidiCommandType
@@ -2100,6 +2113,7 @@ class MidiClient(QtCore.QObject):
 
                     self._event_listener.joystick_event.emit(event)
                     self._event_listener.axis_state_change.emit(event)
+                    self._state_data[input_item.message] = value
 
 
                 elif input_item.is_button:
@@ -2119,7 +2133,7 @@ class MidiClient(QtCore.QObject):
                     self._event_listener.joystick_event.emit(event)
                     self._event_listener.button_state_change.emit(event)
 
-
+                    self._state_data[input_item.message] = is_pressed
 
    
 

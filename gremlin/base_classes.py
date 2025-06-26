@@ -233,6 +233,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._input_description = None
         self._axis_value = None
         self._button_value = False # true if the equivalent of "pressed"
+        
 
     @property
     def guid(self):

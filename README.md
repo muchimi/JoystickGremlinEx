@@ -14,10 +14,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T18)
+### (m76T18/B)
 - Fix: Mode device not tracking profile mode correctly.
 - Fix: Filtering of available mode actions linked to recent API changes.
-
+- New: Profile start will synchronize OSC axis data if Vjoy Remap is tied to an axis OSC input and a start value is set in Vjoy Remap.
+- Fix: Vjoy Remap set axis value option only visible in relative mode.
+- Fix: Vjoy data will clamp to -1,+1 to account for rounding errors in stored floating point values.
+- Fix: Blank state names no longer accepted when adding a new state.
+- Fix: Device header color changes when mappings are added/removed based on context.
+- Fix: Gated Axis UI missing a class reference due to module import reorg.
 
 
 ### (m76T17)

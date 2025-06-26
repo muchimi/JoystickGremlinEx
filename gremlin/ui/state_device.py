@@ -1362,15 +1362,20 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 return
 
         key = self.data.key
-        key_low = self.data.key.casefold().strip()
-        id = self.data.id
-        sc = StateData()
-        data = sc.getStates()
-        states = [item.key for item in data.values() if item.id != id and key_low == item.key]
-        if states:
-            gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.")
-            return
-        self.accept()
+        if key:
+            key_low = self.data.key.casefold().strip()
+            if key_low:
+                id = self.data.id
+                sc = StateData()
+                data = sc.getStates()
+                states = [item.key for item in data.values() if item.id != id and key_low == item.key]
+                if states:
+                    gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.")
+                    return
+                self.accept()
+        else:
+            gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"A state name is required.")
+
         
     def _cancel_button_cb(self):
         ''' cancel button pressed '''
@@ -1530,7 +1535,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # update the display names 
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler)
+        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -1610,20 +1615,14 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _add_input_cb(self):
         """Adds a new input to the inputs list  """
         input_id = StateInputItem()
-        self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(self._index_for_key(input_id),True)
-        
-        index = self.input_item_list_view.current_index
 
         # last index selected, -1 means none
         self._last_selected_index = -1 
 
-        # redraw the UI
-        self._select_item_cb(index)
 
         # auto edit new input
-        self._edit_item_cb(None, index, input_id)
+        self._edit_item_cb(None, -1, input_id)
+
 
     def _edit_item_cb(self, widget, index, data):
         ''' called when the edit button is clicked  '''
@@ -1656,13 +1655,19 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item.setDescription(data.description)
         input_item.default_value = data.default_value
         self.refresh()
-        self._select_item_cb(self._index)
+        self._select_item_cb(index)
+
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
 
 
     def _clear_inputs_cb(self):
         ''' clears all input keys '''
         self.input_item_list_model.clear(input_types=[InputType.State])
         self.input_item_list_view.redraw()
+
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
@@ -1759,6 +1764,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
         #self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
+        self.input_item_list_view.redraw()
         self._select_item_cb(self.input_item_list_view.current_index, emit)
 
     def _select_item_cb(self, index, emit = True):

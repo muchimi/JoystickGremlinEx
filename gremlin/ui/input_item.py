@@ -215,6 +215,12 @@ class InputItemListModel(ui_common.AbstractModel):
         if emit_change:
             self.data_changed.emit()
 
+
+    def indexOf(self, input_id):
+        if input_id in self._item_map:
+            return self._item_map[input_id]
+        return -1
+
     def sort(self, sort_callback):
         ''' sorts the data using a sorting callback - the callback takes a list of input items, and returns a list of input items '''
         
@@ -409,7 +415,7 @@ class InputItemListView(ui_common.AbstractView):
         InputType.Midi: "Midi"
     }
 
-    def __init__(self, parent=None, name = "Not set", custom_widget_handler = None):
+    def __init__(self, parent=None, name = "Not set", custom_widget_handler = None, device_id : str = None):
         """Creates a new input item view instance
 
         :param parent: the parent of the widget
@@ -430,6 +436,7 @@ class InputItemListView(ui_common.AbstractView):
             InputType.Midi
         ]
         self.name = name
+        self._device_id = device_id
         self._current_index = -1 # nothing selected
         self.custom_widget_handler = custom_widget_handler
         self._deleted = False
@@ -451,17 +458,7 @@ class InputItemListView(ui_common.AbstractView):
 
         el = gremlin.event_handler.EventListener()
         el.profile_device_mapping_changed.connect(self._profile_device_mapping_changed)
-        
-        # self.widget_map = {} # list of created widgets
 
-
-    # def _cleanup_ui(self):
-    #     ''' called when item is deleted '''
-    #     if not self._deleted:
-    #         self._deleted = True
-    #     # self._clear_widgets()
-
-        
 
 
     @property
@@ -751,7 +748,7 @@ class InputItemListView(ui_common.AbstractView):
 
         # select the widget if it's not selected
         data = self.model.data(index)
-        if data and data.containers or data.input_type == InputType.KeyboardLatched:
+        if data and (data.containers or data.input_type == InputType.KeyboardLatched):
             # prompt confirm
             message_box = QtWidgets.QMessageBox()
             message_box.setText("Delete confirmation")
@@ -775,8 +772,16 @@ class InputItemListView(ui_common.AbstractView):
 
     def _confirmed_close(self, index):
         self.removeRow(index)
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
         self.item_closed.emit(self, index, self.model.data(index)) # widget, index, data
-
+        self.redraw()
+        # select prior item
+        if index > 0:
+            index-=1
+            data = self.model.data(index)
+            if data:
+                self.select_item(index)
 
     def _edit_item_cb(self, index : int):
         ''' emits the edit event along with the item being edited '''
@@ -791,12 +796,6 @@ class InputItemListView(ui_common.AbstractView):
     def _update_value_changed(self, index : int, value : float):
         self.item_input_value_changed.emit(self, index, self.model.data(index), value)
 
-    # def _closed_item_cb(self):
-    #     ''' emits the edit event along with the item is closed '''
-    #     index = self.current_index
-    #     if not index:
-    #         return None
-    #     self.item_closed.emit(self, index, self.model.data(index)) # widget, index, data
 
 
     def update_item(self, index):
@@ -1547,8 +1546,9 @@ class InputItemWidget(QBoxFrame):
     def _update_container_id(self):
         ''' updates container ID display for associated containers with this input '''
         config = gremlin.config.Configuration()
-        gremlin.util.clear_layout(self._container_id_layout)
         if config.show_container_id:
+            gremlin.util.clear_layout(self._container_id_layout)
+        
             width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
             grids = []
             if self.data:
@@ -4277,65 +4277,3 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
         return lambda: self.model.remove_container(widget.profile_data)
     
-
-# @gremlin.singleton_decorator.SingletonDecorator
-# class InputConfigurationWidgetCache():
-#     ''' caches the joystick input widget for each device/input combination  '''
-#     def __init__(self):
-#         self._widget_map = {}
-
-
-#     def register(self, key, widget):
-#         if not key in self._widget_map:
-#             self._widget_map[key] = widget
-            
-            
-#     def clear(self):
-#         ''' clears the cache '''
-#         self._widget_map.clear()
-
-
-#     def retrieve(self, key):
-#         if key in self._widget_map:
-#             return self._widget_map[key]
-#         return None
-    
-#     def retrieve_by_data(self,item_data):
-#         if item_data:
-#             key = item_data.id
-#             return self.retrieve(key)
-#         return None
-
-#     def remove(self, key):
-#         if key in self._widget_map:
-#             del self._widget_map[key]
-
-#     def dump(self):
-#         ''' dumps the cache content to the log for debug purposes '''
-#         # syslog = logging.getLogger("system")
-#         items = list(self._widget_map.values())
-#         items.sort(key = lambda x: (x.item_data.profile_mode, x.item_data.device_guid, x.item_data.input_type, x.item_data.input_id))
-#         current_device_guid = None
-#         current_mode = None
-#         current_input_type = None
-        
-#         syslog.info("-"*50)
-#         syslog.info("UI widget cache dump")
-#         for index, input_item_config in enumerate(items):
-#             item: gremlin.base_profile.InputItem = input_item_config.item_data
-#             if not current_mode or current_mode != item.profile_mode:
-#                 current_mode = item.profile_mode
-#                 syslog.info(f"Mode {current_mode}:")
-#             if not current_device_guid or current_device_guid != item.device_guid:
-#                 device_name = gremlin.shared_state.get_device_name(item.device_guid)
-#                 current_device_guid = item.device_guid
-#                 syslog.info(f"\tDevice {device_name} id {str(item.device_guid)}:")
-#             if not current_input_type or current_input_type != item.input_type:
-#                 current_input_type = item.input_type
-#                 syslog.info(f"\t\tInput Type: {InputType.to_display_name(item.input_type)}")
-#             syslog.info(f"\t\t\tInput Id: {item.display_name} cache index [{index:,}]")
-
-            
-
-# # primary cache instantiation to prevent GC
-# _cache = InputConfigurationWidgetCache()

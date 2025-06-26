@@ -408,6 +408,14 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         self.installEventFilter(self)
 
+        # hook widgets after init to bypass QT/Pyside gotcha of delayed initialization
+        gremlin.util.singleShot(self._hook_widgets)
+
+    def _hook_widgets(self):
+        # hook input widgets
+        widgets = [widget for widget in self._widget_storage.values() if isinstance(widget, ui_common.JoystickDeviceWidget)]
+        for widget in widgets: widget.setSuspended(False)
+
     @QtCore.Slot()
     def _font_size_cb(self):
         widget = self.sender()
@@ -767,7 +775,8 @@ class InputViewerArea(QtWidgets.QScrollArea):
 
         for widget in self.widgets:
             self.scroll_layout.removeWidget(widget)    
-            widget.unhook()
+            if hasattr(widget,"unhook"):
+                widget.unhook()
             del self.widgets[self.widgets.index(widget)]
             del widget
         self.widgets.clear()

@@ -2092,7 +2092,7 @@ class OscInputItem(AbstractInputItem):
         self._max_range = 1.0 
         self._autorelease = False # true if auto-release
         self._autorelease_delay = 250 # default release delay
-        
+        self._profile_mode = gremlin.shared_state.edit_mode
       
         self._axis_values = []
         current_mode = gremlin.shared_state.current_mode
@@ -2101,6 +2101,13 @@ class OscInputItem(AbstractInputItem):
         tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self.getCompoundMessageKey(), self._guid)
         client = InputOscClient()
         client.registerInput(self)
+
+    @property
+    def profile_mode(self):
+        return self._profile_mode
+    @profile_mode.setter
+    def profile_mode(self, value):
+        self._profile_mode = value        
 
     def getOverrideInputType(self):
         match self._mode:
@@ -2166,14 +2173,7 @@ class OscInputItem(AbstractInputItem):
     def is_button(self) -> bool:
         return self._mode != OscInputItem.InputMode.Axis
     
-    def getOverrideInputType(self):
-        # override input type
-        if self.is_axis:
-            return InputType.JoystickAxis
-        else:
-            return InputType.JoystickButton
-            
-    
+
     @property 
     def command_mode(self) -> OscInputItem.CommandMode:
         ''' command mode '''
@@ -2434,6 +2434,7 @@ class OscInputItem(AbstractInputItem):
         target._message_data = source._message_data
         target._message_data_string = source._message_data_string
         target._mode = source._mode
+        target._profile_mode = source._profile_mode
         target._command_mode = source._command_mode
         target._title_name = source._title_name
         target._display_name =  source._display_name
@@ -3208,7 +3209,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # update the display names 
 
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler)
+        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -3376,18 +3377,21 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """Adds a new input to the inputs list  """
         input_type = InputType.OpenSoundControl
         input_id = OscInputItem()
+
         self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(self._index_for_key(input_id),True)
+        index = self.input_item_list_model.indexOf(input_id)
+        #index = self._index_for_key(input_id)
+        self.input_item_list_view.select_item(index, False)
         
-        index = self.input_item_list_view.current_index
+        # index = self.input_item_list_view.current_index
 
         # last index selected, -1 means none
         self._last_selected_index = -1 
 
         # redraw the UI
-        self._select_item_cb(index)
+        self._select_item_cb(index, False)
 
         # auto edit new input
         self._edit_item_cb(None, index, input_id)
@@ -3832,6 +3836,10 @@ class InputOscClient(QtCore.QObject):
             if address in self._state_data:
                 return self._state_data[address]
         return None
+    
+    def sendData(self, address : str, v1 = None, v2 = None):
+        if self._started:
+            self._interface.send(address, v1, v2)
         
 
     def _osc_message_cb(self, message, args):
@@ -3906,7 +3914,7 @@ class InputOscClient(QtCore.QObject):
                         override_input_type= InputType.JoystickAxis
                         )
                     
-                    self._state_data[input_item.message] = normalized_args
+                    self._state_data[input_item.message_key] = normalized_args # this can have multiple axis values returned
 
                     self._event_listener.joystick_event.emit(event)
 
@@ -3943,6 +3951,7 @@ class InputOscClient(QtCore.QObject):
                             )
 
                     self._event_listener.joystick_event.emit(event)
+                    self._state_data[input_item.message_key] = is_pressed
 
                     if not is_running:
                         #event.event_type = InputType.OpenSoundControl

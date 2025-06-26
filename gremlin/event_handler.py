@@ -16,6 +16,7 @@
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
 import functools
+import traceback
 import inspect
 import logging
 import time
@@ -529,6 +530,8 @@ class EventListener(QtCore.QObject):
 	show_container_id_changed = QtCore.Signal() # fires when condition ID show on/off changed in configuration - this is to update affected widgets
 
 	tts_change = QtCore.Signal(bool) # fires when TTS enable/disabled changes
+
+	device_mapping_changed = QtCore.Signal(str) # fires when device mapping has changed (updates headers) - param = device_id as a string
 	
 
 	def __init__(self):
@@ -2235,6 +2238,8 @@ class EventHandler(QtCore.QObject):
 				# 	syslog.info(f"CALLBACK: execute done")
 			except Exception as ex:
 				syslog.error(f"CALLBACK: error {ex}")
+				tb_msg = traceback.format_exc()
+				syslog.error(tb_msg)
 
 
 	def _trigger_functor_callbacks(self, functors, event : Event):
@@ -2246,6 +2251,8 @@ class EventHandler(QtCore.QObject):
 				functor.process_event(event, gremlin.actions.Value(event.value))
 			except Exception as ex:
 				syslog.error(f"FUNCTOR CALLBACK: error {ex}")				
+				tb_msg = traceback.format_exc()
+				syslog.error(tb_msg)
 
 
 	def _execute_callbacks(self, event, m_list, f_list):

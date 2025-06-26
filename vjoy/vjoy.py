@@ -25,6 +25,7 @@ import time
 import os
 
 import gremlin.event_handler
+import gremlin.util
 from vjoy.vjoy_interface import VJoyState, VJoyInterface
 from gremlin.error import VJoyError
 import gremlin.common
@@ -244,12 +245,15 @@ class Axis:
         import gremlin.event_handler
         from gremlin.input_types import InputType
 
-        if p_value is None or p_value < -1.0 or p_value > 1.0:
-            syslog.warning(
-                "Wrong data type provided, has to be float in [-1, 1]"
-                f" provided value was {p_value}"
-            )
+
+        if p_value is None:
+            syslog.warning("Invalid null value provided")
             return
+            
+        if p_value < -1.0:
+            p_value = -1.0
+        elif p_value > 1.0:
+            p_value = 1.0
 
         el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, p_value)
@@ -258,14 +262,7 @@ class Axis:
 
         self.vjoy_dev.ensure_ownership()
 
-        # Log an error on invalid data but continue processing by clamping
-        # the values in the next step
-        if 1.0 - abs(p_value) < -0.001:
-            syslog.warning(
-                "Wrong data type provided, has to be float in [-1, 1],"
-                f" provided value was {p_value:.2f}"
-            )
-
+      
         # Normalize value to [-1, 1] and apply response curve and deadzone
         # settings
         self._value = self._response_curve_fn(
