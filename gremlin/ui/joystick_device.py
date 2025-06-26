@@ -374,19 +374,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return gremlin.shared_state.is_running
     
 
-    # def _selected_item(self):
-    #     ''' gets the selected item '''
-    #     index = self.last_selected_index
-    #     if index != -1 and self.input_item_list_model.rows() > 0:
-    #         item_data = self.input_item_list_model.data(index)
-    #         return item_data.selected
-    #     return None
-
-
-    # def getWidgetKey(self, input_id):
-    #     ''' gets the content widget compound key for the item / input combination'''
-    #     return (self.device_guid, input_id)
-
     @QtCore.Slot()
     def _select_item_cb(self, index, force_update = False, emit = True):
         """ Handles the loading of mappings for a given input item - handler for select_input event
@@ -419,10 +406,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     return
             else:
                 item_data = self.input_item_list_model.data(index)
-
-
-
-
             
             if not item_data:
                 syslog.warning(f"JoystickDevice: Device [{device_name}] has no inputs for mode {current_mode} - this is not normal.")

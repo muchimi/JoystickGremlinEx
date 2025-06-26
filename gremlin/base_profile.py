@@ -1549,6 +1549,7 @@ class InputItem():
         self._input_type = None
         self._override_input_type = None # override input type for some types that are different
         self._device_guid = None # hardware input ID
+        self._device_id = None # hardware input ID as a string
         self._name = None # device name
         self._input_id = None # input Id on the hardware
         self._input_name = None # input name of the hardware (axis name if an axis)
@@ -1579,6 +1580,7 @@ class InputItem():
                     self._device_type = item.type
                     self._device_name = item.name
                     self._device_guid = item.device_guid
+                    self._device_id = item.device_id
                 if not hasattr(item, "parent"):
                     break
                 item = item.parent
@@ -1778,6 +1780,16 @@ class InputItem():
     @device_guid.setter
     def device_guid(self, value):
         self._device_guid = value
+        self._device_id = str(value)
+        self._update_input()
+
+    @property
+    def device_id(self):
+        return self._device_id
+    @device_id.setter
+    def device_id(self, value):
+        self._device_id = value
+        self._device_guid = gremlin.util.parse_guid(value)
         self._update_input()
 
     @property

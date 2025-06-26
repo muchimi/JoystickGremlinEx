@@ -235,6 +235,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.request_profile_reload.connect(self._reload_profile) # reload the profile from a temporary file
         el.request_reload.connect(self._reload)
         el.device_mapping_changed.connect(self._update_tab)
+        el.mapping_changed.connect(self._mapping_changed)
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
@@ -2051,6 +2052,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         data : TabData = self.ui.devices.tabData(index)
         return  TabDeviceType(data.tab_type)
     
+    def _mapping_changed(self, item_data : gremlin.base_profile.InputItem):
+        ''' called when mapping changes '''
+        self._update_tab(item_data.device_id) # update tab header
+    
     def _update_tab(self, device_id: str):
         ''' updates the given tab for mapping '''
         position = self.getTabIndexForDevice(device_id)
@@ -2067,8 +2072,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         try:
 
             config = gremlin.config.Configuration()
-            verbose_detailed = config.verbose_mode_extra
             verbose = config.verbose_mode_device
+            verbose_detailed = verbose and config.verbose_mode_extra
 
             if verbose_detailed: syslog.info("CREATE TAB: start")
 
