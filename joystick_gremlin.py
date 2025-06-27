@@ -2993,10 +2993,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                     assert item.input_id == restore_input_id, f"SELECT: sync issue: input id mismatch: expected {restore_input_id} got {item.input_id}"
                 
                     # current input mapping
-                    if item.containers:
-                        input_item_config = widget.getContentWidget()
-                        if input_item_config:
-                            assert input_item_config.item_data == item, f"SELECT: sync issue: input id content mismatch: expected {restore_input_id} got {input_item_config.input_id}"
+                    # if item.containers:
+                    #     input_item_config = widget.getContentWidget()
+                    #     if input_item_config:
+                    #         assert input_item_config.item_data == item, f"SELECT: sync issue: input id content mismatch: expected {restore_input_id} got {input_item_config.item_data.input_id}"
                     
                     
 

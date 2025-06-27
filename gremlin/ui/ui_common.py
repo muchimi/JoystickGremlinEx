@@ -5368,7 +5368,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     """ joystick visualization widget  """
 
-    def __init__(self, device_data : DeviceSummary, vis_type, parent=None):
+    def __init__(self, device : DeviceSummary, vis_type, parent=None):
         """Creates a new instance.
 
         :param device_data information about the device itself
@@ -5376,9 +5376,10 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         :param parent the parent of this widget
         """
         super().__init__(parent)
+        assert device is not None, "Device must be provided"
 
-        self.device_data = device_data
-        self.device_guid = device_data.device_guid
+        self._device = device
+        
         self.vis_type = vis_type
         self.widgets = []
         layout = QtWidgets.QHBoxLayout()
@@ -5386,15 +5387,16 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self.setLayout(layout)
         self.vis_type = vis_type
         self._hooked = False
-        self._supended = True # suspend by default
 
+    @property
+    def device_id(self):
+        return self._device.device_id
+    
+    @property
+    def device_guid(self):
+        return self._device.device_guid
 
-    def setSuspended(self, value : bool):
-        ''' suspends processing '''
-        self._supended = value
-
-        
-
+    
     def hook(self):
         ''' hooks events '''
         if self._hooked:
@@ -5404,22 +5406,22 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             self._create_current_axis()
             el.joystick_event.connect(self._current_axis_update)
-            if self.device_data.is_virtual:
+            if self._device.is_virtual:
                 el.registerVjoyCallback(self._vjoy_current_axis_update)
                 
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             self._create_temporal_axis()
             el.joystick_event.connect(self._temporal_axis_update)
-            if self.device_data.is_virtual:
+            if self._device.is_virtual:
                 el.registerVjoyCallback(self._vjoy_temporal_axis_update)
             for widget in self.widgets:
-                for i in self.device_data.axis_index_list():
-                    value = gremlin.joystick_handling.get_axis(self.device_guid, i)
-                    widget.add_point(value, i)
+                for input_id in self._device.axis_index_list():
+                    value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
+                    widget.add_point(value, input_id)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._create_button_hat()
             el.joystick_event.connect(self._button_hat_update)
-            if self.device_data.is_virtual:
+            if self._device.is_virtual:
                 el.registerVjoyCallback(self._vjoy_button_hat_update)
 
         self._hooked = True
@@ -5432,16 +5434,16 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             el.joystick_event.disconnect(self._current_axis_update)
-            if self.device_data.is_virtual:
+            if self._device.is_virtual:
                 el.unregisterVjoyCallback(self._vjoy_current_axis_update)
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             el.joystick_event.disconnect(self._temporal_axis_update)
-            if self.device_data.is_virtual:
+            if self._device.is_virtual:
                 el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._unhook_buttons()
             el.joystick_event.disconnect(self._button_hat_update)
-            if self.device_data.is_virtual:
+            if self._device.is_virtual:
                 el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
 
@@ -5464,28 +5466,28 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
     def _create_button_hat(self):
         """Creates display for button and hat data."""
         self.widgets = [
-            ButtonState(self.device_data),
-            HatState(self.device_data)
+            ButtonState(self._device),
+            HatState(self._device)
         ]
         for widget in self.widgets:
             self.layout().addWidget(widget)
         self.layout().addStretch(1)
 
     def _unhook_buttons(self):
-        if self.device_data.is_virtual:
+        if self._device.is_virtual:
             widgets = [widget for widget in self.widgets if isinstance(widget, ButtonState)]
             for widget in widgets:
                 widget.unhook()
 
     def _create_current_axis(self):
         """Creates display for current axes data."""
-        self.widgets = [AxesCurrentState(self.device_data)]
+        self.widgets = [AxesCurrentState(self._device)]
         for widget in self.widgets:
             self.layout().addWidget(widget)
 
     def _create_temporal_axis(self):
         """Creates display for temporal axes data."""
-        self.widgets = [AxesTimeline(self.device_data)]
+        self.widgets = [AxesTimeline(self._device)]
         for widget in self.widgets:
             self.layout().addWidget(widget)
 
@@ -5501,7 +5503,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             widget.process_event(event)
 
     def _vjoy_button_hat_update(self, event: gremlin.event_handler.VjoyEvent):
-        if self.device_data.vjoy_id != event.vjoy_id:
+        if self._device.vjoy_id != event.vjoy_id:
             return
         
         event = gremlin.event_handler.Event(event_type = event.input_type, identifier = event.input_id, device_guid= self.device_guid, value = event.value)
@@ -5509,8 +5511,6 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             widget.process_event(event)
 
     def _current_axis_update(self, event):
-        if self._supended:
-            return
         if self.device_guid != event.device_guid:
             return
 
@@ -5518,9 +5518,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             widget.process_event(event)
 
     def _vjoy_current_axis_update(self, event : gremlin.event_handler.VjoyEvent):
-        if self._supended:
-            return
-        if self.device_data.vjoy_id != event.vjoy_id:
+        if self._device.vjoy_id != event.vjoy_id:
             return
         
         event = gremlin.event_handler.Event(event_type = event.input_type, identifier = event.input_id, device_guid= self.device_guid, value=event.value)
@@ -5533,8 +5531,6 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
         :param event the event to use in the update
         """
-        if self._supended:
-            return
         if self.device_guid != event.device_guid:
             return
 
@@ -5543,9 +5539,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                 widget.add_point(event.value, event.identifier)
 
     def _vjoy_temporal_axis_update(self, event : gremlin.event_handler.VjoyEvent):
-        if self._supended:
-            return
-        if self.device_data.vjoy_id != event.vjoy_id:
+        if self._device.vjoy_id != event.vjoy_id:
             return
         
         for widget in self.widgets:
