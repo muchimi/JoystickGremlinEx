@@ -14,7 +14,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T18/C)
+### (m76T18/D)
 - Fix: Mode device not tracking profile mode correctly.
 - Fix: Filtering of available mode actions linked to recent API changes.
 - New: Profile start will synchronize OSC axis data if Vjoy Remap is tied to an axis OSC input and a start value is set in Vjoy Remap.
@@ -24,6 +24,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 - Fix: Device header color changes when mappings are added/removed based on context.
 - Fix: Gated Axis UI missing a class reference due to module import reorg.
 - Fix: Small update on device tab highlight on all mapping changes.
+- Fix: Small update on InputViewer
 
 
 ### (m76T17)
