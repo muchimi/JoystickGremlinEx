@@ -5387,6 +5387,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self.setLayout(layout)
         self.vis_type = vis_type
         self._hooked = False
+        self._create_visuals()
 
     @property
     def device_id(self):
@@ -5395,6 +5396,39 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
     @property
     def device_guid(self):
         return self._device.device_guid
+
+    def process_event(self, event):
+        if self.device_guid != event.device_guid:
+            # wrong device
+            return
+        vis_type = self.vis_type
+        if vis_type == gremlin.types.VisualizationType.AxisCurrent:
+            self._current_axis_update(event)
+            
+        elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
+            self._temporal_axis_update(event)
+            for widget in self.widgets:
+                for input_id in self._device.axis_index_list():
+                    value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
+                    widget.add_point(value, input_id)
+        elif vis_type == gremlin.types.VisualizationType.ButtonHat:
+            self._button_hat_update(event)
+
+    def _create_visuals(self):
+        ''' creates the visual for a given visualization type '''
+        vis_type = self.vis_type
+        if vis_type == gremlin.types.VisualizationType.AxisCurrent:
+            self._create_current_axis()
+                
+        elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
+            self._create_temporal_axis()
+            for widget in self.widgets:
+                for input_id in self._device.axis_index_list():
+                    value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
+                    widget.add_point(value, input_id)
+        elif vis_type == gremlin.types.VisualizationType.ButtonHat:
+            self._create_button_hat()
+
 
     
     def hook(self):

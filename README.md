@@ -14,6 +14,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T20)
+- Changed: different method to update input viewer due to reported slowdown over time.
 
 ### (m76T19)
 - Changed: States in macros now track by state ID, not state name.  This is to avoid situations where a state name is edited which would create a whole new state and potentially causing issues with synchronization with macros.

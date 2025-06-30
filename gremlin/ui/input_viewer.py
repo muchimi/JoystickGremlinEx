@@ -18,7 +18,7 @@
 import copy
 import enum
 import time
-
+import threading
 from PySide6 import QtCore, QtGui, QtWidgets
 import lxml.etree
 import dinput
@@ -296,7 +296,8 @@ class InputViewerUi(ui_common.BaseDialogUi):
         """
         super().__init__(self.__class__.__name__, parent)
 
-        self._widget_storage = {}
+        self._joystick_widgets = {}
+        self._lock = threading.Lock()
         self.setMinimumHeight(800)
 
         v_config = VisualizationConfig()
@@ -430,13 +431,28 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         self.installEventFilter(self)
 
-        # hook widgets after init to bypass QT/Pyside gotcha of delayed initialization
-        gremlin.util.singleShot(self._hook_widgets)
 
-    def _hook_widgets(self):
-        # hook input widgets
-        widgets = [widget for widget in self._widget_storage.values() if isinstance(widget, ui_common.JoystickDeviceWidget)]
-        for widget in widgets: widget.hook()
+        
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self._joystick_event_handler)
+
+        # hook widgets after init to bypass QT/Pyside gotcha of delayed initialization
+        #gremlin.util.singleShot(self._hook_widgets)
+
+    def _joystick_event_handler(self, event):
+        ''' handles joystick input updates '''
+        self._lock.acquire()
+        try:
+            for widget in self._joystick_widgets.values():
+                widget.process_event(event)
+        finally:
+            self._lock.release()
+
+    # def _hook_widgets(self):
+    #     # hook input widgets
+    #     #widgets = [widget for widget in self._widget_storage.values() if isinstance(widget, ui_common.JoystickDeviceWidget)]
+    #     for widget in self._widget_storage.values(): widget.hook()
+        
 
     @QtCore.Slot()
     def _font_size_cb(self):
@@ -468,13 +484,15 @@ class InputViewerUi(ui_common.BaseDialogUi):
         if self.keyboard_widget:
             self.keyboard_widget.unhook()
         # unhook widgets that need unhooked
-        for widget in self._widget_storage.values():
+        for widget in self._joystick_widgets.values():
             if hasattr(widget,"unhook"):
                 widget.unhook()
             widget.setParent(None)
 
         self.hideKeyboard()
-        self._widget_storage.clear()
+        self._lock.acquire()
+        self._joystick_widgets.clear()
+        self._lock.release()
 
         config = VisualizationConfig()
         config.save()
@@ -488,7 +506,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(False)
 
-        for widget in self._widget_storage.values():
+        for widget in self._joystick_widgets.values():
             if hasattr(widget,"unhook"):
                 widget.unhook()
             widget.setParent(None)
@@ -498,7 +516,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._state_visualizer_widget = None
         self._keyboard_visualizer_widget = None
             
-        self._widget_storage.clear()
+        self._joystick_widgets.clear()
         self.hideKeyboard()
         config = VisualizationConfig()
         config.clear()
@@ -518,21 +536,25 @@ class InputViewerUi(ui_common.BaseDialogUi):
         key = (device.device_id, visualization)
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if enabled:
-            if not key in self._widget_storage:
+            if not key in self._joystick_widgets:
                 widget = ui_common.JoystickDeviceWidget(device, visualization)
                 self.views.add_widget(widget)
-                self._widget_storage[key] = widget
+                self._lock.acquire()
+                self._joystick_widgets[key] = widget
+                self._lock.release()
                 if verbose: syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
             else:
                 if verbose: syslog.info(f"Use existing vis: {device.name}: {visualization.name}")
-            widget.hook()
+            #widget.hook()
         else:
-            if key in self._widget_storage:
-                widget = self._widget_storage[key]
-                del self._widget_storage[key]
+            if key in self._joystick_widgets:
+                widget = self._joystick_widgets[key]
+                del self._joystick_widgets[key]
                 if verbose: syslog.info(f"Remove existing vis: {device.name}: {visualization.name} key: {key}")
                 widget.unhook()
+                self._lock.acquire()
                 self.views.remove_widget(widget)
+                self._lock.release()
                 widget.setParent(None)
                 
             
@@ -551,8 +573,8 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self.keyboard_visualizer_layout.addWidget(self.keyboard_widget)
             self.keyboard_widget.hook()
             self.views.add_widget(self._keyboard_visualizer_widget)
-            key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
-            self._widget_storage[key] = self._keyboard_visualizer_widget
+            #key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+            #self._widget_storage[key] = self._keyboard_visualizer_widget
             self._keyboard_visible = True
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(True)
@@ -562,9 +584,9 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self.keyboard_widget.unhook()
             self.views.remove_widget(self._keyboard_visualizer_widget)
             self.keyboard_widget = None
-            key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
-            if key in self._widget_storage:
-                del self._widget_storage[key]
+            #key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+            # if key in self._widget_storage:
+            #     del self._widget_storage[key]
             self._keyboard_visualizer_widget = None
             self._keyboard_visible = False
             
@@ -666,8 +688,8 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self.populateState(self._state_button_layout)
             
             self.views.add_widget(self._state_visualizer_widget)
-            device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
-            self._widget_storage[device.device_id] = self._state_visualizer_widget
+            #device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
+            #self._widget_storage[device.device_id] = self._state_visualizer_widget
 
             layout.addLayout(self._state_button_layout)
 
@@ -689,8 +711,8 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self._state_visualizer_widget.setParent(None)
             self._state_visualizer_widget = None
             device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
-            if device in self._widget_storage:
-                del self._widget_storage[device]
+            if device in self._joystick_widgets:
+                del self._joystick_widgets[device]
     
 
     def refreshState(self):
@@ -748,7 +770,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.views = InputViewerArea()
         self.view_container_layout.addWidget(self.views)
 
-        for widget in self._widget_storage.values():
+        for widget in self._joystick_widgets.values():
             self.views.add_widget(widget)
         
 class InputViewerArea(QtWidgets.QScrollArea):
