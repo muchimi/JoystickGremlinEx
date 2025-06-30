@@ -2315,16 +2315,18 @@ class EventHandler(QtCore.QObject):
 
 	def _matching_state_callbacks(self, event):
 		''' returns list of callbacks matching the event '''
+		import gremlin.config
+		import gremlin.execution_graph
 		callback_list = []
 		if event.event_type == InputType.State:
 			key = event.identifier.message_key
 			if event.device_guid in self.state_callbacks:
-				import gremlin.execution_graph
+				
 				ec = gremlin.execution_graph.ExecutionContext() # current execution context
 				# search callbacks for mode hierarchy
 				callback_list = ec.getCallbacks(self.state_callbacks[event.device_guid], key, self.runtime_mode)
 
-			verbose = gremlin.config.Configuration().verbose_mode_osc
+			verbose = gremlin.config.Configuration().verbose_mode_state
 			if verbose and not callback_list:
 				# syslog = logging.getLogger("system")
 				syslog.info(f"STATE: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")

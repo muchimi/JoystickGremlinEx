@@ -22,6 +22,7 @@ import os
 import pickle
 import time
 from PySide6 import QtCore, QtGui, QtWidgets
+import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.input_devices import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
@@ -79,6 +80,7 @@ class MacroListModel(QtCore.QAbstractListModel):
         """
         count = len(self._data)
         return count
+
 
     def data(self, index, role):
         """Return the data of the index for the specified role.
@@ -148,7 +150,10 @@ class MacroListModel(QtCore.QAbstractListModel):
             elif isinstance(entry, gremlin.macro.RemoteControlAction):
                 display = f"Remote control: {VjoyAction.to_name(entry.command)}"
             elif isinstance(entry, gremlin.macro.StateAction):
-                display = f"Set state [{entry.key}] {'On' if entry.value else 'Off'}"
+                if gremlin.config.Configuration().show_container_id:
+                    display = f"Set state [{entry.key}] [{entry.state.id}] {'On' if entry.value else 'Off'}"    
+                else:
+                    display = f"Set state [{entry.key}] {'On' if entry.value else 'Off'}"
             else:
                 raise gremlin.error.GremlinError("Unknown macro action")
             
@@ -267,7 +272,15 @@ class MacroListModel(QtCore.QAbstractListModel):
             )
             return
 
+        if index in self._data:
+            old_entry = self._data[index]
+            old_entry.changed.disconnect(self._data_changed)
         self._data[index] = entry
+        entry.changed.connect(self._data_changed)
+
+    def _data_changed(self):
+        self.dataChanged.emit()
+
 
 
     def remove_entry(self, index):

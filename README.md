@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T19)
+- Changed: States in macros now track by state ID, not state name.  This is to avoid situations where a state name is edited which would create a whole new state and potentially causing issues with synchronization with macros.
+- Changed: additional diagnostics data output for states (if container IDs are displayed), and additional diagnostics data for input viewer to validate widgets are being added/cleared as they should.  
+- Misc. updates.
+
 ### (m76T18/D)
 - Fix: Mode device not tracking profile mode correctly.
 - Fix: Filtering of available mode actions linked to recent API changes.

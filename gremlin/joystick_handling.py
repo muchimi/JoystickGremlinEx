@@ -584,8 +584,9 @@ def joystick_devices_initialization():
     global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map, _vjoy_devices, _all_joystick_devices
 
     _joystick_initialized = False
-    
-    verbose = gremlin.config.Configuration().verbose_mode_inputs
+    config = gremlin.config.Configuration()
+    verbose = config.verbose_mode_inputs
+    verbose_detailed = verbose and config.verbose_mode_extra
 
     _joystick_init_lock.acquire()
 
@@ -737,7 +738,7 @@ def joystick_devices_initialization():
             # not found
             hash_value = (axis_count,button_count,hat_count)
             hash_wheel_value = (axis_count+1,button_count,hat_count)
-            syslog.warning(f"vjoy id {vjoy_index:d}: {hash_value} vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted.  This device cannot be used as input.")
+            if verbose_detailed: syslog.info(f"vjoy id {vjoy_index:d}: {hash_value} vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted.  This device cannot be used as input.  This message is normal if the device is not configured in VJOY.")
             dev = dinput.DeviceSummary()
             dev.setConnected(False)
             dev.device_guid = gremlin.util.get_dinput_guid() # bogus ID
@@ -771,7 +772,7 @@ def joystick_devices_initialization():
             vjoy_lookup[hash_value] = dev
             _all_joystick_devices.append(dev)
             _joystick_device_guid_map[dev.device_guid] = dev
-            syslog.info(f"Adding undetected VJOY device: [{vjoy_index}] {str(dev)}")
+            if verbose_detailed: syslog.info(f"Adding undetected VJOY device: [{vjoy_index}] {str(dev)}")
             
 
         if dev.is_virtual and dev.vjoy_id == -1:

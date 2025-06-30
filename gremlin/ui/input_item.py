@@ -276,6 +276,21 @@ class InputItemListModel(ui_common.AbstractModel):
             return None
 
         return self._index_map[index]
+    
+    def add(self, item):
+        ''' adds new item at the new index '''
+
+        if not item in self._index_map:
+            new_index = len(self._index_map)
+            self._item_map[item] = new_index
+            self._index_map[new_index] = item
+            return new_index
+        else:
+            # return the index of the existing item
+            return self._item_map[item]
+
+        
+
 
 
     def removeRow(self, index):

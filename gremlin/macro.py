@@ -25,12 +25,13 @@ import time
 from threading import Event, Lock, Thread
 from lxml import etree as ElementTree
 
-from PySide6 import QtCore
+from PySide6 import QtCore, QtWidgets
 
 import win32con
 import win32api
 
 import gremlin
+import gremlin.config
 import gremlin.config
 import gremlin.event_handler
 from gremlin.singleton_decorator import SingletonDecorator
@@ -329,7 +330,7 @@ class MacroManager(QtCore.QObject):
         # Default delay between subsequent message dispatch. This is to get
         # around some games not picking up messages if they are sent in too
         # quick a succession.
-        self.default_delay = 0.05
+        self.default_delay = 0.025
 
         self._is_executing_exclusive = False
         self._is_running = False
@@ -616,11 +617,16 @@ class MacroManager(QtCore.QObject):
         if macro._sequence:
             new_sequence = [macro._sequence[0]]
             for a1, a2 in zip(macro._sequence[:-1], macro._sequence[1:]):
-                if isinstance(a1, PauseAction) or isinstance(a2, PauseAction):
+                if isinstance(a1, PauseAction) or isinstance(a2, PauseAction) or \
+                    isinstance(a1, ProcessEventsAction) or isinstance(a2, ProcessEventsAction):
                     new_sequence.append(a2)
                 else:
-                    new_sequence.append(PauseAction(self.default_delay))
+                    new_sequence.append(ProcessEventsAction())
+                    #new_sequence.append(PauseAction(self.default_delay))
                     new_sequence.append(a2)
+            # add a process step after the last step
+            if not isinstance(a2, ProcessEventsAction):
+                new_sequence.append(ProcessEventsAction())
             macro._sequence = new_sequence
 
 
@@ -786,12 +792,14 @@ class Macro:
         self._sequence.append(KeyAction(key, is_pressed))
 
 
-class MacroAbstractAction():
+class MacroAbstractAction(QtCore.QObject):
 
     """Base class for all macro action."""
 
+    changed = QtCore.Signal() # fires when the action changes
+
     def __init__(self, data = None):
-        
+        super().__init__()    
         self._data = data
         self.id = gremlin.util.get_guid() # unique ID of the macro
 
@@ -835,6 +843,7 @@ class JoystickAction(MacroAbstractAction):
         :param value the value of the generated input
         :param axis_type if an axis is used, how to interpret the value
         """
+        super().__init__()
         self.device_guid = device_guid
         self.input_type = input_type
         self.input_id = input_id
@@ -886,6 +895,7 @@ class KeyAction(MacroAbstractAction):
         :param is_pressed True if the key should be pressed, False otherwise
         """
         from gremlin.keyboard import Key
+        super().__init__()
 
         if not isinstance(key, Key):
             raise gremlin.error.KeyboardError("Invalid Key instance provided")
@@ -928,6 +938,7 @@ class MouseButtonAction(MacroAbstractAction):
         :param button the button to use in the action
         :param is_pressed True if the button should be pressed, False otherwise
         """
+        super().__init__()
         if not isinstance(button, gremlin.types.MouseButton):
             raise gremlin.error.MouseError("Invalid mouse button provided")
 
@@ -974,6 +985,7 @@ class MouseMotionAction(MacroAbstractAction):
         :param dx change along the X axis
         :param dy change along the Y axis
         """
+        super().__init__()
         self.dx = int(dx)
         self.dy = int(dy)
 
@@ -988,6 +1000,14 @@ class MouseMotionAction(MacroAbstractAction):
         if is_remote:
             gremlin.input_devices.remote_client.send_mouse_motion(self.dx, self.dy, force_remote)
 
+class ProcessEventsAction(MacroAbstractAction):
+    ''' process event action - allows queued events to complete '''
+    def __init__(self):
+        super().__init__()
+    def __call__(self, is_local = None, is_remote = None, force_remote = None):
+        verbose = gremlin.config.Configuration().verbose_mode_macro
+        if verbose: syslog.info("MACRO: Process Events")
+        QtWidgets.QApplication.processEvents()
 
 class PauseAction(MacroAbstractAction):
 
@@ -998,6 +1018,7 @@ class PauseAction(MacroAbstractAction):
 
         :param duration the duration in seconds of the pause
         """
+        super().__init__()
         self.duration = duration
         self.duration_max = duration_max
         self.is_random = is_random
@@ -1087,6 +1108,7 @@ class VJoyMacroAction(MacroAbstractAction):
         :param value the value of the generated input
         :param axis_type if an axis is used, how to interpret the value
         """
+        super().__init__()
         self.vjoy_id = vjoy_id
         self.input_type = input_type
         self.input_id = input_id
@@ -1132,23 +1154,59 @@ class RemoteControlAction(MacroAbstractAction):
     
 
     def __init__(self):
+        super().__init__()
         self.command =  gremlin.input_devices.VjoyAction.VJoyEnableRemoteOnly
 
     def __call__(self, is_local = True, is_remote = False, force_remote= False):
         ''' execute the mode change '''
+        verbose = gremlin.config.Configuration().verbose_mode_macro
+        if verbose: syslog.info(f"MACRO: set remote control: {self.command.name}")
         gremlin.input_devices.remote_state.mode = self.command
     
 
 class StateAction(MacroAbstractAction):
     ''' state action for a macro '''
     def __init__(self):
-        self.key = None
-        self.description = None
-        self.value = False
+        import gremlin.ui.state_device
+        super().__init__()
+        self._state = None
+        self._state_id = None
         self._register_check = True
+        self.value = None
+        sd = gremlin.ui.state_device.StateData()
+        sd.crud.connect(self._data_changed)
+
+    @property
+    def key(self):
+        if self._state:
+            return self._state.key
+        return None
+    
+    @property
+    def description(self):
+        if self._state:
+            return self._state.description
+        return None
+    
+    @property
+    def state(self):
+        return self._state
+    @state.setter
+    def state(self, data):
+        if self._state_id != data.id:
+            self._state = data
+            self._state_id = data.id
+            self.changed.emit() # indicate the action changed
+
+    def _data_changed(self):
+        self.changed.emit()
+    
+    
+
 
     def __call__(self, is_local = True, is_remote = False, force_remote= False):
         import gremlin.ui.state_device
+        import gremlin.config
         sd = gremlin.ui.state_device.StateData()
         if self._register_check:
             # first time check for the state to exist
@@ -1156,6 +1214,8 @@ class StateAction(MacroAbstractAction):
                 sd.register(self.key, False, self.description)
             self._register_check = False
 
+        verbose = gremlin.config.Configuration().verbose_mode_macro
+        if verbose: syslog.info(f"MACRO: set state [{self.key}] -> {self.value}")
         sd.setValue(self.key, self.value)
 
 

@@ -516,20 +516,25 @@ class InputViewerUi(ui_common.BaseDialogUi):
             removed
         """
         key = (device.device_id, visualization)
-        
+        verbose = gremlin.config.Configuration().verbose_mode_ui
         if enabled:
             if not key in self._widget_storage:
                 widget = ui_common.JoystickDeviceWidget(device, visualization)
                 self.views.add_widget(widget)
                 self._widget_storage[key] = widget
+                if verbose: syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
+            else:
+                if verbose: syslog.info(f"Use existing vis: {device.name}: {visualization.name}")
             widget.hook()
         else:
             if key in self._widget_storage:
                 widget = self._widget_storage[key]
                 del self._widget_storage[key]
+                if verbose: syslog.info(f"Remove existing vis: {device.name}: {visualization.name} key: {key}")
                 widget.unhook()
-                widget.setParent(None)
                 self.views.remove_widget(widget)
+                widget.setParent(None)
+                
             
         
         self._update_view()

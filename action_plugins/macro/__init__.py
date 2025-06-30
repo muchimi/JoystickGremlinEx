@@ -21,6 +21,7 @@ import logging
 import collections
 from lxml import etree as ElementTree
 
+import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.macro
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
@@ -31,6 +32,7 @@ import gremlin.base_profile
 from PySide6 import QtWidgets, QtCore, QtGui
 import os
 import time
+import gremlin.ui.state_device
 import gremlin.ui.ui_common
 import gremlin.keyboard
 import gremlin.input_devices
@@ -131,7 +133,6 @@ class MacroListView(QtWidgets.QListView):
         
         # enable multiple selection
         self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
-        
 
     def keyPressEvent(self, evt):
         """Process key events.
@@ -1268,11 +1269,16 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._recording_times = {None: time.time()}
         self._recording_values = {None: 0.0}
 
-        
 
 
         self._create_ui()
         self._populate_ui()
+
+
+    def _update_state(self):
+        # update the sequence
+        self._populate_ui()
+
 
     def _create_ui(self):
         """Creates the UI of this widget."""
@@ -1286,6 +1292,9 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             MacroWidget.locked = True
 
             self.model = gremlin.macro_handler.MacroListModel(self.action_data.sequence)
+
+            sd = gremlin.ui.state_device.StateData()
+            sd.crud.connect(self._update_state)
 
             # Replace the default vertical with a horizontal layout
             QtWidgets.QWidget().setLayout(self.layout())
@@ -1541,6 +1550,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         input_type = self._get_input_type()
         execution_mode_visible = input_type != InputType.JoystickAxis
         self.execute_container_widget.setVisible(execution_mode_visible)
+        self.list_view.setModel(None)
         self.list_view.setModel(self.model)
         self.list_view.setCurrentIndex(self.model.index(0, 0))
         self._edit_action(self.model.index(0, 0))
@@ -1914,6 +1924,9 @@ class Macro(gremlin.base_profile.AbstractAction):
         self.auto_restart = False
         self.auto_stop = False
 
+        import gremlin.ui.state_device
+        sd = gremlin.ui.state_device.StateData()
+
         if "execute-on-press" in node.attrib:
             self.execute_on_press = safe_read(node,"execute-on-press",bool,True)
         if "execute-on-release" in node.attrib:
@@ -2006,14 +2019,31 @@ class Macro(gremlin.base_profile.AbstractAction):
 
             elif child.tag == "state":
                 state_action = gremlin.macro.StateAction()
+                state = None
+                if "id" in child.attrib:
+                    id = safe_read(child, "id", str, "")
+                    state = sd.getStateById(id)
+                
                 key = child.get("key")
-                description = None
                 if "description" in child.attrib:
                     description = child.get("description")
-                value = safe_read(child,"value", bool, False)
-                state_action.key = key
-                state_action.description = description
+
+                if not state:
+                    state = sd.getState(key)
+                    description = None
+
+                value = safe_read(child,"value", bool, False)                    
+
+                if not state:
+                    state = sd.register(key, value, description)
+
+
+                # state_action.state = state
+
+                # state_action.key = key
+                # state_action.description = description
                 state_action.value = value
+                state_action.state = state
                 self.sequence.append(state_action)
 
 
@@ -2093,9 +2123,10 @@ class Macro(gremlin.base_profile.AbstractAction):
                 action_list.append(action_node)
             elif isinstance(entry, gremlin.macro.StateAction):
                 state_node = ElementTree.Element("state")
-                state_node.set("key", entry.key)
-                if entry.description:
-                    state_node.set("description", entry.description)
+                state_node.set("id", entry._state_id)
+                # state_node.set("key", entry.key)
+                # if entry.description:
+                #     state_node.set("description", entry.description)
                 state_node.set("value", safe_format(entry.value, bool))
                 action_list.append(state_node)
 

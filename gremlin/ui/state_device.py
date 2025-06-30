@@ -295,14 +295,14 @@ class StateCategories(QtCore.QObject):
 
 class StateInputItem(AbstractInputItem):
     ''' holds a single state '''
-    changed = QtCore.Signal(bool) # fires when a state changes
+    changed = QtCore.Signal(bool) # fires when a state changes (value)
     key_changed = QtCore.Signal() # fires when the key changes
+    
 
     def __init__(self, key : str = None, default_value = False, description = None):
         super().__init__()
         self._id = gremlin.util.get_guid()
         self._key = key
-        self._display_name = key
         self._category = None # category (StateCategory)
         self._default_value = default_value
         self._value = default_value
@@ -323,6 +323,11 @@ class StateInputItem(AbstractInputItem):
 
         self._input_item = item
 
+    def clone(self):
+        ''' clones the input item (gives it a new ID)'''
+        return StateInputItem(self.key, self.default_value, self.description)
+        
+
     def getOverrideInputType(self):
         ''' override type '''
         return InputType.JoystickButton
@@ -342,7 +347,8 @@ class StateInputItem(AbstractInputItem):
         return self._category
     
     def setCategory(self, category : StateCategory):
-        self._category = category
+        if self._category != category:
+            self._category = category
     
     @property
     def category_name(self) -> str:
@@ -360,7 +366,9 @@ class StateInputItem(AbstractInputItem):
         cm = StateCategories()
         return cm.default().id 
         
-
+    @property
+    def display_name(self):
+        return self._key
 
 
 
@@ -446,6 +454,8 @@ class StateInputItem(AbstractInputItem):
         node = ElementTree.Element("state", id = self._id, key = self._key)
         value = self._default_value
         description = self.description
+        node.set("id", self._id)
+
         if description:
             node.set("description", description)
         if isinstance(value, str):
@@ -792,11 +802,12 @@ class StateInputItem(AbstractInputItem):
 class StateData(QtCore.QObject):
     ''' holds state information '''
     changed  = QtCore.Signal(object) # fires when the value changes (StateItem)
-    crud = QtCore.Signal() # fires when a state is added or removed
+    crud = QtCore.Signal() # fires when a state is added or removed or changed
 
     def __init__(self):
         super().__init__()
         self._data = {}
+        self._id_map = {}
         self.changed.connect(self._state_changed)
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._reset)
@@ -826,6 +837,7 @@ class StateData(QtCore.QObject):
         
         item = StateInputItem(key, value, description)    
         self._data[key] = item
+        self._id_map[item.id] = item
         self.crud.emit()
         item.key_changed.connect(self._key_changed)
         return item
@@ -846,7 +858,9 @@ class StateData(QtCore.QObject):
         ''' removes a state from the list '''
         key = key.casefold().strip()
         if key in self._data:
+            id = self._data[key].id
             del self._data[key]
+            del self._id_map[id]
 
     def value(self, key : str):
         ''' gets the state value '''
@@ -863,12 +877,14 @@ class StateData(QtCore.QObject):
         return None
 
     
-    def add(self, data : StateInputItem):
+    def add(self, data : StateInputItem, emit = True):
         if data and not data.key in self._data:
             self._data[data.key] = data
+            self._id_map[data.id] = data
             self._sort()
             data.key_changed.connect(self._key_changed)
-            self.crud.emit()
+            if emit:
+                self.crud.emit()
     
 
     def _sort(self):
@@ -895,17 +911,26 @@ class StateData(QtCore.QObject):
         if key in self._data:
             return self._data[key]
         return None
-
     
+    def getStateById(self, id : str) -> StateInputItem:
+        ''' locates a state by id, None if not found '''
+        if id in self._id_map:
+            return self._id_map[id]
+        return None
+
     def setValue(self, key : str, value, emit = True):
         ''' sets state value (and registers if needed) '''
         if not key:
             return
+        
         key = key.casefold().strip()
         trigger = not key in self._data or self._data[key].value != value
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: syslog.info(f"STATE: [{key}] -> {value}")
         self._data[key].value = value
         if emit and trigger:
-            self.changed.emit(self._data[key])    
+            self.changed.emit(self._data[key])   
+            QtWidgets.QApplication.processEvents()
     
     def description(self, key : str) -> str:
         ''' gets the description for the state '''
@@ -945,14 +970,26 @@ class StateData(QtCore.QObject):
         ''' clears all data '''
         if self._data:
             self._data.clear()
+            self._id_map.clear()
             self.crud.emit()
         
 
     def remove(self, key : str):
         key = key.casefold().strip()
         if key in self._data:
+            data = self._data[key]
             del self._data[key]
+            del self._id_map[data.id]
             self.crud.emit()
+
+    def removeId(self, id: str):
+        if id in self._id_map:
+            data = self._id_map[id]
+            key = data.key
+            del self._data[key]
+            del self._id_map[data.id]
+
+
     
     def index(self, item):
         ''' gets the index of the item in the current list'''
@@ -1014,6 +1051,7 @@ class StateData(QtCore.QObject):
                 item = StateInputItem()
                 item.from_xml(node)
                 self._data[item.key] = item
+                self._id_map[item.id] = item
                 
 
     @QtCore.Slot(object)
@@ -1613,23 +1651,31 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     @QtCore.Slot()
     def _add_input_cb(self):
-        """Adds a new input to the inputs list  """
+        """Adds a new state to the inputs list  """
         input_id = StateInputItem()
-
-        # last index selected, -1 means none
-        self._last_selected_index = -1 
-
-
-        # auto edit new input
-        self._edit_item_cb(None, -1, input_id)
-
-
-    def _edit_item_cb(self, widget, index, data):
-        ''' called when the edit button is clicked  '''
-        self._edit_dialog = StateInputConfigDialog(data, self)
-        self._edit_dialog.accepted.connect(self._dialog_ok_cb)
+        index = self.input_item_list_model.add(input_id)
+        self._edit_dialog = StateInputConfigDialog(input_id, self)
+        self._edit_dialog.accepted.connect(self._dialog_ok_new_cb)
         gremlin.util.centerDialog(self._edit_dialog)
         self._edit_dialog.showNormal()
+        self._edit_item = input_id
+        self._edit_item_index = index
+        self._is_edit = True
+        self._index = index
+
+
+
+
+    def _edit_item_cb(self, widget, index, input_id):
+        ''' edit the state  '''
+        tmp_input_id = input_id.clone()
+        self._edit_dialog = StateInputConfigDialog(tmp_input_id, self)
+        self._edit_dialog.accepted.connect(self._dialog_ok_edit_cb)
+        gremlin.util.centerDialog(self._edit_dialog)
+        self._edit_dialog.showNormal()
+        self._edit_item = input_id
+        self._edit_item_index = index
+        self._is_edit = True
         self._index = index
 
     def _close_item_cb(self, widget, index, data):
@@ -1640,15 +1686,21 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # display blank page if no item left
             self._blank_input()
 
-    def _dialog_ok_cb(self):        
-        ''' called when edit dialog closes with ok '''
+    def _dialog_ok_new_cb(self):        
+        ''' called when edit dialog closes with ok on a new state '''
         data = self._edit_dialog.data
         sd = StateData()
         if not sd.exists(data.key):
             sd.add(data)
             self.input_item_list_model.refresh()
+        else:
+            syslog.warning(f"STATE: [{data.key}] already exists, ignoring edit")
+            return 
+        
 
-        index = sd.index(data)
+
+        # index = sd.index(data)
+        index = self._edit_item_index
         identifier = self.input_item_list_model.data(index)
         input_item : StateInputItem = identifier.input_id
         input_item.key = data.key
@@ -1656,6 +1708,28 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item.default_value = data.default_value
         self.refresh()
         self._select_item_cb(index)
+
+        el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)            
+
+    def _dialog_ok_edit_cb(self):        
+        ''' called when edit dialog closes with ok on an edited state '''
+        data = self._edit_dialog.data
+        sd = StateData()
+        trigger = False
+        if self._edit_item._key != data.key:
+            sd.unregister(self._edit_item.key) # remove the old
+            self._edit_item._key = data.key # change the key and don't fire the event
+            sd.add(self._edit_item, False) # this fires the event
+            trigger = True
+        self._edit_item.description = data.description
+        self._edit_item.setCategory(data.category)
+        self.input_item_list_model.refresh()
+        index = sd.index(self._edit_item)
+        self.refresh()
+        self._select_item_cb(index)
+        if trigger:
+            sd.crud.emit()
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
@@ -1841,7 +1915,10 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.data = data
         widget.create_action_icons(data)
         input_id : StateInputItem = data.input_id
-        widget.setTitle(f"State: [{input_id.key}]")
+
+        
+        title = f"State: [{input_id.key}] [{input_id.id}]" if gremlin.config.Configuration().show_container_id else f"State: [{input_id.key}]"
+        widget.setTitle(title)
         layout = widget.content_layout
         gremlin.util.clear_layout(layout)
 

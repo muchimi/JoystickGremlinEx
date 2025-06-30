@@ -266,7 +266,8 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._description = value
     
     def setDescription(self, value : str):
-        self._description = value
+        if value != self._description:
+            self._description = value
     
 
     @property

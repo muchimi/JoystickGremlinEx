@@ -3186,6 +3186,15 @@ class Profile():
         if "force_numlock" in root.attrib:
             self._force_numlock_off = safe_read(root, "force_numlock", bool, True)
 
+        # state data - read first because states can be referenced by nodes
+        nodes = root.xpath("//states")
+        if not nodes:
+            # not found
+            self.state.clear()
+        for node in nodes:
+            self.state.from_xml(node)
+
+
 
 
         # Parse each device into separate DeviceConfiguration objects
@@ -3319,15 +3328,6 @@ class Profile():
         # load the profile graph
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
         self._profile_graph.parse_xml(fname)
-
-        # state data
-        nodes = root.xpath("//states")
-        if not nodes:
-            # not found
-            self.state.clear()
-        for node in nodes:
-            self.state.from_xml(node)
-
 
 
 

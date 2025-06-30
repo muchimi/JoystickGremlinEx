@@ -5406,14 +5406,14 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             self._create_current_axis()
             el.joystick_event.connect(self._current_axis_update)
-            if self._device.is_virtual:
-                el.registerVjoyCallback(self._vjoy_current_axis_update)
+            # if self._device.is_virtual:
+            #     el.registerVjoyCallback(self._vjoy_current_axis_update)
                 
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             self._create_temporal_axis()
             el.joystick_event.connect(self._temporal_axis_update)
-            if self._device.is_virtual:
-                el.registerVjoyCallback(self._vjoy_temporal_axis_update)
+            # if self._device.is_virtual:
+            #     el.registerVjoyCallback(self._vjoy_temporal_axis_update)
             for widget in self.widgets:
                 for input_id in self._device.axis_index_list():
                     value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
@@ -5421,8 +5421,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._create_button_hat()
             el.joystick_event.connect(self._button_hat_update)
-            if self._device.is_virtual:
-                el.registerVjoyCallback(self._vjoy_button_hat_update)
+            # if self._device.is_virtual:
+            #     el.registerVjoyCallback(self._vjoy_button_hat_update)
 
         self._hooked = True
 
@@ -5434,17 +5434,17 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             el.joystick_event.disconnect(self._current_axis_update)
-            if self._device.is_virtual:
-                el.unregisterVjoyCallback(self._vjoy_current_axis_update)
+            # if self._device.is_virtual:
+            #     el.unregisterVjoyCallback(self._vjoy_current_axis_update)
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             el.joystick_event.disconnect(self._temporal_axis_update)
-            if self._device.is_virtual:
-                el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
+            # if self._device.is_virtual:
+            #     el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._unhook_buttons()
             el.joystick_event.disconnect(self._button_hat_update)
-            if self._device.is_virtual:
-                el.unregisterVjoyCallback(self._vjoy_button_hat_update)
+            # if self._device.is_virtual:
+            #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
 
     def _clear_ui(self):
@@ -6982,6 +6982,26 @@ class QSplitTabWidget(QDataWidget):
     def getWidgetKey(self, input_id):
         ''' gets the content widget compound key for the item / input combination'''
         return (gremlin.shared_state.edit_mode, self._device_id, input_id)
+    
+    def getContentInputId(self):
+        ''' gets the input id currently displayed '''
+        import gremlin.ui.input_item
+        widget : gremlin.ui.input_item.InputItemConfigurationWidget = self.getContentWidget()
+        if widget:
+            return widget.item_data.input_id
+        return None
+    
+    def getContentInputItem(self):
+        ''' gets the input id currently displayed '''
+        import gremlin.ui.input_item
+        widget : gremlin.ui.input_item.InputItemConfigurationWidget = self.getContentWidget()
+        if widget:
+            return widget.item_data
+        return None
+    
+    
+
+
     
     def setContentWidget(self, input_id):
         key = self.getWidgetKey(input_id)

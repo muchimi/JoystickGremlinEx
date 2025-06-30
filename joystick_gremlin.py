@@ -2923,6 +2923,14 @@ class GremlinUi(QtWidgets.QMainWindow):
                         
             self._update_highlight_toolbar_enabled()
 
+            if not switch_input:
+                widget = self.getRegisteredWidget(device_guid)
+                if widget:
+                    current_input_id = widget.getContentInputId(self)
+                    if current_input_id:
+                        switch_input = current_input_id != input_id
+    
+
 
             if input_id is not None and switch_input:
                 # select a particular input within a tab
@@ -2940,6 +2948,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
                     index = widget.input_item_list_view.current_index
                     widget.input_item_list_view.redraw_index(index)
+                    widget._select_item_cb(index)
                     #widget.refresh(False)
 
                     item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
@@ -2949,7 +2958,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     item = widget.input_item_list_view.selected_item()
                     if verbose: assert item is not None, f"SELECT: sync issue: no selection"
 
-                  
+                    #widget.select_item(index)
                     widget.setContentWidget(input_id)
 
           
