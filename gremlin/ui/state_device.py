@@ -907,9 +907,10 @@ class StateData(QtCore.QObject):
 
     def getState(self, key : str) -> StateInputItem:
         ''' gets a state object for the given state name '''
-        key = key.casefold().strip()
-        if key in self._data:
-            return self._data[key]
+        if key:
+            key = key.casefold().strip()
+            if key in self._data:
+                return self._data[key]
         return None
     
     def getStateById(self, id : str) -> StateInputItem:

@@ -2029,12 +2029,17 @@ class Macro(gremlin.base_profile.AbstractAction):
                     description = child.get("description")
 
                 if not state:
-                    state = sd.getState(key)
+                    if id:
+                        # use ID as primary
+                        state = sd.getStateById(id)
+                    elif key:
+                        # use key as secondary (legacy profiles)
+                        state = sd.getState(key)
                     description = None
 
                 value = safe_read(child,"value", bool, False)                    
 
-                if not state:
+                if not state and key:
                     state = sd.register(key, value, description)
 
 
@@ -2124,7 +2129,7 @@ class Macro(gremlin.base_profile.AbstractAction):
             elif isinstance(entry, gremlin.macro.StateAction):
                 state_node = ElementTree.Element("state")
                 state_node.set("id", entry._state_id)
-                # state_node.set("key", entry.key)
+                state_node.set("key", entry.key)
                 # if entry.description:
                 #     state_node.set("description", entry.description)
                 state_node.set("value", safe_format(entry.value, bool))

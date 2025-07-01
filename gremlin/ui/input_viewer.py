@@ -436,11 +436,27 @@ class InputViewerUi(ui_common.BaseDialogUi):
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_handler)
 
+        self._event_data = {}
+
         # hook widgets after init to bypass QT/Pyside gotcha of delayed initialization
         #gremlin.util.singleShot(self._hook_widgets)
 
     def _joystick_event_handler(self, event):
         ''' handles joystick input updates '''
+        if event.is_axis:
+            # spam filter for events to filter events that aren't relevant to the UI
+            device_id = event.device_id
+            input_id = event.identifier
+            if not device_id in self._event_data:
+                self._event_data[device_id] = {}
+            if not input_id in self._event_data[device_id]:
+                self._event_data[device_id][input_id] = None
+            last_value = self._event_data[device_id][input_id]
+            if last_value is not None and gremlin.util.is_close(event.value, last_value, 0.005):
+                return
+            self._event_data[device_id][input_id] = event.value
+
+            
         self._lock.acquire()
         try:
             for widget in self._joystick_widgets.values():
