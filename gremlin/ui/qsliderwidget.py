@@ -31,23 +31,25 @@ from PySide6.QtWidgets import QCheckBox, QToolTip
 from PySide6.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter, QFont, QMouseEvent, QCursor
 
 from itertools import pairwise
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
 class QSliderWidget(QtWidgets.QWidget):
     ''' custom slider object '''
 
-    handleClicked = QtCore.Signal(int) # called when a handle is left clicked (handle index)
-    handleRightClicked = QtCore.Signal(int) # called when a handle is right clicked (handle index)
-    handleDoubleClicked = QtCore.Signal(int) # called when a handle is double clicked (handle index)
-    handleDoubleRightClicked = QtCore.Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
-    rangeClicked = QtCore.Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeRightClicked = QtCore.Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeDoubleClicked = QtCore.Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeDoubleRightClicked = QtCore.Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    valueChanged = QtCore.Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
-    handleDragStart = QtCore.Signal(int) # called when a handle is being dragged (handle index)
-    handleDragStop = QtCore.Signal(int) # called when a handle stops being dragged (handle index)
+    handleClicked = Signal(int) # called when a handle is left clicked (handle index)
+    handleRightClicked = Signal(int) # called when a handle is right clicked (handle index)
+    handleDoubleClicked = Signal(int) # called when a handle is double clicked (handle index)
+    handleDoubleRightClicked = Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
+    rangeClicked = Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeRightClicked = Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeDoubleClicked = Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeDoubleRightClicked = Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    valueChanged = Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
+    handleDragStart = Signal(int) # called when a handle is being dragged (handle index)
+    handleDragStop = Signal(int) # called when a handle stops being dragged (handle index)
 
     class PixmapData():
         ''' holds a pixmap definition '''

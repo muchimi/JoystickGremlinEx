@@ -17,6 +17,7 @@ from gremlin.types import ActivationRule
 import dinput
 import lxml
 import gremlin.execution_graph
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -31,7 +32,7 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
 
     """Base class of all individual condition representations."""
 
-    #id_changed = QtCore.Signal(str, str)  # triggers when the ID changes
+    #id_changed = Signal(str, str)  # triggers when the ID changes
 
     def __init__(self):
         """Creates a new condition."""
@@ -443,7 +444,7 @@ class AbstractFunctor(QtCore.QObject):
     These classes are used in the internal code execution system.
     """
 
-    functor_complete = QtCore.Signal() # fires when a functor has completed its execution completely
+    functor_complete = Signal() # fires when a functor has completed its execution completely
 
     def __init__(self, action_data, parent = None):
         """Creates a new instance, extracting needed information.
@@ -813,7 +814,7 @@ class ConditionTracker():
 class ActivationCondition(gremlin.base_classes.BaseCallbacks):
 
     """Dictates under what circumstances an associated code can be executed."""
-    activation_condition_modified = QtCore.Signal()
+    activation_condition_modified = Signal()
 
     rule_lookup = {
         # String to enum

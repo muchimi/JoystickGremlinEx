@@ -35,6 +35,8 @@ import threading
 from PySide6 import QtCore
 import gremlin.event_handler
 from gremlin.singleton_decorator import SingletonDecorator
+import psygnal
+from psygnal import Signal
 
 
 _library_path = os.path.splitext(os.path.abspath(__file__))[0] + '.dll'
@@ -295,23 +297,23 @@ class SimConnectEvent:
 @SingletonDecorator
 class SimConnectEventHandler(QtCore.QObject):
 	''' handles events related to simconnect '''	
-	range_changed = QtCore.Signal(object, RangeEvent) # fires when the block range values change (block, event)
-	value_changed = QtCore.Signal(object) # fires when the block output value changes (block)
-	request_connect = QtCore.Signal() # request simconnect to connect
-	request_disconnect = QtCore.Signal() # request simconnect to disconnect
-	simconnect_connected = QtCore.Signal() # sim connected
-	simconnect_disconnected = QtCore.Signal() # sim disconnected
-	simconnect_sim_start = QtCore.Signal() # sim started
-	simconnect_sim_stop = QtCore.Signal() # sim stopped
-	simconnect_sim_paused = QtCore.Signal(bool) # sim pause (state)
-	simconnect_sim_running = QtCore.Signal(bool) # sim running (state)
-	simconnect_aircraft_loaded = QtCore.Signal(str, str) # sim aircraft loaded (folder, name) 
-	simconnect_event = QtCore.Signal(SimConnectEvent) # fires when we get a Simconnect data value notice
-	simconnect_state_changed = QtCore.Signal(int, float, str) # state change data (int, float, str)	
-	status_callback_clicked = QtCore.Signal() # fires when the status button is clicked 
-	simconnect_AircraftLiveriesReceived = QtCore.Signal(object) # fires when a list of user flyable aircraft is received (AicraftLiveries dict keyed by sim name)
-	simconnect_FacilitiesReceived = QtCore.Signal(list) # fires when a list of facilities is received
-	AircraftDefinitionsChanged = QtCore.Signal() # indicates the aircraft definitions have been updated in options
+	range_changed = Signal(object, RangeEvent) # fires when the block range values change (block, event)
+	value_changed = Signal(object) # fires when the block output value changes (block)
+	request_connect = Signal() # request simconnect to connect
+	request_disconnect = Signal() # request simconnect to disconnect
+	simconnect_connected = Signal() # sim connected
+	simconnect_disconnected = Signal() # sim disconnected
+	simconnect_sim_start = Signal() # sim started
+	simconnect_sim_stop = Signal() # sim stopped
+	simconnect_sim_paused = Signal(bool) # sim pause (state)
+	simconnect_sim_running = Signal(bool) # sim running (state)
+	simconnect_aircraft_loaded = Signal(str, str) # sim aircraft loaded (folder, name) 
+	simconnect_event = Signal(SimConnectEvent) # fires when we get a Simconnect data value notice
+	simconnect_state_changed = Signal(int, float, str) # state change data (int, float, str)	
+	status_callback_clicked = Signal() # fires when the status button is clicked 
+	simconnect_AircraftLiveriesReceived = Signal(object) # fires when a list of user flyable aircraft is received (AicraftLiveries dict keyed by sim name)
+	simconnect_FacilitiesReceived = Signal(list) # fires when a list of facilities is received
+	AircraftDefinitionsChanged = Signal() # indicates the aircraft definitions have been updated in options
 
 
 @SingletonDecorator

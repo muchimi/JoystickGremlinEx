@@ -23,6 +23,8 @@ import gremlin
 import gremlin.types
 from . import ui_common
 from gremlin.input_types import InputType
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -172,7 +174,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
     """UI dialog which allows configuring how to merge two axes."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = QtCore.Signal(QtWidgets.QWidget)
+    closed = Signal(QtWidgets.QWidget)
 
     # Palette used to render widgets
     palette = QtGui.QPalette()

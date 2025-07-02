@@ -37,7 +37,8 @@ import gremlin.gamepad_handling
 from gremlin import input_devices
 from gremlin.types import GamePadOutput
 from gremlin.input_devices import ButtonReleaseActions
-
+import psygnal
+from psygnal import Signal
 
 
 # import vigem.vigem_gamepad as vg

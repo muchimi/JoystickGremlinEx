@@ -33,6 +33,8 @@ import gremlin.shared_state
 import gremlin.config
 import anytree
 import logging
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 

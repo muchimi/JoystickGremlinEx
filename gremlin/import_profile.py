@@ -65,7 +65,8 @@ import gremlin.event_handler
 import gremlin.shared_state
 from vjoy import vjoy
 
-
+import psygnal
+from psygnal import Signal
 
 
 import gremlin.config
@@ -102,7 +103,7 @@ class MapperMode(enum.IntEnum):
 class MapperModeWidget(QtWidgets.QWidget):
     ''' mapper mode widget - lets the user pick a rollover mapping mode '''
 
-    mode_changed = QtCore.Signal(MapperMode) # fires when the mode is changed
+    mode_changed = Signal(MapperMode) # fires when the mode is changed
     def __init__(self, parent = None):
 
         super().__init__(parent)

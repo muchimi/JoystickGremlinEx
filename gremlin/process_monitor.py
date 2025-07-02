@@ -29,6 +29,8 @@ import win32process
 import logging
 import gremlin.config
 import gremlin.event_handler
+import psygnal
+from psygnal import Signal
 
 # Definition of the flags for limited information queries
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
@@ -46,7 +48,7 @@ class ProcessMonitor(QtCore.QObject):
     """
 
     # Signal emitted when the active window changes
-    process_changed = QtCore.Signal(str)
+    process_changed = Signal(str)
 
 
 

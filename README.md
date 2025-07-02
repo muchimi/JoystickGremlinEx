@@ -13,6 +13,14 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T21)
+- Major change: event model largely switched from QT to psygnal for performance and behavior reasons.
+- Added: psygnal library dependency to the project
+- Added: multiple checks for PySide/QT RUDE (rapid unexpected deleted element) behaviors linked to not using QT for events in general.
+- Fix: cloning event extra data could result in a pickle exception on some types.
+- Fix: State input has limited mapping options.
+
+ 
 
 ### (m76T20/A)
 - Changed: different method to update input viewer due to reported slowdown over time.

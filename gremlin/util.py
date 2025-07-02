@@ -37,6 +37,8 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
 import win32gui, win32con
+import psygnal
+from psygnal import Signal
 
 
 
@@ -57,7 +59,7 @@ class FileWatcher(QtCore.QObject):
     """Watches files in the filesystem for changes."""
 
     # Signal emitted when the watched file is modified
-    file_changed = QtCore.Signal(str)
+    file_changed = Signal(str)
 
     def __init__(self, file_names, parent=None):
         """Creates a new instance.
@@ -1685,7 +1687,7 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
                 try:
                     dill.dumps(v)
                 except BaseException as e:
-                    print (k)
+                    print (k)                    
                     problems.extend(debug_pickle(v, e, string + '.' + k))
         except:
             # ignore types that have no attributes
@@ -1713,37 +1715,76 @@ def is_close(a, b, tolerance = 0.0001):
 
 class InvokeUiMethod(QtCore.QObject):
     ''' invokes a call on the UI thread as QT is not thread safe '''
-    def __init__(self, method: Callable, data = None):
+    _called = QtCore.Signal(object, object, object, object, object, object)
+    def __init__(self, method: Callable, p0 = None, p1 = None, p2 = None, p3 = None, p4 = None, p5 = None):
         ''' Invokes a method on the main ui thread. 
         
         :params: method: lambda expression
         
         '''
+
+        
+
         super().__init__()
+
+        assert method is not None,"Method not provided"
         current_thread = QtCore.QThread.currentThread()
         ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
         if current_thread != ui_thread:
             # non on UI thread, move it to the UI thread
             self.moveToThread(ui_thread)
             self.setParent(QtWidgets.QApplication.instance())
-            self.method = method
-            self.called.connect(self.execute)
-            self.called.emit(data)
-        else:
-            if data is not None:
-                method(data)
-            else:
-                method()
+            self._called.connect(self._execute)
+            self.method = method           
+            self._called.emit(p0, p1, p2, p3, p4, p5)     
+        else:   
+            self._exec(method, p0, p1, p2, p3, p4, p5)
 
-    called = QtCore.Signal(object)
+
+    def _exec(self, method, p0, p1, p2, p3, p4, p5):
+        pcount = 0
+        if p5 is not None:
+            pcount +=1
+        if p4 is not None:
+            pcount +=1
+        if p3 is not None:
+            pcount +=1
+        if p2 is not None:
+            pcount +=1
+        if p1 is not None:
+            pcount +=1
+        if p0 is not None:
+            pcount +=1
+
+        match pcount:
+            case 0:
+                method()
+            case 1:
+                method(p0)
+            case 2:
+                method(p0, p1)
+            case 3:
+                method(p0,p1,p2)
+            case 4:
+                method(p0,p1,p2,p3)
+            case 5:
+                method(p0,p1,p2,p3,p4)
+            case 6:
+                method(p0,p1,p2,p3,p4,p5)
+
+
+
 
     @QtCore.Slot(object)
-    def execute(self, data):
-        if data is not None:
-            self.method(data)
-        else:
-            self.method()
-    
+    def _execute(self, p0 = None, 
+                 p1 = None,
+                 p2 = None,
+                 p3 = None,
+                 p4 = None,
+                 p5 = None
+                 ):
+       
+        self._exec(self.method, p0, p1, p2, p3, p4, p5)
         
         # trigger garbage collector
         self.setParent(None)

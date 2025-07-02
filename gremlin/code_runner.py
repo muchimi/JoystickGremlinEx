@@ -53,6 +53,8 @@ import gremlin.execution_graph
 import gremlin.ui
 import anytree
 import traceback
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 

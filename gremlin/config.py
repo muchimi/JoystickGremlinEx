@@ -29,6 +29,8 @@ import gremlin.input_types
 
 import gremlin.shared_state
 from gremlin.types import VerboseMode
+import psygnal
+from psygnal import Signal
 
 from collections import deque
 
@@ -40,7 +42,7 @@ class Configuration(QtCore.QObject):
 
     ''' configuration data '''
 
-    changed = QtCore.Signal(str, object) # fires on some configuration value changes, passes the method to get the value that has changed
+    changed = Signal(str, object) # fires on some configuration value changes, passes the method to get the value that has changed
 
     def get_config(self):
         ''' local config file (version based)'''

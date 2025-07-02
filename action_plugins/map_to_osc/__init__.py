@@ -40,14 +40,17 @@ from gremlin import input_devices
 import gremlin.ui.osc_device
 from gremlin.ui.osc_device import OscInterface, OscClient
 import logging
+import psygnal
+from psygnal import Signal
+
 syslog = logging.getLogger("system")
 
 class OscValueWidget(QtWidgets.QWidget):
-    valueChanged = QtCore.Signal() # fires when the value changes 
-    typeChanged = QtCore.Signal() # fires when integer flag changes 
-    enableValueOnPressChanged = QtCore.Signal(bool)
-    enableValueOnReleaseChanged = QtCore.Signal(bool)
-    enabledChanged = QtCore.Signal(bool) # fires when enabled changes
+    valueChanged = Signal() # fires when the value changes 
+    typeChanged = Signal() # fires when integer flag changes 
+    enableValueOnPressChanged = Signal(bool)
+    enableValueOnReleaseChanged = Signal(bool)
+    enabledChanged = Signal(bool) # fires when enabled changes
     
     def __init__(self, label = "Set Value:", value = None, is_integer = False, enabled = True, parent = None):
         super().__init__(parent)
@@ -193,14 +196,14 @@ class OscValueWidget(QtWidgets.QWidget):
 class OscInputWidget(QtWidgets.QWidget):
     ''' value container for an OSC message '''
 
-    valuePressChanged = QtCore.Signal() # fires when the value changes (press)
-    valueReleaseChanged = QtCore.Signal() # fires when the value changes (release)
-    rangeChanged = QtCore.Signal() # fires when the axis range changes
-    enabledChanged = QtCore.Signal(bool) # fires when enabled status changes
-    typePressChanged = QtCore.Signal(int) # fires when the type change
-    typeReleaseChanged = QtCore.Signal(int) # fires when the type change
-    enableValueOnPressChanged = QtCore.Signal(bool) # send value on press enabled
-    enableValueOnReleaseChanged = QtCore.Signal(bool) # send value on release enabled
+    valuePressChanged = Signal() # fires when the value changes (press)
+    valueReleaseChanged = Signal() # fires when the value changes (release)
+    rangeChanged = Signal() # fires when the axis range changes
+    enabledChanged = Signal(bool) # fires when enabled status changes
+    typePressChanged = Signal(int) # fires when the type change
+    typeReleaseChanged = Signal(int) # fires when the type change
+    enableValueOnPressChanged = Signal(bool) # send value on press enabled
+    enableValueOnReleaseChanged = Signal(bool) # send value on release enabled
     
 
     def __init__(self, label = None, 

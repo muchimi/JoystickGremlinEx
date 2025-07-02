@@ -22,16 +22,7 @@ from lxml import etree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
-import gremlin.base_classes
-import gremlin.base_profile
-import gremlin.config
-import gremlin.event_handler
-import gremlin.macro
-import gremlin.shared_state
-import gremlin.ui.ui_common
-import gremlin.ui.input_item
-import gremlin.util
-import gremlin.util
+
 from .SimConnect import *
 from .SimConnect.SimConnect import *
 from .SimConnect.Enum import *
@@ -41,6 +32,8 @@ from gremlin.singleton_decorator import SingletonDecorator
 import enum
 import time
 import threading
+import psygnal
+from psygnal import Signal
 
 
 syslog = logging.getLogger("system")
@@ -447,16 +440,16 @@ class SimConnectManager(QtCore.QObject):
     ''' holds simconnect data and manages simconnect '''
 
     
-    sim_start = QtCore.Signal() # fires when the sim starts
-    sim_stop = QtCore.Signal() # fires when the sim stops
-    sim_running = QtCore.Signal(bool) # fires when the sim is running
-    sim_paused = QtCore.Signal(bool) # fires when sim is paused or unpaused (state = pause state)
-    lvars_updated = QtCore.Signal(object) # triggers when LVARs are updated (after the request to get LVARs)
-    alive = QtCore.Signal() # fires when the bridge is connected and alive
-    sim_state = QtCore.Signal(int, float, str) # fires when sim state data changes (depends on the state )
-    sim_aircraft_changed = QtCore.Signal(str) # fires when the aircraft title changes
-    sim_aircraft_loaded = QtCore.Signal(str, str, str) # fires when aircraft title changes (folder, name, title)
-    _aircraft_loaded_internal = QtCore.Signal(str, str) # fires when aircraft (folder, name)
+    sim_start = Signal() # fires when the sim starts
+    sim_stop = Signal() # fires when the sim stops
+    sim_running = Signal(bool) # fires when the sim is running
+    sim_paused = Signal(bool) # fires when sim is paused or unpaused (state = pause state)
+    lvars_updated = Signal(object) # triggers when LVARs are updated (after the request to get LVARs)
+    alive = Signal() # fires when the bridge is connected and alive
+    sim_state = Signal(int, float, str) # fires when sim state data changes (depends on the state )
+    sim_aircraft_changed = Signal(str) # fires when the aircraft title changes
+    sim_aircraft_loaded = Signal(str, str, str) # fires when aircraft title changes (folder, name, title)
+    _aircraft_loaded_internal = Signal(str, str) # fires when aircraft (folder, name)
     
 
     def __init__(self) -> None:

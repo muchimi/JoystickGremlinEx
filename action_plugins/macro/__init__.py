@@ -38,6 +38,8 @@ import gremlin.keyboard
 import gremlin.input_devices
 import gremlin.config
 import gremlin.macro_handler
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 

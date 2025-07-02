@@ -31,6 +31,8 @@ import threading
 import gremlin.ui.ui_common
 import time
 import logging
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 

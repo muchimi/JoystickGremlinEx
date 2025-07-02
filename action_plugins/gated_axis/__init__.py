@@ -35,6 +35,8 @@ from gremlin.gated_handler import GateInfo, RangeInfo, DisplayMode, GateData, Ga
 import gremlin.ui.qsliderwidget
 import gremlin.ui.ui_common
 import gremlin.util
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -109,7 +111,7 @@ _cache = InputConfigurationWidgetCache()
 class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to setup the individual action trigger containers and sub actions """
 
-    delete_requested = QtCore.Signal(GateInfo) # fired when the remove button is clicked - passes the GateData to blitz
+    delete_requested = Signal(GateInfo) # fired when the remove button is clicked - passes the GateData to blitz
 
     def __init__(self, gate_data : GateData, info_object : RangeInfo | GateInfo, action_data, input_type : InputType, parent=None):
         '''
@@ -605,11 +607,11 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     
     '''
 
-    delete_requested = QtCore.Signal(object) # fired when the remove button is clicked - passes the GateData to blitz
-    duplicate_requested = QtCore.Signal(object) # fired when the duplicate button is clicked - passes the GateData to duplicate
-    configure_requested = QtCore.Signal(object) # configure clicked
-    configure_range_requested = QtCore.Signal(object) # configure range - data = range object
-    configure_gate_requested = QtCore.Signal(object) # configure gate - data = gate object
+    delete_requested = Signal(object) # fired when the remove button is clicked - passes the GateData to blitz
+    duplicate_requested = Signal(object) # fired when the duplicate button is clicked - passes the GateData to duplicate
+    configure_requested = Signal(object) # configure clicked
+    configure_range_requested = Signal(object) # configure range - data = range object
+    configure_gate_requested = Signal(object) # configure gate - data = gate object
 
 
     def __init__(self, action_data, show_configuration = False, show_output_mode = False, object_name = None, parent = None):
@@ -1200,6 +1202,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     @QtCore.Slot(GateInfo)
     def _gate_value_changed(self, gate : GateInfo):
         ''' called when a gate value changes '''
+        if not Shiboken.isValid(self):
+            return
         if gate in self._gate_data.getGates():
             self._set_slider_gate_value(gate.slider_index, gate.value)
 
@@ -1845,6 +1849,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
                 self._slider_widget.setHandleTooltip(index, f"Gate {gate.value:0.{_decimals}f}")            
 
     def _update_gate_icons(self):
+        if not Shiboken.isValid(self):
+            return
         gates = self._gate_data.getGates()
         gate : GateInfo
         conflicts_map = {}
@@ -1869,6 +1875,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
     def _update_gate_icon(self, index : int, gate : GateInfo):
         ''' updates the icon for a single gate '''
+        if not Shiboken.isValid(self):
+            return
         if Shiboken.isValid(self._slider_widget):
             if gate is None:
                 self._slider_widget.setHandleIcon(index, None)
@@ -1885,6 +1893,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
     def _update_output_value(self):
         ''' updates triggers and UI when the slider input value changes '''
+        if not Shiboken.isValid(self):
+            return
         if self._gate_data is not None:
             self.output_range_trigger_widget.setPlainText(self._gate_data.trigger_range_text)
             # scroll to bottom

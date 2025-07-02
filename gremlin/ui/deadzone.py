@@ -28,7 +28,8 @@ from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_widt
 import enum
 from lxml import etree
 
-
+import psygnal
+from psygnal import Signal
 
 class DeadzonePreset(enum.IntEnum):
     center_zero = 0
@@ -58,7 +59,7 @@ _deadzone_preset_string_lookup = {
 class DeadzoneWidget(QtWidgets.QWidget):
     ''' deadzone widget '''
 
-    changed = QtCore.Signal() # indicates the data has changed
+    changed = Signal() # indicates the data has changed
     
 
     def __init__(self, profile_data, parent=None):

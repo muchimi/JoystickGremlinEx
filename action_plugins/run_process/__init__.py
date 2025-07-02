@@ -29,6 +29,8 @@ import gremlin.util
 from gremlin.util import safe_read, safe_format
 import subprocess
 import logging
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 

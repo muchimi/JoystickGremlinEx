@@ -87,7 +87,8 @@ from lxml.etree import _Element as Element
 
 from abc import ABC, abstractmethod
 import sys
-
+import psygnal
+from psygnal import Signal
 syslog = logging.getLogger("system")
 
 
@@ -1202,7 +1203,7 @@ class ProfileGraph():
     def __init__(self):
         self._root = ProfileRootNode()
         self._source_xml = None # source XML loaded 
-        
+        self._remap_prompt_issued = False
 
         
 

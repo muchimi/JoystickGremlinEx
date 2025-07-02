@@ -39,7 +39,6 @@ from gremlin.input_types import InputType
 from gremlin.base_buttons import *
 from gremlin.types import DeviceType
 import gremlin.plugin_manager
-
 import gremlin.ui.ui_common as ui_common
 from gremlin.ui.ui_common import QBoxFrame
 from functools import partial
@@ -48,7 +47,8 @@ from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 import logging
 import lxml
 from shiboken6 import Shiboken
-
+import psygnal
+from psygnal import Signal
 
 
 
@@ -417,7 +417,7 @@ class InputItemListView(ui_common.AbstractView):
     """View displaying the contents of an InputItemListModel."""
 
     # fires when the list view is redrawn
-    updated = QtCore.Signal()
+    updated = Signal()
 
     # Conversion from input type to a display name
     type_to_string = {
@@ -547,6 +547,8 @@ class InputItemListView(ui_common.AbstractView):
 
         """
         if self._deleted:
+            return
+        if not Shiboken.isValid(self):
             return
         self.setUpdatesEnabled(False)
         try:
@@ -824,6 +826,11 @@ class InputItemListView(ui_common.AbstractView):
             widget.update_display()
         
 
+    def unselect_item(self, index):
+        ''' unselects an item '''
+        pass
+
+
     def select_item(self, index, emit=True, force_update = True, user_selected = False):
         """Handles selecting a specific item.  this is called whenever an input item is selected
 
@@ -990,7 +997,7 @@ class ActionSetView(ui_common.AbstractView):
         Copy = 7 # copy to clipboard
 
     # Signal emitted when an interaction is triggered on an action
-    interacted = QtCore.Signal(Interactions)
+    interacted = Signal(Interactions)
 
     def __init__(
             self,
@@ -1099,42 +1106,44 @@ class ActionSetView(ui_common.AbstractView):
         
         if self.model is None:
             return
+        
+        with self.model.data_changed.blocked():
 
-        clipboard = Clipboard()
-        clipboard.disable()
-        if self.view_type == ui_common.ContainerViewTypes.Action:
-            for index in range(self.model.rows()):
-                data = self.model.data(index)
-                if verbose_ui: syslog.info(f"ActionSet: redraw action widget start: {object_name}")
-                widget = data.widget(data)
-                cache.registerWidget(data.id, widget)
-                widget.action_modified.connect(self.model.data_changed.emit)
-                wrapped_widget = BasicActionWrapper(widget)
-                wrapped_widget.closed.connect(self._create_closed_cb(widget))
-                self.action_layout.addWidget(wrapped_widget)
-                self._widgets.append(wrapped_widget)
-                if verbose_ui: syslog.info(f"ActionSet: redraw action widget completed: {object_name}")
-                
-        elif self.view_type == ui_common.ContainerViewTypes.Conditions:
-            for index in range(self.model.rows()):
-                is_cached = True
-                data = self.model.data(index)
-                if verbose_ui: syslog.info(f"ActionSet: redraw condition widget start: {object_name}")
-                widget = cache.getWidget(data.id)
-                if not widget:
-                    is_cached = False
+            clipboard = Clipboard()
+            clipboard.disable()
+            if self.view_type == ui_common.ContainerViewTypes.Action:
+                for index in range(self.model.rows()):
+                    data = self.model.data(index)
+                    if verbose_ui: syslog.info(f"ActionSet: redraw action widget start: {object_name}")
                     widget = data.widget(data)
-                #widget.action_modified.connect(self.model.data_changed.emit)
-                wrapped_widget = ConditionActionWrapper(widget)
-                if not is_cached and hasattr(widget,"_cleanup_ui"):
-                    widget._cleanup_ui()
-                    widget.deleteLater()
-                if verbose_ui: syslog.info(f"ActionSet: redraw condition widget completed: {object_name}")
-                self.action_layout.addWidget(wrapped_widget)
-                self._widgets.append(wrapped_widget)
+                    cache.registerWidget(data.id, widget)
+                    widget.action_modified.connect(self.model.data_changed.emit)
+                    wrapped_widget = BasicActionWrapper(widget)
+                    wrapped_widget.closed.connect(self._create_closed_cb(widget))
+                    self.action_layout.addWidget(wrapped_widget)
+                    self._widgets.append(wrapped_widget)
+                    if verbose_ui: syslog.info(f"ActionSet: redraw action widget completed: {object_name}")
+                    
+            elif self.view_type == ui_common.ContainerViewTypes.Conditions:
+                for index in range(self.model.rows()):
+                    is_cached = True
+                    data = self.model.data(index)
+                    if verbose_ui: syslog.info(f"ActionSet: redraw condition widget start: {object_name}")
+                    widget = cache.getWidget(data.id)
+                    if not widget:
+                        is_cached = False
+                        widget = data.widget(data)
+                    #widget.action_modified.connect(self.model.data_changed.emit)
+                    wrapped_widget = ConditionActionWrapper(widget)
+                    if not is_cached and hasattr(widget,"_cleanup_ui"):
+                        widget._cleanup_ui()
+                        widget.deleteLater()
+                    if verbose_ui: syslog.info(f"ActionSet: redraw condition widget completed: {object_name}")
+                    self.action_layout.addWidget(wrapped_widget)
+                    self._widgets.append(wrapped_widget)
 
 
-        clipboard.enable()
+            clipboard.enable()
 
         if verbose_ui: syslog.info(f"ActionSet: redraw complete: {object_name}")
 
@@ -1260,25 +1269,25 @@ class InputItemWidget(QBoxFrame):
     """
 
     # Signal emitted whenever this button is pressed
-    selected_changed = QtCore.Signal(InputIdentifier)
+    selected_changed = Signal(InputIdentifier)
 
     # fires when unselected
-    unselected = QtCore.Signal(InputIdentifier) 
+    unselected = Signal(InputIdentifier) 
 
     # signal when button's close button is pressed
-    closed =  QtCore.Signal(InputIdentifier)
+    closed =  Signal(InputIdentifier)
 
     # signal when button's edit button is pressed
-    edit =  QtCore.Signal(InputIdentifier)
+    edit =  Signal(InputIdentifier)
 
     # signal when the edit curve button is pressed
-    edit_curve = QtCore.Signal(InputIdentifier)
+    edit_curve = Signal(InputIdentifier)
 
     # signal when the clear curve button is pressed
-    delete_curve = QtCore.Signal(InputIdentifier)
+    delete_curve = Signal(InputIdentifier)
 
     # signal input value changed
-    input_value_changed = QtCore.Signal(InputIdentifier, float)
+    input_value_changed = Signal(InputIdentifier, float)
 
 
     def __init__(self, identifier, parent=None, populate_ui_callback = None, populate_name_callback = None, update_callback = None, config_external = False, data = None):
@@ -2189,11 +2198,11 @@ class ContainerSelector(QtWidgets.QWidget):
     """Allows the selection of a container type."""
 
     # Signal emitted when a container type is selected
-    container_added = QtCore.Signal(str) # fires when a container is added (name of the container)
-    container_copy =  QtCore.Signal() # copy all containers
-    container_paste = QtCore.Signal(object) # paste containers
-    container_delete = QtCore.Signal() # delete all containers
-    container_from_template = QtCore.Signal() # load a new container from template
+    container_added = Signal(str) # fires when a container is added (name of the container)
+    container_copy =  Signal() # copy all containers
+    container_paste = Signal(object) # paste containers
+    container_delete = Signal() # delete all containers
+    container_from_template = Signal() # load a new container from template
 
     def __init__(self, input_type, is_axis = False, parent=None):
         """Creates a new selector instance.
@@ -2485,13 +2494,13 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     """Base class for container widgets."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = QtCore.Signal(QtWidgets.QWidget)
+    closed = Signal(QtWidgets.QWidget)
 
     # fires when the container is about to be closed
-    closing = QtCore.Signal()
+    closing = Signal()
 
         
-    container_modified = QtCore.Signal()  # container contents changed
+    container_modified = Signal()  # container contents changed
 
 
    
@@ -2675,6 +2684,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     @QtCore.Slot(object)
     def _update_ui(self, container):
+        if not Shiboken.isValid(self.dock_tabs):
+            return
         dock_tabs = self.dock_tabs
         if dock_tabs.data == container:
             tracker = gremlin.base_conditions.ConditionTracker()
@@ -2953,7 +2964,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
     module."""
 
     # Signal which is emitted whenever the widget's contents change
-    action_modified = QtCore.Signal()
+    action_modified = Signal()
 
     def __init__(
             self,
@@ -3350,7 +3361,7 @@ class BasicActionWrapper(AbstractActionWrapper):
     """Wraps an action widget and displays the basic config dialog."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = QtCore.Signal(QtWidgets.QWidget)
+    closed = Signal(QtWidgets.QWidget)
 
     def __init__(self, action_widget, parent=None):
         """Wraps an existing action widget.
@@ -3447,8 +3458,8 @@ class InputItemConfigurationWidget(QtWidgets.QFrame):
     """ mapping viewer for a selected input item (this is the right side of the device tab) """
 
     # Signal emitted when the description changes
-    description_changed = QtCore.Signal(str) # indicates the description was changed
-    description_clear = QtCore.Signal() # clear the description field
+    description_changed = Signal(str) # indicates the description was changed
+    description_clear = Signal() # clear the description field
 
     def __init__(self, item_data, input_type = None, object_name : str = None, parent=None):
         """Creates a new object instance.
@@ -4198,7 +4209,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
-        self.redraw_lock = False
+        self.redraw_lock = threading.Lock()
         self._deleted = False
 
         self.scroll_area = QtWidgets.QScrollArea()
@@ -4249,18 +4260,19 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
     def redraw(self):
         """Redraws the entire view."""
+        import gremlin.util
+        gremlin.util.assert_ui_thread()
+        if not Shiboken.isValid(self):
+            return
+
         if not Shiboken.isValid(self.scroll_area):
             return
         
-        if self._deleted:
-            return
-        if not self.redraw_lock:
+        
+        with self.model.data_changed.blocked():
             try:
-                self.redraw_lock = True
-                import gremlin.ui.ui_common
-
+                self.redraw_lock.acquire()
                 self._clear_widgets()
-                
                 container_count = self.model.rows()
                 if container_count:
                     for index in range(container_count):
@@ -4277,10 +4289,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                     self.scroll_layout.addWidget(label)
                 self.scroll_layout.addStretch(1)
             finally:
-                self.redraw_lock = False
-               
-        else:
-            syslog.error("re-entry code detected")
+                self.redraw_lock.release()
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.

@@ -37,6 +37,8 @@ import glob
 from gremlin.singleton_decorator import SingletonDecorator
 import copy
 import time
+import psygnal
+from psygnal import Signal
 
 kPacketDefinition = 6124
 kPublicDownlinkArea = 6125
@@ -82,9 +84,9 @@ kPacketSize = sizeof(BRIDGE_PACKET)
 class SimConnectBridge(QtCore.QObject):
     ''' Simconnect bridge for GremlinEx '''
 
-    lvars_loaded = QtCore.Signal(object) # sent when lvars are received
-    aircraft_list_loaded = QtCore.Signal(object) # sends the aircraft list (map of [aircraft][list of liveries] )
-    alive = QtCore.Signal() # sent when pong is received (alive signal)
+    lvars_loaded = Signal(object) # sent when lvars are received
+    aircraft_list_loaded = Signal(object) # sends the aircraft list (map of [aircraft][list of liveries] )
+    alive = Signal() # sent when pong is received (alive signal)
 
     def __init__(self, sm : SimConnect):
         super().__init__()

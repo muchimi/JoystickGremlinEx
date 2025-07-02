@@ -30,7 +30,8 @@ from gremlin.signal import signal
 from gremlin.tree import TreeNode
 from gremlin.types import AxisButtonDirection, HatDirection
 from gremlin.input_types import InputType
-
+import psygnal
+from psygnal import Signal
 
 if TYPE_CHECKING:
     from gremlin.base_classes import AbstractActionModel

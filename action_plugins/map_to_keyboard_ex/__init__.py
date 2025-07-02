@@ -76,10 +76,12 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._record_keys_cb)
         
-
         self.show_keyboard_widget = QtWidgets.QPushButton("Select Keys")
         self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color = gremlin.ui.ui_common.Color.listenColor()))
         self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
+
+        self.clear_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback = self._clear_keys_cb)
+
 
 
         self.delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.delay) 
@@ -114,6 +116,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         widgets = [
+            self.clear_widget,
             self.listen_widget, 
             self.show_keyboard_widget
         ]
@@ -258,12 +261,21 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _sec_delay(self):
         self.delay_box.setValue(1000)
+
+    def _clear_keys_cb(self):
+        gremlin.util.InvokeUiMethod(self._clear_keys_ui)
+
+    def _clear_keys_ui(self):
+        self.action_data.keys.clear()
+        self._populate_ui()
         
-
-
-
     def _record_keys_cb(self):
-        """Prompts the user to press the desired key combination."""
+        gremlin.util.InvokeUiMethod(self._record_keys_ui)
+
+
+    def _record_keys_ui(self):
+        """Prompts the user to press the desired key combination. - runs on UI thread"""
+
         button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,

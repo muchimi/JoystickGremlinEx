@@ -54,6 +54,8 @@ import gremlin.actions
 import gremlin.curve_handler
 from gremlin.input_types import InputType
 from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -4159,7 +4161,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     
 
 class MapToSimConnectHelper(QtCore.QObject):
-    range_changed = QtCore.Signal() # indicates the range was updated
+    range_changed = Signal() # indicates the range was updated
     def __init__(self):
         super().__init__()
 

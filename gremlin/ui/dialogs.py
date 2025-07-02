@@ -50,12 +50,14 @@ import uuid
 from lxml import etree
 import dinput
 import gremlin.util
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
 class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to set individual profile settings """
-    start_mode_changed = QtCore.Signal(str)  # when the start mode changes
+    start_mode_changed = Signal(str)  # when the start mode changes
 
     def __init__(self, mode = None, parent=None):
         ''' creates a mode UI - if a mode is specified - selects that mode to start '''
@@ -274,7 +276,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
     """UI allowing the configuration of a variety of options."""
 
-    queue_refresh = QtCore.Signal() # refresh request
+    queue_refresh = Signal() # refresh request
 
     def __init__(self, parent=None):
         """Creates a new options UI instance.
@@ -2136,7 +2138,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
     """Displays active processes in a window for the user to select."""
 
     # Signal emitted when the user selects a process
-    process_selected = QtCore.Signal(str)
+    process_selected = Signal(str)
 
     def __init__(self, text = None, parent=None):
         """Creates a new instance.

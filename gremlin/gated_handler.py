@@ -46,6 +46,8 @@ from itertools import pairwise
 import gremlin.actions
 from shiboken6 import Shiboken
 import gremlin.repeater
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 MAX_UNDO = 20 # number of steps on the UNDO stack
@@ -1121,28 +1123,28 @@ _trigger_tracking = TriggerTracking() # main instance
 @gremlin.singleton_decorator.SingletonDecorator
 class GateEventHandler(QtCore.QObject):
     ''' handler class for gate axis events '''
-    gatedata_stepsChanged = QtCore.Signal(object) # signals that steps (gate counts) have changed  (gatedata)
-    gatedata_valueChanged = QtCore.Signal(object) # signals when the gate data changes (gatedata)
+    gatedata_stepsChanged = Signal(object) # signals that steps (gate counts) have changed  (gatedata)
+    gatedata_valueChanged = Signal(object) # signals when the gate data changes (gatedata)
 
-    gate_value_changed = QtCore.Signal(GateInfo) # fires when a gate value changes (GateInfo)
-    gate_configuration_changed = QtCore.Signal(GateInfo) # fires when a gate changes its configuration data
-    gate_index_changed = QtCore.Signal(GateInfo) # fires when the gate slider index changes
+    gate_value_changed = Signal(GateInfo) # fires when a gate value changes (GateInfo)
+    gate_configuration_changed = Signal(GateInfo) # fires when a gate changes its configuration data
+    gate_index_changed = Signal(GateInfo) # fires when the gate slider index changes
 
-    range_value_changed = QtCore.Signal(RangeInfo) # fires when either of the gate values change
-    range_configuration_changed = QtCore.Signal(RangeInfo) # fires when a range configuration changes
+    range_value_changed = Signal(RangeInfo) # fires when either of the gate values change
+    range_configuration_changed = Signal(RangeInfo) # fires when a range configuration changes
 
-    # slider_marker_update = QtCore.Signal(float, object) # fires when the slider marker should be updated (value, )
+    # slider_marker_update = Signal(float, object) # fires when the slider marker should be updated (value, )
 
-    update_ui = QtCore.Signal()
+    update_ui = Signal()
 
-    use_default_range_changed = QtCore.Signal() # fires when the range default selection is toggled
-    display_mode_changed = QtCore.Signal(DisplayMode) # fires then the display mode changes
-    gate_used_changed = QtCore.Signal(GateInfo) # fires when the use flag changes on gates
-    range_used_changed = QtCore.Signal(RangeInfo) # fires when the use flag changes on ranges
-    gate_order_changed = QtCore.Signal() # fires when the gate order should be updated 
-    visibility_changed = QtCore.Signal(object, bool) # fires when visibility changes
+    use_default_range_changed = Signal() # fires when the range default selection is toggled
+    display_mode_changed = Signal(DisplayMode) # fires then the display mode changes
+    gate_used_changed = Signal(GateInfo) # fires when the use flag changes on gates
+    range_used_changed = Signal(RangeInfo) # fires when the use flag changes on ranges
+    gate_order_changed = Signal() # fires when the gate order should be updated 
+    visibility_changed = Signal(object, bool) # fires when visibility changes
 
-    unhook_gate = QtCore.Signal(object) # fires when the gate is unhooked, object = the gate data object
+    unhook_gate = Signal(object) # fires when the gate is unhooked, object = the gate data object
 
 
 
@@ -1204,6 +1206,13 @@ class GateEventHandler(QtCore.QObject):
                 self._value_changed_callbacks[key].remove(callback)
 
     def fireValueChangedCallbacks(self, value : float):
+        # ensure this is fired on the UI thread
+        gremlin.util.InvokeUiMethod(self._fireValueChangedCallbacks, value)
+
+
+    def _fireValueChangedCallbacks(self, value : float):
+        # update must occur on the UI thread
+        gremlin.util.assert_ui_thread()
         for key in self._value_changed_callbacks:
             for callback in self._value_changed_callbacks[key]:
                 callback(value)

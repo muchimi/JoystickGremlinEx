@@ -35,6 +35,7 @@ import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
 from gremlin.curve_handler import Point2D
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -181,9 +182,9 @@ class AbstractCurveModel(QtCore.QObject):
     """Abstract base class for all  curve models."""
 
     # Signal emitted when model data changes
-    content_modified = QtCore.Signal()
+    content_modified = Signal()
     # Signal emitted when points are added or removed
-    content_added = QtCore.Signal()
+    content_added = Signal()
 
     def __init__(self, profile_data, parent=None):
         """Initializes an empty model.

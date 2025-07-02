@@ -372,7 +372,7 @@ class AbstractContainer(ProfileData):
         InputType.Midi: None,
     }
 
-    #id_changed = QtCore.Signal(str, str) # fires when id changes (old_id, new_id)
+    #id_changed = Signal(str, str) # fires when id changes (old_id, new_id)
 
     # default allowed input types = all
     input_types = InputType.to_list()
@@ -923,7 +923,7 @@ class AbstractAction(ProfileData):
     """Base class for all actions that can be encoded via the XML and
     UI system."""
 
-    #id_changed = QtCore.Signal(str, str)  # triggers when the ID changes
+    #id_changed = Signal(str, str)  # triggers when the ID changes
 
     # allow all input types by default
     input_types = InputType.to_list()

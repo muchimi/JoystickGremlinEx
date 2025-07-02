@@ -51,7 +51,8 @@ import enum
 import gremlin.util
 import gremlin.base_profile
 from gremlin.base_classes import AbstractInputItem
-
+import psygnal
+from psygnal import Signal
 
 
 class ModeInputModeType(enum.IntEnum):
@@ -149,7 +150,7 @@ class CategoryValidator(QtGui.QValidator):
 class StateCategories(QtCore.QObject):
     ''' state categories '''
 
-    changed = QtCore.Signal() # fires when the list of categories changes
+    changed = Signal() # fires when the list of categories changes
 
     _default_category_id = "5e54b523700c4a5996bfea85ce1ea75e"
     _default_category = StateCategory("default", _default_category_id)
@@ -295,8 +296,8 @@ class StateCategories(QtCore.QObject):
 
 class StateInputItem(AbstractInputItem):
     ''' holds a single state '''
-    changed = QtCore.Signal(bool) # fires when a state changes (value)
-    key_changed = QtCore.Signal() # fires when the key changes
+    changed = Signal(bool) # fires when a state changes (value)
+    key_changed = Signal() # fires when the key changes
     
 
     def __init__(self, key : str = None, default_value = False, description = None):
@@ -320,6 +321,7 @@ class StateInputItem(AbstractInputItem):
         item.device_name = "State"
         item.device_type = DeviceType.State
         item.device_guid = gremlin.shared_state.state_tab_guid
+        item.setOverrideInputType(InputType.JoystickButton)
 
         self._input_item = item
 
@@ -327,7 +329,7 @@ class StateInputItem(AbstractInputItem):
         ''' clones the input item (gives it a new ID)'''
         return StateInputItem(self.key, self.default_value, self.description)
         
-
+    
     def getOverrideInputType(self):
         ''' override type '''
         return InputType.JoystickButton
@@ -436,11 +438,7 @@ class StateInputItem(AbstractInputItem):
                 self._value = derived_value
                 self._fire_changed(derived_value)
     
-    
-    def getOverrideInputType(self):
-        # report to containers/actions as a button
-        return InputType.JoystickButton 
-    
+
     @property
     def input_item(self):
         ''' holds a reference to the mapping data for this input '''
@@ -577,7 +575,8 @@ class StateInputItem(AbstractInputItem):
 
         if not gremlin.shared_state.is_running:
             return
-        syslog.info(f"STATE CHANGE: [{self.key}] value: {value}")
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: syslog.info(f"STATE CHANGE: [{self.key}] value: {value}")
         event = gremlin.event_handler.Event(
             event_type= InputType.State,
             device_guid= gremlin.shared_state.state_tab_guid,
@@ -801,8 +800,8 @@ class StateInputItem(AbstractInputItem):
 @SingletonDecorator
 class StateData(QtCore.QObject):
     ''' holds state information '''
-    changed  = QtCore.Signal(object) # fires when the value changes (StateItem)
-    crud = QtCore.Signal() # fires when a state is added or removed or changed
+    changed  = Signal(object) # fires when the value changes (StateItem)
+    crud = Signal() # fires when a state is added or removed or changed
 
     def __init__(self):
         super().__init__()
@@ -1422,7 +1421,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
 class  StateFilterWidget(QtWidgets.QWidget):
     ''' displays a filter widget that can be enabled, and a state category selected '''
-    changed = QtCore.Signal(StateCategory)  # fires when the category is changed
+    changed = Signal(StateCategory)  # fires when the category is changed
         
     def __init__(self, parent = None):
         super().__init__(parent)

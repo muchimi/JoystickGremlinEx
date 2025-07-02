@@ -43,6 +43,7 @@ import gremlin.sendinput
 import gremlin.util
 import enum
 from enum import auto
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -616,6 +617,7 @@ class MacroManager(QtCore.QObject):
         """Inserts pauses as necessary into the macro."""
         if macro._sequence:
             new_sequence = [macro._sequence[0]]
+            a1 = a2 = None
             for a1, a2 in zip(macro._sequence[:-1], macro._sequence[1:]):
                 if isinstance(a1, PauseAction) or isinstance(a2, PauseAction) or \
                     isinstance(a1, ProcessEventsAction) or isinstance(a2, ProcessEventsAction):
@@ -625,7 +627,7 @@ class MacroManager(QtCore.QObject):
                     #new_sequence.append(PauseAction(self.default_delay))
                     new_sequence.append(a2)
             # add a process step after the last step
-            if not isinstance(a2, ProcessEventsAction):
+            if isinstance(a2, ProcessEventsAction):
                 new_sequence.append(ProcessEventsAction())
             macro._sequence = new_sequence
 
@@ -796,7 +798,7 @@ class MacroAbstractAction(QtCore.QObject):
 
     """Base class for all macro action."""
 
-    changed = QtCore.Signal() # fires when the action changes
+    changed = Signal() # fires when the action changes
 
     def __init__(self, data = None):
         super().__init__()    

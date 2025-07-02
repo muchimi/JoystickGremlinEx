@@ -33,6 +33,7 @@ from gremlin import common, error, input_devices, joystick_handling, profile, sh
 import gremlin.ui.ui_common
 from gremlin.input_types import InputType
 import gremlin.types
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -222,7 +223,7 @@ class AbstractVariable(QtCore.QObject):
     """Represents the base class of all variables used in plugins."""
 
     # Signal emitted when the value of the variable changes
-    value_changed = QtCore.Signal(dict)
+    value_changed = Signal(dict)
 
     def __init__(self, label, description, variable_type, is_optional=False):
         """Creates a new instance.

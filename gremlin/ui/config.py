@@ -21,7 +21,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from PySide6 import QtCore, QtQml
-from PySide6.QtCore import Property, Signal, Slot
+import psygnal
+from psygnal import Signal
 
 import gremlin.config
 from gremlin.types import PropertyType

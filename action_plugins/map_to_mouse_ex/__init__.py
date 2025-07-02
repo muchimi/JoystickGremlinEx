@@ -19,6 +19,8 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.sendinput
 from gremlin import input_devices
+import psygnal
+from psygnal import Signal
 
 
 import enum, threading,time, random

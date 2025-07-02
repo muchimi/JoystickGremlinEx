@@ -45,7 +45,8 @@ from lxml import etree as ElementTree
 import enum
 import gremlin.util
 import gremlin.base_profile
-
+import psygnal
+from psygnal import Signal
 
 
 

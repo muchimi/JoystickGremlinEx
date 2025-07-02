@@ -23,7 +23,8 @@ from gremlin.types import ButtonOutputMode
 import vjoy.vjoy
 from gremlin.input_devices import VjoyAction, remote_state
 import gremlin.joystick_handling
-
+import psygnal
+from psygnal import Signal
 import enum, threading,time, random
 
 import gremlin.util
@@ -713,7 +714,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value, extra_data = None):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_state
 
         if event.event_type == InputType.JoystickButton:
             key = self.action_data.key

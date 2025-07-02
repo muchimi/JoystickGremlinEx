@@ -33,6 +33,8 @@ from lxml import etree
 import os
 import logging
 import gremlin.singleton_decorator
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system♂")
 

@@ -25,13 +25,15 @@ import threading
 from typing import List, Optional
 
 from PySide6 import QtCore, QtQml
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property,  Slot
+
 
 from gremlin import event_handler, input_devices, keyboard, shared_state,  windows_event_hook
 
 from gremlin.input_types import InputType
 import gremlin.keyboard
-
+import psygnal
+from psygnal import Signal
 
 QML_IMPORT_NAME = "Gremlin.Util"
 QML_IMPORT_MAJOR_VERSION = 1

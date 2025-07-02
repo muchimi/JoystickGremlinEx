@@ -66,6 +66,9 @@ from gremlin.base_classes import AbstractInputItem
 import gremlin.util
 import vjoy
 import vjoy.vjoy
+import psygnal
+from psygnal import Signal
+
 
 syslog = logging.getLogger("system")
 
@@ -1793,7 +1796,7 @@ class OscServer():
 class OscInterface(QtCore.QObject):
     ''' GremlinEX Open Sound Control/Open Stage Control interface '''
 
-    osc_message = QtCore.Signal(str, object) # signal on receiving an osc message
+    osc_message = Signal(str, object) # signal on receiving an osc message
 
     def __init__(self, host_ip : str = None):
         super().__init__()
@@ -2057,8 +2060,8 @@ class OscInterface(QtCore.QObject):
 class OscInputItem(AbstractInputItem):
     ''' holds OSC input data '''
 
-    message_key_changed = QtCore.Signal(str, str) # fires when message key changes 
-    input_mode_changed = QtCore.Signal() # fires when the repeater mode changes axis or button
+    message_key_changed = Signal(str, str) # fires when message key changes 
+    input_mode_changed = Signal() # fires when the repeater mode changes axis or button
 
     class InputMode(enum.Enum):
         ''' possible input modes '''
@@ -2559,12 +2562,16 @@ class OscInputListenerWidget(QtWidgets.QFrame):
 
     def _osc_message_cb(self, message, data):
         ''' called when a osc messages is provided by the listener '''
-        if self.message is None:
+        gremlin.util.InvokeUiMethod(self._osc_message_ui, message, data)
+        
+
+    
+    def _osc_message_ui(self, message, data):
+        if message:
             self.message = message
-            self._callback(message, data)
-
+        self._callback(message, data)
         self.close()
-
+       
 
 
 class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
@@ -3090,8 +3097,12 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self.reject()        
     
 
-    def _listen_cb(self, current_port_only = False):
-        ''' listens to an inbound OSC message '''
+    
+    def _listen_cb(self, current_port_only = False ):
+        gremlin.util.InvokeUiMethod(self._listen_ui, current_port_only)
+
+    def _listen_ui(self, current_port_only = False):
+        ''' listens to an inbound OSC message - runs on UI thread'''
 
 
         config = gremlin.config.Configuration()
@@ -3113,6 +3124,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _capture_message(self, command, data) :
         ''' called when an OSC message is captured '''
+        gremlin.util.assert_ui_thread()
         self._command = command
         self._command_data = data
         self._validate()

@@ -41,6 +41,8 @@ import logging
 import gremlin.ui.ui_common
 from vigem import vigem_gamepad as vg
 import gremlin.ui.state_device
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -139,8 +141,8 @@ class VisualizationSelector(QtWidgets.QWidget):
     """Presents a list of devices and visualization widgets."""
 
     # Event emitted when the visualization configuration changes
-    changed = QtCore.Signal(dinput.DeviceSummary,VisualizationType,bool)
-    clear = QtCore.Signal() # delete all
+    changed = Signal(dinput.DeviceSummary,VisualizationType,bool)
+    clear = Signal() # delete all
 
     def __init__(self, change_callback, parent=None):
         """Creates a new instance.
@@ -613,6 +615,11 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
 
     def populateState(self, layout):
+        ''' execute on UI thread '''
+        gremlin.util.InvokeUiMethod(self._populateState_ui, layout)
+
+
+    def _populateState_ui(self, layout):
         if self._state_visualizer_widget:
             gremlin.util.clear_layout(layout)
             self._state_buttons.clear()

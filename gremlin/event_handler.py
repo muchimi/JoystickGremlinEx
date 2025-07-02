@@ -48,6 +48,9 @@ import gremlin.ui
 import gremlin.singleton_decorator
 import json
 
+import psygnal
+from psygnal import Signal
+
 syslog = logging.getLogger("system")
 
 
@@ -167,6 +170,19 @@ class Event:
 		dup = copy.deepcopy(self)
 		dup._id = gremlin.util.get_guid() # unique ID for this event
 		return dup
+	
+	def __deepcopy__(self, memo):
+		import copy
+		cls = self.__class__
+		result = cls.__new__(cls)
+		memo[id(self)] = result
+		for k, v in self.__dict__.items():
+			try:
+				setattr(result, k, copy.deepcopy(v, memo))
+			except:
+				# cannot copy = do a shallow copy
+				setattr(result, k, v)
+		return result
 	
 	@property
 	def device_id(self) -> str:
@@ -326,212 +342,212 @@ class EventListener(QtCore.QObject):
 	via QT's signal/slot interface.
 	"""
 
-	ui_ready = QtCore.Signal() # tell the UI all is ready
+	ui_ready = Signal() # tell the UI all is ready
 
 	# Signal emitted when joystick events are received
-	joystick_event = QtCore.Signal(Event)
+	joystick_event = Signal(Event) # Signal(Event)
 
-	hardware_input_event = QtCore.Signal(object, object, object) # called for any input event (device_guid, input_type, input_id)
+	hardware_input_event = Signal(object, object, object) # called for any input event (device_guid, input_type, input_id)
 
-	vjoy_event = QtCore.Signal(VjoyEvent)
+	vjoy_event = Signal(VjoyEvent) # Signal(VjoyEvent)
 
 	# custom joystick event - this is a code based joystick event 
-	custom_joystick_event = QtCore.Signal(Event)
+	custom_joystick_event = Signal(Event)
 
 	# Signal emitted when keyboard events are received
-	keyboard_event = QtCore.Signal(Event)
+	keyboard_event = Signal(Event)
 	# Signal emitted when mouse events are received
-	mouse_event = QtCore.Signal(Event)
+	mouse_event = Signal(Event)
 	# Signal emitted when virtual button events are received
-	virtual_event = QtCore.Signal(Event)
+	virtual_event = Signal(Event)
 
 	# signal emmitted when a MIDI input is received
-	midi_event = QtCore.Signal(Event)
+	midi_event = Signal(Event)
 
 	# signal emitted when an OSC input is received
-	osc_event = QtCore.Signal(Event)
+	osc_event = Signal(Event)
 
 	# state event
-	state_event = QtCore.Signal(Event)
+	state_event = Signal(Event)
 
 	# Signal emitted when a joystick is attached or removed
-	device_change_event = QtCore.Signal()
+	device_change_event = Signal()
 
 	# fires when vjoy input state changes, parameter is the id of the vjoy and what it's changing to
-	vjoy_as_input_changed = QtCore.Signal(int, bool)
+	vjoy_as_input_changed = Signal(int, bool)
 
 	# fires when the number of gamepad devices changes
-	gamepad_change_event = QtCore.Signal()
+	gamepad_change_event = Signal()
 
 	# called when a process device change should be handled
-	_process_device_change = QtCore.Signal()
+	_process_device_change = Signal()
 	
 	# Signal emitted when the icon needs to be refreshed
-	icon_changed = QtCore.Signal(DeviceChangeEvent)
+	icon_changed = Signal(DeviceChangeEvent)
 
 	# Signal emitted when a profile is changed (to refresh UI)
-	profile_changed = QtCore.Signal()
+	profile_changed = Signal()
 
 	# profile loaded event
-	profile_loaded =  QtCore.Signal()
+	profile_loaded =  Signal()
 
 	# profile unloaded - trigger when a profile is being unloaded
-	profile_unloaded = QtCore.Signal()
+	profile_unloaded = Signal()
 	
 	# signal emitted when the selected hardware device changes
-	profile_device_changed = QtCore.Signal(DeviceChangeEvent)
+	profile_device_changed = Signal(DeviceChangeEvent)
 
 	# signal emitted when the selected hardware device changes
-	profile_device_mapping_changed = QtCore.Signal(DeviceChangeEvent)
+	profile_device_mapping_changed = Signal(DeviceChangeEvent)
 
 	# signal emitted when the UI tabs are loaded and profiles are loaded - some widgets use this for post-UI initialization update that needs to occur after the UI data is completely loaded
-	tabs_loaded = QtCore.Signal()
+	tabs_loaded = Signal()
 
-	refresh_devices = QtCore.Signal() # used to refresh the device list going into GremlinEx
+	refresh_devices = Signal() # used to refresh the device list going into GremlinEx
 
-	profile_reset = QtCore.Signal() # profile reset signal (when runtime for a profile needs to reset)
-	profile_start = QtCore.Signal() # profile start signal (when a profile starts)
-	profile_started = QtCore.Signal() # profile started signal (after a profile starts and all process start functions are completed)
-	profile_stop = QtCore.Signal() # profile stop signal (when a profile stops)
-	profile_stop_toolbar = QtCore.Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
-	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
-	request_profile_stop = QtCore.Signal(str) # request the profile to stop (reason: str)
-	request_profile_reload = QtCore.Signal(str, bool) # request a profile to load (str = profile file, bool = as new profile flag)
-	request_reload = QtCore.Signal() # request a reload of the current profile data
+	profile_reset = Signal() # profile reset signal (when runtime for a profile needs to reset)
+	profile_start = Signal() # profile start signal (when a profile starts)
+	profile_started = Signal() # profile started signal (after a profile starts and all process start functions are completed)
+	profile_stop = Signal() # profile stop signal (when a profile stops)
+	profile_stop_toolbar = Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
+	profile_unload = Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
+	request_profile_stop = Signal(str) # request the profile to stop (reason: str)
+	request_profile_reload = Signal(str, bool) # request a profile to load (str = profile file, bool = as new profile flag)
+	request_reload = Signal() # request a reload of the current profile data
 	
-	process_monitor_changed = QtCore.Signal() # process monitor options changed
+	process_monitor_changed = Signal() # process monitor options changed
 
-	host_ip_changed = QtCore.Signal(str) # indicates the local machines' host IP changed
+	host_ip_changed = Signal(str) # indicates the local machines' host IP changed
 	
-	config_changed =  QtCore.Signal() # occurs on broadcast configuration change
-	config_option_changed = QtCore.Signal() # occurs on broadcast configuration change
+	config_changed =  Signal() # occurs on broadcast configuration change
+	config_option_changed = Signal() # occurs on broadcast configuration change
 
-	options_changed = QtCore.Signal() # occurs when the options dialog closes to have components check for any changes
+	options_changed = Signal() # occurs when the options dialog closes to have components check for any changes
 
 	# occurs on broadcast mode change
-	broadcast_changed = QtCore.Signal(StateChangeEvent)
+	broadcast_changed = Signal(StateChangeEvent)
 
 	# occurs on mode edit/update/delete of modes (edit time only)
-	edit_mode_changed = QtCore.Signal(str) # param: the mode that was changed to
+	edit_mode_changed = Signal(str) # param: the mode that was changed to
 
-	mode_name_changed = QtCore.Signal(str, str) # runs when a mode name change occurs for the UI to update - param (old name, new name)
-	mode_list_update = QtCore.Signal() # runs when mode lists changes
-	profile_modes_changed = QtCore.Signal() # occurs when the hierarchy, or list of modes changed for a given profile (mode added, removed, changed or renamed)
-	execution_context_changed = QtCore.Signal() # occurs when execution context changes 
+	mode_name_changed = Signal(str, str) # runs when a mode name change occurs for the UI to update - param (old name, new name)
+	mode_list_update = Signal() # runs when mode lists changes
+	profile_modes_changed = Signal() # occurs when the hierarchy, or list of modes changed for a given profile (mode added, removed, changed or renamed)
+	execution_context_changed = Signal() # occurs when execution context changes 
 
-	runtime_mode_changed = QtCore.Signal(str) # runs when the runtime profile mode changes (runtime mode only, when a profile has been started) - param - the mode changed to
+	runtime_mode_changed = Signal(str) # runs when the runtime profile mode changes (runtime mode only, when a profile has been started) - param - the mode changed to
 
 	# functor enable flag changed
-	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
+	action_created = Signal(object) # runs when an action is created - object = the object that triggered the event 
 
 	# remove action
-	action_delete = QtCore.Signal(object, object, object) # fires when an action is about to be deleted, passes the (input_item, container, action) as a parameters
+	action_delete = Signal(object, object, object) # fires when an action is about to be deleted, passes the (input_item, container, action) as a parameters
 
-	virtual_button_changed = QtCore.Signal(object, object, object) # runs when the action has modified its input mode (input_item, container, action) as parameters
+	virtual_button_changed = Signal(object, object, object) # runs when the action has modified its input mode (input_item, container, action) as parameters
 
 	# selection event - tells the UI to show a different input
-	select_input = QtCore.Signal(object, object, object, bool, bool, bool) # selects a particular input (device_guid, input_type, input_id, force_update, force_switch, tab_changed)
-	select_input_completed = QtCore.Signal(object, object, object) # indicates input selection is completed (device_guid, input_type, input_id)
+	select_input = Signal(object, object, object, bool, bool, bool) # selects a particular input (device_guid, input_type, input_id, force_update, force_switch, tab_changed)
+	select_input_completed = Signal(object, object, object) # indicates input selection is completed (device_guid, input_type, input_id)
 
-	input_selected = QtCore.Signal(object) # widget item was selected, parameter = InputItemWidget
-	input_item_selected = QtCore.Signal(object, int) # widget item was selected, parameter = InputItem, index of input item in the listview
-	input_unselected = QtCore.Signal(object) # widget item was unselected selected, parameter = InputItemWidget
+	input_selected = Signal(object) # widget item was selected, parameter = InputItemWidget
+	input_item_selected = Signal(object, int) # widget item was selected, parameter = InputItem, index of input item in the listview
+	input_unselected = Signal(object) # widget item was unselected selected, parameter = InputItemWidget
 
-	tab_selected = QtCore.Signal(str) # tab selected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
-	tab_unselected = QtCore.Signal(str) # tab unselected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
+	tab_selected = Signal(str) # tab selected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
+	tab_unselected = Signal(str) # tab unselected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
 
 
 	
 
 	# mapping changed - either container or action added -
-	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
+	mapping_changed = Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
 	
 	# suspend keyboard input
-	suspend_keyboard_input = QtCore.Signal(bool) # arg = state, true = suspend, false = resume
+	suspend_keyboard_input = Signal(bool) # arg = state, true = suspend, false = resume
 
 	# called when vjoy button usage has changed in the profile so displays can update themselves
-	button_usage_changed = QtCore.Signal(int)  # (vjoy_device_id) the vjoy device that changed
+	button_usage_changed = Signal(int)  # (vjoy_device_id) the vjoy device that changed
 
 	# called when a condition state changes - used to update the UI
-	condition_redraw = QtCore.Signal(object) # fires when a condition is redrawing
-	condition_state_changed = QtCore.Signal(object) # indicates the container state change  (container : AbstractContainer)
-	condition_changed = QtCore.Signal(object)  # indicates the container's conditions changed (container : AbstractContainer | AbstractAction)
+	condition_redraw = Signal(object) # fires when a condition is redrawing
+	condition_state_changed = Signal(object) # indicates the container state change  (container : AbstractContainer)
+	condition_changed = Signal(object)  # indicates the container's conditions changed (container : AbstractContainer | AbstractAction)
 
-	condition_added = QtCore.Signal(object, str, object) # fires when a condition is added - params (input_item, mode, condition)
-	condition_removed = QtCore.Signal(object, str, object) # fires when a condition is removed - params (input_item, mode, condition)
+	condition_added = Signal(object, str, object) # fires when a condition is added - params (input_item, mode, condition)
+	condition_removed = Signal(object, str, object) # fires when a condition is removed - params (input_item, mode, condition)
 
 	# container deleted 
-	container_delete = QtCore.Signal(object, object) # fires when a container is about to be deleted, passes the input item, container as parameters
+	container_delete = Signal(object, object) # fires when a container is about to be deleted, passes the input item, container as parameters
 
 	# update input curve icons
-	update_input_icons = QtCore.Signal() # fires when the UI needs to refresh input calibration and curve icons
-	update_action_icons = QtCore.Signal() # fires when the UI needs to update the action icons
+	update_input_icons = Signal() # fires when the UI needs to refresh input calibration and curve icons
+	update_action_icons = Signal() # fires when the UI needs to update the action icons
 
 	# occurs when input enabled state changes
-	input_enabled_changed = QtCore.Signal(object) # param - InputItem
+	input_enabled_changed = Signal(object) # param - InputItem
 
 	# occurs when calibration data changes
-	calibration_changed = QtCore.Signal(object) # param - CalibrationData object
-	calibration_options_changed = QtCore.Signal() # fires when calibration options are changed for the UI to update
+	calibration_changed = Signal(object) # param - CalibrationData object
+	calibration_options_changed = Signal() # fires when calibration options are changed for the UI to update
 
 	# occurs when a macro step completes
-	macro_step_completed = QtCore.Signal(int) # param - macro ID returned by the queue_macro function
+	macro_step_completed = Signal(int) # param - macro ID returned by the queue_macro function
 
 	# request profile activate/deactivate
-	request_activate = QtCore.Signal(bool)  # param - flag - true to activate, false to deactivate
+	request_activate = Signal(bool)  # param - flag - true to activate, false to deactivate
 
 	# abort load
-	abort = QtCore.Signal() # tells loops/thread at active time to stop - called when a profile needs to stop due to a start error
+	abort = Signal() # tells loops/thread at active time to stop - called when a profile needs to stop due to a start error
 
 	# request OSC start/stop
-	request_osc = QtCore.Signal(bool) # param - flag - true to start, false to stop
-	osc_input_port_changed = QtCore.Signal() # occurs when OSC input port is changed
-	osc_output_port_changed = QtCore.Signal() # occurs when OSC output port is changed
-	osc_output_server_changed = QtCore.Signal() # occurs when OSC server output IP is changed
+	request_osc = Signal(bool) # param - flag - true to start, false to stop
+	osc_input_port_changed = Signal() # occurs when OSC input port is changed
+	osc_output_port_changed = Signal() # occurs when OSC output port is changed
+	osc_output_server_changed = Signal() # occurs when OSC server output IP is changed
 
 	# request MIDI start/stop
-	request_midi = QtCore.Signal(bool) # param - flag - true to start, false to stop
+	request_midi = Signal(bool) # param - flag - true to start, false to stop
 
 	# # signals the need to register an OSC input item
-	# register_osc_input = QtCore.Signal(object) # param input_item being registered 
+	# register_osc_input = Signal(object) # param input_item being registered 
 	
 
 	# gremlin ex shutdown in progress
-	shutdown = QtCore.Signal() 
+	shutdown = Signal() 
 
 	# toggle highlighting mode state
-	toggle_highlight = QtCore.Signal(object, object, object) # param (axis,button)
-	enable_highlight_changed = QtCore.Signal(bool) # fires when highlight enable is turned on param(enabled)
+	toggle_highlight = Signal(object, object, object) # param (axis,button)
+	enable_highlight_changed = Signal(bool) # fires when highlight enable is turned on param(enabled)
 
-	button_state_change = QtCore.Signal(Event) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
-	axis_state_change = QtCore.Signal(Event) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
+	button_state_change = Signal(Event) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
+	axis_state_change = Signal(Event) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
 
-	update_input_state = QtCore.Signal(object) # request to update all axis and button input states in the UI for a given device: (device_guid) 
+	update_input_state = Signal(object) # request to update all axis and button input states in the UI for a given device: (device_guid) 
 	
 	# heartbeat
-	heartbeat = QtCore.Signal() # ticks every 30 seconds
+	heartbeat = Signal() # ticks every 30 seconds
 
 	# autorepeat abort flag
-	autorepeat_clear =  QtCore.Signal() # fire this to abort any keyboard autorepeat actions
+	autorepeat_clear =  Signal() # fire this to abort any keyboard autorepeat actions
 
 	# module status state notices
-	module_state_change = QtCore.Signal(str, object) # send a module state update, (key, state)
-	module_state_register = QtCore.Signal(str, str, object, object) # registers a module state (key, label, state, callback) - if callback is not None, sets up a button when clicked will execute the callback
+	module_state_change = Signal(str, object) # send a module state update, (key, state)
+	module_state_register = Signal(str, str, object, object) # registers a module state (key, label, state, callback) - if callback is not None, sets up a button when clicked will execute the callback
 
-	# notify when an input is selected
+	# notify when an input is selected (keep this a QT event for thread safety)
 	input_selection_changed = QtCore.Signal(object, object, object) # (device_guid, input_type, input_id)
 
 	# request to paste a condition
-	paste_condition = QtCore.Signal(object, object) # (container, object_encoder)
+	paste_condition = Signal(object, object) # (container, object_encoder)
 
 	# request to copy a condition or activation condition
-	copy_condition = QtCore.Signal(object) # (condition or activation condition)
+	copy_condition = Signal(object) # (condition or activation condition)
 
-	show_container_id_changed = QtCore.Signal() # fires when condition ID show on/off changed in configuration - this is to update affected widgets
+	show_container_id_changed = Signal() # fires when condition ID show on/off changed in configuration - this is to update affected widgets
 
-	tts_change = QtCore.Signal(bool) # fires when TTS enable/disabled changes
+	tts_change = Signal(bool) # fires when TTS enable/disabled changes
 
-	device_mapping_changed = QtCore.Signal(str) # fires when device mapping has changed (updates headers) - param = device_id as a string
+	device_mapping_changed = Signal(str) # fires when device mapping has changed (updates headers) - param = device_id as a string
 	
 
 	def __init__(self):
@@ -1301,16 +1317,16 @@ class EventHandler(QtCore.QObject):
 	"""Listens to the inputs from multiple different input devices."""
 
 
-	mode_status_update = QtCore.Signal() # tell the UI to update the mode status bar
+	mode_status_update = Signal() # tell the UI to update the mode status bar
 
 	# signal emitted when the profile is changed
-	profile_changed = QtCore.Signal(str)
+	profile_changed = Signal(str)
 
 	# Signal emitted when the application is pause / resumed
-	is_active = QtCore.Signal(bool)
+	is_active = Signal(bool)
 
-	last_action_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name)
-	last_container_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name)
+	last_action_changed = Signal(object, str) # fires when the action changes in the selector (drop_down, name)
+	last_container_changed = Signal(object, str) # fires when the action changes in the selector (drop_down, name)
 
 	
 
@@ -2426,7 +2442,7 @@ class EventHandler(QtCore.QObject):
 
 @gremlin.singleton_decorator.SingletonDecorator
 class VjoyRemapEventHandler(QtCore.QObject):
-	grid_visible_changed = QtCore.Signal(bool) # occurs when a grid was updated
+	grid_visible_changed = Signal(bool) # occurs when a grid was updated
 
 	def __init__(self):
 		super().__init__()

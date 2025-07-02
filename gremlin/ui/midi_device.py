@@ -41,6 +41,8 @@ import gremlin.ui.joystick_device
 import gremlin.base_profile
 import gremlin.util
 from gremlin.ui.ui_common import QBoxFrame
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -168,8 +170,8 @@ _string_to_midi_lookup = {
 class MidiInputItem(AbstractInputItem):
     ''' holds the data for a MIDI device '''
 
-    message_key_changed = QtCore.Signal(str, str) # fires when message key changes 
-    input_mode_changed = QtCore.Signal() # fires when the input mode changes 
+    message_key_changed = Signal(str, str) # fires when message key changes 
+    input_mode_changed = Signal() # fires when the input mode changes 
 
     class InputMode(enum.Enum):
         ''' possible input modes '''
@@ -524,7 +526,7 @@ class MidiInterface(QtCore.QObject):
        
     '''
 
-    midi_message = QtCore.Signal(str, int, object)  # port_name, port_index, midi_message
+    midi_message = Signal(str, int, object)  # port_name, port_index, midi_message
     
     def __init__(self):
         ''' setup the midi interface '''
@@ -1248,10 +1250,14 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     def _listen_port_cb(self):
         self._listen_cb(True)
     
-    def _listen_cb(self, current_port_only = False):
-        ''' listens to an inbound MIDI message '''
+
+    def _listen_cb(self, current_port_only = False ):
+        gremlin.util.InvokeUiMethod(self._listen_ui, current_port_only)
+
+    def _listen_ui(self, current_port_only = False):
+        ''' listens to an inbound MIDI message - runs on UI thread '''
         port_name = self.port_name if current_port_only else None
-        self.listener_dialog = MidiInputListenerWidget(self._load_message, port_name)
+        self.listener_dialog = MidiInputListenerWidget(self._load_message_cb, port_name)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -1267,8 +1273,11 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         )
         self.listener_dialog.show()        
 
-    def _load_message(self, port_name : str, port_index : int, message : mido.Message):
-        ''' load the config from a MIDI message '''
+    def _load_message_cb(self, port_name : str, port_index : int, message : mido.Message):
+        gremlin.util.InvokeUiMethod(self._load_message_ui, port_name, port_index, message)
+
+    def _load_message_ui(self, port_name : str, port_index : int, message : mido.Message):
+        ''' load the config from a MIDI message - runs on UI thread '''
         # decode the message 
         
         verbose = gremlin.config.Configuration().verbose

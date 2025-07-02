@@ -36,7 +36,8 @@ from threading import Lock
 import webbrowser
 import faulthandler
 import dinput
-
+import psygnal
+from psygnal import Signal
 
 
 from lxml import etree
@@ -2789,7 +2790,17 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _config_option_changed(self):
         self._update_highlight_toolbar_enabled()
 
+
     def _select_input_handler(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
+        gremlin.util.InvokeUiMethod(self._select_input_handle_ui,
+                                    device_guid,
+                                    restore_input_type,
+                                    restore_input_id,
+                                    force_update,
+                                    force_switch,
+                                    tab_changed)
+
+    def _select_input_handle_ui(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
         ''' Selects a specific input on the given tab
         The tab is changed if different from the current tab.
 

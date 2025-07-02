@@ -35,7 +35,7 @@ import gremlin.singleton_decorator
 import gremlin.ui.osc_device
 import gremlin.ui.qsliderwidget
 from gremlin.util import load_icon
-
+from shiboken6 import Shiboken
 from gremlin.base_conditions import InputActionCondition
 from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
@@ -50,6 +50,8 @@ from gremlin.util import *
 import gremlin.util
 import vjoy.vjoy
 from functools import partial
+import psygnal
+from psygnal import Signal
 
 
 IdMapToButton = -2 # map to button special ID
@@ -79,9 +81,9 @@ class StepWidgetGroup():
 
 
 class StepWidget(gremlin.ui.ui_common.QDataWidget):
-    defaultChanged = QtCore.Signal(int, bool) # fires when default flag changes (index, flag)
-    valueChanged = QtCore.Signal(int, float) # fires when value changes (index, value)
-    deleteRequested = QtCore.Signal(int) # fires when delete is requested
+    defaultChanged = Signal(int, bool) # fires when default flag changes (index, flag)
+    valueChanged = Signal(int, float) # fires when value changes (index, value)
+    deleteRequested = Signal(int) # fires when delete is requested
 
     def __init__(self, index, value):
         super().__init__()
@@ -206,7 +208,7 @@ _merge_operation_to_description_lookup = {
 class GridClickWidget(QtWidgets.QWidget):
     ''' implements a widget that reponds to a mouse click '''
     pressPos = None
-    clicked = QtCore.Signal()
+    clicked = Signal()
 
     def __init__(self, vjoy_device_id, input_type, vjoy_input_id, parent = None):
         super(GridClickWidget, self).__init__(parent=parent)
@@ -486,6 +488,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_repeater(self, value = None):
         ''' updates the input repeater '''
+        if not Shiboken.isValid(self._repeater_range_widget):
+            return
+        if not Shiboken.isValid(self._repeater_axis_widget):
+            return
         range_widget_visible = False
         axis_widget_visible = False
         if self.action_data.input_is_axis():
@@ -1205,11 +1211,12 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.merge_selector_input_widget.setCurrentIndex(selected_input_index)
 
 
-
-
-    QtCore.Slot()
     def _listen_cb(self):
-        ''' listen to an input for a button '''
+        gremlin.util.InvokeUiMethod(self._listen_ui)
+
+    
+    def _listen_ui(self):
+        ''' listen to an input for a button - runs on UI thread '''
         self.axis_listen_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.JoystickAxis],
             return_kb_event=False,
@@ -2437,9 +2444,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.target_step_list.sort()
             self._ensure_step_widgets()
 
-    @QtCore.Slot()        
     def _stepped_listen(self):
-        ''' listens for the button to use as the down step '''
+        gremlin.util.InvokeUiMethod(self._stepped_listen_ui)
+    
+    def _stepped_listen_ui(self):
+        ''' listens for the button to use as the down step - runs on UI thread '''
         button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.JoystickButton],
             return_kb_event=False

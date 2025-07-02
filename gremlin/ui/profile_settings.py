@@ -22,14 +22,15 @@ import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.ui_common
-
+import psygnal
+from psygnal import Signal
 from gremlin.ui.qdatawidget import QDataWidget
 class ProfileSettingsWidget(QDataWidget):
 
     """Widget allowing changing profile specific settings."""
 
     # Signal emitted when a change occurs
-    changed = QtCore.Signal()
+    changed = Signal()
 
     def __init__(self, profile_settings, parent=None):
         """Creates a new UI widget.
@@ -330,7 +331,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
     """Configures which vJoy devices are treated as physical inputs."""
 
     # Signal emitted when a change occurs
-    changed = QtCore.Signal(int, bool) # (vid, enabled)
+    changed = Signal(int, bool) # (vid, enabled)
 
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.

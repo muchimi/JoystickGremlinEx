@@ -7,6 +7,7 @@ import logging
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QClipboard
+from psygnal import Signal
 import lxml.etree
 # import jsonpickle
 # import importlib
@@ -67,7 +68,7 @@ class Clipboard(QtCore.QObject):
     ''' clipboard data '''
 
     # occurs on clipboard changes
-    clipboard_changed = QtCore.Signal(QtCore.QObject)
+    clipboard_changed = Signal(QtCore.QObject)
 
     def __init__(self):
         from gremlin.util import userprofile_path

@@ -13,24 +13,27 @@ import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
+import gremlin.util
 
 from gremlin.keyboard import Key
 from gremlin.util import load_icon
 import logging
 import datetime
 import time
+import psygnal
+from psygnal import Signal
       
 syslog = logging.getLogger("system")
 
 class QKeyWidget(QtWidgets.QPushButton):
 
     # indicates when the widget is hovered (true = on)
-    hover = QtCore.Signal(object, bool)
+    hover = Signal(object, bool)
 
     # fires when selection changes
-    selected_changed = QtCore.Signal(object)
+    selected_changed = Signal(object)
     
-    key_clicked = QtCore.Signal()
+    key_clicked = Signal()
 
 
 
@@ -181,7 +184,7 @@ class QKeyWidget(QtWidgets.QPushButton):
 class QKeyboardWidget(QtWidgets.QWidget):
     ''' virtual keyboard widget '''
 
-    keyEvent = QtCore.Signal() # called when the data has changed
+    keyEvent = Signal() # called when the data has changed
 
     def __init__(self, parent = None):
 
@@ -517,10 +520,11 @@ class QKeyboardWidget(QtWidgets.QWidget):
                 self.mouse_hook.unregister(self._mouse_handler)
             self._hooked = False
 
-
-
-    @QtCore.Slot(object)
     def _keyboard_handler(self, event):
+        # invoke on UI thread
+        gremlin.util.InvokeUiMethod(self._keyboard_handler_ui, event)
+
+    def _keyboard_handler_ui(self, event):
         ''' handles an inbound API key '''
         key = gremlin.keyboard.KeyMap.from_event(event)
         if key is not None:
@@ -549,9 +553,11 @@ class QKeyboardWidget(QtWidgets.QWidget):
             self._add_line(line)
                 
 
-
-
     def _mouse_handler(self, event):
+        ''' invoke on ui thread '''
+        gremlin.util.InvokeUiMethod(self._mouse_handler_ui, event)
+
+    def _mouse_handler_ui(self, event):
         ''' mouse handler '''
         if not self._capture_mouse:
             return
@@ -642,7 +648,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
 class InputKeyboardDialog(QtWidgets.QDialog):
     ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
     
-    closed = QtCore.Signal() # sent when the dialog closes
+    closed = Signal() # sent when the dialog closes
 
     def __init__(self, sequence = None, parent = None, select_single = False, allow_modifiers = True, index = None):
         '''
@@ -804,9 +810,11 @@ class InputKeyboardDialog(QtWidgets.QDialog):
     def _force_numlock_cb(self, checked):
         gremlin.shared_state.current_profile.set_force_numlock(checked)
 
-    @QtCore.Slot()
     def _listen_cb(self):
-        """Handles adding of new keyboard keys to the list.
+        gremlin.util.InvokeUiMethod(self._listen_ui)
+    
+    def _listen_ui(self):
+        """Handles adding of new keyboard keys to the list.  runs on UI thread
 
         Asks the user to press the key they wish to add bindings for.
         """

@@ -29,6 +29,8 @@ import enum
 from gremlin.input_devices import ControlAction, remote_state
 from gremlin.util import *
 import gremlin.util
+import psygnal
+from psygnal import Signal
 
 
 syslog = logging.getLogger("system")

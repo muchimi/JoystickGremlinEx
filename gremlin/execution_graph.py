@@ -48,6 +48,8 @@ from threading import Event
 import gremlin.gated_handler
 import gremlin.types
 import gremlin.ui
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -1920,7 +1922,7 @@ class AbstractExecutionGraph(QtCore.QObject):
     graph terminates.
     """
 
-    graph_completed = QtCore.Signal(object) # fires when the process events have been all processed - parameter - the grap object just completed
+    graph_completed = Signal(object) # fires when the process events have been all processed - parameter - the grap object just completed
 
     def __init__(self, instance, parent = None):
         """Creates a new execution graph based on the provided data.

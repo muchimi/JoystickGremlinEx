@@ -24,13 +24,15 @@ import gremlin.types
 from gremlin.util import load_icon
 from gremlin.ui import ui_common
 import gremlin.ui.ui_common
+import psygnal
+from psygnal import Signal
 
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
 
     """Base class for activation condition widgets."""
 
-    virtual_button_modified = QtCore.Signal()
+    virtual_button_modified = Signal()
     
 
     def __init__(self, condition_data, parent=None, layout_direction="vertical"):

@@ -37,6 +37,8 @@ from gremlin.input_types import InputType
 import enum
 import gremlin.util    
 from gremlin.util import safe_format, safe_read
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -96,7 +98,7 @@ _switch_mode_to_enum_lookup = {
 class SwitchWidget(QtWidgets.QWidget):
     ''' widget that holds the UI for a single switch position '''
 
-    delete_item = QtCore.Signal(object)
+    delete_item = Signal(object)
 
     def __init__(self, container : SwitchContainerWidget, profile_data : SwitchContainer, data : SwitchData, parent = None):
         super().__init__(parent)
@@ -238,8 +240,10 @@ class SwitchWidget(QtWidgets.QWidget):
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self.delete_item.emit(self.data)
 
-    QtCore.Slot()
     def _listen_cb(self):
+        gremlin.util.InvokeUiMethod(self._listen_ui)
+    
+    def _listen_ui(self):
         ''' listen to an input for a button '''
         button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.JoystickButton],

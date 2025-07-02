@@ -49,6 +49,8 @@ from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_widt
 import enum
 from lxml import etree
 from gremlin.ui.deadzone import DeadzonePreset, DeadzoneWidget
+import psygnal
+from psygnal import Signal
 
 import logging
 syslog = logging.getLogger("system")
@@ -322,14 +324,14 @@ class ControlPoint:
 @gremlin.singleton_decorator.SingletonDecorator
 class CurveEventHandler(QtCore.QObject):
     ''' handler of events related to the curve handler '''
-    message = QtCore.Signal(str) # displays an informational message
-    selected_item = QtCore.Signal(object, object, int) # (point_editor, item selected, index of item select : int) - the graphics item selected
-    next_point = QtCore.Signal(object) # navigate to the next control point (point_editor)
-    prev_point = QtCore.Signal(object) # navigate to the previous control point (point_editor)
-    handle_match_x = QtCore.Signal(object) # match control point x value (point_editor)
-    handle_match_y = QtCore.Signal(object) # match control point y value (point_editor)
-    delete_point = QtCore.Signal(object) # delete the control point (point_editor)
-    value_changed = QtCore.Signal(float) # output value changed (point_editor,value:float) 
+    message = Signal(str) # displays an informational message
+    selected_item = Signal(object, object, int) # (point_editor, item selected, index of item select : int) - the graphics item selected
+    next_point = Signal(object) # navigate to the next control point (point_editor)
+    prev_point = Signal(object) # navigate to the previous control point (point_editor)
+    handle_match_x = Signal(object) # match control point x value (point_editor)
+    handle_match_y = Signal(object) # match control point y value (point_editor)
+    delete_point = Signal(object) # delete the control point (point_editor)
+    value_changed = Signal(float) # output value changed (point_editor,value:float) 
 
 
 class AbstractCurveModel(QtCore.QObject):
@@ -337,9 +339,9 @@ class AbstractCurveModel(QtCore.QObject):
     """Abstract base class for all  curve models."""
 
     # Signal emitted when model data changes
-    content_modified = QtCore.Signal()
+    content_modified = Signal()
     # Signal emitted when points are added or removed
-    content_added = QtCore.Signal()
+    content_added = Signal()
 
     def __init__(self, action_data, parent=None):
         """Initializes an empty model.

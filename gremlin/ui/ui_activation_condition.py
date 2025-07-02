@@ -34,16 +34,18 @@ from gremlin.util import load_icon
 import gremlin.util
 import gremlin.base_classes as bc
 from . import ui_common
+from shiboken6 import Shiboken
 from gremlin.base_conditions import *
 import gremlin.keyboard
-
+import psygnal
+from psygnal import Signal
 syslog = logging.getLogger("system")
 class ActivationConditionWidget(QtWidgets.QWidget):
 
     """Widget displaying the UI used to configure activation conditions."""
 
     # Signal which is emitted whenever the widget's contents change
-    activation_condition_modified = QtCore.Signal()
+    activation_condition_modified = Signal()
 
     # Maps activation type name to index
     activation_type_to_index = {
@@ -133,6 +135,8 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
     def _update_counts(self):
         ''' refreshes counts '''   
+        if not Shiboken.isValid(self.activation_count_widget):
+            return
         if self.container:
             self.activation_count_widget.setText(f"Container action conditions ({self.container.condition_count} found):")
         else:
@@ -156,8 +160,8 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
     """Abstract class for condition ui widgets."""
 
     # Signal emitted when a condition is deleted
-    #deleted = QtCore.Signal(base_classes.AbstractCondition)
-    deleted = QtCore.Signal(object)
+    #deleted = Signal(base_classes.AbstractCondition)
+    deleted = Signal(object)
 
     def __init__(self, condition : AbstractCondition, parent=None):
         """Creates a new widget.

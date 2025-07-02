@@ -27,6 +27,8 @@ from gremlin.input_types import InputType
 from gremlin.input_devices import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.types
+import psygnal
+from psygnal import Signal
 
 
 syslog = logging.getLogger("system")

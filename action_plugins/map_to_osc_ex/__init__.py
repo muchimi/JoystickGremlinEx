@@ -40,13 +40,15 @@ import gremlin.sendinput
 from gremlin import input_devices
 import gremlin.ui.osc_device
 from gremlin.ui.osc_device import OscInterface, OscClient
+import psygnal
+from psygnal import Signal
 import logging
 syslog = logging.getLogger("system")
 
 class OscArg(QtCore.QObject):
     ''' holds a single OSC argument definition '''
 
-    valueChanged = QtCore.Signal(object) # fires when the value changes
+    valueChanged = Signal(object) # fires when the value changes
 
     def __init__(self, index : int, value = 0.0, device_id : str = None, input_id = None, enabled : bool = True):
         super().__init__()
@@ -287,11 +289,11 @@ class OscArg(QtCore.QObject):
 
 
 class OscValueWidget(QtWidgets.QWidget):
-    valueChanged = QtCore.Signal(object) # fires when the value changes 
-    typeChanged = QtCore.Signal() # fires when integer flag changes 
-    enableValueOnPressChanged = QtCore.Signal(bool)
-    enableValueOnReleaseChanged = QtCore.Signal(bool)
-    enabledChanged = QtCore.Signal(bool) # fires when enabled changes
+    valueChanged = Signal(object) # fires when the value changes 
+    typeChanged = Signal() # fires when integer flag changes 
+    enableValueOnPressChanged = Signal(bool)
+    enableValueOnReleaseChanged = Signal(bool)
+    enabledChanged = Signal(bool) # fires when enabled changes
     
     def __init__(self, osc_arg : OscArg, action_data, parent = None):
         super().__init__(parent)
@@ -705,8 +707,8 @@ class OscValueWidget(QtWidgets.QWidget):
 class OscInputWidget(QtWidgets.QWidget):
     ''' value container for an OSC message '''
 
-    deleteRequested = QtCore.Signal(OscArg) # sends the ID of the arg to delete
-    moveRequested = QtCore.Signal(str) # sends a move request, passes the direction "up" "down" "top" "bottom"
+    deleteRequested = Signal(OscArg) # sends the ID of the arg to delete
+    moveRequested = Signal(str) # sends a move request, passes the direction "up" "down" "top" "bottom"
 
     def __init__(self, label : str, arg : OscArg,  action_data, parent = None):
         super().__init__(parent)

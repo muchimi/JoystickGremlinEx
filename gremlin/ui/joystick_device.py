@@ -47,7 +47,8 @@ from gremlin.util import safe_read
 import gremlin.ui.ui_common
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 from shiboken6 import Shiboken
-
+import psygnal
+from psygnal import Signal
 import gremlin.util
 
 
@@ -59,7 +60,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to display the input joystick device."""
 
-    inputChanged = QtCore.Signal(str, object, object) # indicates the input selection changed sends (device_guid string, input_type, input_id)
+    inputChanged = Signal(str, object, object) # indicates the input selection changed sends (device_guid string, input_type, input_id)
 
     def __init__(
             self,
@@ -310,6 +311,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
         ''' called on edit mode change '''
+        if not Shiboken.isValid(self):
+            return
         self.set_mode(mode)
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_detailed

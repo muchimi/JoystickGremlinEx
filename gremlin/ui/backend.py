@@ -31,6 +31,8 @@ from gremlin.signal import signal
 from gremlin.ui.device import InputIdentifier
 from gremlin.ui.profile import ActionNodeModel, InputItemBindingModel, \
     InputItemModel
+import psygnal
+from psygnal import Signal
 
 syslog = logging.getLogger("system")
 

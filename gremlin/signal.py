@@ -16,16 +16,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from PySide6 import QtCore
-from PySide6.QtCore import Signal
+# from PySide6 import QtCore
+# import psygnal
+# from psygnal import Signal
 
-from gremlin import common
-from gremlin.singleton_decorator import SingletonDecorator
+# from gremlin import common
+# from gremlin.singleton_decorator import SingletonDecorator
 
-@SingletonDecorator
-class Signal(QtCore.QObject):
+# @SingletonDecorator
+# class Signal(QtCore.QObject):
 
-    reloadUi = Signal()
+#     reloadUi = Signal()
 
 
-signal = Signal()
+# signal = Signal()

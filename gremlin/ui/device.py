@@ -21,7 +21,9 @@ import time
 import typing
 
 from PySide6 import QtCharts, QtCore, QtQml
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, Slot
+import psygnal
+from psygnal import Signal
 
 import dinput
 
