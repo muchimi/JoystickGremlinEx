@@ -1400,7 +1400,15 @@ class Configuration(QtCore.QObject):
         self._data["show_input_axis"] = value
         self.save()
 
-
+    @property
+    def input_viewer_disables_repeaters(self):
+        return self._get_data("input_viewer_disables_repeaters",False)
+    @input_viewer_disables_repeaters.setter
+    def input_viewer_disables_repeaters(self, value):
+        current = self.input_viewer_disables_repeaters
+        if current != value:
+            self._set_data("input_viewer_disables_repeaters", value)
+            self.changed.emit("input_viewer_disables_repeaters", value)
 
 
     @property

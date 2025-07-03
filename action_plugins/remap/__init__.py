@@ -341,6 +341,7 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     if isinstance(self.thread, threading.Thread):
                         self.thread.join()
                     self.thread = threading.Thread(target=self.relative_axis_thread, daemon=False)
+                    self.thread.name = "REMAP relative axis"
                     self.thread.start()
 
         elif input_type == InputType.JoystickButton:

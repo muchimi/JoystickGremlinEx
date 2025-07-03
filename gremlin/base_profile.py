@@ -3457,18 +3457,17 @@ class Profile():
                 str
             ))
             for tag in ["vjoy"]:
-                sub_node = etree.Element(tag)
-                sub_node.set(
-                    "vjoy-id",
-                    safe_format(entry[tag]["vjoy_id"], int)
-                )
-                sub_node.set("axis-id", safe_format(entry[tag]["axis_id"], int))
-                node.append(sub_node)
+                if tag in entry:
+                    sub_node = etree.Element(tag)
+                    sub_node.set("vjoy-id", safe_format(entry[tag]["vjoy_id"], int))
+                    sub_node.set("axis-id", safe_format(entry[tag]["axis_id"], int))
+                    node.append(sub_node)
             for tag in ["lower", "upper"]:
-                sub_node = etree.Element(tag)
-                sub_node.set("device-guid", write_guid(entry[tag]["device_guid"]))
-                sub_node.set("axis-id", safe_format(entry[tag]["axis_id"], int))
-                node.append(sub_node)
+                if tag in entry:
+                    sub_node = etree.Element(tag)
+                    sub_node.set("device-guid", write_guid(entry[tag]["device_guid"]))
+                    sub_node.set("axis-id", safe_format(entry[tag]["axis_id"], int))
+                    node.append(sub_node)
             root.append(node)
 
         # Settings data
@@ -3576,16 +3575,20 @@ class Profile():
             )
         }
         # TODO: apply safe reading to these
-        for tag in ["vjoy"]:
+        tag = "vjoy"
+        n = node.find(tag)
+        if n is not None and "vjoy_id" in n.attrib and "axis_id" in n.attrib:
             entry[tag] = {
-                "vjoy_id": safe_read(node.find(tag), "vjoy-id", int, 1),
-                "axis_id": safe_read(node.find(tag), "axis-id", int, 1),
+                "vjoy_id": safe_read(n, "vjoy-id", int, 1),
+                "axis_id": safe_read(n, "axis-id", int, 1),
             }
         for tag in ["lower", "upper"]:
-            entry[tag] = {
-                "device_guid": parse_guid(node.find(tag).get("device-guid")),
-                "axis_id": safe_read(node.find(tag), "axis-id", int, 1)
-            }
+            n = node.find(tag)
+            if n is not None and "device_guid" in n.attrib and "axis_id" in n.attrib:
+                entry[tag] = {
+                    "device_guid": parse_guid(safe_read(n, "device-guid", str, "")),
+                    "axis_id": safe_read(n, "axis-id", int, 1)
+                }
 
         return entry
 

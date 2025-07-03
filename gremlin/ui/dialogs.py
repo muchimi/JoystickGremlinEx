@@ -554,11 +554,17 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_scancodes_widget.setChecked(self.config.show_scancodes)
         self.show_scancodes_widget.clicked.connect(self._show_scancodes_cb)
 
-        # show scan codes
+        # show live repeaters
         self.show_joystick_input_widget = QtWidgets.QCheckBox("Show live joystick inputs")
         self.show_joystick_input_widget.setToolTip("When enabled, current state of hardware inputs will be displayed in the UI")
         self.show_joystick_input_widget.setChecked(self.config.show_input_axis)
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
+
+        # disable live repeaters when input viewer visible
+        self.disable_joystick_input_widget = QtWidgets.QCheckBox("Disable joystick repeaters when Input Viewer visible")
+        self.disable_joystick_input_widget.setToolTip("When enabled, axis and button visuals will not update while Input Viewer is visible/enabled.\brThis is to help with performance on some systems.")
+        self.disable_joystick_input_widget.setChecked(self.config.input_viewer_disables_repeaters)
+        self.disable_joystick_input_widget.clicked.connect(self._disable_joystick_input_cb)
 
         # show button grid
         self.show_button_grid_widget = QtWidgets.QCheckBox("Show button grid")
@@ -781,6 +787,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         column_layout.addWidget(self.partial_plugin_save, row, col)
         row+=1
         column_layout.addWidget(self.show_joystick_input_widget, row, col)
+        row+=1
+        column_layout.addWidget(self.disable_joystick_input_widget, row, col)
         row+=1
         column_layout.addWidget(self.show_button_grid_widget, row, col)
         row+=1
@@ -1547,6 +1555,11 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _show_joystick_input_cb(self, checked):
         self.config.show_input_axis = checked
+
+    @QtCore.Slot(bool)
+    def _disable_joystick_input_cb(self, checked):
+        self.config.input_viewer_disables_repeaters = checked
+
 
     @QtCore.Slot(bool)
     def _show_button_grid_cb(self, checked):

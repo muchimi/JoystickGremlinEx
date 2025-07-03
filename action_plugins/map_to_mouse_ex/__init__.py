@@ -743,12 +743,14 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
             syslog.debug("Wiggle start local requested...")
             MapToMouseExFunctor._wiggle_local_stop_requested = False
             MapToMouseExFunctor._wiggle_local_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_local, daemon=False)
+            MapToMouseExFunctor._wiggle_remote_thread.name = "wiggle local"
             MapToMouseExFunctor._wiggle_local_thread.start()
 
         if is_remote and not MapToMouseExFunctor._wiggle_remote_thread:
             syslog.debug("Wiggle start remote requested...")
             MapToMouseExFunctor._wiggle_remote_stop_requested = False
             MapToMouseExFunctor._wiggle_remote_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_remote, daemon=False)
+            MapToMouseExFunctor._wiggle_remote_thread.name = "wiggle remote"
             MapToMouseExFunctor._wiggle_remote_thread.start()
 
     def _wiggle_stop(self, is_local = False, is_remote = False):

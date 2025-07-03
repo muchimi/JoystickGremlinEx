@@ -78,6 +78,321 @@ class StepWidgetGroup():
         self.group = QtWidgets.QButtonGroup()
 
 
+class MergeWidget(gremlin.ui.ui_common.QDataWidget):
+    ''' merge axis widget - lets the user pick a device and axis '''
+
+    delete_requested = QtCore.Signal(object) # requesdt to delete (passes the data block)
+    changed = QtCore.Signal(object) # request to update visualization (passes the data block)
+
+    def __init__(self, data : MergeData, label : str = None, filter_input = None, action_data = None, parent = None):
+        ''' creates a merge axis selector 
+        
+        :param data : the merge block that sets or stores the return data 
+        :param label: label to display as a title
+        :param filter_input : callback function - returns true if the entry is ok, false if not, the data passed is the device_id, input_id of the selection
+        '''
+
+        super().__init__(parent = parent)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.data = data
+        self._filter_input = filter_input
+        self.action_data = action_data
+
+
+        self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.main_layout.addWidget(QtWidgets.QLabel(label if label else "Merge axis:"))
+        
+        # merge operations
+        self.container_merge_widget = QtWidgets.QWidget()
+        self.container_merge_layout = QtWidgets.QVBoxLayout(self.container_merge_widget)
+
+        self.merge_selector_device_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.merge_selector_input_widget = gremlin.ui.ui_common.NoWheelComboBox()
+
+        merge_remove_widget = gremlin.ui.ui_common.Buttons.getRemoveWidget(callback = self._remove_cb)
+
+        device_widget = QtWidgets.QWidget()
+        device_layout = QtWidgets.QGridLayout(device_widget)
+        device_layout.addWidget(QtWidgets.QLabel("Merge Device:"),0,0)
+        device_layout.addWidget(self.merge_selector_device_widget,0,1)
+        device_layout.addWidget(QtWidgets.QLabel(" "),0,2)
+        device_layout.addWidget(QtWidgets.QLabel("Merge Axis:"),1,0)
+        device_layout.addWidget(self.merge_selector_input_widget,1,1)
+
+        self.merge_device_listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb, tooltip = "Listen for axis to merge")
+        device_layout.addWidget(self.merge_device_listen_widget, 0, 2)
+        device_layout.addWidget(merge_remove_widget, 0, 3)
+        device_layout.setColumnStretch(4,2)
+
+        self.container_merge_layout.addWidget(device_widget)
+
+        self.merge_selector_device_widget.currentIndexChanged.connect(self._merged_device_changed_cb)
+        self.merge_selector_input_widget.currentIndexChanged.connect(self._merged_input_changed_cb)
+
+        # populate the selector with hardware inputs
+        self.merge_device_map = {} # holds the device information keyed by device_id (str)
+        self.merge_input_map = {} # holds the list of axes for the given device by device_id(str)
+        devices = sorted(joystick_handling.axis_input_devices(),key=lambda x: x.name)
+
+        self._merge_enabled = len(devices) > 0 # assume enabled
+
+        # figure out the default device to use
+        default_device = None
+        selected_input_id = 1
+        if self.data.device_id:
+            default_device : dinput.DeviceSummary = next((dev for dev in devices if dev.device_id == self.data.device_id), None)
+            if default_device:
+
+                if default_device.device_guid == self.action_data.hardware_device_guid:
+                    # the merge device to pick is the same as the current device
+                    if default_device.axis_count == 1:
+                        # there is only one input which is already used
+                        self._merge_enabled = False
+
+                valid_input_ids = default_device.getValidAxisInputIds()
+                if self.data.input_id and self.data.input_id in valid_input_ids:
+                    selected_input_id = self.data.input_id
+
+        if not default_device:
+            default_device = next((dev for dev in devices if dev.device_guid == self.action_data.hardware_device_guid), None)
+            if default_device:
+                axis_count = default_device.axis_count
+                if axis_count == 1:
+                    # there is only one input which is already used
+                    self._merge_enabled = False
+
+                else:
+                    # pick a suitable input
+                    input_id = self.action_data.hardware_input_id
+                    if input_id < axis_count:
+                        # pick next if possible
+                        selected_input_id = input_id + 1
+                    elif input_id > 1:
+                        # pick one below if next not available
+                        selected_input_id = input_id - 1
+                    
+                    self.data.input_id = selected_input_id
+
+
+        if not self._merge_enabled:
+            return
+
+        if not default_device:
+            # pick the first one if nothing else got selected
+            default_device = devices[0]
+
+
+
+
+        selected_device_index = devices.index(default_device)
+        with QtCore.QSignalBlocker(self.merge_selector_device_widget):
+
+            for dev in devices:
+                self.merge_device_map[dev.device_id] = dev
+                axis_list = {}
+                for input_id in range(1, dev.axis_count+1):
+                    if dev.device_guid == self.action_data.hardware_device_guid and \
+                        input_id == self.action_data.hardware_input_id:
+                        # skip self as a possible input
+                        continue
+                    axis_name = joystick_handling.get_axis_name(input_id)
+                    axis_list[input_id] = f"Axis {input_id} ({axis_name})"
+
+                if axis_list:
+                    self.merge_input_map[dev.device_id] = axis_list
+                    self.merge_selector_device_widget.addItem(dev.name, dev.device_id)
+
+
+        self.last_merge_device_id = None
+
+                
+
+        self._update_axis_list(default_device.device_id, selected_input_id)
+
+
+        # merge operation mode
+
+        self._merge_widgets_map = {}
+        
+        widgets = []
+        for merge_type in MergeOperationType:
+            if merge_type != MergeOperationType.NotSet:
+                rb = gremlin.ui.ui_common.QDataRadioButton(text = MergeOperationType.to_display_name(merge_type), data = merge_type)
+                widgets.append(rb)
+                self._merge_widgets_map[merge_type] = rb
+                if merge_type == self.data.operation:
+                    rb.setChecked(True)
+                rb.clicked.connect(self._merge_mode_changed_cb)
+
+        
+
+        self.merge_invert_widget = QtWidgets.QCheckBox("Invert")
+        self.merge_invert_widget.setChecked(self.data.invert)
+        self.merge_invert_widget.clicked.connect(self._merge_invert_changed_cb)
+        widgets.append(self.merge_invert_widget)
+
+        self.container_merge_options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Merge Operation:")
+
+        self.container_merge_layout.addWidget(self.container_merge_options_widget)
+
+        self.main_layout.addWidget(self.container_merge_widget)
+
+        # select the default device
+        with QtCore.QSignalBlocker(self.merge_selector_device_widget):
+            self.merge_selector_device_widget.setCurrentIndex(selected_device_index)
+
+        selected_input_index = self.merge_selector_input_widget.findData(selected_input_id)
+        if selected_input_index == -1:
+            selected_input_index = 0
+        self.merge_selector_input_widget.setCurrentIndex(selected_input_index)
+
+        
+
+
+    def _update_axis_list(self, device_id, select_input_id = None):
+        ''' updates the axis list for a merge input '''
+
+        if self.last_merge_device_id and gremlin.util.compare_guid(self.last_merge_device_id,device_id):
+            return
+        
+        device = joystick_handling.device_info_from_guid(device_id)
+        input_device_id = self.action_data.get_device_guid()
+        input_input_id = self.action_data.get_input_id()
+        
+        with QtCore.QSignalBlocker(self.merge_selector_input_widget):
+            self.merge_selector_input_widget.clear()
+            if not device:
+                return
+            index = 0
+            select_index = None
+
+            valid_input_ids = device.getValidAxisInputIds()
+            for input_id in valid_input_ids:
+                if gremlin.util.compare_guid(device.device_guid, input_device_id) and input_id == input_input_id:
+                    # skip current input as a merge target
+                    continue
+                axis_name = device.getAxisName(input_id)
+                self.merge_selector_input_widget.addItem(axis_name, input_id)
+                if select_index is None and input_id == select_input_id:
+                    select_index = index
+                index += 1
+
+            if select_index is not None:
+                self.merge_selector_input_widget.setCurrentIndex(select_index)
+            
+            self.last_merge_device_id = device.device_id
+
+
+        
+    
+    @QtCore.Slot()
+    def _merged_device_changed_cb(self):
+        ''' merge device changed '''
+        index = self.merge_selector_device_widget.currentIndex()
+        device_id = self.merge_selector_device_widget.itemData(index)
+        input_id = self.data.input_id
+        
+        self._update_axis_list(device_id, input_id)
+        self.data.device_id = device_id
+        self.data.input_id = input_id
+        self.changed.emit(self.data)
+
+
+    @QtCore.Slot()
+    def _merged_input_changed_cb(self):
+        ''' merge input changed '''
+        index = self.merge_selector_input_widget.currentIndex()
+        input_id = self.merge_selector_input_widget.itemData(index)
+        self.data.input_id = input_id
+        self.changed.emit(self.data)
+
+        
+
+    @QtCore.Slot(bool)
+    def _merge_invert_changed_cb(self, checked):
+        self.data.invert = checked
+        self.changed.emit(self.data)
+
+
+    @QtCore.Slot(bool)
+    def _merge_mode_changed_cb(self, checked):
+        ''' merge mode selection change '''
+        widget = self.sender()
+        self.data.operation = widget.data 
+        self.changed.emit(self.data)
+
+    def _remove_cb(self):
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Delete confirmation")
+        message_box.setInformativeText("This will delete this merge data.\nAre you sure?")
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        message_box.setIconPixmap(pixmap)
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+            )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            self._delete_confirmed_cb()
+
+    def _delete_confirmed_cb(self):
+        self.delete_requested.emit(self.data)
+
+    def _listen_cb(self):
+        gremlin.util.InvokeUiMethod(self._listen_ui)
+
+    
+    def _listen_ui(self):
+        ''' listen to an input for an axis - runs on UI thread '''
+        self.axis_listen_dialog = gremlin.ui.ui_common.InputListenerWidget(
+            [InputType.JoystickAxis],
+            return_kb_event=False,
+            filter_func=self._filter_input,
+            callback = self._update_merged_axis
+        )
+
+        # Display the dialog centered in the middle of the UI
+        root = self
+        while root.parent():
+            root = root.parent()
+        geom = root.geometry()
+
+        self.axis_listen_dialog.setGeometry(
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
+            300,
+            150
+        )
+        self.axis_listen_dialog.show()
+
+    def _update_merged_axis(self, event : gremlin.event_handler.Event):
+        ''' merged axis selected via the listen button - runs on UI thread '''
+        device_id = event.device_id
+        input_id = event.identifier
+        self.data.device_id = device_id
+        self.data.input_id = input_id
+        self._select_merge_target(device_id, input_id)
+
+    def _select_merge_target(self, device_id, input_id):
+        ''' selects a given merge axis'''
+        index = self.merge_selector_device_widget.findData(device_id)
+        if index != -1:
+            if index != self.merge_selector_device_widget.currentIndex():
+                with QtCore.QSignalBlocker(self.merge_selector_device_widget):
+                    self.merge_selector_device_widget.setCurrentIndex(index) # this also updates the axis list if needed
+                    self._update_axis_list(device_id, input_id)
+                    self.data.device_id = device_id
+                    self.data.device_guid = gremlin.util.parse_guid(device_id)
+
+            index = self.merge_selector_input_widget.findData(input_id)
+            if index != -1:
+                if index != self.merge_selector_input_widget.currentIndex():
+                    with QtCore.QSignalBlocker(self.merge_selector_input_widget):
+                        self.merge_selector_input_widget.setCurrentIndex(index)
+                        self.data.input_id = input_id        
 
 
 class StepWidget(gremlin.ui.ui_common.QDataWidget):
@@ -147,6 +462,8 @@ class MergeOperationType (enum.IntEnum):
     Center = 3 # centered (left - right)/2
     Min = 4 # min of two axes
     Max = 5 # max of two axes
+    ScaleFull = 6,
+    ScaleHalf = 7
 
     @staticmethod
     def to_display_name(value : MergeOperationType):
@@ -172,6 +489,8 @@ _merge_operation_to_enum_lookup = {
     "center" : MergeOperationType.Center,
     "min" : MergeOperationType.Min,
     "max" : MergeOperationType.Max,
+    "scalefull": MergeOperationType.ScaleFull,
+    "scalehalf": MergeOperationType.ScaleHalf,
 
 }
 
@@ -182,6 +501,8 @@ _merge_operation_to_string_lookup = {
     MergeOperationType.Center : "center",
     MergeOperationType.Min : "min",
     MergeOperationType.Max : "max",
+    MergeOperationType.ScaleFull : "scalefull",
+    MergeOperationType.ScaleHalf : "scalehalf",
 }
 
 
@@ -192,6 +513,9 @@ _merge_operation_display_lookup = {
     MergeOperationType.Center : "Center",
     MergeOperationType.Min : "Minimum",
     MergeOperationType.Max : "Maximum",
+    MergeOperationType.ScaleFull : "Scale ",
+    MergeOperationType.ScaleHalf : "Scale half (0..1)",
+
 }
 
 _merge_operation_to_description_lookup = {
@@ -201,6 +525,8 @@ _merge_operation_to_description_lookup = {
     MergeOperationType.Center : "Centered (A-B)/2",
     MergeOperationType.Min : "Min(A, B)",
     MergeOperationType.Max : "Max(A, B)",
+    MergeOperationType.ScaleFull : "Scale 0..1 is derived from full deviation",
+    MergeOperationType.ScaleHalf : "Scale 0..1 is derived from half axis value - use for centered scale inputs",
 
 }
 
@@ -488,6 +814,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_repeater(self, value = None):
         ''' updates the input repeater '''
+        if not self._ui_loaded:
+            return
         if not Shiboken.isValid(self._repeater_range_widget):
             return
         if not Shiboken.isValid(self._repeater_axis_widget):
@@ -1074,170 +1402,84 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._axis_tracking_enabled = False
 
 
+
+
     def _create_merge_ui(self):
         ''' creates the axis merging UI components '''
-        # merge operations
-        self.container_merge_widget = QtWidgets.QWidget()
-        self.container_merge_layout = QtWidgets.QVBoxLayout(self.container_merge_widget)
-
-        self.merge_selector_device_widget = gremlin.ui.ui_common.NoWheelComboBox()
-        self.merge_selector_input_widget = gremlin.ui.ui_common.NoWheelComboBox()
-
-        device_widget = QtWidgets.QWidget()
-        device_layout = QtWidgets.QGridLayout(device_widget)
-        device_layout.addWidget(QtWidgets.QLabel("Merge Device:"),0,0)
-        device_layout.addWidget(self.merge_selector_device_widget,0,1)
-        device_layout.addWidget(QtWidgets.QLabel(" "),0,2)
-        device_layout.addWidget(QtWidgets.QLabel("Merge Axis:"),1,0)
-        device_layout.addWidget(self.merge_selector_input_widget,1,1)
-
-        self.merge_device_listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb, tooltip = "Listen for axis to merge")
-        device_layout.addWidget(self.merge_device_listen_widget, 0, 2)
-        device_layout.setColumnStretch(3,2)
-
-        self.container_merge_layout.addWidget(device_widget)
-
-        self.merge_selector_device_widget.currentIndexChanged.connect(self._merged_device_changed_cb)
-        self.merge_selector_input_widget.currentIndexChanged.connect(self._merged_input_changed_cb)
-
-        # populate the selector with hardware inputs
-        self.merge_device_map = {} # holds the device information keyed by device_id (str)
-        self.merge_input_map = {} # holds the list of axes for the given device by device_id(str)
-        devices = sorted(joystick_handling.axis_input_devices(),key=lambda x: x.name)
-
-        self._merge_enabled = len(devices) > 0 # assume enabled
-
-        # figure out the default device to use
-        default_device = None
-        selected_input_id = 1
-        if self.action_data.merge_device_id:
-            default_device : dinput.DeviceSummary = next((dev for dev in devices if dev.device_id == self.action_data.merge_device_id), None)
-            if default_device:
-
-                if default_device.device_guid == self.action_data.hardware_device_guid:
-                    # the merge device to pick is the same as the current device
-                    if default_device.axis_count == 1:
-                        # there is only one input which is already used
-                        self._merge_enabled = False
-
-                valid_input_ids = default_device.getValidAxisInputIds()
-                if self.action_data.merge_input_id and self.action_data.merge_input_id in valid_input_ids:
-                    selected_input_id = self.action_data.merge_input_id
-
-        if not default_device:
-            default_device = next((dev for dev in devices if dev.device_guid == self.action_data.hardware_device_guid), None)
-            if default_device:
-                axis_count = default_device.axis_count
-                if axis_count == 1:
-                    # there is only one input which is already used
-                    self._merge_enabled = False
-
-                else:
-                    # pick a suitable input
-                    input_id = self.action_data.hardware_input_id
-                    if input_id < axis_count:
-                        # pick next if possoble
-                        selected_input_id = input_id + 1
-                    elif input_id > 1:
-                        # pick one below if next not available
-                        selected_input_id = input_id - 1
-
-
-        if not self._merge_enabled:
-            return
-
-        if not default_device:
-            # pick the first one if nothing else got selected
-            default_device = devices[0]
-
-
-
-
-        selected_device_index = devices.index(default_device)
-
-        for dev in devices:
-            self.merge_device_map[dev.device_id] = dev
-            axis_list = {}
-            for input_id in range(1, dev.axis_count+1):
-                if dev.device_guid == self.action_data.hardware_device_guid and \
-                    input_id == self.action_data.hardware_input_id:
-                    # skip self as a possible input
-                    continue
-                axis_name = self.get_axis_name(input_id)
-                axis_list[input_id] = f"Axis {input_id} ({axis_name})"
-
-            if axis_list:
-                self.merge_input_map[dev.device_id] = axis_list
-                self.merge_selector_device_widget.addItem(dev.name, dev.device_id)
-
-                
-
-        self._update_axis_list(default_device.device_id, selected_input_id)
-
-
-        # merge operation mode
-
-        self._merge_widgets_map = {}
-        
-        widgets = []
-        for merge_type in MergeOperationType:
-            if merge_type != MergeOperationType.NotSet:
-                rb = gremlin.ui.ui_common.QDataRadioButton(text = MergeOperationType.to_display_name(merge_type), data = merge_type)
-                widgets.append(rb)
-                self._merge_widgets_map[merge_type] = rb
-                if merge_type == self.action_data.merge_mode:
-                    rb.setChecked(True)
-                rb.clicked.connect(self._merge_mode_changed_cb)
-
-        
-
-        self.merge_invert_widget = QtWidgets.QCheckBox("Invert")
-        self.merge_invert_widget.setChecked(self.action_data.merge_invert)
-        self.merge_invert_widget.clicked.connect(self._merge_invert_changed_cb)
-        widgets.append(self.merge_invert_widget)
-
-        self.container_merge_options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Merge Operation:")
-
-        self.container_merge_layout.addWidget(self.container_merge_options_widget)
-
+        self.container_merge_widget, self.container_merge_layout = gremlin.ui.ui_common.getVContainer(label="Merge Information")
+        self._update_merge_widgets()
         self.main_layout.addWidget(self.container_merge_widget)
 
-        # select the default device
-        self.merge_selector_device_widget.setCurrentIndex(selected_device_index)
+    def _update_merge_widgets(self):
+        ''' populates the list of merge axes '''
+        count = 1
+        gremlin.util.clear_layout(self.container_merge_layout)
 
-        selected_input_index = self.merge_selector_input_widget.findData(selected_input_id)
-        if selected_input_index == -1:
-            selected_input_index = 0
-        self.merge_selector_input_widget.setCurrentIndex(selected_input_index)
+        
+        if not self.action_data._merge_data:
+            # add at least one
+            self.action_data._merge_data = [MergeData()]
+        
+        for data in self.action_data._merge_data:
+            widget = MergeWidget(data,f"Merge Axis {count}:", filter_input =self._filter_input, action_data = self.action_data)
+            widget.delete_requested.connect(self._delete_merge_widget)
+            widget.changed.connect(self._changed_merge_widget)
+            count += 1
+            self.container_merge_layout.addWidget(widget)
+
+        merge_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback = self._add_merge_axis)
+        self.merge_clear_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback = self._clear_merge_axis)
+        widgets = [merge_add_widget,
+                   self.merge_clear_widget
+                   ]
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.container_merge_layout.addWidget(widget)
 
 
-    def _listen_cb(self):
-        gremlin.util.InvokeUiMethod(self._listen_ui)
 
-    
-    def _listen_ui(self):
-        ''' listen to an input for a button - runs on UI thread '''
-        self.axis_listen_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            [InputType.JoystickAxis],
-            return_kb_event=False,
-            filter_func=self._filter_input
-        )
+    @QtCore.Slot(object)
+    def _delete_merge_widget(self, data : MergeData):
+        ''' called when a merge axis should be deleted'''
+        if data in self.action_data._merge_data and len(self.action_data._merge_data) > 1:
+            # can only delete if there is more than one entry
+            self.action_data._merge_data.remove(data)
+            self._update_merge_widgets()
 
-        self.axis_listen_dialog.item_selected.connect(self._update_merged_axis)
+    @QtCore.Slot(object)
+    def _changed_merge_widget(self, data : MergeData):
+        ''' called when merge axis data changes '''
+        self._update_axis_widget()
 
-        # Display the dialog centered in the middle of the UI
-        root = self
-        while root.parent():
-            root = root.parent()
-        geom = root.geometry()
+    def _add_merge_axis(self):
+        self.action_data._merge_data.append(MergeData())
+        self._update_merge_widgets()
 
-        self.axis_listen_dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
-        )
-        self.axis_listen_dialog.show()
+    def _clear_merge_axis(self):
+
+        if len(self.action_data._merge_data) > 1:
+            # can only clear if more than one merge axis as there must be always at least 1
+            message_box = QtWidgets.QMessageBox()
+            message_box.setText("Delete confirmation")
+            message_box.setInformativeText("This will delete all merge data.\nAre you sure?")
+            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+            message_box.setIconPixmap(pixmap)
+            message_box.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Ok |
+                QtWidgets.QMessageBox.StandardButton.Cancel
+                )
+            message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+            gremlin.util.centerDialog(message_box)
+            result = message_box.exec()
+            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+                self._delete_confirmed_cb()
+
+    def _delete_confirmed_cb(self):
+        self.action_data._merge_data.clear()
+        self._update_merge_widgets()
+
+
+
+
 
 
     def _filter_input(self, event : gremlin.event_handler.Event) -> bool:
@@ -1356,60 +1598,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_range_text()
         self._update_axis_widget()        
 
-    @QtCore.Slot()
-    def _merged_device_changed_cb(self):
-        ''' merge device changed '''
-        index = self.merge_selector_device_widget.currentIndex()
-        device_id = self.merge_selector_device_widget.itemData(index)
-        input_id = self.action_data.merge_input_id
-        
-        self._update_axis_list(device_id, input_id)
-        self.action_data.merge_device_id = device_id
-        self.action_data.merge_input_id = self.merge_selector_input_widget.currentData()
-        self.action_modified.emit()
-
-    def _update_axis_list(self, device_id, select_input_id = None):
-        ''' updates the axis list for a merge input '''
-
-        if self.last_merge_device_id and gremlin.util.compare_guid(self.last_merge_device_id,device_id):
-            return
-        
-        device = joystick_handling.device_info_from_guid(device_id)
-        input_device_id = self.action_data.get_device_guid()
-        input_input_id = self.action_data.get_input_id()
-        
-        with QtCore.QSignalBlocker(self.merge_selector_input_widget):
-            self.merge_selector_input_widget.clear()
-            if not device:
-                return
-            index = 0
-            select_index = None
-
-            valid_input_ids = device.getValidAxisInputIds()
-            for input_id in valid_input_ids:
-                if gremlin.util.compare_guid(device.device_guid, input_device_id) and input_id == input_input_id:
-                    # skip current input as a merge target
-                    continue
-                axis_name = device.getAxisName(input_id)
-                self.merge_selector_input_widget.addItem(axis_name, input_id)
-                if select_index is None and input_id == select_input_id:
-                    select_index = index
-                index += 1
-
-            if select_index is not None:
-                self.merge_selector_input_widget.setCurrentIndex(select_index)
-            
-            self.last_merge_device_id = device.device_id
 
 
-
-    @QtCore.Slot()
-    def _merged_input_changed_cb(self):
-        ''' merge input changed '''
-        index = self.merge_selector_input_widget.currentIndex()
-        input_id = self.merge_selector_input_widget.itemData(index)
-        self.action_data.merge_input_id = input_id
-        self.action_modified.emit()
 
 
 
@@ -1437,8 +1627,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         value = event.value
 
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
+
             # merge - check two sets
-            if event.device_guid == self.action_data.hardware_device_guid and event.device_guid == self.action_data.merge_device_guid:
+            if event.device_guid == self.action_data.hardware_device_guid and self.action_data.isMergeDeviceGuid(event.device_guid): # == self.action_data.merge_device_guid:
                 # merge hardware is the same as current input - accept only the two input itds
                 if event.identifier != self.action_data.hardware_input_id and event.identifier != self.action_data.merge_input_id:
                     return
@@ -1446,8 +1637,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 # not the same:
                 if event.device_guid == self.action_data.hardware_device_guid and event.identifier != self.action_data.hardware_input_id:
                     return
-                if event.device_guid == self.action_data.merge_device_guid and event.identifier != self.action_data.merge_input_id:
+                
+                if not self.action_data.isMergeDeviceGuid(event.device_guid):
                     return
+                        
 
             # compute the merged value    
             value = self.action_data.get_filtered_axis_value(value)
@@ -1477,6 +1670,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param value: the floating point input value, if None uses the cached value
 
         '''
+        if not self._ui_loaded:
+            return
         # always read the current input as the value could be from another device for merged inputs
         if self.action_data.input_is_axis(): # == InputType.JoystickAxis:
             curves = [self.action_data.curve_data] if self.action_data.curve_data else None
@@ -1490,10 +1685,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
-    @QtCore.Slot(bool)
-    def _merge_invert_changed_cb(self, checked):
-        self.action_data.merge_invert = checked
-        self._update_axis_widget()
+    
 
     @QtCore.Slot(bool)
     def _merge_mode_changed_cb(self, checked):
@@ -1501,42 +1693,22 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         widget = self.sender()
         self.merge_type = widget.data
 
-    @property
-    def merge_type(self) -> MergeOperationType:
-        return self.action_data.merge_type
+    # @property
+    # def merge_type(self) -> MergeOperationType:
+    #     return self.action_data.merge_type
 
-    @merge_type.setter
-    def merge_type(self, value : MergeOperationType):
-        if self.action_data.merge_mode != value:
-            self.action_data.merge_mode = value
-            widget = self._merge_widgets_map[value]
-            with QtCore.QSignalBlocker(widget):
-                widget.setChecked(True)
-            self._update_axis_widget()
+    # @merge_type.setter
+    # def merge_type(self, value : MergeOperationType):
+    #     if self.action_data.merge_mode != value:
+    #         self.action_data.merge_mode = value
+    #         widget = self._merge_widgets_map[value]
+    #         with QtCore.QSignalBlocker(widget):
+    #             widget.setChecked(True)
+    #         self._update_axis_widget()
 
 
 
-    def get_axis_name(self, input_id):
-        ''' gets the axis name based on the input # '''
-        if input_id == 1:
-            axis_name = "X"
-        elif input_id == 2:
-            axis_name = "Y"
-        elif input_id == 3:
-            axis_name = "Z"
-        elif input_id == 4:
-            axis_name = "RX"
-        elif input_id == 5:
-            axis_name = "RY"
-        elif input_id == 6:
-            axis_name = "RZ"
-        elif input_id == 7:
-            axis_name = "S1"
-        elif input_id == 8:
-            axis_name = "S2"
-        else:
-            axis_name = f"(unknown [{input_id}])"
-        return axis_name
+   
 
     def _create_info(self):
         ''' shows what device is currently selected '''
@@ -1575,11 +1747,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         is_axis = self.action_data.input_is_axis()
         if is_axis:
             if not action_name:
-                action_name = f"Vjoy device {vjoy_device_id} axis {vjoy_input_id} ({self.get_axis_name(vjoy_input_id)})"
+                action_name = f"Vjoy device {vjoy_device_id} axis {vjoy_input_id} ({joystick_handling.get_axis_name(vjoy_input_id)})"
             if input_type != InputType.JoystickAxis:
                 name = f"Input axis -> {action_name}"
             else:
-                axis_name = self.get_axis_name(input_id)
+                axis_name = joystick_handling.get_axis_name(input_id)
                 name = f"Axis {input_id} ({axis_name}) -> {action_name}"
         elif input_type in VJoyRemapWidget.input_type_buttons:
             if not action_name:
@@ -2737,6 +2909,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         
             output_curve_visible = action in (VjoyAction.VJoyAxis, VjoyAction.VJoyMergeAxis, VjoyAction.VJoyRangeAxis)
 
+            if action == VjoyAction.VJoyMergeAxis:
+                # can clear if more than one merge axis defined
+                self.merge_clear_widget.setEnabled(len(self.action_data._merge_data) > 1)
+
         elif input_type in VJoyRemapWidget.input_type_buttons:
             pulse_visible = action == VjoyAction.VJoyPulse
             start_visible = action in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease)
@@ -2997,6 +3173,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(bool)
     def _grid_visible_changed(self, visible):
         ''' global grid visible change event '''
+        if not Shiboken.isValid(self):
+            return
         self.action_data.grid_visible = visible
         with QtCore.QSignalBlocker(self.grid_visible_widget):
             self.grid_visible_widget.setChecked(visible)
@@ -3510,7 +3688,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
     def latch_extra_inputs(self):
         ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
-            return [(self.action_data.merge_device_guid, self.action_data.merge_input_type, self.action_data.merge_input_id)]
+            latched = []
+            for data in self.action_data._merge_data:
+                latched.append((data.device_guid, InputType.JoystickAxis, data.input_id))
+            return latched
+            #return [(self.action_data.merge_device_guid, self.action_data.merge_input_type, self.action_data.merge_input_id)]
         if self.action_data.action_mode == VjoyAction.VJoySetAxisStepped:
             return [(self.action_data.stepped_device_guid, self.action_data.stepped_input_type, self.action_data.stepped_input_id)]
         return []
@@ -4307,6 +4489,118 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.functor_complete.emit() # indicate completed
 
 
+class MergeData():
+    ''' defines a merge axis input '''
+    def __init__(self, device_id = None, input_id = None, operation : MergeOperationType = MergeOperationType.Center, invert = False):
+        if not isinstance(device_id, str):
+            device_id = str(device_id)
+
+        self._device_id = device_id
+        self._device_guid = gremlin.util.parse_guid(device_id)
+        self._input_id = input_id
+        self.operation = operation
+        self.invert = invert
+        self.id = gremlin.util.get_guid()
+
+    @property
+    def device_id(self):
+        return self._device_id
+    @property
+    def device_guid(self):
+        return self._device_guid
+    
+    @device_id.setter
+    def device_id(self, value):
+        self._device_id = value
+        self._device_guid = gremlin.util.parse_guid(value)
+
+    @device_guid.setter
+    def device_guid(self, value):
+        self._device_id = str(value)
+        self._device_guid = value
+
+    @property
+    def input_id(self):
+        return self._input_id
+    @input_id.setter
+    def input_id(self, value):
+        self._input_id = value
+
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        if other is None:
+            return False
+        if self.device_id != other.device_id:
+            return False
+        if self.input_id != other.input_id:
+            return False
+        return True
+
+
+    def to_xml(self):
+        ''' saves data to xml and return that xml node '''
+        node = ElementTree.Element("merge-data")
+        node.set("device-id", self.device_id)
+        node.set("input-id", safe_format(self.input_id, int))
+        node.set("operation", safe_format(MergeOperationType.to_string(self.operation), str))
+        node.set("invert", safe_format(self.invert, bool))
+        return node
+
+    def from_xml(self, node):
+        ''' read node data from xml '''
+        if not node.tag == "merge-data":
+            return
+        device_id = safe_read(node,"device-id", str, "")
+        if not device_id:
+            return
+        device_guid = gremlin.util.parse_guid(device_id)
+        self.device_id = device_id
+        self.device_guid = device_guid
+        self.input_id = safe_read(node,"input-id", int, 1)
+        if "operation" in node.attrib:
+            op_str = node.get("operation")
+            if gremlin.util.isNumeric(op_str):
+                # legacy
+                self.operation = MergeOperationType(int(op_str))
+            else:
+                self.operation = MergeOperationType.to_enum(op_str)
+        else:
+            self.operation = MergeOperationType.Center # default
+
+        self.invert = safe_read(node,"invert", bool, False)
+
+
+    def compute(self, value : float):
+        ''' applies the transform '''
+        current = joystick_handling.get_axis(self.device_id, self.input_id)
+        match self.operation:
+            case MergeOperationType.Add:
+                new_value = value + current
+
+            case MergeOperationType.Substract:
+                new_value = value - current
+            case MergeOperationType.Average:
+                new_value = (value + current) / 2
+            case MergeOperationType.Center:
+                new_value = (value - current) / 2
+            case MergeOperationType.ScaleHalf:
+                current = abs(current)
+                new_value = value * scale
+            case MergeOperationType.ScaleFull:
+                scale = gremlin.util.scale_to_range(current,target_min=0, target_max = 1)
+                new_value = value * scale
+            case _:
+                # no change
+                return value 
+            
+        return gremlin.util.clamp(new_value)
+    
+
+            
+
+        
 
 class VjoyRemap(gremlin.base_profile.AbstractAction):
 
@@ -4371,11 +4665,14 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.auto_release = False # true if we should do an auto-release (only means anything on momentary inputs)
         self.ignore_release = False # true if the button release should be ignored
 
-        self._merge_device_id : str = None # input guid (str) of the merged device
-        self._merge_device_guid : dinput.GUID = None # input guid for the merge device
-        self.merge_input_id : int = None # input id of the merged input
-        self.merge_input_type : gremlin.input_types.InputType =  gremlin.input_types.InputType.JoystickAxis # only merging axes at this point
-        self._merge_mode : MergeOperationType = MergeOperationType.Center # default merge method
+        # self._merge_device_id : str = None # input guid (str) of the merged device
+        # self._merge_device_guid : dinput.GUID = None # input guid for the merge device
+        self._merge_data = [] # list of merged axes
+
+        # self.merge_input_id : int = None # input id of the merged input
+        # self.merge_input_type : gremlin.input_types.InputType =  gremlin.input_types.InputType.JoystickAxis # only merging axes at this point
+        # self._merge_mode : MergeOperationType = MergeOperationType.Center # default merge method
+
         self.output_range_min : float = -1.0 # min for merged output
         self.output_range_max : float = 1.0 # max for merged output
         self.merge_invert : bool = False # inversion flag for merged output
@@ -4514,39 +4811,50 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
 
-        elif self.action_mode == VjoyAction.VJoyMergeAxis and self.merge_mode != MergeOperationType.NotSet:
-            if self.merge_device_id and self.merge_input_id:
-                # always read v1 and v2 because the input value may be of either inputs
-                v1 = None
-                v2 = None
-                if gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid):
-                    v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
-                else:
-                    v1 = self.hardware_input_id.axis_value
+        elif self.action_mode == VjoyAction.VJoyMergeAxis: #and self.merge_mode != MergeOperationType.NotSet:
 
-                if gremlin.joystick_handling.is_hardware_device(self.merge_device_guid):
-                    v2 = gremlin.joystick_handling.get_curved_axis(self.merge_device_guid, self.merge_input_id)
+            if gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid):
+                v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+            else:
+                v1 = self.hardware_input_id.axis_value
+            
+            if curves:
+                for curve_data in curves:
+                    v1 = curve_data.curve_value(v1)
+
+            value = v1
+            for data in self._merge_data:
+                merge_device_id = data.device_id
+                merge_input_id = data.input_id
+                if not merge_device_id or merge_input_id is None:
+                    # no data
+                    continue
+                merge_device_guid = data.device_guid
+                
+
+                v2 = None
+
+                if gremlin.joystick_handling.is_hardware_device(merge_device_guid):
+                    v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
                 else:
                     # find the merged device
                     ec = gremlin.execution_graph.ExecutionContext()
-                    input_item = ec.findInputItem(self.merge_device_guid, self.merge_input_id)
+                    input_item = ec.findInputItem(merge_device_guid, merge_input_id)
                     if input_item:
                         v2 = input_item.axis_value
 
                 if v1 is None or v2 is None:
                     # something wasn't found
-                    syslog.error("VjoyRemap: merge: unable to get an axis value, one of the inputs was not found.")
+                    syslog.error(f"VjoyRemap: merge: unable to get an axis value, one of the inputs was not found.: id: [{str(merge_device_guid)}] axis: [{merge_input_id}] ")
                     return 0.0
 
                 # apply any local curves to the values
                 if curves:
                     for curve_data in curves:
-                        v1 = curve_data.curve_value(v1)
                         v2 = curve_data.curve_value(v2)
 
 
-
-                match self.merge_mode:
+                match data.operation:
                     case MergeOperationType.Add:
                         value = scale_to_range(v1+v2,
                                             target_min=self.output_range_min,
@@ -4572,6 +4880,14 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                                                 target_min=self.output_range_min,
                                                 target_max=self.output_range_max,
                                                 invert = self.merge_invert)
+                    case MergeOperationType.ScaleFull:
+                        scale = scale_to_range(v2, target_min=0, target_max = 1)
+                        value = scale_to_range(v1*scale)
+                    case MergeOperationType.ScaleHalf:
+                        scale = abs(v2)
+                        value = scale_to_range(v1*scale)
+
+                v1 = value
 
         return value
     
@@ -4588,40 +4904,47 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             value = gremlin.util.scale_to_range(value*s,target_min=v1,target_max=v2)
         return value
 
-    @property
-    def merge_mode(self) -> MergeOperationType:
-        return self._merge_mode
-    @merge_mode.setter
-    def merge_mode(self, value : MergeOperationType):
-        self._merge_mode = value
-        self.merged = value != MergeOperationType.NotSet
+    # @property
+    # def merge_mode(self) -> MergeOperationType:
+    #     return self._merge_mode
+    # @merge_mode.setter
+    # def merge_mode(self, value : MergeOperationType):
+    #     self._merge_mode = value
+    #     self.merged = value != MergeOperationType.NotSet
 
-    @property
-    def merge_device_id(self) -> str:
-        return self._merge_device_id
+    # @property
+    # def merge_device_id(self) -> str:
+    #     return self._merge_device_id
 
-    @merge_device_id.setter
-    def merge_device_id(self, value : str | dinput.GUID):
-        if value is None:
-            self._merge_device_id = None
-            self._merge_device_guid = None
-            return
-        if not isinstance(value, str):
-            value = str(value)
-        self._merge_device_id = value
-        self._merge_device_guid = util.parse_guid(value)
+    def isMergeDeviceGuid(self, device_guid):
+        for data in self._merge_data:
+            if gremlin.util.compare_guid(device_guid, data.device_guid):
+                return True
+            
+        return False
 
-    @property
-    def merge_device_guid(self) -> dinput.GUID:
-        return self._merge_device_guid
-    @merge_device_guid.setter
-    def merge_device_guid(self, value : dinput.GUID):
-        if value is None:
-            self._merge_device_id = None
-            self._merge_device_guid = None
-            return
-        self._merge_device_guid = value
-        self._merge_device_id = str(value)
+    # @merge_device_id.setter
+    # def merge_device_id(self, value : str | dinput.GUID):
+    #     if value is None:
+    #         self._merge_device_id = None
+    #         self._merge_device_guid = None
+    #         return
+    #     if not isinstance(value, str):
+    #         value = str(value)
+    #     self._merge_device_id = value
+    #     self._merge_device_guid = util.parse_guid(value)
+
+    # @property
+    # def merge_device_guid(self) -> dinput.GUID:
+    #     return self._merge_device_guid
+    # @merge_device_guid.setter
+    # def merge_device_guid(self, value : dinput.GUID):
+    #     if value is None:
+    #         self._merge_device_id = None
+    #         self._merge_device_guid = None
+    #         return
+    #     self._merge_device_guid = value
+    #     self._merge_device_id = str(value)
 
 
     @property
@@ -4997,25 +5320,39 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             if "paired" in node.attrib:
                 self.paired = safe_read(node,"paired", bool, False)
 
-            if "merge_device_id" in node.attrib:
-                self.merge_device_id = node.get("merge_device_id")
+            self._merge_data = []
+            if self.action_mode == VjoyAction.VJoyMergeAxis:
+                # legacy
+                if "merge_device_id" in node.attrib and "merge_input_id" in node.attrib:
+                    device_id = node.get("merge_device_id")
+                    input_id = safe_read(node,"merge_input_id", int, 0)
+                    if "merge_input_type" in node.attrib:
+                        merge_input_type = safe_read(node,"merge_input_type", str, "")
+                        merge_input_type = gremlin.input_types.InputType.to_enum(merge_input_type)
+                    merge_mode = MergeOperationType.Center
+                    if "merge_mode" in node.attrib:
+                        mode = node.get("merge_mode")
+                        try:
+                            merge_mode = MergeOperationType.to_enum(mode)
+                        except:
+                            pass
+                    invert = safe_read(node,"merge_invert", bool, False)
+                    data = MergeData(device_id, input_id, operation = merge_mode, invert = invert)
+                    self._merge_data.append(data)
+                else:
+                    # as of m76t22 - multi-merge support
+                    for child in node:
+                        if child.tag == "merge-axis":
+                            for data_node in child:
+                                data = MergeData()
+                                data.from_xml(data_node)
+                                self._merge_data.append(data)
+                            break
 
-            if "merge_input_id" in node.attrib:
-                self.merge_input_id = safe_read(node,"merge_input_id", int, 0)
+                
 
-            if "merge_input_type" in node.attrib:
-                merge_input_type = safe_read(node,"merge_input_type", str, "")
-                self.merge_input_type = gremlin.input_types.InputType.to_enum(merge_input_type)
-
-            if "merge_mode" in node.attrib:
-                mode = node.get("merge_mode")
-                try:
-                    merge_mode = MergeOperationType.to_enum(mode)
-                    self.merge_mode = merge_mode
-                except:
-                    pass
-            if "merge_invert" in node.attrib:
-                self.merge_invert = safe_read(node,"merge_invert", bool, False)
+                
+            
             if "merge_min" in node.attrib:
                 self.output_range_min = safe_read(node,"merge_min", float, -1.0)
             if "merge_max" in node.attrib:
@@ -5161,15 +5498,27 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 pass
 
             case VjoyAction.VJoyMergeAxis:
-                node.set("merge_mode", MergeOperationType.to_string(self.merge_mode))
-                if self.merge_device_id:
-                    node.set("merge_device_id", self.merge_device_id)
-                if self.merge_input_id:
-                    node.set("merge_input_id", str(self.merge_input_id))
+                # node.set("merge_mode", MergeOperationType.to_string(self.merge_mode))
+                # if self.merge_device_id:
+                #     node.set("merge_device_id", self.merge_device_id)
+                # if self.merge_input_id:
+                #     node.set("merge_input_id", str(self.merge_input_id))
+
+                if self._merge_data:
+                    child = ElementTree.SubElement(node,"merge-axis")
+                    for data in self._merge_data:
+                        node_data = data.to_xml()
+                        child.append(node_data)
+
+
+
+
+
                 node.set("merge_invert", safe_format(self.merge_invert, bool))
                 node.set("merge_min", safe_format(self.output_range_min, float))
                 node.set("merge_max", safe_format(self.output_range_max, float))
-                node.set("merge_input_type", gremlin.input_types.InputType.to_string(self.merge_input_type))
+                #node.set("merge_input_type", gremlin.input_types.InputType.to_string(self.merge_input_type))
+
 
 
             case VjoyAction.VJoyPulse:

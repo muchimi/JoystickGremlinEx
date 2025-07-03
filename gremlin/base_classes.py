@@ -502,6 +502,8 @@ class JoystickHook:
 
     @QtCore.Slot(object)
     def _hook_joystick_event(self, event):
+        if gremlin.shared_state.is_repeater_suspended():
+            return
         if self._callback:
             if not event.is_axis:
                 return 

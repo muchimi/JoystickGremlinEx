@@ -385,6 +385,7 @@ class KeyboardHook:
     def __init__(self):
         self._running = False
         self._listen_thread = threading.Thread(target=self._listen, daemon=False)
+        self._listen_thread.name = "keyboard hook"
         
 
     def register(self, callback):

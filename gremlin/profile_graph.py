@@ -1158,16 +1158,21 @@ class ProfileMergedAxisNode(ProfileBaseNode):
             "mode": node.get("mode", None),
             "operation": gremlin.types.MergeAxisOperation.to_enum(safe_read(node, "operation", str, "average"))
         }
-        for tag in ["vjoy"]:
+        tag = "vjoy"
+        n = node.find(tag)
+        if n is not None and "vjoy_id" in n.attrib and "axis_id" in n.attrib:
             entry[tag] = {
-                "vjoy_id": safe_read(node.find(tag), "vjoy-id", int, 1),
-                "axis_id": safe_read(node.find(tag), "axis-id", int, 1),
+                "vjoy_id": safe_read(n, "vjoy-id", int, 1),
+                "axis_id": safe_read(n, "axis-id", int, 1),
             }
         for tag in ["lower", "upper"]:
-            entry[tag] = {
-                "device_guid": parse_guid(node.find(tag).get("device-guid")),
-                "axis_id": safe_read(node.find(tag), "axis-id", int, 1)
-            }
+            n = node.find(tag)
+            if n is not None and "device_guid" in n.attrib and "axis_id" in n.attrib:
+                entry[tag] = {
+                    "device_guid": parse_guid(safe_read(n, "device-guid", str, "")),
+                    "axis_id": safe_read(n, "axis-id", int, 1)
+                }
+
         self.entry = entry
 
     def to_xml(self):

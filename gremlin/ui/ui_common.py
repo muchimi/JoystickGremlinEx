@@ -635,6 +635,10 @@ class Buttons():
         return Buttons._template(label, "ri.add-line", tooltip, callback, no_keyboard, data)
     
     @staticmethod
+    def getRemoveWidget(label = "Remove", tooltip = "Remove", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, "mdi.close-box-outline", tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
     def getEditWidget(label = None, tooltip = "Edit", callback = None, no_keyboard = True, data = None):
         return Buttons._template(label, "msc.edit", tooltip, callback, no_keyboard, data)
     
@@ -882,6 +886,9 @@ class StateTracker():
             # do not update while profile is running
             return 
         
+        if gremlin.shared_state.is_repeater_suspended():
+            return
+        
         self._process_event(event)
 
     def _process_event(self, event):
@@ -983,6 +990,8 @@ class StateTracker():
         if gremlin.shared_state.is_running:
             # do not update while profile is running
             return 
+        if gremlin.shared_state.is_repeater_suspended():
+            return
         
         device_guid = event.device_guid
         input_type = event.event_type
@@ -2720,6 +2729,7 @@ class InputListenerWidget(QBoxFrame):
             return_kb_event=False,
             multi_keys=False,
             filter_func=None,
+            callback = None, 
             parent=None
     ):
         """Creates a new instance.
@@ -2733,6 +2743,7 @@ class InputListenerWidget(QBoxFrame):
             or return after the first initial press (False)
         :param filter_func function applied to inputs which filters out more
             complex unwanted inputs
+        :param callback : callback on selection
         :param parent the parent widget of this widget
         """
         super().__init__(parent)
@@ -2745,6 +2756,7 @@ class InputListenerWidget(QBoxFrame):
         self._closing = False
         self._abort_timer = threading.Timer(1.0, self._abort_request)
         self._multi_key_storage = []
+        self._callback = callback
 
         self._close_on_key = not (InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types)
         self._esc_key = key_from_name("esc")
@@ -2802,8 +2814,16 @@ class InputListenerWidget(QBoxFrame):
 
         if process_event:
             gremlin.input_devices.JoystickInputSignificant().reset()
-            self.item_selected.emit(event)
-            self.close()
+            gremlin.util.InvokeUiMethod(self._selected_ui, event)
+        
+
+    def _selected_ui(self, event):
+        ''' input selected - runs on UI thread'''
+        if self._callback:
+            self._callback(event)
+        self.item_selected.emit(event)
+        self.close()
+
 
     def _kb_event_cb(self, event):            
         gremlin.util.InvokeUiMethod(self._kb_event_ui, event)
@@ -4908,6 +4928,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         :param event the event with which to update the state display
         """
+
         if event.event_type == InputType.JoystickAxis:
             axis_id = gremlin.joystick_handling.linear_axis_index(
                 self.device.axismap_list,
@@ -7287,7 +7308,7 @@ class BaseDialogUi(QRememberDialog):
     """
 
     # Signal emitted when the dialog is being closed
-    closed = Signal()
+    closed = QtCore.Signal()
 
     def __init__(self, key, parent=None):
         """Creates a new options UI instance.
@@ -7436,6 +7457,10 @@ class QHorizontalSeparator(QtWidgets.QLabel):
         pixmap = icon.pixmap(QtCore.QSize(24,24))
         self.setPixmap(pixmap)
 
+class QHorizontalLine(QtWidgets.QFrame):
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
 
    
 def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, alignment = None, set_alignment = True, min_height = None):

@@ -465,11 +465,6 @@ class InputViewerUi(ui_common.BaseDialogUi):
                 widget.process_event(event)
         finally:
             self._lock.release()
-
-    # def _hook_widgets(self):
-    #     # hook input widgets
-    #     #widgets = [widget for widget in self._widget_storage.values() if isinstance(widget, ui_common.JoystickDeviceWidget)]
-    #     for widget in self._widget_storage.values(): widget.hook()
         
 
     @QtCore.Slot()

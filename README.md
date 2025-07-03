@@ -13,6 +13,12 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T22)
+- Added: option to disable joystick/button input repeaters while Input Viewer is visible to help with performance on some systems.
+- Added: Multiple merge axis to vjoy remap.  The effect is cumulative and the value is computed top to bottom.
+- Added: Scale option to merge axis so one of the merge axes can scale the output value.  For now the scale is only based on the position, so two modes are provided:  full axis and half axis (for centered axes).  
+- Fix: Fixed a QT issue with the new event system.
+
 ### (m76T21)
 - Major change: event model largely switched from QT to psygnal for performance and behavior reasons.
 - Added: psygnal library dependency to the project

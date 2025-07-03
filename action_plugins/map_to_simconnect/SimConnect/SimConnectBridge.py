@@ -249,6 +249,7 @@ class SimConnectBridge(QtCore.QObject):
                                         
                     if self._state == "complete":
                         thread = threading.Thread(target = lambda: self.lvars_loaded.emit(self._lvars), daemon=False)
+                        thread.name = "simconnect bridge"
                         thread.start()
                         self._state = None
                         
@@ -267,6 +268,7 @@ class SimConnectBridge(QtCore.QObject):
                     elif data == "#ac_end#":
                         self._state = "complete"
                         thread = threading.Thread(target = lambda: self.aircraft_list_loaded.emit(self._aircraft_map), daemon=False)
+                        thread.name ="simconnect ac list"
                         thread.start()
 
                     elif self._state == "loading":
@@ -358,6 +360,7 @@ class SimConnectBridge(QtCore.QObject):
             if verbose: syslog.info("SIMCONNECT BRIDGE: handshake initiated...")
             self._connect_in_progress = True
             self._alive_thread = threading.Thread(target = self._ping_runner, daemon=False)
+            self._alive_thread.name = "SIMCONNECT wasm ping runner"
             self._alive_thread.start()
 
     def _ping_runner(self):

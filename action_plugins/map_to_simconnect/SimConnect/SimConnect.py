@@ -677,7 +677,7 @@ class SimConnect():
 		if not self._aircraft_loaded_event.is_set():
 			self._aircraft_loaded_event.set()
 			thread = threading.Thread(target = self._process_aircraft_string, args = [aircraft_cfg], daemon=False)
-			thread.setName("process aircraft file thread")
+			thread.name = "SIMCONNECT aircraft receive thread"
 			thread.start()
 
 		

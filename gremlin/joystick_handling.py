@@ -211,6 +211,27 @@ def get_axis(guid, index, normalized = True):
             return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
     return 0.0
         
+def get_axis_name(input_id):
+    ''' gets the axis name based on the input # '''
+    if input_id == 1:
+        axis_name = "X"
+    elif input_id == 2:
+        axis_name = "Y"
+    elif input_id == 3:
+        axis_name = "Z"
+    elif input_id == 4:
+        axis_name = "RX"
+    elif input_id == 5:
+        axis_name = "RY"
+    elif input_id == 6:
+        axis_name = "RZ"
+    elif input_id == 7:
+        axis_name = "S1"
+    elif input_id == 8:
+        axis_name = "S2"
+    else:
+        axis_name = f"(unknown [{input_id}])"
+    return axis_name        
 
 def get_curved_axis(guid, identifier):
     ''' returns curved/calibrated data same as the event handler '''

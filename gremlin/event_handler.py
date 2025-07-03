@@ -596,12 +596,12 @@ class EventListener(QtCore.QObject):
 
 		self._run_event = threading.Event()
 		self._run_thread = Thread(target=self._run)
-		self._run_thread.setName("EventListener run thread")
+		self._run_thread.name ="EVENT run"
 		self._run_thread.start()
 
 		self._keep_alive_event = threading.Event()
 		self._keep_alive_thread = threading.Thread(target = self._keep_alive, daemon=False)
-		self._keep_alive_thread.setName("heartbeat")
+		self._keep_alive_thread.name = "EVENT heartbeat"
 		self._keep_alive_thread.start()
 
 		self._vjoy_callbacks = []

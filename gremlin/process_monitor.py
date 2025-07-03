@@ -109,6 +109,7 @@ class ProcessMonitor(QtCore.QObject):
                 syslog.info("PROC: start")
                 self._running = True
                 self._update_thread = threading.Thread(target=self._update, daemon=False)
+                self._update_thread.name="process monitor"
                 self._update_thread.start()
             
 

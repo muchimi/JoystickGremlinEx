@@ -241,6 +241,8 @@ previous_runtime_mode = None
 # import prompt count on import
 import_prompt_stack = 0
 
+
+
 @module_property
 def _current_mode() -> str:
     if is_running:
@@ -257,6 +259,28 @@ def resetState():
     previous_runtime_mode = None
 
     
+
+# controls repeater updates in the UI
+_repeater_suspended = 0
+
+
+def push_repeater():
+    global _repeater_suspended
+    _repeater_suspended += 1
+
+def is_repeater_suspended():
+    global _repeater_suspended
+    return _repeater_suspended > 0
+
+def pop_repeater(reset = False):
+    global _repeater_suspended
+    if _repeater_suspended > 0:
+        _repeater_suspended -= 1
+    if reset:
+        _repeater_suspended = 0
+
+
+        
 def ui_keyinput_suspended():
     global _suspend_ui_keyinput
     return _suspend_ui_keyinput > 0
@@ -271,6 +295,7 @@ def push_suspend_ui_keyinput():
         eh.suspend_keyboard_input.emit(True)
 
     _suspend_ui_keyinput += 1
+
 
 
     

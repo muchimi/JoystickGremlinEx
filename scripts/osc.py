@@ -465,6 +465,7 @@ class Osc:
         self._start_requested = False
         self._lock = threading.Lock()
         self._server_thread = threading.Thread(target=self.thread_loop, daemon=False)
+        self._server_thread.name = "OSC server"
 
     @property
     def started(self):

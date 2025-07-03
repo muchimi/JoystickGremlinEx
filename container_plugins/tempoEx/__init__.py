@@ -556,13 +556,15 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                     self.timer.cancel() # kill long press timer - use short press
 
                 if self.activate_on == "release":
-                    threading.Thread(target=lambda: self._short_press(
+                    thread = threading.Thread(target=lambda: self._short_press(
                         self.short_index,                                            
                         self.event_press,
                         self.value_press,
                         event,
                         value
-                    ), daemon=False).start()
+                    ), daemon=False)
+                    thread.name = "TEMPOEX release"
+                    thread.start()
                 else:
                     self._trigger_short_press(event, value, extra_data)
                 

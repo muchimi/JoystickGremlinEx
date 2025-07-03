@@ -245,6 +245,7 @@ class MouseController:
 
         self._is_running = False
         self._thread = threading.Thread(target=self._control_loop, daemon=False)
+        self._thread.name = "mouse controller"
 
     def set_absolute_motion(self, dx=None, dy=None):
         """Configures a motion using absolute velocities.

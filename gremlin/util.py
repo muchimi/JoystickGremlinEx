@@ -75,6 +75,7 @@ class FileWatcher(QtCore.QObject):
 
         self._is_running = True
         self._watch_thread = threading.Thread(target=self._monitor, daemon=False)
+        self._watch_thread.name = "file watcher"
         self._watch_thread.start()
 
     def stop(self):

@@ -362,7 +362,9 @@ class RemoteControl():
             else:
                 msg = "Paired mode disabled"
             syslog.debug(f"Paired mode changed: {msg}")
-            threading.Thread(target = self.say, args=(msg,), daemon=False).start()
+            thread = threading.Thread(target = self.say, args=(msg,), daemon=False)
+            thread.name = "REMOTE CONTROLremote control paired update"
+            thread.start()
 
         syslog.info(f"SYSTEM: Remote control status: local: {self._is_local} remote: {self._is_remote}")            
 
@@ -390,7 +392,9 @@ class RemoteControl():
             elif event.is_remote:
                 msg = "Remote control is enabled"
             if msg:
-                threading.Thread(target = self.say, args=(msg,), daemon=False).start()
+                thread = threading.Thread(target = self.say, args=(msg,), daemon=False)
+                thread.name = "remove control broadcast"
+                thread.start()
         
     @property
     def mode(self):

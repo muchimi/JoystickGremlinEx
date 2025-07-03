@@ -222,6 +222,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         gremlin.shared_state.application_version =gremlin.version.APPLICATION_VERSION
 
         self.config = gremlin.config.Configuration()
+        self.config.changed.connect(self._config_filter_changed_cb)
 
         # last input from last run to restore
         self.restore_input = self.config.get_last_input() 
@@ -1284,6 +1285,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             # gremlin.shared_state.push_suspend_highlighting()
             
             self.ui.actionInputViewer.setChecked(True)
+            if gremlin.config.Configuration().input_viewer_disables_repeaters:
+                gremlin.shared_state.push_repeater()
+
             self.modal_windows["input_viewer"].show()
             self.modal_windows["input_viewer"].closed.connect(self._close_input_viewer)
 
@@ -1295,6 +1299,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         # gremlin.shared_state.pop_suspend_highlighting()
         self._remove_modal_window("input_viewer")
         self.ui.actionInputViewer.setChecked(False)
+
+        if gremlin.config.Configuration().input_viewer_disables_repeaters:
+                gremlin.shared_state.pop_repeater()
 
 
     def load_profile(self, fname = None):
@@ -2784,8 +2791,14 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     def _config_changed_cb(self):
-        ''' called when configuraition has changed '''
         self.refresh()
+
+    def _config_filter_changed_cb(self, filter, value):
+        if filter == "input_viewer_disables_repeaters":
+            if value:
+                gremlin.shared_state.push_repeater()
+            else:
+                gremlin.shared_state.pop_repeater()
 
     def _config_option_changed(self):
         self._update_highlight_toolbar_enabled()

@@ -53,6 +53,7 @@ class Repeater(QtCore.QObject):
         self.is_running = False
         self._events = events
         self._thread = threading.Thread(target=self.emit_events, daemon=False)
+        self._thread.name = "repeater"
         self._start_timer = threading.Timer(1.0, self.run)
         self._stop_timer = threading.Timer(5.0, self.stop)
         self._update_func = update_func

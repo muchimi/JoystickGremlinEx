@@ -339,12 +339,14 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                 if self.activate_on == "release":
                     #print ("tempo short (activate on release)")
 
-                    threading.Thread(target=lambda: self._short_press(
+                    thread = threading.Thread(target=lambda: self._short_press(
                         self.event_press, # send a press event to the functors
                         self.value_press,
                         event,
                         value
-                    ), daemon=False).start()
+                    ), daemon=False)
+                    thread.name = "TEMPO release"
+                    thread.start()
                 else:
                     #self.short_set.process_event(event, value)
                     self._trigger_short_press(event, value, extra_data)

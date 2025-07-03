@@ -1169,7 +1169,7 @@ class SimconnectMonitor():
         
         # start the reconnect thread
         self._auto_reconnect_thread = threading.Thread(target = self._auto_reconnect_loop, daemon=False)
-        self._auto_reconnect_thread.setName("SCMONITOR: auto-reconnect")
+        self._auto_reconnect_thread.name = "SCMONITOR: auto-reconnect"
         self._auto_reconnect_event.clear()
         self._auto_reconnect_thread.start()
         self._started = True
@@ -3837,6 +3837,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self._auto_repeat_thread = None
         self._auto_repeat_event = threading.Event()
         self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command, daemon=False)
+        self._auto_repeat_thread.name = "SIMCONNECT autorepeat"
         
         self.valid = True
 

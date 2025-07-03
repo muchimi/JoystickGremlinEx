@@ -1711,6 +1711,7 @@ class SimConnectManager(QtCore.QObject):
         # send event and wait for readback value or a timeout
         event = DataThreadingEvent()
         thread = threading.Thread(target=self._send_readback_event_worker(event, event_id, value, b_readback, readback_value, timeout), daemon=False)
+        thread.name = "SIMCONNECT readback"
         thread.start()
         event.wait()
 
