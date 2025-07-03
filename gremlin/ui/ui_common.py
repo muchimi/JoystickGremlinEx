@@ -823,8 +823,7 @@ class StateTracker():
         if key:
             # print (f"Add button {key}")
             self._button_cache[device_guid][input_type][key] = widget
-        else:
-            pass
+
 
     def unregisterButtonState(self, device_guid, input_type, input_id):
         if not isinstance(device_guid, str):
@@ -1401,7 +1400,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
     def setValue(self, value : float):
         ''' sets the value '''
         if not gremlin.util.is_close(self._value, value):
-            self._update_value(value)
+            gremlin.util.InvokeUiMethod(self._update_value, value)
+            
 
     def _to_value(self, text : str = None):
         if text is None:
@@ -3813,6 +3813,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         el.tab_selected.connect(self._tab_selected)
         el.tab_unselected.connect(self._tab_unselected)
+
+        self._hooked = False
+        self._suspended = False
         
         
 
@@ -3826,22 +3829,61 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def hookDevice(self, device_guid, input_type, input_id):
         ''' hooks the input  '''
-        import gremlin.joystick_handling
+        if self._hooked:
+            return
+        self._hooked = True
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
         self.updateState()
         self._tab_selected(device_guid)
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self.process_event)
+
+
+    def process_event(self, event):
+        if not Shiboken.isValid(self):
+            return
+        if self._suspended:
+            return
+        if event.is_axis:
+            return
+        if not gremlin.util.compare_guid(event.device_guid, self._device_guid):
+            return
+        if event.identifier != self._input_id:
+            return
+        state = event.is_pressed
+        gremlin.util.InvokeUiMethod(self._update_value, state)
+
+    
         
     def updateState(self):
         ''' updates the widget state with the cached state  '''
-        tracker = StateTracker()
-        state = tracker._get_state(self._device_guid, self._input_type, self._input_id)
-        if state:
-            self._update_value(state)
+        state = gremlin.joystick_handling.get_button(self._device_guid, self._input_id)
+        if state is not None:
+            gremlin.util.InvokeUiMethod(self._update_value, state)
+        # import gremlin.joystick_handling
+        # tracker = StateTracker()
+        # state = tracker._get_state(self._device_guid, self._input_type, self._input_id)
+        # if state is None:
+        #     # not registered, register it
+        #     tracker.registerButtonState(self, self._device_guid, self._input_type, self._input_id)
+        #     state = gremlin.joystick_handling.get_button(self._device_guid, self._input_id)
+        #     tracker._store_state(self._device_guid, self._input_type, self._input_id, state)
+        # if state is not None:
+        #     self._update_value(state)
 
     def unhookDevice(self):
-        self._tab_unselected(self._device_guid)
+        if not Shiboken.isValid(self):
+            return
+        if not self._hooked:
+            return
+        self._hooked = False
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.disconnect(self.process_event)
+
+
+        # self._tab_unselected(self._device_guid)
         
  
 
@@ -3852,21 +3894,25 @@ class ButtonStateWidget(QtWidgets.QWidget):
         :param device_guid: the device selected
         
         '''        
-        if self._handler_connected:
-            # already connected
+        pass
+        if not gremlin.util.compare_guid(device_guid, self._device_guid):
             return
-        if self._device_guid:
-            # syslog = logging.getLogger("system")
-            device_name = gremlin.shared_state.get_device_name(device_guid)
-            if isinstance(device_guid, str):
-                device_guid = gremlin.util.parse_guid(device_guid)
-            #el = gremlin.event_handler.EventListener()
-            if self._device_guid == device_guid:
-                # connect the handler
-                #input_id = self._input_id
-                #syslog.info(f"ButtonState: {device_name} type {InputType.to_display_name(self._input_type)} input {self._input_id} connect")
-                _state_tracker.registerButtonState(self, self._device_guid, self._input_type, self._input_id)
-                self._handler_connected = True
+        self._suspended = False
+        # if self._handler_connected:
+        #     # already connected
+        #     return
+        # if self._device_guid:
+        #     # syslog = logging.getLogger("system")
+        #     #device_name = gremlin.shared_state.get_device_name(device_guid)
+        #     if isinstance(device_guid, str):
+        #         device_guid = gremlin.util.parse_guid(device_guid)
+        #     #el = gremlin.event_handler.EventListener()
+        #     if self._device_guid == device_guid:
+        #         # connect the handler
+        #         #input_id = self._input_id
+        #         #syslog.info(f"ButtonState: {device_name} type {InputType.to_display_name(self._input_type)} input {self._input_id} connect")
+        #         _state_tracker.registerButtonState(self, self._device_guid, self._input_type, self._input_id)
+        #         self._handler_connected = True
 
 
     @property
@@ -3892,31 +3938,34 @@ class ButtonStateWidget(QtWidgets.QWidget):
         :param device_guid: the device to deselect - if None - deselect all
           
         '''
-        if not self._handler_connected:
-            # not connected
-            return 
-        # # syslog = logging.getLogger("system")
-        # el = gremlin.event_handler.EventListener()
-        if device_guid:
-            if isinstance(device_guid, str):
-                device_guid = gremlin.util.parse_guid(device_guid)
-            disconnect = self._device_guid == device_guid
-            #device_name = gremlin.shared_state.get_device_name(device_guid)
-        else:
-            disconnect = True
-            #device_name = 'reset'
+        if gremlin.util.compare_guid(device_guid, self._device_guid):
+            return
+        self._suspended = True
+
+        # if not self._handler_connected:
+        #     # not connected
+        #     return 
+        # # # syslog = logging.getLogger("system")
+        # # el = gremlin.event_handler.EventListener()
+        # if device_guid:
+        #     if isinstance(device_guid, str):
+        #         device_guid = gremlin.util.parse_guid(device_guid)
+        #     disconnect = self._device_guid == device_guid
+        #     #device_name = gremlin.shared_state.get_device_name(device_guid)
+        # else:
+        #     disconnect = True
+        #     #device_name = 'reset'
             
-        if disconnect:
-            #input_id = self._input_id
-            # syslog.info(f"ButtonState: (unselect) {device_name} button {input_id} disconnect")
-            _state_tracker.unregisterButtonState(self._device_guid, self._input_type, self._input_id)
-            self._handler_connected = False
+        # if disconnect:
+        #     #input_id = self._input_id
+        #     # syslog.info(f"ButtonState: (unselect) {device_name} button {input_id} disconnect")
+        #     _state_tracker.unregisterButtonState(self._device_guid, self._input_type, self._input_id)
+        #     self._handler_connected = False
 
 
     def _update_value(self, is_pressed):
         ''' updates a button position '''
-        if self._deleted:
-            return
+        
         if is_pressed:
             self._button_widget.setPixmap(self._on_pixmap)
             # syslog.info(f"button {self.input_id} pressed")
@@ -7204,6 +7253,54 @@ class QSplitTabWidget(QDataWidget):
         widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
         return len(widgets) > 0
 
+
+class QRememberMainWindow(QtWidgets.QMainWindow):
+    
+    def __init__(self, key: str, parent = None):
+        super().__init__(parent)
+
+        self._resize_count = 0
+        assert key,"unique key must be provided"
+        self._window_key = key
+
+        
+        self._apply_window_settings()
+        #gremlin.util.centerDialog(self, parent = parent)
+
+
+
+    def _apply_window_settings(self):
+        """Restores the stored window geometry settings."""
+        config = gremlin.config.Configuration()
+        window_size = config.getWindowSize(self._window_key)
+        window_location = config.getWindowLocation(self._window_key)
+        if window_size:
+            self.resize(window_size[0], window_size[1])
+        if window_location:
+            self.move(window_location[0], window_location[1])
+
+    def moveEvent(self, evt):
+        """Handle changing the position of the window.
+
+        :param evt event information
+        """
+        config = gremlin.config.Configuration()
+        config.setWindowLocation(self._window_key, evt.pos().x(), evt.pos().y())
+        super().moveEvent(evt)
+
+    def resizeEvent(self, evt):
+        """Handling changing the size of the window.
+
+        :param evt event information
+        """
+        if self._resize_count > 1:
+            config = gremlin.config.Configuration()
+            config.setWindowSize(self._window_key, evt.size().width(), evt.size().height())
+
+        self._resize_count += 1
+        super().resizeEvent(evt)
+
+
 class QRememberDialog(QtWidgets.QDialog):
     ''' a dialog window that remembers its size and location '''
 
@@ -7216,7 +7313,7 @@ class QRememberDialog(QtWidgets.QDialog):
 
         
         self.apply_window_settings()
-        gremlin.util.centerDialog(self, parent = parent)
+        #gremlin.util.centerDialog(self, parent = parent)
 
 
 
@@ -7237,8 +7334,8 @@ class QRememberDialog(QtWidgets.QDialog):
         window_location = config.getWindowLocation(self.window_key)
         if window_size:
             self.resize(window_size[0], window_size[1])
-        # if window_location:
-        #     self.move(window_location[0], window_location[1])
+        if window_location:
+            self.move(window_location[0], window_location[1])
 
     def moveEvent(self, evt):
         """Handle changing the position of the window.

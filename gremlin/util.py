@@ -39,7 +39,7 @@ from PySide6.QtGui import QColor
 import win32gui, win32con
 import psygnal
 from psygnal import Signal
-
+from shiboken6 import Shiboken
 
 
 from . import error
@@ -450,6 +450,8 @@ def clear_layout(layout):
     # global _logtabs,_cleaned_widgets
     
     # _logtabs += " "
+    if not Shiboken.isValid(layout):
+        return
     if layout is None:
         return    
     if isinstance(layout, QtWidgets.QWidget):

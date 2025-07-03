@@ -3018,6 +3018,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_output_mode_widget.setVisible(output_mode_visible)
         self.container_reverse_widget.setVisible(reverse_visible)
         self.container_override_widget.setVisible(override_visible)
+        self.container_merge_widget.setVisible(merge_visible)
 
         self.container_pulse_widget.setVisible(pulse_visible)
         self.button_pulse_widget.setVisible(pulse_visible)
@@ -5101,27 +5102,37 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         prefix = "dark_" if is_dark else ""
 
         fallback = f"{prefix}joystick.png"
-        if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis):
+        if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyMergeAxis, VjoyAction.VJoySetAxisStepped):
             input_string = "axis"
         elif self.action_mode == VjoyAction.VJoyHat:
             input_string = "hat"
             fallback = "mdi.axis-arrow"
-        elif self.action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
+        elif self.action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease,  VjoyAction.VJoyButton, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
             input_string = "button"
             fallback = "mdi.gesture-tap-button"
+        elif self.action_mode in ( VjoyAction.VJoyToggleRemote,
+                                    VjoyAction.VJoyEnableRemoteOnly,
+                                    VjoyAction.VJoyEnableLocalOnly,
+                                    VjoyAction.VJoyDisableRemote,
+                                    VjoyAction.VJoyDisableLocal,
+                                    VjoyAction.VJoyEnableRemote,
+                                    VjoyAction.VJoyEnableLocal,
+                                    VjoyAction.VJoyEnableLocalAndRemote,
+                                    VjoyAction.VJoyEnablePairedRemote,
+                                    VjoyAction.VJoyDisablePairedRemote):
+            return "fa6s.gear"
         else:
             input_string = None
             #log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
 
-        
-        icon_path = f"{prefix}icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else fallback
-        icon_file = get_icon_path(icon_path)
-        if icon_file and os.path.isfile(icon_file):
-            return icon_file
+        if input_string:
+            icon_path = f"{prefix}icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else fallback
+            icon_file = get_icon_path(icon_path)
+            if icon_file and os.path.isfile(icon_file):
+                return icon_file
 
         return fallback
 
-        #return super().icon()
 
 
 

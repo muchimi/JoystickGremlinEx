@@ -163,7 +163,7 @@ class TabData:
         ''' device data'''
         return self._device
 
-class GremlinUi(QtWidgets.QMainWindow):
+class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     """Main window of the Joystick Gremlin user interface."""
 
@@ -183,7 +183,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         gremlin.shared_state.ui = self
 
-        QtWidgets.QMainWindow.__init__(self, parent)
+        super().__init__("main_window", parent)
         
         self.ui = Ui_Gremlin()
         self.ui.setupUi(self)
@@ -378,7 +378,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.device_change_event.connect(self._device_change_cb)
 
         #self.apply_user_settings()
-        self.apply_window_settings()
+        self._apply_window_settings()
 
         self._profile_map = gremlin.base_profile.ProfileMap()
 
@@ -888,22 +888,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         if "log" in self.modal_windows:
             self.modal_windows["log"].watcher.stop()
 
-    def resizeEvent(self, evt):
-        """Handling changing the size of the window.
-
-        :param evt event information
-        """
-        if self._resize_count > 1:
-            self.config.window_size = [evt.size().width(), evt.size().height()]
-        self._resize_count += 1
-
-    def moveEvent(self, evt):
-        """Handle changing the position of the window.
-
-        :param evt event information
-        """
-        if self._resize_count > 1:
-            self.config.window_location = [evt.pos().x(), evt.pos().y()]
 
     # +---------------------------------------------------------------
     # | Modal window creation
@@ -3810,19 +3794,20 @@ class GremlinUi(QtWidgets.QMainWindow):
         if not ignore_minimize and self.config.start_minimized:
             self.setHidden(self.config.start_minimized)
    
-
-        if self.config.activate_on_launch:
+        config = gremlin.config.Configuration()
+        if config.activate_on_launch:
             self.ui.actionActivate.setChecked(True)
             self.activate(True)
 
-    def apply_window_settings(self):
-        """Restores the stored window geometry settings."""
-        window_size = self.config.window_size
-        window_location = self.config.window_location
-        if window_size:
-            self.resize(window_size[0], window_size[1])
-        if window_location:
-            self.move(window_location[0], window_location[1])
+    # def apply_window_settings(self):
+    #     """Restores the stored window geometry settings."""
+    #     config = gremlin.config.Configuration()
+    #     window_size = config.window_size
+    #     window_location = config.window_location
+    #     if window_size:
+    #         self.resize(window_size[0], window_size[1])
+    #     if window_location:
+    #         self.move(window_location[0], window_location[1])
 
     def _create_cheatsheet(self):
         """Creates the cheatsheet and stores it in the desired place.

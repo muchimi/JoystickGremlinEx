@@ -24,6 +24,7 @@ import sys
 
 from PySide6 import QtCore
 
+import gremlin.config
 import gremlin.event_handler
 import gremlin.input_types
 
@@ -1587,7 +1588,7 @@ class Configuration(QtCore.QObject):
 
         data : dict = self._profile_data.get("last_input", {})
         
-        verbose = self.verbose
+        verbose = self.verbose_mode_inputs
         
         if input_type != gremlin.input_types.InputType.ModeControl and isinstance(input_id, gremlin.base_classes.AbstractInputItem):
             # convert to an ID we can use

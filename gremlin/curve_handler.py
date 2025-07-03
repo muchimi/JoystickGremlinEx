@@ -1098,9 +1098,12 @@ class CurveView(QtWidgets.QGraphicsScene):
         self._select_item(item)
 
 
-
     def _editor_update(self, value):
-        """Callback for changes in the point editor UI.
+        gremlin.util.InvokeUiMethod(self._editor_update_ui, value)
+
+    def _editor_update_ui(self, value):
+        """Callback for changes in the point editor UI.  
+        runs on UI thread
 
         :param value the new value entered using the editor UI
         """
@@ -1582,9 +1585,12 @@ class AxisCurveWidget(QtWidgets.QWidget):
         clipboard = gremlin.clipboard.Clipboard()
         clipboard.clipboard_changed.connect(self._update_clipboard)
 
-    @QtCore.Slot(float)
+
     def update_value(self, value):
-        ''' updates dot on the curve based on the value -1 to +1 '''
+        gremlin.util.InvokeUiMethod(self._update_value_ui, value)
+
+    def _update_value_ui(self, value):
+        ''' updates dot on the curve based on the value -1 to +1 - runs on UI thread '''
         if value < -1 or value > 1:
             syslog = logging.getLogger("system")
             syslog.warning(f"CurveInput: Error: value {value:0.3f} is our of range -1 to +1 - check input")

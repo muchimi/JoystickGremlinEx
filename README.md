@@ -13,6 +13,15 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+
+
+### (m76T23)
+- Fix: Application not always remembering size and position (note: this will restore defaults the first time T23 runs)
+- Fix: Merge data visible on vjoy remap when not in merge mode.
+- Fix: vjoyremap icons defaulting to generic for known buttons.
+- Changed: button input repeaters using new event logic.
+- Fix: curve widgets using new event logic on incorrect thread.
+
 ### (m76T22)
 - Added: option to disable joystick/button input repeaters while Input Viewer is visible to help with performance on some systems.
 - Added: Multiple merge axis to vjoy remap.  The effect is cumulative and the value is computed top to bottom.

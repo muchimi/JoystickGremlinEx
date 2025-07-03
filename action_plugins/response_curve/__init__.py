@@ -1110,10 +1110,10 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data = action_data
 
         
-        if action_data.show_input_axis:
+        #if action_data.show_input_axis:
             # hook the hardware input so we can see it on the curve
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self._joystick_handler)
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self._joystick_handler)
 
 
     def _update_value(self, value):
@@ -1157,7 +1157,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
             return
 
         value = gremlin.joystick_handling.scale_to_range(event.raw_value, source_min = -32767, source_max = 32767) # -1 to 1 value
-        self._update_value(value)
+        gremlin.util.InvokeUiMethod(self._update_value, value)
        
   
     @QtCore.Slot()

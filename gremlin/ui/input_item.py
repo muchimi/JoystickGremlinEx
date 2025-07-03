@@ -1634,7 +1634,9 @@ class InputItemWidget(QBoxFrame):
         # if self.identifier.input_type == InputType.OpenSoundControl:
         #     pass
 
-        if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.is_hat or self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat, InputType.OpenSoundControl, InputType.Midi)):
+        input_type = self.identifier.input_type
+        if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.is_hat) or \
+            input_type in (InputType.JoystickAxis, InputType.JoystickButton,  InputType.JoystickHat, InputType.OpenSoundControl, InputType.Midi):
             
             if self.identifier.is_axis:
                 # axis
