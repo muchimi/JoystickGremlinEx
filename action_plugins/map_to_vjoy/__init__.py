@@ -2642,9 +2642,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
         button_press_dialog.show()
 
-    @QtCore.Slot()
     def _update_button(self, event : gremlin.event_handler.Event):
-        ''' called when a button input is selected '''
+        gremlin.util.InvokeUiMethod(self._update_button_ui, event)
+
+    def _update_button_ui(self, event : gremlin.event_handler.Event):
+        ''' called when a button input is selected - runs on ui thread '''
         hardware_index = self.stepped_selector_device_widget.findData(event.device_id)
         self.stepped_selector_device_widget.setCurrentIndex(hardware_index)
         input_index = self.stepped_selector_input_widget.findData(event.identifier)

@@ -509,6 +509,33 @@ def send_key_down(key):
         if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
         input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
+def key_from_mousebutton(button_id):
+    ''' maps a mouse button to a key'''
+    match button_id:
+        case gremlin.types.MouseButton.Left:
+            map_key = "mouse_1"
+        case gremlin.types.MouseButton.Right:
+            map_key = "mouse_2"
+        case gremlin.types.MouseButton.Middle: 
+            map_key = "mouse_3"
+        case gremlin.types.MouseButton.Back: 
+            map_key = "mouse_5"
+        case gremlin.types.MouseButton.Forward: 
+            map_key = "mouse_4"
+        case gremlin.types.MouseButton.WheelRight:
+            map_key = "wheel_right"
+        case gremlin.types.MouseButton.WheelLeft:
+            map_key = "wheel_left"
+        case gremlin.types.MouseButton.WheelUp:
+            map_key = "wheel_up"
+        case gremlin.types.MouseButton.WheelDown:
+            map_key = "wheel_down"
+        case _:
+            return None # not one we care about
+    
+    if map_key:
+        return key_from_name(map_key)
+    return None
 
 def send_key_up(key):
     """Sends the KEYUP event for a single key.

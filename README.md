@@ -15,12 +15,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
-### (m76T23)
+### (m76T23/A)
 - Fix: Application not always remembering size and position (note: this will restore defaults the first time T23 runs)
 - Fix: Merge data visible on vjoy remap when not in merge mode.
 - Fix: vjoyremap icons defaulting to generic for known buttons.
 - Changed: button input repeaters using new event logic.
 - Fix: curve widgets using new event logic on incorrect thread.
+- New: virtual keyboard listen dialog traps mouse inputs
+- Fix: keyboard mouse inputs not triggering for mouse events
+- Fix: Fixed a QT thread issue with the new event system.
 
 ### (m76T22)
 - Added: option to disable joystick/button input repeaters while Input Viewer is visible to help with performance on some systems.

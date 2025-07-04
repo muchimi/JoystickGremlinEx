@@ -32,6 +32,7 @@ import gremlin.base_profile
 from PySide6 import QtWidgets, QtCore, QtGui
 import os
 import time
+import gremlin.util
 import gremlin.ui.state_device
 import gremlin.ui.ui_common
 import gremlin.keyboard
@@ -1031,7 +1032,10 @@ class MacroActionEditor(QtWidgets.QWidget):
 
 
     def _modify_joystick(self, event):
-        
+        gremlin.util.InvokeUiMethod(self._modify_joystick_ui, event)
+
+    def _modify_joystick_ui(self, event):
+        ''' runs on UI thread '''
         self.model.set_entry(
             gremlin.macro.JoystickAction(
                 event.device_guid,
@@ -1047,6 +1051,9 @@ class MacroActionEditor(QtWidgets.QWidget):
         self._joystick_ui()
 
     def _modify_key(self, event):
+        gremlin.util.InvokeUiMethod(self._modify_key_ui, event)
+
+    def _modify_key_ui(self, event):
         """Changes which key is mapped.
 
         :param event the event containing information about the key to use
@@ -1059,6 +1066,9 @@ class MacroActionEditor(QtWidgets.QWidget):
         self._keyboard_ui()
 
     def _modify_mouse(self, event):
+        gremlin.util.InvokeUiMethod(self._modify_mouse_ui, event)
+
+    def _modify_mouse_ui(self, event):
         self.model.get_entry(self.index.row()).button = event.identifier
         self._update_model()
         gremlin.ui.ui_common.clear_layout(self.action_layout)

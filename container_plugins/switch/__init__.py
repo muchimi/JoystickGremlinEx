@@ -266,9 +266,11 @@ class SwitchWidget(QtWidgets.QWidget):
         )
         button_press_dialog.show()
 
-    @QtCore.Slot()
     def _update_button(self, event : gremlin.event_handler.Event):
-        ''' called when a button input is selected '''
+        gremlin.util.InvokeUiMethod(self._update_button_ui, event)
+
+    def _update_button_ui(self, event : gremlin.event_handler.Event):
+        ''' called when a button input is selected - runs on UI thread'''
         hardware_index = self.selector_device_widget.findData(event.device_id)
         self.selector_device_widget.setCurrentIndex(hardware_index)
         input_index = self.selector_input_widget.findData(event.identifier)

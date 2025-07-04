@@ -14,7 +14,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
 import gremlin.util
-
+from shiboken6 import Shiboken
 from gremlin.keyboard import Key
 from gremlin.util import load_icon
 import logging
@@ -149,6 +149,8 @@ class QKeyWidget(QtWidgets.QPushButton):
 
     def _update_state(self):
         ''' updates the color of the button based on the selection state '''
+        if not Shiboken.isValid(self):
+            return
         match self._key_size:
             case 2:
                 plain = self._x2_default_style
@@ -820,7 +822,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         """
         from gremlin.ui.ui_common import InputListenerWidget
         self.button_press_dialog = InputListenerWidget(
-            [InputType.Keyboard],
+            [InputType.Keyboard, InputType.Mouse],
             return_kb_event=False,
             multi_keys=True # allow key combinations
         )
@@ -852,17 +854,29 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         # resize window to fit the new size
         QtCore.QTimer.singleShot(0, self.adjustSize)
         
-
+    def _add_keyboard_listener_key_cb(self, data):
+        gremlin.util.InvokeUiMethod(self._add_keyboard_listener_key_ui, data)
         
-    @QtCore.Slot()
-    def _add_keyboard_listener_key_cb(self, keys):
+    def _add_keyboard_listener_key_ui(self, data):
         """Adds the provided key to the list of keys.
 
         :param key the new key to add, either a single key or a combo-key
 
         """
+        import gremlin.windows_event_hook
+        import gremlin.keyboard
+        import gremlin.types
+        if isinstance(data, gremlin.windows_event_hook.MouseEvent):
+            if not data.is_pressed:
+                return # ignore releases 
+            # mouse input
+            key = gremlin.keyboard.key_from_mousebutton(data.button_id)
+            if not key:
+                return
+            data = [key]
+
         # the new entry will be a new index
-        self._set_sequence(keys)
+        self._set_sequence(data)
 
 
     def keyPressEvent(self, event):

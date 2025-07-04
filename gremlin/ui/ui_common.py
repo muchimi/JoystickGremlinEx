@@ -2721,7 +2721,7 @@ class InputListenerWidget(QBoxFrame):
     """Widget overlaying the main gui while waiting for the user
     to press a key or a joystick button """
 
-    item_selected = QtCore.Signal(object) # called when the items are selected
+    item_selected = Signal(object) # called when the items are selected
 
     def __init__(
             self,
@@ -2784,13 +2784,17 @@ class InputListenerWidget(QBoxFrame):
                 InputType.JoystickButton in self._event_types or \
                 InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.connect(self._joy_event_cb)
-        elif InputType.Mouse in self._event_types:
+        if InputType.Mouse in self._event_types:
             if not event_listener.mouseEnabled():
                 # hook mouse
                 event_listener.enableMouse()
 
             gremlin.windows_event_hook.MouseHook().start()
-            event_listener.mouse_event.connect(self._mouse_event_cb)
+            mh = gremlin.windows_event_hook.MouseHook()
+            mh.register(self._mouse_event_cb)
+            mh.start()
+
+            # event_listener.mouse_event.connect(self._mouse_event_cb)
 
 
     def _joy_event_cb(self, event):
@@ -2889,7 +2893,10 @@ class InputListenerWidget(QBoxFrame):
             self._abort_timer.cancel()
             self._abort_timer = threading.Timer(1.0, self._abort_request)
 
-    def _mouse_event_cb(self, event):
+    def _mouse_event_cb(self, event):            
+        gremlin.util.InvokeUiMethod(self._mouse_event_ui, event)
+
+    def _mouse_event_ui(self, event):
         self.item_selected.emit(event)
         self.close()
 
@@ -2913,7 +2920,9 @@ class InputListenerWidget(QBoxFrame):
             event_listener.mouse_event.disconnect(self._mouse_event_cb)
 
         # Stop mouse hook in case it is running
-        gremlin.windows_event_hook.MouseHook().stop()
+        mh = gremlin.windows_event_hook.MouseHook()
+        mh.unregister(self._mouse_event_cb)
+        mh.stop()
 
         # restore highlighting
         gremlin.shared_state.pop_suspend_highlighting()
@@ -3859,6 +3868,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
         
     def updateState(self):
         ''' updates the widget state with the cached state  '''
+        if not self._input_type ==InputType.JoystickButton:
+            # not a button device
+            return
         state = gremlin.joystick_handling.get_button(self._device_guid, self._input_id)
         if state is not None:
             gremlin.util.InvokeUiMethod(self._update_value, state)

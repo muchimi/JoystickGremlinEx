@@ -28,6 +28,7 @@ import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.keyboard import key_from_code
+import gremlin.util
 
 class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -67,6 +68,9 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.key_combination.setText(text)
 
     def _update_keys(self, keys):
+        gremlin.util.InvokeUiMethod(self._update_keys_ui, keys)
+
+    def _update_keys_ui(self, keys):
         """Updates the storage with a new set of keys.
 
         :param keys the keys to use in the key combination

@@ -422,10 +422,12 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._connect_button_hat()
 
     def _update_mouse_button(self, event):
+        gremlin.util.InvokeUiMethod(self._update_mouse_button_ui, event)
+
+    def _update_mouse_button_ui(self, event):
+        ''' mouse event - runs on UI thread'''
         self.action_data.button_id = event.identifier
-        self.mouse_button.setText(
-            gremlin.types.MouseButton.to_string(self.action_data.button_id)
-        )
+        self.mouse_button.setText(gremlin.types.MouseButton.to_string(self.action_data.button_id))
         # update the drop down
         with QtCore.QSignalBlocker(self.mouse_button_widget):
             index = self.mouse_button_widget.findData(self.action_data.button_id)

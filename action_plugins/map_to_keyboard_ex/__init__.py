@@ -187,12 +187,10 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.key_combination_layout.addStretch()
 
             
-        
-
-
-
-
     def _update_keys(self, keys):
+        gremlin.util.InvokeUiMethod(self._update_keys_ui, keys)
+
+    def _update_keys_ui(self, keys):
         """Updates the storage with a new set of keys.
 
         :param keys the keys to use in the key combination

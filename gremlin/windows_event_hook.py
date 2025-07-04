@@ -263,6 +263,7 @@ def process_mouse_event(n_code, w_param, l_param):
     :param w_param message type identifier
     :param l_param message content
     """
+    import gremlin.types
     global g_mouse_callbacks
     verbose = False
     if n_code == HC_ACTION and w_param != WM_MOUSEMOVE:
@@ -352,6 +353,7 @@ def process_mouse_event(n_code, w_param, l_param):
             evt = MouseEvent(button_id, is_pressed, False)
             for cb in g_mouse_callbacks:
                 cb(evt)
+            
 
     # Pass the event on to the next callback in the chain
     return user32.CallNextHookEx(None, n_code, w_param, l_param)

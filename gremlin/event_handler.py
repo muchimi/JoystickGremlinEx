@@ -51,6 +51,8 @@ import json
 import psygnal
 from psygnal import Signal
 
+
+
 syslog = logging.getLogger("system")
 
 
@@ -592,6 +594,8 @@ class EventListener(QtCore.QObject):
 		# calibration data access
 		self._calibrationManager = None
 
+		self.profile_start.connect(self._profile_start)
+		self.profile_stop.connect(self._profile_stop)
 		self.profile_started.connect(self._profile_started_cb)
 
 		self._run_event = threading.Event()
@@ -680,7 +684,16 @@ class EventListener(QtCore.QObject):
 		#gremlin.util.singleShot(lambda: self._fire_event_list(event_list))
 
 
+	def _profile_start(self):
+		''' occurs on profile start '''
 
+		# enable mouse hooks 
+		self.enableMouse(True)
+
+	def _profile_stop(self):
+		if not self.enable_mouse_hook:
+			self.disableMouse()
+		
 	
 	def _profile_started_cb(self):
 		''' occurs on profile start '''
@@ -704,6 +717,8 @@ class EventListener(QtCore.QObject):
 
 		# read the starting hat states
 		self._load_hat_states()
+
+		
 		
 		# fire mode change for mode enter (press + release)
 		eh = EventHandler()
@@ -729,8 +744,8 @@ class EventListener(QtCore.QObject):
 		''' returns mouse hook status '''
 		return self.mouse_hook is not None
 	
-	def enableMouse(self):
-		if self.enable_mouse_hook:
+	def enableMouse(self, force = False):
+		if self.enable_mouse_hook or force:
 			import gremlin.windows_event_hook
 			syslog.info("MOUSE HOOK: enabled")
 			if self.mouse_hook is None:
@@ -1220,25 +1235,37 @@ class EventListener(QtCore.QObject):
 
 		:param event the mouse event
 		"""
+		import gremlin.windows_event_hook
 		
 		# Ignore events we created via the macro system
 		if not event.is_injected:
 			if not self._running:
 				return
 
-			# update keyboard state for that key
-			key_id = (event.button_id.value + 0x1000, False)
-			self._keyboard_state[key_id] = event.is_pressed
+			# translate mouse input to a keyboard input
+			key = gremlin.keyboard.key_from_mousebutton(event.button_id)
+			if key:
+				evt = gremlin.windows_event_hook.KeyEvent(
+					virtual_code = key.virtual_code, 
+					scan_code = key.scan_code, 
+					is_extended = key.is_extended,
+					is_pressed = event.is_pressed,
+					is_injected = event.is_injected)
+				self._keyboard_handler(evt)
+			# key_id = (event.button_id.value + 0x1000, False)
+			# self._keyboard_state[key_id] = event.is_pressed
 
 			# syslog.info(f"mouse event: {str(event)} key id: {key_id}")
 
-			self.mouse_event.emit(Event(
+			mouse_event = Event(
 				event_type= InputType.Mouse,
 				device_guid=dinput.GUID_Keyboard,
 				identifier=event.button_id, # mouse handler is expecting a mouse ID, not a keyboard ID
 				is_pressed=event.is_pressed,
 				data = self._keyboard_state
-			))
+			)
+
+			self.mouse_event.emit(mouse_event)
 			
 		# Allow the windows event to propagate further
 		return True
@@ -1363,6 +1390,7 @@ class EventHandler(QtCore.QObject):
 		if not self._started:
 			self._started = True
 			self._update_mode_change(gremlin.shared_state.runtime_mode)
+			
 			# el = gremlin.event_handler.EventListener()
 			# syslog.info("EVENT: listen to joystick events ON")
 			# el.joystick_event.connect(self.execute_event)   # this is connected in coderunner
