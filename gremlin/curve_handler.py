@@ -973,7 +973,7 @@ class CurveView(QtWidgets.QGraphicsScene):
 
     """Visualization of the entire curve editor UI element."""
 
-    def __init__(self, curve_model, point_editor, show_input_axis = False, parent=None):
+    def __init__(self, curve_model, point_editor, show_input_axis = True, parent=None):
         """Creates a new instance.
 
         :param curve_model the model to visualize
@@ -1591,32 +1591,33 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
     def _update_value_ui(self, value):
         ''' updates dot on the curve based on the value -1 to +1 - runs on UI thread '''
-        if value < -1 or value > 1:
-            syslog = logging.getLogger("system")
-            syslog.warning(f"CurveInput: Error: value {value:0.3f} is our of range -1 to +1 - check input")
-            value = gremlin.util.clamp(value,-1,1)
+        value = gremlin.util.clamp(value)
+        # if value < -1 or value > 1:
+        #     syslog = logging.getLogger("system")
+        #     syslog.warning(f"CurveInput: Error: value {value:0.3f} is out of range -1 to +1 - check input")
+        #     value = gremlin.util.clamp(value,-1,1)
 
-        if self.action_data.show_input_axis:
-            
+        #if self.action_data.show_input_axis:
         
-            ''' draw the current value on the curve '''
-            curve_fn = self.curve_model.get_curve_function()
-            if curve_fn:
-                # get the position of the marker
-                curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max = g_scene_size)  # value on the curve by pixel x
-                x = curve_value
-                y = -g_scene_size * curve_fn(x / g_scene_size)
+        ''' draw the current value on the curve '''
+        curve_fn = self.curve_model.get_curve_function()
+        if curve_fn:
+            # get the position of the marker
+            curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max = g_scene_size)  # value on the curve by pixel x
+            x = curve_value
+            y = -g_scene_size * curve_fn(x / g_scene_size)
 
-                #print (f"value: {value} cv: {curve_value}  x: {x} y: {y}")
+            #print (f"value: {value} cv: {curve_value}  x: {x} y: {y}")
 
-                # tracker only exists when input repeater mode is enabled
+            # tracker only exists when input repeater mode is enabled
+            if self.curve_scene.show_input_axis:
                 self.curve_scene.tracker.update(x,y)
 
-                self.input_raw_widget.setText(f"{value:0.3f}")
-                curved = gremlin.util.clamp(curve_fn(value),-1.0, +1.0)
-                self.input_curved_widget.setText(f"{curved:0.3f}")
+            self.input_raw_widget.setText(f"{value:0.3f}")
+            curved = gremlin.util.clamp(curve_fn(value),-1.0, +1.0)
+            self.input_curved_widget.setText(f"{curved:0.3f}")
 
-                self.reapeater_widget.setValue(curved)
+            self.reapeater_widget.setValue(curved)
 
         self.last_value = value
         self.curve_scene.value = value
@@ -1790,7 +1791,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_scene = CurveView(
             self.curve_model,
             self.control_point_editor,
-            self.action_data.show_input_axis
+            
         )
 
         

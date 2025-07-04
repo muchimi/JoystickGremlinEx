@@ -3858,9 +3858,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         gremlin.shared_state.current_profile = value
 
-
-
     def _do_load_profile(self, source_xml : str, as_new_profile = False) -> bool | tuple:
+        self._profile_load_stack = []
+        return self._do_load_profile_internal(source_xml, as_new_profile)
+
+    def _do_load_profile_internal(self, source_xml : str, as_new_profile = False) -> bool | tuple:
         """Load the profile with the given filename.
 
         :param source_xml: the name of the profile file to load
@@ -3925,7 +3927,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 try:
                     new_profile = gremlin.base_profile.Profile()
 
+                    if not os.path.isfile(source_xml):
+                        gremlin.ui.ui_common.MessageBox(title = "Profile Error", prompt = f"Specified file not found.")
+                        return False
+                    if os.path.getsize(source_xml) == 0:
+                        gremlin.ui.ui_common.MessageBox(title = "Profile Error", prompt = f"Specified file is empty.")
+                        return False
 
+                
                     gremlin.shared_state.current_profile = new_profile
                     profile_updated = new_profile.from_xml(source_xml)
 
@@ -4211,6 +4220,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         :return True continue with the intended action, False abort
         """
         # If the profile is empty we don't need to ask anything
+        if not self.profile:
+            return True
         if self.profile.empty():
             return True
 

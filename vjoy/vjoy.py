@@ -615,8 +615,12 @@ class VJoy:
     def acquired(self) -> bool:
         ''' true if GremlinEx controls the VJOY device '''
         return self._acquired
-
+    
     def ensure_ownership(self):
+        # ensure runs on UI thread
+        gremlin.util.InvokeUiMethod(self._ensure_ownership_ui)
+
+    def _ensure_ownership_ui(self):
         """Ensure this devices is still owned by the process.
 
         This object can only be constructed if it successfully acquires the
@@ -639,7 +643,8 @@ class VJoy:
                 time.sleep(0.01)
                     
             syslog.error(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
-            raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
+            #raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
+            return
             
             
     def ensure_released(self):

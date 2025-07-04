@@ -2887,7 +2887,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 
         relative_target_visible = False
         default_target_visible = False
-        
+        repeater_visible = False
 
         self.chkb_auto_release_widget.setVisible(input_type in (InputType.KeyboardLatched, InputType.Keyboard, InputType.Midi, InputType.OpenSoundControl))
 
@@ -2914,6 +2914,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             if action == VjoyAction.VJoyMergeAxis:
                 # can clear if more than one merge axis defined
                 self.merge_clear_widget.setEnabled(len(self.action_data._merge_data) > 1)
+
+            repeater_visible = True
 
         elif input_type in VJoyRemapWidget.input_type_buttons:
             pulse_visible = action == VjoyAction.VJoyPulse
@@ -3029,6 +3031,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.container_target_widget.setVisible(relative_target_visible)
         self.container_relative_widget.setVisible(default_target_visible)
+        self.container_repeater_widget.setVisible(repeater_visible)
 
 
     def _action_mode_changed(self, index):

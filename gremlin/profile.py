@@ -74,6 +74,9 @@ class ProfileConverter:
         """
         if not os.path.isfile(fname):
             return True
+        # file length
+        if os.path.getsize(fname) == 0:
+            return True
         
         tree = ElementTree.parse(fname)
         root = tree.getroot()

@@ -244,6 +244,7 @@ class Configuration(QtCore.QObject):
         return default_value
 
     def _set_data(self, field, value):
+        ''' save the value to the config file'''
         if not field in self._data or self._data[field] != value:
             self._data[field] = value
             self.save()
@@ -2301,7 +2302,7 @@ class Configuration(QtCore.QObject):
     @property
     def tts_mode_switch_enabled(self) -> bool:
         return self._get_data("tts_mode_switch_enabled", True)
-    @tts_enabled.setter
+    @tts_mode_switch_enabled.setter
     def tts_mode_switch_enabled(self, value : bool):
         self._set_data("tts_mode_switch_enabled", value)
 

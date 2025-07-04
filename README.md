@@ -15,6 +15,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
+### (m76T23/B)
+- Fix: left and right wheel mouse not recognized
+- Fix: persistence of option: TTS on mode switch
+- Changed: curve input tracker decoupled from input repeater visibility (will now always be visible)
+- Fix: Handling of non-existing profiles or empty profile files.  
+- Changed: inability to get a lock of VJOY will only create a soft error rather than a hard application exit.  Note: this situation is definitely not normal an indicates more than one application is concurrently using VJOY likely in exclusive mode.  Ensure no other application/process is using VJOY in exclusive mode, or concurrently.
+
 ### (m76T23/A)
 - Fix: Application not always remembering size and position (note: this will restore defaults the first time T23 runs)
 - Fix: Merge data visible on vjoy remap when not in merge mode.

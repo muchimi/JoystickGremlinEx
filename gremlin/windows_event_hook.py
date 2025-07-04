@@ -296,7 +296,7 @@ def process_mouse_event(n_code, w_param, l_param):
             process = True
         elif w_param == WM_MOUSEWHEEL:
             # vertical mouse wheel
-            delta = msg.mouseData >> 16
+            delta = msg.mouseData >> 16 # high word
             # print (f"mouse V received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
             if delta == 120:
                 button_id = gremlin.types.MouseButton.WheelUp
@@ -307,6 +307,7 @@ def process_mouse_event(n_code, w_param, l_param):
             is_wheel = True
         elif w_param == WM_MOUSEHWHEEL:
             # horizontal mouse wheel
+            delta = msg.mouseData >> 16 # high word
             if delta == 120:
                 button_id = gremlin.types.MouseButton.WheelRight
                 release_button_id = gremlin.types.MouseButton.WheelLeft
