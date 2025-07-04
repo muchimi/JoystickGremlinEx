@@ -15,7 +15,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
-### (m76T23/B)
+### (m76T24)
 - Fix: left and right wheel mouse not recognized
 - Fix: persistence of option: TTS on mode switch
 - Changed: curve input tracker decoupled from input repeater visibility (will now always be visible)
