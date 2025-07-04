@@ -1398,8 +1398,11 @@ class Configuration(QtCore.QObject):
     
     @show_input_axis.setter
     def show_input_axis(self, value):
-        self._data["show_input_axis"] = value
-        self.save()
+        current = self.show_input_axis
+        if current != value:
+            self._set_data("show_input_axis", value)
+            self.changed.emit("show_input_axis", value)
+
 
     @property
     def input_viewer_disables_repeaters(self):

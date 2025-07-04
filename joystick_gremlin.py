@@ -2778,11 +2778,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.refresh()
 
     def _config_filter_changed_cb(self, filter, value):
-        if filter == "input_viewer_disables_repeaters":
-            if value:
-                gremlin.shared_state.push_repeater()
-            else:
-                gremlin.shared_state.pop_repeater()
+        match filter:
+            case "input_viewer_disables_repeaters":
+                if value:
+                    gremlin.shared_state.push_repeater()
+                else:
+                    gremlin.shared_state.pop_repeater()
+            case "show_input_axis":
+                self.refresh()
 
     def _config_option_changed(self):
         self._update_highlight_toolbar_enabled()

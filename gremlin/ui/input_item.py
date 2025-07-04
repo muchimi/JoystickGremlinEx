@@ -1635,31 +1635,36 @@ class InputItemWidget(QBoxFrame):
         #     pass
 
         input_type = self.identifier.input_type
-        if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.is_hat) or \
-            input_type in (InputType.JoystickAxis, InputType.JoystickButton,  InputType.JoystickHat, InputType.OpenSoundControl, InputType.Midi):
+        if config.show_input_axis:
+            if (self.identifier.is_axis or self.identifier.is_button or self.identifier.is_hat) or \
+                input_type in (InputType.JoystickAxis, InputType.JoystickButton,  InputType.JoystickHat, InputType.OpenSoundControl, InputType.Midi):
             
-            if self.identifier.is_axis:
-                # axis
-                if not current_axis_widget:
-                    widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False, show_value = False)
-                    calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
-                    widget.show_calibrated = calibration.hasData # enable calibrated mode dual repeater
+                if self.identifier.is_axis:
+                    # axis
+                    if not current_axis_widget:
+                        widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False, show_value = False)
+                        calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
+                        widget.show_calibrated = calibration.hasData # enable calibrated mode dual repeater
 
-                    widget.data = self
-                    self.axis_widget = widget
-                # remove button widget if we changed modes
-                if self.button_widget:
-                    remove_button = True
+                        widget.data = self
+                        self.axis_widget = widget
+                    # remove button widget if we changed modes
+                    if self.button_widget:
+                        remove_button = True
 
-            else: 
-                # button
-                if not current_button_widget:
-                    widget = gremlin.ui.ui_common.ButtonStateWidget()
-                    self.button_widget = widget
+                else: 
+                    # button
+                    if not current_button_widget:
+                        widget = gremlin.ui.ui_common.ButtonStateWidget()
+                        self.button_widget = widget
 
-                # remove axis widget if we changed modes
-                if self.axis_widget:
-                    remove_axis = True
+                    # remove axis widget if we changed modes
+                    if self.axis_widget:
+                        remove_axis = True
+        else:
+            # remove both axis and button
+            remove_axis = True
+            remove_button = True
                 
 
                 
