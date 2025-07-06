@@ -670,10 +670,8 @@ class Buttons():
         
         :param tooltip: the tooltip to show
         :callback : optional the callback on click
-        
         '''
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        return Buttons._template(None, f"{prefix}button_paste.svg", tooltip, callback)
+        return Buttons._template(None, Icons.pasteIcon(), tooltip, callback)
         
     
     @staticmethod
@@ -684,8 +682,7 @@ class Buttons():
         :callback : optional the callback on click
         
         '''
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        return Buttons._template(None, f"{prefix}button_copy.svg", tooltip, callback)
+        return Buttons._template(None, Icons.copyIcon(), tooltip, callback)
         
     
 
@@ -2240,11 +2237,7 @@ class ActionSelector(QtWidgets.QWidget):
         self.add_button.clicked.connect(self._add_action)
 
         # clipboard
-        self.paste_button = QtWidgets.QPushButton()
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        icon = gremlin.util.load_icon(f"{prefix}button_paste.svg")
-        self.paste_button.setIcon(icon)
-        self.paste_button.clicked.connect(self._paste_action)
+        self.paste_button = gremlin.ui.ui_common.Buttons.getPasteWidget(callback=self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
 
@@ -2495,15 +2488,16 @@ class ModeWidget(QtWidgets.QWidget):
     def select_mode(self, mode: str):
         ''' selects the mode without firing a change event - ignored if the mode doesn't exist '''
         # syslog = logging.getLogger("system")
-        syslog.info(f"Mode: set edit selector mode to [{mode}]")
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose: syslog.info(f"Mode: set edit selector mode to [{mode}]")
         index =  self.edit_mode_selector.findData(mode)
         if index >= 0:
-            syslog.info(f"Mode: mode exists")
+            if verbose: syslog.info(f"Mode: mode exists")
             with QtCore.QSignalBlocker(self.edit_mode_selector):
                 self.edit_mode_selector.setCurrentIndex(index)
         else:
             # not found, update the selector
-            syslog.info(f"Mode: mode does not exist, repopulating")
+            if verbose: syslog.info(f"Mode: mode does not exist, repopulating")
             self.populate_selector(gremlin.shared_state.current_profile, mode)
 
     def populate_selector(self, profile, mode_to_select : str = None, emit : bool = False):

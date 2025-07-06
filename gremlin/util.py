@@ -776,11 +776,8 @@ def find_package_file(file_path):
     return find_file(file_path, root_folder)
 
 
-
 def _find_file(file_path, root_folder = None):
     ''' finds a file '''
-
-
 
     from pathlib import Path
     from gremlin.config import Configuration
@@ -844,7 +841,7 @@ def _find_file(file_path, root_folder = None):
 
 
 
-def get_icon_path(*paths):
+def get_icon_path(path):
         '''
         gets an icon path
            
@@ -856,12 +853,13 @@ def get_icon_path(*paths):
         import gremlin.shared_state
 
         # be aware of runtime environment
-        root_path = gremlin.shared_state.root_path
-        try:
-            the_path = os.path.join(*paths).lower()
-        except:
+        if path:
+            the_path = path.casefold()
+        else:
             # no path provided
             return None
+        
+        root_path = gremlin.shared_state.root_path
         
         if the_path in gremlin.shared_state._icon_path_cache.keys():
             return gremlin.shared_state._icon_path_cache[the_path]
@@ -899,11 +897,16 @@ def get_icon_path(*paths):
     
         return None
 
-def load_pixmap(*paths):
+def load_pixmap(path, size = 24):
     ''' gets a pixmap from the path '''
     import gremlin.ui.ui_common
-    the_path = get_icon_path(*paths)
+
+    desired_size = QtCore.QSize(size, size)
     
+    if isinstance(path, QtGui.QIcon):
+        return  path.pixmap(desired_size)
+    
+    the_path = get_icon_path(path)
     if the_path:
         #syslog.info(f"load_pixmap(): {the_path}")
         pixmap = QtGui.QPixmap(the_path)
@@ -913,9 +916,9 @@ def load_pixmap(*paths):
         return pixmap
     
     # return a dummy pixmap so the code doesn't blow up
-    syslog.error(f"load_pixmap(): invalid path: {the_path} {paths}")
+    syslog.error(f"load_pixmap(): invalid path: {the_path} {path}")
     icon : QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
-    return icon.pixmap(24,24)
+    return icon.pixmap(desired_size)
 
 
 def load_icon(*paths, use_qta = False, qta_color = None):

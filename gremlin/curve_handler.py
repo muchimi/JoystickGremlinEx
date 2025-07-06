@@ -1692,25 +1692,13 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.container_options_layout.addWidget(self.centered_widget)    
         self.container_options_layout.addStretch()
 
-        self.copy_button_widget = QtWidgets.QPushButton()
-
-        is_dark = gremlin.shared_state.is_dark_theme
-        copy_icon = "gfx/dark_button_copy.svg" if is_dark else "gfx/button_copy.svg"
-        icon = gremlin.util.load_icon(copy_icon)
-        self.copy_button_widget.setIcon(icon)
+        self.copy_button_widget = gremlin.ui.ui_common.Buttons.getCopyWidget(callback = self._copy_curve_cb, tooltip = "Copy curve")
         self.copy_button_widget.setMaximumWidth(24)
-        self.copy_button_widget.setToolTip("Copy curve")
-        self.copy_button_widget.clicked.connect(self._copy_curve_cb)
         
-        self.paste_button_widget = QtWidgets.QPushButton()
-
-        paste_icon = "gfx/dark_button_paste.svg" if is_dark else "gfx/button_paste.svg"
-        icon = gremlin.util.load_icon(paste_icon)
-        self.paste_button_widget.setIcon(icon)
+        self.paste_button_widget = gremlin.ui.ui_common.Buttons.getPasteWidget(callback = self._paste_curve_cb, tooltip="Paste curve")
         self.paste_button_widget.setMaximumWidth(24)
-        self.paste_button_widget.setToolTip("Paste curve")
         self._update_clipboard()
-        self.paste_button_widget.clicked.connect(self._paste_curve_cb)
+        
 
 
         self.container_options_layout.addWidget(self.copy_button_widget)

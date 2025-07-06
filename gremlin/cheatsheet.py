@@ -452,10 +452,8 @@ class ViewInput(gremlin.ui.ui_common.QRememberDialog):
         
         self.cb_display_by_device_widget.clicked.connect(self._mode_by_device_cb)
         self.cb_display_by_mode_widget.clicked.connect(self._mode_by_mode_cb)
-        self.to_clipboard_widget = QtWidgets.QPushButton()
-        self.to_clipboard_widget.setIcon(gremlin.util.load_icon("button_copy.svg"))
-        self.to_clipboard_widget.setToolTip("Copies the data to the clipboard")
-        self.to_clipboard_widget.clicked.connect(self._to_clipboard_cb)
+        self.to_clipboard_widget = gremlin.ui.ui_common.Buttons.getCopyWidget(callback = self._to_clipboard_cb, tooltip = "Copy data to clipboard") 
+        
         self.option_container_layout.addWidget(QtWidgets.QLabel("Display Mode:"))
         self.option_container_layout.addWidget(self.cb_display_by_device_widget)
         self.option_container_layout.addWidget(self.cb_display_by_mode_widget)

@@ -15,6 +15,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
+### (m76T24A)
+- Fix: consistent clipboard icons
+- Changed: pass on log messages
+
 ### (m76T24)
 - Fix: left and right wheel mouse not recognized
 - Fix: persistence of option: TTS on mode switch

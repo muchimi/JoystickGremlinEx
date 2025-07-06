@@ -965,16 +965,7 @@ class SimconnectOptions():
         progress.show()
         QtWidgets.QApplication.processEvents()
 
-        # search_folder = os.path.dirname(community_folder)
-        # source_files = gremlin.util.find_files(search_folder,"aircraft.cfg")
-        # source_folders = [os.path.dirname(file) for file in source_files]
-
         search_folders = [community_folder]
-
-        # if self._local_state_folder and os.path.isdir(self._local_state_folder):
-        #     # add the streamd folders to the list
-        #     search_folders.append(self._local_state_folder)
-
 
         source_files = []
         for root_folder in search_folders:

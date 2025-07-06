@@ -1244,12 +1244,6 @@ class ActionSetView(ui_common.AbstractView):
             self.controls_layout.addWidget(self.control_edit)
         if ActionSetView.Interactions.Copy in self.allowed_interactions:
             self.control_edit = gremlin.ui.ui_common.Buttons.getCopyWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Copy))
-            # self.control_edit = QtWidgets.QPushButton(
-            #     load_icon(f"gfx/{prefix}button_copy.svg"), ""
-            # )
-            # self.control_edit.clicked.connect(
-            #     lambda: self.interacted.emit(ActionSetView.Interactions.Copy)
-            # )
             self.controls_layout.addWidget(self.control_edit)
 
 
@@ -2243,23 +2237,9 @@ class ContainerSelector(QtWidgets.QWidget):
 
 
         # clipboard
-        self.copy_button =  QtWidgets.QPushButton()
-        copy_icon = "gfx/dark_button_copy.svg" if is_dark else "gfx/button_copy.svg"
-        icon = gremlin.util.load_icon(copy_icon)
-        self.copy_button.setIcon(icon)
-        self.copy_button.clicked.connect(self._copy_container)
-        self.copy_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.copy_button.setToolTip("Copy container(s)")
-
-        self.paste_button = QtWidgets.QPushButton()
-
-        paste_icon = "gfx/dark_button_paste.svg" if is_dark else "gfx/button_paste.svg"
-        icon = gremlin.util.load_icon(paste_icon)
-        self.paste_button.setIcon(icon)
-        self.paste_button.clicked.connect(self._paste_container)
-        self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.paste_button.setToolTip("Paste container(s)")
-
+        self.copy_button_widget = gremlin.ui.ui_common.Buttons.getCopyWidget(callback = self._copy_container, tooltip = "Copy container(s)")
+        self.paste_button_widget = gremlin.ui.ui_common.Buttons.getPasteWidget(callback = self._paste_container, tooltip = "Paste container(s)")
+        
         # delete all containers
         self.delete_button =  QtWidgets.QPushButton()
         icon = gremlin.ui.ui_common.Icons.trashIcon()
@@ -2271,8 +2251,8 @@ class ContainerSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(self.container_dropdown)
         self.main_layout.addWidget(self.add_container_widget)
         self.main_layout.addWidget(self.load_template_widget)
-        self.main_layout.addWidget(self.copy_button)
-        self.main_layout.addWidget(self.paste_button)
+        self.main_layout.addWidget(self.copy_button_widget)
+        self.main_layout.addWidget(self.paste_button_widget)
         self.main_layout.addWidget(self.delete_button)
 
         eh = gremlin.event_handler.EventHandler()
@@ -2330,12 +2310,12 @@ class ContainerSelector(QtWidgets.QWidget):
 
     def _clipboard_changed(self, clipboard):
         ''' handles paste button state based on clipboard data '''
-        self.paste_button.setEnabled(clipboard.is_container)
+        self.paste_button_widget.setEnabled(clipboard.is_container)
         ''' updates the paste button tooltip with the current clipboard contents'''
         if clipboard.is_container:
-            self.paste_button.setToolTip(f"Paste container ({clipboard.data.name})")
+            self.paste_button_widget.setToolTip(f"Paste container ({clipboard.data.name})")
         else:
-            self.paste_button.setToolTip(f"Paste container (not available)")
+            self.paste_button_widget.setToolTip(f"Paste container (not available)")
 
     @QtCore.Slot()
     def _paste_container(self):
@@ -3277,7 +3257,7 @@ class TitleBar(QtWidgets.QFrame):
         # clipboard copy button - only if a handler is given
         if clipboard_cb:
             self.copy_button = TitleBarButton()
-            copy_icon = "gfx/dark_button_copy.svg" if is_dark else "gfx/button_copy.svg"
+            copy_icon = gremlin.ui.ui_common.Icons.copyIcon() 
             pixmap_copy = load_pixmap(copy_icon)
             icon = QtGui.QIcon()
             pixmap_copy = pixmap_copy.scaled(size, size, QtCore.Qt.KeepAspectRatio)
@@ -4234,7 +4214,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         # Add the scroll area to the main layout
         self.main_layout.addWidget(self.scroll_area)
 
-        syslog.info("create actioncontainerview")
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose: syslog.info(f"create actioncontainerview [{parent.item_data.debug_display}]")
 
         self._widgets = []
 
