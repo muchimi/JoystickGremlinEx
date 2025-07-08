@@ -14,10 +14,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T25)
+- Fix: device change exception due to UI threading change (there may yet be others undiscovered yet - thanks for your patience and do report those as you see them).
+- Fix: changed behavior when loading devices and the device / input is no longer valid (for whatever reason - usually - ID changed or disconnected).
+- Fix: if the last selected device cannot be selected for whatever reason (usually disconnected or ID change), a default that exists will be selected.  If no default can be selected, the request will be ignored instead of causing an exception.
+- Fix: device connection state not always updating on device connection change.
+- New: a message box will now be displayed on device changes to specifically point out a device was changed if in design mode.
 
 ### (m76T24A)
 - Fix: consistent clipboard icons
-- Changed: pass on log messages
+- Changed: pass on log messages  
+- Fix: auto-refactor referencing deprecated files.
 
 ### (m76T24)
 - Fix: left and right wheel mouse not recognized

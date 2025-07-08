@@ -255,16 +255,6 @@ def get_curved_axis(guid, identifier):
         
     return None
             
-            
-
-
-
-            
-
-
-             
-
-    
 
 def get_hat(guid, index):
     ''' gets the current hat value '''
@@ -319,6 +309,20 @@ def physical_devices():
     """
     return [dev for dev in _joystick_devices if dev.device_type == gremlin.types.DeviceType.Joystick and not dev.is_virtual]
 
+
+
+def default_device():
+    ''' gets the default device '''
+    device = None
+    devices = physical_devices
+    if devices:
+        device = devices[0]
+    if not device:
+        devices = joystick_devices
+    if devices:
+        device = devices[0]
+    return device
+        
 
 def select_first_valid_vjoy_input(valid_types):
     """Returns the first valid vjoy input.

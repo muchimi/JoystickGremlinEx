@@ -828,7 +828,8 @@ class Device:
     def device_guid(self, value : dinput.GUID):
         assert isinstance(value, dinput.GUID) if value is not None else True
         self._device_guid = value
-        self.connected = gremlin.joystick_handling.is_device_connected(value) if value is not None else False
+        
+
 
     @property
     def device_id(self) -> str:

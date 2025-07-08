@@ -3149,6 +3149,9 @@ class MessageBox():
         from gremlin.util import load_pixmap
         self._message_box = QMessageBox(parent = parent)
 
+        # force the cursor
+        
+
         if is_warning:
             # pixmap = load_pixmap("warning.svg")
             # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)

@@ -42,9 +42,12 @@ from psygnal import Signal
 
 from lxml import etree
 
+import gremlin.joystick_handling
+
 ''' ALL gremlin modules should be imported here to avoid packaging errors '''
 
 
+import gremlin.joystick_handling
 import gremlin.util
 import gremlin.config
 import gremlin.input_types
@@ -472,18 +475,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         else:
             position = self.ui.devices.insertTab(index, device_name)
 
-        if not device.connected:
-            # indicate device is disconnected
-            color = gremlin.ui.ui_common.Color().disconnectedColor()
-            icon = gremlin.ui.ui_common.Icons.disconnectedIcon() #.load_icon("mdi.power-plug-off", qta_color = color)
-            self.ui.devices.setTabIcon(position, icon)
-            self.ui.devices.setTabTextColor(position, color)   
-        else:
-            # tab color based on mapping
-            color = gremlin.ui.ui_common.Color().mappedColor() if has_mapping else gremlin.ui.ui_common.Color().unmappedColor()
-            self.ui.devices.setTabTextColor(position, color)   
-
-    
+        
         self._tab_device_map[device_guid] = position
         self._tab_index_map[position] = device_guid
         self._tab_name_map[device_guid] = device_name
@@ -495,6 +487,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         verbose = gremlin.config.Configuration().verbose_mode_device
         if verbose: syslog.info(f"Add tab: {position} {device_name} {device_guid}  tab data: {self.ui.devices.tabData(position)}")
+
+        self._update_tab(device_guid)
 
         return position
     
@@ -2049,12 +2043,22 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._update_tab(item_data.device_id) # update tab header
     
     def _update_tab(self, device_id: str):
-        ''' updates the given tab for mapping '''
+        ''' updates the given tab for mapping and connection status '''
         position = self.getTabIndexForDevice(device_id)
         if position is not None:
-            has_mapping = self._has_mapping(device_id)
-            color = gremlin.ui.ui_common.Color().mappedColor() if has_mapping else gremlin.ui.ui_common.Color().unmappedColor()
-            self.ui.devices.setTabTextColor(position, color)
+            device = gremlin.joystick_handling.device_info_from_guid(device_id)
+            device.update() # update connection state
+            if not device.connected:
+                # indicate device is disconnected
+                color = gremlin.ui.ui_common.Color().disconnectedColor()
+                icon = gremlin.ui.ui_common.Icons.disconnectedIcon() #.load_icon("mdi.power-plug-off", qta_color = color)
+                self.ui.devices.setTabIcon(position, icon)
+                self.ui.devices.setTabTextColor(position, color)   
+            else:
+                # tab color based on mapping
+                has_mapping = self._has_mapping(device_id)
+                color = gremlin.ui.ui_common.Color().mappedColor() if has_mapping else gremlin.ui.ui_common.Color().unmappedColor()
+                self.ui.devices.setTabTextColor(position, color)
         
 
     def _create_tabs(self, activate_tab=None):
@@ -2898,12 +2902,37 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
             # guid of current device tab
-
-            if not gremlin.util.compare_guid(current_device_guid, device_guid):
+            index = self._find_tab_index(device_guid)
+            if not gremlin.util.compare_guid(current_device_guid, device_guid) or index is None: # device changed or not found
                 # change tab if not on the correct device tab
                 if verbose: syslog.info("Tab change requested")
-                index = self._find_tab_index(device_guid)
-                if verbose: assert index is not None,f"SELECT: sync issue: no device tab found for device {str(device_guid)}"
+                # validate the requested device exists (this could be because the device is disconnected for example)
+                
+                if index is None:
+                    syslog.warning(f"SELECT INPUT: tab not found for device {str(device_guid)} - device does not exist - selecting default")
+                    # change to the first
+                    device : DeviceSummary = gremlin.joystick_handling.default_device()
+                    if not device:
+                        syslog.warning(f"SELECT INPUT: no default device to select found - aborting selection")
+                        return
+                    device_guid = device.device_guid
+                    # get a default input for that device (first axis or first button)
+                    if device.axis_count:
+                        input_id = device.getAxisInputId(0)
+                    elif device.button_count:
+                        input_item = self._get_input_item(device_guid, 0)
+                    else:
+                        syslog.warning(f"SELECT INPUT: default device has no default input - aborting selection")
+                        return
+
+                    switch_input = True
+
+                    index = self._find_tab_index(device_guid)
+                    if index is None:
+                        syslog.warning(f"SELECT INPUT: default device not found in device tabs: {str(device)} - aborting selection")
+                        return
+
+
                 with QtCore.QSignalBlocker(self.ui.devices):
                     self.ui.devices.setCurrentIndex(index)
                     gremlin.shared_state.current_tab_device_guid = device_guid
@@ -2911,6 +2940,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if verbose: syslog.info(f"Tab change complete: device {str(device_guid)}")
                 switch_tabs = True # we are switching tabs
                 switch_input = True # we are switching inputs
+
 
             if input_id is None:
                 # get the default item to select
@@ -3280,8 +3310,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     # | Signal handlers
     # +---------------------------------------------------------------
 
-
     def _device_change_cb(self):
+        gremlin.util.InvokeUiMethod(self._device_change_ui) # ensure the update is on the UI thread
+
+    def _device_change_ui(self):
         """Handles addition and removal of joystick devices."""
         # Update device tabs
 
@@ -3342,6 +3374,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if verbose_detailed:
                         syslog.info(f"Device change end")
                     self.device_change_locked = False
+
+                    # display a message
+                    if not gremlin.shared_state.is_running:
+                        gremlin.util.pushCursorLevel()
+                        gremlin.ui.ui_common.MessageBox("Device change detected","A device change was detected and you may need to reselect a device/input.")
+                        gremlin.util.popCursorLevel()
+                    
+
+                    
+
                 # mark items processed
                 self._device_change_queue = 0
 

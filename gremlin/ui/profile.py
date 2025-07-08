@@ -26,7 +26,7 @@ from PySide6.QtCore import Property, Signal, Slot
 
 from gremlin import error, plugin_manager, profile, tree, util
 from gremlin.profile import ActionTree, RootAction
-from gremlin.signal import signal
+
 from gremlin.tree import TreeNode
 from gremlin.types import AxisButtonDirection, HatDirection
 from gremlin.input_types import InputType

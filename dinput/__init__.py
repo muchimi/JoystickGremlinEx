@@ -487,20 +487,7 @@ class DeviceSummary:
     def setConnected(self, value: bool):
         self._connected = value
     
-    def refreshConnected(self) -> bool:
-        ''' checks if the device is connected '''
-        if self.device_guid:
-            device_count = DILL.get_device_count()
-            connected_list = []
-            for device_index in range(device_count):
-                dev = DILL.get_device_information_by_index(device_index)
-                connected_list.append(dev.device_id)
-
-            self._connected = self.device_id in connected_list
-            return self._connected
-        
-        
-
+    
     @property
     def is_virtual(self):
         """ determins if a device is virtual.
@@ -586,6 +573,18 @@ class DeviceSummary:
                 return am.axis_index
         return None
     
+    def update(self):
+        ''' updates device connectivity '''
+        if self.is_special:
+            # nothing to update on special devices
+            return
+        
+        # connection state 
+        if self.device_guid is not None:
+            self._connected = DILL.device_exists(self.device_guid)
+        else:
+            self._connected = False
+
 
     
     def getAxisName(self, index : int, is_linear = False):

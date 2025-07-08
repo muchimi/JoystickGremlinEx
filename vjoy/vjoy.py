@@ -275,7 +275,6 @@ class Axis:
                 self.vjoy_id,
                 self.axis_id
         ):
-            from gremlin.ui import backend
             from gremlin.util import log_sys_warn
             log_sys_warn(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
            
