@@ -2533,9 +2533,13 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         # Disable ui input selection on joystick input
         gremlin.shared_state.push_suspend_highlighting()
 
+        cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel_cb)
+
         # listen for the escape key
         event_listener = gremlin.event_handler.EventListener()
         event_listener.keyboard_event.connect(self._kb_event_cb)
+
+        self.main_layout.addWidget(cancel_widget, alignment= QtCore.Qt.AlignmentFlag.AlignCenter)
 
         # start listening on all ports 
         self._interface.start()
@@ -2545,20 +2549,30 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         ''' called when dialog is closing '''
         gremlin.shared_state.pop_suspend_highlighting()
         return super().closeEvent(event)
+    
+    def _cancel_cb(self):
+        gremlin.util.InvokeUiMethod(self._cancel_ui)
+    
+    def _cancel_ui(self):
+        # stop listening
+        self._interface.stop()
+        self.close()
+
 
     def _kb_event_cb(self, event):
+        ''' capture a key - ex'''
+        gremlin.util.InvokeUiMethod(self._kb_event_ui, event)
+
+    def _kb_event_ui(self, event):
         from gremlin.keyboard import key_from_code, key_from_name
         key = key_from_code(
                 event.identifier[0],
                 event.identifier[1]
         )
         if event.is_pressed and key == key_from_name("esc"):
-
-            # stop listening
-            self._interface.stop()
-
-            # close the winow
-            self.close()
+            # esc pressed
+            self._cancel_ui()
+            
 
     def _osc_message_cb(self, message, data):
         ''' called when a osc messages is provided by the listener '''
@@ -3099,12 +3113,13 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     
     def _listen_cb(self, current_port_only = False ):
+        ''' listens to an inbound message '''
         gremlin.util.InvokeUiMethod(self._listen_ui, current_port_only)
 
     def _listen_ui(self, current_port_only = False):
         ''' listens to an inbound OSC message - runs on UI thread'''
 
-
+        gremlin.util.assert_ui_thread()
         config = gremlin.config.Configuration()
         self.listener_dialog = OscInputListenerWidget(self._capture_message)
 

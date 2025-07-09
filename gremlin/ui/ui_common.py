@@ -229,7 +229,24 @@ class Color():
     @staticmethod
     def listenColor(): # color used for listen type buttons
         return "#34b7eb"
+    @staticmethod
+    def infoColor(): # color used for information boxes
+        return "#92882b"
     
+    @staticmethod
+    def cssInfoBox(): 
+        border_color = Color.borderColor()
+        background_color = Color.infoColor()
+        css = f'''
+            QFrame {{
+                border: 1px solid {border_color};
+                background: {background_color};
+            }}
+            QLabel {{
+                border: none;
+            }}
+            '''
+        return css
 
     @staticmethod
     def cssApplication():
@@ -662,6 +679,14 @@ class Buttons():
     def getClearWidget(label = "Clear", tooltip = "Clear", callback = None, no_keyboard = True, data = None):
         return Buttons._template(label, Icons.trashIcon(), tooltip, callback, no_keyboard, data)
 
+    @staticmethod
+    def getOkWidget(label = "Ok", tooltip = "Accept", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, None, tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
+    def getCancelWidget(label = "Cancel", tooltip = "Cancel", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, None, tooltip, callback, no_keyboard, data)
+    
         
 
     @staticmethod
@@ -1149,11 +1174,11 @@ class AbstractView(QtWidgets.QWidget):
     """Base class for MVC views."""
 
     # Signal emitted when a entry is selected
-    item_selected = Signal(int, bool) # index of the item being selected
-    item_edit = Signal(object, int, object)  # widget, index, model data object
-    item_edit_curve = Signal(object, int, object) # widget, index , model data object
-    item_delete_curve = Signal(object, int, object) # widget, index , model data object
-    item_closed = Signal(object, int, object)  # widget, index, model data object
+    item_selected = QtCore.Signal(int, bool) # index of the item being selected
+    item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object
+    item_edit_curve = QtCore.Signal(object, int, object) # widget, index , model data object
+    item_delete_curve = QtCore.Signal(object, int, object) # widget, index , model data object
+    item_closed = QtCore.Signal(object, int, object)  # widget, index, model data object
 
 
     def __init__(self, parent=None):
@@ -1208,7 +1233,7 @@ class LeftRightPushButton(QtWidgets.QPushButton):
     mouse clicks."""
 
     # Signal emitted when the button is pressed using the right mouse button
-    clicked_right = Signal()
+    clicked_right = QtCore.Signal()
 
     def __init__(self, label, parent=None):
         """Creates a new button instance.
@@ -1263,8 +1288,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
 
     '''
 
-    valueChanged = Signal(float) # fires when the value changes
-    doubleClick = Signal() # fires when the input is double clicked
+    valueChanged = QtCore.Signal(float) # fires when the value changes
+    doubleClick = QtCore.Signal() # fires when the input is double clicked
 
     def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
         super().__init__(parent)
@@ -1490,8 +1515,8 @@ class QFloatLineEditEx(QtWidgets.QLineEdit):
 
     '''
 
-    valueChanged = Signal(float) # fires when the value changes
-    doubleClick = Signal() # fires when the input is double clicked
+    valueChanged = QtCore.Signal(float) # fires when the value changes
+    doubleClick = QtCore.Signal() # fires when the input is double clicked
 
     def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
         super().__init__(parent)
@@ -1666,8 +1691,8 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     '''
 
-    valueChanged = Signal(float) # fires when the value changes
-    doubleClick = Signal() # fires when the input is double clicked
+    valueChanged = QtCore.Signal(float) # fires when the value changes
+    doubleClick = QtCore.Signal() # fires when the input is double clicked
 
     def __init__(self, data = None, min_range = -16383, max_range = 16384, step = 1, value = 0, chars = 8, parent = None):
         super().__init__(parent)
@@ -1913,7 +1938,7 @@ class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
 
 class AbstractInputSelector(QtWidgets.QWidget):
 
-    input_changed = Signal() # fires when the input changes 
+    input_changed = QtCore.Signal() # fires when the input changes 
 
     def __init__(self, change_cb, valid_types, parent=None):
         super().__init__(parent)
@@ -2209,8 +2234,8 @@ class ActionSelector(QtWidgets.QWidget):
     """Widget permitting the selection of actions."""
 
     # Signal emitted when an action is going to be added
-    action_added = Signal(str)  # add button pressed
-    action_paste = Signal(object, object) # paste button pressed
+    action_added = QtCore.Signal(str)  # add button pressed
+    action_paste = QtCore.Signal(object, object) # paste button pressed
 
 
     def __init__(self, input_type, input_item, parent=None):
@@ -2433,7 +2458,7 @@ class ModeWidget(QtWidgets.QWidget):
     """Displays the ui for mode selection and management of a device."""
 
     # Signal emitted when the mode changes
-    edit_mode_changed = Signal(str) # when the edit mode changes
+    edit_mode_changed = QtCore.Signal(str) # when the edit mode changes
 
 
     def __init__(self, parent=None):
@@ -2715,7 +2740,7 @@ class InputListenerWidget(QBoxFrame):
     """Widget overlaying the main gui while waiting for the user
     to press a key or a joystick button """
 
-    item_selected = Signal(object) # called when the items are selected
+    item_selected = QtCore.Signal(object) # called when the items are selected
 
     def __init__(
             self,
@@ -3017,7 +3042,7 @@ class NoWheelComboBox (QComboBox):
 class ConfirmPushButton(QtWidgets.QPushButton):
     ''' confirmation push button '''
 
-    confirmed = Signal(object)
+    confirmed = QtCore.Signal(object)
 
     def __init__(self, text = None, title = "Confirmation Required", prompt = "Are you sure?", show_callback = None, parent = None ) -> None:
         ''' shows a confirm dialog box on click
@@ -3398,7 +3423,7 @@ class QIconButton(QDataPushButton):
 
 class QReorderToolbar(QtWidgets.QWidget):
     ''' re-order control up/down/bottom/top '''
-    moveRequested = Signal(str) # move direction
+    moveRequested = QtCore.Signal(str) # move direction
 
     def __init__(self, index :int, count : int,  hide = False, parent = None):
         '''
@@ -3479,8 +3504,8 @@ class QReorderToolbar(QtWidgets.QWidget):
 
 class QDataLineEdit(QtWidgets.QLineEdit):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    valueChanged = Signal() # fires when the text has changed AND we lost the focus
-    lostFocus = Signal() # fires when the input looses focus
+    valueChanged = QtCore.Signal() # fires when the text has changed AND we lost the focus
+    lostFocus = QtCore.Signal() # fires when the input looses focus
 
     def __init__(self, text = None, data = None, parent = None, width = 200):
         super().__init__(text, parent)
@@ -3571,7 +3596,7 @@ class QLimitedComboBox(QDataComboBox):
 class QHatSelectorComboBox(QDataComboBox):
     ''' a combo box for hat directions '''
 
-    valueChanged = Signal(HatDirection) # fires when a value is selected 
+    valueChanged = QtCore.Signal(HatDirection) # fires when a value is selected 
 
     def __init__(self, data = None, parent = None):
 
@@ -3640,8 +3665,8 @@ class QHatSelectorComboBox(QDataComboBox):
 class QPathLineItem(QtWidgets.QWidget):
     ''' An editable text input line with a file selector button '''
 
-    open = Signal(object) # event that fires when the open button is clicked, and passes the control
-    pathChanged = Signal(object, str) # fires when the line item changes
+    open = QtCore.Signal(object) # event that fires when the open button is clicked, and passes the control
+    pathChanged = QtCore.Signal(object, str) # fires when the line item changes
 
     IconSize = QtCore.QSize(16, 16)
 
@@ -3784,7 +3809,7 @@ class QPathLineItem(QtWidgets.QWidget):
 class ButtonStateWidget(QtWidgets.QWidget):
     ''' visualizes the state of a button '''
 
-    deleted = Signal() # triggers on delete
+    deleted = QtCore.Signal() # triggers on delete
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -4051,7 +4076,7 @@ _widget_cache = []
 class QProgressBar(QtWidgets.QWidget):
     ''' visualizes a vertical or horizontal progress bar '''
 
-    valueChanged = Signal() # fires when the value changes (and widget is not in readonly mode)
+    valueChanged = QtCore.Signal() # fires when the value changes (and widget is not in readonly mode)
 
     def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None):
         super().__init__()
@@ -4244,8 +4269,8 @@ class QProgressBar(QtWidgets.QWidget):
 class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
     ''' input axis visualizer '''
 
-    valueChanged = Signal(float, float) # (input_value, curved_value)
-    deleted = Signal(object) # indicates the item is being deleted
+    valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
+    deleted = QtCore.Signal(object) # indicates the item is being deleted
 
     def __init__(self, axis_id = None, show_calibrated = False, show_percentage = True, show_value = True,
                   show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical,
@@ -5001,7 +5026,7 @@ class HatWidget(QtWidgets.QWidget):
 
     """Widget visualizing the state of a hat."""
 
-    clicked = Signal(tuple) # click event (direction)
+    clicked = QtCore.Signal(tuple) # click event (direction)
 
     # Polygon path for a triangle
     triangle = QtGui.QPolygon(
@@ -5749,7 +5774,7 @@ class ButtonState(QtWidgets.QGroupBox):
 
 class QRowSelectorFrame(QtWidgets.QFrame):
 
-    selected_changed = Signal(object)
+    selected_changed = QtCore.Signal(object)
 
     def __init__(self, data = None, parent = None, selected = False):
         super().__init__(parent)
@@ -6032,7 +6057,7 @@ class QAnimatedToggle(QToggle):
 
 class QToggleText(QtWidgets.QWidget):
     ''' switched checkbox  '''
-    clicked = Signal()
+    clicked = QtCore.Signal()
 
     def __init__(self, text = None, parent = None):
         super().__init__(parent)
@@ -6072,7 +6097,7 @@ class QToggleText(QtWidgets.QWidget):
 class QDelayWidget(QtWidgets.QWidget):
     ''' widget to collect a delay time in milliseconds '''
 
-    valueChanged = Signal(int) # fired when the value changes
+    valueChanged = QtCore.Signal(int) # fired when the value changes
 
     def __init__(self, value = 250, is_seconds = False, parent = None, label = None):
         '''
@@ -6232,7 +6257,7 @@ class QHelper():
 
 class QDoubleClickSpinBox(QtWidgets.QSpinBox):
     ''' double click to reset spinbox '''
-    doubleClick = Signal()
+    doubleClick = QtCore.Signal()
 
     def __init__(self, parent = None):
         super().__init__(parent = None)
@@ -6251,13 +6276,13 @@ class DualSlider(QtWidgets.QWidget):
     lower and upper slider cannot pass through each other."""
 
     # Signal emitted when a value changes. (Handle, Value)
-    valueChanged = Signal(int, int)
+    valueChanged = QtCore.Signal(int, int)
     # Signal emitted when a handle is pressed (Handle)
-    sliderPressed = Signal(int)
+    sliderPressed = QtCore.Signal(int)
     # Signal emitted when a handle is moved (Handle, Value)
-    sliderMoved = Signal(int, int)
+    sliderMoved = QtCore.Signal(int, int)
     # Signal emitted when a handle is released (Handle)
-    sliderReleased = Signal(int)
+    sliderReleased = QtCore.Signal(int)
 
     # Enumeration of handle codes used by the widget
     LowerHandle = 1
@@ -6923,7 +6948,7 @@ class ActionLabel(QtWidgets.QLabel):
 class QContentWidget(QtWidgets.QWidget):
     ''' a widget that fires a resize event when its size changes '''
 
-    resized = Signal(QtCore.QSize)
+    resized = QtCore.Signal(QtCore.QSize)
     def __init__(self, parent = None):
         super().__init__(parent)
 
@@ -7453,9 +7478,9 @@ class QDataTab(QtWidgets.QTabWidget):
 class QTabHeader(QtWidgets.QTabBar):
     ''' wrapper for tab bar to catch mouse events on tab bar '''
 
-    tabMoveCompleted = Signal(int, int) # triggers once a tab moved has been completed 
-    tabChanged = Signal(int) # triggers when a tab is selected, aware of tab drag ops
-    tabContextMenu = Signal(int) # triggers a context menu request (index of the tab)
+    tabMoveCompleted = QtCore.Signal(int, int) # triggers once a tab moved has been completed 
+    tabChanged = QtCore.Signal(int) # triggers when a tab is selected, aware of tab drag ops
+    tabContextMenu = QtCore.Signal(int) # triggers a context menu request (index of the tab)
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -7786,10 +7811,10 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
     ''' a widget that displays and collects range information for a joytick '''
 
 
-    valueChanged = Signal(object) # occurs when the data range value changes ((min,max)) or (value) - passes the normalized values or single value
-    modeChanged = Signal() # occurs if the mode changes from single value to range mode
-    rangeChanged = Signal(object) # occurs when the range (command) data changes  ((min,max)) or (value) - passes the new command data or single value
-    invertChanged = Signal() # occurs when inversion flag is changed
+    valueChanged = QtCore.Signal(object) # occurs when the data range value changes ((min,max)) or (value) - passes the normalized values or single value
+    modeChanged = QtCore.Signal() # occurs if the mode changes from single value to range mode
+    rangeChanged = QtCore.Signal(object) # occurs when the range (command) data changes  ((min,max)) or (value) - passes the new command data or single value
+    invertChanged = QtCore.Signal() # occurs when inversion flag is changed
 
     def __init__(self,
                  data = None, 
@@ -8470,7 +8495,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 # class QVjoySelector(QtWidgets.QWidget):
 #     ''' widget to select a vjoy device '''
 
-#     selectionChanged = Signal(object, int,  InputType, int) # fires when selection changes (device_guid, vjoy_id, input_type, input_id)
+#     selectionChanged = QtCore.Signal(object, int,  InputType, int) # fires when selection changes (device_guid, vjoy_id, input_type, input_id)
 
 #     def __init__(self, device_label = "Device:", input_label = "Input:", parent = None):
 #         super().__init__(parent)
@@ -8710,7 +8735,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
 class QPaginator(QtWidgets.QWidget):
     ''' table view that displays paginated data '''
-    pageChanged = Signal(int, int, int) # fires when the page is changed (page_number, start_index, end_index)
+    pageChanged = QtCore.Signal(int, int, int) # fires when the page is changed (page_number, start_index, end_index)
 
     def __init__(self, item_count = 0, page_size=10):
         ''' setups the data model and callback to get a model by index '''
@@ -8942,7 +8967,7 @@ class QGroupBox(QtWidgets.QGroupBox):
 
 class QTypeSelectorWidget(QtWidgets.QWidget):
     ''' implements a type selector widget to select a data type '''
-    valueChanged = Signal(type) # fires when the data type changes 
+    valueChanged = QtCore.Signal(type) # fires when the data type changes 
 
     def __init__(self, allowed_types = [str, bool, int, float], label = "Datatype:", data_type = None, parent = None):
         super().__init__(parent)
@@ -9012,7 +9037,7 @@ class QTypeSelectorWidget(QtWidgets.QWidget):
 class QOnOffWidget(QtWidgets.QWidget):
     ''' widget that has a radio button on/off - like a checkbox but spells out the values '''
 
-    valueChanged = Signal(bool) # fires when the value changes 
+    valueChanged = QtCore.Signal(bool) # fires when the value changes 
 
     def __init__(self, value : bool = True, label = None, parent = None):
         super().__init__(parent)
@@ -9050,7 +9075,7 @@ class QOnOffWidget(QtWidgets.QWidget):
 
 class QAxisSourceSelector(QtWidgets.QWidget):
     ''' axis input selector - lets the user pick an input device and an axis on that input device (physical or virtual) '''
-    valueChanged = Signal(object, int)  # fires when a device is selected
+    valueChanged = QtCore.Signal(object, int)  # fires when a device is selected
 
     def __init__(self, label = "Device:", device_id = None, input_id = None, exclude_list = None, parent = None):
         ''' param: exclude_list : list of device ID (strings) to exclude from the drop down '''
@@ -9221,9 +9246,9 @@ class QWarning(QIconLabel):
 
 class QRangeWidget(QtWidgets.QWidget):
     ''' range widget - two values, min/max '''
-    valueChanged = Signal(float, float) # fires when min or max changed 
-    minChanged = Signal(float) # fires when min changes only
-    maxChanged = Signal(float) # fires when max changes only
+    valueChanged = QtCore.Signal(float, float) # fires when min or max changed 
+    minChanged = QtCore.Signal(float) # fires when min changes only
+    maxChanged = QtCore.Signal(float) # fires when max changes only
 
 
     def __init__(self, min_value : float, max_value = 0,  min_range : float = -1.0, max_range : float = 1.0, label = None, parent = None):
@@ -9293,9 +9318,9 @@ class QRangeWidget(QtWidgets.QWidget):
 
 class QExecuteWidget(QtWidgets.QWidget):
 
-    pressChanged = Signal(bool) # fires when press changes
-    releaseChanged = Signal(bool) # fires when release changes
-    valueChanged = Signal(bool, bool) # fires when either press or release changed
+    pressChanged = QtCore.Signal(bool) # fires when press changes
+    releaseChanged = QtCore.Signal(bool) # fires when release changes
+    valueChanged = QtCore.Signal(bool, bool) # fires when either press or release changed
 
     ''' widget presenting Execute on press, Execute on release options '''
     def __init__(self, execute_on_press : bool = True, execute_on_release : bool = True, label = None, parent = None):
@@ -9365,3 +9390,14 @@ class QExecuteWidget(QtWidgets.QWidget):
 
 
     
+class QInfoBox(QtWidgets.QFrame):
+    ''' widget for information text '''
+    def __init__(self, text, parent = None):
+        super().__init__(parent = parent)
+        self._label_widget = QtWidgets.QLabel(text)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self._label_widget)
+        self.setStyleSheet(Color.cssInfoBox())
+
+    def setText(self, text):
+        self._label_widget.setText(text)

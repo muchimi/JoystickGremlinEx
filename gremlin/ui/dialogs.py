@@ -198,25 +198,24 @@ class HostIpDialog(ui_common.BaseDialogUi):
         self._host_ip = host_ip
         self._ip_list = gremlin.util.getHostIp() # get list of host IPs
         self.setWindowTitle("Host IP Selection")
+        self._existing_only = False # true if the dialog should only allow selecting an existing IP
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         grid_layout = QtWidgets.QGridLayout()
 
-
         self._ip_list_widget = QtWidgets.QComboBox()
         w = gremlin.ui.ui_common.get_text_width("888.888.888.888 ")
         self._ip_list_widget.setMinimumWidth(w)
         self._ip_list_widget.currentIndexChanged.connect(self._ip_selection_changed)
-        grid_layout.addWidget(QtWidgets.QLabel("Available IPs:"), 0, 0)
-        grid_layout.addWidget(self._ip_list_widget, 0, 1)
-        grid_layout.addWidget(QtWidgets.QLabel(""), 0, 3)
+        
 
         self._host_ip_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._host_ip_widget.setMinimumWidth(w)
+        self._host_ip_widget.setText(self._host_ip)
         self._host_ip_widget.textChanged.connect(self._ip_host_changed)
-        grid_layout.addWidget(QtWidgets.QLabel("Host Ip:"), 1, 0)
-        grid_layout.addWidget(self._host_ip_widget, 1, 1)
+
+        self._instruction_widget = QtWidgets.QLabel()
 
         refresh_widget = QtWidgets.QPushButton()
         refresh_widget.setToolTip("Refresh")
@@ -224,7 +223,23 @@ class HostIpDialog(ui_common.BaseDialogUi):
         icon = gremlin.util.load_icon("ei.refresh")
         refresh_widget.setIcon(icon)
         refresh_widget.setMaximumWidth(24)
-        grid_layout.addWidget(refresh_widget, 0,2)
+        
+        row = 0
+
+        grid_layout.addWidget(self._instruction_widget, row, 0, 1, -1)
+
+        row+=1
+        grid_layout.addWidget(QtWidgets.QLabel("Available IPs:"), row, 0)
+        grid_layout.addWidget(self._ip_list_widget, row, 1)
+        grid_layout.addWidget(refresh_widget, row, 2)
+        grid_layout.addWidget(QtWidgets.QLabel(""), row, 3)
+        row+=1
+        
+        grid_layout.addWidget(QtWidgets.QLabel("Host Ip:"), row, 0)
+        grid_layout.addWidget(self._host_ip_widget, row, 1)
+
+        
+        
 
         grid_layout.setColumnStretch(3,2)
         self.main_layout.addLayout(grid_layout)
@@ -235,19 +250,33 @@ class HostIpDialog(ui_common.BaseDialogUi):
         cancel_widget = QtWidgets.QPushButton("Cancel")
         cancel_widget.clicked.connect(self._cancel_cb)
 
-        widget,layout = gremlin.ui.ui_common.getHContainer([ok_widget, cancel_widget],left_stretch=True)
+        widget, _ = gremlin.ui.ui_common.getHContainer([ok_widget, cancel_widget],left_stretch=True)
         self.main_layout.addWidget(widget)
 
         self._update_ip()
+        self._update_ui()
 
+    def setExistingOnly(self, value : bool):
+        ''' controls if the IP address can be random or must exist '''
+        self._existing_only = value
+
+        self._update_ip()
+        self._update_ui()
 
     def _update_ip(self):
-        ''' updates the IP addresses '''
+        ''' updates the available IP addresses '''
         self._ip_list = gremlin.util.getHostIp() # get updated list of host IPs
-        self._ip_list_widget.clear()
-        self._ip_list_widget.addItems(self._ip_list)
-        if self._host_ip in self._ip_list:
-            self._ip_list_widget.setCurrentText(self._host_ip)
+        with QtCore.QSignalBlocker(self._ip_list_widget):
+            self._ip_list_widget.clear()
+            self._ip_list_widget.addItems(self._ip_list)
+            if self._host_ip in self._ip_list:
+                self._ip_list_widget.setCurrentText(self._host_ip)
+        
+    def _update_ui(self):
+        self._host_ip_widget.setReadOnly(self._existing_only)
+        
+        msg = "Select an existing IP address from the drop down list:" if self._existing_only else "Select an IP address:"
+        self._instruction_widget.setText(msg)
 
     @QtCore.Slot()
     def _ip_selection_changed(self):
@@ -1149,10 +1178,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.tab_container.addTab(page_widget, "OSC/MIDI")
 
 
-        self.osc_enabled = QtWidgets.QCheckBox("Enable OSC input")
+        self.osc_enabled = QtWidgets.QCheckBox("Enable OSC")
         self.osc_enabled.clicked.connect(self._osc_enabled)
         self.osc_enabled.setChecked(self.config.osc_enabled)
-        self.osc_enabled.setToolTip("When set, Joystick Gremlin Ex will listen to OSC network traffic on the specified port when a profile is activated.")
+        self.osc_enabled.setToolTip("When set, GremlinEx can receive or send OSC commands when a profile is activated.")
 
         self.osc_input_port = ui_common.QIntLineEdit()
         self.osc_input_port.setRange(4096,65535)
@@ -1183,7 +1212,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
         # midi enabled
-        self.midi_enabled = QtWidgets.QCheckBox("Enable MIDI input")
+        self.midi_enabled = QtWidgets.QCheckBox("Enable MIDI")
         container = QtWidgets.QWidget()
         container.setContentsMargins(8,0,0,0)
         layout = QtWidgets.QHBoxLayout(container)
@@ -1191,7 +1220,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         self.midi_enabled.clicked.connect(self._midi_enabled)
         self.midi_enabled.setChecked(self.config.midi_enabled)
-        self.midi_enabled.setToolTip("When set, Joystick Gremlin Ex will listen to MIDI ports when a profile is activated.")
+        self.midi_enabled.setToolTip("When set, GremlinEx will listen for MIDI data when a profile is activated.")
 
         layout.addWidget(self.midi_enabled)
 
@@ -1222,6 +1251,9 @@ This setting is also available on a profile by profile basis on the profile tab,
             self._host_ip = "127.0.0.1"
         else:
             self.config.hostIp = self._host_ip
+
+
+        # display the local host IP (this is the GremlinEx server IP and cannot be changed)
         self._local_host_ip_widget = ui_common.QDataIPLineEdit()
         self._local_host_ip_widget.setText(self._host_ip)
         self._local_host_ip_widget.textChanged.connect(self._local_host_ip_changed)
@@ -1229,18 +1261,19 @@ This setting is also available on a profile by profile basis on the profile tab,
         self._local_host_ip_widget.setMinimumWidth(w)
         self._local_host_ip_widget.setMaximumWidth(w)
 
-        self._select_ip_widget = QtWidgets.QPushButton("Change")
+        self._select_ip_widget = QtWidgets.QPushButton("Select")
+        self._select_ip_widget.setToolTip("Selects a different IP address for the GremlinEx OSC listener if the host has more than one IP address.")
         self._select_ip_widget.clicked.connect(self._change_host_ip)
 
         row = 0
         col = 0
-        layout.addWidget(QtWidgets.QLabel(f"Local OSC Server:"), row, col)
+        layout.addWidget(QtWidgets.QLabel(f"GremlinEx IP:"), row, col)
         col+=1
         layout.addWidget(self._local_host_ip_widget, row, col)
         col+=1
         layout.addWidget(self._select_ip_widget, row, col)
         col+=1
-        layout.addWidget(QtWidgets.QLabel("OSC Input port:"), row, col)
+        layout.addWidget(QtWidgets.QLabel("Input port:"), row, col)
         col+=1
         layout.addWidget(self.osc_input_port, row, col)
         col+=1
@@ -1249,7 +1282,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         row += 1
         col = 0
-        layout.addWidget(QtWidgets.QLabel("Output host IP:"), row, col)
+        layout.addWidget(QtWidgets.QLabel("Output IP:"), row, col)
         col+=1
         layout.addWidget(remote_host_ip_widget, row, col)
         col+=2
@@ -1262,8 +1295,31 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         page_layout.addWidget(container)
 
-        label = QtWidgets.QLabel("Please configure remote OSC devices to send their output to the local IP and port listed above.")
-        page_layout.addWidget(label)
+        
+
+        msg =  '''Please configure the network information used for the OSC components in GremlinEx:
+
+The GremlinEx IP is the host IP address.
+This IP is what GremlinEx will listen on for OSC data sent to it from a network client.
+This IP address is selected from a drop down listing all known IP addresses for the current machine.
+The host port number defaults to 8000, and is the UDP port GremlinEx will listen on for OSC packets.
+This can be changed to any valid UDP port but cannot be the same as the send port below.
+
+The second IP is where GremlinEx sends OSC data.  
+This entry is a manual entry for the IP of the client GremlinEx will send OSC data to.
+The client port number defaults to 8001.  This can be changed to any valid UDP port and cannot be
+the same as the host port.
+
+Both IP addresses should be local subnet IP addresses.
+Note that firewall rules must allow traffic on the selected IP addresses/ports for any data to be received or transmitted.
+
+
+
+            '''
+        
+        info_box = gremlin.ui.ui_common.QInfoBox(msg)
+        
+        page_layout.addWidget(info_box)
 
 
 
@@ -1279,8 +1335,10 @@ This setting is also available on a profile by profile basis on the profile tab,
 
     @QtCore.Slot()
     def _change_host_ip(self):
+       ''' select a host IP address for hosts with multiple IPs '''
        self._host_dialog = HostIpDialog(self._host_ip)
        self._host_dialog.accepted.connect(self._host_ip_selected)
+       self._host_dialog.setExistingOnly(True)
        self._host_dialog.exec()
        self._host_dialog = None
 

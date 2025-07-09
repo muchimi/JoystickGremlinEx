@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T26)
+- Fix: OSC listen dialog UI thread issue.
+- Fix: OSC host IP configuration box no longer allows invalid IPs to be typed in (IPs come from the host machine and can be selected if multiple adapters are present but not arbitrarily so).
+- New: added cancel button on OSC listen dialog (box can be closed on Esc or clicking the button)
+- Improved: instructions on OSC configuration.
+
 ### (m76T25)
 - Fix: device change exception due to UI threading change (there may yet be others undiscovered yet - thanks for your patience and do report those as you see them).
 - Fix: changed behavior when loading devices and the device / input is no longer valid (for whatever reason - usually - ID changed or disconnected).
