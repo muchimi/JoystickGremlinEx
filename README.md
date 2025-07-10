@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T27)
+- Fix: OSC IP address change override ignores saved value.
+- Fix: UI for MIDI inputs updates for the new event model
+- New: Cancel button on MIDI listen box
+
 ### (m76T26)
 - Fix: OSC listen dialog UI thread issue.
 - Fix: OSC host IP configuration box no longer allows invalid IPs to be typed in (IPs come from the host machine and can be selected if multiple adapters are present but not arbitrarily so).

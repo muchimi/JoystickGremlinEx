@@ -1563,6 +1563,7 @@ class SimpleUDPClient(UDPClient):
 
 
 class OscClient():
+    ''' client that sends data out '''
     def __init__(self, host_ip = "127.0.0.1", output_port = 8001, name = None):
      
         self._server_ip = host_ip
@@ -1574,8 +1575,11 @@ class OscClient():
     def setPort(self, port):
         self._output_port = port
 
-    def setHost(self, host : str):
+    def setHost(self, host : str, output_port : int = None):
         self._server_ip = host
+        if output_port is not None:
+            self._output_port = output_port
+        
 
     def setName(self, value : str):
         self._name = value
@@ -1720,11 +1724,12 @@ class OscServer():
         eh.shutdown.connect(self._shutdown)
 
 
-    def setHostIp(self, host_ip):
+    def setHostIp(self, host_ip, input_port):
         ''' changes the OSC server IP '''
         self.stop()
         self._host_ip = host_ip
-        self.start()
+        self._input_port = input_port
+        self.start(host_ip, self._input_port, self._callback)
 
     @QtCore.Slot()
     def _shutdown(self):
@@ -1801,18 +1806,29 @@ class OscInterface(QtCore.QObject):
     def __init__(self, host_ip : str = None):
         super().__init__()
 
+        self._host_ip = None
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+
         # find our current IP address
         if not host_ip:
             host_ip = gremlin.config.Configuration().hostIp
+            if verbose: syslog.info(f"OSC: last server IP: {host_ip}")
+
         ip_list = gremlin.util.getHostIp()
         if ip_list:
             if host_ip in ip_list:
-                pass
+                if verbose: syslog.info(f"OSC: last server IP found")
             else:
                 host_ip = ip_list[0]
+                if verbose: 
+                    syslog.info("OSC: detected host IPs")
+                    
+                    syslog.info(f"OSC: last server IP not found, defaulting to default host IP: {host_ip}")
         else:
             host_ip = "127.0.0.1" 
-        self._host_ip = host_ip
+            if verbose: syslog.info(f"OSC: last server IP not found, no IP found, defaulting to locahost: {host_ip}")
+
+
         
         
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
@@ -1820,13 +1836,19 @@ class OscInterface(QtCore.QObject):
 
         self._started = False
         self._input_port = config.osc_input_port
+        if self._input_port is None:
+            self._input_port = 8000
+
         self._output_port = config.osc_output_port # self._input_port + 1
+        if self._output_port is None:
+            self._output_port = 8001 # default
+
         self._target_ip = config.osc_host
         self._target_port = config.osc_output_port
         self._osc_server = OscServer() # the OSC server
         self.osc_enabled = True # always able to listen to ports
         self._client_pool = {} # pool of clients keyed by (ip,port)
-        self._osc_internal_client = self.getClient(self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
+        self._osc_internal_client = None
         self._osc_client = self.getClient(self._target_ip, self._target_port) # the default OSC client setup in the configuration file
 
         el = gremlin.event_handler.EventListener()
@@ -1837,6 +1859,8 @@ class OscInterface(QtCore.QObject):
         el.host_ip_changed.connect(self.setHostIp)
         
 
+        self.setHostIp(host_ip)
+        self._osc_internal_client = self.getClient(self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
         self._started = False
 
  
@@ -1844,8 +1868,12 @@ class OscInterface(QtCore.QObject):
         ''' sets a new host IP for the OSC server '''
         if host_ip != self._host_ip and host_ip:
             self._host_ip = host_ip
-            self._osc_internal_client.setHost(host_ip)
-            self._osc_server.setHostIp(host_ip)
+            config = gremlin.config.Configuration()
+            config.hostIp = host_ip
+            if self._osc_internal_client:
+                self._osc_internal_client.setHost(host_ip, self._output_port) # loopback internal device
+            if self._osc_server:
+                self._osc_server.setHostIp(host_ip, self._input_port) # server listening
 
 
 
@@ -1894,6 +1922,7 @@ class OscInterface(QtCore.QObject):
 
     def getClient(self, server : str, port : int, name : str = None) -> OscClient:
         ''' gets the client for that server/port '''
+
         key = (server, port)
         if not key in self._client_pool:
             client = OscClient(server, port, name)
@@ -2560,7 +2589,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
 
 
     def _kb_event_cb(self, event):
-        ''' capture a key - ex'''
+        ''' capture a key - esc'''
         gremlin.util.InvokeUiMethod(self._kb_event_ui, event)
 
     def _kb_event_ui(self, event):

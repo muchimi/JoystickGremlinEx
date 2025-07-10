@@ -714,6 +714,10 @@ class MidiInputListenerWidget(QBoxFrame):
             QtWidgets.QLabel(f"""<center>Please press a MIDI input going to port {port_name if port_name else '(all)'}.<br/><br/>Press ESC to abort.</center>""")
         )
 
+        cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel_cb)
+
+        self.main_layout.addWidget(cancel_widget, alignment= QtCore.Qt.AlignmentFlag.AlignCenter)
+
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         
@@ -732,16 +736,23 @@ class MidiInputListenerWidget(QBoxFrame):
         self._interface.start(port_name)
 
 
+    def _cancel_cb(self):
+        gremlin.util.InvokeUiMethod(self._cancel_ui)
+
+    def _cancel_ui(self):
+        # stop listening
+        self._interface.stop()
+        self.close()        
+
     def _kb_event_cb(self, event):
+        ''' capture a key - esc '''
+        gremlin.util.InvokeUiMethod(self._kb_event_ui, event)
+
+    def _kb_event_ui(self, event):
         from gremlin.keyboard import key_from_code, key_from_name
         key =  gremlin.keyboard.KeyMap.from_event(event)
         if event.is_pressed and key == key_from_name("esc"):
-
-            # stop listening
-            self._interface.stop()
-
-            # close the winow
-            self.close()
+            self._cancel_ui()
 
     def _midi_message(self, port_name : str, port_index : int,  message :mido.Message ):
         ''' called when a midi messages is provided by the listener '''
@@ -1688,7 +1699,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.set_mode(mode)
 
 
-    def refresh(self):
+    def refresh(self, emit = False):
         """Refreshes the current selection, ensuring proper synchronization."""
         self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
         # self.input_item_selected_cb(self.input_item_list_view.current_index)
