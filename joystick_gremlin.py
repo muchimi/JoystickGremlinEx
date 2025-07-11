@@ -972,8 +972,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         dialog.setWindowModality(QtCore.Qt.ApplicationModal)
         dialog.ensurePolished()
         gremlin.util.centerDialog(dialog, width = dialog.width(), height=dialog.height())
-        dialog.closed.connect(lambda: self.apply_user_settings(ignore_minimize=True)
-        )
+        dialog.closed.connect(lambda: self.apply_user_settings(ignore_minimize=True))
         dialog.closed.connect(lambda: self._remove_modal_window("options"))
         
         dialog.closed.connect(self.options_closed)
@@ -2967,7 +2966,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not switch_input:
                 widget = self.getRegisteredWidget(device_guid)
                 if widget:
-                    current_input_id = widget.getContentInputId(self)
+                    current_input_id = widget.getContentInputId()
                     if current_input_id:
                         switch_input = current_input_id != input_id
     

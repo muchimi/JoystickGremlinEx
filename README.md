@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T28)
+- Improved: revamped options dialog to declutter, group and clarify.
+
 ### (m76T27)
 - Fix: OSC IP address change override ignores saved value.
 - Fix: UI for MIDI inputs updates for the new event model

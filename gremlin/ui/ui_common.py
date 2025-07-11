@@ -2707,11 +2707,23 @@ class ModeWidget(QtWidgets.QWidget):
 
 class QBoxFrame(QtWidgets.QFrame):
     ''' boxed frame widget '''
-    def __init__(self, data = None, parent = None, selected = False):
+    def __init__(self, data = None, parent = None, selected = False, transparent = False):
         super().__init__(parent)
+        self._transparent = transparent
+        
+        self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
+        self._update_css()
+        
 
+    def setTransparent(self, transparent : bool):
+        self._transparent = transparent
+        self._update_css()
+
+
+    def _update_css(self):
+        ''' internal style sheet update '''
         border_color = Color.borderColor()
-        background_color = Color.backgroundColor()
+        background_color = "none" if self._transparent else Color.backgroundColor()
         css = f'''
             QFrame {{
                 border: 1px solid {border_color};
@@ -2721,10 +2733,7 @@ class QBoxFrame(QtWidgets.QFrame):
                 border: none;
             }}
             '''
-        
-        self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
         self.setStyleSheet(css)
-
 
     @property
     def data(self):
@@ -2734,6 +2743,39 @@ class QBoxFrame(QtWidgets.QFrame):
     def data(self, value):
         self._data = value
 
+class QBoxFrameLayout(QBoxFrame):
+    def __init__(self, title = None, data = None, parent = None, selected = False, transparent = False):
+        super().__init__(data, parent, selected, transparent)
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        self._layout = QtWidgets.QVBoxLayout()
+        self._title_widget = QtWidgets.QLabel()
+
+        main_layout.addWidget(self._title_widget)
+        main_layout.addLayout(self._layout)
+        main_layout.addStretch(1)
+
+        if title:
+            self._title_widget.setText(title)
+
+    def setTitle(self, title):
+        ''' sets the box title (optional)'''
+        self._title_widget.setText(title)
+        visible = bool(title)
+        self._title_widget.setVisible(visible)
+
+
+    def addWidget(self, widget):
+        ''' adds a widget '''
+        self._layout.addWidget(widget)
+    
+    def clearWidgets(self):
+        ''' removes all widgets '''
+        gremlin.util.clear_layout(self._layout)
+
+    def removeWidget(self, widget):
+        ''' removes a widget '''
+        self._layout.removeWidget(widget)
 
 class InputListenerWidget(QBoxFrame):
 
@@ -3232,14 +3274,17 @@ class QIconLabel(QtWidgets.QWidget):
         if text is None:
             text = icon_path
             icon_path = None
-        container_widget = QtWidgets.QWidget()
-        container_widget.setContentsMargins(0, 0, 0, 0)
-        container_layout = QtWidgets.QHBoxLayout(container_widget)
-        container_layout.setContentsMargins(0, 0, 0, 0)
 
-        w = get_text_width("M")*80
-        container_widget.setMaximumWidth(w)
+        container_widget, container_layout = getHContainer()
 
+        # w = get_text_width("M")*80
+        # container_widget.setMaximumWidth(w)
+        
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+        )
+        
         self._icon_size = QtCore.QSize(icon_size, icon_size)
         self._icon_widget = QtWidgets.QLabel()
         if icon_path:
