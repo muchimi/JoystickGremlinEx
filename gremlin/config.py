@@ -1466,7 +1466,8 @@ class Configuration(QtCore.QObject):
     @property
     def runtime_ui_active(self):
         ''' keep UI enabled at runtime '''
-        return self._get_data("runtime_ui_active",False)
+        return False # disable for now as it can create conflicts
+        #return self._get_data("runtime_ui_active",False)
     
     @runtime_ui_active.setter
     def runtime_ui_active(self, value):

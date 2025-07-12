@@ -774,18 +774,18 @@ class OptionsUi(ui_common.BaseDialogUi):
         col1_layout.addWidget(box)
 
         # enable ui at runtime
-        self.enable_ui_runtime = QtWidgets.QCheckBox("Keep UI enabled when profile is active")
-        self.enable_ui_runtime.setToolTip("When enabled, the UI will remain interactable while a profile is running.<br>This can create conflicts if the profile or mode is changed while a profile is running,<b>use caution.</b>")
-        self.enable_ui_runtime.setChecked(self.config.runtime_ui_active)
-        self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
-        box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Runtime Behavior", transparent = True)
-        box.addWidget(self.enable_ui_runtime)
-        col1_layout.addWidget(box)
+        # self.enable_ui_runtime = QtWidgets.QCheckBox("Keep UI enabled when profile is active")
+        # self.enable_ui_runtime.setToolTip("When enabled, the UI will remain interactable while a profile is running.<br>This can create conflicts if the profile or mode is changed while a profile is running,<b>use caution.</b>")
+        # self.enable_ui_runtime.setChecked(self.config.runtime_ui_active)
+        # self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
+        # box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Runtime Behavior", transparent = True)
+        # box.addWidget(self.enable_ui_runtime)
+        # col1_layout.addWidget(box)
 
 
         # show live repeaters
-        self.show_joystick_input_widget = QtWidgets.QCheckBox("Show live joystick inputs")
-        self.show_joystick_input_widget.setToolTip("When enabled, current state of hardware inputs will be displayed in the UI")
+        self.show_joystick_input_widget = QtWidgets.QCheckBox("Show live joystick inputs (restart required)")
+        self.show_joystick_input_widget.setToolTip("When enabled, current state of hardware inputs will be displayed in the UI.\bGremlinEx must be restarted for this to take full effect when enabled.")
         self.show_joystick_input_widget.setChecked(self.config.show_input_axis)
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
 

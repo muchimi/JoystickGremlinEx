@@ -4214,6 +4214,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def refresh(self):
         ''' refresh the UI '''
+
+        # save selection
+        current_device_guid = gremlin.shared_state.current_tab_device_guid
+        current_input_type, current_input_id = self._get_last_input(current_device_guid)
+
         self._create_tabs()
 
         current_profile =gremlin.shared_state.current_profile
@@ -4228,6 +4233,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # refresh current device tab
         #self._refresh_tab()
+
+        # select
+        self._select_input(current_device_guid, current_input_type, current_input_id, True)
 
 
     def _force_close(self):

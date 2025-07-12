@@ -4250,6 +4250,9 @@ class QProgressBar(QtWidgets.QWidget):
         self._update_value()
 
     def setValue(self, value : float):
+        gremlin.util.InvokeUiMethod(self._set_value_ui, value)
+
+    def _set_value_ui(self, value : float):
         self._value = value
         self._update_value()
 
@@ -4257,6 +4260,9 @@ class QProgressBar(QtWidgets.QWidget):
         return self._value
     
     def _update_value(self):
+        gremlin.util.InvokeUiMethod(self._update_value_ui)
+    
+    def _update_value_ui(self):
         if not Shiboken.isValid(self):
             return
         self._percent = gremlin.util.scale_to_range(self._value, 
@@ -4265,7 +4271,9 @@ class QProgressBar(QtWidgets.QWidget):
                                                     target_min = 0.0,
                                                     target_max = 1.0)
         #syslog.info(f"value: {self._value:0.3f} percent: {self._percent:0.3f}")
+        # force a repaint
         self.update()
+        #self.repaint()
     
     def paintEvent(self, event):
 
@@ -4341,7 +4349,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         self._scale_factor = 1000
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.device = device
-        self._deleted = False
+        
 
         self.container_widget = QtWidgets.QWidget()
         if orientation == QtCore.Qt.Orientation.Vertical:
@@ -4374,15 +4382,10 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         self._display_label_widget = None
         self._display_percent_widget = None
         self._display_value_widget = None
-
-
-       
         
         self._data = None
         self._comment = comment
 
-
-     
         self._label_text = ""
         self._label_value = ""
         self._label_percentage = ""
@@ -4390,8 +4393,6 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
         self._display_value = 0.0
         self._calibrated_value = 0.0
-
-
         
         if axis_id:
             self._label_text = f"Axis {axis_id}"
@@ -4437,12 +4438,16 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def hookDevice(self, device_guid, input_type, input_id):    
         ''' hooks the device '''    
+        if not Shiboken.isValid(self):
+            return
         self._hookDevice(device_guid, input_type, input_id, self._setValue)
         
 
     @QtCore.Slot(object)
     def _calibration_changed(self, calibration):
         ''' occurs when calibration data is changed '''
+        if not Shiboken.isValid(self):
+            return
         if self.device_guid == calibration.device_guid and self.input_id == calibration.input_id:
             # one of ours
             isCalibrated = calibration.hasData
@@ -4462,6 +4467,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def _clear_widgets(self):
         ''' removes all the widgets for a clean slate '''
+        if not Shiboken.isValid(self):
+            return
         try:
             gremlin.ui.ui_common.clear_layout(self.container_layout)
             self._display_curve_widget = None
@@ -4628,6 +4635,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     @QtCore.Slot()
     def _value_changed(self):
+        if not Shiboken.isValid(self):
+            return
         widget = self.sender()        
         value = widget.value()
         input_id = widget.data
@@ -4640,12 +4649,13 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
     @QtCore.Slot()
     def _ui_ready(self):
         ''' fires when the UI is ready '''
+        if not Shiboken.isValid(self):
+            return
         self._setValue(self._value, self._curve_value)
 
     def _cleanup_ui(self):
         ''' item is being deleted '''
-        if not self._deleted:
-            self._deleted = True
+        if Shiboken.isValid(self):
             self.unhookDevice()
             self.deleted.emit(self)
 
@@ -4662,6 +4672,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         return self._show_curve
     @show_curved.setter
     def show_curved(self, value: bool):
+        if not Shiboken.isValid(self):
+            return
         if value != self._show_curve:
             self._show_curve = value
             self._setValue(self._value, self._curve_value)
@@ -4680,6 +4692,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         return self._show_percentage
     @show_percent.setter
     def show_percent(self, value: bool):
+        if not Shiboken.isValid(self):
+            return
         if value != self._show_percentage:
             self._show_percentage = value
             if value:
@@ -4697,6 +4711,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         return self._show_value
     @show_value.setter
     def show_value(self, value: bool):
+        if not Shiboken.isValid(self):
+            return
         if value != self._show_value:
             self._show_value = value
             if value:
@@ -4739,6 +4755,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def setPercentageVisible(self, value: bool):
         ''' shows or hides the percentage value on the axis '''
+        if not Shiboken.isValid(self):
+            return
         self.show_percent(value)
 
     def setValueVisible(self, value: bool):
@@ -4746,10 +4764,14 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def setLabel(self, value : str):
         ''' sets the label for the axis '''
+        if not Shiboken.isValid(self):
+            return
         self._label_text = value
         self._update_widgets()
         
     def setLabelVisible(self, value: bool):
+        if not Shiboken.isValid(self):
+            return
         self.show_label(value)
         
         
@@ -4766,12 +4788,13 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         """Sets the value shown by the widget.
         :param value new value to show
         """
-        self._setValue(value, curve_value, percent_value, other_value)
+        if Shiboken.isValid(self):
+            self._setValue(value, curve_value, percent_value, other_value)
 
     def _setValue(self, value, calibrated_value = None, curve_value = None, percent_value = None, other_value = None):
         ''' internal set value '''
 
-        if self._deleted:
+        if not Shiboken.isValid(self):
             return
         
         if value is None:
@@ -4838,10 +4861,14 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def value(self):
         ''' gets the current value '''
-        return self._value
+        if Shiboken.isValid(self):
+            return self._value
+        return 0
 
     def setRange(self, min = -1.0, max = 1.0, decimals = 3):
         ''' sets the range of the widget '''
+        if not Shiboken.isValid(self):
+            return
         if min > max:
             max, min = min, max
         self._min_range = min
@@ -4868,6 +4895,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def reverse(self):
         ''' reverse flag '''
+        if not Shiboken.isValid(self):
+            return
         return self._reverse
 
     @property
@@ -4881,6 +4910,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         :param device_guid: the device selected
         
         '''
+        if not Shiboken.isValid(self):
+            return
         if self.getEnabled():
             # already connected
             return
@@ -4935,6 +4966,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
     def _update_value(self, value):
         # invert the input if needed
+        if not Shiboken.isValid(self):
+            return
         if self._is_hardware_input:
             #eh = gremlin.event_handler.EventListener()
             # value = eh._apply_calibration_ex(self._device_guid, self._input_id, raw_value)
