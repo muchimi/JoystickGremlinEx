@@ -830,7 +830,7 @@
           <li class="md-nav__item">
   <a href="#what-is-a-state" class="md-nav__link">
     <span class="md-ellipsis">
-      What is a state
+      What is a state?
     </span>
   </a>
   
@@ -948,6 +948,15 @@
   <a href="#state-visualization" class="md-nav__link">
     <span class="md-ellipsis">
       State visualization
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-use-case-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      State use-case scenarios
     </span>
   </a>
   
@@ -2345,7 +2354,7 @@
           <li class="md-nav__item">
   <a href="#what-is-a-state" class="md-nav__link">
     <span class="md-ellipsis">
-      What is a state
+      What is a state?
     </span>
   </a>
   
@@ -2463,6 +2472,15 @@
   <a href="#state-visualization" class="md-nav__link">
     <span class="md-ellipsis">
       State visualization
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-use-case-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      State use-case scenarios
     </span>
   </a>
   
@@ -3844,7 +3862,7 @@
 <h2 id="states">States<a class="headerlink" href="#states" title="Permanent link">&para;</a></h2>
 <p>Starting with 1.0ex m74, GremlinEx includes a state machine.  States can be used for multiple use-cases, such as latching, triggering the same mapping from multiple inputs, and performing simple logic without having to revert to a custom user plugin.</p>
 <p>A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="./#map-to-state">map to state</a> action anywhere in the profile, via a <a href="#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
-<h3 id="what-is-a-state">What is a state<a class="headerlink" href="#what-is-a-state" title="Permanent link">&para;</a></h3>
+<h3 id="what-is-a-state">What is a state?<a class="headerlink" href="#what-is-a-state" title="Permanent link">&para;</a></h3>
 <p>A state is a virtual button with a unique name (not case sensitive).  States are stored in a profile and defined in the state device tab.  States can only have an on or off value.</p>
 <p>States are mode agnostic, meaning that states are available across modes so apply to the entire profile.</p>
 <p>States, like buttons, trigger whenever their value is changed.  A set (on) value will include a "press" action.  A clear (off) value will trigger a "release" action.</p>
@@ -4007,6 +4025,24 @@ Parenthesis can be used to change the evaluation order.</p>
 <p>Be sure to delete all references first.</p>
 <h3 id="state-visualization">State visualization<a class="headerlink" href="#state-visualization" title="Permanent link">&para;</a></h3>
 <p>The input viewer includes a state repeater that can be used to visualize states as they change.</p>
+<h3 id="state-use-case-scenarios">State use-case scenarios<a class="headerlink" href="#state-use-case-scenarios" title="Permanent link">&para;</a></h3>
+<p>When would you use a state?</p>
+<h4 id="state-as-a-condition">State as a condition<a class="headerlink" href="#state-as-a-condition" title="Permanent link">&para;</a></h4>
+<p>Because a state is like a virtual button, it can immediately used instead of any button condition.  However because a state can be setup as an expression using other states, it can also be used for complex latching situations when a trigger should only execute if several things are true, or only if some of them at true, or inverting that test using the NOT operator.</p>
+<p>An example would be the need to trigger a joystick button but only if two physical inputs are pressed.  In this example, we'd create two states, A and B with a default value of off.
+We would define a third state, called a_or_b, defined as:</p>
+<pre><code> A or B
+</code></pre>
+<p>This will evaluate to True if either V1 or V2 are held.</p>
+<p>For each physical input, we will add a map to state action to set the state to on whenever the button is pressed:</p>
+<p><a class="glightbox" href="../assets/state_device_example_v1.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="v1 setting" src="../assets/state_device_example_v1.png" /></a></p>
+<p><a class="glightbox" href="../assets/state_device_example_v2.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="v1 setting" src="../assets/state_device_example_v2.png" /></a></p>
+<p>Note the use of the hold option, which means the state will be on when the button is pressed, and off when the button is released.</p>
+<p><a class="glightbox" href="../assets/state_device_example_r1.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="v1 setting" src="../assets/state_device_example_r1.png" /></a></p>
+<p>At profile runtime, VJOY device 1 button 1 will be triggered whenever either button is pressed/held on the two inputs.  This can also be used to map the same action to more than one input, so that to change the mapping of the output, it only needs to be changed in the state, not for each inputs.  This is a simple use-case but can be made much more complex with more elaborate boolean expressions.   For example, an expression of</p>
+<pre><code>C and (A or B)
+</code></pre>
+<p>would introduce a latching, which means state C (however triggered) would also need to be true for the mapping to trigger.</p>
 <h3 id="changing-modes_1">Changing modes<a class="headerlink" href="#changing-modes_1" title="Permanent link">&para;</a></h3>
 <p>If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.</p>
 <h2 id="gamepad-x-box-controller">Gamepad (X-Box controller)<a class="headerlink" href="#gamepad-x-box-controller" title="Permanent link">&para;</a></h2>
@@ -4638,7 +4674,7 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 <p>Actions execute in the order they are listed and they can be re-ordered if needed.</p>
 <p>The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.</p>
 <h2 id="map-to-state">Map to State<a class="headerlink" href="#map-to-state" title="Permanent link">&para;</a></h2>
-<p>This feature is only available in 1.0ex m75 and above.</p>
+<p>This feature is only available in 1.0ex m74 and above.  For more information on states, consult the <a href="#states">state device section</a> of the documentation.</p>
 <p>The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:</p>
 <p><a class="glightbox" href="../assets/action_state.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="action state" src="../assets/action_state.png" /></a></p>
 <table>
