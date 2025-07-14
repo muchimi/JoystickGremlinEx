@@ -900,9 +900,36 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changing-state-names" class="md-nav__link">
+  <a href="#interacting-with-states" class="md-nav__link">
     <span class="md-ellipsis">
-      Changing state names
+      Interacting with states
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      State Gotchas
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a state
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      State names
     </span>
   </a>
   
@@ -2388,9 +2415,36 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changing-state-names" class="md-nav__link">
+  <a href="#interacting-with-states" class="md-nav__link">
     <span class="md-ellipsis">
-      Changing state names
+      Interacting with states
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      State Gotchas
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a state
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      State names
     </span>
   </a>
   
@@ -3788,7 +3842,8 @@
 </tbody>
 </table>
 <h2 id="states">States<a class="headerlink" href="#states" title="Permanent link">&para;</a></h2>
-<p>GremlinEx includes a state machine.  A state machine can be used for multiple use-cases, such as latching, triggering the same mapping from multiple inputs, and performing simple logic without having to revert to a custom user plugin.</p>
+<p>Starting with 1.0ex m74, GremlinEx includes a state machine.  States can be used for multiple use-cases, such as latching, triggering the same mapping from multiple inputs, and performing simple logic without having to revert to a custom user plugin.</p>
+<p>A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="./#map-to-state">map to state</a> action anywhere in the profile, via a <a href="#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
 <h3 id="what-is-a-state">What is a state<a class="headerlink" href="#what-is-a-state" title="Permanent link">&para;</a></h3>
 <p>A state is a virtual button with a unique name (not case sensitive).  States are stored in a profile and defined in the state device tab.  States can only have an on or off value.</p>
 <p>States are mode agnostic, meaning that states are available across modes so apply to the entire profile.</p>
@@ -3924,10 +3979,32 @@ Parenthesis can be used to change the evaluation order.</p>
 </tbody>
 </table>
 <p>Note that expressions, like states, are not case sensitive.</p>
-<h3 id="changing-state-names">Changing state names<a class="headerlink" href="#changing-state-names" title="Permanent link">&para;</a></h3>
-<p>States are tracked internally by ID (as of m76T28) so a name change will also update all expressions automatically.</p>
+<h3 id="interacting-with-states">Interacting with states<a class="headerlink" href="#interacting-with-states" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/state_device_ui.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="state ui" src="../assets/state_device_ui.png" /></a></p>
+<h3 id="state-gotchas">State Gotchas<a class="headerlink" href="#state-gotchas" title="Permanent link">&para;</a></h3>
+<p>States are designed to be flexible.  As a result of this flexibility, it is possible using expressions to create loops.</p>
+<p>Example:</p>
+<p>State A is defined as not B.</p>
+<p>State B is defined as not A.</p>
+<p>This (simple) example creates a loop because both definitions reference each other.  GremlinEx includes a circuit breaker when evaluating expressions however it is not able to catch all situations.</p>
+<p>Don't create loops!</p>
+<h3 id="creating-a-state">Creating a state<a class="headerlink" href="#creating-a-state" title="Permanent link">&para;</a></h3>
+<p>States are added to a profile via the special State Device.  Click on the add button.</p>
+<h4 id="editor-regular-state">Editor - regular state<a class="headerlink" href="#editor-regular-state" title="Permanent link">&para;</a></h4>
+<p>A regular state is not based on an expression.  It only defines a start value when the profile is executed.</p>
+<p><a class="glightbox" href="../assets/state_device_editor_normal.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="state regular edit" src="../assets/state_device_editor_normal.png" /></a></p>
+<h4 id="editor-expression-state">Editor - expression state<a class="headerlink" href="#editor-expression-state" title="Permanent link">&para;</a></h4>
+<p>An expression state is based on other states using a boolean expression.  The state is automatically computed when one of states in the expression changes.</p>
+<p><a class="glightbox" href="../assets/state_device_editor_expression.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="state regular edit" src="../assets/state_device_editor_expression.png" /></a></p>
+<h3 id="state-names">State names<a class="headerlink" href="#state-names" title="Permanent link">&para;</a></h3>
+<p>States must have a unique name in a given profile.</p>
+<p>Names may not include any spaces.  Separate words using the underscore character.</p>
+<p>Names are not case sensitive (so my_State is the same as my_state).</p>
+<p>States are tracked internally by ID (as of m76T28) so a name change will also update all expressions automatically.  </p>
 <h3 id="deleting-a-state">Deleting a state<a class="headerlink" href="#deleting-a-state" title="Permanent link">&para;</a></h3>
-<p>Deleting a state will not delete a state if it's referenced in an expression.  The state will automatically be recreated.</p>
+<p>Deleting a state will not delete a state if it's referenced in an expression.  The state will automatically be recreated if it is in an expression and it does not exist.</p>
+<p>Note that this could create a challenging situation if the state deleted is itself an expression.</p>
+<p>Be sure to delete all references first.</p>
 <h3 id="state-visualization">State visualization<a class="headerlink" href="#state-visualization" title="Permanent link">&para;</a></h3>
 <p>The input viewer includes a state repeater that can be used to visualize states as they change.</p>
 <h3 id="changing-modes_1">Changing modes<a class="headerlink" href="#changing-modes_1" title="Permanent link">&para;</a></h3>
