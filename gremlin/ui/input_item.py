@@ -3314,7 +3314,9 @@ class TitleBar(QtWidgets.QFrame):
     def _show_container_id_changed(self):
         ''' display/hide container Ids on config change'''
         config = gremlin.config.Configuration()
-        self.id_widget.setVisible(config.show_container_id)        
+        visible = config.show_container_id
+        if Shiboken.isValid(self.id_widget):
+            self.id_widget.setVisible(visible)
 
     @QtCore.Slot()
     def _comment_changed(self):

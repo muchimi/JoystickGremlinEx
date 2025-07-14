@@ -298,9 +298,11 @@ class StateInputItem(AbstractInputItem):
     ''' holds a single state '''
     changed = Signal(bool) # fires when a state changes (value)
     key_changed = Signal() # fires when the key changes
+
+    MAX_STACK_SIZE = 100 # maximum number of expressions in a stack (circuit breaker to detect recursion)
     
 
-    def __init__(self, key : str = None, default_value = False, description = None):
+    def __init__(self, key : str = None, default_value = False, description = None, is_expression = False, expression = None):
         super().__init__()
         self._id = gremlin.util.get_guid()
         self._key = key
@@ -309,7 +311,8 @@ class StateInputItem(AbstractInputItem):
         self._value = default_value
         self._type_cast = type(default_value) if default_value is not None else None
         self.setDescription(description) # parent property
-        self._expression = None # expression to evaluate to derive a state
+        self._expression = expression # expression to evaluate to derive a state
+        self._is_expression = is_expression
         self._expression_stack = [] # expression stack to evaluate
         self._dirty = True # indicates the state is stale and must be recomputed (expressions only)
         self._expression_states = [] # dependent expression states - list of states that need to be evaluated when they change
@@ -327,7 +330,7 @@ class StateInputItem(AbstractInputItem):
 
     def clone(self):
         ''' clones the input item (gives it a new ID)'''
-        return StateInputItem(self.key, self.default_value, self.description)
+        return StateInputItem(self.key, self.default_value, self.description, self.isExpression, self.expression)
         
     
     def getOverrideInputType(self):
@@ -371,6 +374,19 @@ class StateInputItem(AbstractInputItem):
     @property
     def display_name(self):
         return self._key
+    
+    @property
+    def display_value(self):
+        if self.value:
+            return "On (true/1)"
+        return "Off (false/0)"
+    
+    @property
+    def isExpression(self):
+        return self._is_expression
+    @isExpression.setter
+    def isExpression(self, value : bool):
+        self._is_expression = value
 
 
 
@@ -477,6 +493,7 @@ class StateInputItem(AbstractInputItem):
 
         if self._expression:
             node.set("expression", self._expression)
+        node.set("is_expression", safe_format(self._is_expression, bool))
 
         # write container data
         self._input_item.to_xml(node)
@@ -514,9 +531,13 @@ class StateInputItem(AbstractInputItem):
             value = safe_read(node, "value", int, 0)
         elif node_type == "bool":
             value = safe_read(node, "value", bool, False)
-        
         if "expression" in node.attrib:
             self._expression = node.get("expression")
+        if "is_expression" in node.attrib:
+            self._is_expression = safe_read(node,"is_expression",bool, False)
+        else:
+            # suitable default based on existing value
+            self._is_expression = bool(self.expression)
 
         self._default_value = value
         self._value = value
@@ -669,6 +690,15 @@ class StateInputItem(AbstractInputItem):
                 if as_tuple:
                     return ([],True, msg)
                 return []    
+            
+        if len(stack) >= StateInputItem.MAX_STACK_SIZE:
+            msg = f"Expression too complex"
+            if verbose: syslog.error(f"STATE EXPRESSION: {msg}")
+            if as_tuple:
+                return ([],True, msg)
+            return []    
+
+
 
         while stack:
             output.append(stack.pop())
@@ -772,17 +802,31 @@ class StateInputItem(AbstractInputItem):
 
                 stack.append(result)
 
-        if len(stack) != 1:
+                if len(stack) >= StateInputItem.MAX_STACK_SIZE:
+                    break
+
+        stack_size = len(stack)
+
+        if stack_size >= StateInputItem.MAX_STACK_SIZE:
+            # circuit breaker
+            msg = "Invalid postfix expression: too complex and/or recursion detected.  Check there are no loops."
+            if verbose: syslog.error(f"STATE EXPRESSION: {msg}")
+            if as_tuple:
+                return (False,True,msg)
+            return False
+
+        if stack_size != 1:
             msg = "Invalid postfix expression: too many operands or not enough operators"
             if verbose: syslog.info(f"STATE EXPRESSION: {msg}")
             if as_tuple:
-                        return (False,True,msg)
+                return (False,True,msg)
             return False
 
         self._dirty = False # indicate evaluation ok and no errors
         value = stack.pop()
+        value_str = "On (true/1)" if value else "Off (false/0)"
         if as_tuple:
-            return (value,True,f"Result: {value}")
+            return (value,True,f"Result: {value_str}")
         return value
 
 
@@ -867,7 +911,7 @@ class StateData(QtCore.QObject):
         if key in self._data:
             return self._data[key].value
         return None
-    
+
     def toggle(self, key : str):
         ''' toggles a state '''
         key = key.casefold().strip()
@@ -1251,6 +1295,11 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._name_widget.textChanged.connect(self._name_changed)
 
 
+        self._is_expression_widget = QtWidgets.QCheckBox("This state is an expression")
+        self._is_expression_widget.setToolTip("If enabled, the state uses an expression to derive its value.  If not set, a default value on start can be set.")
+        self._is_expression_widget.setChecked(self.data.isExpression)
+        self._is_expression_widget.clicked.connect(self._is_expression_changed)
+
         self._expression_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._expression_widget.setText(data.expression)
         self._expression_widget.textChanged.connect(self._expression_changed)
@@ -1295,13 +1344,14 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._config_layout.addWidget(category_widget, row, col+1)
 
         row += 1
-        widget, layout = gremlin.ui.ui_common.getHContainer([self._expression_widget, self._test_widget])
-        self._config_layout.addWidget(QtWidgets.QLabel("Expression:"), row, col)
-        self._config_layout.addWidget(widget, row, col+1)
+        self._config_layout.addWidget( self._is_expression_widget , row, col, 1, -1)
 
         row += 1
-        self._config_layout.addWidget(QtWidgets.QLabel("Default State:"), row, col)
+        self._expression_container_widget, _ = gremlin.ui.ui_common.getHContainer([self._expression_widget, self._test_widget],"Expression:")
+        self._config_layout.addWidget(self._expression_container_widget, row, col, 1, -1)
 
+        row += 1
+        
         self._default_on_widget = gremlin.ui.ui_common.QDataRadioButton("On", True)
         self._default_off_widget = gremlin.ui.ui_common.QDataRadioButton("Off", False)
         if data.default_value:
@@ -1311,8 +1361,8 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._default_off_widget.clicked.connect(self._default_changed)    
         self._default_on_widget.clicked.connect(self._default_changed)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self._default_on_widget, self._default_off_widget])
-        self._config_layout.addWidget(widget, row, col+1)
+        self._default_container_widget, _ = gremlin.ui.ui_common.getHContainer([self._default_on_widget, self._default_off_widget],"Default State:")
+        self._config_layout.addWidget(self._default_container_widget, row, col, 1, -1)
 
         main_layout.addWidget(self._config_widget)
 
@@ -1325,6 +1375,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
         
         main_layout.addWidget(widget)
+        self._update_ui()
 
     def _category_changed_cb(self, index):
         ''' called when selected command changes '''
@@ -1354,7 +1405,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         sd = StateData()
         enabled = bool(self.data.key)
         if enabled:
-            item = sd.value(self.data.key)
+            item = sd.getState(self.data.key)
             if item:
                 enabled = item.id == self.data.id
 
@@ -1370,6 +1421,12 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     def _description_changed(self):
         description = self._description_widget.text()
         self.data.setDescription(description)
+
+    @QtCore.Slot(bool)
+    def _is_expression_changed(self, checked):
+        self.data.isExpression = checked
+        self._update_ui()
+                 
         
     @QtCore.Slot()
     def _expression_changed(self):
@@ -1379,7 +1436,8 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _test_expression(self):
         value, is_error, error_msg = self.data.evaluate(as_tuple = True, force = True)
-        msg = error_msg if is_error else f"Result: {value}"
+        value_str = "On (true/1)" if value else ("Off (false/0)")
+        msg = error_msg if is_error else f"Result: {value_str}"
         gremlin.ui.ui_common.MessageBox(title = "Expression Evaluation", prompt= msg, is_warning = is_error)
 
         
@@ -1392,12 +1450,13 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     def _ok_button_cb(self):
         ''' ok button pressed '''
         # ensure the item is unique and not already used
-
+        is_expression = False
         if self.data.expression:
             value, is_error, error_msg = self.data.evaluate(as_tuple = True, force = True)
             if is_error:
                 gremlin.ui.ui_common.MessageBox(title = "Expression Evaluation Error", prompt= error_msg, is_warning = is_error)
                 return
+            is_expression = True
 
         key = self.data.key
         if key:
@@ -1406,10 +1465,11 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 id = self.data.id
                 sc = StateData()
                 data = sc.getStates()
-                states = [item.key for item in data.values() if item.id != id and key_low == item.key]
-                if states:
-                    gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.")
-                    return
+                if not is_expression:
+                    states = [item.key for item in data.values() if item.id != id and key_low == item.key]
+                    if states:
+                        gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.")
+                        return
                 self.accept()
         else:
             gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"A state name is required.")
@@ -1418,6 +1478,13 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     def _cancel_button_cb(self):
         ''' cancel button pressed '''
         self.reject()        
+
+    def _update_ui(self):
+        ''' updates the dialog controls based on options '''
+        expression_visible = self.data.isExpression
+        self._expression_container_widget.setVisible(expression_visible)
+        self._default_container_widget.setVisible(not expression_visible)
+
 
 class  StateFilterWidget(QtWidgets.QWidget):
     ''' displays a filter widget that can be enabled, and a state category selected '''
@@ -1724,6 +1791,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             trigger = True
         self._edit_item.description = data.description
         self._edit_item.setCategory(data.category)
+        self._edit_item.expression = data.expression
         self.input_item_list_model.refresh()
         index = sd.index(self._edit_item)
         self.refresh()
@@ -1935,7 +2003,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color.expressionColor())
             layout.addWidget(gremlin.ui.ui_common.QIconLabel(icon, input_id.expression))
         else:
-            layout.addWidget(QtWidgets.QLabel(f"Default: {input_id.default_value}"))
+            layout.addWidget(QtWidgets.QLabel(f"Default: {input_id.display_value}"))
             
         # widget.disable_close()
         # widget.disable_edit()

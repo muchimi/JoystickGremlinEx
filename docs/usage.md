@@ -39,7 +39,7 @@ Note that whatever is first detected will go to that item (axis or button) if no
 
 Holding the left-shift key down when in button detect mode temporarily enables axis detection as well as button detection.  This is the same as the first option in the table above.
 
-Holding the left-shift key and the left-control key when in button detect mode temporarily enables exclusive axis detection and ignores button presses.  This is helpful when you have a hardware axis that also has detents along the way that send button inputs.  In this mode, these buttons will be ignored. 
+Holding the left-shift key and the left-control key when in button detect mode temporarily enables exclusive axis detection and ignores button presses.  This is helpful when you have a hardware axis that also has detents along the way that send button inputs.  In this mode, these buttons will be ignored.
 
 ## Remote control feature
 
@@ -672,6 +672,173 @@ A typical OSC command will thus be /my_command_1, number  where number is:
 | non-zero    | Button press |
 
 
+## States
+
+Starting with 1.0ex m74, GremlinEx includes a state machine.  States can be used for multiple use-cases, such as latching, triggering the same mapping from multiple inputs, and performing simple logic without having to revert to a custom user plugin.
+
+A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](usage.md#map-to-state) action anywhere in the profile, via a [macro](#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
+
+
+### What is a state?
+
+A state is a virtual button with a unique name (not case sensitive).  States are stored in a profile and defined in the state device tab.  States can only have an on or off value.
+
+States are mode agnostic, meaning that states are available across modes so apply to the entire profile.
+
+States, like buttons, trigger whenever their value is changed.  A set (on) value will include a "press" action.  A clear (off) value will trigger a "release" action.
+
+### State mappings
+
+Any action that can be mapped to a joystick button can be mapped to a state.  Linear (axis) inputs are not supported because states only have two values (on or off).
+
+### Default value
+
+When a state is defined, it can be given, at profile start, an or or off value.  When the profile starts, the state wil be initialized to this value.
+
+### Setting a state
+
+GremlinEx can manipulate states at runtime using the *map to state* action or in a macro.   These actions let you set (turn on) or clear (turn off) a state.
+
+### State expressions
+
+States can be defined as a boolean expression from other states.  In this case, the state is not directly set by an action.  Instead, whenever a state value referenced in the expression changes, the expression will be re-evaluated and the new state derived.
+
+At profile start, the value of the expression is evaluated based on the start value of dependent states.
+
+### Supported boolean expressions
+
+GremlinEx supports standard boolean operators.  In the table below, 0 represents the cleared (off) state or FALSE value. 1 represents the set (on) state or TRUE value.
+
+| Operator    | Description | Values | | | | Comment | 
+| ----------- | ----------- | ------ |------ |------ |------ |------ |
+| AND  | boolean AND | 0 and 0 = 0 | 1 and 0 = 0 | 0 and 1 = 0 | 1 and 1 = 1 | Both values must be true
+| OR | boolean OR | 0 or 0 = 0 | 1 or 0 = 1 | 0 or 1 = 1 | 1 or 1 = 1 | One value must be true
+| NOT | boolean NOT (unary) | not 0 = 1 | not 1 = 0 |  | | Flips the value
+| XOR | boolean XOR | 0 xor 0 = 0 | 1 xor 0 = 1 | 0 xor 1 = 1 | 1 xor 1 = 0 | True if values are different
+
+### Evaluation order
+
+NOT takes precedence as a unary operator over all other operators.
+AND takes precedence over OR.
+Parenthesis can be used to change the evaluation order.
+
+### Example of state expressions
+
+Using A, B, C, D as unary states we can define:
+
+A = 1 B = 0 C = 1 and D = 0
+
+
+| Expression    | Result | Explanation
+| ----------- | ----------- | -- |
+| not A  | 0 | inverse of A |
+| A or B  | 1 | either a or b, true because A is 1 |
+| not (A or B)  | 0 | inverse of (A or B)|
+| B or D  | 0 | either b or d, false because both B and D are 0 |
+| A and B or C  | 1 | true because what is evaluated in (A and B) or C, or 0 or 1 = 1
+| A and (B or C) | 1 | true because the parenthesis causes B or C to be evaluated first, 1 or 1 = 1
+| A xor B | 1 | true because A and B are different
+| A xor C | 0 | false because A and C are the same
+| A xor (B or C) | 0 | false because both values evaluate to the same (A) and (B or C)
+| A or B or C and D | 1 | true, C and D is evaluated first, so 0, however the overall expression is true because A = 1
+
+Note that expressions, like states, are not case sensitive.
+
+### Interacting with states
+
+![state ui](assets/state_device_ui.png)
+
+### State Gotchas
+
+States are designed to be flexible.  As a result of this flexibility, it is possible using expressions to create loops.
+
+Example:
+
+State A is defined as not B.
+
+State B is defined as not A.
+
+This (simple) example creates a loop because both definitions reference each other.  GremlinEx includes a circuit breaker when evaluating expressions however it is not able to catch all situations.
+
+Don't create loops!
+
+
+### Creating a state
+
+States are added to a profile via the special State Device.  Click on the add button.
+
+#### Editor - regular state
+
+A regular state is not based on an expression.  It only defines a start value when the profile is executed.
+
+![state regular edit](assets/state_device_editor_normal.png)
+
+#### Editor - expression state
+
+An expression state is based on other states using a boolean expression.  The state is automatically computed when one of states in the expression changes.
+
+![state regular edit](assets/state_device_editor_expression.png)
+
+
+
+
+### State names
+
+States must have a unique name in a given profile.
+
+Names may not include any spaces.  Separate words using the underscore character.
+
+Names are not case sensitive (so my_State is the same as my_state).
+
+States are tracked internally by ID (as of m76T28) so a name change will also update all expressions automatically.  
+
+
+
+### Deleting a state
+
+Deleting a state will not delete a state if it's referenced in an expression.  The state will automatically be recreated if it is in an expression and it does not exist.
+
+Note that this could create a challenging situation if the state deleted is itself an expression.
+
+Be sure to delete all references first.
+
+### State visualization
+
+The input viewer includes a state repeater that can be used to visualize states as they change.
+
+### State use-case scenarios
+
+When would you use a state?
+
+#### State as a condition
+
+Because a state is like a virtual button, it can immediately used instead of any button condition.  However because a state can be setup as an expression using other states, it can also be used for complex latching situations when a trigger should only execute if several things are true, or only if some of them at true, or inverting that test using the NOT operator.
+
+An example would be the need to trigger a joystick button but only if two physical inputs are pressed.  In this example, we'd create two states, A and B with a default value of off.
+We would define a third state, called a_or_b, defined as:
+
+     A or B
+
+This will evaluate to True if either V1 or V2 are held.
+
+For each physical input, we will add a map to state action to set the state to on whenever the button is pressed:
+
+![v1 setting](assets/state_device_example_v1.png)
+
+![v1 setting](assets/state_device_example_v2.png)
+
+
+Note the use of the hold option, which means the state will be on when the button is pressed, and off when the button is released.
+
+![v1 setting](assets/state_device_example_r1.png)
+
+
+At profile runtime, VJOY device 1 button 1 will be triggered whenever either button is pressed/held on the two inputs.  This can also be used to map the same action to more than one input, so that to change the mapping of the output, it only needs to be changed in the state, not for each inputs.  This is a simple use-case but can be made much more complex with more elaborate boolean expressions.   For example, an expression of
+
+    C and (A or B)
+
+would introduce a latching, which means state C (however triggered) would also need to be true for the mapping to trigger.
+
 
 ### Changing modes
 
@@ -1270,7 +1437,7 @@ The purpose of this container is to add macro-like functionality using mappings 
 
 ## Map to State
 
-This feature is only available in 1.0ex m75 and above.
+This feature is only available in 1.0ex m74 and above.  For more information on states, consult the [state device section](#states) of the documentation.
 
 The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:
 

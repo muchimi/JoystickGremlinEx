@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T29)
+- Fix: Resolved an exception when editing some expressions.
+- Fix: Resolved an issue where show container IDs would not update the UI until restart.
+- Improved: UI related to state editing now has a checkbox to tell GremlinEx the state should be an expression.  This is in case an invalid expression is encountered.
+- Update: updated state usage information to the documentation.
+
 ### (m76T28A)
 - Fix: Resolved another QT object garbage collection issue with AxisStateWidget causing a runtime exception on profile stop in some situations.
 - Change: disabled the ability to enable the UI at runtime.  This option was off by default for a long time, and it harkens back to the legacy execution model that made it possible to change some parameters while the profile was running.  This feature is deprecated with the updated processing model (which precompiles the information for performance and thus cannot change dynamically at runtime), and it is also the source of performance issues as the focus at runtime should be on the control aspects, and not the UI aspects.  This does not impact the input viewer.

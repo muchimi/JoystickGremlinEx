@@ -241,6 +241,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.request_reload.connect(self._reload)
         el.device_mapping_changed.connect(self._update_tab)
         el.mapping_changed.connect(self._mapping_changed)
+        el.show_container_id_changed.connect(self._show_container_id_visible_changed)
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
@@ -1100,7 +1101,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionLoadProfile.setEnabled(enabled)
 
 
-        
+    
+
+
 
         
         
@@ -2039,9 +2042,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     
     def _mapping_changed(self, item_data : gremlin.base_profile.InputItem):
         ''' called when mapping changes '''
+
         self._update_tab(item_data.device_id) # update tab header
-    
+
+    def _show_container_id_visible_changed(self):
+        ''' refresh the UI on container visibility changed'''
+        self.refresh()
+
     def _update_tab(self, device_id: str):
+        gremlin.util.InvokeUiMethod(self._update_tab_ui, device_id)
+    
+    def _update_tab_ui(self, device_id: str):
         ''' updates the given tab for mapping and connection status '''
         position = self.getTabIndexForDevice(device_id)
         if position is not None:
@@ -2061,6 +2072,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
 
     def _create_tabs(self, activate_tab=None):
+        gremlin.util.InvokeUiMethod(self._create_tabs_ui)
+
+    def _create_tabs_ui(self, activate_tab=None):
         """Creates the tabs of the configuration dialog representing
         the different connected devices.
         """
@@ -4210,9 +4224,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     #         el.pop_input_selection(True) # restore input selection and reset
     #         self._select_input(last_device_guid, last_input_type, last_input_id, True)
 
-
-
     def refresh(self):
+        gremlin.util.InvokeUiMethod(self._refresh_ui)
+
+    def _refresh_ui(self):
         ''' refresh the UI '''
 
         # save selection

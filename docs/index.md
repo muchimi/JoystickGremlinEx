@@ -66,7 +66,7 @@ Some examples of what GremlinEx can do:
 - Use touch-surface input (glass surface) via the OSC protocol. While OSC is used for music and stage control, GremlinEx uses OSC to work with Open Stage Control (open source) and other OSC protocol enabled touch control surfaces to map touch-screen inputs to a game over the network.  Because software like [Open Stage Control](https://openstagecontrol.ammd.net/docs/getting-started/introduction/) lets you design any control surface using buttons, faders, knobs, encoders, this becomes an extremely powerful custom touch-screen input mapped to a game via GremlinEx.   GremlinEx also supports two-way communications so that state data can be returned to the touch surface via a plugin or the "map to OSC" action.
 - Control Microsoft Flight Simulator (MSFS) 2020 or 2024 via the SimConnect API and a custom WASM module.  This enables GremlinEx to do direct control mappings in MSFS without having to map controllers in MSFS.  GremlinEx can also execute what's called "RPN expressions" and access internal commands and variables, including custom ones created by add-ons).
 - Sophisticated condition based execution
-- (as of 1.0ex m75) GremlinEx adds a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) to the behavior model.
+- (as of 1.0ex m74) GremlinEx adds a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) to the behavior model. See [more information on states](overview.md#state-device) in the overview.
 - Comprehensive collection of various action container types to solve common mapping problems without custom programming.
 - Custom scripting via Python if needed
 - Play audio (.wav) files, and use text to speech (TTS) to convert text to audio cues.
