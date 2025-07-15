@@ -298,11 +298,13 @@ class InputViewerUi(ui_common.BaseDialogUi):
         """
         super().__init__(self.__class__.__name__, parent)
 
-        self._joystick_widgets = {}
+        self._joystick_widgets = {} # holds display widgets
         self._lock = threading.Lock()
         self.setMinimumHeight(800)
 
         v_config = VisualizationConfig()
+        self._keyboard_visible = False
+        self._state_visible = False
 
         self.setWindowTitle("GremlinEx Input Viewer")
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
@@ -414,6 +416,10 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         self._left_panel_layout.addWidget(self.scroll_selector_area)
         self._right_panel_layout.addWidget(self.view_container_widget)
+
+        info_box = gremlin.ui.ui_common.QInfoBox("Some visuals may capture the scrollwheel.<br>Move the mouse to the scrollbar or off a visual to scroll the display if experiencing difficulty scrolling using the wheel.", wrap = True)
+        self._right_panel_layout.addWidget(info_box)
+        #self._right_panel_layout.addStretch(1)
         
 
         #content_widget, _ = gremlin.ui.ui_common.getHContainer((self.scroll_selector_area, self.view_container_widget), set_alignment=False)
@@ -558,7 +564,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
                 if verbose: syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
             else:
                 if verbose: syslog.info(f"Use existing vis: {device.name}: {visualization.name}")
-            #widget.hook()
+            
         else:
             if key in self._joystick_widgets:
                 widget = self._joystick_widgets[key]
@@ -585,12 +591,14 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self.keyboard_widget.setReadonly(True)
             self.keyboard_visualizer_layout.addWidget(self.keyboard_widget)
             self.keyboard_widget.hook()
-            self.views.add_widget(self._keyboard_visualizer_widget)
             #key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
             #self._widget_storage[key] = self._keyboard_visualizer_widget
             self._keyboard_visible = True
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(True)
+
+        self.views.add_widget(self._keyboard_visualizer_widget)
+            
 
     def hideKeyboard(self):
         if self._keyboard_visualizer_widget:
@@ -638,29 +646,32 @@ class InputViewerUi(ui_common.BaseDialogUi):
         i = 0
         items = sd.getStates().items()
         if items:
-            for key, data in items:
+            for key, state in items:
                 if category:
                     # apply filter
-                    item_category = data.category if data.category else default_category
+                    item_category = state.category if state.category else default_category
                     if item_category != category:
                         continue # filter out
                 
 
-                btn = gremlin.ui.ui_common.QDataPushButton(key, data)
+                btn = gremlin.ui.ui_common.QDataPushButton(key)
+                btn.data = state # store the state with the button
 
-                if data.expression:
+                if state.expression:
                     btn.setEnabled(False)    
                     btn.setStyleSheet(cssAlternate)
                 else:
                     btn.setStyleSheet(css)
 
                 btn.setCheckable(True)
-                btn.setChecked(data.value)
-                if verbose: syslog.info(f"viewer state: {key}  value: {data.value}")
+                btn.setChecked(state.value)
+                if verbose: syslog.info(f"viewer state: {key}  value: {state.value}")
                 btn.clicked.connect(self._state_toggle)
+                
                 layout.addWidget(btn, int(i / 10), int(i % 10))
-                data.changed.connect(self._state_changed)
-                self._state_buttons[data.key] = btn
+
+                state.changed.connect(lambda x: self._state_changed(x))
+                self._state_buttons[state.key] = btn
                 i+=1
             
         else:
@@ -705,11 +716,13 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self._state_button_layout = QtWidgets.QGridLayout()
             self.populateState(self._state_button_layout)
             
-            self.views.add_widget(self._state_visualizer_widget)
+
             #device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
             #self._widget_storage[device.device_id] = self._state_visualizer_widget
 
             layout.addLayout(self._state_button_layout)
+
+        self.views.add_widget(self._state_visualizer_widget)
 
 
 
@@ -736,20 +749,30 @@ class InputViewerUi(ui_common.BaseDialogUi):
     def refreshState(self):
         if self._state_visualizer_widget:
             self.populateState(self._state_button_layout)
-        
-
-    @QtCore.Slot()
-    def _state_changed(self):
-        data = self.sender()
-        key = data.key
-        if key in self._state_buttons:
-            self._state_buttons[key].setChecked(data.value)
+    
+    def _state_changed(self, state):
+        # state changed received - ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._state_changed_ui, state)
+    
+    def _state_changed_ui(self, state):
+        ''' called on state changes '''
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: syslog.info(f"Viewer: state {state.key} changed {state.value}")
+        if state.key in self._state_buttons:
+            widget = self._state_buttons[state.key]
+            widget.setChecked(state.value)
+        else:
+            if verbose: syslog.warning(f"Viewer: state {state.key} widget not found")
 
     @QtCore.Slot()
     def _state_toggle(self):
         widget = self.sender()
-        data = widget.data
-        key = data.key
+        state = widget.data
+        key = state.key
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: 
+            syslog.info("-"*50)
+            syslog.info(f"Viewer: state {state.key} toggle")
         sc = gremlin.ui.state_device.StateData()
         sc.toggle(key)
 
@@ -790,6 +813,14 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         for widget in self._joystick_widgets.values():
             self.views.add_widget(widget)
+
+        # re-add keyboard if shown
+        if self._keyboard_visible:
+            self.showKeyboard()
+        # re-add state if shown
+        if self._state_visible:
+            self.showState()
+
         
 class InputViewerArea(QtWidgets.QScrollArea):
 

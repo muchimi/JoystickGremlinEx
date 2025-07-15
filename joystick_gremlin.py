@@ -207,6 +207,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._runtime_mode_map = {} # map of runtime processes to their last runtime mode
         self._process_runtime_map = {} # map of MODE to process associated with a profile - the process executable is the key
         self._active_process_path = None # active mapped process path 
+        self._last_toast_message = None
 
         self._resize_count = 0
 
@@ -3772,7 +3773,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             self.status_bar_mode_widget.setText(msg)
             if self.config.mode_change_message:
-                self.ui.tray_icon.showMessage(f"Runtime Mode: {runtime_mode if runtime_mode else "n/a"} Edit mode: {edit_mode if edit_mode else "n/a"}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
+                toast_msg = f"Runtime Mode: {runtime_mode if runtime_mode else "n/a"} Edit mode: {edit_mode if edit_mode else "n/a"}"
+                if self._last_toast_message is None or self._last_toast_message != toast_msg:
+                    self.ui.tray_icon.showMessage(toast_msg,"",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
+                    self._last_toast_message = toast_msg
         except Exception as err:
             syslog.error(f"Unable to update status bar mode:\n{err}")
 

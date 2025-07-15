@@ -445,7 +445,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
             for map_key in mouse_names:
                 widget = self._key_widget_map[map_key]
                 widget.selected = False
-
+        
     
     @QtCore.Slot(bool)
     def _invert_display_changed(self, checked):
@@ -512,7 +512,6 @@ class QKeyboardWidget(QtWidgets.QWidget):
             self.mouse_hook.register(self._mouse_handler)
             self._hooked = True
 
-
     def unhook(self):
         ''' unhooks keyboard / mouse events '''
         if self._hooked:
@@ -540,6 +539,8 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     is_pressed = event.is_pressed
                     widget.selected = is_pressed
                     if self._show_repeater:
+                        if key.is_mouse and not self._capture_mouse:
+                            return
                         self._add_repeater(key, is_pressed)
                     return
         
@@ -591,6 +592,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
             is_pressed = event.is_pressed
             widget.selected = is_pressed
             if self._show_repeater:
+                
                 key = gremlin.keyboard.key_from_name(map_key)
                 self._add_repeater(key, is_pressed)
 

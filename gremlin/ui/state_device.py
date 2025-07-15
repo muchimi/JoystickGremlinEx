@@ -296,7 +296,7 @@ class StateCategories(QtCore.QObject):
 
 class StateInputItem(AbstractInputItem):
     ''' holds a single state '''
-    changed = Signal(bool) # fires when a state changes (value)
+    changed = Signal(object) # fires when a state changes (state)
     key_changed = Signal() # fires when the key changes
 
     MAX_STACK_SIZE = 100 # maximum number of expressions in a stack (circuit breaker to detect recursion)
@@ -406,7 +406,7 @@ class StateInputItem(AbstractInputItem):
         if not self._expression:
             # only toggle non-expression states
             self._value = not self._value
-            self.changed.emit(self._value)
+            self.changed.emit(self)
             return self._value
         return None
 
@@ -582,7 +582,8 @@ class StateInputItem(AbstractInputItem):
             value = data[0] if as_tuple else data
             is_changed =  value != self._last_expression_value
             if is_changed:
-                self._last_expression_value = value                
+                self._value = value
+                self._last_expression_value = value
                 verbose = gremlin.config.Configuration().verbose_mode_state
                 if verbose: syslog.info(f"State: {self.key} new value: {self._last_expression_value}")
                 self._fire_changed(value)
@@ -592,12 +593,14 @@ class StateInputItem(AbstractInputItem):
     
     def _fire_changed(self, value: bool):
         ''' called when a state changes '''
-        self.changed.emit(value)
-
-        if not gremlin.shared_state.is_running:
-            return
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose: syslog.info(f"STATE CHANGE: [{self.key}] value: {value}")
+        if verbose: syslog.info(f"STATE CHANGE EMIT: [{self.key}] value: {self.value}")
+        self.changed.emit(self)
+
+        # if not gremlin.shared_state.is_running:
+        #     return
+        
+        
         event = gremlin.event_handler.Event(
             event_type= InputType.State,
             device_guid= gremlin.shared_state.state_tab_guid,
@@ -720,8 +723,10 @@ class StateInputItem(AbstractInputItem):
             return (output,False,None)
         return output
     
-    @QtCore.Slot(object)
+    
     def _dependency_changed(self, state : StateInputItem):    
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: syslog.info(f"STATE: Dependent state change: {state.key}")
         self._dirty = True
         self.evaluate()
 

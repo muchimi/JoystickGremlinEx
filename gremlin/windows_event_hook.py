@@ -254,6 +254,12 @@ _mouse_wheel_timer = {} # timer for wheel releases = keyed by button ID for each
 _mouse_wheel_state = {} # holds the current state (pressed) of the wheel button
 _mouse_wheel_delay = 0.5 # mouse wheel delay in ms
 
+_is_runtime = False # true if in runtime
+
+def setRunning(value : bool):
+    global _is_runtime
+    _is_runtime = value
+
 
 @HOOKPROC
 def process_mouse_event(n_code, w_param, l_param):
@@ -264,7 +270,7 @@ def process_mouse_event(n_code, w_param, l_param):
     :param l_param message content
     """
     import gremlin.types
-    global g_mouse_callbacks
+    global g_mouse_callbacks, _is_runtime
     verbose = False
     if n_code == HC_ACTION and w_param != WM_MOUSEMOVE:
         msg = ctypes.cast(l_param, LPMSLLHOOKSTRUCT)[0]
@@ -321,32 +327,30 @@ def process_mouse_event(n_code, w_param, l_param):
             global _mouse_wheel_timer, _mouse_wheel_delay, _mouse_wheel_state
             if verbose: syslog.info(f"wheel press {button_id}")
 
-            if _mouse_wheel_state[button_id]:
-                process = False # don't trigger if already pressed
-            else:
-                _mouse_wheel_state[button_id] = True # mark pressed
-                process = True
-                
-            if _mouse_wheel_timer[button_id]:
-                # cancel current timer
-                _mouse_wheel_timer[button_id].cancel()
+            process = True 
+            if _is_runtime:
+                # if runtime, for wheel events we also send a wheel release as there is no such release event in windows
+                # this is so there is a release on wheel captures as there is for a regular mouse button
+                if _mouse_wheel_state[button_id]:
+                    process = False # don't trigger if already pressed
+                else:
+                    _mouse_wheel_state[button_id] = True # mark pressed
+                    
+                if _mouse_wheel_timer[button_id]:
+                    # cancel current timer
+                    _mouse_wheel_timer[button_id].cancel()
 
-            # new timer
-            _mouse_wheel_timer[button_id] = threading.Timer(_mouse_wheel_delay, lambda: _queue_wheel_release(button_id))
-            _mouse_wheel_timer[button_id].start()
+                # new timer
 
-            is_pressed = True
-            
+                _mouse_wheel_timer[button_id] = threading.Timer(_mouse_wheel_delay, lambda: _queue_wheel_release(button_id))
+                _mouse_wheel_timer[button_id].start()
 
+                # release the paired wheel button if needed
+                if _mouse_wheel_state[release_button_id]:
+                    # paired button is pressed
+                    if verbose: syslog.info(f"wheel timer reset {release_button_id}")
+                    _queue_wheel_release(release_button_id) # send the release event for that paird button
 
-            # release the paired wheel button if needed
-            if _mouse_wheel_state[release_button_id]:
-                # paired button is pressed
-                if verbose: syslog.info(f"wheel timer reset {release_button_id}")
-                _queue_wheel_release(release_button_id) # send the release event for that paird button
-
-                
-       
 
         if process:
             # trigger the event
@@ -484,6 +488,7 @@ class MouseHook:
             return
         if self._listen_thread is None:
             self._listen_thread = threading.Thread(target=self._listen, daemon=False)
+            self._listen_thread.name = "mouse hook"
         try:
             self._listen_thread.start()
             self._running = True

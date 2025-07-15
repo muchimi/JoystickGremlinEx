@@ -39,6 +39,7 @@ import gremlin.shared_state
 import gremlin.types
 import gremlin.plugin_manager
 import gremlin.ui.state_device
+import gremlin.windows_event_hook
 import vjoy as vjoy_module
 from vjoy import vjoy
 import gremlin.config
@@ -160,6 +161,7 @@ class CodeRunner:
 
         # indicate we're in run mode
         gremlin.shared_state.is_running = True
+        gremlin.windows_event_hook.setRunning(True)
 
         # determine numlock state
         numlock_off = config.numlock_off
@@ -694,6 +696,8 @@ class CodeRunner:
 
         # restore the startup mode and profile
         gremlin.shared_state.is_running = False
+        gremlin.windows_event_hook.setRunning(False)
+        
         if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:
             eh.change_profile(self._startup_profile)
         # change back to edit mode

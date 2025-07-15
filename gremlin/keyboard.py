@@ -571,10 +571,10 @@ def mouse_from_name(name):
     name = name.lower()
     if name in ("mouse_1", "mouse_left", MouseButton.to_string(MouseButton.Left).lower()): 
         mouse_button = MouseButton.Left
-    elif name in ("mouse_2", "mouse_right", MouseButton.to_string(MouseButton.Middle).lower()):
-        mouse_button = MouseButton.Middle
-    elif name in ("mouse_3", "mouse_middle", MouseButton.to_string(MouseButton.Right).lower()):
+    elif name in ("mouse_2", "mouse_right", MouseButton.to_string(MouseButton.Right).lower()):
         mouse_button = MouseButton.Right
+    elif name in ("mouse_3", "mouse_middle", MouseButton.to_string(MouseButton.Middle).lower()):
+        mouse_button = MouseButton.Middle
     elif name in ("mouse_4", "mouse_forward", MouseButton.to_string(MouseButton.Forward).lower()):
         mouse_button = MouseButton.Forward
     elif name in ("mouse_5", "mouse_back", MouseButton.to_string(MouseButton.Back).lower()):

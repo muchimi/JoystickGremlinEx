@@ -239,7 +239,7 @@ class Color():
         background_color = Color.infoColor()
         css = f'''
             QFrame {{
-                border: 1px solid {border_color};
+                border: 0px solid {border_color};
                 background: {background_color};
             }}
             QLabel {{
@@ -2818,6 +2818,7 @@ class InputListenerWidget(QBoxFrame):
         self._abort_timer = threading.Timer(1.0, self._abort_request)
         self._multi_key_storage = []
         self._callback = callback
+        self._listen_mouse = InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
 
         self._close_on_key = not (InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types)
         self._esc_key = key_from_name("esc")
@@ -2845,7 +2846,7 @@ class InputListenerWidget(QBoxFrame):
                 InputType.JoystickButton in self._event_types or \
                 InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.connect(self._joy_event_cb)
-        if InputType.Mouse in self._event_types:
+        if self._listen_mouse:
             if not event_listener.mouseEnabled():
                 # hook mouse
                 event_listener.enableMouse()
@@ -2854,8 +2855,6 @@ class InputListenerWidget(QBoxFrame):
             mh = gremlin.windows_event_hook.MouseHook()
             mh.register(self._mouse_event_cb)
             mh.start()
-
-            # event_listener.mouse_event.connect(self._mouse_event_cb)
 
 
     def _joy_event_cb(self, event):
@@ -2946,7 +2945,9 @@ class InputListenerWidget(QBoxFrame):
                 self._abort_timer.cancel()
                 if not self._aborting:
                     self.item_selected.emit(self._multi_key_storage)
-                self.close()
+                    return
+                # ignore release events
+                
 
         # Ensure the timer is cancelled and reset in case the ESC is released
         # and we're not looking to return keyboard events
@@ -2958,8 +2959,12 @@ class InputListenerWidget(QBoxFrame):
         gremlin.util.InvokeUiMethod(self._mouse_event_ui, event)
 
     def _mouse_event_ui(self, event):
-        self.item_selected.emit(event)
-        self.close()
+        ''' process mouse events on UI thread '''
+        syslog.info(f"mouse event ui: {event}")
+        if event.is_pressed:
+            # only handle press events
+            self.item_selected.emit(event)
+            self.close()
 
     def _abort_request(self):
         import time
@@ -2977,13 +2982,13 @@ class InputListenerWidget(QBoxFrame):
                 InputType.JoystickButton in self._event_types or \
                 InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.disconnect(self._joy_event_cb)
-        elif InputType.Mouse in self._event_types:
+        if self._listen_mouse:
             event_listener.mouse_event.disconnect(self._mouse_event_cb)
 
-        # Stop mouse hook in case it is running
-        mh = gremlin.windows_event_hook.MouseHook()
-        mh.unregister(self._mouse_event_cb)
-        mh.stop()
+            # Stop mouse hook in case it is running
+            mh = gremlin.windows_event_hook.MouseHook()
+            mh.unregister(self._mouse_event_cb)
+            mh.stop()
 
         # restore highlighting
         gremlin.shared_state.pop_suspend_highlighting()
@@ -3006,8 +3011,8 @@ class InputListenerWidget(QBoxFrame):
             valid_str.append("Button")
         if InputType.JoystickHat in self._event_types:
             valid_str.append("Hat")
-        if InputType.Keyboard in self._event_types:
-            valid_str.append("Key")
+        if InputType.Keyboard in self._event_types or InputType.KeyboardLatched in self._event_types:
+            valid_str.append("Key/Mouse")
 
         return ", ".join(valid_str)
 
@@ -9466,16 +9471,83 @@ class QExecuteWidget(QtWidgets.QWidget):
                 self._release_widget.setChecked(True)
 
 
+# adapted from GitHub example https://github.com/cameel/auto-resizing-text-edit/tree/master
+class QAutoResizingTextEdit(QtWidgets.QTextEdit):
+    def __init__(self, parent = None):
+        super(QAutoResizingTextEdit, self).__init__(parent)
 
-    
+        # This seems to have no effect. I have expected that it will cause self.hasHeightForWidth()
+        # to start returning True, but it hasn't - that's why I hardcoded it to True there anyway.
+        # I still set it to True in size policy just in case - for consistency.
+        size_policy = self.sizePolicy()
+        size_policy.setHeightForWidth(True)
+        size_policy.setVerticalPolicy(QtWidgets.QSizePolicy.Preferred)
+        self.setSizePolicy(size_policy)
+
+        self.textChanged.connect(lambda: self.updateGeometry())
+
+    def setMinimumLines(self, num_lines):
+        """ Sets minimum widget height to a value corresponding to specified number of lines
+            in the default font. """
+
+        self.setMinimumSize(self.minimumSize().width(), self.lineCountToWidgetHeight(num_lines))
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        margins = self.contentsMargins()
+
+        if width >= margins.left() + margins.right():
+            document_width = width - margins.left() - margins.right()
+        else:
+            # If specified width can't even fit the margin, there's no space left for the document
+            document_width = 0
+        document = self.document().clone()
+        document.setTextWidth(document_width)
+
+        return margins.top() + document.size().height() + margins.bottom()
+
+    def sizeHint(self):
+        original_hint = super(QAutoResizingTextEdit, self).sizeHint()
+        return QSize(original_hint.width(), self.heightForWidth(original_hint.width()))
+
+    def lineCountToWidgetHeight(self, num_lines):
+        """ Returns the number of pixels corresponding to the height of specified number of lines
+            in the default font. """
+
+        assert num_lines >= 0
+
+        widget_margins  = self.contentsMargins()
+        document_margin = self.document().documentMargin()
+        font_metrics    = QtGui.QFontMetrics(self.document().defaultFont())
+
+        return (
+            widget_margins.top()                      +
+            document_margin                           +
+            max(num_lines, 1) * font_metrics.height() +
+            self.document().documentMargin()          +
+            widget_margins.bottom()
+        )
+
+
+
 class QInfoBox(QtWidgets.QFrame):
     ''' widget for information text '''
-    def __init__(self, text, parent = None):
+    def __init__(self, text, wrap = False, parent = None):
         super().__init__(parent = parent)
-        self._label_widget = QtWidgets.QLabel(text)
+        self._label_widget = QAutoResizingTextEdit()
+        self._label_widget.setReadOnly(True)
         layout = QtWidgets.QVBoxLayout(self)
+        
         layout.addWidget(self._label_widget)
         self.setStyleSheet(Color.cssInfoBox())
 
+        self.setText(text)
+
     def setText(self, text):
-        self._label_widget.setText(text)
+        self._label_widget.setHtml(text)
+        
+        
+
+

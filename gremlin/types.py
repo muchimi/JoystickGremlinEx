@@ -820,7 +820,7 @@ class MouseButton(IntEnum):
     Right = 2
     Middle = 3
     DoubleLeft = 0x101 # add 0x100
-    DoubleRight = 0x002 # add 0x100
+    DoubleRight = 0x102 # add 0x100
     DoubleMiddle = 0x103 # add 0x100
     Forward = 4
     Back = 5

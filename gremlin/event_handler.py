@@ -2349,7 +2349,7 @@ class EventHandler(QtCore.QObject):
 			verbose = gremlin.config.Configuration().verbose_mode_osc
 			if verbose and not callback_list:
 				# syslog = logging.getLogger("system")
-				syslog.info(f"OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
+				syslog.info(f"EVENT: OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:
@@ -2373,7 +2373,7 @@ class EventHandler(QtCore.QObject):
 			verbose = gremlin.config.Configuration().verbose_mode_state
 			if verbose and not callback_list:
 				# syslog = logging.getLogger("system")
-				syslog.info(f"STATE: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
+				syslog.info(f"EVENT: STATE: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:

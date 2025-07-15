@@ -14,6 +14,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T30)
+
+- Fix: mouse button translation mixing up middle, right and double right click.
+- Fix: keyboard listen dialog closing on event release without a capture performed.
+- Fix: system tray (toast) messages will only trigger if the information has changed (if such messages are enabled).
+- Fix: design time mouse wheel detect logic bypasses runtime logic (depending on timing, would ignore mouse wheel input if within the press/release window) - this is because wheel events only have a "make" and no "break" so we have to fake a "break" at runtime.
+- Fix: input viewer manual state toggle (by clicking on a non-expression state)
+- Fix: input viewer add/remove joystick inputs hides keyboard/state widgets
+- Fix: input viewer keyboard repeater mouse event continue to show even after being disabled again.
+
 ### (m76T29)
 - Fix: Resolved an exception when editing some expressions.
 - Fix: Resolved an issue where show container IDs would not update the UI until restart.

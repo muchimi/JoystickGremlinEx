@@ -49,6 +49,7 @@ from gremlin.util import log_info
 import gremlin.util
 from gremlin import input_devices
 import gremlin.repeater
+import gremlin.windows_event_hook
 
 syslog = logging.getLogger("system")
 
@@ -195,6 +196,18 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         :param keys the keys to use in the key combination
         """
+
+        if isinstance(keys, gremlin.windows_event_hook.MouseEvent):
+            # if not keys.is_pressed:
+            #     return # ignore releases 
+            # mouse input
+            key = gremlin.keyboard.key_from_mousebutton(keys.button_id)
+            syslog.info(f"keyboard <- mouse: {keys.button_id}")
+            if not key:
+                return
+            keys = [key]
+
+        
 
         data = []
         for code in keys:
