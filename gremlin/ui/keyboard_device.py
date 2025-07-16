@@ -552,7 +552,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # creates the item in the profile if needed
-        self.device_profile.modes[current_mode].get_data(input_type,input_id)
+        item_data = self.device_profile.modes[current_mode].get_data(input_type,input_id)
+        # ensure override type for keyboard input is a joystick button
+        item_data.setOverrideInputType(InputType.JoystickButton)
 
         if reload:
             # refreshes the model from the profile

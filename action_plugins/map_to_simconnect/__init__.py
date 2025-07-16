@@ -3894,11 +3894,11 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         if not self.manager.is_running:
             # sim is not running - attempt to reconnect every few seconds
-            syslog.info("SIMCONNECT: manager not running - connecting....")
-            if self.last_reconnect_time is None or self.last_reconnect_time + self.reconnect_timeout > time.time():
-                self.last_reconnect_time = time.time()
-                eh = SimConnectEventHandler()
-                eh.request_connect.emit()
+            # syslog.info("SIMCONNECT: manager not running - connecting....")
+            # if self.last_reconnect_time is None or self.last_reconnect_time + self.reconnect_timeout > time.time():
+            #     self.last_reconnect_time = time.time()
+            #     eh = SimConnectEventHandler()
+            #     eh.request_connect.emit()
             return True
 
         return self._process_event(event, action_value, extra_data)

@@ -1988,6 +1988,7 @@ class InputItem():
                                 break
                 self.input_type = InputType.KeyboardLatched # force new input type
                 #syslog.info(f"Loaded key input: {input_item.display_name}")
+                self.setOverrideInputType(InputType.JoystickButton)
                 self.input_id = input_item
 
 

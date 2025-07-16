@@ -441,7 +441,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
 
-    def _add_tab(self, device_guid, tab_type, index = None) -> int: 
+    def _add_tab(self, device_guid, tab_type, index = None, override_name = None) -> int: 
         ''' adds a tab to the tab header 
         :param device_guid: the device guid of the device to add
         :param index: optiona, if specified, the index to add
@@ -453,13 +453,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.error(f"Unknown device GUID found in tabs: {device_guid}")
             return
         device_name = device.name
-        has_mapping = self._has_mapping(device_guid)
+        #has_mapping = self._has_mapping(device_guid)
         if device_name == "Controller (XBOX 360 For Windows)":
             widget = self.getRegisteredWidget(device_guid)
             device_profile = self.profile.get_device_modes(
                     device.device_guid,
                     DeviceType.Joystick,
-                    device.name
+                    device.name,
                 )
             if not widget:
                 widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
@@ -472,15 +472,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self.registerWidget(device_guid, widget)
                 #gremlin.shared_state.device_widget_map[device.device_guid] = widget
 
+        tab_name = override_name if override_name else device_name
         if index is None:
-            position = self.ui.devices.addTab(device_name)
+            position = self.ui.devices.addTab(tab_name)
         else:
-            position = self.ui.devices.insertTab(index, device_name)
+            position = self.ui.devices.insertTab(index, tab_name)
 
         
+
         self._tab_device_map[device_guid] = position
         self._tab_index_map[position] = device_guid
-        self._tab_name_map[device_guid] = device_name
+        self._tab_name_map[device_guid] = tab_name
         
         self.ui.devices.setTabData(position, TabData(device.device_id, tab_type, device))
 
@@ -488,7 +490,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._joystick_device_guids.append(device_guid)
         
         verbose = gremlin.config.Configuration().verbose_mode_device
-        if verbose: syslog.info(f"Add tab: {position} {device_name} {device_guid}  tab data: {self.ui.devices.tabData(position)}")
+        
+        if verbose: syslog.info(f"Add tab: {position} {device_name} tab name: {tab_name} {device_guid}  tab data: {self.ui.devices.tabData(position)}  ")
 
         self._update_tab(device_guid)
 
@@ -979,7 +982,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         dialog.closed.connect(self.options_closed)
         dialog.show()
-
+        dialog.apply_window_settings()
+        
     def options_closed(self):
         dialog = self.sender()
         if dialog.reload_profile:
@@ -1252,25 +1256,31 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """Displays the input viewer dialog."""
         if self.modal_windows["input_viewer"]:
             # set the focus to that window
-            self.modal_windows["input_viewer"].activateWindow()
+            dialog =self.modal_windows["input_viewer"]
+            dialog.activateWindow()
             self.ui.actionInputViewer.setChecked(True)
+
         else:
-            self.modal_windows["input_viewer"] = gremlin.ui.input_viewer.InputViewerUi()
-            geom = self.geometry()
-            self.modal_windows["input_viewer"].setGeometry(
-                int(geom.x() + geom.width() / 2 - 350),
-                int(geom.y() + geom.height() / 2 - 150),
-                700,
-                300
-            )
-            # gremlin.shared_state.push_suspend_highlighting()
+            dialog = gremlin.ui.input_viewer.InputViewerUi()
+            self.modal_windows["input_viewer"] = dialog
+            
+            if not dialog.hasConfig():
+                # set size
+                geom = self.geometry()
+                self.modal_windows["input_viewer"].setGeometry(
+                    int(geom.x() + geom.width() / 2 - 350),
+                    int(geom.y() + geom.height() / 2 - 150),
+                    700,
+                    300
+                )
             
             self.ui.actionInputViewer.setChecked(True)
             if gremlin.config.Configuration().input_viewer_disables_repeaters:
                 gremlin.shared_state.push_repeater()
 
-            self.modal_windows["input_viewer"].show()
-            self.modal_windows["input_viewer"].closed.connect(self._close_input_viewer)
+            dialog.show()
+            dialog.closed.connect(self._close_input_viewer)
+            gremlin.util.singleShot(dialog.apply_window_settings)
 
     @QtCore.Slot()
     def _reload_devices(self):
@@ -2287,7 +2297,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._keyboard_device_guid = device_guid
             
             
-            self._add_tab(device_guid, TabDeviceType.Keyboard)
+            self._add_tab(device_guid, TabDeviceType.Keyboard, override_name="Keyboard/Mouse")
             index+=1
             
             # =======================================================
@@ -2503,7 +2513,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # clear and rebuild the tabs in the new order
                 self._reset_tab_data()
                 for device_guid, device_name, tab_type, index in reordered_data:
-                    self._add_tab(device_guid, tab_type)
+                    device = self._get_device(device_guid)
+                    tab_name = "Keyboard/Mouse" if device.device_type == DeviceType.Keyboard else device.name
+                    self._add_tab(device_guid, tab_type, override_name= tab_name)
 
                 self._reindex_tabs()
 

@@ -7427,10 +7427,12 @@ class QRememberDialog(QtWidgets.QDialog):
         self._resize_count = 0
         assert key,"unique key must be provided"
         self.window_key = key
+        self._moving = False
+        self._resizable = True
+        self._move_stack = []
+        self._move_lock = False
+        self._visible = False
 
-        
-        self.apply_window_settings()
-        #gremlin.util.centerDialog(self, parent = parent)
 
 
 
@@ -7445,6 +7447,9 @@ class QRememberDialog(QtWidgets.QDialog):
 
 
     def apply_window_settings(self):
+        gremlin.util.InvokeUiMethod(self._apply_window_settings_ui)
+
+    def _apply_window_settings_ui(self):
         """Restores the stored window geometry settings."""
         config = gremlin.config.Configuration()
         window_size = config.getWindowSize(self.window_key)
@@ -7452,27 +7457,57 @@ class QRememberDialog(QtWidgets.QDialog):
         if window_size:
             self.resize(window_size[0], window_size[1])
         if window_location:
-            self.move(window_location[0], window_location[1])
+            x, y = window_location
+            pos = QtCore.QPoint(x,y)
+            # syslog.info(f"recall move window {self.window_key} to {x},{y}")
+            self.move(pos)
+
+
+    def showEvent(self, event): 
+        ''' occurs when window is displayed (made visible)'''
+        super().showEvent(event)
+        self._visible = True
+        self._apply_window_settings_ui()    
+    
+    def hideEvent(self, event):
+        ''' occurs when window is hidden '''
+        self._visible = False
+        return super().hideEvent(event)
+    
+    def closeEvent(self, event):
+        ''' occurs when window is closed '''
+        self._visible = False
+        return super().closeEvent(event)
+
+    def hasConfig(self) -> bool:
+        ''' checks if the window has saved geometry/position data '''
+        config = gremlin.config.Configuration()
+        window_location = config.getWindowLocation(self.window_key)
+        return window_location is not None
 
     def moveEvent(self, evt):
-        """Handle changing the position of the window.
-
-        :param evt event information
-        """
-        config = gremlin.config.Configuration()
-        config.setWindowLocation(self.window_key, evt.pos().x(), evt.pos().y())
+        ''' occurs when window is moved '''
+        if self._visible:
+            # only save the position if the window is visible - that's because the move event can occur multiple times before the window is visible 
+            pos = evt.pos()
+            config = gremlin.config.Configuration()
+            x = pos.x()
+            y = pos.y()
+            config.setWindowLocation(self.window_key, x, y)
+            # syslog.info(f"move event save {self.window_key} to {x},{y}")
+        
         super().moveEvent(evt)
-
+        
     def resizeEvent(self, evt):
         """Handling changing the size of the window.
 
         :param evt event information
         """
-        if self._resize_count > 1:
+        if self._resize_count:
             config = gremlin.config.Configuration()
             config.setWindowSize(self.window_key, evt.size().width(), evt.size().height())
-
-        self._resize_count += 1
+        if not self._resize_count:
+            self._resize_count = 1
         super().resizeEvent(evt)
 
 

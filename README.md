@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T31)
+- Improved: handling of unexpected characters in HID hardware device names - some hardware devices - especially custom ones - may have have invalid binary encoded string data as reported to HID, and this would cause an exception when decoding.  The new behavior will gracefully handle these invalid names and call out the issue rather than throwing a critical exception.
+- Improved: Input Viewer and Options window will remember size/position
+- Changed: Keyboard device renamed to Keyboard/Mouse as the keyboard device can also handle mouse mapping inputs (and this wasn't entirely evident).
+- Fix: profile using map to simconnect does not always abort if MSFS simconnect is not available (this only impacts GremlinEx if using it for MSFS control).
+- Fix: mapping actions excluded from keyboard/mouse input due to unset override mapping type
+
 ### (m76T30)
 
 - Fix: mouse button translation mixing up middle, right and double right click.

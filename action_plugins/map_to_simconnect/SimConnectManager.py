@@ -466,6 +466,7 @@ class SimConnectManager(QtCore.QObject):
         el.abort.connect(self._abort) # trap abort
         el.profile_stop.connect(self._profile_stop) # trap profile stop
         el.profile_start.connect(self._profile_start) # trap profile start
+        el.request_profile_stop.connect(self._profile_stop) # trap profile stop request
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
         self._aircraft_change_callbacks = []
@@ -593,6 +594,7 @@ class SimConnectManager(QtCore.QObject):
             syslog.info("SIMCONNECT: not enabled (no mappings found)")
             return False
         
+        self._request_abort = False
         self.activate()
 
         
@@ -1137,6 +1139,9 @@ class SimConnectManager(QtCore.QObject):
         if self._connect_in_progress:
             # already connecting
             return
+        if self._request_abort:
+            # abort requested
+            return
         
         self._connect_in_progress = True
         
@@ -1179,6 +1184,7 @@ class SimConnectManager(QtCore.QObject):
                             # request the profile to stop
                             el.module_state_change.emit("simconnect",False)
                             el.request_profile_stop.emit(msg)
+                            self._request_abort = True
                             gremlin.shared_state.profile_state = False # indicate a profile start error occured
                         syslog.error("SIMCONNECT: failed to start.")
                     return False
@@ -1186,13 +1192,13 @@ class SimConnectManager(QtCore.QObject):
                 else:
                     syslog.info("Simconnect: connected to simulator")
             
+
+            if not self._request_abort:
+                self._is_running = True
+                self.bridge.start()
+                return True # connected  
             
-            self._is_running = True
-            self.bridge.start()
-
-
-
-            return True # connected  
+            return False
         finally:
             self._connect_in_progress = False
 
