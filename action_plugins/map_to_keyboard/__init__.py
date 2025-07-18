@@ -19,7 +19,7 @@
 import os
 from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets, QtGui
+from PySide6 import QtWidgets, QtGui, QtCore
 import gremlin.base_profile
 
 from gremlin.input_types import InputType
@@ -45,12 +45,10 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
         self.key_combination = QtWidgets.QLabel()
-        self.record_button = QtWidgets.QPushButton("Record keys")
-
-        self.record_button.clicked.connect(self._record_keys_cb)
+        self.record_button = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._record_keys_cb)
 
         self.main_layout.addWidget(self.key_combination)
-        self.main_layout.addWidget(self.record_button)
+        self.main_layout.addWidget(self.record_button, alignment = QtCore.Qt.AlignmentFlag.AlignCenter)
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
         warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality", use_wrap=False)
@@ -88,7 +86,7 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,
-            multi_keys=True
+            multi_keys=False
         )
 
         self.button_press_dialog.item_selected.connect(self._update_keys)

@@ -2825,9 +2825,20 @@ class InputListenerWidget(QBoxFrame):
 
         # Create and configure the ui overlay
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.main_layout.addWidget(
-            QtWidgets.QLabel(f"""<center>Please press the desired {self._valid_event_types_string()}.<br/><br/>Hold ESC{'' if self._close_on_key else ' for one second'} to abort.</center>""")
-        )
+        label = QtWidgets.QLabel()
+        self.main_layout.addWidget(label)
+
+
+        if self._multi_keys:
+            self.cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel)
+            self.ok_widget = gremlin.ui.ui_common.Buttons.getOkWidget(callback = self._accept)
+            widget, _ = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget])
+            self.main_layout.addWidget(widget, alignment= QtCore.Qt.AlignmentFlag.AlignHCenter)
+            msg = f"""<center>Multi-Key/Mouse Listen Mode</center><br/><center>Please press the desired keys/mouse sequence.</center><br/><center>Press Ok to accept, Cancel to quit.</center>"""
+        else:
+            msg = f"""<center>Please press the desired {self._valid_event_types_string()}.<br/><br/>Hold ESC{'' if self._close_on_key else ' for one second'} to abort.</center>"""
+
+        label.setText(msg)
 
         gremlin.shared_state.push_suspend_highlighting()
         gremlin.shared_state.push_suspend_ui_keyinput()
@@ -2916,44 +2927,48 @@ class InputListenerWidget(QBoxFrame):
 
         # Return immediately once the first key press is detected
         if not self._multi_keys:
+            # single key mode
             if event.is_pressed and key == self._esc_key:
                 if not self._abort_timer.is_alive():
                     self._abort_timer.start()
             elif not event.is_pressed and \
                     InputType.Keyboard in self._event_types:
                 if not self._return_kb_event:
-                    self.item_selected.emit(key)
+                    self.item_selected.emit([key])
                 else:
                     self.item_selected.emit(event)
                 self._abort_timer.cancel()
                 self.close()
+
+            if not event.is_pressed and key == self._esc_key:
+                self._abort_timer.cancel()
+                self._abort_timer = threading.Timer(1.0, self._abort_request)
+
+
         # Record all key presses and return on the first key release
         else:
+            # multi-key mode
             if event.is_pressed:
                 if InputType.Keyboard in self._event_types:
                     if not self._return_kb_event:
                         self._multi_key_storage.append(key)
                     else:
                         self._multi_key_storage.append(event)
-                if key == self._esc_key:
-                    # Start a timer and close if it expires, aborting the
-                    # user input request
-                    if not self._abort_timer.is_alive():
-                        self._abort_timer.start()
-            else:
-
-                self._abort_timer.cancel()
-                if not self._aborting:
-                    self.item_selected.emit(self._multi_key_storage)
-                    return
-                # ignore release events
                 
 
-        # Ensure the timer is cancelled and reset in case the ESC is released
-        # and we're not looking to return keyboard events
-        if key == self._esc_key and not event.is_pressed:
+
+    def _accept(self):
+        # multi key accept mode 
+        if self._abort_timer:
             self._abort_timer.cancel()
-            self._abort_timer = threading.Timer(1.0, self._abort_request)
+        self.item_selected.emit(self._multi_key_storage)
+        self.close()
+
+    def _cancel(self):
+        self._multi_key_storage.clear()
+        if self._abort_timer:
+            self._abort_timer.cancel()
+        self.close()
 
     def _mouse_event_cb(self, event):            
         gremlin.util.InvokeUiMethod(self._mouse_event_ui, event)
@@ -2963,15 +2978,25 @@ class InputListenerWidget(QBoxFrame):
         syslog.info(f"mouse event ui: {event}")
         if event.is_pressed:
             # only handle press events
-            self.item_selected.emit(event)
-            self.close()
+            key = gremlin.keyboard.key_from_mousebutton(event.button_id)
+            if self._multi_keys:
+                # record event if multiple keys
+                # make sure the mouse is not over the buttons
+                pos = QtGui.QCursor.pos()
+                widget = QtWidgets.QApplication.widgetAt(pos)
+                if widget != self.ok_widget and widget != self.cancel_widget:
+                    self._multi_key_storage.append(key)
+            else:
+                # not listening to multiple keys
+                self.item_selected.emit([key])
+                self.close()
 
     def _abort_request(self):
+        ''' runs when the abort timer lapses '''
         import time
         self._aborting = True
-        if self._abort_timer.is_alive():
-            self._abort_timer.cancel()
-            time.sleep(0.1)
+        self._abort_timer = None
+        gremlin.util.InvokeUiMethod(self.close)
 
 
     def closeEvent(self, evt):
@@ -3308,7 +3333,7 @@ class QIconLabel(QtWidgets.QWidget):
 
         layout = QtWidgets.QGridLayout(self)
         layout.setContentsMargins(0,0,0,0)
-        layout.addWidget(self._icon_widget,0,0,alignment= QtCore.Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self._icon_widget,0,0, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
         layout.addWidget(container_widget, 0, 1)
         layout.addWidget(QtWidgets.QWidget(),0,2)
         layout.setColumnStretch(2,2)

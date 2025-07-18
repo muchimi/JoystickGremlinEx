@@ -75,7 +75,11 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.key_combination_layout = QtWidgets.QHBoxLayout(self.key_combination_widget)
 
         
+        self.listen_multi_widget = gremlin.ui.ui_common.Buttons.getListenWidget(label="Listen (multi)", callback = self._record_multi_keys_cb)
+        self.listen_multi_widget.setToolTip("Listen for multiple inputs.  Click on ok when done.  Clicks on the buttons will not be included in the recorded list.")
+
         self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._record_keys_cb)
+        self.listen_widget.setToolTip("Listen for a single input.")
         
         self.show_keyboard_widget = QtWidgets.QPushButton("Select Keys")
         self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color = gremlin.ui.ui_common.Color.listenColor()))
@@ -118,7 +122,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         widgets = [
             self.clear_widget,
-            self.listen_widget, 
+            self.listen_widget,  
+            self.listen_multi_widget, 
             self.show_keyboard_widget
         ]
 
@@ -281,16 +286,19 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._populate_ui()
         
     def _record_keys_cb(self):
-        gremlin.util.InvokeUiMethod(self._record_keys_ui)
+        gremlin.util.InvokeUiMethod(self._record_keys_ui, False)
+
+    def _record_multi_keys_cb(self):
+        gremlin.util.InvokeUiMethod(self._record_keys_ui, True)
 
 
-    def _record_keys_ui(self):
+    def _record_keys_ui(self, multi_keys):
         """Prompts the user to press the desired key combination. - runs on UI thread"""
 
         button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,
-            multi_keys=True
+            multi_keys=multi_keys
         )
 
         button_press_dialog.item_selected.connect(self._update_keys)

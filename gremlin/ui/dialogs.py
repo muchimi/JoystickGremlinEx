@@ -2459,6 +2459,7 @@ class LogWindowUi(ui_common.BaseDialogUi):
         :param fname path to the file whose content to display
         :param title the title of the tab
         """
+        gremlin.util.assert_ui_thread()
         page = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(page)
         log_display = QtWidgets.QTextEdit()
@@ -2486,8 +2487,12 @@ class LogWindowUi(ui_common.BaseDialogUi):
         :param fname path to the file to clear
         """
         open(fname, "w").close()
+        
 
     def _reload(self, fname):
+        gremlin.util.InvokeUiMethod(self._reload_ui, fname)
+
+    def _reload_ui(self, fname):
         """Reloads the content of tab displaying the given file.
 
         :param fname name of the file whose content to update

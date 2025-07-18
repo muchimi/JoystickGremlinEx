@@ -885,7 +885,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # Terminate file watcher thread
         if "log" in self.modal_windows:
-            self.modal_windows["log"].watcher.stop()
+            dialog = self.modal_windows["log"]
+            if dialog:
+                dialog.watcher.stop()
 
 
     # +---------------------------------------------------------------
@@ -937,12 +939,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         )
 
     def log_window(self):
+        gremlin.util.InvokeUiMethod(self._log_window_ui)
+
+    def _log_window_ui(self):
         """Opens the log display window."""
+        gremlin.util.assert_ui_thread()
         self.modal_windows["log"] = gremlin.ui.dialogs.LogWindowUi()
+        self.modal_windows["log"].closed.connect(lambda: self._remove_modal_window("log"))
         self.modal_windows["log"].show()
-        self.modal_windows["log"].closed.connect(
-            lambda: self._remove_modal_window("log")
-        )
+
 
     def log_edit(self):
         ''' opens the log file in the editor '''

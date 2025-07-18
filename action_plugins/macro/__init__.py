@@ -2032,6 +2032,7 @@ class Macro(gremlin.base_profile.AbstractAction):
             elif child.tag == "state":
                 state_action = gremlin.macro.StateAction()
                 state = None
+                id = None
                 if "id" in child.attrib:
                     id = safe_read(child, "id", str, "")
                     state = sd.getStateById(id)

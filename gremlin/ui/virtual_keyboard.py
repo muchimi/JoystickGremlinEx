@@ -22,6 +22,7 @@ import datetime
 import time
 import psygnal
 from psygnal import Signal
+import threading
       
 syslog = logging.getLogger("system")
 
@@ -44,10 +45,13 @@ class QKeyWidget(QtWidgets.QPushButton):
         self._selected = False
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
         #self.clicked.connect(self._clicked)
+        self._auto_release = False
+        self._auto_release_delay = 0.5
+        self._release_timer = None
 
 
 
-        
+        self._text = text
 
         # border-style: outset;
         self._key_size = 1
@@ -57,6 +61,22 @@ class QKeyWidget(QtWidgets.QPushButton):
 
         self.installEventFilter(self)
         self._update_style()
+
+    def setAutoRelease(self, value : bool):
+        self._auto_release = value
+
+    def autoRelease(self) -> bool:
+        ''' autorelease flag '''
+        return self._auto_release
+    
+    def setAutoReleaseDelay(self, value : float):
+        ''' autorelease delay in seconds '''
+        if value < 0:
+            value = 0
+        self._auto_release_delay = value
+
+    def autoReleaseDelay(self) -> float:
+        return self._auto_release_delay
     
 
     def _update_style(self):
@@ -93,7 +113,6 @@ class QKeyWidget(QtWidgets.QPushButton):
             self.setStyleSheet(selected_style)
         else:
             self.setStyleSheet(default_style)
-
 
 
     @property
@@ -144,8 +163,16 @@ class QKeyWidget(QtWidgets.QPushButton):
         if self._selected != value:
             # syslog.info(f"selected state changed to : {value}")
             self._selected = value
-            self._update_state()
+            gremlin.util.InvokeUiMethod(self._update_state)
+            if value and self._auto_release:
+                if self._release_timer:
+                    self._release_timer.cancel()
+                self._release_timer = threading.Timer(self._auto_release_delay, self._release_cb)
+                self._release_timer.start()
 
+
+    def _release_cb(self):
+        self.selected = False
 
     def _update_state(self):
         ''' updates the color of the button based on the selection state '''
@@ -188,7 +215,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
     keyEvent = Signal() # called when the data has changed
 
-    def __init__(self, parent = None):
+    def __init__(self, release_wheel = False, parent = None):
 
         ''' creates a full keyboard widget for manual data entry '''
         super().__init__(parent)
@@ -218,6 +245,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self._repeater_timestamp = {}
         self._invert_display = self.config.keyboard_repeater_invert_display
         self._capture_mouse = self.config.keyboard_repeater_capture_mouse
+        self._autorelease_wheel = release_wheel
 
 
         clear_widget = QtWidgets.QPushButton("Clear")
@@ -274,6 +302,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         current_row = 0
         self._key_map = {} # map of key (scancode, extended) to key name
         self._key_widget_map = {} # map of key (scancode, extended) to widget
+        self._key_release_timers = {} # release timers for wheel mouse keys
         self._hooked = False
         self._read_only = False
 
@@ -389,6 +418,14 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
                     
                     self._key_widget_map[key_name] = widget
+
+                    if action_key.is_mouse and self._autorelease_wheel and action_key.mouse_button in (gremlin.keyboard.MouseButton.WheelDown,
+                        gremlin.keyboard.MouseButton.WheelUp,
+                        gremlin.keyboard.MouseButton.WheelLeft,
+                        gremlin.keyboard.MouseButton.WheelRight,
+                        ):
+                        widget.setAutoRelease(True) # auto return wheel keys to off
+
                     key_widgets.append(widget)
 
                 else:
@@ -538,11 +575,14 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     widget = self._key_widget_map[map_key]
                     is_pressed = event.is_pressed
                     widget.selected = is_pressed
+                        
                     if self._show_repeater:
                         if key.is_mouse and not self._capture_mouse:
                             return
                         self._add_repeater(key, is_pressed)
                     return
+                
+           
         
             # output error message
             now = datetime.datetime.now()
@@ -554,7 +594,6 @@ class QKeyboardWidget(QtWidgets.QWidget):
             except Exception as ex:
                 line = f"{timestamp}: [ERROR] {ex}"
             self._add_line(line)
-                
 
     def _mouse_handler(self, event):
         ''' invoke on ui thread '''

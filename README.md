@@ -14,6 +14,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T32)
+- Fix: input viewer keyboard/state selector synchronization with other actions
+- Fix: keyboard/mouse listener closes on keyboard input (broken with the last update)
+- Change: input viewer must have the mouse events enabled to activate mouse input.  When activated, mouse buttons will always reflect pressed/release states.  Mouse wheel events, because they only have a "on" or "break" trigger, will automatically turn off after half a second.  There is no concept for mouse wheel events of press/release at the operating system level.  
+- Change: map to keyboard EX supports two listen modes.  The first (default) mode capture the first key or mouse event detected.  The second mode is a multi input recorder where a sequence of inputs will be captured until the ok button is pressed.  Click on the ok button to accept, cancel to exit.  Button mouse 1 (left) click will not register as an input by design.  To capture that event, click somewhere other than the buttons, then click the ok button, or use the virtual keyboard selection.
+- Change: legacy map to keyboard action can now only record a single key (this is a band-aid to make it work - this action is deprecated although will still function).  If you intend to use keyboard/mouse input, please use the updated map to keyboard ex action.
+- Fix: macro profile load.  For older profile that don't have state IDs defined, undefined id variable exception.  
+- Fix: internal log window viewer causes a QT crash with the updated event model
+
 ### (m76T31)
 - Improved: handling of unexpected characters in HID hardware device names - some hardware devices - especially custom ones - may have have invalid binary encoded string data as reported to HID, and this would cause an exception when decoding.  The new behavior will gracefully handle these invalid names and call out the issue rather than throwing a critical exception.
 - Improved: Input Viewer and Options window will remember size/position
