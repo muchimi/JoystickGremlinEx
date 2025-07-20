@@ -71,9 +71,16 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self.key_combination = QtWidgets.QLabel("<b>Current key combination:</b>")
-        self.key_combination_widget = QtWidgets.QWidget() # holds the keys
-        self.key_combination_layout = QtWidgets.QHBoxLayout(self.key_combination_widget)
 
+        self.display_container_widget, self.display_container_layout = gremlin.ui.ui_common.getVContainer()
+
+
+        self.key_combination_widget, self.key_combination_layout = gremlin.ui.ui_common.getHContainer()
+
+        widget = gremlin.ui.virtual_keyboard.QKeyWidget()
+        self._key_height = widget.desiredHeight
+        self.display_container_widget.setMinimumHeight(self._key_height)
+        self.display_container_layout.addWidget(self.key_combination_widget)
         
         self.listen_multi_widget = gremlin.ui.ui_common.Buttons.getListenWidget(label="Listen (multi)", callback = self._record_multi_keys_cb)
         self.listen_multi_widget.setToolTip("Listen for multiple inputs.  Click on ok when done.  Clicks on the buttons will not be included in the recorded list.")
@@ -81,7 +88,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._record_keys_cb)
         self.listen_widget.setToolTip("Listen for a single input.")
         
-        self.show_keyboard_widget = QtWidgets.QPushButton("Select Keys")
+        self.show_keyboard_widget = QtWidgets.QPushButton("Select...")
         self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color = gremlin.ui.ui_common.Color.listenColor()))
         self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
 
@@ -131,7 +138,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self.main_layout.addWidget(self.key_combination)
-        self.main_layout.addWidget(self.key_combination_widget)
+        self.main_layout.addWidget(self.display_container_widget)
         self.main_layout.addWidget(self.container_action_widget)
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(self.description_widget)
@@ -170,25 +177,29 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         gremlin.util.clear_layout(self.key_combination_layout)
 
-        for index, key in enumerate(self.action_data._get_keys()):
-            assert key.name,"Invalid key provided"
-            if index:
-                lbl = QtWidgets.QLabel("+")
-                self.key_combination_layout.addWidget(lbl)
-            widget = gremlin.ui.virtual_keyboard.QKeyWidget()
-            icon = gremlin.keyboard.KeyMap.icon(key)
-            name = gremlin.keyboard.KeyMap.get_name(key)
-            tooltip = gremlin.keyboard.KeyMap.get_description(key)
-            if icon:
-                widget.setIcon(icon)
-            if name:
-                widget.setText(name)
-            if tooltip:
-                widget.setToolTip(tooltip)
-            widget.keySize = 2
-            widget.autoSize = True
-            
-            self.key_combination_layout.addWidget(widget)
+        keys = self.action_data._get_keys()
+        if keys:
+            for index, key in enumerate(keys):
+                assert key.name,"Invalid key provided"
+                if index:
+                    lbl = QtWidgets.QLabel("+")
+                    self.key_combination_layout.addWidget(lbl)
+                widget = gremlin.ui.virtual_keyboard.QKeyWidget()
+                icon = gremlin.keyboard.KeyMap.icon(key)
+                name = gremlin.keyboard.KeyMap.get_name(key)
+                tooltip = gremlin.keyboard.KeyMap.get_description(key)
+                if icon:
+                    widget.setIcon(icon)
+                if name:
+                    widget.setText(name)
+                if tooltip:
+                    widget.setToolTip(tooltip)
+                widget.keySize = 2
+                widget.autoSize = True
+                
+                self.key_combination_layout.addWidget(widget)
+        else:
+            self.key_combination_layout.addWidget(gremlin.ui.ui_common.QWarning("No input selected. Please select at least one input."))
 
         self.key_combination_layout.addStretch()
 
@@ -227,6 +238,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             data.append(key)
 
         self.action_data.keys = gremlin.keyboard.sort_keys(data)
+        gremlin.util.InvokeUiMethod(self._populate_ui) # reload new keys
+
         self.action_modified.emit()
 
     def _mode_changed(self):

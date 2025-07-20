@@ -199,7 +199,7 @@ class Color():
         return "#458ae6"
     @staticmethod
     def buttonBackgroundColor():
-        return Color.backgroundColor()
+        return "#414141" if gremlin.shared_state.is_dark_theme else "#414141"
     @staticmethod
     def buttonColor():
         return Color.normalColor()
@@ -232,7 +232,36 @@ class Color():
     @staticmethod
     def infoColor(): # color used for information boxes
         return "#92882b"
+    @staticmethod
+    def inputTitleColor(): # color for the input title bar
+        return "#5A725A" if gremlin.shared_state.is_dark_theme else "#678867"
     
+    def inputTitleUnselectedColor(): # color for the input title bar
+        return "#3A3A3A" if gremlin.shared_state.is_dark_theme else "#7C7C7C"
+    
+    @staticmethod
+    def cssInputHeader(): 
+        background_color = Color.inputTitleColor()
+        button_background_color = Color.buttonBackgroundColor()
+        css = f"#title_bar {{ background: {background_color}; max-height = 32px;}} QPushButton {{ background: {button_background_color};}}"
+        return css
+    
+    @staticmethod
+    def cssUnselectedInputHeader(): 
+        background_color = Color.inputTitleUnselectedColor()
+        button_background_color = Color.buttonBackgroundColor()
+        css = f"#title_bar {{ background: {background_color}; max-height = 32px; }} QPushButton {{ background: {button_background_color};}}"
+        return css
+    
+    
+
+    @staticmethod
+    def cssButton(): 
+        background_color = Color.buttonBackgroundColor()
+        css = f" QPushButton {{ background: {background_color};}}"
+        return css
+
+
     @staticmethod
     def cssInfoBox(): 
         border_color = Color.borderColor()
@@ -247,6 +276,8 @@ class Color():
             }}
             '''
         return css
+    
+    
 
     @staticmethod
     def cssApplication():
@@ -3301,19 +3332,17 @@ class QIconLabel(QtWidgets.QWidget):
     def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = False, icon_size = 16, parent = None):
         super().__init__(parent)
 
-        if text is None:
+        if text is None and isinstance(icon_path, str):
             text = icon_path
             icon_path = None
+        
 
         container_widget, container_layout = getHContainer()
 
         # w = get_text_width("M")*80
         # container_widget.setMaximumWidth(w)
         
-        self.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.Expanding
-        )
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         
         self._icon_size = QtCore.QSize(icon_size, icon_size)
         self._icon_widget = QtWidgets.QLabel()
@@ -3333,7 +3362,8 @@ class QIconLabel(QtWidgets.QWidget):
 
         layout = QtWidgets.QGridLayout(self)
         layout.setContentsMargins(0,0,0,0)
-        layout.addWidget(self._icon_widget,0,0, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
+        #layout.addWidget(self._icon_widget,0,0, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self._icon_widget,0,0)
         layout.addWidget(container_widget, 0, 1)
         layout.addWidget(QtWidgets.QWidget(),0,2)
         layout.setColumnStretch(2,2)
@@ -7034,6 +7064,7 @@ class ActionLabel(QtWidgets.QLabel):
             pixmap = QtGui.QPixmap(icon)
         pixmap = pixmap.scaled(self._width, self._width, QtCore.Qt.KeepAspectRatio)
         self.setPixmap(pixmap)
+        self.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
         self.action_entry = action_entry
         
@@ -8989,8 +9020,9 @@ class QPaginator(QtWidgets.QWidget):
             # no data
             self._page_label_widget.setText("No items")
             self._page_input_widget.setText("")
-
         self.setEnabled(enabled)
+
+        
 
             
 

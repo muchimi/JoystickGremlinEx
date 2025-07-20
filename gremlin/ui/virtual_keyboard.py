@@ -49,7 +49,8 @@ class QKeyWidget(QtWidgets.QPushButton):
         self._auto_release_delay = 0.5
         self._release_timer = None
 
-
+        self._max_height = 30 # height in pixels
+        self._min_width = 32 # min width of key in pixels
 
         self._text = text
 
@@ -61,6 +62,11 @@ class QKeyWidget(QtWidgets.QPushButton):
 
         self.installEventFilter(self)
         self._update_style()
+
+    @property
+    def desiredHeight(self) -> int:
+        ''' widget desired height (single scale)'''
+        return self._max_height
 
     def setAutoRelease(self, value : bool):
         self._auto_release = value
@@ -89,18 +95,21 @@ class QKeyWidget(QtWidgets.QPushButton):
         hover_background_color = Color.keyHoverBackgroundColor()
         hover_selected_background_color = Color.keyHoverSelectedBackgroundColor()
 
+        h = self._max_height
+        w = self._min_width
+
         if self._auto_size:
-            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"    
+            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"    
         else:
-            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
         if self._key_size == 1:
             default_style = self._default_style

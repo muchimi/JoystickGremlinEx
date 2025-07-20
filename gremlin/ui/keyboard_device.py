@@ -696,6 +696,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.enable_edit()
 
         self._update_input_widget(widget, widget.parent)
+        #widget.setMaximumHeight(100)
 
         return widget
     
