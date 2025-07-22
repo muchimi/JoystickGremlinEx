@@ -65,12 +65,15 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         """
         super().__init__(action_data, parent=parent)
         self.action_data = action_data
+        
 
     def _create_ui(self):
         """Creates the UI components."""
 
 
         self.key_combination = QtWidgets.QLabel("<b>Current key combination:</b>")
+        self.key_map = {} # map of key to widgets
+        self.keys = [] # list of keys
 
         self.display_container_widget, self.display_container_layout = gremlin.ui.ui_common.getVContainer()
 
@@ -176,36 +179,55 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Populates the UI components."""
 
         gremlin.util.clear_layout(self.key_combination_layout)
+        
+
 
         keys = self.action_data._get_keys()
+        self.key_map.clear()
+        self.keys.clear()
         if keys:
-            for index, key in enumerate(keys):
+
+            key : gremlin.keyboard.Key
+            for key in keys:
                 assert key.name,"Invalid key provided"
-                if index:
-                    lbl = QtWidgets.QLabel("+")
-                    self.key_combination_layout.addWidget(lbl)
-                widget = gremlin.ui.virtual_keyboard.QKeyWidget()
-                icon = gremlin.keyboard.KeyMap.icon(key)
-                name = gremlin.keyboard.KeyMap.get_name(key)
-                tooltip = gremlin.keyboard.KeyMap.get_description(key)
-                if icon:
-                    widget.setIcon(icon)
-                if name:
-                    widget.setText(name)
-                if tooltip:
-                    widget.setToolTip(tooltip)
-                widget.keySize = 2
-                widget.autoSize = True
+                if not key in self.keys:
+                    self._add_key(key)
                 
-                self.key_combination_layout.addWidget(widget)
         else:
             self.key_combination_layout.addWidget(gremlin.ui.ui_common.QWarning("No input selected. Please select at least one input."))
+            self.key_combination_layout.addStretch()
+            
 
-        self.key_combination_layout.addStretch()
+    def _add_key(self, key):
+        ''' adds a key (must run on UI thread) '''
+        gremlin.util.assert_ui_thread()
+
+        widget = gremlin.ui.virtual_keyboard.QKeyWidget()
+        icon = gremlin.keyboard.KeyMap.icon(key)
+        name = gremlin.keyboard.KeyMap.get_name(key)
+        tooltip = gremlin.keyboard.KeyMap.get_description(key)
+        if icon:
+            widget.setIcon(icon)
+        if name:
+            widget.setText(name)
+        if tooltip:
+            widget.setToolTip(tooltip)
+        widget.keySize = 2
+        widget.autoSize = True
+        
+        index = len(self.keys)
+        self.key_combination_layout.insertWidget(index, widget)
+        if not self.keys:
+            self.key_combination_layout.addStretch()
+
+        self.key_map[key] = widget # remember keys created
+        self.keys.append(key)
 
             
     def _update_keys(self, keys):
         gremlin.util.InvokeUiMethod(self._update_keys_ui, keys)
+
+    
 
     def _update_keys_ui(self, keys):
         """Updates the storage with a new set of keys.
@@ -241,6 +263,31 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         gremlin.util.InvokeUiMethod(self._populate_ui) # reload new keys
 
         self.action_modified.emit()
+
+    def _clear_selection(self):
+        ''' clears all keys '''
+        if self.key_map:
+            gremlin.util.InvokeUiMethod(self._clear_selection_ui)
+
+    def _clear_selection_ui(self):
+        ''' clears keys (ui thread)'''
+        if self.key_map:
+            self.key_map.clear()
+            self.keys.clear()
+            gremlin.util.clear_layout(self.key_combination_layout)
+            # note: this does not clear the action data so it can be restored 
+            
+
+
+    def _handle_key_input(self, key):
+        gremlin.util.InvokeUiMethod(self._handle_key_input_ui, key)
+
+    def _handle_key_input_ui(self, key : gremlin.keyboard.Key):
+        # handles an input key on the UI thread
+        if not key in self.keys:
+            self._add_key(key)
+        
+
 
     def _mode_changed(self):
         ''' output mode changed '''
@@ -315,6 +362,11 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
 
         button_press_dialog.item_selected.connect(self._update_keys)
+        button_press_dialog.keyInput.connect(self._handle_key_input)
+        button_press_dialog.closed.connect(self._handle_closed)
+
+        self._clear_selection() # clear current selection
+
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -330,6 +382,15 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
         button_press_dialog.show()
 
+    def _handle_closed(self, accepted):
+        ''' occurs when the listen dialog closes, passes the close state'''
+        if accepted:
+            ''' accept all the keys '''
+            keys = self.key_map.values()
+        else:
+            keys = self.action_data.keys
+
+        self._update_keys_ui(keys)
 
 class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
@@ -710,15 +771,6 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
             value = 0
         self._delay = value
         gremlin.config.Configuration().last_keyboard_mapper_pulse_value = value
-
-    # @property
-    # def mode(self) -> KeyboardOutputMode:
-    #     return self._mode
-    # @mode.setter
-    # def mode(self, value : KeyboardOutputMode):
-    #     if value == KeyboardOutputMode.Hold:
-    #         pass
-    #     self._mode = value
 
     @property
     def autorepeat_delay(self):

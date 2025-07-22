@@ -1282,6 +1282,9 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         '''
         
         super().__init__(self.__class__.__name__,parent = parent)
+
+        gremlin.shared_state.push_suspend_highlighting() # prevent device highlight changes while editing a state 
+
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("State Editor")
@@ -1475,6 +1478,8 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                     if states:
                         gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.")
                         return
+                    
+                gremlin.shared_state.pop_suspend_highlighting()
                 self.accept()
         else:
             gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"A state name is required.")
@@ -1482,6 +1487,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         
     def _cancel_button_cb(self):
         ''' cancel button pressed '''
+        gremlin.shared_state.pop_suspend_highlighting()
         self.reject()        
 
     def _update_ui(self):

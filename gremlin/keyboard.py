@@ -935,9 +935,14 @@ class KeyMap:
     @staticmethod
     def icon(key : Key):
         ''' gets an icon for the given key if the key has one'''
-        lookup_name = key.lookup_name
-        if lookup_name in KeyMap._g_icon_map:
-            data = KeyMap._g_icon_map[lookup_name]
+        data = None
+        if key.is_mouse:
+            data = "mdi.mouse"
+        else:
+            lookup_name = key.lookup_name
+            if lookup_name in KeyMap._g_icon_map:
+                data = KeyMap._g_icon_map[lookup_name]
+        if data:
             if isinstance(data, str):
                 return gremlin.util.load_icon(data)
             icon_name, icon_color = data
@@ -1077,12 +1082,17 @@ class KeyMap:
         ''' gets a translated or short name for a key '''
         short_name = key.name
         if key.is_mouse:
-            short_name = MouseButton.to_short_name(key.lookup_name)
+            short_name = MouseButton.to_short_name(key.mouse_button)
         return short_name
 
     @staticmethod
-    def get_description(key : Key) -> str:
-        ''' gets a description for the key '''
+    def get_description(key : Key, extended = False) -> str:
+        ''' gets a description for the key, if extended, includes hex codes '''
+        if key._is_mouse:
+            return key.name
+        if extended:
+            # mouse keys don't have extended data because they have no scan codes
+            return key.debug_name
         name = key.lookup_name
         if name in KeyMap._key_description_lookup:
             return KeyMap._key_description_lookup[name]
@@ -1431,6 +1441,7 @@ class KeyMap:
         "wheel_down": "mdi.mouse",
         "wheel_left": "mdi.mouse",
         "wheel_right": "mdi.mouse",
+        
 
 
     }

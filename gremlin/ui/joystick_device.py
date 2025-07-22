@@ -298,7 +298,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
-            print ("delete curve data")
+            verbose = gremlin.config.Configuration().verbose_mode_ui
+            if verbose: syslog.info("delete curve data")
             data.curve_data = None
             self._update_curve_icon(index, data)
         
@@ -326,11 +327,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 self._update_curve_icon(index, self.input_item_list_view.model.data(index))
 
     def _update_curve_icon(self, index : int, data):
-
+        
         widget = self.input_item_list_view.getWidgetAt(index)
         if widget is not None:
-            enabled = data.curve_data is not None
-            widget.update_curve_icon(enabled)
+            widget.update_display()
 
 
 

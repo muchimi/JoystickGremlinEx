@@ -930,7 +930,7 @@ def load_icon(*paths, use_qta = False, qta_color = None):
 
     is_dark = gremlin.shared_state.is_dark_theme
 
-    (the_path,) = paths
+    the_path = paths[0]
     _ , ext = os.path.splitext(the_path.casefold())
 
     if ext == ".svg":

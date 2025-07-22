@@ -560,10 +560,10 @@ class EventListener(QtCore.QObject):
 		self.keyboard_hook.register(self._keyboard_handler)
 
 		config = gremlin.config.Configuration()
+		self._mouse_hook_stack = 0
 		self.mouse_hook = None
 		self.enable_mouse_hook = not config.is_debug  # disable mouse hooks while in debug mode
 		self.enableMouse()
-
 
 		# Calibration function for each axis of all devices
 		self._calibrations = {}
@@ -745,22 +745,34 @@ class EventListener(QtCore.QObject):
 		return self.mouse_hook is not None
 	
 	def enableMouse(self, force = False):
+		''' pushes the mouse hook stack - mouse hook is enabled the first time this is called (if options for that allow it) '''
 		if self.enable_mouse_hook or force:
-			import gremlin.windows_event_hook
-			syslog.info("MOUSE HOOK: enabled")
-			if self.mouse_hook is None:
-				self.mouse_hook = gremlin.windows_event_hook.MouseHook()
-				self.mouse_hook.register(self._mouse_handler)
-				self.mouse_hook.start()
+			if not self._mouse_hook_stack:
+				import gremlin.windows_event_hook
+				syslog.info("MOUSE HOOK: enabled")
+				if self.mouse_hook is None:
+					self.mouse_hook = gremlin.windows_event_hook.MouseHook()
+					self.mouse_hook.register(self._mouse_handler)
+					self.mouse_hook.start()
+			self._mouse_hook_stack += 1
 		else:
 			syslog.warning("MOUSE HOOK: ************ DEBUG MODE: disabled")
 				
 
-	def disableMouse(self):
-		if self.mouse_hook is not None:
-			self.mouse_hook.shutdown()
-			self.mouse_hook.unregister(self._mouse_handler)
-			self.mouse_hook = None
+	def disableMouse(self, reset = False):
+		''' pops the mouse hook stack '''
+		if reset:
+			# force a stack reset
+			self._mouse_hook_stack = 0
+		else:
+			if self._mouse_hook_stack > 1:
+				self._mouse_hook_stack -= 1
+				return 
+		if self._mouse_hook_stack == 0:
+			if self.mouse_hook is not None:
+				self.mouse_hook.shutdown()
+				self.mouse_hook.unregister(self._mouse_handler)
+				self.mouse_hook = None
 
 	def push_joystick(self):
 		gremlin.shared_state.push_joystick()

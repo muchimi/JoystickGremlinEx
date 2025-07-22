@@ -235,9 +235,14 @@ class Color():
     @staticmethod
     def inputTitleColor(): # color for the input title bar
         return "#5A725A" if gremlin.shared_state.is_dark_theme else "#678867"
-    
+    @staticmethod
     def inputTitleUnselectedColor(): # color for the input title bar
         return "#3A3A3A" if gremlin.shared_state.is_dark_theme else "#7C7C7C"
+    @staticmethod
+    def repeaterColor(): # color for repeaters
+        return "#0C8D12"
+    def repeaterBackgroundColor(): # color for repeaters
+        return "#374438"
     
     @staticmethod
     def cssInputHeader(): 
@@ -259,6 +264,13 @@ class Color():
     def cssButton(): 
         background_color = Color.buttonBackgroundColor()
         css = f" QPushButton {{ background: {background_color};}}"
+        return css
+
+    @staticmethod
+    def cssRepeater():
+        background_color = Color.repeaterBackgroundColor()
+        color = Color.repeaterColor()
+        css = f"QProgressBar {{ background: {background_color}; color: {color}}}"
         return css
 
 
@@ -2814,6 +2826,8 @@ class InputListenerWidget(QBoxFrame):
     to press a key or a joystick button """
 
     item_selected = QtCore.Signal(object) # called when the items are selected
+    keyInput = Signal(object) # called when a keyboard input is made - the parameter will be a key if mouse/keyboard input
+    closed = QtCore.Signal(bool) # closed - passes the accepted flag
 
     def __init__(
             self,
@@ -2849,6 +2863,9 @@ class InputListenerWidget(QBoxFrame):
         self._abort_timer = threading.Timer(1.0, self._abort_request)
         self._multi_key_storage = []
         self._callback = callback
+        self._accepted = False # true if the input is accepted
+        
+        
         self._listen_mouse = InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
 
         self._close_on_key = not (InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types)
@@ -2889,15 +2906,16 @@ class InputListenerWidget(QBoxFrame):
                 InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.connect(self._joy_event_cb)
         if self._listen_mouse:
-            if not event_listener.mouseEnabled():
-                # hook mouse
-                event_listener.enableMouse()
 
-            gremlin.windows_event_hook.MouseHook().start()
+            # hook the mouse
             mh = gremlin.windows_event_hook.MouseHook()
             mh.register(self._mouse_event_cb)
-            mh.start()
+            
 
+    @property
+    def accepted(self) -> bool:
+        ''' true if the input is accepted'''
+        return self._accepted
 
     def _joy_event_cb(self, event):
         """Passes the pressed joystick event to the provided callback
@@ -2968,6 +2986,7 @@ class InputListenerWidget(QBoxFrame):
                     self.item_selected.emit([key])
                 else:
                     self.item_selected.emit(event)
+                self._accepted = True
                 self._abort_timer.cancel()
                 self.close()
 
@@ -2985,6 +3004,7 @@ class InputListenerWidget(QBoxFrame):
                         self._multi_key_storage.append(key)
                     else:
                         self._multi_key_storage.append(event)
+                    self.keyInput.emit(key) # notify a key was pressed
                 
 
 
@@ -3015,11 +3035,14 @@ class InputListenerWidget(QBoxFrame):
                 # make sure the mouse is not over the buttons
                 pos = QtGui.QCursor.pos()
                 widget = QtWidgets.QApplication.widgetAt(pos)
-                if widget != self.ok_widget and widget != self.cancel_widget:
-                    self._multi_key_storage.append(key)
+                if widget and isinstance(widget, QtWidgets.QPushButton):
+                    return # ignore if click is on the button
+                self._multi_key_storage.append(key)
+                self.keyInput.emit(key) # notify a key was pressed
             else:
                 # not listening to multiple keys
                 self.item_selected.emit([key])
+                self._accepted = True
                 self.close()
 
     def _abort_request(self):
@@ -3039,19 +3062,21 @@ class InputListenerWidget(QBoxFrame):
                 InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.disconnect(self._joy_event_cb)
         if self._listen_mouse:
-            event_listener.mouse_event.disconnect(self._mouse_event_cb)
-
-            # Stop mouse hook in case it is running
+            # unhook mouse
             mh = gremlin.windows_event_hook.MouseHook()
             mh.unregister(self._mouse_event_cb)
-            mh.stop()
+            
 
         # restore highlighting
         gremlin.shared_state.pop_suspend_highlighting()
         gremlin.shared_state.pop_suspend_ui_keyinput()
 
+        self.closed.emit(self._accepted)
+
         # print ("input widget close")
         super().closeEvent(evt)
+
+
 
 
 
@@ -3079,17 +3104,6 @@ def clear_layout(layout):
     :param layout the layout from which to remove all items
     """
     gremlin.util.clear_layout(layout)
-    # while layout.count() > 0:
-    #     child = layout.takeAt(0)
-    #     if child.layout():
-    #         clear_layout(child.layout())
-    #     elif child.widget():
-    #         widget = child.widget()
-    #         if hasattr(widget,"_cleanup_ui"):
-    #             widget._cleanup_ui()
-    #         widget.hide()
-    #         widget.deleteLater()
-    #     layout.removeItem(child)
 
 def get_layout_widgets(layout) -> list:
     ''' returns a list of layout widgets '''
@@ -3911,272 +3925,6 @@ class QPathLineItem(QtWidgets.QWidget):
         self._data = value
 
 
-class ButtonStateWidget(QtWidgets.QWidget):
-    ''' visualizes the state of a button '''
-
-    deleted = QtCore.Signal() # triggers on delete
-
-    def __init__(self, parent = None):
-        super().__init__(parent)
-
-
-        self.setContentsMargins(0,0,0,0)
-        self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.main_layout.setSpacing(0)
-        self.main_layout.setContentsMargins(0,0,0,0)
-        self._deleted = False
-
-        self._icon_size = QtCore.QSize(16,16)
-        self._device_guid = None
-        self._input_id = None
-        self._input_type = None
-        self._button_widget = QtWidgets.QLabel()
-        self._button_widget.setContentsMargins(0,0,0,0)
-        on_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.activeColor())
-        self._on_pixmap = on_icon.pixmap(self._icon_size)
-        off_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.inactiveColor())
-        self._off_pixmap = off_icon.pixmap(self._icon_size)
-        height = self._icon_size.height()+2
-        self._button_widget.setMinimumHeight(height)
-        self._button_widget.setMaximumHeight(height)
-        self._button_widget.setStyleSheet("")
-
-        self._hat_icons = {} # icon hats, keyed by position
-        
-        self.main_layout.addWidget(self._button_widget)
-
-        self._handler_connected = False
-        el = gremlin.event_handler.EventListener()
-        el.tab_selected.connect(self._tab_selected)
-        el.tab_unselected.connect(self._tab_unselected)
-
-        self._hooked = False
-        self._suspended = False
-        
-        
-
-    def _cleanup_ui(self):
-        if not self._deleted:
-            self._deleted = True
-            self.unhookDevice()
-            self.deleted.emit()
-
-
-
-    def hookDevice(self, device_guid, input_type, input_id):
-        ''' hooks the input  '''
-        if self._hooked:
-            return
-        self._hooked = True
-        self._device_guid = device_guid
-        self._input_id = input_id
-        self._input_type = input_type
-        self.updateState()
-        self._tab_selected(device_guid)
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self.process_event)
-
-
-    def process_event(self, event):
-        if not Shiboken.isValid(self):
-            return
-        if self._suspended:
-            return
-        if event.is_axis:
-            return
-        if not gremlin.util.compare_guid(event.device_guid, self._device_guid):
-            return
-        if event.identifier != self._input_id:
-            return
-        state = event.is_pressed
-        gremlin.util.InvokeUiMethod(self._update_value, state)
-
-    
-        
-    def updateState(self):
-        ''' updates the widget state with the cached state  '''
-        if not self._input_type ==InputType.JoystickButton:
-            # not a button device
-            return
-        state = gremlin.joystick_handling.get_button(self._device_guid, self._input_id)
-        if state is not None:
-            gremlin.util.InvokeUiMethod(self._update_value, state)
-        # import gremlin.joystick_handling
-        # tracker = StateTracker()
-        # state = tracker._get_state(self._device_guid, self._input_type, self._input_id)
-        # if state is None:
-        #     # not registered, register it
-        #     tracker.registerButtonState(self, self._device_guid, self._input_type, self._input_id)
-        #     state = gremlin.joystick_handling.get_button(self._device_guid, self._input_id)
-        #     tracker._store_state(self._device_guid, self._input_type, self._input_id, state)
-        # if state is not None:
-        #     self._update_value(state)
-
-    def unhookDevice(self):
-        if not Shiboken.isValid(self):
-            return
-        if not self._hooked:
-            return
-        self._hooked = False
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.disconnect(self.process_event)
-
-
-        # self._tab_unselected(self._device_guid)
-        
- 
-
-    @QtCore.Slot(str)
-    def _tab_selected(self, device_guid):
-        ''' triggered when a tab is selected 
-        
-        :param device_guid: the device selected
-        
-        '''        
-        pass
-        if not gremlin.util.compare_guid(device_guid, self._device_guid):
-            return
-        self._suspended = False
-        # if self._handler_connected:
-        #     # already connected
-        #     return
-        # if self._device_guid:
-        #     # syslog = logging.getLogger("system")
-        #     #device_name = gremlin.shared_state.get_device_name(device_guid)
-        #     if isinstance(device_guid, str):
-        #         device_guid = gremlin.util.parse_guid(device_guid)
-        #     #el = gremlin.event_handler.EventListener()
-        #     if self._device_guid == device_guid:
-        #         # connect the handler
-        #         #input_id = self._input_id
-        #         #syslog.info(f"ButtonState: {device_name} type {InputType.to_display_name(self._input_type)} input {self._input_id} connect")
-        #         _state_tracker.registerButtonState(self, self._device_guid, self._input_type, self._input_id)
-        #         self._handler_connected = True
-
-
-    @property
-    def enabled(self) -> bool:
-        return self._handler_connected
-    
-    @property
-    def input_id(self) -> object:
-        return self._input_id
-    @property
-    def device_guid(self) -> str:
-        return self._device_guid
-    @property
-    def input_type(self) -> InputType:
-        return self._input_type
-
-
-    
-    @QtCore.Slot(str)
-    def _tab_unselected(self, device_guid):
-        ''' triggered when a device tab is deselected, also used to force a disconnect
-         
-        :param device_guid: the device to deselect - if None - deselect all
-          
-        '''
-        if gremlin.util.compare_guid(device_guid, self._device_guid):
-            return
-        self._suspended = True
-
-        # if not self._handler_connected:
-        #     # not connected
-        #     return 
-        # # # syslog = logging.getLogger("system")
-        # # el = gremlin.event_handler.EventListener()
-        # if device_guid:
-        #     if isinstance(device_guid, str):
-        #         device_guid = gremlin.util.parse_guid(device_guid)
-        #     disconnect = self._device_guid == device_guid
-        #     #device_name = gremlin.shared_state.get_device_name(device_guid)
-        # else:
-        #     disconnect = True
-        #     #device_name = 'reset'
-            
-        # if disconnect:
-        #     #input_id = self._input_id
-        #     # syslog.info(f"ButtonState: (unselect) {device_name} button {input_id} disconnect")
-        #     _state_tracker.unregisterButtonState(self._device_guid, self._input_type, self._input_id)
-        #     self._handler_connected = False
-
-
-    def _update_value(self, is_pressed):
-        ''' updates a button position '''
-        
-        if is_pressed:
-            self._button_widget.setPixmap(self._on_pixmap)
-            # syslog.info(f"button {self.input_id} pressed")
-            # self._button_widget.update()
-            #self._button_widget.setText("pressed")
-        else:
-            self._button_widget.setPixmap(self._off_pixmap)
-            # syslog.info(f"button {self.input_id} released")
-            # self._button_widget.update()
-            #self._button_widget.setText(" ")
-        
-
-    def _update_hat(self, position):
-        ''' updates a hat position '''
-        if self._deleted:
-            return
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        if not isinstance(position,tuple):
-            # convert from value to position tuple
-            import vjoy.vjoy
-            position =  vjoy.vjoy.Hat.to_continuous_position[position]
-        position = HatDirection.to_enum(position) 
-        
-        if not position in self._hat_icons:
-            match position:
-                case HatDirection.Center:
-                    png = "hat_ctr_inactive.png"
-                    png_active = "hat_ctr_active.png"
-                case HatDirection.North:
-                    png = f"{prefix}hat_n.png"
-                    png_active = "hat_n_active.png"
-                case HatDirection.NorthEast:
-                    png = f"{prefix}hat_ne.png"
-                    png_active = "hat_ne_active.png"
-                case HatDirection.NorthWest:
-                    png = f"{prefix}hat_nw.png"
-                    png_active = "hat_nw_active.png"
-                case HatDirection.East:
-                    png = f"{prefix}hat_e.png"
-                    png_active = "hat_e_active.png"
-                case HatDirection.South:
-                    png = f"{prefix}hat_s.png"
-                    png_active = "hat_s_active.png"
-                case HatDirection.SouthEast:
-                    png = f"{prefix}hat_se.png"
-                    png_active = "hat_se_active.png"
-                case HatDirection.SouthWest:
-                    png = f"{prefix}hat_sw.png"      
-                    png_active = "hat_sw_active.png"
-                case HatDirection.West:
-                    png = f"{prefix}hat_w.png"  
-                    png_active = "hat_w_active.png"
-            on_pixmap = load_icon(png_active).pixmap(self._icon_size)
-            off_pixmap = load_icon(png).pixmap(self._icon_size)
-            self._hat_icons[position] = (off_pixmap, on_pixmap)
-
-        off_pixmap, on_pixmap = self._hat_icons[position]
-        if position != HatDirection.Center:
-            self._button_widget.setPixmap(on_pixmap)
-        else:
-            self._button_widget.setPixmap(off_pixmap)
-
-
-    def setValue(self, is_pressed):
-        ''' value '''
-        self._update_value(is_pressed)
-
-
-
-
-_widget_cache = []
-
 
 class QProgressBar(QtWidgets.QWidget):
     ''' visualizes a vertical or horizontal progress bar '''
@@ -4379,6 +4127,254 @@ class QProgressBar(QtWidgets.QWidget):
 
         #syslog.info(f"X: {x} y: {y} w: {w} h: {h} v:{v} value: {self._percent:0.3f}")
 
+class ButtonStateWidget(QtWidgets.QWidget):
+    ''' visualizes the state of a button '''
+
+    deleted = QtCore.Signal() # triggers on delete
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+
+
+        self.setContentsMargins(0,0,0,0)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setSpacing(0)
+        self.main_layout.setContentsMargins(0,0,0,0)
+        self._deleted = False
+
+        self._icon_size = QtCore.QSize(16,16)
+        self._device_guid = None
+        self._input_id = None
+        self._input_type = None
+        self._button_widget = QtWidgets.QLabel()
+        self._button_widget.setContentsMargins(0,0,0,0)
+        on_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.activeColor())
+        self._on_pixmap = on_icon.pixmap(self._icon_size)
+        off_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.inactiveColor())
+        self._off_pixmap = off_icon.pixmap(self._icon_size)
+        height = self._icon_size.height()+2
+        self._button_widget.setMinimumHeight(height)
+        self._button_widget.setMaximumHeight(height)
+
+
+        self._last_state_value = None # not set
+
+        self._button_widget.setStyleSheet("")
+
+        self._hat_icons = {} # icon hats, keyed by position
+        
+        self.main_layout.addWidget(self._button_widget)
+
+        self._handler_connected = False
+        el = gremlin.event_handler.EventListener()
+        el.tab_selected.connect(self._tab_selected)
+        el.tab_unselected.connect(self._tab_unselected)
+
+        self._hooked = False
+        self._suspended = False
+
+        config = gremlin.config.Configuration()
+        config.changed.connect(self._config_changed)
+        
+    def _config_changed(self, option, value):
+        ''' called when a configuration option changes '''
+        match option: 
+            case "highlight_input_axis":
+                self._last_state_value = None
+            case "highlight_device":
+                self._last_state_value = None
+
+    def _cleanup_ui(self):
+        if not self._deleted:
+            self._deleted = True
+            self.unhookDevice()
+            self.deleted.emit()
+
+
+
+    def hookDevice(self, device_guid, input_type, input_id):
+        ''' hooks the input  '''
+        if self._hooked:
+            return
+        self._hooked = True
+        self._device_guid = device_guid
+        self._input_id = input_id
+        self._input_type = input_type
+        self._last_state_value = None # reset state
+        self.updateState()
+        self._tab_selected(device_guid)
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self.process_event)
+
+
+
+
+    def process_event(self, event):
+        if not Shiboken.isValid(self):
+            return
+        if self._suspended:
+            return
+        if event.is_axis:
+            return
+        if not gremlin.util.compare_guid(event.device_guid, self._device_guid):
+            return
+        if event.identifier != self._input_id:
+            return
+        state = event.is_pressed
+
+        if self._last_state_value is None or self._last_state_value != state:
+            # changed
+            gremlin.util.InvokeUiMethod(self._update_value, state)
+
+            # only issue a state change on press and if highlighing is enabled
+            if state:
+                config = gremlin.config.Configuration()
+                if config.highlight_enabled and config.highlight_input_buttons:
+                    el = gremlin.event_handler.EventListener()
+                    el.button_state_change.emit(event)
+
+
+    
+        
+    def updateState(self):
+        ''' updates the widget state with the cached state  '''
+        if not self._input_type ==InputType.JoystickButton:
+            # not a button device
+            return
+        state = gremlin.joystick_handling.get_button(self._device_guid, self._input_id)
+        if state is not None:
+            self._update_value(state)
+
+
+    def unhookDevice(self):
+        if not Shiboken.isValid(self):
+            return
+        if not self._hooked:
+            return
+        self._hooked = False
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.disconnect(self.process_event)
+
+
+        # self._tab_unselected(self._device_guid)
+        
+ 
+
+    @QtCore.Slot(str)
+    def _tab_selected(self, device_guid):
+        ''' triggered when a tab is selected 
+        
+        :param device_guid: the device selected
+        
+        '''        
+        pass
+        if not gremlin.util.compare_guid(device_guid, self._device_guid):
+            return
+        self._suspended = False
+
+
+
+    @property
+    def enabled(self) -> bool:
+        return self._handler_connected
+    
+    @property
+    def input_id(self) -> object:
+        return self._input_id
+    @property
+    def device_guid(self) -> str:
+        return self._device_guid
+    @property
+    def input_type(self) -> InputType:
+        return self._input_type
+
+
+    
+    @QtCore.Slot(str)
+    def _tab_unselected(self, device_guid):
+        ''' triggered when a device tab is deselected, also used to force a disconnect
+         
+        :param device_guid: the device to deselect - if None - deselect all
+          
+        '''
+        if gremlin.util.compare_guid(device_guid, self._device_guid):
+            return
+        self._suspended = True
+
+    def _update_value(self, is_pressed):
+        ''' updates a button position '''
+        
+        if self._last_state_value is None or self._last_state_value != is_pressed:
+
+            gremlin.util.InvokeUiMethod(self._update_pixmap_ui, is_pressed)
+
+            self._last_state_value = is_pressed
+              
+
+    def _update_pixmap_ui(self, state):
+        # updates the visual, on UI thread
+        if state:
+            self._button_widget.setPixmap(self._on_pixmap)
+        else:
+            self._button_widget.setPixmap(self._off_pixmap)
+
+    def _update_hat(self, position):
+        ''' updates a hat position '''
+        if self._deleted:
+            return
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        if not isinstance(position,tuple):
+            # convert from value to position tuple
+            import vjoy.vjoy
+            position =  vjoy.vjoy.Hat.to_continuous_position[position]
+        position = HatDirection.to_enum(position) 
+        
+        if not position in self._hat_icons:
+            match position:
+                case HatDirection.Center:
+                    png = "hat_ctr_inactive.png"
+                    png_active = "hat_ctr_active.png"
+                case HatDirection.North:
+                    png = f"{prefix}hat_n.png"
+                    png_active = "hat_n_active.png"
+                case HatDirection.NorthEast:
+                    png = f"{prefix}hat_ne.png"
+                    png_active = "hat_ne_active.png"
+                case HatDirection.NorthWest:
+                    png = f"{prefix}hat_nw.png"
+                    png_active = "hat_nw_active.png"
+                case HatDirection.East:
+                    png = f"{prefix}hat_e.png"
+                    png_active = "hat_e_active.png"
+                case HatDirection.South:
+                    png = f"{prefix}hat_s.png"
+                    png_active = "hat_s_active.png"
+                case HatDirection.SouthEast:
+                    png = f"{prefix}hat_se.png"
+                    png_active = "hat_se_active.png"
+                case HatDirection.SouthWest:
+                    png = f"{prefix}hat_sw.png"      
+                    png_active = "hat_sw_active.png"
+                case HatDirection.West:
+                    png = f"{prefix}hat_w.png"  
+                    png_active = "hat_w_active.png"
+            on_pixmap = load_icon(png_active).pixmap(self._icon_size)
+            off_pixmap = load_icon(png).pixmap(self._icon_size)
+            self._hat_icons[position] = (off_pixmap, on_pixmap)
+
+        off_pixmap, on_pixmap = self._hat_icons[position]
+        if position != HatDirection.Center:
+            self._button_widget.setPixmap(on_pixmap)
+        else:
+            self._button_widget.setPixmap(off_pixmap)
+
+
+    def setValue(self, is_pressed):
+        ''' value '''
+        self._update_value(is_pressed)
+
+
+
 class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
     ''' input axis visualizer '''
 
@@ -4409,6 +4405,8 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         self._scale_factor = 1000
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.device = device
+        self.setObjectName("state_repeater")
+        self._is_state = True # indicate this is a state widget
         
 
         self.container_widget = QtWidgets.QWidget()
@@ -4486,6 +4484,9 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
         self._setValue(self._value)
 
+
+        css = Color.cssRepeater()
+        self.setStyleSheet(css)
         self.installEventFilter(self)
 
     def eventFilter(self, widget, event):
@@ -4916,7 +4917,10 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
         self._update_widgets()
 
+        
         self.valueChanged.emit(self._value, self._curve_value)
+
+           
 
 
     def value(self):
@@ -5850,6 +5854,7 @@ class ButtonState(QtWidgets.QGroupBox):
 
         self._event_times = {}
         self._device = device
+        self.setObjectName("state_repeater")
 
         is_disabled = True
         if device.is_virtual:
@@ -5857,6 +5862,9 @@ class ButtonState(QtWidgets.QGroupBox):
             is_disabled = False
         else:
             self.setTitle(f"{device.name} - Buttons")
+
+        css = Color.cssRepeater()
+        self.setStyleSheet(css)
 
         css = Color.cssButtonState()
         self.buttons = [None]
@@ -5877,6 +5885,7 @@ class ButtonState(QtWidgets.QGroupBox):
             button_layout.addWidget(btn, int(i / 10), int(i % 10))
         button_layout.setColumnStretch(10, 1)
         self.setLayout(button_layout)
+
 
     
         

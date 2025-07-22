@@ -219,7 +219,16 @@ class MidiInputItem(AbstractInputItem):
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
 
-
+    @property
+    def is_valid(self) -> bool:
+        ''' true if the input is configured (controls the visibility of the repeater)'''
+        valid =  bool(self._message)
+        return valid
+    
+    @property
+    def is_status(self) -> bool:
+        ''' true if the input has status information to display'''
+        return False
     
 
     @property
@@ -776,6 +785,10 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         :param identifier - the input item identifier 
         '''
         super().__init__(self.__class__.__name__, parent = parent)
+
+
+        gremlin.shared_state.push_suspend_highlighting() # prevent device change while editing this data
+
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Midi Input Mapper")
@@ -981,6 +994,8 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self.port_name = self._midi_port_selector_widget.currentText()
         self.channel = self._midi_channel_selector_widget.value()
         self._update_message()
+
+
 
     def _update_display(self):
         command = self.command
@@ -1253,10 +1268,12 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _ok_button_cb(self):
         ''' ok button pressed '''
+        gremlin.shared_state.pop_suspend_highlighting()
         self.accept()
         
     def _cancel_button_cb(self):
         ''' cancel button pressed '''
+        gremlin.shared_state.pop_suspend_highlighting()
         self.reject()        
 
     def _listen_port_cb(self):

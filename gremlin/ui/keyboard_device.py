@@ -257,7 +257,7 @@ class KeyboardInputItem(AbstractInputItem):
         self._message_key = message_key
     
         is_latched = self._key.is_latched
-        self._title_name = f"Key input {'(latched)'if is_latched else ''}"
+        self._title_name = f"Key/Mouse input {'(latched)'if is_latched else ''}"
 
         self._display_name = self._key.latched_name
         self._description = self.key.latched_code
@@ -696,7 +696,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.enable_edit()
 
         self._update_input_widget(widget, widget.parent)
-        #widget.setMaximumHeight(100)
+        
 
         return widget
     
@@ -731,6 +731,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=QtGui.QColor(warning_color))
                 
         input_widget.setStatus(status_text, icon)
+        
 
  
    

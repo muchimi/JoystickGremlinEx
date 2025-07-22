@@ -20,9 +20,11 @@ from collections.abc import MutableSequence
 from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
 
+import gremlin.config
 import gremlin.shared_state
+import logging
 
-
+syslog = logging.getLogger("system")
 
 
 class TraceableList(MutableSequence):
@@ -419,6 +421,8 @@ class JoystickHook:
         self._hook_enabled = True # hook updates by default
         self._hook_value = 0.0 # current value
         self._hook_calibrated_value = 0.0 # current calibrated value
+        self._is_state = False # true if the hook is attached to axis state widget
+        self._last_state_value = None # value for the last highlight event trigger
         el = gremlin.event_handler.EventListener()
         el.ui_ready.connect(self._hook_ui_ready)
         self._input_id = None
@@ -427,7 +431,17 @@ class JoystickHook:
         self._calibrate = True # calibrate the data by default, false = do not apply calibration
 
 
-    
+        config = gremlin.config.Configuration()
+        config.changed.connect(self._config_changed)
+
+
+    def _config_changed(self, option, value):
+        ''' called when a configuration option changes '''
+        match option: 
+            case "highlight_input_axis":
+                self._last_state_value = None
+            case "highlight_device":
+                self._last_state_value = None
 
 
     @property
@@ -507,12 +521,15 @@ class JoystickHook:
         if self._callback:
             if not event.is_axis:
                 return 
-            if self._device_guid != event.device_guid:
-                return
             if self._input_type != event.event_type:
                 return
-            if self._input_id != event.identifier:
+            if self._device_guid != event.device_guid:
+                self._last_state_value = None # different axis moved
                 return
+            if self._input_id != event.identifier:
+                self._last_state_value = None # different axis moved
+                return
+            
             
 
             self._hook_value = event.value
@@ -529,6 +546,20 @@ class JoystickHook:
             if should_process:
                 self._callback(self._hook_value, self._hook_calibrated_value)
             
+            if self._is_state:
+                # see if we should trigger a highlight change
+                config = gremlin.config.Configuration()
+                if config.highlight_input_axis and config.highlight_enabled:
+                    # ensure highlighting is enabled
+                    
+                    trigger = self._last_state_value is None or abs(self._last_state_value - event.value) > 0.2
+                    #device = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
+                    #syslog.info(f"Device: {device.name} axis: {self._input_id} value: {event.value:0.3f} last value: {self._last_state_value}  trigger: {trigger}")
+                    if trigger:
+                        self._last_state_value = event.value
+                        el = gremlin.event_handler.EventListener()
+                        el.axis_state_change.emit(event)
+
 
 
     def unhookDevice(self):
@@ -599,14 +630,16 @@ class JoystickHook:
         if self._hooked:
             self._is_hardware_input = gremlin.joystick_handling.is_hardware_device(self.device_guid)
             if self._input_type in (InputType.OpenSoundControl, InputType.Midi):
-                self._hook_value = self.input_id.axis_value
+                raw_value = self.input_id.axis_value
+                self._hook_value = raw_value
             elif self._is_hardware_input:
-                self._hook_value = gremlin.joystick_handling.get_axis(self.device_guid, self.input_id)
+                raw_value = gremlin.joystick_handling.get_axis(self.device_guid, self.input_id)
+                self._hook_value = raw_value
             
             if self._calibrate:
                 # apply calibration
                 calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
-                self._hook_value = calibration.getValue(self._hook_value)
+                self._hook_value = calibration.getValue(raw_value)
 
             if self._callback:
                 self._callback(self._hook_value, self._hook_calibrated_value)

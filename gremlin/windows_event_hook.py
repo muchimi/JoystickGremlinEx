@@ -474,13 +474,19 @@ class MouseHook:
         :param callback the new callback to register
         """
         global g_mouse_callbacks
-        g_mouse_callbacks.append(callback)
+        if callback and not callback in g_mouse_callbacks:
+            g_mouse_callbacks.append(callback)
+            self.start() # start listen if needed
 
     def unregister(self, callback):
         ''' removes a mouse callback '''
         global g_mouse_callbacks
         if callback in g_mouse_callbacks:
             g_mouse_callbacks.remove(callback)
+
+        if not callback:
+            # no more callbacks, stop the hook
+            self.stop() 
 
     def start(self):
         """Starts the hook if it is not yet running."""

@@ -1694,7 +1694,6 @@ class OscServer():
     def _server_thread_loop(self):
         ''' main threading loop '''
         
-        #syslog.info("OSC: server starting")
         self._dispatcher = OscDispatcher()
         self._dispatcher.set_default_handler(self._callback)
         self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
@@ -1754,6 +1753,10 @@ class OscServer():
         
         '''
 
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        if not callback:
+            return # don't start unless there's a callback provided
+
         with self._lock:
             # everything here is now locked until the server start is completed
 
@@ -1772,7 +1775,7 @@ class OscServer():
             self._running = True
 
             # syslog = logging.getLogger("system")
-            syslog.info(f"OSC: start {self._host_ip} port {self._input_port}")        
+            syslog.info(f"OSC: server start {self._host_ip} port {self._input_port}")        
 
 
 
@@ -1785,6 +1788,7 @@ class OscServer():
         self._stop = True
         if self._server:
             self._server.shutdown()
+            time.sleep(0.1)
         self._server_thread.join()
         self._server_thread = None
         self._running = False
@@ -1843,6 +1847,8 @@ class OscInterface(QtCore.QObject):
         if self._output_port is None:
             self._output_port = 8001 # default
 
+        if verbose: syslog.info(f"OSC: input port: {self._input_port}")
+
         self._target_ip = config.osc_host
         self._target_port = config.osc_output_port
         self._osc_server = OscServer() # the OSC server
@@ -1850,6 +1856,7 @@ class OscInterface(QtCore.QObject):
         self._client_pool = {} # pool of clients keyed by (ip,port)
         self._osc_internal_client = None
         self._osc_client = self.getClient(self._target_ip, self._target_port) # the default OSC client setup in the configuration file
+        if verbose: syslog.info(f"OSC: output IP: {self._target_ip} port: {self._output_port}")
 
         el = gremlin.event_handler.EventListener()
         el.request_osc.connect(self._request_osc_state)
@@ -2049,6 +2056,7 @@ class OscInterface(QtCore.QObject):
 
         if not self._started:
             syslog.info(f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
+            self._osc_server.stop() # stop server if started - this resets the message handler for the server and listen ip/port
             self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
             self.startClients()
             self._started = True
@@ -2140,6 +2148,17 @@ class OscInputItem(AbstractInputItem):
     @profile_mode.setter
     def profile_mode(self, value):
         self._profile_mode = value        
+
+    @property
+    def is_valid(self) -> bool:
+        ''' true if the input is configured (controls the visibility of the repeater)'''
+        valid =  bool(self._message)
+        return valid
+    
+    @property
+    def is_status(self) -> bool:
+        ''' true if the input has status information to display'''
+        return False
 
     def getOverrideInputType(self):
         match self._mode:
@@ -2534,6 +2553,8 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         """
         super().__init__(parent)
 
+        # Disable ui input selection on joystick input
+        gremlin.shared_state.push_suspend_highlighting()
 
         # setup and listen for the osc message
         self._interface = OscInterface()
@@ -2559,8 +2580,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)
 
-        # Disable ui input selection on joystick input
-        gremlin.shared_state.push_suspend_highlighting()
+        
 
         cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel_cb)
 
@@ -2628,6 +2648,10 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         
         super().__init__(self.__class__.__name__,parent = parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
+
+        # Disable ui input selection on joystick input
+        gremlin.shared_state.push_suspend_highlighting()
+
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("OSC Input Mapper")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -3132,11 +3156,13 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _ok_button_cb(self):
         ''' ok button pressed '''
+        gremlin.shared_state.pop_suspend_highlighting()
         self._update_message() # update data from UI
         self.accept()
         
     def _cancel_button_cb(self):
         ''' cancel button pressed '''
+        gremlin.shared_state.pop_suspend_highlighting()
         self.reject()        
     
 
@@ -3544,7 +3570,6 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if not self.input_item_list_model.rows():
             # display blank page if no item left
             self._blank_input()
-
         
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
@@ -3650,6 +3675,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         input_widget.setStatus(status_text, icon)
 
+
     def _populate_input_widget_ui(self, input_widget, container_widget, data):
         ''' called when a button is created for custom content '''
         layout = QtWidgets.QVBoxLayout(container_widget)
@@ -3663,6 +3689,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called when the edit button is clicked  '''
         self._edit_dialog = OscInputConfigDialog(self.current_mode, index, data, self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
+        self._edit_dialog.rejected.connect(self._dialog_rejected_cb)
         gremlin.util.centerDialog(self._edit_dialog)
         self._edit_dialog.showNormal()
         self._index = index
@@ -3697,7 +3724,10 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         input_item._update() # refresh other properties
         self.input_item_list_view.update_item(index)
-        
+
+    def _dialog_rejected_cb(self):
+        index = self._edit_dialog.index
+        self.input_item_list_view.update_item(index)
 
     def _index_for_key(self, input_id):
         ''' returns the index of the selected input id'''

@@ -43,6 +43,9 @@ class QKeyWidget(QtWidgets.QPushButton):
         super().__init__(text= text, parent = parent)
         self._key = None
         self._selected = False
+        self._readOnly = False
+        self._border_radius = 8 # border size in pixels
+
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
         #self.clicked.connect(self._clicked)
         self._auto_release = False
@@ -60,8 +63,27 @@ class QKeyWidget(QtWidgets.QPushButton):
         self.shifted_key = None # what to display when shifted
         self._auto_size = False
 
+
         self.installEventFilter(self)
         self._update_style()
+
+    def setBorderRadius(self, radius: int):
+        if radius < 2:
+            radius = 2
+        self._border_radius = radius
+        gremlin.util.InvokeUiMethod(self._update_style)
+
+    def readOnly(self) -> bool:
+        ''' true if the button is in readonly mode - if enabled, disables hover and selection and mouse clicks '''
+        return self._readOnly
+    
+    def setReadOnly(self, value : bool):
+        if value != self._readOnly:
+            self._readOnly = value
+            if not value:
+                # mark deselected if in readonly mode
+                self.selected = False
+
 
     @property
     def desiredHeight(self) -> int:
@@ -85,6 +107,8 @@ class QKeyWidget(QtWidgets.QPushButton):
         return self._auto_release_delay
     
 
+
+
     def _update_style(self):
         Color = gremlin.ui.ui_common.Color
         foreground_color = Color.keyForegroundColor()
@@ -94,22 +118,23 @@ class QKeyWidget(QtWidgets.QPushButton):
         hover_border = Color.keyHoverBorderColor()
         hover_background_color = Color.keyHoverBackgroundColor()
         hover_selected_background_color = Color.keyHoverSelectedBackgroundColor()
+        radius = self._border_radius
 
         h = self._max_height
         w = self._min_width
 
         if self._auto_size:
-            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"    
+            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border};  background-color: {hover_selected_background_color};}}"    
         else:
-            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
         if self._key_size == 1:
             default_style = self._default_style
@@ -203,19 +228,27 @@ class QKeyWidget(QtWidgets.QPushButton):
 
   
     def eventFilter(self, widget, event):
+        ''' mouse event filter '''
         t = event.type()
-        if t == QtCore.QEvent.Type.HoverEnter:
-            self.hover.emit(self, True)
-        elif t == QtCore.QEvent.Type.HoverLeave:
-            self.hover.emit(self, False)
+        if not self._readOnly:
+            if t == QtCore.QEvent.Type.HoverEnter:
+                self.hover.emit(self, True)
+            elif t == QtCore.QEvent.Type.HoverLeave:
+                self.hover.emit(self, False)
+            elif t == QtCore.QEvent.Type.MouseButtonPress:
+                return True # eat the event
+            
 
         return False # super().eventFilter(widget, event)
     
     @property
     def display_name(self):
         ''' friendly key name'''
+
         if self._key:
-            return self._key.name + " " + self._key.latched_code
+            return gremlin.keyboard.KeyMap.get_description(self._key, True)
+            # return self._key.
+            # return self._key.name + " " + self._key.latched_code
         return ""
         
 
@@ -709,6 +742,10 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         :param allow_modifiers - if set - modifier keys along with regular keys are allowed
         '''
         super().__init__(parent = parent)
+
+        # Disable ui input selection on joystick input
+        gremlin.shared_state.push_suspend_highlighting()
+
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Keyboard & Mouse Input Mapper")
@@ -719,11 +756,14 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self._display_shifted = False
         self._solo_select = False
         
+        
 
         self._modifier_keys = gremlin.keyboard.KeyMap._keyboard_modifiers
 
         self._key_map = {} # map of (scancode, extended) to keys  (scancode, extended) -> key
         self._key_widget_map = {} # map of keys to widgets  key -> widget
+        self._current_keys = [] # used to save the current selection on new input
+        self._keys = [] # list of keys selected
         self.keyboard_widget = self._get_keyboard_widget() # populate the two maps 
         self.mouse_widget = self._get_mouse_widget()
         self.media_widget = self._get_media_widget()
@@ -796,11 +836,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         self.setLayout(main_layout)
 
-        self._set_sequence(sequence)      
-
-    def closeEvent(self, event):
-        self.closed.emit()
-        super().closeEvent(event)
+        self._set_keyboard_state(sequence)      
 
     @property
     def latched_key(self):
@@ -813,7 +849,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         return self._keys
 
 
-    def _set_sequence(self, sequence):
+    def _set_keyboard_state(self, sequence):
         ''' loads a given key sequence into the virtual keyboard '''
         
         if sequence:
@@ -859,6 +895,16 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                     # log the fact we didn't find the key in the keyboard dialog
                     syslog.warning(f"Keyboard: unable to find {item} in dialog keyboard")
 
+    def _get_keyboard_state(self) -> list[Key]:
+        ''' gets a list of selected keys as a list '''
+        selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+        keys = []
+        for widget in selected_widgets:
+            key = widget.key.duplicate()
+            keys.append(key)
+        return keys
+                
+
     def _force_numlock_cb(self, checked):
         gremlin.shared_state.current_profile.set_force_numlock(checked)
 
@@ -877,7 +923,12 @@ class InputKeyboardDialog(QtWidgets.QDialog):
             multi_keys=True # allow key combinations
         )
 
+        # save the current state
+        self._current_keys = self._get_keyboard_state() 
+
         self.button_press_dialog.item_selected.connect(self._add_keyboard_listener_key_cb)
+        self.button_press_dialog.closed.connect(self._handle_close)
+        #self.closed.connect(self._handle_close)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -885,14 +936,17 @@ class InputKeyboardDialog(QtWidgets.QDialog):
             root = root.parent()
         geom = root.geometry()
 
+        w = 300
+        h = 150
         self.button_press_dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
+            int(geom.x() + geom.width() / 2 - w/2),
+            int(geom.y() + geom.height() / 2 - h/2), 
+            w,
+            h
         )
 
         self.button_press_dialog.show()
+
 
     @QtCore.Slot()
     def _size_changed(self):
@@ -926,7 +980,18 @@ class InputKeyboardDialog(QtWidgets.QDialog):
             data = [key]
 
         # the new entry will be a new index
-        self._set_sequence(data)
+        self._set_keyboard_state(data)
+
+
+    def _handle_close(self, accepted):
+        if accepted:
+            # data is ok
+            self._do_close()
+
+    def _do_close(self):
+        gremlin.shared_state.pop_suspend_highlighting()
+        self.close()
+                    
 
 
     def keyPressEvent(self, event):
@@ -974,30 +1039,31 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         ''' ok button pressed '''
         
         
-        selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
-        keys = []
-        for widget in selected_widgets:
-            key = widget.key.duplicate()
-            keys.append(key)
-            # print (f"returning key: {key} ")
+        # selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+        # keys = []
+        # for widget in selected_widgets:
+        #     key = widget.key.duplicate()
+        #     keys.append(key)
+        #     # print (f"returning key: {key} ")
 
         # returned keys
+        keys = self._get_keyboard_state()
         self._keys = keys
-
         return_key = gremlin.keyboard.KeyMap.get_latched_key(keys)
         
         # print (f"Return key: {return_key}")
         self._latched_key = return_key
         
-
+        gremlin.shared_state.pop_suspend_highlighting()
         self.accept()
-        self.close()
+        self._do_close()
         
 
     def _cancel_button_cb(self):
         ''' cancel button pressed '''
+        gremlin.shared_state.pop_suspend_highlighting()
         self.reject()
-        self.close()
+        self._do_close()
 
     def _clear_button_cb(self):
         ''' clear button pressed - clear all entries  '''

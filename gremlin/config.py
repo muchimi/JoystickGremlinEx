@@ -734,7 +734,6 @@ class Configuration(QtCore.QObject):
             self._data["highlight_switch"] = value
             self.save()
 
-
     @property
     def highlight_input_axis(self):
         """Returns whether or not to highlight inputs for an axis
@@ -759,6 +758,9 @@ class Configuration(QtCore.QObject):
         if value != self.highlight_input_axis:
             self._data["highlight_input_axis"] = value
             self.save()
+            # indicate axis highlighting was changed
+            self.changed.emit("highlight_input_axis", value)
+            
 
 
     @property
@@ -785,7 +787,7 @@ class Configuration(QtCore.QObject):
         if value != self.highlight_input_buttons:
             self._data["highlight_input_buttons"] = value
             self.save()
-
+            self.changed.emit("highlight_input_buttons", value)
 
 
 
@@ -813,6 +815,7 @@ class Configuration(QtCore.QObject):
         if value != self.highlight_enabled:
             self._data["highlight_device"] = value
             self.save()
+            self.changed.emit("highlight_device", value)
             el = gremlin.event_handler.EventListener()
             el.config_option_changed.emit()
 

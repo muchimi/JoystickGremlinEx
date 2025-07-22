@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T33)
+- Improved: UI look and feel, UI element layouts and consistency.
+- Improved: API low level mouse handling behavior change.
+- Fix: OSC UDP server ignores reset request.
+- Fix: general UI interaction/navigation fixes
+
+
 ### (m76T32)
 - Fix: input viewer keyboard/state selector synchronization with other actions
 - Fix: keyboard/mouse listener closes on keyboard input (broken with the last update)

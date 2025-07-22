@@ -221,6 +221,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.devices.tabContextMenu.connect(self._tab_context_menu_cb)
 
         self._last_input_item = None # last selected input item
+        self._last_state_device_guid = None
+        self._last_state_input_id = None
+        self._last_state_data = {} # holds data for axis highlight switching
 
 
         gremlin.shared_state.application_version =gremlin.version.APPLICATION_VERSION
@@ -634,27 +637,42 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _axis_state_change(self, event):
         ''' axis changed - triggered only at design time '''
 
-
-        # avoid input spamming
-        if self._last_input_timestamp + self._input_delay > time.time():
-            # delay not occured yet
+        if not self.is_axis_highlighting:
+            # highlight disabled - reset tracking 
+            self._last_state_device_guid = None
+            self._last_state_input_id = None
+            self._last_state_data = {}
             return
         
 
-
-        self._last_input_timestamp = time.time()
-        if gremlin.shared_state.is_highlighting_suspended():
-            return
-        
-        is_axis = self.is_axis_highlighting
-        if not is_axis:
-            # highlight disabled
-            return
         device_guid = event.device_guid
         input_type = event.event_type
         input_id = event.identifier
         value = event.value
+
+
         
+        if self._last_state_input_id == device_guid and self._last_state_input_id == input_id:
+            # same device as last selected, ignore
+            return 
+        
+        # to avoid instant triggers - compare deviation from last value for that specific axis
+        # this avoids a small change on a new axis from triggering a change
+        if not device_guid in self._last_state_data:
+            self._last_state_data[device_guid] = {}
+        if not input_id in self._last_state_data[device_guid]:
+            self._last_state_data[device_guid][input_id] = None
+
+        self._last_state_device = device_guid
+        self._last_state_input_id = input_id
+
+        if self._last_state_data[device_guid][input_id] is not None:
+            last_value = self._last_state_data[device_guid][input_id]
+            if abs(last_value - value) <= 0.2:
+                return # insufficient deviation to trigger
+            
+        
+
         tab_switch_needed = self._tabswitch_needed(device_guid)
         is_tabswitch_enabled = self.config.highlight_autoswitch
         input_switch_needed = tab_switch_needed or self._inputswitch_needed(device_guid, input_id)
@@ -666,22 +684,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         if not input_switch_needed:
             return
-        
-        # check for axis deviation
-        if not device_guid in self._joystick_axis_highlight_map:
-            self._joystick_axis_highlight_map[device_guid] = {}
-        if not input_id in self._joystick_axis_highlight_map[device_guid]:
-            self._joystick_axis_highlight_map[device_guid][input_id] = value
-            deviation = 2.0
-        else:
-            deviation = abs(self._joystick_axis_highlight_map[device_guid][input_id] - value)
+     
+        # trigger - record last value
+        self._last_state_data[device_guid][input_id] = value
 
-        if deviation < self._joystick_axis_highlight_deviation:
-            # deviation insufficient to trigger a tab switch
-            return
-        
-        # trigger switch
-        self._select_input_handler(device_guid, input_type, input_id)
+        # trigger highlight switch
+        self._select_input_handler(device_guid, input_type, input_id, force_switch=True)
 
     @QtCore.Slot(int)
     def _tab_selected(self, index):
@@ -1919,24 +1927,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             return self._widget_device_index_map[device_guid]
         return None
 
-
-
-
-        # for widget in self._widget_cache.values():
-        #     # cleanup widgets
-        #     if hasattr(widget, "_cleanup_ui"):
-        #         widget._cleanup_ui()
-        #         widget.setParent(None)
-        # self._widget_cache.clear()
-        #gremlin.shared_state.device_widget_map = {}
-        
-
     def clearWidgets(self):
         ''' clears the device cache'''
-        # self._current_tab_widget = None # remove reference to tab widget
-        #gremlin.util.clear_layout(self.ui.tab_content_layout)
-        # tracker = gremlin.ui.ui_common.WidgetTracker()
-        # tracker.clearRegisteredWidgets()
         tracker = gremlin.ui.ui_common.StateTracker()
         tracker.clear()
         self.unregisterAllWidgets()
@@ -2731,7 +2723,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # update status nar
         self._update_mode_status_bar()
         # startup setups
-        el.toggle_highlight.emit(self.is_autoswitch_highlighting, self.is_axis_highlighting, self.is_button_highlighting)
+        el.toggle_highlight.emit(self.is_highligthing_enabled, self.is_axis_highlighting, self.is_button_highlighting)
 
 
 
@@ -2880,11 +2872,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # syslog = logging.getLogger("system")
         input_id = restore_input_id
         input_type = restore_input_type
-
-        switch_tabs = False # true if tabs switched
+        
         switch_input = force_switch # true if inputs are switched or forcing refresh
 
-        switch_enabled = self.is_autoswitch_highlighting
+        switch_enabled = self.is_highligthing_enabled
         if not force_switch and gremlin.util.compare_guid(gremlin.shared_state.current_tab_device_guid,device_guid) and not switch_enabled:
             if verbose:
                 syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)")
@@ -2933,6 +2924,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
             # guid of current device tab
+            switch_tabs = False
             index = self._find_tab_index(device_guid)
             if not gremlin.util.compare_guid(current_device_guid, device_guid) or index is None: # device changed or not found
                 # change tab if not on the correct device tab
@@ -2971,6 +2963,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if verbose: syslog.info(f"Tab change complete: device {str(device_guid)}")
                 switch_tabs = True # we are switching tabs
                 switch_input = True # we are switching inputs
+
+
+            if switch_tabs and not force_switch and not config.highlight_autoswitch:
+                if verbose: syslog.info("Tab change ignored: auto tab switching is disabled")
 
 
             if input_id is None:
@@ -4595,13 +4591,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         return self.config.highlight_input_axis or is_control or self._axis_highlighting_enabled
     
     @property
-    def is_autoswitch_highlighting(self) -> bool:
+    def is_highligthing_enabled(self) -> bool:
         ''' true if tab switch highlighting is enabled '''
         if gremlin.shared_state.is_highlighting_suspended():
             # skip if highlighting is currently suspended
             return False
         
-        return self.config.highlight_autoswitch
+        return self.config.highlight_enabled
+    
 
     def push_highlighting(self):
         ''' disables the highlighting of devices '''

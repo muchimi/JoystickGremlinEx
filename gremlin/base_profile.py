@@ -1914,7 +1914,7 @@ class InputItem():
 
             elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
                 if isinstance(input_id, gremlin.keyboard.Key):
-                    self._input_name = key_from_code(input_id.scan_code, input_id.is_extended).name
+                    self._input_name =  key_from_code(input_id.scan_code, input_id.is_extended).name
                 elif isinstance(input_id, gremlin.ui.keyboard_device.KeyboardInputItem):
                     self._input_name = input_id.display_name
                 else:
