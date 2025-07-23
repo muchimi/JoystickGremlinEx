@@ -1304,13 +1304,13 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
             self.osc_client.start()
             self.valid = True
         else:
-            syslog.error(f"OSC SEND: invalid target IP: {self.action_data.server_ip}")
+            syslog.error(f"OSC SEND: invalid target IP: {self.server_ip}")
             self.valid = False
             return
 
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if verbose:
-            syslog.info(f"OSC SEND: target: {self.action_data.server_ip} port: {self.action_data.server_port}")
+            syslog.info(f"OSC SEND: target: {self.server_ip} port: {self.server_port}")
 
     def profile_stop(self):
         if self.osc_client is not None:
