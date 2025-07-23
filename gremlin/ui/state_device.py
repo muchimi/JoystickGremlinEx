@@ -328,6 +328,7 @@ class StateInputItem(AbstractInputItem):
 
         self._input_item = item
 
+
     def clone(self):
         ''' clones the input item (gives it a new ID)'''
         return StateInputItem(self.key, self.default_value, self.description, self.isExpression, self.expression)

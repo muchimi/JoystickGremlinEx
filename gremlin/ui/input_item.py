@@ -1599,7 +1599,7 @@ class InputItemWidget(QBoxFrame):
     @property
     def content_layout(self):
         ''' gets the the content row '''
-        return self._container_content_layout
+        return self._custom_container_layout
     
     def _getIconSize(self) -> int:
         return 24

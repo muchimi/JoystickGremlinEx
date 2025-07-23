@@ -412,13 +412,24 @@ class KeyboardHook:
 
     def stop(self):
         """Stops the hook from running."""
-        syslog.info("KEYBOARD: shutdown")
+        syslog.info("KBD: stop")
         if self._running:
             self._running = False
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
             self._listen_thread.join()
             # Recreate thread so we can launch it again
             self._listen_thread = threading.Thread(target=self._listen, daemon=False)
+
+
+    def shutdown(self):
+        ''' requests a shutdown '''
+        self.stop()
+
+        syslog.info("KBD: shutdown")
+        if self._listen_thread:
+            if self._listen_thread.is_alive():
+                self._listen_thread.join()
+            self._listen_thread = None
 
     def _listen(self):
         """Configures the hook and starts listening."""
@@ -467,6 +478,12 @@ class MouseHook:
             _mouse_wheel_timer[button_id] = None
 
         _mouse_wheel_delay = gremlin.config.Configuration().mouse_wheel_autorelease_delay
+
+        # get mouse swap setting from Windows
+        SM_SWAPBUTTON = 23
+        self._is_swapped =  ctypes.windll.user32.GetSystemMetrics(SM_SWAPBUTTON) != 0
+        
+
 
     def register(self, callback):
         """Registers a new message callback.
@@ -519,7 +536,7 @@ class MouseHook:
         ''' requests a shutdown '''
         self.stop()
 
-        syslog.info("MOUSE HOOK: shutdown")
+        syslog.info("MOUSE: shutdown")
         if self._listen_thread:
             if self._listen_thread.is_alive():
                 self._listen_thread.join()
@@ -554,5 +571,10 @@ class MouseHook:
                 raise ctypes.WinError(get_last_error())
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
+
+    @property            
+    def is_swapped(self) -> bool:
+        ''' true if right button is button 1 on windows '''
+        return self._is_swapped
             
 _mouse_hook = MouseHook()

@@ -203,6 +203,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         gremlin.util.assert_ui_thread()
 
         widget = gremlin.ui.virtual_keyboard.QKeyWidget()
+        widget.key = key
         icon = gremlin.keyboard.KeyMap.icon(key)
         name = gremlin.keyboard.KeyMap.get_name(key)
         tooltip = gremlin.keyboard.KeyMap.get_description(key)
@@ -214,7 +215,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             widget.setToolTip(tooltip)
         widget.keySize = 2
         widget.autoSize = True
-        
+        widget.right_clicked.connect(self._handle_key_context)
         index = len(self.keys)
         self.key_combination_layout.insertWidget(index, widget)
         if not self.keys:
@@ -222,8 +223,30 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.key_map[key] = widget # remember keys created
         self.keys.append(key)
+        
 
-            
+    def _handle_key_context(self, widget):
+        gremlin.util.InvokeUiMethod(self._handle_key_context_ui, widget)
+
+    def _handle_key_context_ui(self, widget):
+        ''' handle right click '''
+        from functools import partial
+        actionDelete = QtGui.QAction("Delete", self)
+        actionDelete.triggered.connect(partial(self._delete_key, widget))
+        menu = QtWidgets.QMenu(self)
+        menu.addAction(actionDelete)
+        menu.exec_(QtGui.QCursor.pos())
+
+    def _delete_key(self, widget):
+        ''' called on context menu delete key '''
+        # action: QtGui.QAction = self.sender()
+        # widget : gremlin.ui.virtual_keyboard.QKeyWidget = action.data()
+        key = widget.key
+        self.keys.remove(key)
+        self.action_data.keys.remove(key)
+        self._populate_ui()
+
+
     def _update_keys(self, keys):
         gremlin.util.InvokeUiMethod(self._update_keys_ui, keys)
 
@@ -284,6 +307,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _handle_key_input_ui(self, key : gremlin.keyboard.Key):
         # handles an input key on the UI thread
+        if not self.keys:
+            gremlin.util.clear_layout(self.key_combination_layout) # clear the prior message
         if not key in self.keys:
             self._add_key(key)
         
@@ -386,7 +411,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' occurs when the listen dialog closes, passes the close state'''
         if accepted:
             ''' accept all the keys '''
-            keys = self.key_map.values()
+            keys = self.keys
         else:
             keys = self.action_data.keys
 
@@ -893,6 +918,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
             self.autorepeat_delay = safe_read(node, "interval", int, 250) # pulse interval milliseconds
 
         for child in node.findall("key"):
+            key = None
             virtual_code = safe_read(child, "virtual-code", int, 0)
             if virtual_code > 0:
                 key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)

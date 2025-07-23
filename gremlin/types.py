@@ -877,9 +877,9 @@ class MouseButton(IntEnum):
 
 
 _MouseButton_to_string_lookup = {
-    MouseButton.Left: "Mouse Left",
-    MouseButton.Right: "Mouse Right",
-    MouseButton.Middle: "Mouse Middle",
+    MouseButton.Left: "Mouse 1",
+    MouseButton.Right: "Mouse 2",
+    MouseButton.Middle: "Mouse 3",
     MouseButton.Forward: "Mouse Forward",
     MouseButton.Back: "Mouse Back",
     MouseButton.WheelUp: "Wheel Up",

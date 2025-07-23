@@ -814,6 +814,16 @@ class MacroAbstractAction(QtCore.QObject):
     def data(self, value):
         self._data = value
 
+    def __getstate__(self):
+        state = {}
+        state['id'] = self.id
+        return state
+
+    def __setstate__(self, state):
+        self.id = state['id']
+
+
+
     def __call__(self, is_local = True, is_remote = False, force_remote = False):
         raise gremlin.error.MissingImplementationError(
             "AbstractAction.__call__ not implemented in derived class."
@@ -851,6 +861,25 @@ class JoystickAction(MacroAbstractAction):
         self.input_id = input_id
         self.value = value
         self.axis_type = axis_type
+
+    def __getstate__(self):
+        ''' serialize '''
+        state = super().__getstate__()
+        state['device_guid'] = self.device_guid
+        state['input_type'] = self.input_type
+        state['input_id'] = self.input_id
+        state['axis_type'] = self.axis_type
+        state['value'] = self.value
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        super().__setstate__(state)
+        self.device_guid = state['device_guid']
+        self.input_type = state['input_type']
+        self.input_id = state['input_id']
+        self.axis_type = state['axis_type']
+        self.value = state['value']
         
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
@@ -923,6 +952,23 @@ class KeyAction(MacroAbstractAction):
             else:
                 _send_key_up(self.key, is_local, is_remote, force_remote)
 
+    def __getstate__(self):
+        ''' serialize '''
+        state = super().__getstate__()
+        state['extended'] = self.key.is_extended
+        state['scancode'] = self.key.scan_code
+        state['is_pressed'] = self.is_pressed
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        super().__setstate__(state)
+        is_extended = state['extended']
+        scan_code = state['scancode']
+        self.key = gremlin.keyboard.KeyMap.from_message_key(scan_code, is_extended)
+        self.is_pressed = state['is_pressed']
+
+
     def __str__(self):
         if self.key:
             return f"KeyAction: {self.key.debug_name}"
@@ -946,6 +992,20 @@ class MouseButtonAction(MacroAbstractAction):
 
         self.button = button
         self.is_pressed = is_pressed
+
+
+    def __getstate__(self):
+        ''' serialize '''
+        state = super().__getstate__()
+        state['button'] = self.button
+        state['is_pressed'] = self.is_pressed
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        super().__setstate__(state)
+        self.button = state['button']
+        self.is_pressed = state['is_pressed']
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
@@ -991,6 +1051,19 @@ class MouseMotionAction(MacroAbstractAction):
         self.dx = int(dx)
         self.dy = int(dy)
 
+    def __getstate__(self):
+        ''' serialize '''
+        state = super().__getstate__()
+        state['dx'] = self.dx
+        state['dy'] = self.dy
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        super().__setstate__(state)
+        self.dx = state['dx']
+        self.dy = state['dy']
+
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
         # syslog = logging.getLogger("system")
@@ -1006,6 +1079,7 @@ class ProcessEventsAction(MacroAbstractAction):
     ''' process event action - allows queued events to complete '''
     def __init__(self):
         super().__init__()
+
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         verbose = gremlin.config.Configuration().verbose_mode_macro
         if verbose: syslog.info("MACRO: Process Events")
@@ -1024,6 +1098,22 @@ class PauseAction(MacroAbstractAction):
         self.duration = duration
         self.duration_max = duration_max
         self.is_random = is_random
+
+    def __getstate__(self):
+        ''' serialize '''
+        state = super().__getstate__()
+        state['duration'] = self.duration
+        state['duration_max'] = self.duration_max
+        state['is_random'] = self.is_random
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        super().__setstate__(state)
+        self.duration = state['duration']
+        self.duration_max = state['duration_max']
+        self.is_random = state['is_random']
+
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         import random
@@ -1064,6 +1154,7 @@ class GraphAction(MacroAbstractAction):
         el = gremlin.event_handler.EventListener()
         el.profile_stop.connect(self._profile_stop)
         self._complete_event = Event()
+
 
     @QtCore.Slot()
     def _profile_stop(self):
@@ -1117,6 +1208,26 @@ class VJoyMacroAction(MacroAbstractAction):
         self.value = value
         self.axis_type = axis_type
 
+        
+    def __getstate__(self):
+        ''' serialize '''
+        state = super().__getstate__()
+        state['vjoy_id'] = self.vjoy_id
+        state['input_type'] = self.input_type
+        state['input_id'] = self.input_id
+        state['axis_type'] = self.axis_type
+        state['value'] = self.value
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        super().__setstate__(state)
+        self.vjoy_id = state['vjoy_id']
+        self.input_type = state['input_type']
+        self.input_id = state['input_id']
+        self.axis_type = state['axis_type']
+        self.value = state['value']
+
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
         verbose = gremlin.config.Configuration().verbose_mode_macro
@@ -1159,6 +1270,19 @@ class RemoteControlAction(MacroAbstractAction):
         super().__init__()
         self.command =  gremlin.input_devices.VjoyAction.VJoyEnableRemoteOnly
 
+    def __getstate__(self):
+        ''' serialize '''
+        state = super().__getstate__()
+        state['command'] = self.command
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        super().__setstate__(state)
+        self.command = state['command']
+        
+    
+
     def __call__(self, is_local = True, is_remote = False, force_remote= False):
         ''' execute the mode change '''
         verbose = gremlin.config.Configuration().verbose_mode_macro
@@ -1177,6 +1301,28 @@ class StateAction(MacroAbstractAction):
         self.value = None
         sd = gremlin.ui.state_device.StateData()
         sd.crud.connect(self._data_changed)
+
+    def __getstate__(self):
+        ''' serialize '''
+        
+        state = super().__getstate__()
+        #state['state'] = self._state
+        state['state_id'] = self._state_id
+        state['register_check'] = self._register_check
+        state['value'] = self.value
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        import gremlin.ui.state_device
+        super().__setstate__(state)
+        #self._state  = state['state']
+        self._state_id =  state['state_id']
+        self._register_check = state['register_check']
+        self.value = state['value']        
+        sd = gremlin.ui.state_device.StateData()
+        self._state = sd.getStateById(self._state_id)
+        # sd.crud.connect(self._data_changed)
 
     @property
     def key(self):

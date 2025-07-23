@@ -53,6 +53,8 @@ from psygnal import Signal
 
 
 
+
+
 syslog = logging.getLogger("system")
 
 
@@ -630,6 +632,7 @@ class EventListener(QtCore.QObject):
 	@QtCore.Slot()
 	def _shutdown_handler(self):
 		''' terminate threads '''
+		import gremlin.windows_event_hook
 		if self._keep_alive_thread:
 			self._keep_alive_event.set()
 			self._keep_alive_thread.join()
@@ -639,6 +642,14 @@ class EventListener(QtCore.QObject):
 			self._run_event.set()
 			self._run_thread.join()
 			self._run_thread = None
+
+		# shutdown keyboard hook if enabled
+		kh = gremlin.windows_event_hook.KeyboardHook()
+		kh.shutdown()
+
+		# shutdown mouse hook if enabled
+		mh = gremlin.windows_event_hook.MouseHook()
+		mh.shutdown()
 
 	@property
 	def calibrationManager(self):
@@ -905,7 +916,6 @@ class EventListener(QtCore.QObject):
 		syslog.info("EVENT: shutdown requested")
 		gremlin.shared_state.terminating = True # tell UI we're terminating to avoid uncessary updates if we're shutting down
 		self._running = False
-		self.keyboard_hook.stop()
 		self.disableMouse()
 		
 

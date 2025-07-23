@@ -153,9 +153,10 @@ class MacroListModel(QtCore.QAbstractListModel):
                 display = f"Remote control: {VjoyAction.to_name(entry.command)}"
             elif isinstance(entry, gremlin.macro.StateAction):
                 if gremlin.config.Configuration().show_container_id:
-                    display = f"Set state [{entry.key}] [{entry.state.id}] {'On' if entry.value else 'Off'}"    
-                else:
-                    display = f"Set state [{entry.key}] {'On' if entry.value else 'Off'}"
+                    if entry.state:
+                        display = f"Set state [{entry.state.key}] [{entry.state.id}] {'On' if entry.value else 'Off'}"    
+                    else:
+                        display = f"Set state [...] {'On' if entry.value else 'Off'}"
             else:
                 raise gremlin.error.GremlinError("Unknown macro action")
             
@@ -267,6 +268,7 @@ class MacroListModel(QtCore.QAbstractListModel):
         :param entry the new entry object to store
         :param index the index at which to store the entry
         """
+        from functools import partial
         if not 0 <= index < len(self._data):
             syslog.error(
                 "Attempted to set an entry with index greater "
@@ -278,10 +280,12 @@ class MacroListModel(QtCore.QAbstractListModel):
             old_entry = self._data[index]
             old_entry.changed.disconnect(self._data_changed)
         self._data[index] = entry
-        entry.changed.connect(self._data_changed)
+        entry.changed.connect(partial(self._data_changed, index, entry))
 
-    def _data_changed(self):
-        self.dataChanged.emit()
+    def _data_changed(self, index, entry):
+        # changed # dataChanged(QModelIndex,QModelIndex,QList<int>); dataChanged(QModelIndex,QModelIndex)
+        qindex = self.createIndex(index,0, index)
+        self.dataChanged.emit(qindex, qindex)
 
 
 

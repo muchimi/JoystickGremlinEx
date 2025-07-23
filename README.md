@@ -17,8 +17,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 ### (m76T33)
 - Improved: UI look and feel, UI element layouts and consistency.
 - Improved: API low level mouse handling behavior change.
-- Fix: OSC UDP server ignores reset request.
+- Improved: Listen box (multi) displays last selected keyboard or mouse input
+- Fix: OSC UDP server ignores reset requests
 - Fix: general UI interaction/navigation fixes
+- Fix: macro action serialization issue impacting copy/paste
 
 
 ### (m76T32)

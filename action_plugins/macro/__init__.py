@@ -41,6 +41,7 @@ import gremlin.config
 import gremlin.macro_handler
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -814,12 +815,6 @@ class MacroActionEditor(QtWidgets.QWidget):
         widget = self.sender()
         action, value = widget.data
         action.value = value
-        # rb_on = self.ui_elements["state_press"]
-        # rb_off = self.ui_elements["state_release"]
-        # with QtCore.QSignalBlocker(rb_on):
-        #     rb_on.setChecked(value)
-        # with QtCore.QSignalBlocker(rb_off):
-        #     rb_off.setChecked(not value)
         self._update_model()
 
     def populate_state_selector(self, action):
@@ -828,21 +823,22 @@ class MacroActionEditor(QtWidgets.QWidget):
         with QtCore.QSignalBlocker(self.state_selector):
             self.state_selector.clear()
             sd = gremlin.ui.state_device.StateData()
-            for key, data in sd.getStates().items():
-                self.state_selector.addItem(key, (action, data))
-
-            key = action.key
-            if key:
-                index = self.state_selector.findText(key)
-                if index >= 0:
-                    self.state_selector.setCurrentIndex(index)
-            else:
-                # pick the first as the default
-                action.key = self.state_selector.currentText()
-            
-            if self.state_selector.count():
-                action, data = self.state_selector.currentData()
-                self.setStateDescription(data.description)
+            items = sd.getStates().items()
+            if items:
+                for key, state in items:
+                    self.state_selector.addItem(key, (action, state))
+                state = action.state
+                key = action.state.key if state else None
+                if key:
+                    index = self.state_selector.findText(key)
+                    if index >= 0:
+                        self.state_selector.setCurrentIndex(index)
+                else:
+                    _, action.state = self.state_selector.currentData()
+                    
+                if self.state_selector.count():
+                    action, state = self.state_selector.currentData()
+                    self.setStateDescription(state.description)
 
     def setStateDescription(self, value):
         self.state_description_widget.setText(value if value else "n/a")
@@ -1558,14 +1554,15 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         """Populate the UI with content from the data."""
-        self.model = gremlin.macro_handler.MacroListModel(self.action_data.sequence)
-        input_type = self._get_input_type()
-        execution_mode_visible = input_type != InputType.JoystickAxis
-        self.execute_container_widget.setVisible(execution_mode_visible)
-        self.list_view.setModel(None)
-        self.list_view.setModel(self.model)
-        self.list_view.setCurrentIndex(self.model.index(0, 0))
-        self._edit_action(self.model.index(0, 0))
+        if Shiboken.isValid(self.execute_container_widget) and Shiboken.isValid(self.list_view):
+            self.model = gremlin.macro_handler.MacroListModel(self.action_data.sequence)
+            input_type = self._get_input_type()
+            execution_mode_visible = input_type != InputType.JoystickAxis
+            self.execute_container_widget.setVisible(execution_mode_visible)
+            self.list_view.setModel(None)
+            self.list_view.setModel(self.model)
+            self.list_view.setCurrentIndex(self.model.index(0, 0))
+            self._edit_action(self.model.index(0, 0))
 
     def _edit_action(self, model_index):
         """Enable editing of the current action via a editor widget.
@@ -1742,6 +1739,11 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _duplicate_entry(self):
+        ''' duplicate '''
+        gremlin.util.InvokeUiMethod(self._duplicate_entry_ui) # on UI thread
+
+    def _duplicate_entry_ui(self):
+        ''' duplicates an entry (on UI thread)'''
         import copy
         actions = []
         selected_indices = []

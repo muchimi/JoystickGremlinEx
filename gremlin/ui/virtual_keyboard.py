@@ -36,6 +36,8 @@ class QKeyWidget(QtWidgets.QPushButton):
     
     key_clicked = Signal()
 
+    right_clicked = Signal(object) # occurs on button right click (sends itself as the parameter)
+
 
 
     ''' custom key label '''
@@ -236,7 +238,12 @@ class QKeyWidget(QtWidgets.QPushButton):
             elif t == QtCore.QEvent.Type.HoverLeave:
                 self.hover.emit(self, False)
             elif t == QtCore.QEvent.Type.MouseButtonPress:
+                button = event.buttons()
+                if button == QtCore.Qt.RightButton:
+                    # fire a right click
+                    self.right_clicked.emit(self)
                 return True # eat the event
+            
             
 
         return False # super().eventFilter(widget, event)
@@ -782,7 +789,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self.clear_widget.clicked.connect(self._clear_button_cb)
         self.clear_widget.setToolTip("Clears the selection")
 
-        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb)
+        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(label="Listen (multi)", callback = self._listen_cb)
         
 
         widgets = [gremlin.ui.ui_common.QDataRadioButton("Small",1),

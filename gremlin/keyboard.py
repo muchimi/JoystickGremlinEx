@@ -160,7 +160,19 @@ class Key():
         if is_mouse:
             mouse_button = scan_code - 0x1000
             if mouse_button > 0x100:
-                mouse_button -= 0x100 # convert double click
+                b = mouse_button - 0x100
+                match b:
+                    case 1:
+                        mouse_button = MouseButton.DoubleLeft
+                    case 2:
+                        mouse_button = MouseButton.DoubleRight
+                    case 3:
+                        mouse_button = MouseButton.DoubleMiddle
+                    case _:
+                        syslog.error(f"Don't know how to handle mouse scan code: 0x{mouse_button:x}")
+                        mouse_button = MouseButton.DoubleLeft
+
+                
             self._mouse_button = mouse_button
 
 
@@ -980,8 +992,15 @@ class KeyMap:
             syslog.error(f"KEY: error: invalid event: {ex}")
         syslog.error("KEY: invalid event")
         return None
-
     
+    @staticmethod
+    def from_message_key(scan_code, is_extended):
+        ''' returns a key from the message key (used in pickle ops) '''
+    
+        key = KeyMap.find(scan_code, is_extended)
+        if key is None:
+            syslog.error(f"KEY: Don't know how to message_key: 0x{scan_code:02X} ({scan_code}) extended: {extended}")
+        return key
      
     @staticmethod
     def scan_code_to_virtual_code(scan_code, is_extended):
@@ -1110,9 +1129,9 @@ class KeyMap:
         "wheel_down": "Mouse Wheel Down",
         "wheel_left": "Mouse Wheel Left",
         "wheel_right": "Mouse Wheel Right",
-        "mouse_d_1" : "Left Doubleclick (1)",
-        "mouse_d_2" : "Right Doubleclick (2)",
-        "mouse_d_3" : "Middle Doubleclick (3)",
+        "mouse_d_1" : "Left Dclick (1)",
+        "mouse_d_2" : "Right Dclick (2)",
+        "mouse_d_3" : "Middle Dclick (3)",
         "mediaprevtrack": "Previous Track",
         "mediaplay" : "Play",
         "medianexttrack": "Next Track",
