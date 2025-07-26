@@ -22,9 +22,11 @@ import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.ui_common
+import gremlin.util
 import psygnal
 from psygnal import Signal
 from gremlin.ui.qdatawidget import QDataWidget
+from shiboken6 import Shiboken
 class ProfileSettingsWidget(QDataWidget):
 
     """Widget allowing changing profile specific settings."""
@@ -90,6 +92,8 @@ class ProfileSettingsWidget(QDataWidget):
     def _create_ui(self):
         """Creates the UI elements of this widget."""
         # Default start mode selection
+
+        from functools import partial
         self.scroll_layout.addWidget(DefaultModeSelector(self.profile_settings))
 
         # Default macro delay
@@ -101,6 +105,18 @@ class ProfileSettingsWidget(QDataWidget):
         vjoy_as_input_widget.changed.connect(self.vjoy_as_input_changed)
 
         # vJoy axis initialization value setup
+        widget = QtWidgets.QGroupBox(f"Profile Start Initial Values")
+        box_layout = QtWidgets.QHBoxLayout()
+        widget.setLayout(box_layout)
+
+        grid_widget, grid_layout = gremlin.ui.ui_common.getGridContainer()
+        max_col = 5
+        row = 0
+        col = 0
+
+        box_layout.addWidget(grid_widget)
+        box_layout.addStretch()
+
         for dev in sorted(gremlin.joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id):
             # Only show devices that are not treated as inputs
             if not dev.connected:
@@ -109,12 +125,19 @@ class ProfileSettingsWidget(QDataWidget):
             if self.profile_settings.vjoy_as_input.get(dev.vjoy_id) is True:
                 continue
 
-            widget = QtWidgets.QGroupBox(f"{dev.name} #{dev.vjoy_id} - Profile Start Initial Values")
-            box_layout = QtWidgets.QVBoxLayout()
-            widget.setLayout(box_layout)
-            box_layout.addWidget(VJoyAxisDefaultsWidget(dev, self.profile_settings))
+
+            dialog_widget = gremlin.ui.ui_common.Buttons.getEditWidget(callback = partial(self._edit_dialog, dev), label = f"Edit {dev.name} #{dev.vjoy_id}")
+            grid_layout.addWidget(dialog_widget, row, col)
+            col +=1
+            if col == max_col:
+                row+=1
+                col = 0
 
             self.scroll_layout.addWidget(widget)
+
+        grid_layout.addWidget(QtWidgets.QWidget(), 0, max_col)
+        grid_layout.setColumnStretch(max_col, 2)
+        
 
         self.scroll_layout.addStretch(1)
 
@@ -129,6 +152,17 @@ class ProfileSettingsWidget(QDataWidget):
         label.setFrameShape(QtWidgets.QFrame.Box)
         label.setMargin(10)
         self.scroll_layout.addWidget(label)
+
+    def _edit_dialog(self, device):
+        self.dialog = VjoyDefaultsDialog(device, self.profile_settings)
+        self.dialog.accepted.connect(self._accept_edit)
+        self.dialog.rejected.connect(self._reject_edit)
+        self.dialog.show()
+
+    def _accept_edit(self):
+        pass
+    def _reject_edit(self):
+        pass
 
 
 class DefaultDelay(QtWidgets.QGroupBox):
@@ -218,6 +252,95 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
         gremlin.shared_state.current_profile.set_start_mode(mode)
 
 
+class VjoyDefaultsDialog(gremlin.ui.ui_common.QRememberDialog):
+
+    def __init__(self, device, settings, parent=None):
+        super().__init__(self.__class__.__name__,parent = parent)
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+        self.setWindowTitle(f"VJoy {device.vjoy_id} Profile Default Editor")
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self._parent = parent # list view
+
+
+        self.axis_widget = VJoyAxisDefaultsWidget(device, settings)
+        self.axis_widget.from_profile(gremlin.shared_state.current_profile)
+
+
+        self.button_widget = VJoyButtonsDefaultsWidget(device, settings)
+        self.button_widget.from_profile(gremlin.shared_state.current_profile) # load current data
+
+
+
+        # create axis tab
+        self.tab_widget = QtWidgets.QTabWidget()
+        self.tab_widget.addTab(self.axis_widget, "Axis Default")
+        self.tab_widget.addTab(self.button_widget, "Button Default")
+
+        self.device = device
+        main_layout.addWidget(self.tab_widget)
+
+        self.ok_widget = QtWidgets.QPushButton("Ok")
+        self.ok_widget.clicked.connect(self._ok_button_cb)
+
+        self.cancel_widget = QtWidgets.QPushButton("Cancel")
+        self.cancel_widget.clicked.connect(self._cancel_button_cb)
+
+        widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
+        
+        main_layout.addWidget(widget)
+
+             
+    def _ok_button_cb(self):
+        ''' ok button pressed '''
+        profile = gremlin.shared_state.current_profile
+        # save the data to the profile
+        self.axis_widget.to_profile(profile)
+        self.button_widget.to_profile(profile)
+        self.accept()   
+
+    def _cancel_button_cb(self):
+        ''' cancel button pressed '''
+        self.reject()        
+
+
+class VJoyButtonsDefaultsWidget(QtWidgets.QWidget):
+
+    """UI widget allowing modification of button initialization values."""
+
+    def __init__(self, device, settings, parent=None):
+        super().__init__(parent)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.grid_widget = gremlin.ui.ui_common.QButtonGrid(device)
+        self.main_layout.addWidget(self.grid_widget)
+
+
+        on_widget = QtWidgets.QPushButton("All On")
+        on_widget.setToolTip("Sets all buttons to off")
+        on_widget.clicked.connect(self._all_on)
+        off_widget = QtWidgets.QPushButton("All Off")
+        off_widget.setToolTip("Sets all buttons to off")
+        off_widget.clicked.connect(self._all_off)
+        
+        button_container_widget, _ = gremlin.ui.ui_common.getHContainer([on_widget, off_widget], left_stretch=True)
+        self.main_layout.addWidget(button_container_widget)
+        
+
+    def _all_on(self):
+        self.grid_widget.all_on()
+
+    def _all_off(self):
+        self.grid_widget.all_off()
+
+    def from_profile(self, profile):
+        ''' load data from the current profile '''
+        self.grid_widget.from_profile(gremlin.shared_state.current_profile)
+
+    def to_profile(self, profile):
+        ''' save data to the current profile'''
+        self.grid_widget.to_profile(gremlin.shared_state.current_profile)
+
+
 class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
 
     """UI widget allowing modification of axis initialization values."""
@@ -230,18 +353,157 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         :param parent the parent of this widget
         """
         super().__init__(parent)
+        import dinput
 
         assert device.is_virtual and device.vjoy_id > 0,"Device provided is not a VJOY device"
-        self.device = device
+        self.device : dinput.DeviceSummary = device
+        self._device_guid = device.device_guid
+        self._device_id = device.device_id
+        self._axis_count = device.axis_count
         
         self.settings = settings
-        self.main_layout = QtWidgets.QGridLayout(self)
-        self.main_layout.setColumnMinimumWidth(0, 100)
-        self.main_layout.setColumnStretch(2, 1)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+
+        self.grid_layout = QtWidgets.QGridLayout(self)
+        self.grid_layout.setColumnMinimumWidth(0, 100)
+        self.grid_layout.setColumnStretch(2, 1)
+        self._state = {}  # map of [axis: int] to float 
+        self._enabled_state = {} # map of [axi: int] to bool, true if the widget is enabled
+
+        self._grid_widgets = {} # map of [axis: int] to floatinput widget
+        self._grid_enabled = {} # map of [axis: int] to enabled widget
 
         self._spin_boxes = []
 
+        self.main_layout.addLayout(self.grid_layout)
+
+
         self._create_ui()
+
+
+        # helper commands 
+
+        enabled_widget = QtWidgets.QPushButton("All Enabled")
+        enabled_widget.setToolTip("Sets all axes to enabled")
+        enabled_widget.clicked.connect(self._all_enabled)
+
+        disabled_widget = QtWidgets.QPushButton("All Disabled")
+        disabled_widget.setToolTip("Sets all axes to disabled")
+        disabled_widget.clicked.connect(self._all_disabled)
+
+        min_widget =  QtWidgets.QPushButton("All Min")
+        min_widget.setToolTip("Sets all axes to minimum")
+        min_widget.clicked.connect(self._all_min)
+
+        max_widget =  QtWidgets.QPushButton("All Max")
+        max_widget.setToolTip("Sets all axes to maximum")
+        max_widget.clicked.connect(self._all_max)
+
+        zero_widget = QtWidgets.QPushButton("All Center")
+        zero_widget.setToolTip("Sets all axes to center")
+        zero_widget.clicked.connect(self._all_zero)
+
+
+        widgets = [enabled_widget, 
+                   disabled_widget,
+                   " ",
+                   min_widget,
+                   zero_widget,
+                   max_widget]  
+
+        button_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True)
+        self.main_layout.addWidget(button_container_widget)
+
+    def _all_enabled(self):
+        gremlin.util.InvokeUiMethod(self._all_enabled_ui)
+
+    def _all_enabled_ui(self):
+        for widget in self._grid_enabled.values():
+            if Shiboken.isValid(widget):
+                with QtCore.QSignalBlocker(widget):
+                    widget.setChecked(True)
+                    id = widget.data
+                    self._enabled_state[id] = True
+
+    def _all_disabled(self):
+        gremlin.util.InvokeUiMethod(self._all_disabled_ui)
+
+    def _all_disabled_ui(self):
+        for widget in self._grid_enabled.values():
+            if Shiboken.isValid(widget):
+                with QtCore.QSignalBlocker(widget):
+                    widget.setChecked(False)
+                    id = widget.data
+                    self._enabled_state[id] = False
+
+    def _all_min(self):
+        gremlin.util.InvokeUiMethod(self._all_min_ui)
+
+    def _all_min_ui(self):
+        for widget in self._grid_widgets.values():
+            if Shiboken.isValid(widget):
+                with QtCore.QSignalBlocker(widget):
+                    widget.setValue(-1.0)
+                    id = widget.data
+                    self._state[id] = -1.0
+
+    def _all_max(self):
+        gremlin.util.InvokeUiMethod(self._all_max_ui)
+
+    def _all_max_ui(self):
+        for widget in self._grid_widgets.values():
+            if Shiboken.isValid(widget):
+                with QtCore.QSignalBlocker(widget):
+                    widget.setValue(1.0)
+                    id = widget.data
+                    self._state[id] = 1.0
+
+    def _all_zero(self):
+        gremlin.util.InvokeUiMethod(self._all_zero_ui)
+
+    def _all_zero_ui(self):
+        for widget in self._grid_widgets.values():
+            if Shiboken.isValid(widget):
+                with QtCore.QSignalBlocker(widget):
+                    widget.setValue(0.0)
+                    id = widget.data
+                    self._state[id] = 0.0
+
+
+        
+
+    def from_profile(self, profile):
+        ''' reads the data from the current profile '''
+        if not self.device:
+            return
+        self._state.clear()
+        for id in range(1, self._axis_count + 1):
+            value = profile.getStartAxisValue(self._device_id, id)
+            if value is None:
+                value = 0.0
+            self._state[id] = value
+            enabled = profile.getStartAxisEnabled(self._device_id, id)
+            if enabled is not None:
+                self._enabled_state[id] = enabled
+        self._populate_grid()
+
+    def to_profile(self, profile):
+        ''' saves the data to the current profile '''
+        if not self.device:
+            return
+        for id in range(1, self._axis_count + 1):
+            if id in self._state:
+                value = self._state[id]
+            else:
+                value = 0.0 # default 
+            profile.setStartAxisValue(self._device_id, id, value)        
+            if id in self._enabled_state:
+                enabled = self._enabled_state[id]
+            else:
+                enabled = False
+            profile.setStartAxisEnabled(self._device_id, id, enabled)
 
     def _create_ui(self):
         """Creates the UI elements."""
@@ -249,18 +511,29 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         self._spin_boxes.clear()
         row = 0
         vjoy_id = self.device.vjoy_id
+
+        self._state.clear()
+        self._grid_widgets.clear()
+        self._grid_enabled.clear()
+        gremlin.util.clear_layout(self.grid_layout)
         for input_id in self.device.axis_index_list():
             axis_name = self.device.get_axis_name(input_id)
-            self.main_layout.addWidget(QtWidgets.QLabel(axis_name), row, 0)
+            self.grid_layout.addWidget(QtWidgets.QLabel(axis_name), row, 0)
             frame = gremlin.ui.ui_common.QBoxFrame()
             frame.setStyleSheet(f"border: 2px solid {gremlin.ui.ui_common.Color.selectColor()};")
             frame.setLayout(QtWidgets.QHBoxLayout())
 
             box = gremlin.ui.ui_common.QFloatLineEdit()
             box.setRange(-1, 1)
-            box.setValue(self.settings.get_initial_vjoy_axis_value(self.device.vjoy_id, input_id))
+            value = self.settings.get_initial_vjoy_axis_value(self.device.vjoy_id, input_id)
+            box.setValue(value)
+            box.data = input_id
             box.valueChanged.connect(self._create_value_cb(input_id))
             self._spin_boxes.append(box)
+
+            self._state[input_id] = value
+            self._grid_widgets[input_id] = box
+            
 
             frame.layout().addWidget(box)
 
@@ -269,6 +542,8 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             enabled_widget.data = input_id
             enabled_widget.setChecked(is_enabled)
             enabled_widget.clicked.connect(self._enabled_changed)
+
+            self._grid_enabled[input_id] = enabled_widget
             
 
             presets = [-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1]
@@ -282,20 +557,40 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
                 widget.setToolTip(f"Sets to {value:0.3f}")
                 widget.clicked.connect(self._handle_preset)
                 container_layout.addWidget(widget)
+                
+
             container_layout.addStretch()
 
-            self.main_layout.addWidget(frame, row, 1)
-            self.main_layout.addWidget(container_widget, row, 2)
+            self.grid_layout.addWidget(frame, row, 1)
+            self.grid_layout.addWidget(container_widget, row, 2)
             row += 1
-        self.main_layout.addWidget(QtWidgets.QWidget(), 0, 3)
-        self.main_layout.setColumnStretch(3,2)
+        self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 3)
+        self.grid_layout.setColumnStretch(3,2)
         vjoy_proxy.reset()
+
+    def _populate_grid(self):
+        ''' reload data into the widgets '''
+        gremlin.util.InvokeUiMethod(self._populate_grid_ui)
+
+    def _populate_grid_ui(self):
+        ''' updates the usage grid based on current VJOY mappings '''
+        for id in self._state:
+            if Shiboken.isValid(self._grid_widgets[id]):
+                with QtCore.QSignalBlocker(self._grid_widgets[id]):
+                    self._grid_widgets[id].setValue(self._state[id])
+            if Shiboken.isValid(self._grid_enabled[id]):
+                with QtCore.QSignalBlocker(self._grid_enabled[id]):
+                    self._grid_enabled[id].setChecked(self._enabled_state[id])
+
+        
+
 
     @QtCore.Slot(bool)
     def _enabled_changed(self, checked):
         widget = self.sender()
         input_id = widget.data
-        self.settings.set_vjoy_axis_enabled(self.device.vjoy_id, input_id)
+        # self.settings.set_vjoy_axis_enabled(self.device.vjoy_id, input_id)
+        self._enabled_state[input_id] = checked
 
     @QtCore.Slot()
     def _handle_preset(self):
@@ -303,7 +598,38 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         index, x = widget.data
         self._spin_boxes[index].setValue(x)
         
+    def getValue(self, id : int) -> float:
+        ''' gets the axis value '''
+        if id in self._state:
+            return self._state[id]
+        return None
+    
+    def setValue(self, id : int, value : float):
+        ''' sets the value of the axis '''
+        gremlin.util.InvokeUiMethod(self._setValue_ui, id, value)
+    
+    def _setValue_ui(self, id : int, value : float):
+        ''' sets the value of the axis - runs on UI thread '''
+        if id in self._grid_widgets and Shiboken.isValid(self._grid_widgets[id]):
+            self._grid_widgets[id].setValue(value)
+            self._state[id] = value
 
+    def getEnabled(self, id : int) -> bool:
+        if id in self._enabled_state:
+            return self._enabled_state[id]
+        return None
+    
+    def setEnabled(self, id: int, value : bool):
+        ''' sets the enabled state on the axis '''
+        gremlin.util.InvokeUiMethod(self._setEnabled_ui, id, value)
+    
+    def _setEnabled_ui(self, id: int, value : bool):
+        ''' sets enabled flag on widget - runs on ui thread'''
+        self._enabled_state[id] = value
+        if id in self._grid_enabled and Shiboken.isValid(self._grid_enabled[id]):
+            with QtCore.QSignalBlocker(self._grid_enabled[id]):
+                self._grid_enabled[id].setChecked(value)
+                self._enabled_state[id] = value
 
     def _create_value_cb(self, axis_id):
         """Creates a callback function which updates axis values.
@@ -319,11 +645,14 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         :param axis_id id of the axis to update
         :param value the value to update the axis to
         """
-        self.settings.set_initial_vjoy_axis_value(
-            self.device.vjoy_id,
-            axis_id,
-            value
-        )
+
+        self._state[axis_id] = value
+
+        # self.settings.set_initial_vjoy_axis_value(
+        #     self.device.vjoy_id,
+        #     axis_id,
+        #     value
+        # )
 
 
 class VJoyAsInputWidget(QtWidgets.QGroupBox):

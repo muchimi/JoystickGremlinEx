@@ -161,6 +161,9 @@ class ProfileRootNode(ProfileBaseNode):
         # Parse each device 
         self.devices = {} 
         for child in node.iter("device"):
+            if not "type" in child.attrib:
+                # not a device node we are looking for
+                continue
 
             device_node = ProfileDeviceNode(parent = self)
             device_node.from_xml(child, data)

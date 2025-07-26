@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T34)
+- Improved: vjoy profile start value refactor. The settings tab can now set axis and button start values for VJOY devices on profile start.
+- Fix: various.
+
 ### (m76T33)
 - Improved: UI look and feel, UI element layouts and consistency.
 - Improved: API low level mouse handling behavior change.

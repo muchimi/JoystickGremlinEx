@@ -152,11 +152,13 @@ class MacroListModel(QtCore.QAbstractListModel):
             elif isinstance(entry, gremlin.macro.RemoteControlAction):
                 display = f"Remote control: {VjoyAction.to_name(entry.command)}"
             elif isinstance(entry, gremlin.macro.StateAction):
-                if gremlin.config.Configuration().show_container_id:
-                    if entry.state:
-                        display = f"Set state [{entry.state.key}] [{entry.state.id}] {'On' if entry.value else 'Off'}"    
+                if entry.state:
+                    if gremlin.config.Configuration().show_container_id:
+                        display = f"Set state [{entry.state.key}] [{entry.state.id}] {f'Press/On' if entry.value else 'Release/Off'}"    
                     else:
-                        display = f"Set state [...] {'On' if entry.value else 'Off'}"
+                        display = f"Set state [...] {'Press/On' if entry.value else 'Release/Off'}"
+                else:
+                    display = "Set State (no state data found)"
             else:
                 raise gremlin.error.GremlinError("Unknown macro action")
             

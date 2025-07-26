@@ -2311,6 +2311,7 @@ class Profile():
         self._loaded = False
         self.state = gremlin.ui.state_device.StateData()
         self.state.clear()
+        self._start_state = {}  # profile startup output state - index by [device_id (str)][buttons/axis (str)][id (int)] = value (float or bool)
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
@@ -2352,7 +2353,75 @@ class Profile():
         ''' gets the hash value of the device mapping '''
         xml = self.to_xml()
         return hash(xml)
+    
+    # startup state
+    def getStartButtonState(self, device_id : str, id : int ) -> bool:
+        ''' returns the startup button state for that device/button '''
+        if device_id in self._start_state:
+            if "buttons" in self._start_state[device_id]:
+                if id in self._start_state[device_id]["buttons"]:
+                    return self._start_state[device_id]["buttons"][id]
+        return False
+    
+    def setStartButtonState(self, device_id : str, id : int, state : bool):
+        if not device_id in self._start_state:
+            self._start_state[device_id] = {}
+        if not "buttons" in self._start_state[device_id]:
+            self._start_state[device_id]["buttons"] = {}
+        self._start_state[device_id]["buttons"][id] = state
 
+    def getStartAxisValue(self, device_id : str, id : int ) -> float:
+        ''' returns the startup axis value for that device/axis, returns None if not set '''
+        if device_id in self._start_state:
+            verbose = gremlin.config.Configuration().verbose_mode_output
+            if "axis" in self._start_state[device_id]:
+                if id in self._start_state[device_id]["axis"]:
+                    value = self._start_state[device_id]["axis"][id]
+                    if verbose:
+                        device = gremlin.joystick_handling.get_device(device_id)
+                        syslog.info(f"Default axis value GET: vjoy: {device.vjoy_id} axis: {id} value: {value:0.3f}")
+                    return value
+                
+        return None
+    
+    def setStartAxisValue(self, device_id : str, id : int, value : float):
+        ''' sets a start value for a given vjoy device / id'''
+        if not device_id in self._start_state:
+            self._start_state[device_id] = {}
+        if not "axis" in self._start_state[device_id]:
+            self._start_state[device_id]["axis"] = {}
+        self._start_state[device_id]["axis"][id] = value
+        verbose = gremlin.config.Configuration().verbose_mode_output
+        if verbose:
+            device = gremlin.joystick_handling.get_device(device_id)
+            syslog.info(f"Default axis value: vjoy SET: {device.vjoy_id} axis: {id} value: {value:0.3f}")
+
+
+    def getStartAxisEnabled(self, device_id : str, id : int ) -> bool:
+        ''' returns the startup axis value for that device/axis is enabled  returns None if not set '''
+        if device_id in self._start_state:
+            verbose = gremlin.config.Configuration().verbose_mode_output
+            if verbose:
+                device = gremlin.joystick_handling.get_device(device_id)
+            if "enabled" in self._start_state[device_id]:
+                if id in self._start_state[device_id]["enabled"]:
+                    enabled = self._start_state[device_id]["enabled"][id]
+                    syslog.info(f"Default axis value enabled GET: vjoy: {device.vjoy_id} axis: {id} value: {enabled}")
+                    return enabled
+        return None
+    
+    def setStartAxisEnabled(self, device_id : str, id : int, enabled : bool):
+        ''' sets a start value enabled flag for a given vjoy device / id'''
+        if not device_id in self._start_state:
+            self._start_state[device_id] = {}
+        if not "enabled" in self._start_state[device_id]:
+            self._start_state[device_id]["enabled"] = {}
+        verbose = gremlin.config.Configuration().verbose_mode_output
+        if verbose:
+            device = gremlin.joystick_handling.get_device(device_id)
+            syslog.info(f"Default axis value enabled SET: vjoy: {device.vjoy_id} axis: {id} value: {enabled}")
+        self._start_state[device_id]["enabled"][id] = enabled
+    
 
     def setSimconnectMode(self, key, mode):
         ''' sets the simconnect startup mode for a given aicraft key - the key comes from the SimconnectAicraftDefinition for the aircraft'''
@@ -3200,11 +3269,11 @@ class Profile():
 
 
         # Parse each device into separate DeviceConfiguration objects
-        for child in root.iter("device"):
+        devices = root.xpath("//profile/devices/device")
+        for child in devices:
             device = Device(self)
             device.from_xml(child, data)
             self.devices[device.device_guid] = device
-
 
 
         # Parse each vjoy device into separate DeviceConfiguration objects
@@ -3320,6 +3389,35 @@ class Profile():
                 device.modes[mode_name] = mode
 
 
+        # read button and axis startup data
+        node_devices = root.xpath("//profile/start/devices/device")
+        self._start_state.clear()
+        for node_device in node_devices:
+            device_id = node_device.get("device-guid")
+            self._start_state[device_id] = {}
+            for node in node_device:
+                id = safe_read(node,"id", int, 0)
+                if not id:
+                    continue
+                if node.tag == "button":
+                    state = safe_read(node,"value",bool, False)
+                    if not "buttons" in self._start_state[device_id]:
+                        self._start_state[device_id]["buttons"] = {}
+                    self._start_state[device_id]["buttons"][id] = state
+                elif node.tag == "axis":
+                    if not "axis" in self._start_state[device_id]:
+                        self._start_state[device_id]["axis"] = {}
+                    if not "enabled" in self._start_state[device_id]:
+                        self._start_state[device_id]["enabled"] = {}
+                    value = safe_read(node,"value", float, 0.0)
+                    self._start_state[device_id]["axis"][id] = value
+                    enabled = safe_read(node,"enabled", bool, False)
+                    self._start_state[device_id]["enabled"][id] = enabled
+                    
+
+
+
+
 
 
         # have config use updated profile settings
@@ -3378,13 +3476,6 @@ class Profile():
             nodes[mode] = node # track it
             parent_mode = tree_node.parent.name if tree_node.parent else None
             root_mode_node.append(node)
-
-        
-
-
-
-
-
 
         # Device settings
         devices = etree.Element("devices")
@@ -3480,6 +3571,44 @@ class Profile():
         for plugin in self.plugins:
             plugins.append(plugin.to_xml())
         root.append(plugins)
+
+        # startup device button and axis values data
+        node_start = etree.SubElement(root, "start")
+        node_devices = etree.SubElement(node_start, "devices")
+        dn = {}
+        for device_id in self._start_state:
+            node_device = None
+            for id in self._start_state[device_id]:
+                if "buttons" in self._start_state[device_id]:
+                    # only write non default values for buttons
+                    for id in self._start_state[device_id]["buttons"]:
+                        state = self._start_state[device_id]["buttons"][id]
+                        if state:
+                            if not device_id in dn:
+                                node_device = etree.SubElement(node_devices,"device")
+                                node_device.set("device-guid", device_id)
+                                dn[device_id] = node_device
+                            node_button = etree.SubElement(node_device,"button")
+                            node_button.set("id", safe_format(id, int))
+                            node_button.set("value", safe_format(state,bool))
+
+                if "axis" in self._start_state[device_id]:
+                    for id in self._start_state[device_id]["axis"]:
+                        if not device_id in dn:
+                            node_device = etree.SubElement(node_devices,"device")
+                            node_device.set("device-guid", device_id)
+                            dn[device_id] = node_device
+
+                        node_axis = etree.SubElement(node_device,"axis")
+                        node_axis.set("id", safe_format(id, int))
+                        value = self._start_state[device_id]["axis"][id]
+                        node_axis.set("value", safe_format(value,float))
+
+                        enabled = self._start_state[device_id]["enabled"][id]
+                        node_axis.set("enabled", safe_format(enabled, bool))
+
+                
+
 
 
         # state data

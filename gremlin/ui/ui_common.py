@@ -37,6 +37,7 @@ import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
+from lxml import etree
 from qtpy.QtCore import (
     Qt, QSize, QPoint, QPointF, QRectF,
     QEasingCurve, QPropertyAnimation, QSequentialAnimationGroup,
@@ -47,7 +48,7 @@ from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter, QStandardIte
 
 
 
-from gremlin.util import load_pixmap, load_icon
+from gremlin.util import load_pixmap, load_icon, safe_format, safe_read
 import gremlin.util
 import gremlin.ui.ui_common
 from gremlin.singleton_decorator import SingletonDecorator
@@ -1491,6 +1492,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
     def value(self) -> float:
         ''' current value, None if not a valid input'''
         return self._value
+    
+
 
     def isValid(self):
         ''' true if the input in the box is currently valid'''
@@ -9446,4 +9449,216 @@ class QInfoBox(QtWidgets.QFrame):
         
         
 
+class GridClickWidget(QtWidgets.QWidget):
+    ''' implements a widget that reponds to a mouse click '''
+    pressPos = None
+    clicked = Signal()
 
+    def __init__(self, vjoy_device_id, input_type, vjoy_input_id, parent = None):
+        super(GridClickWidget, self).__init__(parent=parent)
+        self.vjoy_device_id = vjoy_device_id
+        self.input_type = input_type
+        self.vjoy_input_id = vjoy_input_id
+
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton :
+            self.pressPos = event.pos()
+
+    def mouseReleaseEvent(self, event):
+        # ensure that the left button was pressed *and* released within the
+        # geometry of the widget; if so, emit the signal;
+        if self.pressPos is not None and event.button() == QtCore.Qt.LeftButton:
+            pos = event.pos()
+            rect = self.rect()
+            if  rect.contains(pos):
+                self.clicked.emit()
+        self.pressPos = None
+
+# class GridButton(QtWidgets.QPushButton):
+#     def __init__(self, action):
+#         super(GridButton,self).__init__()
+#         self.action = action
+
+#     def _clicked(self):
+#         pass
+
+class QButtonGrid(QtWidgets.QWidget):
+    ''' button grid - displays joystick button grid and state '''
+
+    def __init__(self, device, parent = None):
+        ''' init '''
+
+        super().__init__(parent)
+        from dinput import DeviceSummary
+        self._state = {} # map of button number to state [id:int] = bool
+        self._device : DeviceSummary = device
+        self._device_guid = device.device_guid
+        self._device_id = device.device_id
+        self._button_count = device.button_count
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self._create_input_grid()
+
+    
+    def from_device(self):
+        ''' sets the state from the current device '''
+        if not self._device:
+            return
+        self._state.clear()
+        for id in range(1, self.button_count + 1):
+            state = gremlin.joystick_handling.get_button(self._device_guid, id)
+            self._state[id] = state
+        self._populate_grid()
+
+    def from_profile(self, profile):
+        ''' reads the data from the current profile '''
+        if not self._device:
+            return
+        self._state.clear()
+        for id in range(1, self._button_count + 1):
+            state = profile.getStartButtonState(self._device_id, id)
+            if state is None:
+                state = False # default
+            self._state[id] = state
+        self._populate_grid()
+
+    def to_profile(self, profile):
+        ''' saves the data to the current profile '''
+        if not self._device:
+            return
+        for id in range(1, self._button_count + 1):
+            state = self._state[id]
+            profile.setStartButtonState(self._device_id, id, state)
+
+    def all_on(self):
+        for id in range(1, self._button_count + 1):
+            self._state[id] = True
+        self._populate_grid()
+            
+    def all_off(self):
+        for id in range(1, self._button_count + 1):
+            self._state[id] = False
+        self._populate_grid()
+            
+
+    def to_profile(self, profile):
+        ''' saves widget data to a profile '''
+        for id, state in self._state.items():
+            profile.setStartButtonState(self._device_id, id, state)
+
+    def _populate_grid(self):
+        gremlin.util.InvokeUiMethod(self._populate_grid_ui)
+
+    def _populate_grid_ui(self):
+        ''' updates the usage grid based on current VJOY mappings '''
+
+        self._grid_widgets = {}
+
+        for cb in self.button_group.buttons():
+            id = self.button_group.id(cb)
+            self._grid_widgets[id] = cb
+            with QtCore.QSignalBlocker(cb):
+                if id in self._state:
+                    value = self._state[id]
+                else:
+                    value = False # dafault
+                    self._state[id] = False
+                cb.setChecked(value)
+
+
+    def _create_input_grid(self):
+        ''' create a grid of buttons for easy selection'''
+        
+        gremlin.util.clear_layout(self.main_layout)
+
+
+        self.button_grid_widget = QtWidgets.QWidget()
+
+        # link all radio buttons
+        self.button_group = QtWidgets.QButtonGroup()
+        self.button_group.buttonClicked.connect(self._select_changed)
+        self.button_group.setExclusive(False) # allow multiple selections
+        self.icon_map = {}
+
+        self.active_id = -1
+
+
+        
+        grid = QtWidgets.QGridLayout(self.button_grid_widget)
+        grid.setSpacing(2)
+        self.remap_type_layout = grid
+
+        max_col = 16
+        col = 0
+        row = 0
+
+        
+        for id in range(1, self._button_count+1):
+            # container for the vertical box
+            v_cont = QtWidgets.QWidget()
+            #v_cont.setFixedWidth(32)
+            v_box = QtWidgets.QVBoxLayout(v_cont)
+            v_box.setContentsMargins(0,0,0,5)
+            v_box.setAlignment(QtCore.Qt.AlignCenter)
+
+            # line 1
+            h_cont = QtWidgets.QWidget()
+            h_cont.setFixedWidth(36)
+            h_box = QtWidgets.QHBoxLayout(h_cont)
+            h_box.setContentsMargins(0,0,0,0)
+            h_box.setAlignment(QtCore.Qt.AlignCenter)
+            cb = gremlin.ui.ui_common.QDataRadioButton()
+
+            self.button_group.addButton(cb)
+            self.button_group.setId(cb, id)
+            cb.data = id # data has the button id
+
+            name = str(id)
+            h_box.addWidget(cb)
+            v_box.addWidget(h_cont)
+
+            # line 2
+            line2_cont = GridClickWidget(self._device_guid, InputType.JoystickButton, id)
+            line2_cont.setFixedWidth(36)
+            h_box = QtWidgets.QHBoxLayout(line2_cont)
+            h_box.setContentsMargins(0,0,0,0)
+            h_box.setSpacing(0)
+
+
+            icon_lbl = QtWidgets.QLabel()
+
+            lbl = QtWidgets.QLabel(name)
+            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+
+            self.icon_map[id] = icon_lbl
+
+            h_box.addWidget(icon_lbl)
+            h_box.addWidget(lbl)
+            v_box.addWidget(line2_cont)
+
+            line2_cont.clicked.connect(self._grid_button_clicked)
+
+
+            grid.addWidget(v_cont, row, col)
+            col+=1
+            if col == max_col:
+                row+=1
+                col=0
+
+        self.main_layout.addWidget(self.button_grid_widget)
+
+    def _select_changed(self, rb):
+        # called when a button is toggled
+        button_id = self.button_group.checkedId()
+        if not button_id in self._state:
+            self._state[button_id] = False
+        self._state[button_id] = not self._state[button_id]
+
+
+    @QtCore.Slot()
+    def _grid_button_clicked(self):
+        sender = self.sender()
+        pass
+        
+        

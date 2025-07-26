@@ -473,6 +473,25 @@ class CodeRunner:
                     vjoy_proxy = gremlin.joystick_handling.VJoyProxy()[vid]
                     vjoy_proxy.ensure_released()
 
+            # set vjoy from profile defaults
+            vjoy_devices = gremlin.joystick_handling.vjoy_devices()
+            for device in vjoy_devices:
+                device_id = device.device_id
+
+                # set axes
+                for id in range(1, device.axis_count + 1):
+                    enabled = profile.getStartAxisEnabled(device_id, id)
+                    if enabled:
+                        value = profile.getStartAxisValue(device_id, id)
+                        if value is not None:
+                            gremlin.joystick_handling.set_axis(device_id, id, value)
+
+                # set buttons
+                for id in range(1, device.button_count + 1):
+                    value = profile.getStartButtonState(device_id, id)
+                    if value is not None:
+                        gremlin.joystick_handling.set_button(device_id, id, value)
+
 
 
             if verbose_detailed:

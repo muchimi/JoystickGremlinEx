@@ -531,39 +531,6 @@ _merge_operation_to_description_lookup = {
 }
 
 
-class GridClickWidget(QtWidgets.QWidget):
-    ''' implements a widget that reponds to a mouse click '''
-    pressPos = None
-    clicked = Signal()
-
-    def __init__(self, vjoy_device_id, input_type, vjoy_input_id, parent = None):
-        super(GridClickWidget, self).__init__(parent=parent)
-        self.vjoy_device_id = vjoy_device_id
-        self.input_type = input_type
-        self.vjoy_input_id = vjoy_input_id
-
-
-    def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton :
-            self.pressPos = event.pos()
-
-    def mouseReleaseEvent(self, event):
-        # ensure that the left button was pressed *and* released within the
-        # geometry of the widget; if so, emit the signal;
-        if self.pressPos is not None and event.button() == QtCore.Qt.LeftButton:
-            pos = event.pos()
-            rect = self.rect()
-            if  rect.contains(pos):
-                self.clicked.emit()
-        self.pressPos = None
-
-class GridButton(QtWidgets.QPushButton):
-    def __init__(self, action):
-        super(GridButton,self).__init__()
-        self.action = action
-
-    def _clicked(self):
-        pass
 
 
 class GridPopupWindow(gremlin.ui.ui_common.QRememberDialog):
@@ -606,7 +573,7 @@ class GridPopupWindow(gremlin.ui.ui_common.QRememberDialog):
             elif action.device_input_type == InputType.JoystickHat:
                 name = f"Hat {action.device_input_id}"
             item_box.addWidget(QtWidgets.QLabel(name))
-            #item_box.addWidget(GridButton(action))
+            
             box.addWidget(item)
 
 
@@ -3133,7 +3100,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             v_box.addWidget(h_cont)
 
             # line 2
-            line2_cont = GridClickWidget(vjoy_device_id, input_type, id)
+            line2_cont = gremlin.ui.ui_common.GridClickWidget(vjoy_device_id, input_type, id)
             line2_cont.setFixedWidth(36)
             h_box = QtWidgets.QHBoxLayout(line2_cont)
             h_box.setContentsMargins(0,0,0,0)
@@ -3782,7 +3749,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                                 value = self.hat_position,
                                                 )
             
-            self.process_event(event, action_value)
+            self.process_event(event, self.hat_position)
 
         elif self.input_type == InputType.JoystickButton:
             # button presses
