@@ -242,6 +242,10 @@ class QKeyWidget(QtWidgets.QPushButton):
                 if button == QtCore.Qt.RightButton:
                     # fire a right click
                     self.right_clicked.emit(self)
+                elif button == QtCore.Qt.LeftButton:
+                    self.key_clicked.emit()
+                    self.clicked.emit()
+                
                 return True # eat the event
             
             

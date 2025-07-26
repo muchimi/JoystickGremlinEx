@@ -588,8 +588,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     """
     locked = False
 
-
-
     # all button type inputs (hat is handled separately as is axis)
     input_type_buttons = [InputType.JoystickButton,
                           InputType.Keyboard,
@@ -663,7 +661,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.main_layout.setSpacing(0)
 
             self._merge_enabled = False # disable merging by default
-
 
             # Create UI widgets for absolute / relative axis modes if the remap
 
@@ -1167,6 +1164,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
+
+
         self.b_min_value = QtWidgets.QPushButton("-1")
         w = 32
         self.set_width(self.b_min_value,w)
@@ -1199,22 +1198,25 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
 
-        self.sb_start_value = gremlin.ui.ui_common.DynamicDoubleSpinBox(parent = self.container_axis_widget)
+        self.sb_start_value = gremlin.ui.ui_common.QFloatLineEdit(parent = self.container_axis_widget)
         # w = 100
         # self.set_width(self.sb_start_value,w)
         self.sb_start_value.setMinimum(-1.0)
         self.sb_start_value.setMaximum(1.0)
         self.sb_start_value.setDecimals(3)
 
+        self.sync_on_start_widget = QtWidgets.QCheckBox("Sync on start")
+        self.sync_on_start_widget.setToolTip("On profile start, reads the input axis to synchronize with output.")
+        self.sync_on_start_widget.setChecked(self.action_data.sync_on_start)
+        self.sync_on_start_widget.clicked.connect(self._sync_on_start_changed)
+
+        self.main_layout.addWidget(self.sync_on_start_widget)
+
 
         self.relative_scaling_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.relative_scaling_widget.setMinimum(0)
         self.relative_scaling_widget.setMaximum(1000.0)
         self.relative_scaling_widget.setDecimals(3)
-
-        
-
-        
 
         self.container_reverse_widget, _ = gremlin.ui.ui_common.getHContainer(self.reverse_checkbox, min_height = self.container_height)
         self.main_layout.addWidget(self.container_reverse_widget)
@@ -1233,7 +1235,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         widgets = [
             self._axis_start_value_enabled_widget,
-            self.sb_start_value
+            self.sb_start_value,
         ]
 
         self.container_start_value_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height)
@@ -2830,6 +2832,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         pulse_visible = False
         repeat_visible = self.action_data.pulse_repeat
         start_visible = False
+        start_value_enabled = False
+        sync_on_start_visible = False
         grid_visible = False
         show_grid_visible = True
         output_range_visible = False
@@ -2878,6 +2882,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         
             output_curve_visible = action in (VjoyAction.VJoyAxis, VjoyAction.VJoyMergeAxis, VjoyAction.VJoyRangeAxis)
 
+            start_value_enabled = not self.action_data.sync_on_start
+
+            sync_on_start_visible =  action == VjoyAction.VJoyAxis
+
+
             if action == VjoyAction.VJoyMergeAxis:
                 # can clear if more than one merge axis defined
                 self.merge_clear_widget.setEnabled(len(self.action_data._merge_data) > 1)
@@ -2885,6 +2894,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             repeater_visible = True
 
         elif input_type in VJoyRemapWidget.input_type_buttons:
+            sync_on_start_visible = True
             pulse_visible = action == VjoyAction.VJoyPulse
             start_visible = action in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease)
             if action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButtonPress, VjoyAction.VJoyToggle, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyButton):
@@ -2941,6 +2951,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         #self.pulse_widget.setVisible(pulse_visible)
         self.start_widget.setVisible(start_visible)
         self.grid_visible_widget.setVisible(show_grid_visible)
+
+        self._axis_start_value_enabled_widget.setEnabled(start_value_enabled)
+        self.sb_start_value.setEnabled(start_value_enabled)
 
         if self.button_grid_widget:
             self.button_grid_widget.setVisible(grid_visible)
@@ -3000,6 +3013,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_relative_widget.setVisible(default_target_visible)
         self.container_repeater_widget.setVisible(repeater_visible)
 
+        self.sync_on_start_widget.setVisible(sync_on_start_visible)
 
     def _action_mode_changed(self, index):
         ''' called when the drop down value changes '''
@@ -3376,6 +3390,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.axis_start_value_enabled = checked
         self._update_ui()
 
+    @QtCore.Slot(bool)
+    def _sync_on_start_changed(self, checked):
+        self.action_data.sync_on_start = checked
+        self._update_ui()
+
 
     @QtCore.Slot()
     def _axis_range_high_changed(self):
@@ -3569,7 +3588,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             for action in actions:
                 if action.curve_data:
                     # see if the curve should apply
-                    if self.shouldExecute(event, value, action):
+                    if event is None or self.shouldExecute(event, value, action):
                         curves.append(action.curve_data)
 
         # add self
@@ -3672,12 +3691,22 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
     def profile_start(self):
+        ''' occurs on profile start '''
         # setup initial state
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_outputs
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
         raw_input_type = self.action_data.hardware_raw_input_type
+        
+        # get the current mode
+        mode = gremlin.shared_state.runtime_mode 
+        # get the profile start mode
+        start_mode = gremlin.shared_state.current_profile.get_start_mode()
+
+        # vjoy startup config 
+        vs = gremlin.joystick_handling.VjoyStart()
+
         
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # set start button state
@@ -3689,41 +3718,45 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_device_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
 
-
-
             match self.action_mode:
                 case VjoyAction.VJoyAxis:
                     # straight axis
-                    value = None
-                    if self.action_data.axis_start_value_enabled:
+
+
+                    # straight axis
+                    raw_input_type = self.action_data.hardware_raw_input_type
+                    input_id = self.action_data.hardware_input_id
+                    input_type = self.action_data.get_input_type()
+
+                    raw_value = gremlin.joystick_handling.get_axis(self.hardware_device_guid, input_id)
+
+                    fake_event = gremlin.event_handler.Event(self.hardware_input_type, self.hardware_input_id, device_guid = self.hardware_device_guid,value = raw_value,is_axis = True)
+                    action_value = gremlin.actions.Value(raw_value)
+                    curves = self.getCurveData(fake_event, action_value)
+                    value = self.action_data.get_filtered_axis_value(raw_value, curves = curves)
+                    value = self.action_data.get_ranged_axis_value(value)
+                    trigger = False
+
+                    if not self.action_data.sync_on_start and self.action_data.axis_start_value_enabled:
+                        trigger = True
                         value = self.axis_start_value
-                        if raw_input_type == InputType.OpenSoundControl:
-                            # sync the OSC with the start value
-                            message = input_id.message
-                            osc_value = gremlin.util.scale_to_range(value, target_min = 0, target_max = 1)
-                            gremlin.ui.osc_device.osc_client.sendData(message, osc_value)
+                    if self.action_data.sync_on_start and raw_input_type == InputType.JoystickAxis:
+                        trigger = True
+                        # sync vjoy output with current input axis value
 
+                    if trigger and start_mode == mode:
+                        vs.setStartValue(self.vjoy_device_id, self.vjoy_input_id, value)
 
-                    else:
-                        # read the current value
-                        raw_value = None
-                        if raw_input_type == InputType.JoystickAxis:
-                            raw_value = joystick_handling.get_axis(device_guid, input_id)
-                        elif raw_input_type == InputType.OpenSoundControl:
-                            message = input_id.message_key
-                            raw_value = gremlin.ui.osc_device.osc_client.getData(message)
-                        if raw_value is not None:
-                            fake_event = gremlin.event_handler.Event(self.hardware_input_type, self.hardware_input_id, device_guid = self.hardware_device_guid,value = raw_value,is_axis = True)
-                            action_value = gremlin.actions.Value(raw_value)
-                            curves = self.getCurveData(fake_event, action_value)
-                            value = self.action_data.get_filtered_axis_value(raw_value, curves = curves)
-                            value = self.action_data.get_ranged_axis_value(value)
+                    if raw_input_type == InputType.OpenSoundControl and self.action_data.axis_start_value_enabled:
+                        # sync OSC with the start value
+                        message = input_id.message
+                        osc_value = gremlin.util.scale_to_range(value, target_min = 0, target_max = 1)
+                        gremlin.ui.osc_device.osc_client.sendData(message, osc_value)
 
-                    if value is not None:
-                        if verbose: syslog.info(f"Profile start - sync axis: vjoy ID: [{self.vjoy_device_id}] axis [{self.vjoy_input_id}] value: {value:0.3f}")
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
-                        self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
-
+       
+                        
+                    
+                    
                 case VjoyAction.VJoyAxisToButton:
                     value = joystick_handling.get_curved_axis(device_guid, input_id)
                     action_value = gremlin.actions.Value(value)
@@ -3786,30 +3819,35 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
 
+            if self.action_data.sync_on_start and start_mode == mode:
+                # register the start value
+                vs.setStartState(self.vjoy_device_id, self.vjoy_input_id, is_pressed)
 
 
-
-            if is_pressed is not None:
-                action_value = gremlin.actions.Value(0,0,is_pressed = is_pressed)
-                if verbose: syslog.info(f"Profile start - sync button: vjoy ID: [{self.vjoy_device_id}] axis [{self.vjoy_input_id}] pressed: {is_pressed}")
-                event = gremlin.event_handler.Event(self.input_type,
-                                            device_guid = device_guid,
-                                            identifier = input_id,
-                                            is_pressed=is_pressed,
-                                            value = is_pressed
-                )
+            # if is_pressed is not None:
+            #     action_value = gremlin.actions.Value(0,0,is_pressed = is_pressed)
+            #     if verbose: syslog.info(f"Profile start - sync button: vjoy ID: [{self.vjoy_device_id}] axis [{self.vjoy_input_id}] pressed: {is_pressed}")
+            #     event = gremlin.event_handler.Event(self.input_type,
+            #                                 device_guid = device_guid,
+            #                                 identifier = input_id,
+            #                                 is_pressed=is_pressed,
+            #                                 value = is_pressed
+            #     )
                 
                 
-                self.process_event(event, action_value)
+            #     self.process_event(event, action_value)
             
 
         if self.action_mode == VjoyAction.VJoySetAxisStepped:
             # initial stepped axis value
 
-            self.step_index = self.action_data.target_step_start_index
-            value = self.action_data.target_step_list[self.step_index]
-            syslog.info(f"VJOY: step mode initial value: {value:0.3f}")
-            joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+            if start_mode == mode:
+                self.step_index = self.action_data.target_step_start_index
+                value = self.action_data.target_step_list[self.step_index]
+                vs.setStartValue(self.vjoy_device_id, self.vjoy_input_id, value)
+                # syslog.info(f"VJOY: step mode initial value: {value:0.3f}")
+                # joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+
 
 
     def profile_stop(self):
@@ -3830,7 +3868,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if is_local:
             joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = True
         if is_remote:
-            self.remote_client.send_button(device_id, True, False, force_remote = force_remote)
+            self.remote_client.send_button(device_id, input_id, True, force_remote = force_remote)
 
 
     def _pulse_off(self, data):
@@ -3964,7 +4002,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # get list of curves that applies to this input
                 curves = self.getCurveData(event, action_value)
 
-                # this handles axis merging and applies any curves
+                # this handles axis merging and applies any curves and axis inversion
                 value = self.action_data.get_filtered_axis_value(action_value.current, curves = curves)
 
                 value = self.action_data.get_ranged_axis_value(value)
@@ -4023,6 +4061,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             if value is None or not isinstance(value, float):
                 if verbose: syslog.error(f"VJOYREMAP: invalid value {value} for axis")
                 return 
+            
 
             # axis mode
             match self.action_mode:
@@ -4094,8 +4133,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                         if is_local:
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
-                        
-                        
+                                                
                         if is_remote:
                             self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
                     else:
@@ -4621,6 +4659,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.vjoy_button_id = 1
         self.vjoy_hat_id = 1
         self.vjoy_device_guid = None
+        self.sync_on_start = True # true if the value should sync on profile start to synchronize with input (on by default as it's generally a desired behavior)
 
         self._reverse : bool = False
         self.axis_mode = "absolute"
@@ -4896,29 +4935,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             
         return False
 
-    # @merge_device_id.setter
-    # def merge_device_id(self, value : str | dinput.GUID):
-    #     if value is None:
-    #         self._merge_device_id = None
-    #         self._merge_device_guid = None
-    #         return
-    #     if not isinstance(value, str):
-    #         value = str(value)
-    #     self._merge_device_id = value
-    #     self._merge_device_guid = util.parse_guid(value)
-
-    # @property
-    # def merge_device_guid(self) -> dinput.GUID:
-    #     return self._merge_device_guid
-    # @merge_device_guid.setter
-    # def merge_device_guid(self, value : dinput.GUID):
-    #     if value is None:
-    #         self._merge_device_id = None
-    #         self._merge_device_guid = None
-    #         return
-    #     self._merge_device_guid = value
-    #     self._merge_device_id = str(value)
-
 
     @property
     def stepped_device_id(self) -> str:
@@ -5032,8 +5048,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     def reverse(self):
         # axis reversed state
         return self._reverse
-        # usage_data = gremlin.joystick_handling.VJoyUsageState()
-        # return usage_data.is_inverted(self.vjoy_device_id, self.vjoy_axis_id) or self._reverse
 
     @reverse.setter
     def reverse(self,value):
@@ -5188,11 +5202,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                     #valid = True
                     break
 
-            # if not valid:
-            #     raise gremlin.error.GremlinError(f"VJOYREMAP: Invalid remap type provided: {node.attrib}")
-
-
-
+       
             self.pulse_delay = 250
             self.merge_input_id = None
             self.merge_device_id = None
@@ -5219,6 +5229,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 # check action mode for special case axis to button
                 if self.action_mode == VjoyAction.VJoyAxisToButton:
                     usage_data.set_usage_state(self.vjoy_device_id, self.vjoy_input_id, state = True, action = self, emit = False)
+
+            # sync on start (axis input only)
+            if "sync_on_start" in node.attrib:
+                self.sync_on_start = safe_read(node,"sync_on_start", bool, False)
 
 
             if "reverse" in node.attrib:
@@ -5253,9 +5267,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
             if "relative_pulse_delay" in node.attrib:
                 self.relative_pulse_delay = safe_read(node,"relative_pulse_delay", int, 500)
-
-
-
 
             if "range_low" in node.attrib:
                 self.button_range_min = safe_read(node,"range_low", float, -1.0)
@@ -5294,14 +5305,14 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
             if "axis_start_value_enabled" in node.attrib:
                 self.axis_start_value_enabled = safe_read(node,"axis_start_value_enabled", bool, False)
-            
 
             if "exec_on_release" in node.attrib:
                 self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
 
-
             if "paired" in node.attrib:
                 self.paired = safe_read(node,"paired", bool, False)
+
+            
 
             self._merge_data = []
             if self.action_mode == VjoyAction.VJoyMergeAxis:
@@ -5459,6 +5470,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         if self.override_input_type is not None:
             node.set("override-input-type", gremlin.input_types.InputType.to_string(self.override_input_type))
 
+        node.set("sync_on_start", safe_format(self.sync_on_start, bool))
+
         match self.action_mode:
             case VjoyAction.VJoyAxis:
                 node.set("axis-type", safe_format(self.axis_mode, str))
@@ -5471,6 +5484,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 node.set("output_range_high", safe_format(self.output_range_max, float))
                 reverse = safe_format(self.reverse_configured, bool)
                 node.set("reverse", reverse)
+                
 
             case VjoyAction.VJoyButtonPress:
                 # button, command or

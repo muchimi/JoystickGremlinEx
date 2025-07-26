@@ -7316,9 +7316,9 @@ class QSplitTabWidget(QDataWidget):
             return widget
         return None
     
-    def getWidgetKey(self, input_id):
+    def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
-        return (gremlin.shared_state.edit_mode, self._device_id, input_id)
+        return (gremlin.shared_state.edit_mode, self._device_id, input_type, input_id)
     
     def getContentInputId(self):
         ''' gets the input id currently displayed '''
@@ -7340,8 +7340,8 @@ class QSplitTabWidget(QDataWidget):
 
 
     
-    def setContentWidget(self, input_id):
-        key = self.getWidgetKey(input_id)
+    def setContentWidget(self, input_type, input_id):
+        key = self.getWidgetKey(input_type, input_id)
         widget = self.getRegisteredWidget(key)
         if not widget:
             self._ensure_blank_widget()

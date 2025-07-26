@@ -605,7 +605,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             config = gremlin.config.Configuration()
             config.set_last_input(device_guid, input_type, input_id)
 
-            key = self.getWidgetKey(input_id)
+            key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
                 widget = InputItemConfigurationWidget(item_data, object_name = f"Keyboard InputItemConfig for: {item_data.display_name}")

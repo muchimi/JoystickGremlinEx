@@ -433,7 +433,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_type = item_data.input_type
                 input_id = item_data.input_id
 
-                key = self.getWidgetKey(input_id)
+                key = self.getWidgetKey(input_type, input_id)
                 widget = self.getRegisteredWidget(key)
                 if not widget:
                     

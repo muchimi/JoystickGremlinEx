@@ -577,10 +577,15 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         for id in self._state:
             if Shiboken.isValid(self._grid_widgets[id]):
                 with QtCore.QSignalBlocker(self._grid_widgets[id]):
-                    self._grid_widgets[id].setValue(self._state[id])
+                    value = self.getValue(id)
+                    if not value is None:
+                        self._grid_widgets[id].setValue(value)
             if Shiboken.isValid(self._grid_enabled[id]):
                 with QtCore.QSignalBlocker(self._grid_enabled[id]):
-                    self._grid_enabled[id].setChecked(self._enabled_state[id])
+                    enabled = self.getEnabled(id)
+                    if enabled is None:
+                        enabled = False
+                    self._grid_enabled[id].setChecked(enabled)
 
         
 
@@ -604,6 +609,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             return self._state[id]
         return None
     
+    
     def setValue(self, id : int, value : float):
         ''' sets the value of the axis '''
         gremlin.util.InvokeUiMethod(self._setValue_ui, id, value)
@@ -615,6 +621,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             self._state[id] = value
 
     def getEnabled(self, id : int) -> bool:
+        ''' get the enabled flag '''
         if id in self._enabled_state:
             return self._enabled_state[id]
         return None

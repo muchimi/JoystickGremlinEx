@@ -1634,7 +1634,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if item_data:
             device_guid = self.device_guid
-            key = self.getWidgetKey(input_id)
+            key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
                 widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name=f"MIDI: {item_data.display_name}")

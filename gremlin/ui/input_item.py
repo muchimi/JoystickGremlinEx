@@ -1335,6 +1335,7 @@ class InputItemWidget(QBoxFrame):
         # main container
         self._container_widget, self._container_layout = gremlin.ui.ui_common.getVContainer()
         self._container_widget.setContentsMargins(4,0,4,0)
+        self._container_layout.setSpacing(0)
         self.main_layout.addWidget(self._container_widget)
 
 
@@ -1460,6 +1461,7 @@ class InputItemWidget(QBoxFrame):
 
         # repeater
         self._repeater_container_widget, self._repeater_container_layout = gremlin.ui.ui_common.getVContainer()
+        self._repeater_container_widget.setContentsMargins(0,0,0,2)
         self._setWidgetHeight(self._repeater_container_widget, 0)
         if debug_layout:self._repeater_container_widget.setStyleSheet("background: red;")
         self._container_layout.addWidget(self._repeater_container_widget)
@@ -1479,6 +1481,7 @@ class InputItemWidget(QBoxFrame):
         # custom content row
         self._custom_container_widget, self._custom_container_layout = gremlin.ui.ui_common.getVContainer()
         self._setWidgetHeight(self._custom_container_widget, 0)
+        self._custom_container_widget.setContentsMargins(0,0,0,4)
         if debug_layout:self._custom_container_widget.setStyleSheet("background: cyan;")
         self._container_layout.addWidget(self._custom_container_widget)
 
@@ -1531,6 +1534,18 @@ class InputItemWidget(QBoxFrame):
         
     def getLayout(self):
         return self._custom_container_layout
+    
+    def addWidget(self, widget):
+        ''' adds a widget to the container '''
+        self._custom_container_layout.addWidget(widget)
+        self._custom_container_widget.setMaximumHeight(200)
+
+    def clearWidgets(self):
+        ''' clears the custom container layout and hides it '''
+        gremlin.util.clear_layout(self._custom_container_layout)
+        self._custom_container_widget.setMaximumHeight(0)
+        
+    
 
     def _update_title(self):
         ''' updates the title bar stylesheet based on the selection state '''
@@ -1602,10 +1617,10 @@ class InputItemWidget(QBoxFrame):
         return self._custom_container_layout
     
     def _getIconSize(self) -> int:
-        return 24
+        return 16
     
     def _getRowHeight(self) -> int:
-        return 34
+        return 28
     
     def _setWidgetHeight(self, widget : QtWidgets.QWidget, h):
         ''' sets min/max height'''
@@ -1694,7 +1709,7 @@ class InputItemWidget(QBoxFrame):
             widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
             self._repeater_container_layout.addWidget(widget)                
             self._repeater_container_layout.addStretch()
-            self._setWidgetHeight(self._repeater_container_widget, self._getRowHeight())
+            self._setWidgetHeight(self._repeater_container_widget, 16)
 
 
 

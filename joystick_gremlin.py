@@ -2819,7 +2819,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
     def _select_input_handler(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
-        gremlin.util.InvokeUiMethod(self._select_input_handle_ui,
+        gremlin.util.InvokeUiMethod(self._select_input_handler_ui,
                                     device_guid,
                                     restore_input_type,
                                     restore_input_id,
@@ -2827,7 +2827,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     force_switch,
                                     tab_changed)
 
-    def _select_input_handle_ui(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
+    def _select_input_handler_ui(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
         ''' Selects a specific input on the given tab
         The tab is changed if different from the current tab.
 
@@ -3027,7 +3027,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if verbose: assert item is not None, f"SELECT: sync issue: no selection"
 
                     #widget.select_item(index)
-                    widget.setContentWidget(input_id)
+                    widget.setContentWidget(input_type, input_id)
 
           
                     if verbose: syslog.info(f"Select input: selected widget {input_type} {input_id}")

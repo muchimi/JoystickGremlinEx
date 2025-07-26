@@ -3501,9 +3501,9 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return sorted_keys.index(input_id)
     
     
-    def getWidgetKey(self, input_id):
+    def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
-        return (self.device_guid, input_id)
+        return (self.device_guid, input_type, input_id)
 
     def _select_item_cb(self, index, emit = True):
         """Handles the selection of an input item.
@@ -3536,7 +3536,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if item_data:
             device_guid = self.device_guid
-            key = self.getWidgetKey(input_id)
+            key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
                 widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name=f"OSC: {item_data.display_name}")

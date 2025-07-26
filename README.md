@@ -15,8 +15,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T34)
-- Improved: vjoy profile start value refactor. The settings tab can now set axis and button start values for VJOY devices on profile start.
-- Fix: various.
+- New feature: VJoy start value sync and initial value on profile start:
+	- In the profile settings tab, it is now possible to set both axis and button start values for any VJOY device on profile start, regardless of mappings.  These will be applied on profile start (or restart), and before any mappings are applied.
+	- VJoy Remap gains a new "sync on start" option, which defaults to on.  This will cause vjoy to synchronize with the input buttons/axis on profile start. The sync only executes if the remap action is mapped to the profile startup mode. If multiple mappings to the same vjoy output exist in the start mode and the mapping is a different input, the last one loaded will take precedence. Since the load order is indeterminate and varies with devices and configurations, the sync is also indeterminate. It's recommended only one action does the sync in this (uncommon) scenario.
+- Fix: UI sync issue when the selected input has duplicated IDs on the same device  (this is common with joystick hardware).  The prior refactor on UI sync was overly optimized.
+- Improved: further optimization to the UI layout of inputs.
+- Fix: virtual keyboard keys can be selected again by clicking on them.
+- Fix: state inputs missing edit/trash button in header.
+- Fix: Vjoy Remap pulse ON wrong parameters sent
+- Fix: various miscellaneous fixes.
+- Known issue: In simconnect options, when a new aicraft is found, search fails even if the list of valid aircraft is refreshed (current workaround restart GremlinEx).
 
 ### (m76T33)
 - Improved: UI look and feel, UI element layouts and consistency.

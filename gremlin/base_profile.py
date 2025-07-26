@@ -2401,12 +2401,12 @@ class Profile():
         ''' returns the startup axis value for that device/axis is enabled  returns None if not set '''
         if device_id in self._start_state:
             verbose = gremlin.config.Configuration().verbose_mode_output
-            if verbose:
-                device = gremlin.joystick_handling.get_device(device_id)
             if "enabled" in self._start_state[device_id]:
                 if id in self._start_state[device_id]["enabled"]:
                     enabled = self._start_state[device_id]["enabled"][id]
-                    syslog.info(f"Default axis value enabled GET: vjoy: {device.vjoy_id} axis: {id} value: {enabled}")
+                    if verbose: 
+                        device = gremlin.joystick_handling.get_device(device_id)
+                        syslog.info(f"Default axis value enabled GET: vjoy: {device.vjoy_id} axis: {id} value: {enabled}")
                     return enabled
         return None
     

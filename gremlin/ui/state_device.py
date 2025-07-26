@@ -1909,9 +1909,9 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return sorted_keys.index(input_id)
     
      
-    def getWidgetKey(self, input_id):
+    def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
-        return (self.device_guid, input_id)
+        return (self._device_guid, input_type, input_id)
 
 
 
@@ -1942,8 +1942,9 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         
         item_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        input_type = InputType.State
         input_id = item_data.input_id
-        key = self.getWidgetKey(input_id)
+        key = self.getWidgetKey(input_type, input_id)
         widget = self.getRegisteredWidget(key)
         if not widget:
             widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name=f"STATE: {item_data.input_id.key}")
@@ -1999,23 +2000,24 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         title = f"State: [{input_id.key}] [{input_id.id}]" if gremlin.config.Configuration().show_container_id else f"State: [{input_id.key}]"
         widget.setTitle(title)
-        layout = widget.content_layout
-        gremlin.util.clear_layout(layout)
+        widget.enable_edit()
+        widget.enable_close()
+        widget.clearWidgets()
 
         if input_id.description:
-            layout.addWidget(QtWidgets.QLabel(f"{input_id.description}"))
-        
-        
-        
+            widget.addWidget(QtWidgets.QLabel(f"{input_id.description}"))
+
         category_name =input_id.category_name
         if category_name:
-            layout.addWidget(QtWidgets.QLabel(f"Category: [{category_name}]"))
+            widget.addWidget(QtWidgets.QLabel(f"Category: [{category_name}]"))
 
         if input_id.expression:
             icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color.expressionColor())
-            layout.addWidget(gremlin.ui.ui_common.QIconLabel(icon, input_id.expression))
+            widget.addWidget(gremlin.ui.ui_common.QIconLabel(icon, input_id.expression))
         else:
-            layout.addWidget(QtWidgets.QLabel(f"Default: {input_id.display_value}"))
+            widget.addWidget(QtWidgets.QLabel(f"Default: {input_id.display_value}"))
+
+
             
         # widget.disable_close()
         # widget.disable_edit()

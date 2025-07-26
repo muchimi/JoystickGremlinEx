@@ -140,6 +140,8 @@ class CodeRunner:
         eh = gremlin.event_handler.EventHandler()
 
         eh.reset() # reset any prior run data 
+        vs = gremlin.joystick_handling.VjoyStart()
+        vs.reset()  # reset the vjoy start data
         
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(force_rebuild = True) # rebuild the execution tree
@@ -612,19 +614,30 @@ class CodeRunner:
 
 
             ec.registerCallbacks(eh.callbacks)
-            
+
+            # apply global start values 
+            for vjoy_device_id, vjoy_input_id, value in profile.settings.get_initial_vjoy_axis_value_list():
+                vs.setStartValue(vjoy_device_id, vjoy_input_id, value)
+
+            # applies profile start data 
+            # this will override global settings
+            for vjoy_device in gremlin.joystick_handling.vjoy_devices():
+                vjoy_device_id = vjoy_device.device_guid
+                for vjoy_input_id in range(1,vjoy_device.axis_count+1):
+                    if profile.getStartAxisEnabled(vjoy_device_id, vjoy_input_id):
+                        value = profile.getStartAxisValue(vjoy_device_id, vjoy_input_id)
+                        vs.setStartValue(vjoy_device_id, vjoy_input_id, value)
+                for vjoy_input_id in range(1,vjoy_device.button_count+1):
+                    state = profile.getStartButtonState(vjoy_device_id, vjoy_input_id)
+                    vs.setStartState(vjoy_device_id, vjoy_input_id, state)
                                 
 
             # tell GremlinEx the profile started
+            # this will also apply default start data and override prior data
             el.profile_start.emit()
 
             
-            # load profile vjoy axis settings and apply them
-            remote_client = gremlin.input_devices.RemoteClient()
-            for vjoy_device_id, vjoy_input_id, value in profile.settings.get_initial_vjoy_axis_value_list():
-                gremlin.joystick_handling.VJoyProxy()[vjoy_device_id].axis(vjoy_input_id).value = value
-                remote_client.send_axis(vjoy_device_id, vjoy_input_id, value)
-           
+
 
 
             el.profile_started.emit()

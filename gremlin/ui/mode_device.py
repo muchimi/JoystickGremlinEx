@@ -270,6 +270,11 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sorted_keys = list(mode.config[InputType.ModeControl].keys())
         return sorted_keys.index(input_id)
     
+         
+    def getWidgetKey(self, input_type, input_id):
+        ''' gets the content widget compound key for the item / input combination'''
+        return (self._device_guid, input_type, input_id)
+
 
     def _select_item_cb(self, index):
         """Handles the selection of an input item.
@@ -296,8 +301,9 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         
         item_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        input_type = InputType.ModeControl
 
-        key = self.getWidgetKey(index)
+        key = self.getWidgetKey(input_type, index)
         widget = self.getRegisteredWidget(key)
         if not widget:
             widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name = f"Mode  [{item_data.display_name}]")
