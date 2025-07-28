@@ -2105,6 +2105,7 @@ class OscInputItem(AbstractInputItem):
         Axis = 0  # input is variable
         Button = 1 # input is marked pressed if the value is in the upper range 
         OnChange = 2 # input triggers pressed on any state change
+        Encoder = 3 # input is an encoder - two ranges of valuel, triggers two actions
 
     class CommandMode(enum.Enum):
         ''' OSC command mode = determines how the command key is derived '''
@@ -2301,22 +2302,29 @@ class OscInputItem(AbstractInputItem):
     
     @property
     def mode_string(self):
-        if self._mode == OscInputItem.InputMode.Axis:
-            return "axis"
-        if self._mode == OscInputItem.InputMode.Button:
-            return "button"
-        if self._mode == OscInputItem.InputMode.OnChange:
-            return "change"
+        match self._mode:
+            case OscInputItem.InputMode.Axis:
+                return "axis"
+            case OscInputItem.InputMode.Button:
+                return "button"
+            case OscInputItem.InputMode.OnChange:
+                return "change"
+            case OscInputItem.InputMode.Encoder:
+                return "encoder"
+        
         
     def _mode_from_string(self, value):
-        if value == "axis":
-            self._mode = OscInputItem.InputMode.Axis
-        elif value == "button":
-            self._mode = OscInputItem.InputMode.Button
-        elif value == "change":
-            self._mode = OscInputItem.InputMode.OnChange
-        else:
-            raise ValueError(f"mode_from_string(): don't know how to handle {value}")
+        match value:
+            case "axis":
+                self._mode = OscInputItem.InputMode.Axis
+            case "button":
+                self._mode = OscInputItem.InputMode.Button
+            case "change":
+                self._mode = OscInputItem.InputMode.OnChange
+            case "encoder":
+                self._mode = OscInputItem.InputMode.Encoder
+            case _:
+                raise ValueError(f"mode_from_string(): don't know how to handle {value}")
         
 
     @property
@@ -2674,6 +2682,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._autorelease = data._autorelease
         self._pulse_delay = data._autorelease_delay
         self._source_index = data._source_index
+        
 
         self._data_widgets = {} # value of the parameter
         self._label_widgets = {} # label for the parameter
@@ -2740,7 +2749,6 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._max_range_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self._max_range_widget.setValue(1.0) # default min range 
         self._min_range_widget.valueChanged.connect(self._max_range_cb)
-
 
         self._container_range_layout.addWidget(QtWidgets.QLabel("Min range:"))
         self._container_range_layout.addWidget(self._min_range_widget)
@@ -3097,6 +3105,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         # mode radio buttons
         autorelease_visible = False
         parameters_visible = True
+        range_visible = False
         if self._mode == OscInputItem.InputMode.Button:
             self._container_mode_description_widget.setText(f"The input will trigger a button press when the value is 1<br>Use this to trigger a button press from a specific OSC message.")
             with QtCore.QSignalBlocker(self._mode_button_widget):
@@ -3109,6 +3118,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             #self._command_mode = OscInputItem.CommandMode.Message # force message mode in axis as the value will determine the state
             with QtCore.QSignalBlocker(self._mode_axis_widget):
                 self._mode_axis_widget.setChecked(True)
+            range_visible = True
             
         elif self._mode == OscInputItem.InputMode.OnChange:
             self._container_mode_description_widget.setText(f"The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the OSC command value changes.")
@@ -3133,6 +3143,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._data_container_widget.setVisible(parameters_visible)
         self._source_container_widget.setVisible(parameters_visible)
         self._autorelease_container_widget.setVisible(autorelease_visible)
+
+        self._container_range_widget.setVisible(range_visible)
 
     def _update_message(self):
         ''' updates message data from UI '''
@@ -3969,6 +3981,7 @@ class InputOscClient(QtCore.QObject):
                 
                 input_item._axis_values = normalized_args
                 index = source_index # input_item.source_index # source index of the param
+                raw_value = 0.0
                 if args:
                     if index < len(args):
                         raw_value = args[input_item.source_index]

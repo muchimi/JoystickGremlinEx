@@ -101,6 +101,9 @@ class StateCategory():
     def id(self, value : str):
         self._id = value
 
+    def text(self) -> str:
+        return self._name
+
     def __eq__(self, value : StateCategory):
         if value is None: return False
         return self._id == value.id
@@ -325,8 +328,9 @@ class StateInputItem(AbstractInputItem):
         item.device_type = DeviceType.State
         item.device_guid = gremlin.shared_state.state_tab_guid
         item.setOverrideInputType(InputType.JoystickButton)
-
         self._input_item = item
+
+
 
 
     def clone(self):
@@ -1127,6 +1131,79 @@ class StateData(QtCore.QObject):
         eh.execute_event(event)
 
 
+class CategoryModel(QtCore.QAbstractListModel):
+    """
+    A custom list model that stores and provides a list of strings to a QListView.
+    """
+
+    def __init__(self, data=None, parent=None):
+        super().__init__(parent)
+        self._data = {} 
+        if data:
+            for index, item in enumerate(data):
+                self._data[index] = item
+        
+
+    def rowCount(self, parent=QModelIndex()):
+        """ Returns the number of rows in the model. """
+        return len(self._data) 
+
+    def data(self, index, role=QtCore.Qt.DisplayRole):
+        """
+        Retrieves the data for a given item and role.
+        """
+        if not index.isValid() or not (0 <= index.row() < self.rowCount()):
+            return None
+        
+        if role == QtCore.Qt.DisplayRole:
+            # Return the string at the given row for the DisplayRole
+            item = self._data[index.row()]
+            return item.text()
+
+        elif role == QtCore.Qt.EditRole:
+            # For editable models, return the data that can be edited
+            return self._data[index.row()]
+        elif role == QtCore.Qt.UserRole:
+            # You can define custom roles to store and retrieve additional data
+            # Here, let's return the length of the string at the given row
+            return len(self._data[index.row()])
+        return None
+
+    def setData(self, index, value, role=QtCore.Qt.EditRole):
+        """
+        Sets the data for a given item and role.
+        """
+        if not index.isValid() or not (0 <= index.row() < self.rowCount()):
+            return False
+
+        if role == QtCore.Qt.EditRole:
+            self._data[index.row()].name = value
+            self.dataChanged.emit(index, index, [role])
+            return True
+        return False
+
+    def flags(self, index):
+        """
+        Returns the item flags for a given index.
+        """
+        if not index.isValid():
+            return QtCore.Qt.NoItemFlags
+
+        # Make items selectable and editable
+        return QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+    
+    def addData(self, item, role=QtCore.Qt.EditRole):
+        ''' adds an item to the model '''
+        if not item in self._data:
+            index = len(self._data)
+            self._data[index] = item
+            self.dataChanged.emit(index, index, [role])
+
+    @property
+    def items(self):
+        ''' gets the data in the model'''
+        return self._data.values()
+    
 
 class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog showing the category configuration options '''
@@ -1148,9 +1225,11 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._parent = parent # list view
 
         self._cm = StateCategories()
+        categories = [item for item in self._cm.getCategories().values()]
         self._list_view = QtWidgets.QListView()
-        self._model = gremlin.ui.ui_common.QSimpleModel()
+        self._model = CategoryModel(categories)
         self._list_view.setModel(self._model)
+        
         
         main_layout.addWidget(self._list_view)
 
@@ -1214,8 +1293,10 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 
                 self._model.clear()
                 for item in keep:
-                    self._model.addItem(item.name, item)
+                    self._model.addData(item)
 
+
+                self._model.dataChanged.emit()
                 # select the first item kept
                 if keep:
                     self.list_view.setCurrentIndex(self.model.index(0,0))
@@ -1239,11 +1320,8 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             if self._cm.findByName(name):
                 gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"Category [{name}] already exists.")
             else:
-                category = StateCategory(name)
-                self._model.addItem(name, category)
-                
-
-
+                item = StateCategory(name)
+                self._model.addData(item)
 
      
     def _ok_button_cb(self):
@@ -1256,7 +1334,8 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 
     def getCategories(self) -> list:
         ''' gets a list of edited categories '''
-        return self._model.items()
+        categories = [item for item in self._model.items]
+        return categories
 
         
 
@@ -1276,7 +1355,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog showing the state input configuration options '''
 
-    def __init__(self, data : StateInputItem, parent):
+    def __init__(self, data : StateInputItem, parent = None):
         '''
         :param index - the input item index zero based
         :param identifier - the input item identifier 
@@ -1291,6 +1370,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self.setWindowTitle("State Editor")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent # list view
+        self._is_edit = data is not None
         
 
         main_layout = QtWidgets.QVBoxLayout()
@@ -1468,18 +1548,21 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             is_expression = True
 
         key = self.data.key
+
         if key:
             key_low = self.data.key.casefold().strip()
             if key_low:
-                id = self.data.id
-                sc = StateData()
-                data = sc.getStates()
-                if not is_expression:
-                    states = [item.key for item in data.values() if item.id != id and key_low == item.key]
-                    if states:
-                        gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.")
-                        return
-                    
+                if not self._is_edit:
+                    # validate if not editing 
+                    if not is_expression:
+                        id = self.data.id
+                        sc = StateData()
+                        data = sc.getStates()
+                        states = [item.key for item in data.values() if item.id != id and key_low == item.key]
+                        if states:
+                            gremlin.ui.ui_common.MessageBox(title ="State Error", prompt = f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.")
+                            return
+                        
                 gremlin.shared_state.pop_suspend_highlighting()
                 self.accept()
         else:
@@ -1797,10 +1880,12 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sd = StateData()
         trigger = False
         if self._edit_item._key != data.key:
+            # name change?
             sd.unregister(self._edit_item.key) # remove the old
             self._edit_item._key = data.key # change the key and don't fire the event
             sd.add(self._edit_item, False) # this fires the event
             trigger = True
+
         self._edit_item.description = data.description
         self._edit_item.setCategory(data.category)
         self._edit_item.expression = data.expression
@@ -1813,6 +1898,9 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
+
+        # redraw for any updates
+        self.input_item_list_view.redraw()
 
 
     def _clear_inputs_cb(self):
