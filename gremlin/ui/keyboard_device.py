@@ -31,7 +31,7 @@ import gremlin.shared_state
 import gremlin.util
 from . import input_item, ui_common
 from gremlin.keyboard import Key
-from .input_item import InputItemWidget, InputIdentifier, InputItemListView, InputItemConfigurationWidget
+from .input_item import InputItemWidget, InputIdentifier, InputItemListView, InputItemMappingWidget
 import uuid
 from gremlin.util import *
 from gremlin.input_types import InputType
@@ -608,7 +608,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = InputItemConfigurationWidget(item_data, object_name = f"Keyboard InputItemConfig for: {item_data.display_name}")
+                widget = InputItemMappingWidget(item_data, object_name = f"Keyboard InputItemConfig for: {item_data.display_name}")
                 self.registerWidget(key, widget)
             
             # Create new configuration widget
@@ -620,7 +620,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             #self.input_item_list_view.select_item(index, False)
             self.selectRegisteredWidget(key)
         else:
-            widget = InputItemConfigurationWidget(object_name = "Blank inputitemconfig for keyhboard device (select item cb - no item data)")
+            widget = InputItemMappingWidget(object_name = "Blank inputitemconfig for keyhboard device (select item cb - no item data)")
             self.setRightPanelWidget(widget)
 
         self._last_selected_index = index           

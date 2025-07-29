@@ -40,6 +40,7 @@ import win32gui, win32con
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+import inspect
 
 
 from . import error
@@ -1773,19 +1774,23 @@ class InvokeUiMethod(QtCore.QObject):
 
 
     def _exec(self, method, p0, p1, p2, p3, p4, p5):
-        pcount = 0
-        if p5 is not None:
-            pcount +=1
-        if p4 is not None:
-            pcount +=1
-        if p3 is not None:
-            pcount +=1
-        if p2 is not None:
-            pcount +=1
-        if p1 is not None:
-            pcount +=1
-        if p0 is not None:
-            pcount +=1
+        sig = inspect.signature(method)
+        pcount = len(sig.parameters)
+
+
+        # pcount = 0
+        # if p5 is not None:
+        #     pcount +=1
+        # if p4 is not None:
+        #     pcount +=1
+        # if p3 is not None:
+        #     pcount +=1
+        # if p2 is not None:
+        #     pcount +=1
+        # if p1 is not None:
+        #     pcount +=1
+        # if p0 is not None:
+        #     pcount +=1
 
         match pcount:
             case 0:

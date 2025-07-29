@@ -535,7 +535,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
                 container_widget = self._cache.retrieve_by_data(item_data)        
                 if not container_widget:
                     # create the container, cache it
-                    container_widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
+                    container_widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
                     self._cache.register(item_data, container_widget)
                 condition_container_layout.addWidget(container_widget)
                 
@@ -564,7 +564,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self._condition_tab.setTabIcon(index, self._icon_enabled if has_condition else self._icon_disabled)
                 
     QtCore.Slot(object)
-    def _mapping_changed_cb(self, item_data : gremlin.ui.input_item.InputItemConfigurationWidget):
+    def _mapping_changed_cb(self, item_data : gremlin.ui.input_item.InputItemMappingWidget):
         ''' hooks a mapping change '''
         item_data_map = self._range_info.item_data_map if self._is_range else self._gate_info.item_data_map
         if item_data in item_data_map.values():
@@ -962,9 +962,10 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         gh = GateEventHandler()
         gh.gatedata_stepsChanged.connect(self._update_steps_cb)
         gh.gatedata_valueChanged.connect(self._update_values_cb)
-        # gh.slider_marker_update.connect(self._slider_marker_update_handler)
+
         gh.gate_order_changed.connect(self._gate_order_changed_cb)
         gh.gate_value_changed.connect(self._gate_value_changed)
+        gh.gates_changed.connect(self._gates_changed)
         gh.use_default_range_changed.connect(self._update_range_display)
         gh.gate_configuration_changed.connect(self._gate_configuration_changed)
 
@@ -981,15 +982,16 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             if verbose:
                 syslog.info(f"gate axis widget: unhook {self.id} {self.action_data.input_display_name}")
 
-            eh = GateEventHandler()
+            gh = GateEventHandler()
 
-            eh.gatedata_stepsChanged.disconnect(self._update_steps_cb)
-            eh.gatedata_valueChanged.disconnect(self._update_values_cb)
-            #eh.slider_marker_update.disconnect(self._slider_marker_update_handler)
-            # eh.range_value_changed.disconnect(self._range_changed_cb)
-            eh.gate_order_changed.disconnect(self._gate_order_changed_cb)
-            eh.use_default_range_changed.disconnect(self._update_range_display)
-            eh.gate_configuration_changed.disconnect(self._gate_configuration_changed)
+            gh.gatedata_stepsChanged.disconnect(self._update_steps_cb)
+            gh.gatedata_valueChanged.disconnect(self._update_values_cb)
+
+            gh.gate_order_changed.disconnect(self._gate_order_changed_cb)
+            gh.gate_value_changed.disconnect(self._gate_value_changed)
+            gh.gates_changed.disconnect(self._gates_changed)
+            gh.use_default_range_changed.disconnect(self._update_range_display)
+            gh.gate_configuration_changed.disconnect(self._gate_configuration_changed)
             self._hooked = False
             
 
@@ -1051,12 +1053,14 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._sort_gate_layout()
 
     
-
-    
     def _sort_gate_layout(self):
+        gremlin.util.InvokeUiMethod(self._sort_gate_layout_ui)
+    
+    def _sort_gate_layout_ui(self):
         ''' updates and sorts the gate container layout '''
 
-        gremlin.util.assert_ui_thread()
+        if not Shiboken.isValid(self.gate_table_widget):
+            return
 
         self._gwi_map.clear()
         table = self.gate_table_widget
@@ -1087,6 +1091,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             
 
             self._update_gate_icon(gate.slider_index, gate)
+            widget.valueChanged.connect(self._gate_value_changed)
 
             table.setCellWidget(row, col, widget)
             self._gwi_map[gate] = (row, col)
@@ -1198,15 +1203,27 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.range_count_widget.setText(f"Ranges ({range_count}):")
         self.container_range_layout.update()
 
-
-    @QtCore.Slot(GateInfo)
-    def _gate_value_changed(self, gate : GateInfo):
+    def _gate_value_changed(self, gate):
+        gremlin.util.InvokeUiMethod(self._gate_value_changed_ui, gate)
+    
+    def _gate_value_changed_ui(self, gate):
         ''' called when a gate value changes '''
         if not Shiboken.isValid(self):
             return
-        if gate in self._gate_data.getGates():
+        
+        elif gate in self._gate_data.getGates():
             self._set_slider_gate_value(gate.slider_index, gate.value)
 
+        
+
+    def _gates_changed(self):
+        gremlin.util.InvokeUiMethod(self._gates_changed_ui)
+
+    def _gates_changed_ui(self):
+        if not Shiboken.isValid(self):
+            return
+        for gate in self._gate_data.getGates():
+            self._set_slider_gate_value(gate.slider_index, gate.value)
         # update icons on value change
         self._update_gate_icons()
 
@@ -1302,7 +1319,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         ''' occurs when the slider values change '''
         gate : GateInfo = self._gate_data.getGateSliderIndex(index)
         if gate is not None:
-            gate.setValue(value, emit = True)
+            gate.setValue(value, emit = False)
 
     def _set_slider_gate_value(self, index, value):
         ''' sets a gate value on the slider '''
@@ -1375,6 +1392,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._remove_gate(gate)
 
     def _remove_gate(self, gate):
+        gremlin.util.InvokeUiMethod(self._remove_gate, gate)
+
+    def _remove_gate_ui(self, gate):
 
         # ensure there are at least two gates left
         count = len(self._gate_data._gate_used_gates())
@@ -1403,14 +1423,16 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     def _delete_confirmed_cb(self, gate):
          self.deleteGate(gate)
 
-    QtCore.Slot(object, GateInfo)
     def _delete_gate_cb(self, gate):
         ''' delete the gate '''
         self.deleteGate(gate)
-        
+
+
+    def _configure_range_cb(self):
+        gremlin.util.InvokeUiMethod(self._configure_range_cb_ui)    
         
     @QtCore.Slot()
-    def _configure_range_cb(self):
+    def _configure_range_cb_ui(self):
         ''' open the configuration dialog for ranges '''
         widget = self.sender()  # the button's data field contains the widget to update
         rng = widget.data
@@ -1891,7 +1913,11 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             if widget:
                 widget._update_icon()
 
+
     def _update_output_value(self):
+        gremlin.util.InvokeUiMethod(self._update_output_value_ui)
+
+    def _update_output_value_ui(self):
         ''' updates triggers and UI when the slider input value changes '''
         if not Shiboken.isValid(self):
             return
@@ -1946,8 +1972,10 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             self._update_slider(self._gate_data.getGateValues())
             self._update_output_value()
 
+    def deletegate(self, gate):
+        gremlin.util.InvokeUiMethod(self._delete_gate_ui, gate)
 
-    def deleteGate(self, gate : GateInfo):
+    def _delete_gate_ui(self, gate : GateInfo):
         ''' remove a gate from this widget '''
         gwi : GateWidgetInfo = self._gwi_map[gate]
         gwi.setUsed(False)

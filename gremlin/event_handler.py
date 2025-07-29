@@ -321,6 +321,7 @@ class DeviceChangeEvent:
 		self.vjoy_device_id = 0
 		self.vjoy_input_id = 0
 		self.source = None # object source responsible for the change, for example, the action
+		
 
 class StateChangeEvent:
 	''' sent when the state changes '''

@@ -2098,7 +2098,7 @@ class OscInputItem(AbstractInputItem):
     ''' holds OSC input data '''
 
     message_key_changed = Signal(str, str) # fires when message key changes 
-    input_mode_changed = Signal() # fires when the repeater mode changes axis or button
+    input_type_changed = Signal(object) # fires when osc input type changes from button to axis or vice versa
 
     class InputMode(enum.Enum):
         ''' possible input modes '''
@@ -2215,7 +2215,7 @@ class OscInputItem(AbstractInputItem):
         if self._mode != value:
             self._mode = value
             self._update()
-            self.input_mode_changed.emit()
+            self.input_type_changed.emit(self)
 
     @property
     def is_axis(self) -> bool:
@@ -3424,28 +3424,6 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called when configuraition has changed '''
         self.refresh()      
 
-    # @QtCore.Slot()
-    # def _find_input_cb(self):
-    #     ''' finds an input '''
-    #     name, ok = QtWidgets.QInputDialog.getText(self, "OSC Lookup", "Search for:")
-    #     if ok:
-    #         name = name.casefold()
-    #         model = self.input_item_list_model.dataModel()
-    #         osc : OscInputItem
-    #         selected_index = None
-    #         item = None
-    #         for index, osc in model.items():
-    #             if osc.message.casefold() == name:
-    #                 selected_index = index
-    #                 item = osc
-    #                 break
-
-    #         if selected_index is not None:
-    #             self.input_item_list_view.select_item(selected_index,True)
-    #         else:
-    #             gremlin.ui.ui_common.MessageBox(prompt=f"OSC command [{name}] not found.")
-
-
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
         return self.input_item_list_view.itemAt(index)
@@ -3471,6 +3449,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """Adds a new input to the inputs list  """
         input_type = InputType.OpenSoundControl
         input_id = OscInputItem()
+        input_id.input_type_changed.connect(self._refresh_mappings)
 
         self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
         self.input_item_list_model.refresh()
@@ -3512,6 +3491,9 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sorted_keys = list(mode.config[InputType.OpenSoundControl].keys())
         return sorted_keys.index(input_id)
     
+    def _refresh_mappings(self, item):
+        ''' called when the mappings should be refreshed due to input change '''
+        pass
     
     def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
@@ -3551,7 +3533,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name=f"OSC: {item_data.display_name}")
+                widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"OSC: {item_data.display_name}")
                 self.registerWidget(key, widget)
             
             # Create new configuration widget
@@ -3563,7 +3545,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.selectRegisteredWidget(key)
         else:
             item_data = OscInputItem()
-            widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
+            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
 
         #self.setRightPanelWidget(widget)
 
@@ -3982,6 +3964,7 @@ class InputOscClient(QtCore.QObject):
                 input_item._axis_values = normalized_args
                 index = source_index # input_item.source_index # source index of the param
                 raw_value = 0.0
+                value = 0.0
                 if args:
                     if index < len(args):
                         raw_value = args[input_item.source_index]
@@ -3999,6 +3982,8 @@ class InputOscClient(QtCore.QObject):
                     is_pressed = False
                     is_axis = True
                     # update the current axis value for the input
+
+                    
                     
                     event = gremlin.event_handler.Event(
                         event_type = InputType.OpenSoundControl,

@@ -13,7 +13,9 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
-
+### (m76T35)
+- Fix: OSC axis value when in axis mode and no parameter received.
+- 
 ### (m76T34)
 - New feature: VJoy start value sync and initial value on profile start:
 	- In the profile settings tab, it is now possible to set both axis and button start values for any VJOY device on profile start, regardless of mappings.  These will be applied on profile start (or restart), and before any mappings are applied.

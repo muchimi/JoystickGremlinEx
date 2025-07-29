@@ -1435,6 +1435,7 @@ class QFloatLineEdit(QtWidgets.QWidget):
 
 
     def _update_value(self, value, format = True):
+        gremlin.util.assert_ui_thread()
         if value is None:
             return
         current_value = self._value
@@ -1443,7 +1444,7 @@ class QFloatLineEdit(QtWidgets.QWidget):
             s_value = f"{float(value):0.{self._decimals}f}"
         else:
             s_value = str(value)
-        if format and self._widget.text() != s_value:
+        if self._widget.text() != s_value:
             with QtCore.QSignalBlocker(self):
                 self._widget.setText(s_value)
         if current_value is None or current_value != value:
@@ -1492,8 +1493,6 @@ class QFloatLineEdit(QtWidgets.QWidget):
     def value(self) -> float:
         ''' current value, None if not a valid input'''
         return self._value
-    
-
 
     def isValid(self):
         ''' true if the input in the box is currently valid'''
@@ -1555,29 +1554,35 @@ class QFloatLineEdit(QtWidgets.QWidget):
         self._data = value
     
 
-class QFloatLineEditEx(QtWidgets.QLineEdit):
+class QFloatLineEditEx(QtWidgets.QWidget):
     ''' double input validator with optional range limits for input axis
 
         this line edit behaves like a spin box so it's interchangeable
 
     '''
-
+    
     valueChanged = QtCore.Signal(float) # fires when the value changes
     doubleClick = QtCore.Signal() # fires when the input is double clicked
 
+
     def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
         super().__init__(parent)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
+        self._widget = QtWidgets.QLineEdit()
+        self.main_layout.addWidget(self._widget)
+        
         self._min_range = min_range
         self._max_range = max_range
         self._step = step
         self._decimals = decimals
-
+        self._value = None      
         #self._validator = QFloatLineEdit.FloatValidator(bottom=min_range, top=max_range)
         self._validator = QtGui.QDoubleValidator(bottom=min_range, top=max_range)
         self._validator.setLocale(self.locale()) # handle correct floating point separator
         self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
-        self.setValidator(self._validator)
-        self.textChanged.connect(self._validate)
+        self._widget.setValidator(self._validator)
+        self._widget.textChanged.connect(self._validate)
         self.installEventFilter(self)
         #self.setText("0")
         self.setValue(value)
@@ -1587,6 +1592,7 @@ class QFloatLineEditEx(QtWidgets.QLineEdit):
             self._update_width(chars)
         else:
             self.chars = 0
+        
 
 
     @property
@@ -1606,7 +1612,11 @@ class QFloatLineEditEx(QtWidgets.QLineEdit):
         self.setMaximumWidth(w)
 
 
-
+    def isReadOnly(self) -> bool:
+        return self._widget.isReadOnly()
+    
+    def setReadOnly(self, value : bool):
+        self._widget.setReadOnly(value)
 
 
     def eventFilter(self, widget, event):
@@ -1646,11 +1656,14 @@ class QFloatLineEditEx(QtWidgets.QLineEdit):
     def _update_value(self, value):
         if value is None:
             return
-        other = self.value()
+        other = self._value
         if other is None or other != value:
             s_value = f"{float(value):0.{self._decimals}f}"
-            if s_value != self.text():
-                self.setText(s_value)
+            self._value = value
+            if s_value != self._widget.text():
+                with QtCore.QSignalBlocker(self):
+                    self._widget.setText(s_value)
+                
             self.valueChanged.emit(value)
 
 
@@ -1658,9 +1671,11 @@ class QFloatLineEditEx(QtWidgets.QLineEdit):
     @QtCore.Slot()
     def _validate(self):
         ''' called whenever the text changes '''
-        if self.hasAcceptableInput():
+        if self._widget.hasAcceptableInput():
             value = self.value()
-            self.valueChanged.emit(value)
+            self._update_value(value)
+            
+            
 
     def setValue(self, value : float):
         ''' sets the value '''
@@ -1668,10 +1683,10 @@ class QFloatLineEditEx(QtWidgets.QLineEdit):
 
     def value(self) -> float:
         ''' current value, None if not a valid input'''
-        if self.hasAcceptableInput():
-            return float(self.text())
+        if self._widget.hasAcceptableInput():
+            return float(self._widget.text())
         try:
-            text = self.text()
+            text = self._widget.text()
             if text:
                 v = float(text)
                 return v
@@ -1681,7 +1696,7 @@ class QFloatLineEditEx(QtWidgets.QLineEdit):
 
     def isValid(self):
         ''' true if the input in the box is currently valid'''
-        return self.hasAcceptableInput()
+        return self._widget.hasAcceptableInput()
 
     def step(self):
         ''' mouse wheel step value'''
@@ -7312,7 +7327,7 @@ class QSplitTabWidget(QDataWidget):
         ''' returns configuration items currently displayed in the UI '''
         import gremlin.ui.input_item
         widget =  self._config_widget.currentWidget()
-        if isinstance(widget, gremlin.ui.input_item.InputItemConfigurationWidget):
+        if isinstance(widget, gremlin.ui.input_item.InputItemMappingWidget):
             return widget
         return None
     
@@ -7323,7 +7338,7 @@ class QSplitTabWidget(QDataWidget):
     def getContentInputId(self):
         ''' gets the input id currently displayed '''
         import gremlin.ui.input_item
-        widget : gremlin.ui.input_item.InputItemConfigurationWidget = self.getContentWidget()
+        widget : gremlin.ui.input_item.InputItemMappingWidget = self.getContentWidget()
         if widget:
             return widget.item_data.input_id
         return None
@@ -7331,7 +7346,7 @@ class QSplitTabWidget(QDataWidget):
     def getContentInputItem(self):
         ''' gets the input id currently displayed '''
         import gremlin.ui.input_item
-        widget : gremlin.ui.input_item.InputItemConfigurationWidget = self.getContentWidget()
+        widget : gremlin.ui.input_item.InputItemMappingWidget = self.getContentWidget()
         if widget:
             return widget.item_data
         return None
@@ -7345,7 +7360,7 @@ class QSplitTabWidget(QDataWidget):
         widget = self.getRegisteredWidget(key)
         if not widget:
             self._ensure_blank_widget()
-            key = self.getWidgetKey(self._blank_input_id)
+            key = self.getWidgetKey(input_type, self._blank_input_id)
             widget = self.getRegisteredWidget(key)
             
         if widget:

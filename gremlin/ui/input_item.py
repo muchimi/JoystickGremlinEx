@@ -495,7 +495,7 @@ class InputItemListView(ui_common.AbstractView):
 
 
         el = gremlin.event_handler.EventListener()
-        el.profile_device_mapping_changed.connect(self._profile_device_mapping_changed)
+        el.mapping_changed.connect(self._mapping_changed)
 
 
 
@@ -508,17 +508,14 @@ class InputItemListView(ui_common.AbstractView):
         ''' gets the device associated with this list view '''
         return self.model._device_data
 
+    def _mapping_changed(self, item_data):
+        gremlin.util.InvokeUiMethod(self._mapping_changed_ui, item_data) # to UI thread if needed
 
-    def _profile_device_mapping_changed(self, event):
-        if not event.device_guid:
-            return
+    def _mapping_changed_ui(self, item_data):
+        ''' mapping changed '''
         for index in range(self.model.rows()):
             data = self.model.data(index)
-            if data.input_type not in self.shown_input_types:
-                continue
-            if data.input_type != event.device_input_type:
-                continue
-            if data.input_id != event.device_input_id:
+            if data != item_data:
                 continue
             self.redraw_index(index)
 
@@ -949,6 +946,7 @@ class ActionSetModel(ui_common.AbstractModel):
         event.device_input_id = action.hardware_input_id
         event.device_input_type = action.hardware_input_type
         event.source = action
+        
         el.icon_changed.emit(event)
 
         
@@ -967,7 +965,9 @@ class ActionSetModel(ui_common.AbstractModel):
 
             event = gremlin.event_handler.DeviceChangeEvent()
             event.source = input_item
+            event.device_input_id = input_item
             el.icon_changed.emit(event)
+            
             
             
         self.data_changed.emit()
@@ -3585,7 +3585,7 @@ class ConditionActionWrapper(AbstractActionWrapper):
 
 
 
-class InputItemConfigurationWidget(QtWidgets.QFrame):
+class InputItemMappingWidget(QtWidgets.QFrame):
 
     """ mapping viewer for a selected input item (this is the right side of the device tab) """
 
@@ -3625,8 +3625,19 @@ class InputItemConfigurationWidget(QtWidgets.QFrame):
 
         self.setItemData(item_data)
 
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.connect(self._mapping_changed)
+
         self._deleted = False
 
+        
+    def _mapping_changed(self, item_data):
+        ''' occurs when a device mapping changed through user interaction with the UI '''
+        from gremlin.event_handler import DeviceChangeEvent
+        if item_data != self.item_data:
+            # not ours
+            return
+        self.refresh()
         
 
 
@@ -3647,14 +3658,25 @@ class InputItemConfigurationWidget(QtWidgets.QFrame):
         return self._deleted
     
     
-    
+    def refresh(self):
+        ''' refreshes the current content with any changes '''
+        gremlin.util.InvokeUiMethod(self._refresh_ui)
+
+    def _refresh_ui(self):
+        ''' refresh on ui thread'''
+        self.setItemData(None)
 
 
     def setItemData(self, item_data):
         ''' updates the item data '''
 
         from gremlin.ui.joystick_device import JoystickDeviceTabWidget
-        assert item_data is not None, "Item data must be provided"
+        assert gremlin.util.is_ui_thread()
+
+        if item_data is None:
+            assert self.item_data, "Device data must be provided"
+            item_data = self.item_data
+        
         self.setUpdatesEnabled(False)
         try:
             gremlin.util.clear_layout(self.main_layout)
@@ -4235,11 +4257,11 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
     """Stores action containers for display using the corresponding view."""
 
-    def __init__(self, containers, item_data : InputItemConfigurationWidget = None, input_type: InputType = None, parent=None):
+    def __init__(self, containers, item_data : InputItemMappingWidget = None, input_type: InputType = None, parent=None):
         """Creates a new instance.
 
         :param containers: the container instances of this model
-        :param item_data: the input mapping data (InputItemConfigurationWidget)
+        :param item_data: the input mapping data (InputItemMappingWidget)
         :param input_type: the override input type if different from the input item configuration
         :param parent: the parent of this widget
         """
@@ -4249,7 +4271,7 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
         self._input_type = input_type if input_type is not None else item_data._input_type
 
     @property
-    def item_data(self) -> InputItemConfigurationWidget:
+    def item_data(self) -> InputItemMappingWidget:
         ''' get the item data associated with this action container '''
         return self._item_data
     
@@ -4287,7 +4309,6 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
         :param container the container instance to remove
         """
         el = gremlin.event_handler.EventListener()
-
         if container in self._containers:
             # notify actions that the container is closing
             for action_set in container.action_sets:
@@ -4295,13 +4316,15 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
                     for action in action_set:
                         el.action_delete.emit(self._item_data, container, action)
 
-            del self._containers[self._containers.index(container)]
-        self.data_changed.emit()
-        el.container_delete.emit(self.item_data, container)
-        el.mapping_changed.emit(self.item_data)
-        
 
-        
+            self._containers.remove(container)
+
+            # self._item_data.remove_container(container)
+            
+            self.data_changed.emit()
+            el.container_delete.emit(self.item_data, container)
+            el.mapping_changed.emit(self.item_data)
+
 
     def remove_all_containers(self):
         """Removes an existing container from the model.

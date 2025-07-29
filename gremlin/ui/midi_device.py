@@ -1594,7 +1594,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         
-        # widget = gremlin.ui.joystick_device.InputItemConfigurationWidget(object_name="MIDI Blank InputConfigItem (clear inputs)")     
+        # widget = gremlin.ui.joystick_device.InputItemMappingWidget(object_name="MIDI Blank InputConfigItem (clear inputs)")     
         # self.setRightPanelWidget(widget)
         self._blank_input()
 
@@ -1637,7 +1637,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name=f"MIDI: {item_data.display_name}")
+                widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"MIDI: {item_data.display_name}")
                 self.registerWidget(key, widget)
 
             change_cb = self._create_change_cb(index)
@@ -1648,7 +1648,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         else:
             item_data = MidiInputItem()
-            widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name="MIDI Blank InputConfigItem (no item data)")     
+            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="MIDI Blank InputConfigItem (no item data)")     
             
 
         self._last_selected_index = index            

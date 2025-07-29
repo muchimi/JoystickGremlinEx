@@ -20,6 +20,7 @@ from collections.abc import MutableSequence
 from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
 
+from psygnal import Signal
 import gremlin.config
 import gremlin.shared_state
 import logging
@@ -223,6 +224,8 @@ class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
 
 class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     ''' base class for input items for MIDI, OSC, KEYBOARD and STATE items '''
+
+    input_type_change = Signal(object) # fires when an input item needs to refresh the output mapping due to input type changed
 
     def __init__(self):
         

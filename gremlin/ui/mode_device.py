@@ -306,7 +306,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         key = self.getWidgetKey(input_type, index)
         widget = self.getRegisteredWidget(key)
         if not widget:
-            widget = gremlin.ui.input_item.InputItemConfigurationWidget(item_data, object_name = f"Mode  [{item_data.display_name}]")
+            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name = f"Mode  [{item_data.display_name}]")
             self.registerWidget(key, widget)
 
         self._item_data = item_data

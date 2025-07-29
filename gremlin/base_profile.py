@@ -1715,6 +1715,14 @@ class InputItem():
         self._containers.append(container)
 
     def remove_container(self, container):
+        if not container in self._containers:
+            id = container.id
+            for c in self._containers:
+                if c.id == id:
+                    self._containers.remove(c)
+                    break
+            return
+                
         self._containers.remove(container)
 
     def get_containers(self):

@@ -638,6 +638,7 @@ class RangeInfo():
         eh = GateEventHandler()
         eh.gate_value_changed.connect(self._gate_value_changed_cb)
         eh.gate_used_changed.connect(self._gate_used_changed_cb)
+        
 
 
 
@@ -925,7 +926,7 @@ class RangeInfo():
     @QtCore.Slot(GateInfo)
     def _gate_value_changed_cb(self, gate):
         ''' occurs when either gate values change or gates are changed '''
-        if gate.id == self._g1_id or gate.id == self._g2_id:
+        if gate is None or (gate.id == self._g1_id or gate.id == self._g2_id):
             eh = GateEventHandler()
             eh.range_value_changed.emit(self)
             # print (f"Range: value changed: G1: set to {self.v1:0.{_decimals}f} G2: set to {self.v2:0.{_decimals}f}")
@@ -1127,6 +1128,7 @@ class GateEventHandler(QtCore.QObject):
     gatedata_valueChanged = Signal(object) # signals when the gate data changes (gatedata)
 
     gate_value_changed = Signal(GateInfo) # fires when a gate value changes (GateInfo)
+    gates_changed = Signal() # fires when all gates changed
     gate_configuration_changed = Signal(GateInfo) # fires when a gate changes its configuration data
     gate_index_changed = Signal(GateInfo) # fires when the gate slider index changes
 
@@ -1507,7 +1509,7 @@ class GateData():
         # build allowed mode list
    
 
-        item_data: gremlin.ui.input_item.InputItemConfigurationWidget
+        item_data: gremlin.ui.input_item.InputItemMappingWidget
 
         eh = gremlin.event_handler.EventHandler()
         ec = gremlin.execution_graph.ExecutionContext()
@@ -2284,12 +2286,14 @@ class GateData():
         for index, gate in enumerate(gates):
             if verbose:
                 syslog.info(f"\tGate [{index}] value: {current:0.{_decimals}f}")
-            gate.value = current
+            gate.setValue(current, emit = False) # don't update the UI
             current += interval
             
             if current > max_value:
                 current = max_value # clamp for rounding errors
         
+        eh = GateEventHandler()
+        eh.gates_changed.emit()
 
 
     def _get_next_gate_index(self):
@@ -3354,6 +3358,8 @@ class TriggerData():
 class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
     ''' holds the data for a single gate '''
 
+    valueChanged = Signal(object) # fires when a gate value is changed
+
     def __init__(self, gate : GateInfo, 
                  configure_handler,
                  delete_confirm_handler,
@@ -3367,6 +3373,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.setup_icon = None
         self.display_index = 0 # display index for ordering
         self.warning_visible = False # flag for warning label/icon
+        self._lock = False
         
 
         # hook gate used flag to update widget visibility
@@ -3393,6 +3400,9 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
 
     def _update_icon(self):
+        gremlin.util.InvokeUiMethod(self._update_icon_ui)
+
+    def _update_icon_ui(self):
         ''' updates the icon on the setup button depending on the container state '''
 
         if self.gate.hasAnyContainers():
@@ -3442,7 +3452,10 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
             self._update_icon()
 
     def _update_value(self, value):
-        ''' updates the display gate value '''
+        gremlin.util.InvokeUiMethod(self._update_value_ui, value)
+
+    def _update_value_ui(self, value):
+        ''' updates the display gate value on UI thread '''
         with QtCore.QSignalBlocker(self.value_widget):
             # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
             self.value_widget.setValue(value)
@@ -3500,8 +3513,8 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.label_warning.setMinimumWidth(20)
         #self.label_warning.setVisible(False)
         
-        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(gate, range_min, range_max, value = gate.display_value)
-
+        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(gate, range_min, range_max)
+        self.value_widget.setValue(gate.value)
         self.value_widget.valueChanged.connect(self._value_changed_cb) # hook manual changes made to the widget
 
         self.grab_widget = gremlin.ui.ui_common.QDataPushButton()
@@ -3545,8 +3558,11 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
     def setValue(self, value : float, emit=True):
         ''' sets the gate value on the widget'''
-        with QtCore.QSignalBlocker(self.value_widget):
-            self.value_widget.setValue(value)
+        if self._lock:
+            return
+        if value != self.value_widget.value():
+            with QtCore.QSignalBlocker(self.value_widget):
+                self.value_widget.setValue(value)
         self.gate.setValue(value, emit=emit)
 
     def setUsed(self, value : bool):
@@ -3555,10 +3571,12 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.gate.setUsed(value)
 
 
-    def _value_changed_cb(self):
+    def _value_changed_cb(self, value):
         ''' called to record a value changed when the gate value widget is manually changed '''
-        value = gremlin.util.scale_to_range(self.value_widget.value(), self.value_widget.minimum(), self.value_widget.maximum(), -1.0, 1.0)
-        self.gate.setValue(value, emit=True)
+        value = gremlin.util.scale_to_range(value, self.value_widget.minimum(), self.value_widget.maximum(), -1.0, 1.0)
+        self.gate.setValue(value, emit=False)
+        self.valueChanged.emit(self.gate)
+        
 
     def setIcon(self, icon, color = None):
         ''' sets the icon, pass a None value to clear it'''
