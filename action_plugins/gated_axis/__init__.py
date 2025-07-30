@@ -170,6 +170,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
             range_info : RangeInfo = info_object
             self._range_info = range_info
+            self.setWindowTitle("Gated Axis Range Configuration")
             self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration: {info_object.range_display()}"))
 
             self.range_description_widget = gremlin.ui.ui_common.QDataLineEdit()
@@ -281,6 +282,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
         else:
             # gate configuration
+            self.setWindowTitle("Gated Axis Gate Configuration")
             self._gate_info = info_object
             self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {self._gate_info.slider_index + 1} Configuration:"))
 

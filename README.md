@@ -15,6 +15,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 ### (m76T35)
 - Fix: OSC axis value when in axis mode and no parameter received.
+- Fix: Gated Axis UI gate data numeric display and interactions updated to new event model.
+- 
 - 
 ### (m76T34)
 - New feature: VJoy start value sync and initial value on profile start:
