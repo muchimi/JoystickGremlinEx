@@ -1516,6 +1516,10 @@ class InputItemWidget(QBoxFrame):
         # event filter
         self.installEventFilter(self)
 
+        # hook mapping changed event
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.connect(self._mapping_changed_cb)
+
         # update mapping action icons
         self._update_repeater() # create the correct repeater widget
         self._update_selected_ui()
@@ -1553,6 +1557,9 @@ class InputItemWidget(QBoxFrame):
         self._title_container_widget.setStyleSheet(css)
 
     def _update_container_id(self):
+        gremlin.util.InvokeUiMethod(self._update_container_id_ui) # on UI thread
+
+    def _update_container_id_ui(self):
         ''' updates container ID display for associated containers with this input '''
         config = gremlin.config.Configuration()
         gremlin.util.clear_layout(self._container_id_layout)
@@ -1805,10 +1812,15 @@ class InputItemWidget(QBoxFrame):
             # find the widget corresponding to this action
             self.clear_action_icon(self.data, action)
 
-    @QtCore.Slot(object)
     def _mapping_changed_cb(self, item_data):
+        ''' called when a mapping changes - sends the item being changed '''
         if item_data == self.data:
-            self._update_container_id()
+            gremlin.util.InvokeUiMethod(self._mapping_changed_cb_ui, item_data)
+
+    def _mapping_changed_cb_ui(self, item_data):
+            ''' update the widget on mapping change '''
+            self._update_container_id_ui()
+            self._update_action_icons_ui()
         
                 
 
@@ -2588,12 +2600,6 @@ class ConditionStateTracker():
         if not isinstance(container, gremlin.base_profile.AbstractContainer):
             return
         self.unregister(input_item, container)
-
-        # update the input item icons
-        el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.DeviceChangeEvent()
-        event.source = input_item
-        el.icon_changed.emit(event)
                     
     @QtCore.Slot()
     def _mapping_changed(self):
@@ -4343,9 +4349,8 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
             el.container_delete.emit(self.item_data, container)
             del self._containers[self._containers.index(container)]
-        self.data_changed.emit()
 
-        
+        self.data_changed.emit()
         el.mapping_changed.emit(self.item_data)
         
 

@@ -509,6 +509,7 @@ class EventListener(QtCore.QObject):
 	osc_input_port_changed = Signal() # occurs when OSC input port is changed
 	osc_output_port_changed = Signal() # occurs when OSC output port is changed
 	osc_output_server_changed = Signal() # occurs when OSC server output IP is changed
+	osc_loopback = Signal(object) # occurs when a loopback message is sent [osc_message]
 
 	# request MIDI start/stop
 	request_midi = Signal(bool) # param - flag - true to start, false to stop
@@ -2369,7 +2370,8 @@ class EventHandler(QtCore.QObject):
 				# search callbacks for mode hierarchy
 				callback_list = ec.getCallbacks(self.osc_callbacks[event.device_guid], key, self.runtime_mode)
 
-			verbose = gremlin.config.Configuration().verbose_mode_osc
+			config = gremlin.config.Configuration()
+			verbose = config.verbose_mode_osc and config.verbose_mode_extra
 			if verbose and not callback_list:
 				# syslog = logging.getLogger("system")
 				syslog.info(f"EVENT: OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")

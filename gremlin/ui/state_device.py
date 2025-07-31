@@ -94,6 +94,13 @@ class StateCategory():
             value = value.casefold().strip()
         self._name = value
 
+
+    @property
+    def key(self) -> str:
+        if self._name:
+            return self._name.casefold().strip()
+        return None
+
     @property
     def id(self) -> str:
         return self._id
@@ -260,15 +267,28 @@ class StateCategories(QtCore.QObject):
         widget = gremlin.ui.ui_common.QDataComboBox()
         widget.setEditable(editable)
         widget.setValidator(CategoryValidator())
-        widget.addItem(self._default_category.name, self._default_category)
+
         index = 0
         select_index = None
         default_id = default_category.id if default_category else None
+        categories = []
         for category in self._categories.values():
-            widget.addItem(category.name, category)
-            if default_id and default_id == category.id:
-                select_index = index
-            index +=1 
+            key = category.key
+            if not key in categories:
+                widget.addItem(category.name, category)
+                if select_index is None and default_id and default_id == category.id:
+                    select_index = index
+                index +=1 
+                categories.append(key)
+
+        if default_category:
+            key = default_category.key
+            if not key in categories:
+                widget.addItem(default_category.name, default_category)
+                if select_index is None and default_id and default_id == category.id:
+                    select_index = index
+                index +=1 
+
         widget.setMinimumWidth(200)
         if select_index is not None:
             widget.setCurrentIndex(select_index)
@@ -1824,9 +1844,6 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._edit_item_index = index
         self._is_edit = True
         self._index = index
-
-
-
 
     def _edit_item_cb(self, widget, index, input_id):
         ''' edit the state  '''

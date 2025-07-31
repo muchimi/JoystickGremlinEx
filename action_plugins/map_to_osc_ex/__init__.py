@@ -990,10 +990,10 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
         is_axis = self.action_data.input_is_axis()
-        if is_axis:
-            # hook the input
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self._joystick_event_handler)
+        # if is_axis:
+        #     # hook the input
+        #     el = gremlin.event_handler.EventListener()
+        #     el.joystick_event.connect(self._joystick_event_handler)
 
 
         self._osc_widget = gremlin.ui.ui_common.QDataLineEdit()
@@ -1105,24 +1105,21 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
-    def _joystick_event_handler(self, event):
-        ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
-        if gremlin.shared_state.is_running:
-            return 
+    # def _joystick_event_handler(self, event):
+    #     ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
+    #     if gremlin.shared_state.is_running:
+    #         return 
 
-        if not event.is_axis:
-            return 
+    #     if not event.is_axis:
+    #         return 
         
-        value = event.value
+    #     value = event.value
         
-        if event.device_guid != self.action_data.hardware_device_guid:
-            return
-        if event.identifier != self.action_data.hardware_input_id:
-            return
-
-        self._v1_widget.setRepeaterValue(value)
-        self._v2_widget.setRepeaterValue(value)
-
+    #     if event.device_guid != self.action_data.hardware_device_guid:
+    #         return
+    #     if event.identifier != self.action_data.hardware_input_id:
+    #         return
+        
     @QtCore.Slot()
     def _test_command(self):
         ''' sends a test command '''

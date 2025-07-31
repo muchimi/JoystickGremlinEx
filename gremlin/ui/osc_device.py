@@ -1571,6 +1571,7 @@ class OscClient():
         self._client = None
         self._started = False
         self._name = name
+        self._loopback = False # true if the client sends to the current server hosted in this process (same IP, same port)
 
     def setPort(self, port):
         self._output_port = port
@@ -1579,6 +1580,10 @@ class OscClient():
         self._server_ip = host
         if output_port is not None:
             self._output_port = output_port
+
+    @property
+    def isLoopback(self) -> bool:
+        return self._loopback
         
 
     def setName(self, value : str):
@@ -1590,34 +1595,47 @@ class OscClient():
         :param server_ip = ip address of server in format xxx.xxx.xxx.xxx
         :param server_port = output port
         '''
-
+        
         if self._started:
             # already started
             return
+        
+        verbose = gremlin.config.Configuration().verbose_mode_osc
 
         if server_ip:
             self._server_ip = server_ip
         if server_port:
             self._output_port = server_port
-        
-        # syslog = logging.getLogger("system")
-        if self._server_ip is not None and self._output_port is not None:
-            self._client = UDPClient(self._server_ip, self._output_port)
-            self._started = True
-            syslog.info(f"OSC client: {self._name} starting {self._server_ip} port: {self._output_port}")
+
+        oi = OscInterface()
+        if self._server_ip == oi.hostIp and self._output_port == oi.hostPort:
+            # loopback scenario
+            self._loopback = True
+            if verbose: syslog.info(f"OSC loopback client: {self._name} starting {self._server_ip} port: {self._output_port}")
         else:
-            syslog.error(f"OSC client: {self._name} Invalid OSC configuration, provide server IP and port #")
+            # syslog = logging.getLogger("system")
+            if self._server_ip is not None and self._output_port is not None:
+                self._client = UDPClient(self._server_ip, self._output_port)
+                self._started = True
+                if verbose: syslog.info(f"OSC client: {self._name} starting {self._server_ip} port: {self._output_port}")
+            else:
+                syslog.error(f"OSC client: {self._name} Invalid OSC configuration, provide server IP and port #")
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.stop)
 
     def stop(self):
+        verbose = gremlin.config.Configuration().verbose_mode_osc
         if self._started:
             self._started = False
-            self._client.stop() # stop UDP client
-            self._client = None
-            # syslog = logging.getLogger("system")
-            syslog.info(f"OSC: client stop: ip: {self._server_ip} port: {self._output_port}")
+            if self._loopback:
+                self._loopback = False
+                if verbose: syslog.info(f"OSC: loopback client stop: ip: {self._server_ip} port: {self._output_port}")
+            else:
+                self._client.stop() # stop UDP client
+                self._client = None
+                # syslog = logging.getLogger("system")
+                if verbose: syslog.info(f"OSC: client stop: ip: {self._server_ip} port: {self._output_port}")
         
 
     def add_arg(self, builder, value):
@@ -1666,9 +1684,13 @@ class OscClient():
         self.add_arg(builder, v2)
 
         osc = builder.build()
-        self._send(osc)
 
-    
+        if self._loopback:
+            # send via the internal loop back   
+            el = gremlin.event_handler.EventListener()
+            el.osc_loopback.emit(osc)
+        else:
+            self._send(osc)
 
     def sendEx(self, command : str, *args):
         ''' sends a variable number args to OSC '''
@@ -1681,7 +1703,13 @@ class OscClient():
                 self.add_arg(builder, arg)
 
         osc = builder.build()
-        self._send(osc)
+
+        if self._loopback:
+            # send via the internal loop back   
+            el = gremlin.event_handler.EventListener()
+            el.osc_loopback.emit(osc)
+        else:
+            self._send(osc)
 
     
     def _send(self, content):
@@ -1719,8 +1747,8 @@ class OscServer():
         self._dispatcher = None
         self._callback = None
 
-        eh = gremlin.event_handler.EventListener()
-        eh.shutdown.connect(self._shutdown)
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self._shutdown)
 
 
     def setHostIp(self, host_ip, input_port):
@@ -1778,8 +1806,6 @@ class OscServer():
             syslog.info(f"OSC: server start {self._host_ip} port {self._input_port}")        
 
 
-
-
     def stop(self):
         ''' stops the server '''
         if not self._running or self._start_requested:
@@ -1793,6 +1819,7 @@ class OscServer():
         self._server_thread = None
         self._running = False
         syslog.info("OSC: server stopped")
+
 
     
 
@@ -1864,12 +1891,16 @@ class OscInterface(QtCore.QObject):
         el.osc_output_port_changed.connect(self._output_port_changed)
         el.osc_output_server_changed.connect(self._output_server_changed)
         el.host_ip_changed.connect(self.setHostIp)
-        
+        el.osc_loopback.connect(self._loopback_handler)
 
         self.setHostIp(host_ip)
         self._osc_internal_client = self.getClient(self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
         self._started = False
 
+
+    def _loopback_handler(self, data : OscMessage):
+        ''' handles a loopback osc message '''
+        self._osc_message_handler(data.address, *data.params)
  
     def setHostIp(self, host_ip):
         ''' sets a new host IP for the OSC server '''
@@ -1882,7 +1913,13 @@ class OscInterface(QtCore.QObject):
             if self._osc_server:
                 self._osc_server.setHostIp(host_ip, self._input_port) # server listening
 
-
+    @property
+    def hostIp(self) -> str:
+        return self._host_ip
+    
+    @property
+    def hostPort(self) -> int:
+        return self._input_port
 
     @QtCore.Slot(bool)
     def _request_osc_state(self, state : bool):
@@ -2042,7 +2079,7 @@ class OscInterface(QtCore.QObject):
     def _osc_message_handler(self, address, *args):
         ''' handles internal OSC messages'''
         verbose = gremlin.config.Configuration().verbose_mode_osc
-        if verbose: syslog.info(f"OSC: {address}: {args}")
+        if verbose: syslog.info(f"OSC: received: {address}: {args}")
         address = address.casefold()
         if address == "/noop":
             # heartbeat
@@ -2134,6 +2171,7 @@ class OscInputItem(AbstractInputItem):
         self._autorelease = False # true if auto-release
         self._autorelease_delay = 250 # default release delay
         self._profile_mode = gremlin.shared_state.edit_mode
+        self._autorelease_timer = None # autorelease timer for this input 
       
         self._axis_values = []
         current_mode = gremlin.shared_state.current_mode
@@ -2142,6 +2180,15 @@ class OscInputItem(AbstractInputItem):
         tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self.getCompoundMessageKey(), self._guid)
         client = InputOscClient()
         client.registerInput(self)
+
+    @property
+    def autorelease_timer(self):
+        return self._autorelease_timer
+    @autorelease_timer.setter
+    def autorelease_timer(self, timer):
+        if self._autorelease_timer:
+            self._autorelease_timer.cancel()
+        self._autorelease_timer = timer
 
     @property
     def profile_mode(self):
@@ -2721,7 +2768,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._container_mode_radio_widget = QtWidgets.QWidget()
         self._container_mode_radio_layout = QtWidgets.QHBoxLayout(self._container_mode_radio_widget )
         
-        self._container_mode_description_widget = QtWidgets.QLabel()
+        self._container_mode_description_widget = gremlin.ui.ui_common.QInfoBox()
 
         self._container_command_mode_radio_widget = QtWidgets.QWidget()
         self._container_command_mode_radio_layout = QtWidgets.QHBoxLayout()
@@ -2735,9 +2782,14 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                                             "If the value is in the upper half of the reange, the button will be pressed<br>")
         self._mode_button_widget.clicked.connect(self._mode_button_cb)
 
+
         self._mode_axis_widget = QtWidgets.QRadioButton("Axis")
         self._mode_axis_widget.setToolTip("The input will be scaled (-1 to +1) based on the input's value")
         self._mode_axis_widget.clicked.connect(self._mode_axis_cb)
+
+
+
+      
 
         self._container_range_widget = QtWidgets.QWidget()
         self._container_range_layout = QtWidgets.QHBoxLayout(self._container_range_widget)
@@ -2777,18 +2829,29 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._autorelease_widget.clicked.connect(self._autorelease_change_cb)
 
 
-        self._autorelease_container_widget = QtWidgets.QWidget()
-        self._autorelease_container_layout = QtWidgets.QHBoxLayout(self._autorelease_container_widget)
-        self.pulse_spin_widget = QtWidgets.QSpinBox()
-        self.pulse_spin_widget.setMinimum(0)
-        self.pulse_spin_widget.setMaximum(60000)
-        self.pulse_spin_widget.setValue(self._pulse_delay)
-        self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
+        self._trigger_on_message_widget = QtWidgets.QCheckBox("Trigger on message")
+        self._trigger_on_message_widget.setChecked(self._autorelease)
+        self._trigger_on_message_widget.clicked.connect(self._autorelease_change_cb)
+        self._trigger_on_message_widget.setToolTip("When enabled, receiving a message regardless of parameter will trigger the action with an autorelease.<br>Use this option when the OSC source message does not send >0 for press, 0 for release.")
+        self._trigger_on_message_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self._pulse_delay, callback = self._pulse_value_changed)
+        
 
-        self._autorelease_container_layout.addWidget(self._autorelease_widget)
-        self._autorelease_container_layout.addWidget(QtWidgets.QLabel("Pulse duration (ms):"))
-        self._autorelease_container_layout.addWidget(self.pulse_spin_widget)
-        self._autorelease_container_layout.addStretch()
+        self._container_trigger_widget, _ = gremlin.ui.ui_common.getHContainer([self._trigger_on_message_widget, self._trigger_on_message_delay_widget])
+
+
+        # self._autorelease_container_widget = QtWidgets.QWidget()
+        # self._autorelease_container_layout = QtWidgets.QHBoxLayout(self._autorelease_container_widget)
+
+        # self.pulse_spin_widget = QtWidgets.QSpinBox()
+        # self.pulse_spin_widget.setMinimum(0)
+        # self.pulse_spin_widget.setMaximum(60000)
+        # self.pulse_spin_widget.setValue(self._pulse_delay)
+        # self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
+
+        # self._autorelease_container_layout.addWidget(self._autorelease_widget)
+        # self._autorelease_container_layout.addWidget(QtWidgets.QLabel("Pulse duration (ms):"))
+        # self._autorelease_container_layout.addWidget(self.pulse_spin_widget)
+        # self._autorelease_container_layout.addStretch()
         
 
 
@@ -2837,8 +2900,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         main_layout.addWidget(self._parameter_widget)
         main_layout.addWidget(self._source_widget)
         main_layout.addWidget(self._container_options_widget)
+        main_layout.addWidget(self._container_trigger_widget)
         main_layout.addWidget(self._container_range_widget)
-        main_layout.addWidget(self._autorelease_container_widget)
         main_layout.addWidget(self._container_mode_description_widget)
         main_layout.addWidget(self._container_command_mode_description_widget)
         main_layout.addWidget(self._validation_message_widget)
@@ -2881,6 +2944,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' called when the pulse value changes '''
         if value >= 0:
             self._pulse_delay = value
+
 
     def _validate(self):
         ''' validates the input to ensure it does not conflict with an existing input '''
@@ -2995,6 +3059,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot(bool)
     def _autorelease_change_cb(self, checked):
         self._autorelease = checked
+        self._update_display()
 
     @QtCore.Slot()
     def _command_mode_message_cb(self):
@@ -3106,10 +3171,17 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         autorelease_visible = False
         parameters_visible = True
         range_visible = False
+        delay_enabled = False
         if self._mode == OscInputItem.InputMode.Button:
-            self._container_mode_description_widget.setText(f"The input will trigger a button press when the value is 1<br>Use this to trigger a button press from a specific OSC message.")
-            with QtCore.QSignalBlocker(self._mode_button_widget):
-                self._mode_button_widget.setChecked(True)
+            if self._autorelease:
+                msg = f"The input will trigger a press action when a message is received, followed by a release when the delay has lapsed.<br>Use This mode to trigger a button press/release when an OSC message arrives."    
+                delay_enabled = True
+            else:
+                msg = f"The input will trigger a press action when the first parameter value is not zero (0).<br>A value of zero (0) will trigger a release action.<br>Use this to mode to trigger button presses from OSC messages."
+            self._container_mode_description_widget.setText(msg)
+            if not self._mode_button_widget.isChecked():
+                with QtCore.QSignalBlocker(self._mode_button_widget):
+                    self._mode_button_widget.setChecked(True)
             autorelease_visible = True
             parameters_visible = False
             
@@ -3142,8 +3214,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self._data_container_widget.setVisible(parameters_visible)
         self._source_container_widget.setVisible(parameters_visible)
-        self._autorelease_container_widget.setVisible(autorelease_visible)
-
+        self._container_trigger_widget.setVisible(autorelease_visible)
+        self._trigger_on_message_delay_widget.setEnabled(delay_enabled)
         self._container_range_widget.setVisible(range_visible)
 
     def _update_message(self):
@@ -3780,6 +3852,10 @@ class InputOscClient(QtCore.QObject):
         self._osc_map = {}  # map of message keys to inputs 
         self._started = False
         self._state_data = {} # holds the state data from received messages
+        self._autorelease_tracker = {}
+
+
+        
 
     @QtCore.Slot()            
     def _options_changed(self):
@@ -3934,9 +4010,10 @@ class InputOscClient(QtCore.QObject):
         # look for the the message
         message_key = OscInputItem.toMessageKey(command, message, args)
         is_running = gremlin.shared_state.is_running
-        
+        input_type = InputType.OpenSoundControl
         verbose = gremlin.config.Configuration().verbose_mode_osc
-        normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args]
+
+        normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args] if args else []
         hits = [key for key in self._osc_map if key.startswith(message)]
         for hit_key in hits:
             if message != hit_key:
@@ -3954,13 +4031,7 @@ class InputOscClient(QtCore.QObject):
                     # incorrect source
                     continue
 
-               
-
-                # button press mode - if the value is in the top half of the range, the button is considered pressed
                 is_axis = False
-                
-                # scale each axis value
-                
                 input_item._axis_values = normalized_args
                 index = source_index # input_item.source_index # source index of the param
                 raw_value = 0.0
@@ -4004,9 +4075,7 @@ class InputOscClient(QtCore.QObject):
 
                     if not is_running:
                         self._event_listener.axis_state_change.emit(event)
-                    
-
-                    continue
+                        continue
 
                 elif input_item.mode == OscInputItem.InputMode.OnChange:
                     is_pressed = True
@@ -4014,13 +4083,20 @@ class InputOscClient(QtCore.QObject):
 
                 elif input_item.mode == OscInputItem.InputMode.Button:
                     # trigger a button press event
-                    is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
-                    value = 1 if is_pressed else 0
                     autorelease = input_item._autorelease
+                    if autorelease:
+                        # parameter don't care
+                       is_pressed = True
+                    else:
+                        is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
+
+                    value = 1 if is_pressed else 0
+                    
                     input_item.setButtonValue(is_pressed)
-                    extra_data = {"autorelease": False} # do not autorelease OSC inputs
+                    extra_data = {"autorelease": False} # set autorelease mode
+                    
                     event = gremlin.event_handler.Event(
-                            event_type = InputType.OpenSoundControl,
+                            event_type = input_type,
                             device_guid = OscDeviceTabWidget.device_guid,
                             identifier = input_item,
                             is_pressed = is_pressed,
@@ -4031,24 +4107,21 @@ class InputOscClient(QtCore.QObject):
                             is_axis = False,
                             override_input_type=InputType.JoystickButton,
                             extra_data = extra_data
-
                             )
-
+                    
                     self._event_listener.joystick_event.emit(event)
                     self._state_data[input_item.message_key] = is_pressed
 
                     if not is_running:
                         #event.event_type = InputType.OpenSoundControl
                         self._event_listener.button_state_change.emit(event)
-
-                    continue
-                
+                        continue
 
                 if self._verbose:
                     syslog.info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
                 if not is_axis:
-                    input_type = InputType.JoystickButton
+                    
                     event = gremlin.event_handler.Event(
                         event_type = input_type,
                         device_guid = OscDeviceTabWidget.device_guid,
@@ -4069,11 +4142,12 @@ class InputOscClient(QtCore.QObject):
                         release_event = event.clone()
                         release_event.is_pressed = False
                         release_event.value = 0
-                        timer = threading.Timer(delay, lambda: self._event_listener.osc_event.emit(release_event))
+                        timer = threading.Timer(delay, self._create_callback(input_item, release_event))
+                        input_item.autorelease_timer = timer # auto cancels the prior timer when the new value is set
                         timer.start()
 
         # grab any defined callbacks
-        if gremlin.shared_state.is_running:
+        if is_running:
             callbacks = gremlin.input_devices.callback_registry.registry
             device_guid = gremlin.shared_state.osc_tab_guid
             current_mode = gremlin.shared_state.runtime_mode
@@ -4098,10 +4172,15 @@ class InputOscClient(QtCore.QObject):
                             self._event_listener.osc_event.emit(event)
 
 
+    def _create_callback(self, input_item, event):
+        return lambda : self._autorelease_callback(input_item, event)
 
-                            
+    def _autorelease_callback(self, input_item, event):
+        ''' execute autorelease for an input '''
+        self._event_listener.osc_event.emit(event)
 
 
+        
 
 
 # listen to OSC input

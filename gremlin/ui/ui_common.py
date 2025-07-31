@@ -1336,7 +1336,7 @@ class QFloatLineEdit(QtWidgets.QWidget):
     valueChanged = QtCore.Signal(float) # fires when the value changes
     doubleClick = QtCore.Signal() # fires when the input is double clicked
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3,  step = 0.01, value = 0.0, chars = 8, parent = None):
         super().__init__(parent)
         self._min_range = min_range
         self._max_range = max_range
@@ -1347,7 +1347,9 @@ class QFloatLineEdit(QtWidgets.QWidget):
         self.main_layout.setContentsMargins(0,0,0,0)
 
         self._widget = QtWidgets.QLineEdit()
-        self._widget.textChanged.connect(self._validate)
+        
+        # validate on field lost focus only
+        #self._widget.textChanged.connect(self._validate)
 
         self.main_layout.addWidget(self._widget)
 
@@ -1403,7 +1405,11 @@ class QFloatLineEdit(QtWidgets.QWidget):
                 else:
                     # down
                     v -= self._step * factor
-                v = gremlin.util.clamp(v, self._min_range, self._max_range)
+                if v < self._min_range:
+                    v = self._min_range
+                elif v > self._max_range:
+                    v = self._max_range
+                #v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
                 return True
 
@@ -1440,13 +1446,12 @@ class QFloatLineEdit(QtWidgets.QWidget):
             return
         current_value = self._value
 
-        if self._decimals:
+        if self._decimals > 0:
             s_value = f"{float(value):0.{self._decimals}f}"
         else:
-            s_value = str(value)
-        if self._widget.text() != s_value:
-            with QtCore.QSignalBlocker(self):
-                self._widget.setText(s_value)
+            s_value = f"{int(value)}"
+        with QtCore.QSignalBlocker(self):
+            self._widget.setText(s_value)
         if current_value is None or current_value != value:
             self._value = value
             self.valueChanged.emit(value)
@@ -1467,8 +1472,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
 
     def setValue(self, value : float):
         ''' sets the value '''
-        if not gremlin.util.is_close(self._value, value):
-            gremlin.util.InvokeUiMethod(self._update_value, value)
+        #if not gremlin.util.is_close(self._value, value):
+        gremlin.util.InvokeUiMethod(self._update_value, value)
             
 
     def _to_value(self, text : str = None):
@@ -1481,6 +1486,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
                 return None
         except:
             return None
+        
+
         
         if value < self._min_range:
             value = self._min_range
@@ -1526,8 +1533,10 @@ class QFloatLineEdit(QtWidgets.QWidget):
             bottom, top = top, bottom
         self._min_range = bottom
         self._max_range = top
+
         # self._validator.setBottom(bottom)
         # self._validator.setTop(top)
+
         self._update_value(self.value())
 
     def setMaximum(self, top):
@@ -6302,13 +6311,14 @@ class QDelayWidget(QtWidgets.QWidget):
 
     valueChanged = QtCore.Signal(int) # fired when the value changes
 
-    def __init__(self, value = 250, is_seconds = False, parent = None, label = None):
+    def __init__(self, value = 250, is_seconds = False, callback = None, parent = None, label = None):
         '''
 
         :params value: default delay in milliseconds '''
         super().__init__(parent)
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
+        self._callback = callback # callback when value change 
 
         self.delay_container_widget = QtWidgets.QWidget()
         self.delay_container_layout = QtWidgets.QHBoxLayout()
@@ -6359,11 +6369,16 @@ class QDelayWidget(QtWidgets.QWidget):
         milliseconds = milliseconds = value * 1000 if self._is_seconds else value
         if milliseconds >= 0 and milliseconds != self._delay_widget.value():
             self._delay_widget.setValue(milliseconds)
+            if self._callback:
+                self._callback(milliseconds)
             self.valueChanged.emit(milliseconds)
 
     @QtCore.Slot()
     def _value_changed(self):
-        self.valueChanged.emit(self._delay_widget.value())
+        milliseconds = self._delay_widget.value()
+        if self._callback:
+            self._callback(milliseconds)
+        self.valueChanged.emit(milliseconds)
 
     @QtCore.Slot()
     def _quarter_sec_delay(self):
@@ -8110,15 +8125,16 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
         w = gremlin.shared_state.char_width * 12 # gremlin.ui.ui_common.get_text_width("0000000.0000")
 
-        output_data_entry_widget = QtWidgets.QWidget()
+        output_data_entry_widget= QtWidgets.QWidget()
         output_data_entry_layout = QtWidgets.QGridLayout(output_data_entry_widget)
 
 
          # output range                 
         self._command_min_widget = QFloatLineEdit()
         self._command_min_widget.setRange(min_range, max_range)
+
         self._command_min_widget.setValue(min_cmd)
-        self._command_min_widget.valueChanged.connect(self._update_from_command)
+        self._command_min_widget.valueChanged.connect(self._update_command_min_range)
         self._command_min_widget.setMinimumWidth(w)
 
         # output value
@@ -8134,22 +8150,26 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._command_max_widget.setRange(min_range, max_range)
         self._command_max_widget.setValue(max_cmd)
         self._command_max_widget.setMinimumWidth(w)
-        self._command_max_widget.valueChanged.connect(self._update_from_command)
+        self._command_max_widget.valueChanged.connect(self._update_command_max_range)
         
 
         # output min
         self._data_min_widget = QFloatLineEdit()
         self._data_min_widget.setRange(min_range, max_range)
+        if min_range < -1 or max_range > 1:
+            self._data_min_widget.setDecimals(0)
         self._data_min_widget.setValue(min_output)
         self._data_min_widget.setMinimumWidth(w)
-        self._data_min_widget.valueChanged.connect(self._update_from_output)
+        self._data_min_widget.valueChanged.connect(self._update_data_min_range)
 
         # output max
         self._data_max_widget = QFloatLineEdit()
         self._data_max_widget.setRange(min_range, max_range)
+        if min_range < -1 or max_range > 1:
+            self._data_max_widget.setDecimals(0)
         self._data_max_widget.setValue(max_output)
         self._data_max_widget.setMinimumWidth(w)
-        self._data_max_widget.valueChanged.connect(self._update_from_output)
+        self._data_max_widget.valueChanged.connect(self._update_data_max_range)
 
         
         
@@ -8169,8 +8189,6 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._normalized_max_widget.setMinimumWidth(w)
         
         self._normalized_max_widget.valueChanged.connect(self._update_from_normalized)
-        
-        
 
         self._percent_min_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
         #self._output_min_percent_range_widget.setReadOnly(True)
@@ -8288,6 +8306,47 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
 
         if self._verbose: syslog.info(f"JRANGE: init():   output: {min_output:0.3f} {max_output:0.3f} normalized: {min_norm:0.3f} {max_norm:0.3f} percent: {min_percent:0.3f} {max_percent:0.3f} cmd: {min_cmd:0.3f} {max_cmd:0.3f} ")
+
+        self._update_decimals()
+
+    def _update_command_min_range(self, value):
+        ''' called when min command value changes '''
+        self._update_widget_decimals(self._command_min_widget)
+        self._update_from_command(value)
+
+    def _update_command_max_range(self, value):
+        ''' called when max command value changes '''
+        self._update_widget_decimals(self._command_max_widget)
+        self._update_from_command(value)        
+
+    def _update_data_min_range(self, value):
+        ''' called when min data value changes '''
+        self._update_widget_decimals(self._data_min_widget)
+        self._update_from_output(value)
+
+    def _update_data_max_range(self, value):
+        ''' called when max data value changes'''
+        self._update_widget_decimals(self._data_max_widget)
+        self._update_from_output(value)        
+
+    def _update_decimals(self):
+        ''' updates decimal range based on the range values of each component '''
+        widgets = [self._command_min_widget,
+                   self._command_max_widget,
+                   self._data_min_widget,
+                   self._data_max_widget]
+        for widget in widgets:
+            self._update_widget_decimals(widget)
+        
+
+    def _update_widget_decimals(self, widget):
+        ''' updates decimal display for a given float line widget '''
+        v1 = widget.minimum()
+        v2 = widget.maximum()
+        if v1 < -1 or v2 > 1:
+            widget.setDecimals(0)
+        else:
+            widget.setDecimals(3)
 
 
     @QtCore.Slot(bool)
@@ -8514,6 +8573,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                 else:
                     self.rangeChanged.emit(min_cmd)
                     self.valueChanged.emit(min_norm)
+
 
 
 
@@ -9448,7 +9508,7 @@ class QAutoResizingTextEdit(QtWidgets.QTextEdit):
 
 class QInfoBox(QtWidgets.QFrame):
     ''' widget for information text '''
-    def __init__(self, text, wrap = False, parent = None):
+    def __init__(self, text = None, wrap = False, parent = None):
         super().__init__(parent = parent)
         self._label_widget = QAutoResizingTextEdit()
         self._label_widget.setReadOnly(True)
@@ -9457,7 +9517,8 @@ class QInfoBox(QtWidgets.QFrame):
         layout.addWidget(self._label_widget)
         self.setStyleSheet(Color.cssInfoBox())
 
-        self.setText(text)
+        if text:
+            self.setText(text)
 
     def setText(self, text):
         self._label_widget.setHtml(text)
@@ -9677,3 +9738,33 @@ class QButtonGrid(QtWidgets.QWidget):
         pass
         
         
+
+
+class QModeSelector(QtWidgets.QGroupBox):
+
+    """Allows selecting the mode in which Gremlin starts."""
+    modeSelected = Signal(str) # profile selected
+
+    def __init__(self, profile, parent=None):
+        super().__init__(parent)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+
+        self.setTitle("Mode Select:")
+
+        self.dropdown = gremlin.ui.ui_common.QComboBox()
+        for mode in profile.mode_list():
+            self.dropdown.addItem(mode)
+        self.dropdown.currentIndexChanged.connect(self._update_cb)
+
+        self.main_layout.addWidget(self.dropdown)
+        self.main_layout.addStretch()
+
+    def _update_cb(self, index):
+        """Handles changes in the mode selection drop down.
+
+        :param index the index of the entry selected
+        """
+        mode = self.dropdown.currentText()
+        self.modeSelected.emit(mode)
+        
+

@@ -56,6 +56,7 @@ from gremlin.input_types import InputType
 from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -174,11 +175,13 @@ class SimconnectManualDefinition():
     def __init__(self, 
                  id = None,
                  sim_name = None,
-                 mode = None):
+                 mode = None,
+                 manual = False):
         
         self.id = id if id else gremlin.util.get_guid()
         self.sim_name = sim_name
         self.mode = mode
+        self.manual = manual
 
         # runtime item (not saved or loaded)
         self.selected = False # for UI interation - selected mode
@@ -191,7 +194,7 @@ class SimconnectManualDefinition():
     @property
     def key(self):
         if self.sim_name:
-            return self.sim_name.casefold()
+            return self.sim_name.casefold().strip()
         return ""
 
 
@@ -219,8 +222,8 @@ class SimconnectAicraftDefinition():
         self.icao_manufacturer = icao_manufacturer
         self.icao_model = icao_model
         self.titles = titles
-        self.path = path.casefold() if path else ""
-        self.state_folder = state_folder.casefold() if state_folder else ""
+        self.path = path.casefold().strip() if path else ""
+        self.state_folder = state_folder.casefold().strip() if state_folder else ""
         self.mode = mode
         self.sim_name = sim_name
         self.id = id if id else gremlin.util.get_guid()
@@ -229,8 +232,8 @@ class SimconnectAicraftDefinition():
         self.aircraft_path = None
         if self.entry_type == SimconnectAicraftDefinition.EntryType.Scan:
             assert community_path and aircraft_path,"Community path and Aircraft path are primary keys and cannot be NULL"
-            self.community_path = community_path.casefold()  # AP
-            self.aircraft_path = aircraft_path.casefold() # CP
+            self.community_path = community_path.casefold().strip()  # AP
+            self.aircraft_path = aircraft_path.casefold().strip() # CP
         
         # runtime item (not saved or loaded)
         self.selected = False # for UI interation - selected mode
@@ -305,7 +308,7 @@ class SimconnectOptions():
         self._auto_mode_select = True # if set, autoloads the mode associated with the aircraft if such a mode exists, on by default
         self._auto_mode_lock = True # if set, mode changes other the mapped aicraft will be ignored
         self._aircraft_definition_map = {} # holds definitions by aircraft container name, [name] = SimconnectAicraftDefinition
-        self._aircraft_manual_definitions = [] # holds manual aicraft entries 
+        self._aircraft_manual_definition_map = {} # holds manual aicraft entries 
         self._titles = []
         
         self._base_community_folder = None # base of community folder
@@ -325,19 +328,25 @@ class SimconnectOptions():
 
         self.parse_xml()
 
+    
     @property
     def definitions(self) -> dict:
-        return self._aircraft_definition_map
+        return self._aircraft_definition_map | self._aircraft_manual_definition_map
+    @property
+    def manual_definitions(self) -> list:
+        return self._aircraft_manual_definition_map
 
     def validateEntries(self) -> bool:
         ''' validates the manual entries to make sure they are unique '''
         sim_names = []
-        for item in self._aircraft_manual_definitions:
+        for item in self._aircraft_manual_definition_map.values():
             if item.sim_name and item.sim_name in sim_names:
                 return False
             sim_names.append(item.sim_name)
         return True
 
+
+    
 
 
     @QtCore.Slot(dict)
@@ -346,9 +355,9 @@ class SimconnectOptions():
         added = False
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         name_list = [name for name in data.keys()]
-        name_list.sort(key = lambda x: x.casefold()) # sort case insensitive
+        name_list.sort(key = lambda x: x.casefold().strip()) # sort case insensitive
         for aircraft in name_list:
-            key = aircraft.casefold()
+            key = aircraft.casefold().strip()
             if "fsltl" in key or "passiveaircraft" in key:
                 # skip FSLTL AI aircraft
                 # skip passive aircraft
@@ -462,7 +471,7 @@ class SimconnectOptions():
         ''' gets an item based on the state data which is a partial subfolder '''
 
         # example: SimObjects\\Airplanes\\FNX_320_IAE\\aircraft.CFG
-        stub = os.path.dirname(state_string.casefold())
+        stub = os.path.dirname(state_string.casefold().strip())
 
         item : SimconnectAicraftDefinition
         print (stub)
@@ -480,27 +489,21 @@ class SimconnectOptions():
             syslog.info(f"\t{item.display_name} {item.sim_name} mode: {item.mode}")
 
         syslog.info("Manual entry mode configurations:")
-        for item in self._aircraft_manual_definitions:
+        for item in self._aircraft_manual_definition_map.values():
             syslog.info(f"\t{item.display_name} {item.sim_name} mode: {item.mode}")
 
 
-    def find_definition_by_sim_name(self, key, is_scan = True, is_manual = True):
+    def find_definition_by_sim_name(self, key):
         ''' gets an item based on the state data which is a partial subfolder '''
-        key = key.casefold()
+        key = key.casefold().strip()
         verbose = gremlin.config.Configuration().verbose_mode_details
         if verbose: self.dump()
-        if is_scan:
-            # lookup scanned entries
-            if key in self._aircraft_definition_map:
-                return self._aircraft_definition_map[key]
-            
-            return None
-        if is_manual:
-            # lookup manual entries
-            item = next((item for item in self._aircraft_manual_definitions if item.sim_name == key), None)
-            if item:
-                return item
-            return None
+        # lookup scanned entries
+        if key in self._aircraft_definition_map:
+            return self._aircraft_definition_map[key]
+        if key in self._aircraft_manual_definition_map:
+            return self._aircraft_manual_definition_map[key]
+        return None
 
 
     def find_definition_by_aicraft(self, aircraft) -> SimconnectAicraftDefinition:
@@ -511,6 +514,8 @@ class SimconnectOptions():
         item : SimconnectAicraftDefinition
         if key in self._aircraft_definition_map:
             return self._aircraft_definition_map[key]
+        if key in self._aircraft_manual_definition_map:
+            return self._aircraft_manual_definition_map[key]
         return None
     
     def find_definition_by_title(self, title) -> SimconnectAicraftDefinition:
@@ -518,6 +523,8 @@ class SimconnectOptions():
         if not title:
             return None
         item = next((n for n in self._aircraft_definition_map.values() if n.title in item.titles), None)
+        if not item:
+            item = next((n for n in self._aircraft_manual_definition_map.values() if n.title in item.titles), None)
         return item    
 
     def find_definition_by_aicraft_folder(self, folder) -> SimconnectAicraftDefinition:
@@ -564,7 +571,7 @@ class SimconnectOptions():
         
     
         self._titles = []
-        self._aircraft_manual_definitions = []
+        self._aircraft_manual_definition_map.clear()
         self._aircraft_definition_map.clear()
 
         
@@ -624,7 +631,7 @@ class SimconnectOptions():
                         sim_name = node.get("sim_name")
 
                     if not key and sim_name:
-                        key = sim_name.casefold()
+                        key = sim_name.casefold().strip()
 
                     # print (f"automatic: read mode: {mode} for item: {sim_name}")
                     titles = []
@@ -658,9 +665,9 @@ class SimconnectOptions():
                 mode = safe_read(node,"mode", str, "")
                 id = safe_read(node,"id", str, "")
                 sim_name = safe_read(node,"sim_name", str, "")
-                item =SimconnectManualDefinition(id, sim_name, mode)
-                self._aircraft_manual_definitions.append(item)
-                
+                item =SimconnectManualDefinition(id, sim_name, mode, manual = True)
+                key = sim_name.casefold().strip()
+                self._aircraft_manual_definition_map[key] = item
                 if verbose: syslog.info (f"SIMCONNECT: manual: read mode: {mode} for item: {sim_name}")
 
 
@@ -740,9 +747,9 @@ class SimconnectOptions():
                         child.text = title
 
         # manual entries (usually for streamed entries) - this only has name and mode as we don't have any other info
-        if self._aircraft_manual_definitions:
+        if self._aircraft_manual_definition_map:
             node_items = etree.SubElement(root,"user_items")
-            for item in self._aircraft_manual_definitions:
+            for item in self._aircraft_manual_definition_map.values():
                 node = etree.SubElement(node_items,"item")
                 node.set("id", item.id)
                 if item.sim_name:
@@ -793,9 +800,9 @@ class SimconnectOptions():
         assert sim_name
         if not mode:
             mode = gremlin.shared_state.current_profile.get_default_mode()
-        sim_name = sim_name.casefold()
+        key = sim_name.casefold().strip()
         item = SimconnectManualDefinition(sim_name = sim_name, mode = mode)
-        self._aircraft_manual_definitions.append(item)
+        self._aircraft_manual_definition_map[key] = item
 
     def removeEntry(self, item):
         ''' deletes an entry, scanned or manual - returns True if the entry was deleted'''
@@ -803,18 +810,18 @@ class SimconnectOptions():
             if isinstance(item, SimconnectAicraftDefinition) and item in self._aircraft_definitions:
                 self._aircraft_definitions.remove(item)
                 return True
-            if isinstance(item, SimconnectManualDefinition) and item in self._aircraft_manual_definitions:
-                self._aircraft_manual_definitions.remove(item)
+            if isinstance(item, SimconnectManualDefinition) and item in self._aircraft_manual_definition_map:
+                self._aircraft_manual_definition_map.remove(item)
                 return True
         return False
 
     def removeManualEntry(self, sim_name: str):
         ''' removes a manual entry '''
         assert sim_name
-        sim_name = sim_name.casefold()
-        item = next((item for item in self._aircraft_manual_definitions if item.sim_name == sim_name), None)
+        sim_name = sim_name.casefold().strip()
+        item = next((item for item in self._aircraft_manual_definition_map if item.sim_name == sim_name), None)
         if item:
-            self._aircraft_manual_definitions.remove(item)
+            self._aircraft_manual_definition_map.remove(item)
 
 
     def scan_entry(self, folder):
@@ -908,7 +915,7 @@ class SimconnectOptions():
 
 
         sim_name = None
-        work_cfg = aircraft_cfg.replace("/", os.sep).casefold()			
+        work_cfg = aircraft_cfg.replace("/", os.sep).casefold().strip()			
         splits = work_cfg.split(os.sep)
         max_index = len(splits)
         index = 0
@@ -1041,13 +1048,13 @@ class SimconnectOptions():
         ''' sorts definitions '''
         if self._sort_mode == SimconnectSortMode.AicraftAscending:
             self._aircraft_definitions.sort(key = lambda x: x.key)
-            self._aircraft_manual_definitions.sort(key = lambda x: x.key)
+            self._aircraft_manual_definition_map.sort(key = lambda x: x.key)
         elif self._sort_mode == SimconnectSortMode.AircraftDescending:
             self._aircraft_definitions.sort(key = lambda x: x.key, reverse = True)
-            self._aircraft_manual_definitions.sort(key = lambda x: x.key)
+            self._aircraft_manual_definition_map.sort(key = lambda x: x.key)
         elif self._sort_mode == SimconnectSortMode.Mode:
             self._aircraft_definitions.sort(key = lambda x: (x.mode.casefold(), x.key))
-            self._aircraft_manual_definitions.sort(key = lambda x: (x.mode.casefold(), x.key))
+            self._aircraft_manual_definition_map.sort(key = lambda x: (x.mode.casefold(), x.key))
 
 @SingletonDecorator
 class SimconnectMonitor():
@@ -1478,19 +1485,17 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.filter_current_widget.clicked.connect(self._handle_current_search)
         self.filter_current_widget.setToolTip("Search for current aircraft")
 
-
         self.refresh_aircraft_list_widget = QtWidgets.QPushButton("Refresh All")
         self.refresh_aircraft_list_widget.setToolTip("Refresh the available aircraft list from MSFS")
         self.refresh_aircraft_list_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
         self.refresh_aircraft_list_widget.clicked.connect(self._handle_refresh_aircraft_list)
-        
 
         row_widgets = [QtWidgets.QLabel("Filter:"), 
                         self.filter_widget,
                         self.apply_filter_widget,
                         self.clear_filter_widget,
                         self.filter_current_widget,
-                        self.refresh_aircraft_list_widget,
+                        self.refresh_aircraft_list_widget
                        ]
         
         widget, layout = gremlin.ui.ui_common.getGridContainer(row_widgets)
@@ -1509,8 +1514,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         widget, layout = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True)
         self.container_paginator_widget = widget
         self.container_paginator_layout = layout
-        
-        
 
         # start scrolling container widget definition
 
@@ -1518,20 +1521,10 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.container_map_layout = QtWidgets.QVBoxLayout(self.container_map_widget)
         self.container_map_layout.setContentsMargins(0,0,0,0)
 
-        # self.manual_container_map_widget = QtWidgets.QWidget()
-        # self.manual_container_map_layout = QtWidgets.QVBoxLayout(self.manual_container_map_widget)
-        # self.manual_container_map_layout.setContentsMargins(0,0,0,0)
-
         # add aircraft map items
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
-
-
-        # add manual aircraft map items
-        # self.manual_scroll_area = QtWidgets.QScrollArea()
-        # self.manual_scroll_widget = QtWidgets.QWidget()
-        # self.manual_scroll_layout = QtWidgets.QVBoxLayout()
 
         # Configure the widget holding the layout with all the buttons
         self.scroll_widget.setLayout(self.scroll_layout)
@@ -1740,25 +1733,25 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         ''' adds the current simconnect aircraft to the mode list '''
         name = self.current_aircraft_widget.text()
         folder = self.current_aircraft_folder
-
+        default_mode = gremlin.shared_state.current_profile.get_default_mode()
         if folder and os.path.isdir(folder):
             # local entry
-            if not self.options.find_definition_by_sim_name(name, is_manual = False):
+            if not self.options.find_definition_by_sim_name(name):
                 self.options.scan_entry(folder)
-                self._populate_ui()
             else:
-                gremlin.ui.ui_common.MessageBox(title = "Duplicate Entry", prompt = f"Entry {name} already exists")
+                self.options.addManualEntry(name, mode = default_mode) # add a manual 
+                
+                #gremlin.ui.ui_common.MessageBox(title = "Duplicate Entry", prompt = f"Entry {name} already exists")
         else:
             # manual entry
-            item = self.options.find_definition_by_sim_name(name, is_scan = False)
+            item = self.options.find_definition_by_sim_name(name)
             if not item:
                 # only add it if not there
-                self.options.addManualEntry(name)
-                self._populate_ui()
-            else:
-                gremlin.ui.ui_common.MessageBox(title = "Duplicate Entry", prompt = f"Entry {name} already exists")
-            
+                self.options.addManualEntry(name, mode = default_mode)
 
+        self._update_data() # refresh the data 
+        self._populate_ui()
+        
     @QtCore.Slot()
     def _remove_current_aircraft_cb(self):
         ''' remove button '''
@@ -1821,7 +1814,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
     def _update_data(self):
         ''' re-index the data '''
-
         definitions = self.options.definitions
         item_count = len(definitions)
         if self.paginator_widget.itemCount != item_count:
@@ -1829,6 +1821,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self.paginator_widget.setPageNumber(1, False)
 
         data = [item for item in definitions.values()]
+
+
         # sort the data
         data.sort(key = lambda x: x.sim_name)
         self._data = data
@@ -1902,6 +1896,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 self.paginator_widget.setPageNumber(1, False)
             self._data = data
             self._populate_ui()
+
+
 
 
     @QtCore.Slot()
@@ -2319,8 +2315,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         gremlin.util.pushCursor()
 
         self._update_scanned_list()
-        # self._update_manual_list()
-
 
         # mode locking is only enabled if auto mode change enabled
         self._auto_mode_lock.setEnabled(self._auto_mode_switch.isChecked())
@@ -2880,13 +2874,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._axis_value_widget.setMinimumWidth(w)
         self._axis_value_widget.setDecimals(0)
 
-
-        # self._axis_alt_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=True,orientation=QtCore.Qt.Orientation.Horizontal)
-        # self._axis_alt_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        # self._axis_alt_value_widget.setReadOnly(True)
-        # self._axis_alt_value_widget.setMinimumWidth(w)
-        # self._axis_alt_value_widget.setDecimals(0)
-
         self._calculator_value_widget = QtWidgets.QPlainTextEdit()
         self._calculator_value_widget.setReadOnly(True)
 
@@ -2920,6 +2907,18 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
         widget = gremlin.ui.ui_common.QDataPushButton("0..16K", data = (0, 16384))
+        widget.clicked.connect(self._set_command_range)
+        self._range_button_container_layout.addWidget(widget)
+
+        # airbus detent data 
+        # sets up output gates
+        
+
+        widget = gremlin.ui.ui_common.QDataPushButton("Reverse Detent", data = (-16383 + int(16383 * 0.1), 16384))
+        widget.clicked.connect(self._set_command_range)
+        self._range_button_container_layout.addWidget(widget)
+
+        widget = gremlin.ui.ui_common.QDataPushButton("Min Detent", data = (-16383 + int(16383 * 0.1), 16384))
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
@@ -3153,6 +3152,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.command_min_range = value
             if verbose: syslog.info(f"Set single value (command): {value:0.3f}")
         
+        # update the computed output value
         self._update_repeater()
 
 
@@ -3269,6 +3269,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         '''
         # always read the current input as the value could be from another device for merged inputs
 
+        if not Shiboken.isValid(self._axis_value_widget) or not Shiboken.isValid(self._calculator_value_widget):
+            return # garbage collected
+
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui
         
@@ -3319,6 +3322,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._current_value = normalized
 
             if self.action_data.command_mode == SimConnectCommandMode.Simvar:
+                
                 self._axis_value_widget.setValue(output_value)
                 self._axis_value_widget.setVisible(True)
                 self._calculator_value_widget.setVisible(False)
@@ -3393,9 +3397,10 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
 
-            
+    def _update_repeater(self):        
+        gremlin.util.InvokeUiMethod(self._update_repeater_ui) # flip to UI thread if needed
 
-    def _update_repeater(self):
+    def _update_repeater_ui(self):
         value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
         self._update_axis_widget(value)
 
@@ -3777,6 +3782,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._update_visible()
 
     def _readonly_cb(self):
+        if not Shiboken.isValid(self):
+            return
         block : SimConnectBlock
         block = self.action_data.block
         
@@ -3790,7 +3797,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         """Populates the UI components."""
-        
+        if not Shiboken.isValid(self):
+            return
         command = self._command_selector_widget.currentText()
 
         if self.action_data.command != command:

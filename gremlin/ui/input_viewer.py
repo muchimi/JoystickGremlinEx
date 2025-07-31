@@ -420,7 +420,15 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._left_panel_layout.addWidget(self.scroll_selector_area)
         self._right_panel_layout.addWidget(self.view_container_widget)
 
-        info_box = gremlin.ui.ui_common.QInfoBox("Some visuals may capture the scrollwheel.<br>Move the mouse to the scrollbar or off a visual to scroll the display if experiencing difficulty scrolling using the wheel.", wrap = True)
+        msg = """
+Some visuals may capture the scrollwheel.<br>
+Move the mouse to the scrollbar or off a visual to scroll the display if experiencing difficulty scrolling using the wheel.<br>
+<br>
+States can be toggled by clicking on the state button.  Expression states will update.
+
+"""
+
+        info_box = gremlin.ui.ui_common.QInfoBox(msg, wrap = True)
         self._right_panel_layout.addWidget(info_box)
         #self._right_panel_layout.addStretch(1)
         
@@ -722,19 +730,12 @@ class InputViewerUi(ui_common.BaseDialogUi):
                 rb.clicked.connect(self._font_size_cb)
                 widgets.append(rb)
 
-
-
-
             widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Button size:")
             layout.addWidget(widget)
 
 
             self._state_button_layout = QtWidgets.QGridLayout()
             self.populateState(self._state_button_layout)
-            
-
-            #device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
-            #self._widget_storage[device.device_id] = self._state_visualizer_widget
 
             layout.addLayout(self._state_button_layout)
 

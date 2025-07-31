@@ -14,10 +14,18 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 ### (m76T35)
-- Fix: OSC axis value when in axis mode and no parameter received.
-- Fix: Gated Axis UI gate data numeric display and interactions updated to new event model.
-- 
-- 
+- New: OSC internal bridge - when sending OSC data to the built-in OSC server (ip and port), the OSC packet will route internally to the server. In this mode, there is no transmission over UDP so a protocol listener will not see these packets. OSC messages routed this way will still appear in the log file if OSC verbose mode is enabled for diagnostic purposes.
+- New: OSC button trigger mode in input.  This new mode will trigger a press on receiving an OSC message.  Any parameters is ignored.  When in this mode, the delay determines the release action.  This mode was added as not all OSC output surfaces support a parameter, nor is a parameter needed.  To control press and release from OSC messages separately, one parameter must be provided.  If the parameter is non-zero, the input triggers a press.  If the parameter is 0, it triggers a release. In non trigger mode, two messages must be received by GremlinEx, one to press, one to release.
+- Fix: When a mapping is removed from an input, the input action icon list did not consistently update to reflect the deletion.
+- Fix: Gated Axis: gate data numeric value display and interactions updated to new event model.
+- Fix: OSC exception due to new event model.
+- Improved: Floating point input box now validates on focus loss to avoid spamming .
+- Fix: Simconnect configuration: adding new aircraft to aircraft list to assign it a profile mode did not show in list until restart.
+- Fix: map to Simconnect: updated to use new UI event model.
+- Improved: map to Simconnect: data entry, decimals display, and computed data repeater computation update.
+- Change: log file is limited to 2 Mb and will recycle if this maximum size is exceeded. This is to avoid gigabyte files when too many verbose options are enabled.
+- Fix: State categories.
+
 ### (m76T34)
 - New feature: VJoy start value sync and initial value on profile start:
 	- In the profile settings tab, it is now possible to set both axis and button start values for any VJOY device on profile start, regardless of mappings.  These will be applied on profile start (or restart), and before any mappings are applied.

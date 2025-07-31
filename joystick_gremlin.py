@@ -4716,6 +4716,7 @@ def configure_logger(config):
 
     :param config configuration information for the new logger
     """
+    import logging.handlers
 
     # blitz the log file
     log_file = config["logfile"]
@@ -4726,8 +4727,10 @@ def configure_logger(config):
         pass
     logger = logging.getLogger(config["name"])
     logger.setLevel(config["level"])
-    handler = logging.FileHandler(config["logfile"])
+    #handler = logging.FileHandler(config["logfile"])
+    handler = logging.handlers.RotatingFileHandler(config["logfile"], maxBytes = 2 * 1024 * 1024, backupCount = 1)
     handler.setLevel(config["level"])
+
     formatter = logging.Formatter(config["format"], "%Y-%m-%d %H:%M:%S")
     handler.setFormatter(formatter)
     logger.addHandler(handler)

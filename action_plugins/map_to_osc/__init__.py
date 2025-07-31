@@ -42,6 +42,7 @@ from gremlin.ui.osc_device import OscInterface, OscClient
 import logging
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -472,10 +473,12 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param parent the parent of this widget
         """
         super().__init__(action_data, parent=parent)
+        self._ui_ready = False
 
     def _create_ui(self):
         """Creates the UI components."""
         # Layouts to use
+        self._ui_ready = False
         self._container_widget = QtWidgets.QWidget()
         self._container_layout = QtWidgets.QVBoxLayout(self._container_widget)
 
@@ -598,6 +601,8 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._v1_widget.setRepeaterValue(value)
             self._v2_widget.setRepeaterValue(value)
 
+        self._ui_ready = True
+
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -606,6 +611,13 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _joystick_event_handler(self, event):
         ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
+
+        if not Shiboken.isValid(self):
+            # garbage collected
+            return
+        if not self._ui_ready:
+            return # not loaded yet
+        
         if gremlin.shared_state.is_running:
             return 
 
@@ -764,13 +776,32 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
 
     def profile_start(self):
         ''' occurs when process starts '''
-        device_name = gremlin.shared_state.get_device_name(self.action_data.hardware_device_guid)
+
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        device = gremlin.joystick_handling.get_device(self.hardware_device_guid)
+        device_name = device.name
+        if not self.action_data.command:
+            # command not provided
+            self.valid = False
+            
+            syslog.warning(f"OSC SEND: null command - ignoring mapping - device [{device_name}]  input id: [{self.hardware_input_id}")
+            return False
+
+
+        if not self.action_data.server_port:
+            syslog.error(f"OSC SEND: invalid port: [{self.action_data.server_port}] device [{device_name}]  input id: [{self.hardware_input_id}")
+            self.valid = False
+            return
+
         if gremlin.util.validateIp(self.action_data.server_ip):
             self.osc_client = self.oscInterface.getClient(self.action_data.server_ip,
                                             self.action_data.server_port,                                            
                                             name=f"OSC {device_name}/{self.action_data.hardware_input_id}")
             self.osc_client.start()
             self.valid = True
+
+            self.osc_client.send("/start", 0.0, 0.0)
+            
         else:
             syslog.error(f"OSC SEND: invalid target IP: {self.action_data.server_ip}")
             self.valid = False
