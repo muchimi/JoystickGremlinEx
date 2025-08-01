@@ -569,8 +569,6 @@ class InputItemListView(ui_common.AbstractView):
         This creates a fake listview where a vertical container just has InputItemButton widgets
 
         """
-        if self._deleted:
-            return
         if not Shiboken.isValid(self):
             return
         self.setUpdatesEnabled(False)
@@ -649,7 +647,7 @@ class InputItemListView(ui_common.AbstractView):
         finally:
             self.setUpdatesEnabled(True)
             self.update()
-            
+
 
 
     def redraw_index(self, index : int):
@@ -657,6 +655,10 @@ class InputItemListView(ui_common.AbstractView):
 
         :param index the index of the entry to redraw
         """
+
+        if not Shiboken.isValid(self):
+            # garbage collected
+            return
 
         if self.model is None or self._deleted:
             return
@@ -3117,6 +3119,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
         """
 
         import gremlin.ui.ui_common
+        import gremlin.util
         QtWidgets.QFrame.__init__(self, parent)
 
         css = f"background-color: {gremlin.ui.ui_common.Color.actionBackgroundColor()}"
@@ -3644,6 +3647,10 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             # not ours
             return
         self.refresh()
+        
+        el = gremlin.event_handler.EventListener()
+        el.update_action_icons.emit(item_data)
+            
         
 
 

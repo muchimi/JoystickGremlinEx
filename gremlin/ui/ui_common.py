@@ -1324,6 +1324,16 @@ class NoKeyboardPushButton(QtWidgets.QPushButton):
         self._data = value
 
 
+class QLineEdit(QtWidgets.QLineEdit):
+
+    focusOut = Signal()
+
+    def __init__(self, text = None, parent = None):
+        super().__init__(text = text, parent = parent)
+
+    def focusOutEvent(self, event):
+        self.focusOut.emit()
+        return super().focusOutEvent(event)
 
 
 class QFloatLineEdit(QtWidgets.QWidget):
@@ -1345,8 +1355,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
         self._value = None
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
-
-        self._widget = QtWidgets.QLineEdit()
+        self._widget = QLineEdit()
+        self._widget.focusOut.connect(self._focus_out)
         
         # validate on field lost focus only
         #self._widget.textChanged.connect(self._validate)
@@ -1363,6 +1373,16 @@ class QFloatLineEdit(QtWidgets.QWidget):
         else:
             self.chars = 0
 
+
+    def _focus_out(self):
+        syslog.info("focus loss")
+        value = self._widget.text()
+        try:
+            value = float(value)
+        except:
+            value = self.value()
+        self.setValue(value)
+        
 
     def setReadOnly(self, value : bool):
         ''' sets or clears readonly state '''
@@ -1411,19 +1431,22 @@ class QFloatLineEdit(QtWidgets.QWidget):
                     v = self._max_range
                 #v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
-                return True
-
+                
             return True # filter the wheel event
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
+            syslog.info("focus about to change")
             value = self._to_value()
             if value is None:
                 return True # skip the event
         elif t == QtCore.QEvent.Type.FocusOut:
             # format the input to the correct decimals
+            syslog.info("focus loss")
             self.setValue(self.value())
         elif t == QtCore.QEvent.Type.MouseButtonDblClick:
             self.doubleClick.emit()
-        return False
+        
+
+        return super().eventFilter(widget, event)
     
     def keyPressEvent(self, event):
         if event == QtGui.QKeySequence.StandardKey.Paste:

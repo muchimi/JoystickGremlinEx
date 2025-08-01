@@ -132,25 +132,6 @@ class Event:
 		self.is_repeater = False # True if the event is a repeater generated event
 		self.override_input_type = override_input_type # override input type - used as the input type for actions 
 		self.extra_data = extra_data
-		
-
-	# @property
-	# def event_type(self):
-	# 	return self._event_type
-	# @event_type.setter
-	# def event_type(self, value):
-	# 	if self._event_type == InputType.JoystickHat and value != InputType.JoystickHat:
-	# 		pass
-	# 	self._event_type = value
-
-	# @property
-	# def value(self):
-	# 	return self._value
-	# @value.setter
-	# def value(self, data):
-	# 	if not data and self.event_type == InputType.JoystickHat:
-	# 		pass
-	# 	self._value = data
 
 	@property
 	def is_pressed(self):
@@ -351,13 +332,15 @@ class EventListener(QtCore.QObject):
 
 	# Signal emitted when joystick events are received
 	joystick_event = Signal(Event) # Signal(Event)
+	
+	# custom joystick event - this is a code based joystick event that mapping items can listen to when inside other containers
+	custom_joystick_event = Signal(Event)
+
 
 	hardware_input_event = Signal(object, object, object) # called for any input event (device_guid, input_type, input_id)
 
 	vjoy_event = Signal(VjoyEvent) # Signal(VjoyEvent)
 
-	# custom joystick event - this is a code based joystick event 
-	custom_joystick_event = Signal(Event)
 
 	# Signal emitted when keyboard events are received
 	keyboard_event = Signal(Event)

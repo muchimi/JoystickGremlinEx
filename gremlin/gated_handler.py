@@ -1126,6 +1126,7 @@ class GateEventHandler(QtCore.QObject):
     ''' handler class for gate axis events '''
     gatedata_stepsChanged = Signal(object) # signals that steps (gate counts) have changed  (gatedata)
     gatedata_valueChanged = Signal(object) # signals when the gate data changes (gatedata)
+    slider_update_event = Signal(object) # signals a slider to update passes a joystick (event)
 
     gate_value_changed = Signal(GateInfo) # fires when a gate value changes (GateInfo)
     gates_changed = Signal() # fires when all gates changed
@@ -1207,17 +1208,17 @@ class GateEventHandler(QtCore.QObject):
             if callback in self._value_changed_callbacks[key]:
                 self._value_changed_callbacks[key].remove(callback)
 
-    def fireValueChangedCallbacks(self, value : float):
+    def fireValueChangedCallbacks(self, device_id, input_id, value : float):
         # ensure this is fired on the UI thread
-        gremlin.util.InvokeUiMethod(self._fireValueChangedCallbacks, value)
+        gremlin.util.InvokeUiMethod(self._fireValueChangedCallbacks, device_id, input_id, value)
 
 
-    def _fireValueChangedCallbacks(self, value : float):
+    def _fireValueChangedCallbacks(self, device_id, input_id, value : float):
         # update must occur on the UI thread
         gremlin.util.assert_ui_thread()
         for key in self._value_changed_callbacks:
             for callback in self._value_changed_callbacks[key]:
-                callback(value)
+                callback(device_id, input_id, value)
 
     def _shutdown(self):
         el = gremlin.event_handler.EventListener()
@@ -1258,6 +1259,11 @@ class GateData():
         self._hooked = False
         self._lock = threading.Lock()
         self._action_data = action_data
+        self._input_type = action_data.get_input_type()
+        self._device_guid = action_data.hardware_device_guid
+        self._device_id = action_data.hardware_device_id
+        self._device_name = action_data.hardware_device_name
+        self._input_id = action_data.hardware_input_id
         self._ec = gremlin.execution_graph.ExecutionContext()
         self.condition = condition
         self.output_mode = mode
@@ -1380,11 +1386,12 @@ class GateData():
                 verbose = gremlin.config.Configuration().verbose_mode_gate
                 if verbose: syslog.info("GATE: hook enabled")
 
-                gh = GateEventHandler()
-                gh.registerJoystickCallback(self.id, self._joystick_event_handler)
+                
+                # gh = GateEventHandler()
+                # gh.registerJoystickCallback(self.id, self._joystick_event_handler)
 
-                # el = gremlin.event_handler.EventListener()
-                # el.joystick_event.connect(self._joystick_event_handler)
+                el = gremlin.event_handler.EventListener()
+                el.joystick_event.connect(self._joystick_event_handler)
 
 
                 if self._action_data.input_is_hardware():
@@ -1408,8 +1415,10 @@ class GateData():
                 gh = GateEventHandler()
                 gh.unregisterJoystickCallback(self.id)
 
-                # el = gremlin.event_handler.EventListener()
-                # el.joystick_event.disconnect(self._joystick_event_handler)
+                
+
+                el = gremlin.event_handler.EventListener()
+                el.joystick_event.disconnect(self._joystick_event_handler)
             finally:
                 self._lock.release()
             
@@ -1592,18 +1601,27 @@ class GateData():
             if not event.is_axis:
                 # ignore if not an axis event
                 return False
-            
-            # if not hasattr(self,"_action_data"):
-            #     # this happens at shutdown usually as objects are removed
-            #     # syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
-            #     return False
-            
+
             if not self._action_data:
                 # not initialized yet
                 return  False
             
-            if self._action_data.hardware_device_guid != event.device_guid:
+            if self._input_type != event.event_type:
+                # wrong input type
+                return
+            
+            device_name = self._device_name
+            device = gremlin.joystick_handling.get_device(event.device_id)
+            if device_name == device.name and not gremlin.util.compare_guid(self._device_id, event.device_id):
+                syslog.error(f"Device ID mismatch: {device_name} - expected {device.device_id} got {self._device_id}")
+                pass
+
+            if not gremlin.util.compare_guid(self._device_id, event.device_id):
                 # ignore if a different input device
+                return False
+            
+            if self._input_id != event.identifier:
+                # incorrect input
                 return False
             
             config = gremlin.config.Configuration()
@@ -1626,9 +1644,7 @@ class GateData():
                 if self._action_data.hardware_input_id.message_key != event.identifier.message_key:
                     # ignore if a different input axis on the input device
                     return False
-                
-            elif self._action_data.hardware_input_id != event.identifier:
-                return False
+  
             
 
             # process curved intput
@@ -1657,19 +1673,18 @@ class GateData():
                 # raw input value updates
                 self._axis_value = input_value
                 #remove_callbacks = []
-                gh = GateEventHandler()
-                gh.fireValueChangedCallbacks(input_value)
 
+                gh = GateEventHandler()
+                gh.slider_update_event.emit(event)
+                gh.fireValueChangedCallbacks(self._device_id, self._input_id, input_value)
 
             
             if triggers:
                 value = gremlin.actions.Value(event.value)
-                # button_press_event = event.clone()
-                # button_press_event.fake_button()
-                # button_action_value = gremlin.actions.Value(input_value, True)
-                # button_action_value.current = True
+                
                 range_event = event.clone()
                 range_event.event_type = InputType.JoystickAxis # force linear
+                
 
     
                 for trigger in triggers:
@@ -1681,6 +1696,7 @@ class GateData():
                         case TriggerMode.FixedValue:
                             if verbose: syslog.info(f"Exec Trigger: fixed value: {trigger.range.range_display() if trigger.range else trigger.gate.slider_index} : value {input_value:0.3f}")
                             value.current = trigger.value
+
                         case TriggerMode.ValueInRange:
                             if verbose: syslog.info(f"Exec Trigger: value in range: {trigger.range.range_display()} : value {input_value:0.3f}")
                             value.current = trigger.value
@@ -1728,9 +1744,14 @@ class GateData():
 
                     if not gremlin.shared_state.is_running:
                         # non-runtime trigger updates for the UI
-                        if verbose_ui: syslog.info("GATE Event: before trigger callbacks")
+                        # if verbose_ui: syslog.info("GATE Event: before trigger callbacks")
                         self._fire_trigger_callbacks(trigger)
-                        if verbose_ui: syslog.info("GATE Event: after trigger callbacks")
+                        # if verbose_ui: syslog.info("GATE Event: after trigger callbacks")
+
+                        # fire the custom joystick event
+                        el = gremlin.event_handler.EventListener()
+                        el.custom_joystick_event.emit(trigger_event) # have widgets update at design time
+
                         return True
                     else:
 

@@ -13,6 +13,12 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+
+### (m76T36)
+- Fix: resolved an issue with gated axis slider marker
+- Fix: map to simconnect: incorrect value repeater when using fixed value mode.
+- Fix: map to simconnect: set value by percentage does not always update
+
 ### (m76T35)
 - New: OSC internal bridge - when sending OSC data to the built-in OSC server (ip and port), the OSC packet will route internally to the server. In this mode, there is no transmission over UDP so a protocol listener will not see these packets. OSC messages routed this way will still appear in the log file if OSC verbose mode is enabled for diagnostic purposes.
 - New: OSC button trigger mode in input.  This new mode will trigger a press on receiving an OSC message.  Any parameters is ignored.  When in this mode, the delay determines the release action.  This mode was added as not all OSC output surfaces support a parameter, nor is a parameter needed.  To control press and release from OSC messages separately, one parameter must be provided.  If the parameter is non-zero, the input triggers a press.  If the parameter is 0, it triggers a release. In non trigger mode, two messages must be received by GremlinEx, one to press, one to release.

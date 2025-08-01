@@ -362,10 +362,11 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             # value update for in-range 
             self.axis_widget.setValue(trigger.value)
 
-    def _input_value_changed_handler(self, value : float):
+    def _input_value_changed_handler(self, device_id, input_id, value : float):
         # update input value
-        self.slider.setMarkerValue(value)
-        
+        if gremlin.util.compare_guid(self._action_data, device_id) and input_id == self._action_data.input_id:
+            self.slider.setMarkerValue(value)
+            
 
     def _update_axis_widget(self, value : float = None):
         ''' updates the axis output repeater with the value 
@@ -842,7 +843,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         self.hook()
         gh = GateEventHandler()
-        gh.registerValueChangedCallback(self.id, self._update_slider_marker)
+        gh.slider_update_event.connect(self._handle_slider_update)
+
+        #gh.registerValueChangedCallback(self.id, self._update_slider_marker)
 
         # create range data 
               
@@ -862,8 +865,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             self._gate_data.unhook()
             gremlin.util.clear_layout(self.main_layout)
             self._deleted = True
-            gh = GateEventHandler()
-            gh.unregisterValueChangedCallback(self.id, self._update_slider_marker)        
+            # gh = GateEventHandler()
+            # gh.unregisterValueChangedCallback(self.id, self._update_slider_marker)        
 
 
     def _pushState(self):
@@ -1493,11 +1496,20 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     def _duplicate_cb(self):
         ''' duplicate requested '''
         self.duplicate_requested.emit(self._gate_data)
+
+    def _handle_slider_update(self, event):
+        if not event.is_axis:
+            return
+        if not gremlin.util.compare_guid(self.action_data.hardware_device_id, event.device_guid) or event.identifier != self.action_data.hardware_input_id:
+            return # not ours
+        gremlin.util.InvokeUiMethod(self._update_slider_marker, event.value)
             
     
-    def _update_slider_marker(self, value : float):
+    #def _update_slider_marker(self, device_id, input_id, value : float):
+    def _update_slider_marker(self,  value : float):
         ''' updates the slider value '''
         # print (f"update marker: {value} input id: {self.action_data.hardware_input_id}")
+     
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
         if self._deleted:
             if verbose_ui: syslog.info(f"GATE Widget: update slider marker : {self.objectName()} ignored - object marked deleted ")

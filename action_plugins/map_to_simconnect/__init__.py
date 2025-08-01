@@ -2074,25 +2074,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 name_widget.setText(item.sim_name)
             name_widget.installEventFilter(self)    
 
-            # # manufacturer
-            # manufacturer_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            # manufacturer_widget.setReadOnly(True)
-            # manufacturer_widget.setText(item.icao_manufacturer if item.icao_manufacturer else "n/a")
-            # manufacturer_widget.installEventFilter(self)
-
-            # # model
-            # model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            # model_widget.setReadOnly(True)
-            # model_widget.setText(item.icao_model if item.icao_model else "n/a")
-            # model_widget.installEventFilter(self)
-
-            # # type
-            # type_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            # type_widget.setReadOnly(True)
-            # type_widget.setText(item.icao_type if item.icao_type else "n/a")
-            # type_widget.installEventFilter(self)
-
-
             # mode drop down
             mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget), wheel_enabled=False)
 
@@ -2672,7 +2653,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._calculator_entry_widget.setPlainText(self.action_data.command)
         self._calculator_entry_widget.textChanged.connect(self._expression_changed_cb)
 
-
         self._calculator_release_entry_widget = QtWidgets.QTextEdit()
         self._calculator_release_entry_widget.setAcceptRichText(False)
         self._calculator_release_entry_widget.setToolTip("RPN calculator expression sent to MSFS on input release")
@@ -2882,6 +2862,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_repeater_layout.addWidget(self.curve_clear_widget)
         self.container_repeater_layout.addWidget(self._axis_repeater_widget)
         #self.container_repeater_layout.addWidget(self._axis_alt_repeater_widget)
+
+    
         self.container_repeater_layout.addWidget(QtWidgets.QLabel("SimConnect Output:"))
         self.container_repeater_layout.addWidget(self._axis_value_widget)
         self.container_repeater_layout.addWidget(self._calculator_value_widget)
@@ -3240,14 +3222,15 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not event.is_axis:
             return 
         
-        value = None
+        #value = None
         
         if event.device_guid != self.action_data.hardware_device_guid:
             return
         if event.identifier != self.action_data.hardware_input_id:
             return
-        if event.is_custom:
-            value = event.value
+        #if event.is_custom:
+
+        value = event.value
         
         self._update_axis_widget(value)            
 
@@ -3259,9 +3242,10 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                   self.action_data.hardware_input_id) 
 
                 
-
-    
     def _update_axis_widget(self, value : float = None):
+        gremlin.util.InvokeUiMethod(self._update_axis_widget_ui, value) # flip to UI thread
+    
+    def _update_axis_widget_ui(self, value : float = None):
         ''' updates the axis output repeater with the value 
         
         :param value: the floating point normalized input value, if None uses the cached value -1 to +1 range
@@ -3274,7 +3258,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui
-        
+  
+
         if self.input_type == InputType.JoystickAxis:
             
             raw_value = self.action_data.get_raw_axis_value()
@@ -3287,30 +3272,41 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                 filtered_value = self.action_data.get_local_curve_value(filtered_value)
             normalized = filtered_value
             value = filtered_value
-                
+
+
+            min_range = self.action_data.command_min_range
+            max_range = self.action_data.command_max_range
+
 
             # if the output is ranged apply that range
-            
-            if self.action_data.mode == SimConnectActionMode.Ranged:
-                # scale up to apply the block range
-                filtered_value = self.action_data.get_filtered_axis_value(value)
+            match self.action_data.mode:
+                case  SimConnectActionMode.Ranged:
+                    # scale up to apply the block range
+                    filtered_value = self.action_data.get_filtered_axis_value(value)
 
-                raw = filtered_value # -1 to +1
-                normalized = raw 
+                    raw = filtered_value # -1 to +1
+                    normalized = raw 
 
-                # apply local curve to the range -1 to + 1
-                curved = self.action_data.get_local_curve_value(normalized)
+                    # apply local curve to the range -1 to + 1
+                    curved = self.action_data.get_local_curve_value(normalized)
 
-                # compute the output value based on the range setup
-                min_range = self.action_data.command_min_range
-                max_range = self.action_data.command_max_range
-                percent = gremlin.util.scale_to_range(curved, target_min = 0, target_max = 100)    
-                output_value = gremlin.util.scale_to_range(curved, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
-                                
-                if verbose: syslog.info(f"SIMCONNECT UI: {value:0.3f} output range: [{self.action_data.output_min_range:0.3f}, {self.action_data.output_max_range:0.3f}] normalized range: [{self.action_data.normalized_min_range:0.4f}, {self.action_data.normalized_max_range:0.4f}] normalized {normalized:0.4f} curved {curved:0.3f} percent: {percent:0.3f} output: {output_value}")
-            else:
-                output_value = value
-                percent = gremlin.util.scale_to_range(value, source_min = self.action_data.output_min_range, source_max = self.action_data.output_max_range, target_min=0, target_max=100) # convert to percent
+                    # compute the output value based on the range setup
+                    percent = gremlin.util.scale_to_range(curved, target_min = 0, target_max = 100)    
+                    output_value = gremlin.util.scale_to_range(curved, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
+                                    
+                    if verbose: syslog.info(f"SIMCONNECT UI: {value:0.3f} output range: [{self.action_data.output_min_range:0.3f}, {self.action_data.output_max_range:0.3f}] normalized range: [{self.action_data.normalized_min_range:0.4f}, {self.action_data.normalized_max_range:0.4f}] normalized {normalized:0.4f} curved {curved:0.3f} percent: {percent:0.3f} output: {output_value}")
+
+                case SimConnectActionMode.SetValue:
+                    output_value = self.action_data.value # value to set
+                    percent = gremlin.util.scale_to_range(output_value,
+                                                          source_min = self.action_data.output_min_range,
+                                                          source_max = self.action_data.output_max_range,
+                                                          target_min = 0,
+                                                          target_max = 100)
+
+                case _:
+                    output_value = value
+                    percent = gremlin.util.scale_to_range(value, source_min = self.action_data.output_min_range, source_max = self.action_data.output_max_range, target_min=0, target_max=100) # convert to percent
 
             if self.action_data.curve_data is not None:
                 # curve the data 
@@ -3322,7 +3318,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._current_value = normalized
 
             if self.action_data.command_mode == SimConnectCommandMode.Simvar:
-                
                 self._axis_value_widget.setValue(output_value)
                 self._axis_value_widget.setVisible(True)
                 self._calculator_value_widget.setVisible(False)
