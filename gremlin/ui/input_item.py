@@ -951,6 +951,9 @@ class ActionSetModel(ui_common.AbstractModel):
         
         el.icon_changed.emit(event)
 
+        container : gremlin.base_profile.AbstractContainer = action.get_container()
+        container.mapping_changed() # tell the UI about the change
+
         
 
 
@@ -958,7 +961,7 @@ class ActionSetModel(ui_common.AbstractModel):
         
         if action in self._action_set:
             input_item = action.get_input_item()
-            container = action.get_container()
+            container : gremlin.base_profile.AbstractContainer = action.get_container()
             del self._action_set[self._action_set.index(action)]
             el = gremlin.event_handler.EventListener()
             el.action_delete.emit(input_item, container, action)
@@ -969,10 +972,13 @@ class ActionSetModel(ui_common.AbstractModel):
             event.source = input_item
             event.device_input_id = input_item
             el.icon_changed.emit(event)
+
+            container.mapping_changed() # tell the UI about the change
             
             
             
         self.data_changed.emit()
+        
 
 
 @gremlin.singleton_decorator.SingletonDecorator

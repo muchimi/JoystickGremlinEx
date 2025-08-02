@@ -16,6 +16,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T36)
 - Fix: resolved an issue with gated axis slider marker
+- Fix: resolved another issue with remap changes not updating action icons.
+- Change: prevent category dialog from editing or deleting the default category
 - Fix: map to simconnect: incorrect value repeater when using fixed value mode.
 - Fix: map to simconnect: set value by percentage does not always update
 

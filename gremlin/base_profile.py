@@ -410,23 +410,27 @@ class AbstractContainer(ProfileData):
         self._action_sets_callback = None # callback to return different action sets if needed for containers that do their own thing
 
         # attached hardware device to this container
+        input_item = None
         if isinstance(parent, gremlin.profile_graph.ProfileContainerNode):
             input_item = _get_input_item(parent)
             if not input_item:
                 input_item = _get_input_item(parent)
 
-        input_item = _get_input_item(parent)
+        if not input_item:
+            input_item = _get_input_item(parent)
+
+        self._input_item = input_item
         assert input_item is not None
-        if input_item is not None:
-            self.device_guid = input_item.device_guid
-            self.device_input_id = input_item.input_id
-            self.device_input_type = input_item.input_type
-            self.device = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
-        else:
-            self.device_guid = None
-            self.device_input_id = None
-            self.device_input_type = None
-            self.device = None
+        # if input_item is not None:
+        self.device_guid = input_item.device_guid
+        self.device_input_id = input_item.input_id
+        self.device_input_type = input_item.input_type
+        self.device = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+        # else:
+        #     self.device_guid = None
+        #     self.device_input_id = None
+        #     self.device_input_type = None
+        #     self.device = None
 
     @QtCore.Slot(object, object, object)
     def _virtual_button_changed(self, input_item, container, action):
@@ -435,6 +439,12 @@ class AbstractContainer(ProfileData):
             self.create_or_delete_virtual_button()
             el = gremlin.event_handler.EventListener()
             el.condition_changed.emit(self)
+
+    def mapping_changed(self):
+        ''' fires the mapping changed event to notify UI on mapping changes made to this container '''
+        # tell the UI about the change
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.emit(self._input_item)
 
     def generateGuids(self):
         ''' called when GUIDs for this container, actions and conditions need to be re-set '''
@@ -548,6 +558,10 @@ class AbstractContainer(ProfileData):
         # Create activation condition data if needed
         self.create_or_delete_virtual_button()
 
+        # tell the UI about the change
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.emit(self._input_item)
+
     @property
     def action_sets(self):
         ''' gets the action sets for this container '''
@@ -644,6 +658,7 @@ class AbstractContainer(ProfileData):
         self._parse_action_set_xml(node, data)
         self._parse_virtual_button_xml(node, data)
         self._parse_activation_condition_xml(node, data)
+
 
     def to_xml(self):
         """Returns a XML node representing the instance's contents.
@@ -1713,6 +1728,10 @@ class InputItem():
 
     def add_container(self, container):
         self._containers.append(container)
+        
+        # tell the UI about the change
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.emit(self)
 
     def remove_container(self, container):
         if not container in self._containers:
@@ -1724,6 +1743,10 @@ class InputItem():
             return
                 
         self._containers.remove(container)
+
+        # tell the UI about the change
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.emit(self)
 
     def get_containers(self):
         return self._containers

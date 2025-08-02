@@ -92,7 +92,14 @@ class StateCategory():
     def name(self, value : str):
         if value:
             value = value.casefold().strip()
-        self._name = value
+        if self._name != value:
+            self._name = value
+
+            # tell UI of category name change
+            el = gremlin.event_handler.EventListener()
+            el.state_category_name_change.emit(self)
+
+
 
 
     @property
@@ -177,6 +184,38 @@ class StateCategories(QtCore.QObject):
         return self._default_category
         
 
+    def addCategory(self, name : str) -> StateCategory:
+        ''' adds a category '''
+        if name:
+            key = name.casefold().strip()
+            if not key in self._categories:
+                category = StateCategory(key, id)
+                self._categories[key] = category
+                return category
+            
+        return None
+
+    def removeCategory(self, category):
+        ''' removes a category if it exists '''
+        if category:
+            if category != self._default_category:
+                # only delete non default category
+                el = gremlin.event_handler.EventListener()
+                el.state_category_delete.emit(category)
+                del self._categories[category.key]
+
+    def renameCategory(self, old_name : str, new_name :str):
+        ''' renames a category '''
+        if old_name and new_name:
+            n1 = old_name.casefold().strip()
+            n2 = new_name.casefold().strip()
+            if n1 != n2 and n1 in self._categories:
+                category = self._categories[n1]
+                if category != self._default_category:
+                    category.name = n2
+            
+
+
     def _ensure_categories(self):
         ''' adds the default category if missing '''
         self._categories[self._default_category.name] = self._default_category
@@ -233,13 +272,13 @@ class StateCategories(QtCore.QObject):
 
     def getCategoryNames(self) -> list:
         ''' gets the list of categories '''
-        return [name for name in self._categories.keys()]
+        return [name for name in self._categories]
 
     def _sort(self):
         ''' sorts the category list '''
         if self._categories:
 
-            keys = [key for key in self._categories.keys()]
+            keys = list((key for key in self._categories))
             keys.sort()
             new_map = {}
             for key in keys:
@@ -253,11 +292,25 @@ class StateCategories(QtCore.QObject):
         return self._categories
     
     def setCategories(self, categories : list):
-        ''' updates the list of category objects '''
-        new_map = {}
+        ''' updates the list of category objects - fires appropriate events on changes '''
+        id_map = {}
+        for category in self._categories.values():
+            id_map[category.id] = category
         for category in categories:
-            new_map[category.name] = category
-        self._categories = new_map
+            id = category.id
+            if id in id_map:
+                # look for name changes
+                existing_category = id_map[id]
+                if category.name != existing_category.name:
+                    self.renameCategory(existing_category.name, category.name)
+            else:
+                self._categories[id] = category
+        
+        # get list of remove categories
+        removed_list = [c for c in self._categories.values() if not c in categories]
+        for category in removed_list:
+            self.removeCategory(category)
+
         self._sort()
 
 
@@ -321,6 +374,7 @@ class StateInputItem(AbstractInputItem):
     ''' holds a single state '''
     changed = Signal(object) # fires when a state changes (state)
     key_changed = Signal() # fires when the key changes
+    category_changed = Signal(object) # fires when a category changes
 
     MAX_STACK_SIZE = 100 # maximum number of expressions in a stack (circuit breaker to detect recursion)
     
@@ -351,6 +405,10 @@ class StateInputItem(AbstractInputItem):
         self._input_item = item
 
 
+        el = gremlin.event_handler.EventListener()
+        el.state_name_change.connect(self._state_name_change)
+        el.state_category_delete.connect(self._state_category_delete)
+        el.state_category_name_change.connect(self._state_category_name_change)
 
 
     def clone(self):
@@ -478,6 +536,37 @@ class StateInputItem(AbstractInputItem):
             if derived_value != self._value:
                 self._value = derived_value
                 self._fire_changed(derived_value)
+
+    def stateInExpression(self, key) -> bool:
+        ''' true if the key is found in the expression '''
+        if self._is_expression:
+            if not self._expression_stack:
+                self.evaluate()
+            pass
+        return False
+
+    def _state_name_change(self, old_name, new_name, state):
+        ''' called when a state name change happened '''
+        if not self._is_expression:
+            # ignore non expression states
+            return 
+        # update state if needed
+        self.expression = self._expression.replace(old_name, new_name)
+
+    def _state_category_delete(self, category : StateCategory):
+        ''' called when a category is deleted '''
+        if self._category == category:
+            cm = StateCategories()
+            default_category = cm.default()
+            self._category = default_category  # replace with default category
+            self.category_changed.emit(self)
+
+
+    def _state_category_name_change(self, category : StateCategory):
+        ''' called when a category is changed '''
+        if self._category == category:
+            self.category_changed.emit(self)
+
     
 
     @property
@@ -885,6 +974,11 @@ class StateData(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._reset)
 
+        
+
+
+
+
     def _reset(self):
         ''' reset states to default values '''
         to_evaluate = []
@@ -1159,6 +1253,9 @@ class CategoryModel(QtCore.QAbstractListModel):
     def __init__(self, data=None, parent=None):
         super().__init__(parent)
         self._data = {} 
+        cb = StateCategories()
+        self._source = data
+        self._default_category = cb.default()
         if data:
             for index, item in enumerate(data):
                 self._data[index] = item
@@ -1224,6 +1321,63 @@ class CategoryModel(QtCore.QAbstractListModel):
         ''' gets the data in the model'''
         return self._data.values()
     
+    def getItems(self):
+        return self._data
+    
+    def clear(self):
+        self._data.clear()
+    
+
+class StateCategoryEditorDelegate(QtWidgets.QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        cb = StateCategories()
+        self._default_category = cb.default()
+
+
+    def createEditor(self, parent, option, index):
+        value = index.data(QtCore.Qt.EditRole)
+        if value == self._default_category:
+            gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"The default category cannot be changed.")
+            return None
+        
+        editor = QtWidgets.QLineEdit(parent)
+        # Store original text
+        editor.original_text = value.name
+        return editor
+
+    # def setEditorData(self, editor, index):
+    #     value = index.data(QtCore.Qt.EditRole)
+    #     if value == self._default_category:
+    #         gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"Default category cannot be changed")
+    #         editor.setReadOnly(True)
+
+
+    def setModelData(self, editor, model, index):
+        value = editor.text()
+        if not value or not value.strip():
+            gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"Category name cannot be blank.")
+            return
+        # if value == self._default_category.name:
+        #     gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"The default category cannot be renamed.")
+        #     return
+        model.setData(index, value, QtCore.Qt.EditRole)
+
+
+class StateCategoryListView(QtWidgets.QListView):
+    edited = Signal()    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.delegate = StateCategoryEditorDelegate(self)
+        self.setItemDelegate(self.delegate)
+        
+        self.delegate.closeEditor.connect(self.handle_editor_closed)
+
+    def handle_editor_closed(self, editor, hint):
+        self.edited.emit()
+
+    
+
 
 class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog showing the category configuration options '''
@@ -1245,10 +1399,14 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._parent = parent # list view
 
         self._cm = StateCategories()
+        self._default_category = self._cm.default()
+
         categories = [item for item in self._cm.getCategories().values()]
-        self._list_view = QtWidgets.QListView()
+        self._list_view = StateCategoryListView()
+        self._list_view.edited.connect(self._handle_edited)
         self._model = CategoryModel(categories)
         self._list_view.setModel(self._model)
+        self._list_view.edit
         
         
         main_layout.addWidget(self._list_view)
@@ -1269,7 +1427,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._delete_button.clicked.connect(self._delete_cb)
 
         self._edit_widget = gremlin.ui.ui_common.QDataLineEdit()
-        self._edit_widget.textChanged.connect(self._new_category_changed_cb)
+        self._edit_widget.lostFocus.connect(self._new_category_changed_cb)
 
         widget, layout = gremlin.ui.ui_common.getHContainer([self._edit_widget, self._add_button, self._delete_button],"New Category:")
         main_layout.addWidget(widget)
@@ -1285,6 +1443,16 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         main_layout.addWidget(widget)
 
         self._update()
+
+    def _handle_edited(self):
+        ''' called when the list view has been edited '''
+        pass
+        # edited = self._model.data(self._list_view.currentIndex())
+        # if edited == self._default_category.name:
+        #     gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"The default category cannot be renamed.")
+        
+
+
 
     def _update(self):
         name = self._curent_category
@@ -1306,28 +1474,36 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             if result == QtWidgets.QMessageBox.StandardButton.Ok:
                 rows = [idx.row() for idx in indices]
                 keep = []
-                for index, item in enumerate(self._model.items()):
+                data = self._model.getItems()
+                for index, item in enumerate(data.items()):
                     if index in rows:
                         continue
-                    keep.append(item)
+                    keep.append(item[1])
                 
                 self._model.clear()
                 for item in keep:
                     self._model.addData(item)
 
-
-                self._model.dataChanged.emit()
+                role=QtCore.Qt.EditRole
+                self._model.dataChanged.emit(index, index, [role])
+                
                 # select the first item kept
                 if keep:
-                    self.list_view.setCurrentIndex(self.model.index(0,0))
-    @QtCore.Slot()
-    def _new_category_changed_cb(self):
-        self._curent_category = self._edit_widget.text()
-        self._update()
+                    self._list_view.setCurrentIndex(self._model.index(0))
 
     @QtCore.Slot()
-    def _edit_category_cb(self):
-        pass
+    def _new_category_changed_cb(self):
+        ''' called on name change '''
+        name = self._edit_widget.text()
+        if name:
+            # check it's not the default
+            name = name.casefold().strip()
+            if name == self._default_category.name:
+                gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"The default category cannot be renamed.")
+                return
+
+            if name != self._curent_category:
+                self._update()
 
 
 
@@ -1354,7 +1530,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 
     def getCategories(self) -> list:
         ''' gets a list of edited categories '''
-        categories = [item for item in self._model.items]
+        categories = list([item for item in self._model.items])
         return categories
 
         

@@ -224,6 +224,9 @@ class BasicContainer(AbstractContainer):
 
         self.create_or_delete_virtual_button()
 
+        self.mapping_changed() # tell UI of changes
+        
+
     def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.
 

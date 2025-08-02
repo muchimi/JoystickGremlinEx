@@ -538,6 +538,9 @@ class EventListener(QtCore.QObject):
 
 	device_mapping_changed = Signal(str) # fires when device mapping has changed (updates headers) - param = device_id as a string
 	
+	state_name_change = Signal(str,str,object) # fires when a state changes names (old_name, new_name, StateInputItem)
+	state_category_delete = Signal(object) # fires when a state category is removed (StateCategory)
+	state_category_name_change = Signal(object) # fires when a state category name is changed (StateCategory)
 
 	def __init__(self):
 		"""Creates a new instance."""
