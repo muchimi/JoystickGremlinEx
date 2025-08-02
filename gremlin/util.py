@@ -2227,3 +2227,11 @@ def compare_float_lists(l1 : list, l2 : list):
             return True
     return False
 
+def decorate_filter(filter) -> str:
+    ''' wraps a filter with wildcards if not provided '''
+    if filter:
+        filter = filter.casefold().strip()
+        if not "*" in filter and not "?" in filter:
+            filter = f"*{filter}*" # add wild cards
+    return filter
+

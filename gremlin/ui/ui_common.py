@@ -705,6 +705,10 @@ class Buttons():
         return Buttons._template(label, "msc.edit", tooltip, callback, no_keyboard, data)
     
     @staticmethod
+    def getSearchWidget(label = None, tooltip = "Search", callback = None, no_keyboard = True, data = None):
+        return Buttons._template(label, "ei.search", tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
     def getKeyboardWidget(label = None, tooltip = "Select Keys", callback = None, no_keyboard = True, data = None):
         return Buttons._template(label, "fa5.keyboard", tooltip, callback, no_keyboard, data)
     
@@ -1185,7 +1189,7 @@ _ContainerView_to_string_lookup = {
 }
 
 
-class AbstractModel(QtCore.QObject):
+class AbstractModel(QtCore.QAbstractItemModel):
 
     """Base class for MVC models."""
 
@@ -3711,8 +3715,10 @@ class QReorderToolbar(QtWidgets.QWidget):
 
 class QDataLineEdit(QtWidgets.QLineEdit):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    valueChanged = QtCore.Signal() # fires when the text has changed AND we lost the focus
+    valueChanged = QtCore.Signal() # fires when the text has changed AND we lost the focus if that option is selected
     lostFocus = QtCore.Signal() # fires when the input looses focus
+    enterPressed = QtCore.Signal() # indicates the enter key was pressed
+    escPressed = QtCore.Signal() # indicates the esc key was pressed
 
     def __init__(self, text = None, data = None, parent = None, width = 200):
         super().__init__(text, parent)
@@ -3722,10 +3728,35 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         #self.setStyleSheet("QLineEdit{border: #8FBC8F;}")
         super().textChanged.connect(self._text_changed_cb)
         self.setMinimumWidth(width)
+        self._trigger_on_focus_loss = True
+
+        self.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+                self.enterPressed.emit()
+                return True # eat it
+            if event.key() == Qt.Key.Key_Escape:
+                self.escPressed.emit()
+                return True # eat it
+             
+        return super().eventFilter(watched, event)
+
+    def setTriggerOnFocusOnly(self, value : bool):
+        self._trigger_on_focus_loss = value
+
+    def triggerOnFocusOnly(self) -> bool:
+        ''' true if the widget triggers value changed only on focus loss '''
+        return self._trigger_on_focus_loss
 
 
     def _text_changed_cb(self):
         self._text_changed = True
+        if not self._trigger_on_focus_loss:
+            # trigger on any text change
+            self.valueChanged.emit()
 
 
     def focusOutEvent(self, event):
@@ -9791,3 +9822,42 @@ class QModeSelector(QtWidgets.QGroupBox):
         self.modeSelected.emit(mode)
         
 
+
+
+class QInputDialog(QRememberDialog):
+    ''' grabs user input, adds enter key accept - we use our own here to avoid focus issues and have control over the enter key to accept on enter'''
+    def __init__(self, title = "Input Dialog", label = None, text=None,parent = None):
+        super().__init__(self.__class__.__name__, parent = parent)
+
+        
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.setWindowTitle(title)
+
+        if label:
+            self.main_layout.addWidget(QtWidgets.QLabel(label))    
+
+        # edit box
+        self._widget = QDataLineEdit(text)
+        self._widget.enterPressed.connect(self._accept)
+        self._widget.escPressed.connect(self._cancel)
+        self.main_layout.addWidget(self._widget)
+
+
+        self.cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel)
+        self.ok_widget = gremlin.ui.ui_common.Buttons.getOkWidget(callback = self._accept)
+        widget, _ = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget])
+        self.main_layout.addWidget(widget, alignment= QtCore.Qt.AlignmentFlag.AlignHCenter)
+
+    def text(self) -> str:
+        return self._widget.text()
+    
+    def setText(self, text :str) :
+        self._widget.setText(text)
+
+    def _cancel(self):
+        self.close()
+
+    def _accept(self):
+        self.accept()
+        self.close()
+    

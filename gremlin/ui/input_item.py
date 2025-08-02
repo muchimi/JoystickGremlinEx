@@ -49,6 +49,7 @@ import lxml
 from shiboken6 import Shiboken
 import psygnal
 from psygnal import Signal
+import copy
 
 
 
@@ -146,7 +147,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
 
 
-    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None):
+    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
@@ -166,6 +167,7 @@ class InputItemListModel(ui_common.AbstractModel):
         self._custom_update_handler = custom_update_handler
         self._custom_clear_handler = custom_clear_handler
         self._custom_remove_handler = custom_remove_handler
+        self._custom_filter_handler = custom_filter_handler # handles entries, return true to include, false to exclude
         self._update_data()
 
 
@@ -198,15 +200,44 @@ class InputItemListModel(ui_common.AbstractModel):
         self._update_data()
 
 
+    def _filter_data(self):
+        # filters the input data
+        if self._custom_filter_handler:
+            # apply filter
+            new_index_map = {} # holds filtered items only
+            new_item_map = {}
+            new_index = 0
+            for index in self._source_index_map:
+                data = self._source_index_map[index]
+                if self._custom_filter_handler(data):
+                    new_index_map[new_index] = data
+                    new_item_map[data.input_id] = new_index
+                    new_index +=1
 
+            self._index_map = new_index_map
+            self._item_map = new_item_map
 
-    def _update_data(self, emit_change = True):
+        
+    
+
+    def _update_source(self):
+        ''' updates source data (unfiltered) '''
+        self._source_index_map = self._index_map.copy()
+        self._source_item_map = self._item_map.copy()
+
+    def _update_filter(self, emit = False):
+        ''' updates the filters only (does not load new data) '''
+        self._filter_data()                
+
+    def _update_data(self, apply_filter = True, emit_change = True):
         ''' loads into the data model all the items for the current mode and device '''
         # load the items for this mode
 
         if self._custom_update_handler:
             # use our custom handler to update the model data
             self._custom_update_handler(self, emit_change)
+            self._update_source()
+            if apply_filter: self._filter_data()
             return
 
         input_items = self._device_data.modes[self._mode]
@@ -224,6 +255,9 @@ class InputItemListModel(ui_common.AbstractModel):
                     self._item_map[data.input_id] = index
                     index += 1
 
+        self._update_source()
+        if apply_filter: self._filter_data()
+
         if emit_change:
             self.data_changed.emit()
 
@@ -232,6 +266,10 @@ class InputItemListModel(ui_common.AbstractModel):
         if input_id in self._item_map:
             return self._item_map[input_id]
         return -1
+    
+    
+    
+
 
     def sort(self, sort_callback):
         ''' sorts the data using a sorting callback - the callback takes a list of input items, and returns a list of input items '''
@@ -256,23 +294,34 @@ class InputItemListModel(ui_common.AbstractModel):
         self._update_data()
 
 
-    def refresh(self):
+    def refresh(self, emit = False):
         ''' refreshes the mode data without data reload '''
-        self._update_data(emit_change = False)
+        self._update_data(emit_change = emit)
+
+    def applyFilter(self):
+        ''' applies the filters only (does not load new data)'''
+        self._filter_data()
+
+    def clearFilter(self):
+        ''' removes any filtering '''
+        self._update_data(apply_filter = False)
 
 
-    def rows(self):
+
+    def rows(self) -> int:
         """Returns the number of rows in the model.
 
         :return number of rows in the model
         """
-
-        return len(self._index_map)
+        return len(self._source_index_map)
+    
+    def filteredRows(self) -> int:
+         return len(self._index_map)
     
 
     def dataModel(self):
         ''' gets all the items'''
-        return self._index_map
+        return self._source_index_map
 
 
     def data(self, index):
@@ -296,39 +345,44 @@ class InputItemListModel(ui_common.AbstractModel):
             new_index = len(self._index_map)
             self._item_map[item] = new_index
             self._index_map[new_index] = item
+
+            self._update_source()
+            self._update_filter()
+
             return new_index
         else:
             # return the index of the existing item
             return self._item_map[item]
 
-        
 
 
 
     def removeRow(self, index):
         ''' removes the item at the specified index '''
 
-        if self._custom_remove_handler:
-            self._custom_remove_handler(self, index)
+        try:
+            if self._custom_remove_handler:
+                self._custom_remove_handler(self, index)
+        
+                return True
+
+            data = self.data(index)
+            if data:
+                input_type = data.input_type
+                if not input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
+                    # cannot remove other types
+                    return False
+
+                input_id = data.input_id
+                input_items = self._device_data.modes[self._mode]
+                # item_list = list(input_items.config[input_type].keys())
+                # item_index = item_list.index(input_id)
+                del input_items.config[input_type][input_id]
+
+
             return True
-
-        data = self.data(index)
-        if data:
-            input_type = data.input_type
-            if not input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
-                # cannot remove other types
-                return False
-
-            input_id = data.input_id
-            input_items = self._device_data.modes[self._mode]
-            # item_list = list(input_items.config[input_type].keys())
-            # item_index = item_list.index(input_id)
-            del input_items.config[input_type][input_id]
-
-            # refresh the data post delete
+        finally:
             self._update_data()
-
-        return True
 
 
     def action_id_to_index(self, action_id):
@@ -561,6 +615,11 @@ class InputItemListView(ui_common.AbstractView):
         # if index < len(widgets):
         #     return widgets[index]
         return None
+    
+    def scrollToIndex(self, index):
+        widget = self.getWidgetAt(index)
+        if index != -1:
+            self._scroll_to_item(widget)
 
 
     def redraw(self):

@@ -20,6 +20,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 - Change: prevent category dialog from editing or deleting the default category
 - Fix: map to simconnect: incorrect value repeater when using fixed value mode.
 - Fix: map to simconnect: set value by percentage does not always update
+- New: OSC mapping input message search and filtering.  It is now possible to filter the inputs by partial command message, and to locate a specific item.
+
 
 ### (m76T35)
 - New: OSC internal bridge - when sending OSC data to the built-in OSC server (ip and port), the OSC packet will route internally to the server. In this mode, there is no transmission over UDP so a protocol listener will not see these packets. OSC messages routed this way will still appear in the log file if OSC verbose mode is enabled for diagnostic purposes.

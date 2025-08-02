@@ -47,7 +47,7 @@ import logging
 from typing import Any, Iterator, List, Union
 import asyncio
 from asyncio import BaseEventLoop
-
+import fnmatch
 import socketserver
 import socket
 from socket import socket as _socket
@@ -3284,6 +3284,14 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._validate()
         self._update_parameters_from_command()
         self._update_display() # update UI with these settings
+        
+        if not data and command:
+            # no args - enable auto release
+            self._autorelease = True
+            with QtCore.QSignalBlocker(self._autorelease_widget):
+                self._autorelease_widget.setChecked(True)
+
+
 
     @property
     def command(self):
@@ -3329,6 +3337,142 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._update_display()  
 
 
+class  OscFilterWidget(QtWidgets.QWidget):
+    ''' displays a filter widget that can be enabled, and a state category selected '''
+    changed = Signal(str)  # fires when the filter is changed (passes the filter)
+    select = Signal(object) # request to select an item 
+        
+    def __init__(self, model, parent = None):
+        super().__init__(parent)
+
+        self._config = gremlin.config.Configuration()
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+         # filter widget
+        self._model = model
+       
+        current_filter = self._config.osc_filter
+       
+        self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text = current_filter)
+        self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback = self._find_entry)
+
+
+        self._apply_widget = QtWidgets.QPushButton("Apply")
+        self._apply_widget.setToolTip("Apply current filter")
+        self._apply_widget.clicked.connect(self._apply_filter)
+
+        self._clear_filter_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback = self._clear_filter,label=None)
+        self._clear_filter_widget.setMaximumWidth(24)
+
+        # self._filter_widget.setEnabled(is_filter)
+        # self._apply_widget.setEnabled(is_filter)
+
+        
+        widget, _ = gremlin.ui.ui_common.getHContainer([self._find_widget,
+                                                             "",
+                                                             #self._filter_enabled_widget,
+                                                             QtWidgets.QLabel(" Filter:"),
+                                                             self._filter_widget,
+                                                             "",
+                                                             self._apply_widget,
+                                                             self._clear_filter_widget,
+
+                                                             ])
+        
+        self.main_layout.addWidget(widget)
+
+        # count row
+        self._count_widget = QtWidgets.QLabel()
+        widget, _ = gremlin.ui.ui_common.getHContainer(self._count_widget)
+
+
+        self.main_layout.addWidget(widget)
+        self.main_layout.setSpacing(0)
+        
+        
+        self._update_count()
+
+
+    def _find_entry(self):
+        ''' occurs when the find button is clicked '''
+        gremlin.util.InvokeUiMethod(self._find_entry_ui)
+
+
+    def _find_entry_ui(self):
+        ''' displays the find dialog '''
+        config = gremlin.config.Configuration()
+        current_term = config.osc_last_search_term
+        self._dialog = gremlin.ui.ui_common.QInputDialog("Find OSC message","Search for:", text = current_term)
+        self._dialog.accepted.connect(self._find_entry_accept)
+        self._dialog.setModal(True)
+        self._dialog.show()
+
+    def _find_entry_accept(self):
+        
+        config = gremlin.config.Configuration()
+        current_term = config.osc_last_search_term
+        new_term = self._dialog.text()
+        if new_term and new_term != current_term:
+            input_item : OscInputItem
+            new_term = gremlin.util.decorate_filter(new_term)
+            config.osc_last_search_term = new_term
+            for input_item in self._model.dataModel().values():
+                if fnmatch.fnmatch(input_item.input_id.message, new_term):
+                    self.select.emit(input_item)
+       
+    def _update_count(self):
+        ''' updates the count of defined inputs '''
+        total = self._model.rows()
+        filtered = self._model.filteredRows()
+        
+        if filtered != total:
+            msg = f"<i>({filtered:,} of {total:,} OSC inputs)</i>"
+        else:
+            msg = f"<i>({total:,} OSC inputs)</i>"
+        self._count_widget.setText(msg)
+
+    def updateCounts(self):
+        ''' updates the model counts '''
+        self._update_count()
+    
+    def _clear_filter(self):
+        value = self._filter_widget.text()
+        if value:
+            # if there is a filter, clear it
+            with QtCore.QSignalBlocker(self._filter_widget):
+                self._filter_widget.setText(None)
+            self._apply_filter()    
+
+    def _apply_filter(self):
+        ''' applies the filter '''
+        value = self._filter_widget.text()
+        self._config.osc_filter = value
+        self.changed.emit(value)
+
+
+    def clearFilter(self):
+        ''' clears the filter '''
+        self._clear_filter()
+
+    @property
+    def filter(self) -> str:
+        return self._filter_widget.text()
+    
+
+    @QtCore.Slot()
+    def _find_input_cb(self):
+        ''' finds a state '''
+        name, ok = QtWidgets.QInputDialog.getText(self, "OSC Lookup", "Search for:")
+        if ok:
+            # sc = StateData()
+            # if sc.exists(name):
+            #     data = sc.getState(name)
+            #     index = self._index_for_key(data)
+            #     self.input_item_list_view.select_item(index,True)
+            # else:
+            #     gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
+            pass
 
 
 class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
@@ -3361,8 +3505,13 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         #assert self.device_profile.device_guid == gremlin.shared_state.osc_tab_guid
         self.current_mode = current_mode
 
+        config = gremlin.config.Configuration()
+
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.widget_storage = {}
+        self._filter = gremlin.util.decorate_filter(config.osc_filter)
+        self._in_input_dialog = False # flag to deal with focus issue
+        
 
         self._last_selected_index = -1 # index of last input, -1 if none
 
@@ -3370,7 +3519,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model = input_item.InputItemListModel(
             device_profile,
             current_mode,
-            [InputType.OpenSoundControl] # only allow OSC inputs for this widget
+            [InputType.OpenSoundControl], # only allow OSC inputs for this widget
+            custom_filter_handler = self._filter_data
         )
 
         # update the display names 
@@ -3388,7 +3538,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
         
-        config = gremlin.config.Configuration()
+        
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
             width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
@@ -3411,6 +3561,15 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             gremlin.ui.ui_common.synchronize_grids([w1, w2])
             
 
+        # filter view
+        self._filter_widget = OscFilterWidget(self.input_item_list_model)
+        self._filter_widget.changed.connect(self._filter_changed)
+        self._filter_widget.select.connect(self._select_input_item_cb)
+        
+        self.addLeftPanelWidget(self._filter_widget)
+
+
+        # list of inputs
         self.addLeftPanelWidget(self.input_item_list_view)
 
        
@@ -3429,13 +3588,6 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         button_container_layout.addWidget(clear_button)
         button_container_layout.addStretch(1)
 
-        # # find key button
-        # find_button = QtWidgets.QPushButton()
-        # icon = gremlin.ui.ui_common.Icons.findIcon()
-        # find_button.setIcon(icon)
-        # find_button.setToolTip("Find Command")
-        # find_button.clicked.connect(self._find_input_cb)
-        # button_container_layout.addWidget(find_button)
 
         # sort button
         sort_button = QtWidgets.QPushButton("Sort")
@@ -3469,6 +3621,30 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if selected_index is not None:
             self._select_item_cb(selected_index)
 
+    def _filter_data(self, input_item) -> bool:
+        ''' custom filter handler - true if the data is included in the filter, false otherwise '''
+        import fnmatch
+        if not self._filter:
+            return True # ok
+        item : OscInputItem = input_item.input_id
+        message = item.message
+        if not message:
+            # no message = match
+            return True
+        
+        message = item.message.casefold().strip()
+        return fnmatch.fnmatch(message, self._filter)
+        #return self._filter in message
+
+
+    def _filter_changed(self, filter):
+        ''' called when the filter changes '''
+        self._filter = gremlin.util.decorate_filter(filter)
+        self.input_item_list_model.applyFilter()
+        self.input_item_list_view.redraw()
+        self._filter_widget.updateCounts()
+
+
 
     def find_item(self, device_guid, input_type, input_id):
         ''' locates the input item, returns none if not found '''
@@ -3482,9 +3658,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 return osc
             
         return None
-
-
-
+    
+    
 
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
@@ -3534,6 +3709,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # last index selected, -1 means none
         self._last_selected_index = -1 
+        self._last_selected_input_item = None
+        self._item_data = None
 
         # redraw the UI
         self._select_item_cb(index, False)
@@ -3544,12 +3721,6 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     @QtCore.Slot()
     def _sort_input_cb(self):
         self.input_item_list_model.sort(self._sort_items)
-        # data = self.input_item_list_model.dataModel()
-        # item_list = [item for item in data.values()]
-        # item_list.sort(key = lambda x: x.input_id.message.casefold())
-        # self.input_item_list_model.clear()
-        # for index, item in enumerate(item_list):
-        #     self.input_item_list_model.add(item)
         self.input_item_list_view.redraw()
 
     def _sort_items(self, item_list : list )-> list:
@@ -3570,6 +3741,24 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
         return (self.device_guid, input_type, input_id)
+    
+    def _select_input_item_cb(self, input_item, emit = True):
+        ''' select by input '''
+        input_id = input_item.input_id
+        index = self.input_item_list_model.indexOf(input_id)
+        if index == -1:
+            self.clearFilter()
+            index = self.input_item_list_model.indexOf(input_id)
+        if index != -1:
+            self._select_item_cb(index)
+
+
+    def clearFilter(self):
+        ''' clears the current data filter '''
+        self._filter_widget.clearFilter()
+        self.input_item_list_view.redraw()
+
+        
 
     def _select_item_cb(self, index, emit = True):
         """Handles the selection of an input item.
@@ -3615,6 +3804,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             widget.description_changed.connect(change_cb)
 
             self.selectRegisteredWidget(key)
+            self.input_item_list_view.scrollToIndex(index)
         else:
             item_data = OscInputItem()
             widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
@@ -3623,6 +3813,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._last_selected_index = index 
         self._item_data = widget
+        self._last_selected_input_item = item_data
+
+
+        # ensure visible
+
 
         if emit:
             el = gremlin.event_handler.EventListener()
@@ -4088,6 +4283,10 @@ class InputOscClient(QtCore.QObject):
                         # parameter don't care
                        is_pressed = True
                     else:
+                        if len(args) == 0:
+                            syslog.warning(f"Autorelease not set on OSC no param button.  Thay may cause no trigger.  Check mode for [{input_item.message}]")
+
+
                         is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
 
                     value = 1 if is_pressed else 0
