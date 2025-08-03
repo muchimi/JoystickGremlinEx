@@ -15,12 +15,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T36)
-- Fix: resolved an issue with gated axis slider marker
-- Fix: resolved another issue with remap changes not updating action icons.
+- New: OSC and State inputs can be searched and filtered.  It is now possible to filter the inputs by partial name (command message or state name), and to locate a specific item.  The find function will find the first matching item.
 - Change: prevent category dialog from editing or deleting the default category
+- Fix: resolved an issue with gated axis slider marker.
+- Fix: resolved an issue with remap changes not updating action icons.
+- Fix: resolved three issues with state category UI interactions.
 - Fix: map to simconnect: incorrect value repeater when using fixed value mode.
-- Fix: map to simconnect: set value by percentage does not always update
-- New: OSC mapping input message search and filtering.  It is now possible to filter the inputs by partial command message, and to locate a specific item.
+- Fix: map to simconnect: set value by percentage does not always update.
 
 
 ### (m76T35)

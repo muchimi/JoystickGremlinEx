@@ -588,7 +588,8 @@ class Icons():
         return Icons._icon("fa6s.gear", qta_color)
     @staticmethod
     def findIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
-        return Icons._icon("fa6s.magnifying-glass", qta_color)
+        return Icons._icon("ei.search", qta_color)
+        #return Icons._icon("fa6s.magnifying-glass", qta_color)
     @staticmethod
     def refreshIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ei.refresh", qta_color)
@@ -706,7 +707,8 @@ class Buttons():
     
     @staticmethod
     def getSearchWidget(label = None, tooltip = "Search", callback = None, no_keyboard = True, data = None):
-        return Buttons._template(label, "ei.search", tooltip, callback, no_keyboard, data)
+        icon = Icons.findIcon()
+        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
     
     @staticmethod
     def getKeyboardWidget(label = None, tooltip = "Select Keys", callback = None, no_keyboard = True, data = None):

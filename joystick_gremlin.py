@@ -2788,7 +2788,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         items = self._get_input_items(device_guid)
         if items:
-            return next((item for item in items if item.input_id == input_id and item.input_type == input_type), None)
+            return next((item for item in items if item and item.input_id and item.input_id == input_id and item.input_type == input_type), None)
         return None
         
 

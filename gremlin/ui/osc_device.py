@@ -3365,16 +3365,12 @@ class  OscFilterWidget(QtWidgets.QWidget):
         self._clear_filter_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback = self._clear_filter,label=None)
         self._clear_filter_widget.setMaximumWidth(24)
 
-        # self._filter_widget.setEnabled(is_filter)
-        # self._apply_widget.setEnabled(is_filter)
-
-        
         widget, _ = gremlin.ui.ui_common.getHContainer([self._find_widget,
-                                                             "",
+                                                             "||",
                                                              #self._filter_enabled_widget,
                                                              QtWidgets.QLabel(" Filter:"),
                                                              self._filter_widget,
-                                                             "",
+                                                             "||",
                                                              self._apply_widget,
                                                              self._clear_filter_widget,
 
@@ -3388,7 +3384,7 @@ class  OscFilterWidget(QtWidgets.QWidget):
 
 
         self.main_layout.addWidget(widget)
-        self.main_layout.setSpacing(0)
+        self.main_layout.setSpacing(2)
         
         
         self._update_count()
@@ -3411,25 +3407,33 @@ class  OscFilterWidget(QtWidgets.QWidget):
     def _find_entry_accept(self):
         
         config = gremlin.config.Configuration()
-        current_term = config.osc_last_search_term
         new_term = self._dialog.text()
-        if new_term and new_term != current_term:
+        if new_term:
+            config.osc_last_search_term = new_term
             input_item : OscInputItem
             new_term = gremlin.util.decorate_filter(new_term)
-            config.osc_last_search_term = new_term
-            for input_item in self._model.dataModel().values():
-                if fnmatch.fnmatch(input_item.input_id.message, new_term):
-                    self.select.emit(input_item)
+            data = self._model.dataModel()
+            matches = [(index, item) for index, item in data.items() if fnmatch.fnmatch(item.input_id.message, new_term)]
+            if matches:
+                index_list = [i for (i, item) in matches]
+                index_list.sort()
+                index = index_list[0]
+                input_item = data[index]
+                self.select.emit(input_item)
+
        
     def _update_count(self):
         ''' updates the count of defined inputs '''
         total = self._model.rows()
         filtered = self._model.filteredRows()
         
-        if filtered != total:
-            msg = f"<i>({filtered:,} of {total:,} OSC inputs)</i>"
+        plural = "s" if total > 1 else ""
+        if total == 0:
+            msg = f"<i>(no inputs found)</i>"
+        elif filtered != total:
+            msg = f"<i>({filtered:,} of {total:,} OSC input{plural})</i>"
         else:
-            msg = f"<i>({total:,} OSC inputs)</i>"
+            msg = f"<i>({total:,} OSC input{plural})</i>"
         self._count_widget.setText(msg)
 
     def updateCounts(self):
@@ -3460,19 +3464,19 @@ class  OscFilterWidget(QtWidgets.QWidget):
         return self._filter_widget.text()
     
 
-    @QtCore.Slot()
-    def _find_input_cb(self):
-        ''' finds a state '''
-        name, ok = QtWidgets.QInputDialog.getText(self, "OSC Lookup", "Search for:")
-        if ok:
-            # sc = StateData()
-            # if sc.exists(name):
-            #     data = sc.getState(name)
-            #     index = self._index_for_key(data)
-            #     self.input_item_list_view.select_item(index,True)
-            # else:
-            #     gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
-            pass
+    # @QtCore.Slot()
+    # def _find_input_cb(self):
+    #     ''' finds a state '''
+    #     name, ok = QtWidgets.QInputDialog.getText(self, "OSC Lookup", "Search for:")
+    #     if ok:
+    #         # sc = StateData()
+    #         # if sc.exists(name):
+    #         #     data = sc.getState(name)
+    #         #     index = self._index_for_key(data)
+    #         #     self.input_item_list_view.select_item(index,True)
+    #         # else:
+    #         #     gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
+    #         pass
 
 
 class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
@@ -4119,7 +4123,7 @@ class InputOscClient(QtCore.QObject):
                 self._osc_map[message_key].append(input_item)
             if self._verbose:
                 syslog.info(f"OSC: register trigger on: {input_item.display_name} source index: {input_item.source_index} mode: {input_item.mode_string} key: {message_key}")
-                pass
+                
         
 
     def unregisterInput(self, input_item):

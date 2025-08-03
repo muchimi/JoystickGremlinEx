@@ -2260,6 +2260,25 @@ class Configuration(QtCore.QObject):
         self.save()
 
     @property
+    def state_filter(self) -> str:
+        ''' state  filter for the state device '''
+        return self._get_data("state_filter",None)
+    @state_filter.setter
+    def state_filter(self, value : str):
+        self._data["state_filter"] = value
+        self.save()
+
+
+    @property
+    def state_last_search_term(self) -> str:
+        ''' last search term for an state item '''
+        return self._get_data("state_last_search_term","")
+    @state_last_search_term.setter
+    def state_last_search_term(self, value : str):
+        self._data["state_last_search_term"] = value
+        self.save()        
+
+    @property
     def osc_filter(self) -> str:
         ''' message filter for the osc device '''
         return self._get_data("osc_filter",None)
@@ -2272,10 +2291,11 @@ class Configuration(QtCore.QObject):
     def osc_last_search_term(self) -> str:
         ''' last search term for an OSC item '''
         return self._get_data("osc_last_search_term","")
-    @osc_filter.setter
+    @osc_last_search_term.setter
     def osc_last_search_term(self, value : str):
         self._data["osc_last_search_term"] = value
         self.save()
+        
 
     @property
     def osc_filter_enabled(self) -> bool:
