@@ -2965,9 +2965,11 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 input_item._source_index = self._source_index
                 input_item._update() # this updates the message key
                 key = input_item.message_key
-                
-                for index in range(model.rows()):
+                visible_indices = model.getFilteredIndices()
+                for index in range(len(visible_indices)):
                     widget = parent_widget.itemAt(index)
+                    if not widget:
+                        continue
                     if index == self.index : continue # ignore self
                     # grab the input's configured osc message
                     other_input = widget.identifier.input_id

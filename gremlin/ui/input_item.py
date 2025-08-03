@@ -217,6 +217,12 @@ class InputItemListModel(ui_common.AbstractModel):
             self._index_map = new_index_map
             self._item_map = new_item_map
 
+    def getFilteredIndices(self):
+        ''' returns the list of indices currently visible in the model '''
+        return [index for index in self._index_map]
+    
+    
+
         
     
 

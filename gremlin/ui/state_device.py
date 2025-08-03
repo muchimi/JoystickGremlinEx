@@ -1874,6 +1874,9 @@ class  StateFilterWidget(QtWidgets.QWidget):
     
     def _update_count(self):
         ''' updates the count of defined inputs '''
+        if not self._model:
+            self._count_widget.setText(None)
+            return
         total = self._model.rows()
         filtered = self._model.filteredRows()
 
