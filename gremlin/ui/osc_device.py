@@ -62,7 +62,7 @@ from gremlin.util import *
 from lxml import etree as ElementTree
 
 import enum
-from gremlin.base_classes import AbstractInputItem
+#from gremlin.base_classes import AbstractInputItem
 import gremlin.util
 import vjoy
 import vjoy.vjoy
@@ -2131,7 +2131,8 @@ class OscInterface(QtCore.QObject):
 
 
 
-class OscInputItem(AbstractInputItem):
+#class OscInputItem(AbstractInputItem):
+class OscInputItem(gremlin.base_profile.InputItem):
     ''' holds OSC input data '''
 
     message_key_changed = Signal(str, str) # fires when message key changes 
@@ -2251,6 +2252,11 @@ class OscInputItem(AbstractInputItem):
     def message(self, value):
         self._message = value
         self._update()
+
+    @property
+    def input_id(self):
+        ''' input id for this input item '''
+        return self._message
 
     @property 
     def mode(self) -> OscInputItem.InputMode:

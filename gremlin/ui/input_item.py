@@ -221,8 +221,13 @@ class InputItemListModel(ui_common.AbstractModel):
         ''' returns the list of indices currently visible in the model '''
         return [index for index in self._index_map]
     
-    
+    def getFilteredItems(self):
+        ''' returns the list of filtered items '''
+        return self._index_map.values()
 
+    def getItems(self):
+        ''' returns the list of unfiltered items '''
+        return self._source_index_map.values()
         
     
 
@@ -337,12 +342,24 @@ class InputItemListModel(ui_common.AbstractModel):
         :return data stored at the provided index
         """
 
-        if not index in self._index_map.keys():
-            # bad index
-            #syslog.error(f"InputItemListModel: bad index request {index} for mode: {self._mode} device: {self._device_data.name}")
+        if not index in self._source_index_map:
+            return None
+
+        return self._source_index_map[index]
+    
+    def filteredData(self, index):
+        """Returns the data stored at the provided index.
+
+        :param index the index for which to return the data
+        :return data stored at the provided index
+        """
+
+        if not index in self._index_map:
             return None
 
         return self._index_map[index]
+    
+
     
     def add(self, item):
         ''' adds new item at the new index '''

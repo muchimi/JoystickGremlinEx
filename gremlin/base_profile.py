@@ -26,11 +26,6 @@ import logging
 import time
 
 #import gremlin.base_classes
-import gremlin.base_classes
-import gremlin.base_profile
-import gremlin.config
-import gremlin.curve_handler
-import gremlin.event_handler
 
 import gremlin.keyboard
 import gremlin.profile
@@ -62,6 +57,11 @@ from anytree import Node
 from PySide6.QtWidgets import QMessageBox
 import gremlin.profile_graph
 import gremlin.execution_graph
+import gremlin.base_classes
+import gremlin.base_profile
+import gremlin.config
+import gremlin.curve_handler
+import gremlin.event_handler
 
 syslog = logging.getLogger("system")
 
@@ -1550,7 +1550,7 @@ class ProfileRegistry():
         return None # not found
 
 
-class InputItem():
+class InputItem(gremlin.base_classes.AbstractInputItem):
 
     """Represents a single input item such as a button or axis, containers and parameters/options associated with that input mapping """
 
@@ -1559,7 +1559,10 @@ class InputItem():
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
         :param parent: the parent mode of this input item
         """
-        self._id = gremlin.util.get_guid() # unique ID of this object
+        # self._id = gremlin.util.get_guid() # unique ID of this object
+        # self._guid = gremlin.util.parse_guid(self._id)
+
+        super().__init__()
         
         self.parent = parent # mode object
         self._input_type = None
@@ -1638,13 +1641,6 @@ class InputItem():
     def _profile_start(self):
         # enable the input at profile start 
         self._enabled = True
-
-                
-    @property
-    def id(self):
-        ''' id of the InputItem '''
-        return self._id
-
 
     @property
     def description(self):

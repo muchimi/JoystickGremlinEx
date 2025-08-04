@@ -24,7 +24,7 @@ from gremlin.ui import ui_common
 from gremlin.ui.qsliderwidget import QSliderWidget
 from gremlin.util import *
 from gremlin.types import *
-from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
+import gremlin.ui.ui_common 
 import enum
 from lxml import etree
 

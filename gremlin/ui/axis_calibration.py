@@ -23,10 +23,9 @@ import gremlin.util
 from gremlin.util import parse_guid, safe_read, safe_format
 from . import ui_common
 from gremlin.input_types import InputType
-import gremlin.ui.ui_common
+
 import gremlin.event_handler
 import gremlin.shared_state
-from gremlin.util import axis_calibration, create_calibration_function
 from gremlin.ui.qsliderwidget import QSliderWidget
 from PySide6.QtGui import QColor
 from lxml import etree
@@ -35,10 +34,11 @@ import logging
 import gremlin.singleton_decorator
 import psygnal
 from psygnal import Signal
+import gremlin.ui.ui_common
 
 syslog = logging.getLogger("system♂")
 
-class CalibrationUi(ui_common.BaseDialogUi):
+class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
 
     """Dialog to calibrate joystick axes."""
 

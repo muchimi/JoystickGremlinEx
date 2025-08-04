@@ -45,12 +45,14 @@ from gremlin.util import InvokeUiMethod
 import gremlin.util
 from itertools import pairwise
 
-from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
+
 import enum
 from lxml import etree
 from gremlin.ui.deadzone import DeadzonePreset, DeadzoneWidget
 import psygnal
 from psygnal import Signal
+import gremlin.ui.ui_common
+
 
 import logging
 syslog = logging.getLogger("system")
@@ -1748,7 +1750,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.control_point_editor.setContentsMargins(0,0,0,0)
         self.container_control_layout.addWidget(self.control_point_editor)        
 
-        width = get_text_width("M") * 8
+        width = gremlin.ui.common.get_text_width("M") * 8
 
         self.input_raw_widget = QtWidgets.QLineEdit()
         self.input_raw_widget.setMaximumWidth(width)

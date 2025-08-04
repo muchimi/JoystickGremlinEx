@@ -38,31 +38,36 @@ import faulthandler
 import dinput
 import psygnal
 from psygnal import Signal
-
-
+import anytree
+from dinput import DeviceSummary
+from gremlin.util import InvokeUiMethod, assert_ui_thread
 from lxml import etree
+import PySide6
+from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
+from gremlin.types import TabDeviceType
 
 import gremlin.joystick_handling
 
 ''' ALL gremlin modules should be imported here to avoid packaging errors '''
 
 
-import gremlin.joystick_handling
 import gremlin.util
 import gremlin.config
 import gremlin.input_types
 import gremlin.event_handler
-import gremlin.execution_graph
-import gremlin.gamepad_handling
-import gremlin.import_profile
-import gremlin.input_devices
+import gremlin.base_classes
+
+
 import gremlin.config
 import gremlin.joystick_handling
 
+import gremlin.input_devices
+
 import gremlin.hid
-import gremlin.profile_graph
 import gremlin.shared_state
 import gremlin.types
+import gremlin.profile_graph
+import gremlin.base_profile
 import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
 import gremlin.ui.osc_device
@@ -73,19 +78,16 @@ import gremlin.ui.theme
 import gremlin.plugin_manager
 import gremlin.process_monitor
 import gremlin.execution_graph
+import gremlin.gamepad_handling
+import gremlin.import_profile
 import gremlin.windows_event_hook # reference needed for packaging
 import gremlin.macro_handler # reference needed for packaging
 
-import anytree
-from dinput import DeviceSummary
-from gremlin.util import InvokeUiMethod, assert_ui_thread
+
 
 
 # Import QtMultimedia so pyinstaller doesn't miss it
 
-import PySide6
-from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
-from gremlin.types import TabDeviceType
 
 
 

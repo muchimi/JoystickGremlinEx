@@ -14,7 +14,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T36)
+### (m76T36/A)
 - New: OSC and State inputs can be searched and filtered.  It is now possible to filter the inputs by partial name (command message or state name), and to locate a specific item.  The find function will find the first matching item.
 - Change: prevent category dialog from editing or deleting the default category
 - Fix: resolved an issue with gated axis slider marker.

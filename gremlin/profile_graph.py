@@ -33,7 +33,15 @@ import copy
 import logging
 import time
 from typing import Union, Any
-import gremlin.import_profile
+
+
+import gremlin.joystick_handling
+import dinput
+import enum
+from enum import auto
+import anytree
+from anytree import NodeMixin
+
 import gremlin.joystick_handling
 import gremlin.plugin_manager
 import gremlin.types
@@ -71,14 +79,7 @@ from vjoy import vjoy
 import gremlin.config
 from gremlin.ui import ui_common
 from gremlin.util import parse_guid, safe_format, safe_read, get_guid, write_guid, read_bool
-
-
-import gremlin.joystick_handling
-import dinput
-import enum
-from enum import auto
-import anytree
-from anytree import NodeMixin
+import gremlin.import_profile
 
 #from xml.dom import minidom
 import lxml

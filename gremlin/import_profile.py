@@ -33,7 +33,20 @@ import copy
 import logging
 import time
 from typing import Union, Any
-import gremlin.import_profile
+
+from gremlin.clipboard import Clipboard
+# from gremlin.input_types import InputType
+import dinput 
+import uuid
+import copy
+
+import dinput
+from dinput import DeviceSummary
+import gremlin.base_classes
+import gremlin.base_profile
+import gremlin.event_handler
+import gremlin.shared_state
+from vjoy import vjoy
 import gremlin.joystick_handling
 import gremlin.plugin_manager
 import gremlin.ui
@@ -50,20 +63,8 @@ from gremlin.types import DeviceType, TabDeviceType
 from gremlin.input_types import InputType
 import gremlin.util
 from gremlin.util import safe_read
-from gremlin.ui import ui_common,midi_device,osc_device, keyboard_device
-from gremlin.clipboard import Clipboard
-# from gremlin.input_types import InputType
-import dinput 
-import uuid
-import copy
 
-import dinput
-from dinput import DeviceSummary
-import gremlin.base_classes
-import gremlin.base_profile
-import gremlin.event_handler
-import gremlin.shared_state
-from vjoy import vjoy
+
 
 import psygnal
 from psygnal import Signal
@@ -79,7 +80,8 @@ import dinput
 import enum
 from enum import auto
 from anytree import NodeMixin
-
+import gremlin.import_profile
+from gremlin.ui import ui_common,midi_device,osc_device, keyboard_device
 
 #from xml.dom import minidom
 from lxml import etree as ElementTree

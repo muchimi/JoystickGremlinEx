@@ -374,7 +374,8 @@ class StateCategories(QtCore.QObject):
                     
 
 
-class StateInputItem(AbstractInputItem):
+#class StateInputItem(AbstractInputItem):
+class StateInputItem(gremlin.base_profile.InputItem):
     ''' holds a single state '''
     changed = Signal(object) # fires when a state changes (state)
     key_changed = Signal() # fires when the key changes
@@ -515,6 +516,11 @@ class StateInputItem(AbstractInputItem):
         if self._key != value:
             self._key = value
             self.key_changed.emit()
+
+    @property
+    def input_id(self):
+        ''' input id for this key '''
+        return self._key            
     
     @property
     def type_cast(self):

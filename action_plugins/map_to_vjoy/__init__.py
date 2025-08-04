@@ -4178,7 +4178,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         
 
         elif self.action_mode == VjoyAction.VJoyHatToButton:
-            position = action_value.current
+
+            if isinstance(action_value, tuple):
+                position = action_value
+            else:
+                position = action_value.current
 
             pressed_positions = list(self.pressed_hat_buttons.keys())
             is_pressed = event.is_pressed # position != (0,0)

@@ -20,19 +20,14 @@ import os
 from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui #QtWebEngineWidgets
 
-import gremlin.base_profile
-import gremlin.config
-import gremlin.config
-import gremlin.event_handler
-import gremlin.execution_graph
-import gremlin.execution_graph
+
 from gremlin.input_types import InputType
-import gremlin.joystick_handling
+
 import gremlin.shared_state
-import gremlin.ui.joystick_device
+
 import gremlin.ui.input_item
-import gremlin.ui.ui_common
-from gremlin.ui.qsliderwidget import QSliderWidget
+
+
 import gremlin.util
 from gremlin.util import *
 from gremlin.types import *
@@ -48,6 +43,13 @@ from shiboken6 import Shiboken
 import gremlin.repeater
 import psygnal
 from psygnal import Signal
+
+import gremlin.ui.ui_common
+import gremlin.joystick_handling
+import gremlin.base_profile
+import gremlin.config
+import gremlin.event_handler
+
 
 syslog = logging.getLogger("system")
 MAX_UNDO = 20 # number of steps on the UNDO stack
@@ -1494,6 +1496,9 @@ class GateData():
     @QtCore.Slot()
     def _profile_start_cb(self):
         ''' profile starts - build execution callbacks by defined container '''
+        import gremlin.execution_graph
+        import gremlin.event_handler
+
 
         # verify the profile mode exists
         profile_mode = self.profile_mode

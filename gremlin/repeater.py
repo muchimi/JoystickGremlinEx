@@ -26,9 +26,7 @@ import gremlin.event_handler
 
 from . import common, event_handler, input_devices, joystick_handling
 import logging
-from gremlin.input_types import InputType
-from gremlin.actions import Value
-import gremlin.joystick_handling
+
 
 syslog = logging.getLogger("system")
 

@@ -24,7 +24,7 @@ import os
 from typing import Optional
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
-import gremlin.actions
+
 import gremlin.base_classes
 import gremlin.config
 import gremlin.error

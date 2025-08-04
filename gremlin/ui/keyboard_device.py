@@ -50,7 +50,7 @@ class KeyboardInputItem(AbstractInputItem):
         self._title_name = "Keyboard input (not configured)"
         
         self._display_tooltip = None
-
+        self._input_type = InputType.Keyboard
         self._suspend_update = False
         self._update()
 
@@ -64,6 +64,10 @@ class KeyboardInputItem(AbstractInputItem):
         ''' title for this input '''
         return self._title_name
 
+    @property
+    def input_id(self):
+        ''' input id for this key '''
+        return self._key
     
     @property
     def display_tooltip(self):
@@ -73,12 +77,19 @@ class KeyboardInputItem(AbstractInputItem):
     def key(self):
         return self._key
     
+    @key.setter
+    def key(self, value):
+        assert isinstance(value, Key), f"Invalid type for key property: expected Key - got {value.type()}"
+        self._key = value
+        self._update()
+
     @property
     def key_tuple(self):
         if self._key:
             return (self._key.scan_code, self._key.is_extended)
         return None
-    
+            
+
     @property
     def sequence(self):
         ''' returns a list of (scan_code, extended) tuples for all latched keys in this sequence '''
@@ -87,14 +98,6 @@ class KeyboardInputItem(AbstractInputItem):
         return []
     
     def _latched_key_update(self, source, action, index, value):
-        self._update()
-
-    
-    
-    @key.setter
-    def key(self, value):
-        assert isinstance(value, Key), f"Invalid type for key property: expected Key - got {value.type()}"
-        self._key = value
         self._update()
 
     @property

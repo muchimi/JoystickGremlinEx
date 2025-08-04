@@ -219,6 +219,8 @@ class MidiInputItem(AbstractInputItem):
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
 
+
+
     @property
     def is_valid(self) -> bool:
         ''' true if the input is configured (controls the visibility of the repeater)'''
@@ -239,6 +241,11 @@ class MidiInputItem(AbstractInputItem):
     def message(self, value):
         self._message = value
         self._update_display_name()
+
+    @property
+    def input_id(self):
+        ''' input id for this key '''
+        return self._message        
 
     
     @property

@@ -45,7 +45,7 @@ from enum import Enum,auto
 from gremlin.singleton_decorator import SingletonDecorator
 from PySide6 import QtCore
 from threading import Event
-import gremlin.gated_handler
+
 import gremlin.types
 import gremlin.ui
 import psygnal
@@ -1112,6 +1112,10 @@ class ExecutionContext():
 
     def _build_container_tree(self, container, parent_group, mode_name, device_node, input_item, m_input_node ) -> ExecutionGraphNode:
         ''' builds a tree branch for the given container '''
+
+        import gremlin.gated_handler
+        import gremlin.shared_state
+        import gremlin.config
 
         gremlin.shared_state.pushLog()
         try:

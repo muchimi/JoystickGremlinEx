@@ -222,7 +222,9 @@ class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
     pass
 
 
+
 class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
+
     ''' base class for input items for MIDI, OSC, KEYBOARD and STATE items '''
 
     input_type_change = Signal(object) # fires when an input item needs to refresh the output mapping due to input type changed
@@ -238,7 +240,20 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._input_description = None
         self._axis_value = None
         self._button_value = False # true if the equivalent of "pressed"
-        
+        self._is_action = False
+        self._is_axis = False
+        self._is_button = True
+        self._input_type = None
+        self._description_readonly = True
+
+    @property
+    def descriptionReadOnly(self) -> bool:
+        ''' true if description is readonly'''
+        return self._description_readonly
+    
+    @descriptionReadOnly.setter
+    def descriptionReadOnly(self, value: bool):
+        self._description_readonly = value
 
     @property
     def guid(self):
@@ -273,7 +288,6 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     def setDescription(self, value : str):
         if value != self._description:
             self._description = value
-    
 
     @property
     def input_description(self) -> str:
@@ -315,10 +329,36 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     def setButtonValue(self, value: bool):
         self._button_value = value
 
+    @property
+    def is_action(self) -> bool:
+        ''' true if the item is action '''
+        return self._is_action
+    @is_action.setter
+    def is_action(self, value : bool):
+        self._is_action = value
+
+    @property
+    def is_axis(self) -> bool:
+        ''' true if this item is setup as an axis input (linear) '''
+        return self._is_axis or self._input_type == InputType.JoystickAxis
+    @is_axis.setter
+    def is_axis(self, value : bool):
+        self._is_axis = value
+
+    @property
+    def is_button(self) -> bool:
+        ''' true if this item is setup as an axis input (momentary) '''
+        return not self.is_axis        
+
 
     @property
     def message_key(self):
         assert False,"message_key property must be implemented by subclasses"
+
+    @property
+    def input_id(self):
+        assert False,"input id property must be implemented by subclasses"
+
 
     @abstractmethod
     def to_xml(self):
