@@ -703,7 +703,7 @@ All OSC inputs must be unique or a warning will be triggered in the UI.  An inpu
 | Mode      | Description |
 | ----------- | ----------- |
 | Change      | Triggers whenever the value changes |
-| Button      | Triggers a press event if the first argument is non-zero, and a released event when the first argument is zero  |
+| Button      | Triggers a press event if the first argument is non-zero, and a released event when the first argument is zero.  For singleton commands with no parameters, such as for rotary encoders, use the *trigger on message* option so have GremlinEx issue an autorelease.  Note that a release is not always needed but most actions in GremlinEx expect a trigger on press followed by a release at some point.  |
 | Axis        | The input is placed in axis mode, which enables the vjoy-remap container in axis input mode. A range value can be provided that tells GremlinEx the input range, it can map it to the VJOY range of -1 to +1.  The default is 0 to 1. |
 
 
