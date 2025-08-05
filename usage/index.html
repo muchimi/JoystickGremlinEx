@@ -795,9 +795,36 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#osc-port" class="md-nav__link">
+  <a href="#osc-ports" class="md-nav__link">
     <span class="md-ellipsis">
-      OSC port
+      OSC ports
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-port-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC port configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-related-firewall-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC related firewall rules
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-test-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC test tool
     </span>
   </a>
   
@@ -2319,9 +2346,36 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#osc-port" class="md-nav__link">
+  <a href="#osc-ports" class="md-nav__link">
     <span class="md-ellipsis">
-      OSC port
+      OSC ports
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-port-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC port configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-related-firewall-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC related firewall rules
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-test-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC test tool
     </span>
   </a>
   
@@ -3786,15 +3840,111 @@
 <p>The majority of issues will come from messages not being recognized by GremlinEx because the input configuration is causing it to filter (skip) that message.  To this end, Gremlin will tell you what it's listening to.</p>
 <p>There are some tools that let you visualize what MIDI messages the computer is receiving such as <a href="http://www.midiox.com/">MidiOx</a>, and older but tried and true MIDI diagnostics tool, or something like <a href="https://hexler.net/protokol">Hexler Protokol</a>.  Both utilities are free.  It's always a good idea to verify the MIDI signaling is functional outside of GremlinEx to verify the machine is seeing messages.  If GremlinEx cannot "listen" to a message via the listen buttons, it cannot see it.</p>
 <h2 id="osc-device-open-sound-control">OSC device (Open Sound Control)<a class="headerlink" href="#osc-device-open-sound-control" title="Permanent link">&para;</a></h2>
-<p>GremlinEx, as of 13.40.14ex, can map OSC messages as input and use those to trigger actions.  OSC is generally much easier to setup and program than MIDI.  For more information on the open sound control protocol, visit <a href="https://OpenSoundControl.org">OpenSoundControl.org</a>.</p>
-<p>As of 13.40.16ex, GremlinEx can also send OSC messages.</p>
-<p>Unlike hardware devices, OSC inputs must be user defined and added to tell GremlinEx what to listen to. GremlinEx supports any OSC message, although in the current version, limits are imposed on parameter types for ease of processing/mapping to a VJOY device:</p>
+<p>GremlinEx, as of 13.40.14ex, can map OSC (Open Sound control) protocol messages as input and use those to trigger actions.  OSC is a network protocol over UDP used to exchange information between AV (audio visual) control panels, studio equipment and related software.  In GremlinEx's context, OSC is used to get input from control panels and touch surfaces that support the OSC protocol, including faders/knobs, buttons/switches, rotary encoders and sliders, all of which are very useful to use as  game input.  GremlinEx can receive and send OSC messages.  OSC is generally much easier to setup and program than MIDI as it supports text commands and multiple parameters, including floating point and integer values.  For more information on the open sound control protocol, visit <a href="https://OpenSoundControl.org">OpenSoundControl.org</a>.</p>
+<p>Examples of what can be achieved using OSC:</p>
+<ul>
+<li>Receive input and control <a href="https://bitfocus.io/companion">Bitfocus Companion</a> which enables GremlinEx to use input from hardware panels like <a href="https://www.elgato.com/us/en/p/stream-deck">Elgato StreamDeck</a>, <a href="https://loupedeck.com">LoupeDeck</a> panels, and other studio control hardware.</li>
+<li>Receive input and control touch surfaces through <a href="https://openstagecontrol.ammd.net/">Open Stage Control</a>, <a href="https://hexler.net/touchosc">Hexler Touch/OSC</a> or <a href="https://oscpilot.com/">OSC/Pilot</a>, which gives GremlinEx the ability to get input from a tablet, phone or touchscreen.</li>
+<li>Supports these devices over the network so devices do not need to be physically connected to the GremlinEx machine.</li>
+</ul>
+<p>Unlike joystick devices and most hardwired HID inputs, OSC inputs must be user defined and added to tell GremlinEx what to listen to. GremlinEx supports any OSC message, although in the current version, limits are imposed on parameter types for ease of processing/mapping to a VJOY device:</p>
 <p>OSC messages must consist of a text part, example  /this_is_my_test_fader followed by a numeric value (float or int).   Extra parameters are currently ignored, but can be provided without error.</p>
 <p>Important: all OSC commands must start with a forward slash or they will be ignored.  OSC commands also accept one or two numeric parameters, floating point or integer.  It is customary for faders and axes to use a value of 0.0 to 1.0 for a range of values, and for momentary buttons to use a value of 1.0 when pressed, and 0.0 when released.</p>
-<h3 id="osc-port">OSC port<a class="headerlink" href="#osc-port" title="Permanent link">&para;</a></h3>
-<p>OSC uses a UDP port to listen on the network for OSC messages.  The default port is 8000 for receiving, and 8001 for sending.   The port can be configured by your OSC utility, just make sure GremlinEx listens on the correct port for messages.  The output port is not used by GremlinEx currently except to configure the OSC client. The output port is always 1 above the input port, so 8001 if the default 8000 input port is used. If you are using a firewall, make sure the port is configured to receive.</p>
-<p>The port is configured in options.</p>
-<p>The host is auto-configured to the current IP of the machine. Currently, that IP cannot be localhost (127.0.0.1).  This makes sense because any OSC input device will typically run on a separate host, and thus the GremlinEx machine needs to have network connectivity.</p>
+<p>OSC messages that do not include parameters can be treated as an input trigger (press) if the option is selected in the OSC input configuration box.  In this mode, GremlinEx will automatically issue an internal release trigger after the set delay has lapsed.  This is often necessary because many actions in GremlinEx require both a press and release triggers, although that depends on the desired behavior. </p>
+<p>The general case for switches or buttons on panels is for the OSC device to send two messages to GremlinEx.  The message should have a single numeric parameter (others are ignored).  The parameter is decoded as a release for a value of zero (0), and a press for any value not zero (!= 0).  To make things consistent with most OSC control tablets, the convention is to use a value of 1.0 for button presses, and 0.0 for button releases. Note that GremlinEx will use the first parameter either as an integer or a floating point value, either will work.  </p>
+<p>The general case for rotary encoders is different as these typically can only send rotation pulses, and no release.  For these inputs, configure GremlinEx to auto-trigger the release using the "trigger on press" checkbox and set the delay in milliseconds.  The delay is the time between the OSC message is received, and the internal release is triggered.  Most games require at least 100ms to capture the input, many require 250ms.  This varies with the game however testing most games prefer 250ms which is why the default is set at 250ms (quarter second).</p>
+<h3 id="osc-ports">OSC ports<a class="headerlink" href="#osc-ports" title="Permanent link">&para;</a></h3>
+<p>OSC is a protocol running over UDP, so requires not only an IP address but a port port to listen to, or send to OSC messages.  GremlinEx includes an internal OSC server to listen to incoming OSC traffic.  The default GremlinEx server (listen) port is 8000.  GremlinEx usually uses port 8001 for sending.</p>
+<p>Network devices should send OSC traffic to GremlinEx using the IP address of the machine running GremlinEx and the GremlinEx server port (8000 by default).  Do not use the loopback IP address (127.0.0.1) - use the assigned IP address.  For dual homed machines (machines with more than one network interface), ensure you use the primary IP address.</p>
+<p>When sending OSC data from GremlinEx using the *map to OSC" or "map to OSC ex" actions, be sure to also specify the IP address and listen port of the receiving panel.</p>
+<p>GremlinEx can send itself messages, in which case the OSC packet will be internally bridged and will not go over UDP.  This enables hardware connected to GremlinEx to send OSC messages to itself, or the network devices.</p>
+<p>The port can be configured by your OSC utility, just make sure GremlinEx listens on the correct port for messages.  The output port is not used by GremlinEx currently except to configure the OSC client. The output port is always 1 above the input port, so 8001 if the default 8000 input port is used. If you are using a firewall, make sure the port is configured to receive.</p>
+<p>The GremlinEx OSC server port is configured in options.  GremlinEx uses by default the current non-loopback IP of the machine. Currently, that IP cannot be localhost (127.0.0.1), it may work in some configurations however it may not.  This makes sense because any OSC input device will typically run on a separate host, and thus the GremlinEx machine needs to have network connectivity.</p>
+<h3 id="osc-port-configuration">OSC port configuration<a class="headerlink" href="#osc-port-configuration" title="Permanent link">&para;</a></h3>
+<p>Ports should be used to avoid conflicts with each other.  Recommend defaults are:</p>
+<ul>
+<li>port 8000 to send data to GremlinEx</li>
+<li>port 8001 to receive data from GremlinEx</li>
+<li>Gremlin server port: 8000</li>
+<li>Gremlin OSC map send to port: 8001</li>
+<li>Bitfocus server admin port (web server): 8010</li>
+</ul>
+<p>Example for GremlinEx running on the same machine as Bitfocus, and Open Stage Control running on a different network machine:</p>
+<table>
+<thead>
+<tr>
+<th>Item to configure</th>
+<th>Role</th>
+<th>IP</th>
+<th>Port</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bitfocus web server</td>
+<td>admin</td>
+<td>GremlinEx IP</td>
+<td>8010</td>
+<td>Admin web site</td>
+</tr>
+<tr>
+<td>Bitfocus OSC generic module</td>
+<td>send</td>
+<td>GremlinEx IP</td>
+<td>8000</td>
+<td>Send to GremlinEx</td>
+</tr>
+<tr>
+<td>Bitfocus OSC generic module</td>
+<td>listen</td>
+<td>GremlinEx IP</td>
+<td>8001</td>
+<td>Listen to GremlinEx</td>
+</tr>
+<tr>
+<td>Open Stage control</td>
+<td>send</td>
+<td>GremlinEx IP</td>
+<td>8000</td>
+<td>Send to GremlinEx</td>
+</tr>
+<tr>
+<td>Open Stage control</td>
+<td>listen</td>
+<td>Open Stage IP</td>
+<td>8001</td>
+<td>Listen to GremlinEx</td>
+</tr>
+<tr>
+<td>GremlinEx (OSC configuration)</td>
+<td>listen</td>
+<td>GremlinEx IP</td>
+<td>8000</td>
+<td>Listen to Open Stage or Bitfocus</td>
+</tr>
+<tr>
+<td>GremlinEx (map to OSC)</td>
+<td>send</td>
+<td>Open Stage IP</td>
+<td>8001</td>
+<td>Send to Open Stage</td>
+</tr>
+<tr>
+<td>GremlinEx (map to OSC)</td>
+<td>send</td>
+<td>GremlinEx IP</td>
+<td>8001</td>
+<td>Send to Bitfocus</td>
+</tr>
+</tbody>
+</table>
+<p>GremlinEx IP = primary IP address of the computer running GremlinEx and Bitfocus (do not use localhost or 127.0.0.1)</p>
+<p>Open Stage IP = primary IP address of the computer running Open Stage Control attached to a touch screen.</p>
+<h3 id="osc-related-firewall-rules">OSC related firewall rules<a class="headerlink" href="#osc-related-firewall-rules" title="Permanent link">&para;</a></h3>
+<p>In Windows 11, the Windows Firewall will automatically configure itself when GremlinEx attempts to open the port, and prompt to allow this traffic the first time. This prompt wil typically appear for each new port used. However this behavior varies with different configuration and policy settings in Windows.  A firewall rule may needed to be setup to allow UDP traffic on the ports used for OSC traffic.  If the firewall is not configured, the OSC traffic is not allowed to communicate so the packets will not transmit and GremlinEx will not be able to receive or send OSC data over that port.   The same is true of any OSC device in that ports must be opened and allowed to communicate.</p>
+<h3 id="osc-test-tool">OSC test tool<a class="headerlink" href="#osc-test-tool" title="Permanent link">&para;</a></h3>
+<p>Hexler provides a free analysis tool for OSC packets:  <a href="https://hexler.net/protokol">Hexler Protokol</a></p>
 <h3 id="osc-inputs">OSC inputs<a class="headerlink" href="#osc-inputs" title="Permanent link">&para;</a></h3>
 <p>All OSC inputs must be unique or a warning will be triggered in the UI.  An input maps to a specific message type.  In the current release, OSC inputs support the following input modes:</p>
 <h4 id="osc-trigger-modes">OSC Trigger modes<a class="headerlink" href="#osc-trigger-modes" title="Permanent link">&para;</a></h4>
