@@ -1605,6 +1605,9 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._description_widget.setText(data._description)
         self._description_widget.textChanged.connect(self._description_changed)
 
+        self._status_widget = gremlin.ui.ui_common.QWarningWidget()
+
+
         self._cm = StateCategories()
 
         selected_index = None
@@ -1658,6 +1661,8 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
         main_layout.addWidget(self._config_widget)
 
+        main_layout.addWidget(self._status_widget)
+
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
 
@@ -1668,6 +1673,16 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         
         main_layout.addWidget(widget)
         self._update_ui()
+
+    def _set_status(self, text : str):
+        ''' sets the status text '''
+        self._status_widget.setText(text)
+        visible = bool(text)
+        self._update_ui()
+
+    def _clear_status(self):
+        ''' clears and hides the status text '''
+        self._set_status(None)
 
     def _category_changed_cb(self, index):
         ''' called when selected command changes '''
@@ -1695,13 +1710,33 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _validate(self):
         sd = StateData()
-        enabled = bool(self.data.key)
+        msg = None
+        key = self.data.key
+
+        # blank
+        enabled = bool(key)
+        if not enabled:
+            msg = "Name cannot be blank."
+        
+        # words
+        if re.search(r'\s', key):
+            enabled = False
+            msg = "Name cannot include spaces"
+            
         if enabled:
             item = sd.getState(self.data.key)
             if item:
                 enabled = item.id == self.data.id
+                msg = "Name is not case sensitive and must be unique."
+
+        if enabled:
+            # check against reserved keywords
+            if key in ("and","or","not","xor"):
+                enabled = False
+                msg =  "Name cannot be a reserved keyword."
 
         self.ok_widget.setEnabled(enabled)
+        self._set_status(msg)
 
 
     @QtCore.Slot()
@@ -1782,6 +1817,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         expression_visible = self.data.isExpression
         self._expression_container_widget.setVisible(expression_visible)
         self._default_container_widget.setVisible(not expression_visible)
+        self._status_widget.setVisible(bool(self._status_widget.text()))
 
 
 class  StateFilterWidget(QtWidgets.QWidget):

@@ -194,7 +194,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
                     self._add_key(key)
                 
         else:
-            self.key_combination_layout.addWidget(gremlin.ui.ui_common.QWarning("No input selected. Please select at least one input."))
+            self.key_combination_layout.addWidget(gremlin.ui.ui_common.QWarningWidget("No input selected. Please select at least one input."))
             self.key_combination_layout.addStretch()
             
 

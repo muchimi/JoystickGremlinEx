@@ -9349,12 +9349,6 @@ class QAxisSourceSelector(QtWidgets.QWidget):
 
 
 
-class QWarning(QIconLabel):
-    def __init__(self, text = None, parent = None):
-        super().__init__()
-        self.setIcon(Icons.warningIcon())
-        if text:
-            self.setText(text)
 
 
 class QRangeWidget(QtWidgets.QWidget):
@@ -9863,3 +9857,32 @@ class QInputDialog(QRememberDialog):
         self.accept()
         self.close()
     
+
+class QWarningWidget(QtWidgets.QWidget):
+    ''' warning widget'''
+    def __init__(self, text = None,  parent = None):
+        super().__init__(parent)
+        self._text = text
+        main_layout = QtWidgets.QVBoxLayout(self)
+        warning_color = Color.warningColor()
+        icon = Icons.warningIcon()
+        self._widget = QIconLabel(icon_path = icon, text=text)
+        widget, _ = getHContainer(self._widget)
+        main_layout.addWidget(widget)
+
+    def text(self) -> str:
+        return self._text
+    
+    def setText(self, text : str):
+        self._text = text
+        self._widget.setText(text)
+
+    def hasText(self) -> bool:
+        return bool(self._text)
+
+# class QWarning(QIconLabel):
+#     def __init__(self, text = None, parent = None):
+#         super().__init__()
+#         self.setIcon(Icons.warningIcon())
+#         if text:
+#             self.setText(text)

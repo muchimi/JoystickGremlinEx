@@ -463,7 +463,7 @@ class OscValueWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(widget)
 
         self._auto_widget = QtWidgets.QLabel("Auto (scaled axis value 0..1)" if self._is_axis else "Auto (1 for press, 0 for release)")
-        self._warning_widget = gremlin.ui.ui_common.QWarning()
+        self._warning_widget = gremlin.ui.ui_common.QWarningWidget()
 
         widgets = [ 
                    self._auto_widget,

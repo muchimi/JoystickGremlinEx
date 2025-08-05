@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T37)
+- Improved: state name validation and validation UI
+- Fix: vjoy remap: hat to button mode not understanding certain hat values due to event model value changes.
+- Fix: add state button
+- Documentation update for OSC configuration
+
+
 ### (m76T36/A)
 - New: OSC and State inputs can be searched and filtered.  It is now possible to filter the inputs by partial name (command message or state name), and to locate a specific item.  The find function will find the first matching item.
 - Change: prevent category dialog from editing or deleting the default category

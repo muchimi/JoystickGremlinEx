@@ -706,11 +706,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._slider_widget.rangeDoubleClicked.connect(self._slider_range_configure_cb) # calls up range actions
         self._slider_widget.handleDragStart.connect(self._slider_drag_start_cb)
         
-        # warning_color = gremlin.ui.ui_common.Color.warningColor()
-        # self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
-        # self.warning_widget.setVisible(False)
-        # self.warning_widget = None
-        # self.container_warning_widget, self.container_warning_layout = gremlin.ui.ui_common.getHContainer()
+ 
         
 
         self.slider_frame_layout.addWidget(self._slider_widget)
