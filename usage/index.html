@@ -3962,7 +3962,7 @@
 </tr>
 <tr>
 <td>Button</td>
-<td>Triggers a press event if the first argument is non-zero, and a released event when the first argument is zero</td>
+<td>Triggers a press event if the first argument is non-zero, and a released event when the first argument is zero.  For singleton commands with no parameters, such as for rotary encoders, use the <em>trigger on message</em> option so have GremlinEx issue an autorelease.  Note that a release is not always needed but most actions in GremlinEx expect a trigger on press followed by a release at some point.</td>
 </tr>
 <tr>
 <td>Axis</td>
