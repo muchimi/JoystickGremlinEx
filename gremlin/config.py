@@ -1910,13 +1910,33 @@ class Configuration(QtCore.QObject):
         if self._osc_enabled is None:
             self._osc_enabled = self._get_data("osc_enabled", True)
         return self._osc_enabled
-    
-        
+            
     @osc_enabled.setter
     def osc_enabled(self, value : bool):
         self._data["osc_enabled"] = value
         self._osc_enabled = None # force a re-read 
 
+    @property
+    def osc_pad_args(self) -> bool:
+        ''' true if no arg commands should pad with a default arg value '''
+        return self._get_data("osc_pad_args", True)
+    @osc_pad_args.setter
+    def osc_pad_args(self, value : bool):
+        self._set_data("osc_pad_args", value)
+
+    @property
+    def osc_last_target_ip(self) -> str:
+        return self._get_data("osc_last_target_ip", None)
+    @osc_last_target_ip.setter
+    def osc_last_target_ip(self, target_ip: str):
+        self._set_data("osc_last_target_ip", target_ip)
+
+    @property
+    def osc_last_target_port(self) -> int:
+        return self._get_data("osc_last_target_port", 0)
+    @osc_last_target_port.setter
+    def osc_last_target_port(self, port : int):
+        self._set_data("osc_last_target_port", port)
 
     # @property
     # def splitter_pos(self) -> int:

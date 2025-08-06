@@ -501,6 +501,7 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._server_reset_widget.clicked.connect(self._reset_server)
 
         self._server_container_layout.addWidget(QtWidgets.QLabel("Target IP:"))
+
         self._server_container_layout.addWidget(self._server_ip_widget)
         self._server_container_layout.addWidget(QtWidgets.QLabel("Target Port:"))
         self._server_container_layout.addWidget(self._server_port_widget)
@@ -915,8 +916,24 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
 
         config = gremlin.config.Configuration()
         self.command = None
-        self.server_ip = config.osc_host
-        self.server_port = config.osc_output_port
+        self._server_ip = None
+        self._server_port = None
+
+
+        last_target_ip = config.osc_last_target_ip
+        if not last_target_ip:
+            last_target_ip = config.osc_host
+
+        last_target_port = config.osc_last_target_port
+        if not last_target_port:
+            last_target_port = config.osc_output_port
+            
+
+        
+        self.server_ip = last_target_ip
+        self.server_port = last_target_port        
+        
+
         self.v1_press = 1.0 # default v1 value
         self.v2_press = 1.0 # default v2 value
         self.v1_release = 0.0 # default v1 value
@@ -939,7 +956,25 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
         self.v2_min_range = 0.0 # min range when mapping to an axis
         self.v2_max_range = 1.0 # max range whem mapping to an axis
 
-    
+    @property
+    def server_ip(self) -> str:
+        return self._server_ip
+    @server_ip.setter
+    def server_ip(self, ip : str):
+        if self._server_ip != ip:
+            self._server_ip = ip
+            gremlin.config.Configuration().osc_last_target_ip = ip
+
+    @property
+    def server_port(self) -> str:
+        return self._server_port
+    @server_port.setter
+    def server_port(self, port : str):
+        if self._server_port != port:
+            self._server_port = port
+            gremlin.config.Configuration().osc_last_target_port = port
+
+
 
     def display_name(self):
         ''' returns a display string for the current configuration '''

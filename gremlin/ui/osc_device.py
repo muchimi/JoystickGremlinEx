@@ -1680,9 +1680,16 @@ class OscClient():
             syslog.info(msg)
 
         builder = OscMessageBuilder(command)
+        
         if v1 is not None or v2 is not None:
             self.add_arg(builder, v1)
             self.add_arg(builder, v2)
+        else:
+            if gremlin.config.Configuration().osc_pad_args:
+                # add default
+                value = 1.0
+                self.add_arg(builder, value)
+
 
         osc = builder.build()
 
@@ -1694,18 +1701,25 @@ class OscClient():
             self._send(osc)
             verbose = gremlin.config.Configuration().verbose_mode_osc
             if verbose:
-                syslog.info(f"OSC SEND: target: {self._server_ip} port: {self._output_port} message: {command} v1: {v1 if v1 is not None else 'n/a'} v2: {v2 if v2 is not None else 'n/a'}")
+                syslog.info(f"OSC SEND: target: {self._server_ip} port: {self._output_port} message: {command} v1: {v1 if v1 is not None else 'n/a'} v2: {v2 if v2 is not None else 'n/a'}  args: {builder.args}")
 
     def sendEx(self, command : str, *args):
         ''' sends a variable number args to OSC '''
         builder = OscMessageBuilder(command)
+        arg_count = 0
         if args:
             for arg in args:
                 if isinstance(arg, list) or isinstance(arg, tuple):
                     for a in arg:
+                        arg_count +=1
                         self.add_arg(builder, a)
                 else:
+                    arg_count +=1
                     self.add_arg(builder, arg)
+        if arg_count == 0 and gremlin.config.Configuration().osc_pad_args:
+            # add default
+            value = 1.0
+            self.add_arg(builder, value)
 
         osc = builder.build()
 
@@ -1717,7 +1731,7 @@ class OscClient():
             self._send(osc)
             verbose = gremlin.config.Configuration().verbose_mode_osc
             if verbose:
-                syslog.info(f"OSC SEND: target: {self._server_ip} port: {self._output_port} message: {command} args: {args}")
+                syslog.info(f"OSC SEND: target: {self._server_ip} port: {self._output_port} message: {command} args: {builder.args}")
 
     
     def _send(self, content):

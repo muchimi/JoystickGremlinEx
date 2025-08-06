@@ -14,8 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T39)
+### (m76T39A)
 - Improved: UI interactions related to state editing / state category editing
+- New:  OSC: added default pad option in OSC options.  This will add a default argument of 1.0 to a command with no arguments as some target platforms like Bitfocus' OSC module requires an argument even if no arguments are expected. The option is enabled by default.  The option can be turned off, in which case arguments will need to be manually specified in map to Osc / Ex.  
+- New: OSC: Map actions for OSC will remember the last used IP / Port if different from the defaults in global options.
 
 
 ### (m76T38)

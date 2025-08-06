@@ -1255,6 +1255,12 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         self.osc_enabled.setChecked(self.config.osc_enabled)
         self.osc_enabled.setToolTip("When set, GremlinEx can receive or send OSC commands when a profile is activated.")
 
+        self.osc_pad_arg_widget = QtWidgets.QCheckBox("Pad zero argument commands")
+        self.osc_pad_arg_widget.setToolTip("When set, GremlinEx will add a default argument (1.0) to commands with no arguments - this is required by some target platforms to understand commands.")
+        self.osc_pad_arg_widget.setChecked(self.config.osc_pad_args)
+        self.osc_pad_arg_widget.clicked.connect(self._osc_pad_args)
+
+
         self.osc_input_port = ui_common.QIntLineEdit()
         self.osc_input_port.setRange(4096,65535)
         self.osc_input_port.setEnabled(self.config.osc_enabled)
@@ -1362,8 +1368,14 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         col+=1
         layout.addWidget(self.osc_output_port, row, col)
 
+        row +=1 
+        col = 0
+        layout.addWidget(self.osc_pad_arg_widget, row, col, 1, -1)
+
         
         layout.setColumnStretch(stretch_col,2)
+
+        
 
         page_layout.addWidget(container)
 
@@ -1404,6 +1416,11 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _mouse_wheel_delay_change_value(self):
         value = self.mouse_wheel_delay_widget.value() / 1000 # to seconds
         self.config.mouse_wheel_autorelease_delay = value
+
+    @QtCore.Slot(bool)
+    def _osc_pad_args(self, checked):
+        self.config.osc_pad_args = checked
+
 
     @QtCore.Slot()
     def _change_host_ip(self):
