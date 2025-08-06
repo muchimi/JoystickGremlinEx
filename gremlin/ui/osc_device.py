@@ -1680,8 +1680,9 @@ class OscClient():
             syslog.info(msg)
 
         builder = OscMessageBuilder(command)
-        self.add_arg(builder, v1)
-        self.add_arg(builder, v2)
+        if v1 is not None or v2 is not None:
+            self.add_arg(builder, v1)
+            self.add_arg(builder, v2)
 
         osc = builder.build()
 
@@ -1691,16 +1692,20 @@ class OscClient():
             el.osc_loopback.emit(osc)
         else:
             self._send(osc)
+            verbose = gremlin.config.Configuration().verbose_mode_osc
+            if verbose:
+                syslog.info(f"OSC SEND: target: {self._server_ip} port: {self._output_port} message: {command} v1: {v1 if v1 is not None else 'n/a'} v2: {v2 if v2 is not None else 'n/a'}")
 
     def sendEx(self, command : str, *args):
         ''' sends a variable number args to OSC '''
         builder = OscMessageBuilder(command)
-        for arg in args:
-            if isinstance(arg, list) or isinstance(arg, tuple):
-                for a in arg:
-                    self.add_arg(builder, a)
-            else:
-                self.add_arg(builder, arg)
+        if args:
+            for arg in args:
+                if isinstance(arg, list) or isinstance(arg, tuple):
+                    for a in arg:
+                        self.add_arg(builder, a)
+                else:
+                    self.add_arg(builder, arg)
 
         osc = builder.build()
 
@@ -1710,6 +1715,9 @@ class OscClient():
             el.osc_loopback.emit(osc)
         else:
             self._send(osc)
+            verbose = gremlin.config.Configuration().verbose_mode_osc
+            if verbose:
+                syslog.info(f"OSC SEND: target: {self._server_ip} port: {self._output_port} message: {command} args: {args}")
 
     
     def _send(self, content):
@@ -1858,12 +1866,11 @@ class OscInterface(QtCore.QObject):
         else:
             host_ip = "127.0.0.1" 
             if verbose: syslog.info(f"OSC: last server IP not found, no IP found, defaulting to locahost: {host_ip}")
-
-
-        
         
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
         config = gremlin.config.Configuration()
+
+        
 
         self._started = False
         self._input_port = config.osc_input_port
@@ -1881,8 +1888,9 @@ class OscInterface(QtCore.QObject):
         self._osc_server = OscServer() # the OSC server
         self.osc_enabled = True # always able to listen to ports
         self._client_pool = {} # pool of clients keyed by (ip,port)
+        self._client_map = {} # list of clients by client ID (str)
         self._osc_internal_client = None
-        self._osc_client = self.getClient(self._target_ip, self._target_port) # the default OSC client setup in the configuration file
+        self._osc_client = self.getClient("osc_interface", self._target_ip, self._target_port) # the default OSC client setup in the configuration file
         if verbose: syslog.info(f"OSC: output IP: {self._target_ip} port: {self._output_port}")
 
         el = gremlin.event_handler.EventListener()
@@ -1894,7 +1902,7 @@ class OscInterface(QtCore.QObject):
         el.osc_loopback.connect(self._loopback_handler)
 
         self.setHostIp(host_ip)
-        self._osc_internal_client = self.getClient(self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
+        self._osc_internal_client = self.getClient("osc_internal_client", self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
         self._started = False
 
 
@@ -1961,12 +1969,12 @@ class OscInterface(QtCore.QObject):
             syslog.info(f"OSC: output host changed to: {value}")
         self.target_server = value
 
-
     
 
-    def getClient(self, server : str, port : int, name : str = None) -> OscClient:
-        ''' gets the client for that server/port '''
 
+    def getClient(self, client_id: str, server : str, port : int, name : str = None) -> OscClient:
+        ''' gets the client for that server/port '''
+        
         key = (server, port)
         if not key in self._client_pool:
             client = OscClient(server, port, name)
@@ -1975,14 +1983,29 @@ class OscInterface(QtCore.QObject):
             if verbose:
                 # syslog = logging.getLogger("system")
                 syslog.info(f"OSC: register client {key}")
-
-
-        return self._client_pool[key]
+        else:
+            client = self._client_pool[key]
+        if not key in self._client_map:
+            self._client_map[key] = []
+        if not client_id in self._client_map[key]:
+            self._client_map[key].append(client_id)
+        return client
     
-    def closeClient(self, client : OscClient):
+    def closeClient(self, client_id : str, client : OscClient):
         ''' removes a client from the pool '''
+
+        key = (client._server_ip, client._output_port)    
+        if key in self._client_map:
+            if not key in self._client_map:
+                self._client_map[key] = []
+            if client_id in self._client_map[key]:
+                self._client_map[key].remove(client_id)
+        
+        if self._client_map[key]:
+            # client is still used
+            return 
         if client is not None:
-            key = (client._server_ip, client._output_port)
+            
             if key in self._client_pool:
                 client.stop()
                 verbose = gremlin.config.Configuration().verbose_mode_osc
@@ -1996,6 +2019,7 @@ class OscInterface(QtCore.QObject):
         ''' stops all registered clients '''
         for client in self._client_pool.values():
             client.stop()
+        self._client_map.clear()
 
     def startClients(self, server = None, port = None):
         ''' starts all registered clients '''

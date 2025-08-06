@@ -14,6 +14,21 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T38)
+- Changed: MODE device renamed to Mode/profile.
+- New: Mode/profile device gains two new mapping entries to enable triggers on profile start/stop.
+	+ Profile start
+	+ Profile stop
+	
+	These are sent as virtual button press/release with a delay of 250ms between triggers whenever the profile starts or stops.  Profile start/stop are mode agnostic and will send the default profile mode for mappings that check modes.
+- New: OSC Map Ex gains three options to help with profile synchronization on other OSC devices.  The behavior is cumulative, meaning, the OSC commands is also sent on input triggers.
+	+ Execute on profile load - this will send the OSC command when the profile is loaded.
+	+ Execute on profile start - this will send the OSC command when the profile starts.
+	+ Execute on profile stop - this will send the OSC command when the profile stops.
+- Fix: category add button stays disabled on valid input.
+
+
 ### (m76T37)
 - Improved: state name validation and validation UI
 - Fix: vjoy remap: hat to button mode not understanding certain hat values due to event model value changes.

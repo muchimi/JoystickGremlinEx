@@ -538,7 +538,7 @@ def registerSpecialDevices():
     # mode
     device_guid = str(gremlin.shared_state.mode_tab_guid)
     device = dinput.DeviceSummary()
-    device.name = "MODE"
+    device.name = "Mode/Profile"
     device.device_guid = gremlin.shared_state.mode_tab_guid
     device.device_id = device_guid
     device.device_type = DeviceType.ModeControl

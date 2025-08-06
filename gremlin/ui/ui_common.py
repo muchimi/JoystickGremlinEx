@@ -9123,8 +9123,10 @@ class QTypeSelectorWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _type_changed(self):
+        verbose = gremlin.config.Configuration().verbose_mode_osc
         widget = self.sender()
         value = widget.data
+        if verbose: syslog.info(f"OSC: data type changed to: {value}")
         self.valueChanged.emit(value)
 
     def value(self) -> type:

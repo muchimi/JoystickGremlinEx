@@ -462,11 +462,11 @@ class AbstractFunctor(QtCore.QObject):
         self.action_data = action_data
         self._id = action_data.id
         self.manual_callback = False # functor uses automatic mode
-        
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
         el.profile_stop.connect(self.profile_stop)
+        el.profile_stopping.connect(self.profile_stopping)
         el.profile_started.connect(self.profile_started)
         el.abort.connect(self.profile_stop) # abort also stops the profile
 
@@ -500,6 +500,10 @@ class AbstractFunctor(QtCore.QObject):
 
     def profile_stop(self):
         ''' called when the profile stops '''
+        pass
+
+    def profile_stopping(self):
+        ''' called before a profile stops '''
         pass
 
     

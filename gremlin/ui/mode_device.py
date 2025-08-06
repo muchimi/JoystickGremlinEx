@@ -56,6 +56,9 @@ class ModeInputModeType(enum.IntEnum):
     ModeExit = 1 # executes on mode exit
     ModeGlobalEnter = 2 # executes on any mode change (activate)
     ModeGlobalExit = 3 # executes on any mode change (deactivate)
+    ModeProfileLoad = 4 # executes on profile load
+    ModeProfileStart = 5 # executes on profile start
+    ModeProfileStop = 6 # executes on profile stop
 
     @staticmethod
     def to_display_name(value):
@@ -68,6 +71,12 @@ class ModeInputModeType(enum.IntEnum):
                 return "Mode Activate (any)"
             case ModeInputModeType.ModeGlobalExit:
                 return "Mode Deactivate (any)"
+            case ModeInputModeType.ModeProfileLoad:
+                return "Profile load"
+            case ModeInputModeType.ModeProfileStart:
+                return "Profile start"
+            case ModeInputModeType.ModeProfileStop:
+                return "Profile stop"
         
         return f"Unknown mode: {value}"
 
@@ -204,6 +213,12 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 return f"Mode Activate (any)"
             case ModeInputModeType.ModeGlobalExit:
                 return f"Mode Deactivate (any)"
+            case ModeInputModeType.ModeProfileLoad:
+                return "Profile load"
+            case ModeInputModeType.ModeProfileStart:
+                return "Profile start"
+            case ModeInputModeType.ModeProfileStop:
+                return "Profile stop"
             
         return f"Mode [{gremlin.shared_state.edit_mode}] Unknown id: {input_item.input_id}"
             
@@ -220,6 +235,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         config = self.device_profile.modes[current_mode].config
         
         changed = False
+
 
         if not ModeInputModeType.ModeEnter in config[InputType.ModeControl]:
             modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler)
@@ -245,9 +261,52 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             changed = True
         else:
             modeExit = config[InputType.ModeControl][ModeInputModeType.ModeExit]
+
+
+        # if not ModeInputModeType.ModeProfileLoad in config[InputType.ModeControl]:
+        #     modeProfileLoad = gremlin.base_profile.InputItem(self._custom_name_handler)
+        #     modeProfileLoad.input_type = InputType.ModeControl
+        #     modeProfileLoad.setOverrideInputType(InputType.JoystickButton)
+        #     modeProfileLoad.input_id = ModeInputModeType.ModeProfileLoad
+        #     modeProfileLoad.description = "Profile Load"
+        #     modeProfileLoad.descriptionReadOnly = True
+        #     config[InputType.ModeControl][ModeInputModeType.ModeProfileLoad] = modeProfileLoad
+        #     changed = True
+        # else:
+        #     modeProfileLoad = config[InputType.ModeControl][ModeInputModeType.ModeProfileLoad]            
+
+        if not ModeInputModeType.ModeProfileStart in config[InputType.ModeControl]:
+            modeProfileStart = gremlin.base_profile.InputItem(self._custom_name_handler)
+            modeProfileStart.input_type = InputType.ModeControl
+            modeProfileStart.setOverrideInputType(InputType.JoystickButton)
+            modeProfileStart.input_id = ModeInputModeType.ModeProfileStart
+            modeProfileStart.description = "Profile Start"
+            modeProfileStart.descriptionReadOnly = True
+            config[InputType.ModeControl][ModeInputModeType.ModeProfileStart] = modeProfileStart
+            changed = True
+        else:
+            modeProfileStart = config[InputType.ModeControl][ModeInputModeType.ModeProfileStart]                        
+
+        if not ModeInputModeType.ModeProfileStop in config[InputType.ModeControl]:
+            modeProfileStop = gremlin.base_profile.InputItem(self._custom_name_handler)
+            modeProfileStop.input_type = InputType.ModeControl
+            modeProfileStop.setOverrideInputType(InputType.JoystickButton)
+            modeProfileStop.input_id = ModeInputModeType.ModeProfileStop
+            modeProfileStop.description = "Profile Stop"
+            modeProfileStop.descriptionReadOnly = True
+            config[InputType.ModeControl][ModeInputModeType.ModeProfileStop] = modeProfileStop
+            changed = True
+        else:
+            modeProfileStop = config[InputType.ModeControl][ModeInputModeType.ModeProfileStop]                        
         
         modeEnter.profile_mode = current_mode
         modeExit.profile_mode = current_mode
+
+        default_mode = gremlin.shared_state.current_profile.get_default_mode()
+        #modeProfileLoad.profile_mode = default_mode
+        modeProfileStart.profile_mode = default_mode
+        modeProfileStop.profile_mode = default_mode
+        
         
         if changed or refresh:
             self.input_item_list_model.refresh()    

@@ -670,7 +670,8 @@ class CodeRunner:
         eh = gremlin.event_handler.EventHandler()
         
         # tell components we're stopping
-        el.profile_stop.emit()
+        el.profile_stopping.emit() # about to stop
+        el.profile_stop.emit() # stop
 
 
         # unhook vjoy debug data

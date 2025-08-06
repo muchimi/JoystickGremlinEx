@@ -397,6 +397,7 @@ class EventListener(QtCore.QObject):
 	profile_start = Signal() # profile start signal (when a profile starts)
 	profile_started = Signal() # profile started signal (after a profile starts and all process start functions are completed)
 	profile_stop = Signal() # profile stop signal (when a profile stops)
+	profile_stopping = Signal() # profile is about to stop (before a profile stops)
 	profile_stop_toolbar = Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
 	profile_unload = Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
 	request_profile_stop = Signal(str) # request the profile to stop (reason: str)
@@ -585,8 +586,10 @@ class EventListener(QtCore.QObject):
 		self._calibrationManager = None
 
 		self.profile_start.connect(self._profile_start)
-		self.profile_stop.connect(self._profile_stop)
+		self.profile_stopping.connect(self._profile_stopping_cb)
 		self.profile_started.connect(self._profile_started_cb)
+		
+		
 
 		self._run_event = threading.Event()
 		self._run_thread = Thread(target=self._run)
@@ -689,7 +692,30 @@ class EventListener(QtCore.QObject):
 		# enable mouse hooks 
 		self.enableMouse(True)
 
-	def _profile_stop(self):
+	def _profile_stopping_cb(self):
+		# mode events
+		device_guid = gremlin.shared_state.mode_tab_guid
+		delay = 0.250 # delay in seconds between press/release events for mode control change
+		default_mode = gremlin.shared_state.current_profile.get_default_mode()
+
+		event_stop_pressed = Event(InputType.ModeControl, 
+						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
+						device_guid= device_guid,
+						is_pressed=True,
+						mode = default_mode)
+		
+		event_stop_released = Event(InputType.ModeControl, 
+						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
+						device_guid= device_guid,
+						is_pressed=False,
+						mode = default_mode)
+		
+
+		eh = EventHandler()
+		m2_list, f2_list = eh.execute_event(event_stop_pressed)
+		start_release = Timer(delay, lambda : eh._execute_callbacks(event_stop_released, m2_list, f2_list))
+		start_release.start()
+
 		if not self.enable_mouse_hook:
 			self.disableMouse()
 		
@@ -700,7 +726,21 @@ class EventListener(QtCore.QObject):
 		mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
 		delay = 0.250 # delay in seconds between press/release events for mode control change
 		new_mode = gremlin.shared_state.runtime_mode
+		default_mode = gremlin.shared_state.current_profile.get_default_mode()
 
+		event_start_pressed = Event(InputType.ModeControl, 
+						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
+						device_guid= device_guid,
+						is_pressed=True,
+						mode = default_mode)
+		
+		event_start_released = Event(InputType.ModeControl, 
+						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
+						device_guid= device_guid,
+						is_pressed=False,
+						mode = default_mode)
+		
+		
 
 		event_enter_pressed = Event(InputType.ModeControl, 
 						identifier = mode_enter,
@@ -721,6 +761,12 @@ class EventListener(QtCore.QObject):
 		
 		# fire mode change for mode enter (press + release)
 		eh = EventHandler()
+
+
+		m2_list, f2_list = eh.execute_event(event_start_pressed)
+		start_release = Timer(delay, lambda : eh._execute_callbacks(event_start_released, m2_list, f2_list))
+		start_release.start()
+
 		m2_list, f2_list = eh.execute_event(event_enter_pressed)
 		enter_release = Timer(delay, lambda : eh._execute_callbacks(event_enter_released, m2_list, f2_list))
 		enter_release.start()
@@ -956,7 +1002,7 @@ class EventListener(QtCore.QObject):
 		while not self._keep_alive_event.is_set():
 			if time.time() >= notify_time:
 				self.heartbeat.emit()
-				notify_time = time.time() + 30
+				notify_time = time.time() + 60*2 # 2 minutes
 			time.sleep(1)
 
 	def _joystick_event_handler(self, data):

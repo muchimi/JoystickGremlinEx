@@ -1399,7 +1399,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         
         super().__init__(self.__class__.__name__,parent = parent)
 
-        self._curent_category = None # contains the name of the new category
+        self._current_category = None # contains the name of the new category
 
         
         main_layout = QtWidgets.QVBoxLayout(self)
@@ -1462,7 +1462,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
     def _update(self):
-        name = self._curent_category
+        name = self._current_category
         if name:
             name = name.casefold().strip()
         self._add_button.setEnabled(bool(name))
@@ -1509,14 +1509,15 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"The default category cannot be renamed.")
                 return
 
-            if name != self._curent_category:
+            if name != self._current_category:
+                self._current_category = name
                 self._update()
 
 
 
     @QtCore.Slot()
     def _add_input_cb(self):
-        name = self._curent_category
+        name = self._current_category
         if name:
             name = name.casefold().strip()
         if name:

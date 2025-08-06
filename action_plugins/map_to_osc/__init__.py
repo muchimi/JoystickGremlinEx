@@ -774,9 +774,32 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
         self.valid = True
         
 
+    def _start_client(self):
+        if not self.osc_client:
+            verbose = gremlin.config.Configuration().verbose_mode_osc
+            device = gremlin.joystick_handling.get_device(self.hardware_device_guid)
+            device_name = device.name
+            if gremlin.util.validateIp(self.action_data.server_ip):
+                self.osc_client = self.oscInterface.getClient(self.action_data.action_id, 
+                                                            self.action_data.server_ip,
+                                                            self.action_data.server_port,                                            
+                                                            name=f"OSC {device_name}/{self.action_data.hardware_input_id}")
+                self.osc_client.start()
+                self.valid = True
+                
+                
+            else:
+                syslog.error(f"OSC SEND: invalid target IP: {self.action_data.server_ip}")
+                self.valid = False
+                return False
+            
+        return True
+
+
     def profile_start(self):
         ''' occurs when process starts '''
-
+        
+        
         verbose = gremlin.config.Configuration().verbose_mode_osc
         device = gremlin.joystick_handling.get_device(self.hardware_device_guid)
         device_name = device.name
@@ -793,33 +816,23 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
             self.valid = False
             return
 
-        if gremlin.util.validateIp(self.action_data.server_ip):
-            self.osc_client = self.oscInterface.getClient(self.action_data.server_ip,
-                                            self.action_data.server_port,                                            
-                                            name=f"OSC {device_name}/{self.action_data.hardware_input_id}")
-            self.osc_client.start()
-            self.valid = True
-
-            self.osc_client.send("/start", 0.0, 0.0)
-            
-        else:
-            syslog.error(f"OSC SEND: invalid target IP: {self.action_data.server_ip}")
-            self.valid = False
-            return
-
+        self._start_client()
+     
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if verbose:
             syslog.info(f"OSC SEND: target: {self.action_data.server_ip} port: {self.action_data.server_port}")
 
     def profile_stop(self):
         if self.osc_client is not None:
-            self.osc_client.stop()
+            osc = OscInterface()
+            osc.closeClient(self.action_data.action_id, self.osc_client)
             self.osc_client = None
 
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None) -> bool:
-        if not self.valid:
-            return False
+        if not self._start_client():
+            return
+        
         verbose = gremlin.config.Configuration().verbose_mode_osc
         is_axis = self.action_data.input_is_axis()
         if is_axis:
@@ -862,7 +875,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
                 else:
                     v2 = None
 
-            if verbose: syslog.info(f"OSC SEND: sending {self.action_data.command}  v1: {v1:0.3f} v2: {v2:0.3f}")
+            
             self.osc_client.send(self.action_data.command, v1, v2)
         
 
