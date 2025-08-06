@@ -741,7 +741,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
 
 
-class InputKeyboardDialog(QtWidgets.QDialog):
+class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
     
     closed = Signal() # sent when the dialog closes

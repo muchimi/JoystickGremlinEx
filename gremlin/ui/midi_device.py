@@ -783,7 +783,7 @@ class MidiInputListenerWidget(QBoxFrame):
         gremlin.shared_state.pop_suspend_highlighting()
 
 
-class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
+class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     ''' dialog showing the MIDI input configuration options '''
 
     def __init__(self, current_mode, index, data, parent):

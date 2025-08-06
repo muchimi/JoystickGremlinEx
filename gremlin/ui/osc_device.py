@@ -2722,7 +2722,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
        
 
 
-class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
+class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     ''' dialog showing the OSC input configuration options '''
 
     def __init__(self, current_mode, index, data, parent):

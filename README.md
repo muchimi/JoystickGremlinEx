@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T39)
+- Improved: UI interactions related to state editing / state category editing
+
 
 ### (m76T38)
 - Changed: MODE device renamed to Mode/profile.

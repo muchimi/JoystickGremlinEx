@@ -591,6 +591,9 @@ class Icons():
         return Icons._icon("ei.search", qta_color)
         #return Icons._icon("fa6s.magnifying-glass", qta_color)
     @staticmethod
+    def questionIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+        return Icons._icon("fa5s.question-circle", qta_color)
+    @staticmethod
     def refreshIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ei.refresh", qta_color)
     @staticmethod
@@ -3347,13 +3350,14 @@ class ConfirmBoxEx(QtWidgets.QDialog):
         return self._result
 
 class ConfirmBox():
-    def __init__(self, title = "Confirmation Required", prompt = "Are you sure?", parent = None):
+    def __init__(self, title = "Confirmation Required:", prompt = "Are you sure?", parent = None):
 
         from gremlin.util import load_pixmap
-        self._message_box = QtWidgets.QMessageBox(parent = parent)
+        self._message_box = QMessageBox(parent = parent)
         # pixmap = load_pixmap("warning.svg")
         # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.questionIcon())
+
         self._message_box.setIconPixmap(pixmap)
         self._message_box.setText(title)
         self._message_box.setInformativeText(prompt)
@@ -3362,14 +3366,14 @@ class ConfirmBox():
             QtWidgets.QMessageBox.StandardButton.Cancel
             )
         self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-        gremlin.util.centerDialog(self._message_box)
+        #gremlin.util.centerDialog(self._message_box)
         
 
     def show(self):
         return self._message_box.exec()
 
 class QMessageBox(QtWidgets.QMessageBox):
-    def __init__(self, width = 400, height = 100, parent = None):
+    def __init__(self, width = 240, height = 100, parent = None):
         super().__init__(parent)
         self._width = width
         self._height = height
@@ -3377,6 +3381,13 @@ class QMessageBox(QtWidgets.QMessageBox):
     def resizeEvent(self, event):
         self.setFixedWidth(self._width)
         self.setFixedHeight(self._height)
+
+    def showEvent(self, event):
+        # Show the dialog at the current mouse position
+        geom = self.frameGeometry()
+        geom.moveCenter(QtGui.QCursor.pos())
+        self.setGeometry(geom)
+        super().showEvent(event)
 
 
 class MessageBox():
@@ -3399,7 +3410,7 @@ class MessageBox():
             QtWidgets.QMessageBox.StandardButton.Ok
             )
         self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-        gremlin.util.centerDialog(self._message_box)
+        #gremlin.util.centerDialog(self._message_box)
         self._message_box.exec()
 
 
@@ -7608,6 +7619,46 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
 
         self._resize_count += 1
         super().resizeEvent(evt)
+
+
+
+class QShowAtCursorDialog(QtWidgets.QDialog):
+    ''' a dialog that pops up near the cursor '''
+    def __init__(self, key = None, parent = None):
+        super().__init__(parent)
+
+    def showEvent(self, event):
+        # Show the dialog at the current mouse position
+        geom = self.frameGeometry()
+        geom.moveCenter(QtGui.QCursor.pos())
+
+        # stay in bounds if the screen 
+        screen = QtWidgets.QApplication.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        a = geom.bottom()
+        b = screen_geometry.bottom()
+        if a > b :
+            geom.moveBottom(b)
+        a = geom.top()
+        b = screen_geometry.top()
+        if a < b:
+            geom.moveTop(b)
+        a = geom.left()
+        b = screen_geometry.left()
+        if a < b:
+            geom.moveLeft(b)
+        a = geom.right()
+        b = screen_geometry.right()
+        if a > b:
+            geom.moveRight(b)
+            
+        
+
+        self.setGeometry(geom)
+
+        
+
+        super().showEvent(event)
 
 
 class QRememberDialog(QtWidgets.QDialog):
