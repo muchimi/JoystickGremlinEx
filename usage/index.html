@@ -73,7 +73,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gremlinex-usage-guide" class="md-skip">
+        <a href="#gremlinex-feature-usage-guide" class="md-skip">
           Skip to content
         </a>
       
@@ -495,9 +495,27 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#profile-start-and-stop-event-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Profile start and stop event mappings
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mode-selection" class="md-nav__link">
     <span class="md-ellipsis">
       Mode selection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-change-event-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode change event mappings
     </span>
   </a>
   
@@ -2046,9 +2064,27 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#profile-start-and-stop-event-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Profile start and stop event mappings
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mode-selection" class="md-nav__link">
     <span class="md-ellipsis">
       Mode selection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-change-event-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode change event mappings
     </span>
   </a>
   
@@ -3446,7 +3482,7 @@
 
 
 
-<h1 id="gremlinex-usage-guide">GremlinEx usage guide<a class="headerlink" href="#gremlinex-usage-guide" title="Permanent link">&para;</a></h1>
+<h1 id="gremlinex-feature-usage-guide">GremlinEx feature usage guide<a class="headerlink" href="#gremlinex-feature-usage-guide" title="Permanent link">&para;</a></h1>
 <h2 id="automatic-input-detection">Automatic Input detection<a class="headerlink" href="#automatic-input-detection" title="Permanent link">&para;</a></h2>
 <p>GremlinEx can usually detect at edit time and auto-highlight hardware joystick input devices by clicking a button or moving an axis on them.   This eliminates the guesswork on how the hardware maps to buttons or axes, and what the state of the input is.</p>
 <p>Automatic detection is only active when a profile is not running.</p>
@@ -3553,6 +3589,10 @@
 <p>The automatic load occurs whenever GremlinEx detects a process focus change.</p>
 <h3 id="keep-profile-active-when-focus-is-lost">Keep profile active when focus is lost<a class="headerlink" href="#keep-profile-active-when-focus-is-lost" title="Permanent link">&para;</a></h3>
 <p>This mode is used to ensure GremlinEx keeps the profile running even if the process it is mapped to no longer has the primary focus.   This happens, for example when you alt-tab, or when you activate another window.  The recommendation is to leave this option enabled.</p>
+<h3 id="profile-start-and-stop-event-mappings">Profile start and stop event mappings<a class="headerlink" href="#profile-start-and-stop-event-mappings" title="Permanent link">&para;</a></h3>
+<p>Starting with m76T40, it is possible in the <em>Mode/Profile</em> device tab to define actions that will execute either on profile start, along with actions to trigger on profile stop.  These will execute on every profile start or stop and can be used to initialize outputs.</p>
+<p>For example, it is possible to send an OSC command to OSC based control panels on the network or the local machine to call up a particular configuration.</p>
+<p>Actions mapped to profile start and stop will behave as a joystick button with a press and release.  The delay between press and release is defined in options as the default auto-release delay, and defaults to 250 milliseconds.</p>
 <h3 id="mode-selection">Mode selection<a class="headerlink" href="#mode-selection" title="Permanent link">&para;</a></h3>
 <p>When automatic profile load is enabled, GremlinEx has the option to override the default "startup" mode of a profile.  This is by default, the top level mode.  There are two options of interest:</p>
 <ul>
@@ -3560,6 +3600,11 @@
 <li>Activate the last mode used when the profile was last activated (this is the alternate mode).  If this is enabled, the default mode setting is ignored.  The first mode used will be the default mode if the mode has not been changed before.</li>
 </ul>
 <p>In addition to this, the profile itself provides actions that can switch modes.</p>
+<h3 id="mode-change-event-mappings">Mode change event mappings<a class="headerlink" href="#mode-change-event-mappings" title="Permanent link">&para;</a></h3>
+<p>The <em>Mode/Profile</em> device tab lets you define actions to occur when a mode is entered or exited.   This includes when the default mode is activated on profile start.</p>
+<p>There is one set of mappings possible for each defined mode.  </p>
+<p>Actions mapped to mode start and stop will behave as a joystick button with a press and release.  The delay between press and release is defined in options as the default auto-release delay, and defaults to 250 milliseconds.</p>
+<p>Note: if you delete a mode, any associated mappings linked to mode enter/exit will be deleted.</p>
 <h3 id="profile-device-substitution-and-input-order">Profile device substitution and input order<a class="headerlink" href="#profile-device-substitution-and-input-order" title="Permanent link">&para;</a></h3>
 <p>Windows is notorious for changing the order of gaming controllers and to this end, GremlinEx does not use the sequence of controllers.  GremlinEx tracks input controllers by their hardware ID, a "guid" or globally unique identifier that includes the manufacturer hardware code, and unique to a device.   This approach avoids the device re-order issue, but walks right into, what happens when the hardware ID changes?</p>
 <p>The hardware ID is saved with a profile, and mappings are tied to that hardware ID.</p>
@@ -4010,16 +4055,24 @@
 </tbody>
 </table>
 <h2 id="states">States<a class="headerlink" href="#states" title="Permanent link">&para;</a></h2>
-<p>Starting with 1.0ex m74, GremlinEx includes a state machine.  States can be used for multiple use-cases, such as latching, triggering the same mapping from multiple inputs, and performing simple logic without having to revert to a custom user plugin.</p>
-<p>A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="./#map-to-state">map to state</a> action anywhere in the profile, via a <a href="#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
+<p>Starting with 1.0ex m74, GremlinEx includes a state machine.  States are used in multiple use-cases to solve simple to complex mapping scenarios.  For example states can help with latching, triggering the same mapping from multiple inputs, and conditional mapping based on boolean logic on multiple states without having to revert to a custom user plugin.</p>
 <h3 id="what-is-a-state">What is a state?<a class="headerlink" href="#what-is-a-state" title="Permanent link">&para;</a></h3>
-<p>A state is a virtual button with a unique name (not case sensitive).  States are stored in a profile and defined in the state device tab.  States can only have an on or off value.</p>
-<p>States are mode agnostic, meaning that states are available across modes so apply to the entire profile.</p>
-<p>States, like buttons, trigger whenever their value is changed.  A set (on) value will include a "press" action.  A clear (off) value will trigger a "release" action.</p>
+<p>A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="./#map-to-state">map to state</a> action anywhere in the profile, via a <a href="#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
+<p>Attributes of a state:</p>
+<ul>
+<li>States are stored in a profile and specific to that profile.</li>
+<li>States are defined in the state device tab.</li>
+<li>States can only have an on or off value.</li>
+<li>States have no mode.  Mappings attached to states scope to the entire profile regardless of the current execution mode.</li>
+<li>States (like buttons) trigger whenever their value is changed.  A set (on) value will include a "press" action.  A clear (off) value will trigger a "release" action.</li>
+<li>States can be defined using boolean expressions using other states.  If a state in the expression changes values, the expression is re-evaluated.</li>
+</ul>
+<p>Remember to save the profile if you have created states as they are only saved upon profile save.</p>
 <h3 id="state-mappings">State mappings<a class="headerlink" href="#state-mappings" title="Permanent link">&para;</a></h3>
 <p>Any action that can be mapped to a joystick button can be mapped to a state.  Linear (axis) inputs are not supported because states only have two values (on or off).</p>
 <h3 id="default-value">Default value<a class="headerlink" href="#default-value" title="Permanent link">&para;</a></h3>
 <p>When a state is defined, it can be given, at profile start, an or or off value.  When the profile starts, the state wil be initialized to this value.</p>
+<p>Note: As of m76T40, a state can also be set using the new profile start/stop mappings in the Mode/Profile device via the <em>map to state</em> actions.</p>
 <h3 id="setting-a-state">Setting a state<a class="headerlink" href="#setting-a-state" title="Permanent link">&para;</a></h3>
 <p>GremlinEx can manipulate states at runtime using the <em>map to state</em> action or in a macro.   These actions let you set (turn on) or clear (turn off) a state.</p>
 <h3 id="state-expressions">State expressions<a class="headerlink" href="#state-expressions" title="Permanent link">&para;</a></h3>
@@ -4290,8 +4343,8 @@ We would define a third state, called a_or_b, defined as:</p>
 <h4 id="mode-additionremoval">Mode addition/removal<a class="headerlink" href="#mode-additionremoval" title="Permanent link">&para;</a></h4>
 <p>Modes can be added or deleted.  Deletions can cause a loss of data as mappings are attached not only to an input, but a specific mode, so avoid deleting modes.</p>
 <p>The last mode cannot be deleted.  A profile must have at least one mode defined.</p>
-<h4 id="mode-device">Mode device<a class="headerlink" href="#mode-device" title="Permanent link">&para;</a></h4>
-<p>A special mode device, appearing as the "Mode" tab defines a pair of virtual buttons triggered by GremlinEx on mode change.</p>
+<h4 id="modeprofile-device">Mode/Profile device<a class="headerlink" href="#modeprofile-device" title="Permanent link">&para;</a></h4>
+<p>A special mode device, appearing as the <em>Mode/Profile</em> tab defines a pair of virtual buttons triggered by GremlinEx on mode change.</p>
 <p>One triggers when the mode is entered.  The other triggers when the mode is exited (meaning, the before the new mode that was selected is activated).</p>
 <p>Both inputs function as buttons, so containers and actions that support buttons can be mapped to these special inputs.</p>
 <p>The mode enter and mode exit virtual buttons are unique to each mode, so each can have a different set (or none).</p>
