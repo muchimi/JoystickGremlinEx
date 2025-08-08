@@ -832,6 +832,7 @@ class Device:
         self.type = None # device type
         self.virtual = False # true if the device is virtual (vjoy)
         self.connected = False # true if the device was found in the detected hardware list
+        self.masterMode = {} # master mode
         
 
     @property
@@ -855,16 +856,18 @@ class Device:
     def device_type(self) -> DeviceType:
         return self.type        
 
-    def ensure_mode_exists(self, mode_name, device : dinput.DeviceSummary =None):
+    def ensure_mode_exists(self, mode_name, device : dinput.DeviceSummary =None, is_system = False) -> Mode:
         """Ensures that a specified mode exists, creating it if needed.
 
         :param mode_name the name of the mode being checked
         :param device a device to initialize for this mode if specified
+        :param is_system: true if the mode is a special system mode (not user defined)
+        :returns: Mode object 
         """
         if mode_name in self.modes:
             mode = self.modes[mode_name]
         else:
-            mode = Mode(self)
+            mode = Mode(self, is_system)
             mode.name = mode_name
             self.modes[mode.name] = mode
 
@@ -882,6 +885,8 @@ class Device:
                 mode.get_data(InputType.JoystickButton, idx)
             for idx in range(1, device.hat_count + 1):
                 mode.get_data(InputType.JoystickHat, idx)
+
+        return mode
 
     def from_xml(self, node, data = None):
         """Populates this device based on the xml data.
@@ -911,6 +916,7 @@ class Device:
             mode = Mode(self)
             mode.from_xml(child, data)
             self.modes[mode.name] = mode
+
 
     def to_xml(self):
         """Returns a XML node representing this device's contents.
@@ -1548,21 +1554,51 @@ class ProfileRegistry():
         if key in self._input_item_registry:
             return self._input_item_registry[key]
         return None # not found
+    
+
+def get_mode_object(node):
+    ''' gets the mde object corresponding to a profile XML node 
+    
+    :param node: lxml element to scan ancestors for 
+    
+    '''
+
+    nodes = node.xpath("ancestor::mode")
+    mode_node = nodes.pop()
+    mode = safe_read(mode_node, "name", str, "")
+    assert len(mode) > 0, "XML hierarchy error - parent mode not found"
+
+    nodes = node.xpath("ancestor::device")
+    device_node = nodes.pop()
+    device_id = safe_read(device_node, "device-guid", str, "")
+    assert device_id, "XML hierarchy error - parent device not found"
+    device_guid = gremlin.util.parse_guid(device_id)
+    device_type = safe_read(device_node,"type", str, "")
+    device_type = DeviceType.to_enum(device_type)
+    
+    profile = gremlin.shared_state.current_profile
+    device_modes = profile.get_device_modes(device_guid,device_type,DeviceType.to_string(device_type))
+    mode_object = device_modes.ensure_mode_exists(mode)    
+
+    return mode_object
 
 
 class InputItem(gremlin.base_classes.AbstractInputItem):
 
     """Represents a single input item such as a button or axis, containers and parameters/options associated with that input mapping """
 
-    def __init__(self, custom_name_handler = None, parent = None):
+    def __init__(self, custom_name_handler = None, custom_mode_name_handler = None, parent = None):
         """Creates a new InputItem instance.
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
+        :param custom_mode_name_handler: handler() returns a string, optional, to override the default mode for special inputs that use special modes
         :param parent: the parent mode of this input item
         """
         # self._id = gremlin.util.get_guid() # unique ID of this object
         # self._guid = gremlin.util.parse_guid(self._id)
 
         super().__init__()
+
+        assert parent is not None, "InputItem must have a parent mode owner" # must provide a mode owner
         
         self.parent = parent # mode object
         self._input_type = None
@@ -1576,7 +1612,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self.always_execute = False
         self._description = ""
         self._description_readonly = False # true if description is read/only (cannot be changed)
-        
+        self._profile_mode_callback = custom_mode_name_handler # special callback to use to get the profile mode for this item (if special)
         self._containers = []
         self._selected = False # true if the item is selected
         self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)
@@ -1586,16 +1622,16 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._is_button = False # true if the item is a button input
         self._calibration = None # calibration data if the item is an input axis
         self._curve_data = None # true if the item has its input curved
-        self._profile_mode = None
+        # self._profile_mode = None
         self._enabled = True # enabled flag
         if parent is not None:
             # find the missing properties from the parenting hierarchy
             self._is_action = isinstance(parent, AbstractAction)
             item = parent
             while True:
-                if isinstance(item, Mode):
-                    self._profile_mode = item.name
-                elif isinstance(item, Device):
+                # if isinstance(item, Mode):
+                #    self._profile_mode = item.name
+                if isinstance(item, Device):
                     self._device_type = item.type
                     self._device_name = item.name
                     self._device_guid = item.device_guid
@@ -1609,6 +1645,27 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
 
+    def setProfileModeCallback(self, callback):
+        ''' sets an override callback to change profile mode return value for special cases '''
+        self._profile_mode_callback = callback
+
+
+    @property
+    def profile_mode(self) -> str:
+        if self._input_type == InputType.ModeControl:
+            if self._input_id in (gremlin.ui.mode_device.ModeInputModeType.ModeProfileLoad,
+                                  gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
+                                  gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop):
+                return gremlin.shared_state.master_mode
+
+        if self._profile_mode_callback:
+            return self._profile_mode_callback(self)
+        mode : Mode = self.parent
+        if mode:
+            return mode.name
+        return None
+    
+        
       
 
     @property
@@ -1820,13 +1877,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._device_guid = gremlin.util.parse_guid(value)
         self._update_input()
 
-    @property
-    def profile_mode(self):
-        return self._profile_mode
-    @profile_mode.setter
-    def profile_mode(self, value):
-        self._profile_mode = value
-    
+
     @property
     def device_type(self):
         return self._device_type
@@ -1885,7 +1936,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def hasConditions(self):
         ''' true if the input item has conditions defined '''
         tracker = ConditionTracker()
-        count = tracker.getInputItemConditionCount(self, gremlin.shared_state.current_mode)
+        count = tracker.getInputItemConditionCount(self, self.profile_mode) # gremlin.shared_state.current_mode)
         return count > 0
         # for container in self._containers:
         #     if container.condition_count or container.action_condition_count:
@@ -1959,30 +2010,36 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
     
 
-    def from_xml(self, node, data = None, skip_root = False):
+    def from_xml(self, node, data, skip_root = False):
         """Parses an InputItem node.
 
         :param node XML node to parse
         """
+
+        assert data is not None, "InputItem must be provided"
 
         container_node = node # node that holds the container information
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
 
-        parent = node.getparent()
-        while parent is not None and parent.tag != "mode":
-            parent = parent.getparent()
-        if parent is not None:
-            profile_mode = safe_read(parent,"name",str, "")
-            self.profile_mode = profile_mode
-        
+        # parent = node.getparent()
+        # while parent is not None and parent.tag != "mode":
+        #     parent = parent.getparent()
+        #if parent is not None:
+            #profile_mode = safe_read(parent,"name",str, "")
+            # self.profile_mode = profile_mode
+
 
         if not skip_root: # skip header processing if set
 
             self._description = safe_read(node, "description", str, "")
             self.always_execute = read_bool(node, "always-execute", False)
 
+            
+       
+            mode_object = get_mode_object(node)
+            assert mode_object is not None,"Mode object could not be derived"
 
             if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
                 from gremlin.ui.keyboard_device import KeyboardInputItem
@@ -2023,7 +2080,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             elif self.input_type == InputType.Midi:
                 # midi data
                 from gremlin.ui.midi_device import MidiInputItem
-                midi_input_item = MidiInputItem()
+                midi_input_item = MidiInputItem(parent = mode_object)
                 for child in node:
                     if child.tag == "input":
                         midi_input_item.parse_xml(child, data)
@@ -2037,7 +2094,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             elif self.input_type == InputType.OpenSoundControl:
                 # OSC data
                 from gremlin.ui.osc_device import OscInputItem
-                osc_input_item = OscInputItem()
+                osc_input_item = OscInputItem(parent = mode_object)
                 for child in node:
                     if child.tag == "input":
                         osc_input_item.parse_xml(child, data)
@@ -2635,7 +2692,10 @@ class Profile():
         display_names = [n[1] for n in labels]
 
         # Add properly arranged mode names to the drop down list
+        master_mode = gremlin.shared_state.master_mode
         for display_name, mode_name in zip(display_names, mode_names):
+            if mode_name == master_mode:
+                continue # special mode
             mode_list.append((display_name, mode_name))
 
 
@@ -3001,10 +3061,14 @@ class Profile():
         ''' get all profile mode names as a list '''
 
         self._ensure_mode_tree()
+
+        master_mode = gremlin.shared_state.master_mode
+
         if casefold:
-            modes = [node.name.casefold() for node in self._mode_tree.descendants]    
+            modes = [node.name.casefold() for node in self._mode_tree.descendants if node.name != master_mode]    
         else:
-            modes = [node.name for node in self._mode_tree.descendants]
+            modes = [node.name for node in self._mode_tree.descendants if node.name != master_mode]
+
 
         if not modes:
             modes = ["Default"]
@@ -3036,6 +3100,7 @@ class Profile():
             else:
                 modes = [node.name for node in self._mode_tree.descendants]
 
+        
         for node in anytree.PreOrderIter(self._mode_tree):
             mode_name = node.name
             if mode_name:
@@ -3899,14 +3964,16 @@ class Mode:
             InputType.ModeControl,
         ]
 
-    def __init__(self, device : Device):
+    def __init__(self, device : Device, is_system = False):
         """Creates a new DeviceConfiguration instance.
 
-        :param parent the parent device of this mode
+        :param device : the device that owns this mode
+        :param is_system : true if the mode is a system mode (not user defined) 
         """
         self.parent = device
         self.inherit = None # name of the mode we inherit properties from
         self._name = None # name of the current mode
+        self.isSystem = is_system
        
         self.config = {
             InputType.JoystickAxis: {},
@@ -3937,6 +4004,11 @@ class Mode:
         """
         from gremlin.base_profile import InputItem
         name = safe_read(node, "name", str, "")
+        if "system" in node.attrib:
+            self.isSystem = safe_read(node,"system", bool, False)
+        else:
+            self.isSystem = False
+
         name = name.strip()
         self._name = name
 
@@ -3972,6 +4044,9 @@ class Mode:
         """
         node = etree.Element("mode")
         node.set("name", safe_format(self.name, str))
+        if self.isSystem:
+            node.set("system", safe_format(True, bool))
+
         if self.inherit is not None:
             node.set("inherit", safe_format(self.inherit, str))
         input_types = Mode.SaveInputTypes

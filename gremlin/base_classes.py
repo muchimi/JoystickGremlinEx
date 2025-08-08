@@ -244,7 +244,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._is_axis = False
         self._is_button = True
         self._input_type = None
-        self._description_readonly = True
+
 
     @property
     def descriptionReadOnly(self) -> bool:

@@ -746,7 +746,7 @@ class ConditionTracker():
         ''' gets a count of registered condition for a specific owner - owner is an input_item'''
         import gremlin.shared_state
         if not mode:
-            mode = gremlin.shared_state.current_mode
+            mode = input_item.profile_mode # gremlin.shared_state.current_mode
         if mode in self._cache:
             id_list = [item.condition.id for item in self._cache[mode].values() if item.input_item == input_item]
             return len(id_list)
@@ -756,7 +756,8 @@ class ConditionTracker():
         ''' gets a count of registered condition for a specific owner - owner is an input_item'''
         import gremlin.shared_state
         if not mode:
-            mode = gremlin.shared_state.current_mode
+            input_item = container.parent
+            mode = mode = input_item.profile_mode #gremlin.shared_state.current_mode
         if mode in self._cache:
             id_list = [item.condition.id for item in self._cache[mode].values() if item.container == container]
             return len(id_list)

@@ -90,6 +90,9 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
     device_guid = gremlin.shared_state.mode_tab_guid
 
+    # master mode name for profile wide mode
+    master_mode = str(gremlin.shared_state.mode_tab_guid)
+
     def __init__(
             self,
             device_profile,
@@ -118,7 +121,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model = input_item.InputItemListModel(
             device_profile,
             current_mode,
-            [InputType.ModeControl] # only allow Mode inputs for this widget
+            [InputType.ModeControl], # only allow Mode inputs for this widget
+            show_master_mode = True
         )
 
         # create the two entries
@@ -222,7 +226,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             
         return f"Mode [{gremlin.shared_state.edit_mode}] Unknown id: {input_item.input_id}"
             
-            
+    
 
     def ensureInputItems(self, refresh = False):
         ''' ensures we have input items for the current mode 
@@ -231,14 +235,17 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         '''
         current_mode = gremlin.shared_state.edit_mode
-        self.device_profile.ensure_mode_exists(current_mode)
+        mode_object = self.device_profile.ensure_mode_exists(current_mode)
         config = self.device_profile.modes[current_mode].config
-        
+        master_mode = ModeDeviceTabWidget.master_mode
+        master_mode_object = self.device_profile.ensure_mode_exists(master_mode, is_system = True)
+        master_config = self.device_profile.modes[master_mode].config
+
         changed = False
 
 
         if not ModeInputModeType.ModeEnter in config[InputType.ModeControl]:
-            modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler)
+            modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler, parent = mode_object)
             modeEnter.input_type = InputType.ModeControl
             modeEnter.setOverrideInputType(InputType.JoystickButton)
             modeEnter.input_id = ModeInputModeType.ModeEnter
@@ -251,7 +258,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         
         if not ModeInputModeType.ModeExit in config[InputType.ModeControl]:
-            modeExit = gremlin.base_profile.InputItem(self._custom_name_handler)
+            modeExit = gremlin.base_profile.InputItem(self._custom_name_handler, parent = mode_object)
             modeExit.input_type = InputType.ModeControl
             modeExit.setOverrideInputType(InputType.JoystickButton)
             modeExit.input_id = ModeInputModeType.ModeExit
@@ -263,55 +270,64 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeExit = config[InputType.ModeControl][ModeInputModeType.ModeExit]
 
 
-        # if not ModeInputModeType.ModeProfileLoad in config[InputType.ModeControl]:
-        #     modeProfileLoad = gremlin.base_profile.InputItem(self._custom_name_handler)
+        # if not ModeInputModeType.ModeProfileLoad in master_config[InputType.ModeControl]:
+        #     modeProfileLoad = gremlin.base_profile.InputItem(self._custom_name_handler, parent = master_mode_object)
         #     modeProfileLoad.input_type = InputType.ModeControl
         #     modeProfileLoad.setOverrideInputType(InputType.JoystickButton)
         #     modeProfileLoad.input_id = ModeInputModeType.ModeProfileLoad
         #     modeProfileLoad.description = "Profile Load"
         #     modeProfileLoad.descriptionReadOnly = True
-        #     config[InputType.ModeControl][ModeInputModeType.ModeProfileLoad] = modeProfileLoad
+        
+        #     master_config[InputType.ModeControl][ModeInputModeType.ModeProfileLoad] = modeProfileLoad
         #     changed = True
         # else:
-        #     modeProfileLoad = config[InputType.ModeControl][ModeInputModeType.ModeProfileLoad]            
+        #     modeProfileLoad = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileLoad]            
 
-        if not ModeInputModeType.ModeProfileStart in config[InputType.ModeControl]:
-            modeProfileStart = gremlin.base_profile.InputItem(self._custom_name_handler)
+        if not ModeInputModeType.ModeProfileStart in master_config[InputType.ModeControl]:
+            modeProfileStart = gremlin.base_profile.InputItem(self._custom_name_handler, parent = master_mode_object)
             modeProfileStart.input_type = InputType.ModeControl
             modeProfileStart.setOverrideInputType(InputType.JoystickButton)
             modeProfileStart.input_id = ModeInputModeType.ModeProfileStart
             modeProfileStart.description = "Profile Start"
             modeProfileStart.descriptionReadOnly = True
-            config[InputType.ModeControl][ModeInputModeType.ModeProfileStart] = modeProfileStart
+            
+            master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStart] = modeProfileStart
             changed = True
         else:
-            modeProfileStart = config[InputType.ModeControl][ModeInputModeType.ModeProfileStart]                        
+            modeProfileStart = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStart]                     
 
-        if not ModeInputModeType.ModeProfileStop in config[InputType.ModeControl]:
-            modeProfileStop = gremlin.base_profile.InputItem(self._custom_name_handler)
+        if not ModeInputModeType.ModeProfileStop in master_config[InputType.ModeControl]:
+            modeProfileStop = gremlin.base_profile.InputItem(self._custom_name_handler, parent = master_mode_object)
             modeProfileStop.input_type = InputType.ModeControl
             modeProfileStop.setOverrideInputType(InputType.JoystickButton)
             modeProfileStop.input_id = ModeInputModeType.ModeProfileStop
             modeProfileStop.description = "Profile Stop"
             modeProfileStop.descriptionReadOnly = True
-            config[InputType.ModeControl][ModeInputModeType.ModeProfileStop] = modeProfileStop
+            
+            master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStop] = modeProfileStop
             changed = True
         else:
-            modeProfileStop = config[InputType.ModeControl][ModeInputModeType.ModeProfileStop]                        
-        
-        modeEnter.profile_mode = current_mode
-        modeExit.profile_mode = current_mode
+            modeProfileStop = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStop]                        
 
-        default_mode = gremlin.shared_state.current_profile.get_default_mode()
-        #modeProfileLoad.profile_mode = default_mode
-        modeProfileStart.profile_mode = default_mode
-        modeProfileStop.profile_mode = default_mode
-        
+        #     modeProfileLoad.setProfileModeCallback(self._custom_profile_mode_handler)
+        # modeProfileStart.setProfileModeCallback(self._custom_profile_mode_handler)
+        # modeProfileStop.setProfileModeCallback(self._custom_profile_mode_handler)
+        # syslog.info(modeEnter.profile_mode)
+        # syslog.info(modeExit.profile_mode)
+
+        # #modeProfileLoad.profile_mode = master_mode
+        # syslog.info(modeProfileStart.profile_mode)
+        # syslog.info(modeProfileStop.profile_mode)
         
         if changed or refresh:
             self.input_item_list_model.refresh()    
 
         return changed 
+    
+    # def _custom_profile_mode_handler(self, input_item):
+    #     ''' gets the current input's profile mode (this can vary with some input types)'''
+    #     return gremlin.shared_state.master_mode
+
 
     def itemAt(self, index):
         ''' returns the input widget at the given index '''

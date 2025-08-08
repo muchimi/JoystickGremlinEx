@@ -2793,7 +2793,11 @@ The setting can be overriden by the global mode reload option set in Options for
 
     def _get_mode_list(self):
         ''' gets the mode list as a map keyed by mode name map[mode] = parent_mode (none if no parent)'''
-        return gremlin.shared_state.current_profile.get_mode_map()
+        modes = gremlin.shared_state.current_profile.get_mode_map()
+        master_mode = gremlin.shared_state.master_mode
+        if master_mode in modes:
+            del modes[master_mode]
+        return modes
 
 
     def _populate_mode_layout(self):
@@ -3032,6 +3036,9 @@ The setting can be overriden by the global mode reload option set in Options for
     @QtCore.Slot()
     def _add_mode_confirm(self):
         mode_name = self._add_mode_dialog.added_mode
+        if mode_name == gremlin.shared_state.master_mode:
+            gremlin.ui.ui_common.MessageBox(prompt = "Special modes cannot be added or edited.")
+            return
         parent_mode_name = self._add_mode_dialog.added_parent
         if self._profile.add_mode(mode_name, parent_mode_name, emit = False):
             self._populate_mode_layout()

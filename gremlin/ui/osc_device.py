@@ -2189,8 +2189,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         Data = 1 # the message and arguments are considered
 
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent = None):
+        super().__init__(parent=parent) # parent is the mode object this input belongs to
         self.verbose = gremlin.config.Configuration().verbose_mode_osc
         self._message = None # the OSC message command
         self._message_data = None # the list of values associated with that command

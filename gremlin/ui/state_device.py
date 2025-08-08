@@ -402,8 +402,18 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._dirty = True # indicates the state is stale and must be recomputed (expressions only)
         self._expression_states = [] # dependent expression states - list of states that need to be evaluated when they change
         self._last_expression_value = False # last computed expression result
+
+        # get the mode object for this state input
+        device_modes = self.profile.get_device_modes(
+                    gremlin.shared_state.state_tab_guid,
+                    DeviceType.State,
+                    DeviceType.to_string(DeviceType.State)
+                )
+
+        current_mode = gremlin.shared_state.edit_mode
+        mode_object = device_modes.ensure_mode_exists(current_mode)
         
-        item = gremlin.base_profile.InputItem() #self._custom_name_handler)
+        item = gremlin.base_profile.InputItem(parent = mode_object) #self._custom_name_handler)
         item.input_id = self
         item.input_type = InputType.State
         item.device_name = "State"

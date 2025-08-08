@@ -2645,27 +2645,7 @@ class ModeWidget(QtWidgets.QWidget):
 
             mode_list_pairs = get_mode_list(profile)
             self.mode_list = [x[1] for x in mode_list_pairs]
-            # Create mode name labels visualizing the tree structure
-            # inheritance_tree = self.profile.build_inheritance_tree()
-            # labels = []
-            # _inheritance_tree_to_labels(labels, inheritance_tree, 0)
-
-            # # Filter the mode names such that they only occur once below
-            # # their correct parent
-            # mode_names = []
-            # display_names = []
-            # for entry in labels:
-            #     if entry[0] in mode_names:
-            #         idx = mode_names.index(entry[0])
-            #         if len(entry[1]) > len(display_names[idx]):
-            #             del mode_names[idx]
-            #             del display_names[idx]
-            #             mode_names.append(entry[0])
-            #             display_names.append(entry[1])
-            #     else:
-            #         mode_names.append(entry[0])
-            #         display_names.append(entry[1])
-
+            
             # Add properly arranged mode names to the drop down list
             index = 0
             current_index = 0
@@ -2675,7 +2655,11 @@ class ModeWidget(QtWidgets.QWidget):
             if not last_edit_mode in modes:
                 last_edit_mode = gremlin.shared_state.current_profile.get_default_mode()
 
+
+            master_mode = gremlin.shared_state.master_mode
             for display_name, mode_name in mode_list_pairs:
+                if mode_name == master_mode:
+                    continue
                 self.edit_mode_selector.addItem(display_name, mode_name)
                 # self.mode_list.append(mode_name)
                 if mode_to_select and select_index is None and mode_to_select == mode_name:

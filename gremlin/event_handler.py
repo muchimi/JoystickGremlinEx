@@ -696,19 +696,19 @@ class EventListener(QtCore.QObject):
 		# mode events
 		device_guid = gremlin.shared_state.mode_tab_guid
 		delay = 0.250 # delay in seconds between press/release events for mode control change
-		default_mode = gremlin.shared_state.current_profile.get_default_mode()
+		master_mode = gremlin.shared_state.master_mode
 
 		event_stop_pressed = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
 						device_guid= device_guid,
 						is_pressed=True,
-						mode = default_mode)
+						mode = master_mode)
 		
 		event_stop_released = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
 						device_guid= device_guid,
 						is_pressed=False,
-						mode = default_mode)
+						mode = master_mode)
 		
 
 		eh = EventHandler()
@@ -726,19 +726,19 @@ class EventListener(QtCore.QObject):
 		mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
 		delay = 0.250 # delay in seconds between press/release events for mode control change
 		new_mode = gremlin.shared_state.runtime_mode
-		default_mode = gremlin.shared_state.current_profile.get_default_mode()
+		master_mode = gremlin.shared_state.master_mode
 
 		event_start_pressed = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
 						device_guid= device_guid,
 						is_pressed=True,
-						mode = default_mode)
+						mode = master_mode)
 		
 		event_start_released = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
 						device_guid= device_guid,
 						is_pressed=False,
-						mode = default_mode)
+						mode = master_mode)
 		
 		
 

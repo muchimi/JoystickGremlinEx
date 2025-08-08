@@ -878,7 +878,19 @@ class ProfileInputNode(ProfileBaseNode):
 
         if device_node.device_type == DeviceType.ModeControl:
             # create the special input item
-            self._input_item = gremlin.base_profile.InputItem()
+
+            profile = gremlin.shared_state.current_profile
+            device_modes = profile.get_device_modes(
+                gremlin.shared_state.mode_tab_guid,
+                DeviceType.ModeControl,
+                DeviceType.to_string(DeviceType.ModeControl)
+            )
+
+            current_mode = gremlin.shared_state.edit_mode
+            mode_object = device_modes.ensure_mode_exists(current_mode)
+
+
+            self._input_item = gremlin.base_profile.InputItem(parent = mode_object)
             self._input_item.device_type = DeviceType.ModeControl
             self._input_item.input_id = 0
 
@@ -931,9 +943,9 @@ class ProfileInputNode(ProfileBaseNode):
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_tag_map = container_plugins.tag_map
-        # registry = gremlin.base_profile.ProfileRegistry()
 
-        # syslog.info(f"node: {etree.tostring(node)}")
+        mode_object = gremlin.base_profile.get_mode_object(node)
+        assert mode_object is not None,"Mode object could not be derived"
 
         input_entry = None
         if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
@@ -975,7 +987,7 @@ class ProfileInputNode(ProfileBaseNode):
         elif self.input_type == InputType.Midi:
             # midi data
             from gremlin.ui.midi_device import MidiInputItem
-            midi_input_item = MidiInputItem()
+            midi_input_item = MidiInputItem(parent = mode_object)
             for child in node:
                 if child.tag == "input":
                     midi_input_item.parse_xml(child, midi_input_item)
@@ -985,7 +997,7 @@ class ProfileInputNode(ProfileBaseNode):
         elif self.input_type == InputType.OpenSoundControl:
             # OSC data
             from gremlin.ui.osc_device import OscInputItem
-            osc_input_item = OscInputItem()
+            osc_input_item = OscInputItem(parent = mode_object)
             for child in node:
                 if child.tag == "input":
                     osc_input_item.parse_xml(child, osc_input_item)

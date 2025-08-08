@@ -147,16 +147,18 @@ class InputItemListModel(ui_common.AbstractModel):
 
 
 
-    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None):
+    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None, show_master_mode = False):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
         :param mode the mode this model manages
         :param custom_update_handler: handler for custom updates to the data
+        :param show_master_mode: determines if master mode items are displayed in the model
         """
         super().__init__()
         self._device_data = device_data
         self._mode = mode
+        self._show_master_mode = show_master_mode
         self._index_map = {} # map of index to input item
         self._item_map = {} # map of input_id to index
         if allowed_types is not None:
@@ -265,6 +267,22 @@ class InputItemListModel(ui_common.AbstractModel):
                     self._index_map[index] = data
                     self._item_map[data.input_id] = index
                     index += 1
+
+        if self._show_master_mode:
+            master_mode = gremlin.shared_state.master_mode
+            input_items = self._device_data.modes[master_mode]
+            for input_type in self._allowed_input_types:
+                if input_type in input_items.config.keys():
+                    sorted_keys = sorted(input_items.config[input_type].keys())
+                    for data_key in sorted_keys:
+                        data = input_items.config[input_type][data_key]
+                        # add hardware GUID reference to data block so we have an easier reference to it
+                        data.device_guid = self._device_data.device_guid
+                        self._index_map[index] = data
+                        self._item_map[data.input_id] = index
+                        index += 1
+
+
 
         self._update_source()
         if apply_filter: self._filter_data()
@@ -2620,7 +2638,7 @@ class ConditionStateTracker():
 
         dock_tab : QtWidgets.QTabWidget = container_widget.dock_tabs
         device_guid = input_item.device_guid
-        mode = gremlin.shared_state.current_mode
+        mode =input_item.profile_mode # gremlin.shared_state.current_mode
         input_id = input_item.input_id
         if not device_guid in self._cache:
             self._cache[device_guid] = {}
@@ -2640,7 +2658,7 @@ class ConditionStateTracker():
             return
         assert isinstance(container, gremlin.base_profile.AbstractContainer)
         device_guid = input_item.device_guid
-        mode = gremlin.shared_state.current_mode
+        mode = input_item.profile_mode # gremlin.shared_state.current_mode
         input_id = input_item.input_id
         if device_guid in self._cache:
             if mode in self._cache[device_guid]:
@@ -2781,6 +2799,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.action_widgets = []
 
         mode = self.profile_data.get_mode()
+        if mode == gremlin.shared_state.master_mode:
+            mode = "[Master]"
         self._title_bar_widget = TitleBar(
             f"{self._get_window_title()} ({mode})",
             gremlin.hints.hint.get(self.profile_data.tag, ""),
@@ -3684,7 +3704,7 @@ class ConditionActionWrapper(AbstractActionWrapper):
 
 class InputItemMappingWidget(QtWidgets.QFrame):
 
-    """ mapping viewer for a selected input item (this is the right side of the device tab) """
+    """ mapping viewer for a selected input item (this is the right side of the device tab) - right panel widgets """
 
     # Signal emitted when the description changes
     description_changed = Signal(str) # indicates the description was changed

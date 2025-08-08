@@ -2969,6 +2969,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if switch_tabs and not force_switch and not config.highlight_autoswitch:
                 if verbose: syslog.info("Tab change ignored: auto tab switching is disabled")
+                return
 
 
             if input_id is None:
