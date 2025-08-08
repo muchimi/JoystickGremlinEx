@@ -55,32 +55,33 @@ import psygnal
 from psygnal import Signal
 
 
-class ModeInputModeType(enum.IntEnum):
-    ''' possible input modes '''
-    ModeEnter = 0  # executes on mode enter
-    ModeExit = 1 # executes on mode exit
-    ModeGlobalEnter = 2 # executes on any mode change (activate)
-    ModeGlobalExit = 3 # executes on any mode change (deactivate)
+# class ModeInputModeType(enum.IntEnum):
+#     ''' possible input modes '''
+#     ModeEnter = 0  # executes on mode enter
+#     ModeExit = 1 # executes on mode exit
+#     ModeGlobalEnter = 2 # executes on any mode change (activate)
+#     ModeGlobalExit = 3 # executes on any mode change (deactivate)
 
-    @staticmethod
-    def to_display_name(value):
-        match value:
-            case ModeInputModeType.ModeEnter:
-                return "Mode Activate"
-            case ModeInputModeType.ModeExit:
-                return "Mode Deactivate"
-            case ModeInputModeType.ModeGlobalEnter:
-                return "Mode Activate (any)"
-            case ModeInputModeType.ModeGlobalExit:
-                return "Mode Deactivate (any)"
+#     @staticmethod
+#     def to_display_name(value):
+#         match value:
+#             case ModeInputModeType.ModeEnter:
+#                 return "Mode Activate"
+#             case ModeInputModeType.ModeExit:
+#                 return "Mode Deactivate"
+#             case ModeInputModeType.ModeGlobalEnter:
+#                 return "Mode Activate (any)"
+#             case ModeInputModeType.ModeGlobalExit:
+#                 return "Mode Deactivate (any)"
         
-        return f"Unknown mode: {value}"
+#         return f"Unknown mode: {value}"
     
 
 class StateCategory():
     ''' holds a state category '''
     def __init__(self, name : str, id = None):
-        self._id = gremlin.util.get_guid() if id is None else id
+        assert id is None or isinstance(id, str)
+        self._id = gremlin.util.get_guid() if id is None  else id
         self._name = name.casefold().strip() if name else None
 
 
@@ -111,8 +112,10 @@ class StateCategory():
     @property
     def id(self) -> str:
         return self._id
+    
     @id.setter
     def id(self, value : str):
+        assert value and isinstance(value, str), "Invalid value for ID"
         self._id = value
 
     def text(self) -> str:
@@ -193,8 +196,10 @@ class StateCategories(QtCore.QObject):
         if name:
             key = name.casefold().strip()
             if not key in self._categories:
-                category = StateCategory(key, id)
+                category = StateCategory(key)
                 self._categories[key] = category
+                el = gremlin.event_handler.EventListener()
+                el.state_category_add.emit(category)
                 return category
             
         return None
@@ -203,11 +208,22 @@ class StateCategories(QtCore.QObject):
         ''' removes a category if it exists '''
         if category:
             if category != self._default_category:
-                # only delete non default category
-                el = gremlin.event_handler.EventListener()
-                el.state_category_delete.emit(category)
+                # only delete if not the default category
                 if category.key in self._categories:
                     del self._categories[category.key]
+                    el = gremlin.event_handler.EventListener()
+                    el.state_category_delete.emit(category)
+
+    def removeCategoryName(self, name : str):
+        ''' removes a category by name if it exists '''
+        if name:
+            key = name.casefold().strip()
+            if key in self._categories:
+                category = self._categories[key]
+                self.removeCategory(category)
+
+
+        
 
     def renameCategory(self, old_name : str, new_name :str):
         ''' renames a category '''
@@ -218,6 +234,8 @@ class StateCategories(QtCore.QObject):
                 category = self._categories[n1]
                 if category != self._default_category:
                     category.name = n2
+                    el = gremlin.event_handler.EventListener()
+                    el.state_category_name_change.emit(category)
             
 
 
@@ -388,7 +406,20 @@ class StateInputItem(gremlin.base_profile.InputItem):
     
 
     def __init__(self, key : str = None, default_value = False, description = None, is_expression = False, expression = None, category = None):
-        super().__init__()
+        master_mode = gremlin.shared_state.master_mode
+
+
+        # get the mode object for this state input
+        profile = gremlin.shared_state.current_profile
+        device_modes = profile.get_device_modes(
+                    gremlin.shared_state.state_tab_guid,
+                    DeviceType.State,
+                    DeviceType.to_string(DeviceType.State)
+                )
+
+        mode_object = device_modes.ensure_mode_exists(master_mode)
+
+        super().__init__(parent = mode_object)
         self._id = gremlin.util.get_guid()
         self._key = key
         self._category = category # category (StateCategory)
@@ -403,15 +434,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._expression_states = [] # dependent expression states - list of states that need to be evaluated when they change
         self._last_expression_value = False # last computed expression result
 
-        # get the mode object for this state input
-        device_modes = self.profile.get_device_modes(
-                    gremlin.shared_state.state_tab_guid,
-                    DeviceType.State,
-                    DeviceType.to_string(DeviceType.State)
-                )
 
-        current_mode = gremlin.shared_state.edit_mode
-        mode_object = device_modes.ensure_mode_exists(current_mode)
         
         item = gremlin.base_profile.InputItem(parent = mode_object) #self._custom_name_handler)
         item.input_id = self
@@ -620,6 +643,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
             return None
         
         if self._category:
+            test = self._category.id
             node.set("category_id", self._category.id)
         
         if self._description:
@@ -1461,9 +1485,6 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         
         super().__init__(self.__class__.__name__,parent = parent)
 
-        self._current_category = None # contains the name of the new category
-
-        
         main_layout = QtWidgets.QVBoxLayout(self)
         self.setWindowTitle("Category Editor")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -1533,6 +1554,11 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         ''' on focus loss, clear selection '''
         pass
 
+    def category(self) -> StateCategory:
+        ''' gets the selected category '''
+        category = self._cm.findByName(self._last_selected_category)
+        return category
+
         
     def _selection_changed(self, selected, deselected):
         selected_indexes = self._list_view.selectedIndexes()
@@ -1546,10 +1572,11 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 break
         self._delete_button.setEnabled(enabled)
         
+        
             
 
     def _update(self):
-        name = self._current_category
+        name = self._last_selected_category
         add_enabled = False
         if name:
             name = name.casefold().strip()
@@ -1616,16 +1643,17 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             # check it's not the default
             name = name.casefold().strip()
             if not name in self._model.getCategoryNames():
-                self._current_category = name
+                self._last_selected_category = name
                 enabled = True
 
+            
         self._add_button.setEnabled(enabled)
 
 
 
     @QtCore.Slot()
     def _add_input_cb(self):
-        name = self._current_category
+        name = self._last_selected_category
         if name:
             name = name.casefold().strip()
         if name:
@@ -1640,6 +1668,17 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
      
     def _ok_button_cb(self):
         ''' ok button pressed '''
+
+        # update categories 
+        category_names = self._model.getCategoryNames()
+        for category_name in category_names:
+            category = self._cm.findByName(category_name)
+            if not category:
+                self._cm.addCategory(category_name)
+        # remove categories that no longer exist 
+        for category_name in self._cm.getCategoryNames():
+            if not category_name in category_names:
+                self._cm.removeCategoryName(category_name)
         self.accept()   
 
     def _cancel_button_cb(self):
@@ -1688,6 +1727,8 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent # list view
         self._is_edit = data is not None
+
+        el = gremlin.event_handler.EventListener()
         
 
         main_layout = QtWidgets.QVBoxLayout()
@@ -1725,13 +1766,21 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._cm = StateCategories()
 
         selected_index = None
-        self._category_selector_widget = self._cm.getSelector(self._category_changed_cb)
+        self._category_selector_widget : QtWidgets.QComboBox = self._cm.getSelector() # self._category_changed_cb)
+
+        # update selector when categories change
+        el.state_category_add.connect(self._category_change_cb) 
+        el.state_category_delete.connect(self._category_change_cb)
+        el.state_category_name_change.connect(self._category_change_cb)
+
         if self.data.category:
             index = self._category_selector_widget.findData(self.data.category)
             if selected_index is None and index != -1:
                 with QtCore.QSignalBlocker(self._category_selector_widget):
                     selected_index = index
                     self._category_selector_widget.setCurrentIndex(index)
+
+
         self._category_config_widget = QtWidgets.QPushButton()
         self._category_config_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon())
         self._category_config_widget.setMaximumWidth(24)
@@ -1801,37 +1850,46 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         ''' clears and hides the status text '''
         self._set_status(None)
 
-    def _category_changed_cb(self, index):
-        ''' called when selected command changes '''
-        category = self._category_selector_widget.currentData()
-        self.data.setCategory(category)
-        index = self._category_selector_widget.findData(category)
-        if index == -1:
-            self._cm.updateSelector(self._category_selector_widget)
-            index = self._category_selector_widget.findData(category)
-        if index != -1:
-            self._category_selector_widget.setCurrentIndex(index)
+    # def _category_changed_cb(self, index):
+    #     ''' called when selected command changes '''
+    #     category = self._category_selector_widget.currentData()
+    #     index = self._category_selector_widget.findData(category)
+    #     if index == -1:
+    #         self._cm.updateSelector(self._category_selector_widget)
+    #         index = self._category_selector_widget.findData(category)
+    #     if index != -1:
+    #         self._category_selector_widget.setCurrentIndex(index)
         
-        
+    def category(self) -> StateCategory:
+        ''' gets the current selected category '''
+        return self._category_selector_widget.currentData()
 
     def _category_config_cb(self):
         self._category_dialog = StateCategoryConfigDialog()
-        self._category_dialog.accepted.connect(self._category_updated)
+        self._category_dialog.accepted.connect(self._category_dialog_ok)
         self._category_dialog.show()
 
-    def _category_updated(self):
-        categories = self._category_dialog.getCategories()
-        selected_category = self._category_dialog.selectedCategory()
-        if categories:
-            self._cm.setCategories(categories)
-            self._cm.updateSelector(self._category_selector_widget)
-            if selected_category:
-                index = self._category_selector_widget.findText(selected_category)
-                if index != -1:
-                    self._category_selector_widget.setCurrentIndex(index)
+    def _category_dialog_ok(self):
+        ''' called when category data changes '''
+        selected_category = self._category_dialog.category()
+        self._cm.updateSelector(self._category_selector_widget)
+        if selected_category:
+            index = self._category_selector_widget.findData(selected_category)
+            if index != -1:
+                self._category_selector_widget.setCurrentIndex(index)
 
 
-            
+    def _category_change_cb(self, category):
+        ''' category was changed '''
+        self._cm.updateSelector(self._category_selector_widget)
+        index = self._category_selector_widget.findData(category)
+        if index == -1:
+            # pick the default
+            default_category = self._cm.default()
+            index = self._category_selector_widget.findData(default_category)
+        if index != -1:
+            self._category_selector_widget.setCurrentIndex(index)
+        
 
     def _validate(self):
         sd = StateData()
@@ -2382,6 +2440,8 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         index = self._edit_item_index
         identifier = self.input_item_list_model.data(index)
         input_item : StateInputItem = identifier.input_id
+        category = self._edit_dialog.category()
+        input_item.setCategory(category)
         input_item.key = data.key
         input_item.setDescription(data.description)
         input_item.default_value = data.default_value

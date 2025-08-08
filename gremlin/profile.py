@@ -24,8 +24,10 @@ import logging
 import os
 import shutil
 import uuid
+
 #from xml.dom import minidom
-from lxml import etree as ElementTree
+import lxml
+from lxml import etree
 import gremlin.base_classes
 import gremlin.base_profile
 
@@ -38,6 +40,7 @@ import gremlin.actions
 from gremlin.util import *
 from gremlin.input_types import InputType
 from . import error, joystick_handling
+
 
 syslog = logging.getLogger("system")
 
@@ -62,7 +65,7 @@ class ProfileConverter:
     """Handle converting and checking profiles."""
 
     # Current profile version number
-    current_version = 10
+    current_version = 11
 
     def __init__(self):
         pass
@@ -78,7 +81,7 @@ class ProfileConverter:
         if os.path.getsize(fname) == 0:
             return True
         
-        tree = ElementTree.parse(fname)
+        tree = etree.parse(fname)
         root = tree.getroot()
 
         version = self._determine_version(root)
@@ -89,11 +92,11 @@ class ProfileConverter:
         import gremlin.util
 
         try:
-            tree = ElementTree.parse(fname)
+            tree = etree.parse(fname)
             root = tree.getroot()
 
             new_root = self._convert_to_ex(root, fname)
-            tree = ElementTree.tostring(new_root)
+            tree = etree.tostring(new_root)
             tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
         except:
             gremlin.util.m
@@ -104,7 +107,7 @@ class ProfileConverter:
         :param fname path to the profile to convert
         """
         # Load the profile
-        tree = ElementTree.parse(fname)
+        tree = etree.parse(fname)
         root = tree.getroot()
 
         # Check if a conversion is required
@@ -120,7 +123,9 @@ class ProfileConverter:
             6: self._convert_from_v6,
             7: self._convert_from_v7,
             8: self._convert_from_v8,
-            9: None
+            9: None,
+            10: self._convert_from_v10,
+            11: None,
         }
 
         # Create a backup of the outdated profile
@@ -148,7 +153,7 @@ class ProfileConverter:
         if converted:
             if new_root is not None:
                 # Save converted version
-                tree = ElementTree.tostring(new_root)
+                tree = etree.ElementTree(root)
                 tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
             else:
                 raise error.ProfileError("Failed to convert profile")
@@ -174,11 +179,11 @@ class ProfileConverter:
         :param root the v1 profile
         :return v2 representation of the profile
         """
-        new_root = ElementTree.Element("profile")
+        new_root = etree.Element("profile")
         new_root.set("version", "2")
 
         # Device entries
-        devices = ElementTree.Element("devices")
+        devices = etree.Element("devices")
         for node in root.iter("device"):
             # Modify each node to include the correct type attribute
             if node.get("name") == "keyboard" and \
@@ -255,7 +260,7 @@ class ProfileConverter:
                 # If this widget is purely a map to keyboard action then
                 # replace the two macro widgets with a single one
                 if count == 2 and all(press_and_release):
-                    container = ElementTree.Element("container")
+                    container = etree.Element("container")
                     container.set("type", "basic")
 
                     container.append(
@@ -272,7 +277,7 @@ class ProfileConverter:
                     containers = []
                     items_to_remove = []
                     for action in input_item:
-                        container = ElementTree.Element("container")
+                        container = etree.Element("container")
                         container.set("type", "basic")
 
                         # Move conditions to the container and remove them from
@@ -288,7 +293,7 @@ class ProfileConverter:
                             else:
                                 copy_condition = True
                             if copy_condition:
-                                cond = ElementTree.Element("activation-condition")
+                                cond = etree.Element("activation-condition")
                                 cond.set("lower-limit", action.get("lower-limit"))
                                 cond.set("upper-limit", action.get("upper-limit"))
                                 container.append(cond)
@@ -305,7 +310,7 @@ class ProfileConverter:
                                 del action.attrib["on-release"]
                         elif input_item.tag == "hat":
                             if "on-n" in action.keys():
-                                cond = ElementTree.Element("activation-condition")
+                                cond = etree.Element("activation-condition")
                                 keys = [
                                     ("on-n", "north"),
                                     ("on-ne", "north-east"),
@@ -325,7 +330,7 @@ class ProfileConverter:
 
                         # Macro actions have changed, update their layout
                         if action.tag == "macro":
-                            actions_node = ElementTree.Element("actions")
+                            actions_node = etree.Element("actions")
                             remove_key_nodes = []
                             for key_node in action:
                                 actions_node.append(key_node)
@@ -335,7 +340,7 @@ class ProfileConverter:
                                 action.remove(key_node)
 
                             action.append(actions_node)
-                            action.append(ElementTree.Element("properties"))
+                            action.append(etree.Element("properties"))
 
                         container.append(action)
                         containers.append(container)
@@ -371,7 +376,7 @@ class ProfileConverter:
                     actions_to_remove.append(action)
                 # Handle actions
                 else:
-                    action_set = ElementTree.Element("action-set")
+                    action_set = etree.Element("action-set")
                     action_set.append(action)
                     action_sets.append(action_set)
                     actions_to_remove.append(action)
@@ -409,9 +414,9 @@ class ProfileConverter:
             # If we have both axis remap and response curve actions place them
             # all in a single basic container
             if has_remap and has_curve:
-                new_container = ElementTree.Element("container")
+                new_container = etree.Element("container")
                 new_container.set("type", "basic")
-                new_actionset = ElementTree.Element("action-set")
+                new_actionset = etree.Element("action-set")
 
                 # Copy all axis remaps and response curves into the new
                 # action set
@@ -789,12 +794,12 @@ class ProfileConverter:
             del entry.attrib["device2"]
             del entry.attrib["axis2"]
 
-        plugins_node = ElementTree.Element("plugins")
+        plugins_node = etree.Element("plugins")
         for entry in root.findall(".//import/module"):
-            p_node = ElementTree.Element("plugin")
+            p_node = etree.Element("plugin")
             p_node.set("file-name", entry.attrib["name"])
 
-            i_node = ElementTree.Element("instance")
+            i_node = etree.Element("instance")
             i_node.set("name", "Default")
 
             p_node.append(i_node)
@@ -806,6 +811,47 @@ class ProfileConverter:
 
         return root
 
+    def _convert_from_v10(self, root, fname = None):
+        ''' convert from V10 - looks for profile start/stop and move to new master mode '''
+        import gremlin.shared_state
+        master_mode = gremlin.shared_state.master_mode
+
+        root.attrib["version"] = "11" # change version
+
+        # look for mode control input nodes
+        nodes = root.xpath("//device[@type='mode']")
+        if nodes:
+            device_node = nodes[0]
+
+            # locate the correct mode
+            nodes = device_node.xpath(f"//mode[@name='{master_mode}']")
+            if nodes:
+                master_node = nodes[0]
+                # remove any empty profile start/stop nodes
+                nodes = master_node.xpath("//modecontrol[not(*) and (@id='5' or @id='6')]")
+                for node in nodes:
+                    master_node.remove(node)
+            else:
+                # create it
+                master_node = lxml.etree.Element("mode", name=master_mode, system='True')
+                device_node.append(master_node)
+
+            nodes = device_node.xpath("//modecontrol[@id='5' or @id='6']") # profile start or profile stop
+            for node in nodes:
+                mode_node = node.getparent()
+                if mode_node != master_node:
+                    # move the node to the correct parent
+                    mode_node.remove(node)
+                    master_node.append(node)
+                    
+
+        return root
+
+
+            
+
+
+    
     def _p3_extract_map_to_keyboard(self, input_item):
         """Converts an old macro setup to a map to keyboard action.
 
@@ -816,14 +862,14 @@ class ProfileConverter:
         :param input_item the InputItem containing the old macro definitions
         :return map to keyboard node representing the old macros
         """
-        node = ElementTree.Element("map-to-keyboard")
+        node = etree.Element("map-to-keyboard")
 
         for action in input_item:
             assert action.tag == "macro"
 
             for key in action:
                 if key.tag == "key":
-                    key_node = ElementTree.Element("key")
+                    key_node = etree.Element("key")
                     key_node.set("scan_code", key.get("scan_code"))
                     key_node.set("extended", key.get("extended"))
                     node.append(key_node)

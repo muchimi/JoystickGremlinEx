@@ -270,17 +270,19 @@ class InputItemListModel(ui_common.AbstractModel):
 
         if self._show_master_mode:
             master_mode = gremlin.shared_state.master_mode
-            input_items = self._device_data.modes[master_mode]
-            for input_type in self._allowed_input_types:
-                if input_type in input_items.config.keys():
-                    sorted_keys = sorted(input_items.config[input_type].keys())
-                    for data_key in sorted_keys:
-                        data = input_items.config[input_type][data_key]
-                        # add hardware GUID reference to data block so we have an easier reference to it
-                        data.device_guid = self._device_data.device_guid
-                        self._index_map[index] = data
-                        self._item_map[data.input_id] = index
-                        index += 1
+            if master_mode in self._device_data.modes:
+                # older profile may not have master mode defined until saved
+                input_items = self._device_data.modes[master_mode]
+                for input_type in self._allowed_input_types:
+                    if input_type in input_items.config.keys():
+                        sorted_keys = sorted(input_items.config[input_type].keys())
+                        for data_key in sorted_keys:
+                            data = input_items.config[input_type][data_key]
+                            # add hardware GUID reference to data block so we have an easier reference to it
+                            data.device_guid = self._device_data.device_guid
+                            self._index_map[index] = data
+                            self._item_map[data.input_id] = index
+                            index += 1
 
 
 
@@ -2417,6 +2419,12 @@ class InputItemWidget(QBoxFrame):
     def _close_button_cb(self):
         ''' fires the closed event when the close button has been pressed '''
         
+
+        # prompt
+        msgbox =gremlin.ui.ui_common.ConfirmBox(prompt = "Remove this input?")
+        result = msgbox.show()
+        if result != QtWidgets.QMessageBox.StandardButton.Ok:
+            return
 
         # remove the tracker objects
         widget_tracker = gremlin.ui.ui_common.StateTracker()

@@ -357,6 +357,10 @@ class EventListener(QtCore.QObject):
 
 	# state event
 	state_event = Signal(Event)
+	state_name_change = Signal(str,str,object) # fires when a state changes names (old_name, new_name, StateInputItem)
+	state_category_add = Signal(object) # fires when a state category is added (StateCategory)
+	state_category_delete = Signal(object) # fires when a state category is removed (StateCategory)
+	state_category_name_change = Signal(object) # fires when a state category name is changed (StateCategory)
 
 	# Signal emitted when a joystick is attached or removed
 	device_change_event = Signal()
@@ -539,9 +543,7 @@ class EventListener(QtCore.QObject):
 
 	device_mapping_changed = Signal(str) # fires when device mapping has changed (updates headers) - param = device_id as a string
 	
-	state_name_change = Signal(str,str,object) # fires when a state changes names (old_name, new_name, StateInputItem)
-	state_category_delete = Signal(object) # fires when a state category is removed (StateCategory)
-	state_category_name_change = Signal(object) # fires when a state category name is changed (StateCategory)
+	
 
 	def __init__(self):
 		"""Creates a new instance."""
@@ -697,18 +699,19 @@ class EventListener(QtCore.QObject):
 		device_guid = gremlin.shared_state.mode_tab_guid
 		delay = 0.250 # delay in seconds between press/release events for mode control change
 		master_mode = gremlin.shared_state.master_mode
+		extra_data = {'mode' : master_mode} # override execution mode 
 
 		event_stop_pressed = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
 						device_guid= device_guid,
 						is_pressed=True,
-						mode = master_mode)
+						extra_data = extra_data)
 		
 		event_stop_released = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
 						device_guid= device_guid,
 						is_pressed=False,
-						mode = master_mode)
+						extra_data = extra_data)
 		
 
 		eh = EventHandler()
@@ -727,31 +730,32 @@ class EventListener(QtCore.QObject):
 		delay = 0.250 # delay in seconds between press/release events for mode control change
 		new_mode = gremlin.shared_state.runtime_mode
 		master_mode = gremlin.shared_state.master_mode
+		extra_data = {'mode' : master_mode} # override execution mode 
 
 		event_start_pressed = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
 						device_guid= device_guid,
 						is_pressed=True,
-						mode = master_mode)
+						extra_data = extra_data)
 		
 		event_start_released = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
 						device_guid= device_guid,
 						is_pressed=False,
-						mode = master_mode)
+						extra_data = extra_data)
 		
 		
-
+		
 		event_enter_pressed = Event(InputType.ModeControl, 
 						identifier = mode_enter,
 						device_guid= device_guid,
 						is_pressed=True,
-						mode = new_mode)
+						extra_data = extra_data)
 		event_enter_released = Event(InputType.ModeControl, 
 						identifier = mode_enter,
 						device_guid= device_guid,
 						is_pressed=False,
-						mode = new_mode)
+						extra_data = extra_data)
 		
 
 		# read the starting hat states
@@ -2469,13 +2473,19 @@ class EventHandler(QtCore.QObject):
 
 		config =  gremlin.config.Configuration()
 		verbose = config.verbose_mode_details # or config.verbose_mode_condition
+		mode = self.runtime_mode
+		if event.extra_data:
+			# look for options
+			if 'mode' in event.extra_data:
+				mode = event.extra_data['mode']
+		
 
 		# Obtain callbacks matching the event
 		callback_list = []
 		key = event.callbackKey
 		device_guid = event.device_guid
 		if device_guid in self.callbacks:
-			mode = self.runtime_mode
+			
 			if mode in self.callbacks[device_guid]:
 				if key in self.callbacks[device_guid][mode]:
 					callback_list = self.callbacks[device_guid][mode][key]

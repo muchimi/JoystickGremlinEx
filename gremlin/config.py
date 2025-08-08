@@ -1713,7 +1713,7 @@ class Configuration(QtCore.QObject):
                     count = widget.input_item_list_model.rows()
                     found = False
                     save_input_id = input_id
-                    items = widget.input_item_list_model.getItems()
+                    items = list(widget.input_item_list_model.getItems())
                     for item in items:
                         if item.input_id.guid == input_id:
                             input_id = item.input_id

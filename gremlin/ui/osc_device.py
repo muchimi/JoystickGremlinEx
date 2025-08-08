@@ -2578,7 +2578,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
         ''' duplicates an input item '''
         import copy
         source = self
-        target= OscInputItem()
+        target= OscInputItem(parent = self.parent)
         target.id = uuid.uuid4()
         target._message = copy.deepcopy(source._message)
         target._message_data = source._message_data
@@ -2758,10 +2758,14 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         assert hasattr(parent, "input_item_list_model"),"OSC CONFIG: Parent widget does not have required listview model"
         assert hasattr(parent, "input_item_list_view"),"OSC CONFIG: Parent widget does not have required listview"
 
+        profile = gremlin.shared_state.current_profile
+        device_guid = gremlin.shared_state.osc_tab_guid
+        device_modes = profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
+        self._mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
+
         self._config_widget =  QtWidgets.QWidget()
         self._config_layout = QtWidgets.QHBoxLayout()
         self._config_widget.setLayout(self._config_layout)
-        
         self._current_mode = current_mode
         self.index = index
         self.identifier = data
@@ -3001,7 +3005,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 parent_widget = self._parent
                 model = parent_widget.input_item_list_model
                 message = self._command
-                input_item = OscInputItem()
+
+                input_item = OscInputItem(parent = self._mode_object)
                 input_item._message = message
                 input_item._message_data = self._command_data
                 input_item._command_mode = self._command_mode
@@ -3745,7 +3750,12 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _add_input_cb(self):
         """Adds a new input to the inputs list  """
         input_type = InputType.OpenSoundControl
-        input_id = OscInputItem()
+
+        profile = gremlin.shared_state.current_profile
+        device_modes =  profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Osc))
+        mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
+
+        input_id = OscInputItem(parent = mode_object)
         input_id.input_type_changed.connect(self._refresh_mappings)
 
         self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
@@ -3816,6 +3826,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param index the index of the selected item
         """
         import gremlin.ui.input_item
+        import gremlin.shared_state
 
         # self._last_selected_index = index
         item_data = None
@@ -3856,7 +3867,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.selectRegisteredWidget(key)
             self.input_item_list_view.scrollToIndex(index)
         else:
-            item_data = OscInputItem()
+            profile = gremlin.shared_state.current_profile
+            device_guid = gremlin.shared_state.osc_tab_guid
+            device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
+            mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
+            item_data = OscInputItem(mode_object)
             widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="OSC Blank InputConfigItem (no item data)")     
 
         #self.setRightPanelWidget(widget)

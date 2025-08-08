@@ -1,4 +1,4 @@
-# GremlinEx usage guide
+# GremlinEx feature usage guide
 
 ## Automatic Input detection
 
@@ -140,6 +140,14 @@ The automatic load occurs whenever GremlinEx detects a process focus change.
 
 This mode is used to ensure GremlinEx keeps the profile running even if the process it is mapped to no longer has the primary focus.   This happens, for example when you alt-tab, or when you activate another window.  The recommendation is to leave this option enabled.
 
+### Profile start and stop event mappings
+
+Starting with m76T40, it is possible in the *Mode/Profile* device tab to define actions that will execute either on profile start, along with actions to trigger on profile stop.  These will execute on every profile start or stop and can be used to initialize outputs.
+
+For example, it is possible to send an OSC command to OSC based control panels on the network or the local machine to call up a particular configuration.
+
+Actions mapped to profile start and stop will behave as a joystick button with a press and release.  The delay between press and release is defined in options as the default auto-release delay, and defaults to 250 milliseconds.
+
 ### Mode selection
 
 When automatic profile load is enabled, GremlinEx has the option to override the default "startup" mode of a profile.  This is by default, the top level mode.  There are two options of interest:
@@ -148,6 +156,17 @@ When automatic profile load is enabled, GremlinEx has the option to override the
 - Activate the last mode used when the profile was last activated (this is the alternate mode).  If this is enabled, the default mode setting is ignored.  The first mode used will be the default mode if the mode has not been changed before.
 
 In addition to this, the profile itself provides actions that can switch modes.
+
+### Mode change event mappings
+
+The *Mode/Profile* device tab lets you define actions to occur when a mode is entered or exited.   This includes when the default mode is activated on profile start.
+
+There is one set of mappings possible for each defined mode.  
+
+Actions mapped to mode start and stop will behave as a joystick button with a press and release.  The delay between press and release is defined in options as the default auto-release delay, and defaults to 250 milliseconds.
+
+Note: if you delete a mode, any associated mappings linked to mode enter/exit will be deleted.
+
 
 ### Profile device substitution and input order
 
@@ -726,18 +745,22 @@ A typical OSC command will thus be /my_command_1, number  where number is:
 
 ## States
 
-Starting with 1.0ex m74, GremlinEx includes a state machine.  States can be used for multiple use-cases, such as latching, triggering the same mapping from multiple inputs, and performing simple logic without having to revert to a custom user plugin.
-
-A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](usage.md#map-to-state) action anywhere in the profile, via a [macro](#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
-
+Starting with 1.0ex m74, GremlinEx includes a state machine.  States are used in multiple use-cases to solve simple to complex mapping scenarios.  For example states can help with latching, triggering the same mapping from multiple inputs, and conditional mapping based on boolean logic on multiple states without having to revert to a custom user plugin.
 
 ### What is a state?
 
-A state is a virtual button with a unique name (not case sensitive).  States are stored in a profile and defined in the state device tab.  States can only have an on or off value.
+A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](usage.md#map-to-state) action anywhere in the profile, via a [macro](#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
 
-States are mode agnostic, meaning that states are available across modes so apply to the entire profile.
+Attributes of a state:
 
-States, like buttons, trigger whenever their value is changed.  A set (on) value will include a "press" action.  A clear (off) value will trigger a "release" action.
+- States are stored in a profile and specific to that profile.
+- States are defined in the state device tab.
+- States can only have an on or off value.
+- States have no mode.  Mappings attached to states scope to the entire profile regardless of the current execution mode.
+- States (like buttons) trigger whenever their value is changed.  A set (on) value will include a "press" action.  A clear (off) value will trigger a "release" action.
+- States can be defined using boolean expressions using other states.  If a state in the expression changes values, the expression is re-evaluated.
+
+Remember to save the profile if you have created states as they are only saved upon profile save.
 
 ### State mappings
 
@@ -746,6 +769,8 @@ Any action that can be mapped to a joystick button can be mapped to a state.  Li
 ### Default value
 
 When a state is defined, it can be given, at profile start, an or or off value.  When the profile starts, the state wil be initialized to this value.
+
+Note: As of m76T40, a state can also be set using the new profile start/stop mappings in the Mode/Profile device via the *map to state* actions.
 
 ### Setting a state
 
@@ -990,9 +1015,9 @@ Modes can be added or deleted.  Deletions can cause a loss of data as mappings a
 
 The last mode cannot be deleted.  A profile must have at least one mode defined.
 
-#### Mode device
+#### Mode/Profile device
 
-A special mode device, appearing as the "Mode" tab defines a pair of virtual buttons triggered by GremlinEx on mode change.
+A special mode device, appearing as the *Mode/Profile* tab defines a pair of virtual buttons triggered by GremlinEx on mode change.
 
 One triggers when the mode is entered.  The other triggers when the mode is exited (meaning, the before the new mode that was selected is activated).
 

@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T40)
+- Improved: UI interactions related to state editing / state category editing
+- New: confirm prompts on delete actions for key, OSC, MIDI and state inputs.
+- API: new internal master mode for profile wide mapping operations (used for profile start/stop and state operations).  This mode is internal only.
+- Profile V10 to V11 conversion (for any profiles that added start/stop mappings in T39)
+
 ### (m76T39A)
 - Improved: UI interactions related to state editing / state category editing
 - New:  OSC: added default pad option in OSC options.  This will add a default argument of 1.0 to a command with no arguments as some target platforms like Bitfocus' OSC module requires an argument even if no arguments are expected. The option is enabled by default.  The option can be turned off, in which case arguments will need to be manually specified in map to Osc / Ex.  

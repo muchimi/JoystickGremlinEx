@@ -854,7 +854,13 @@ class Device:
 
     @property
     def device_type(self) -> DeviceType:
-        return self.type        
+        return self.type 
+
+    def get_mode_object(self, mode_name):
+        ''' gets the mode object for the given mode'''
+        if mode_name in self.modes:
+            return self.modes[mode_name]       
+        return None
 
     def ensure_mode_exists(self, mode_name, device : dinput.DeviceSummary =None, is_system = False) -> Mode:
         """Ensures that a specified mode exists, creating it if needed.
@@ -1598,7 +1604,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         super().__init__()
 
-        assert parent is not None, "InputItem must have a parent mode owner" # must provide a mode owner
+        assert isinstance(parent, gremlin.base_profile.Mode), "Parent parameter must be a mode object"
+
         
         self.parent = parent # mode object
         self._input_type = None
@@ -2016,20 +2023,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         :param node XML node to parse
         """
 
-        assert data is not None, "InputItem must be provided"
+        #assert data is not None, "InputItem must be provided"
 
         container_node = node # node that holds the container information
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
-
-        # parent = node.getparent()
-        # while parent is not None and parent.tag != "mode":
-        #     parent = parent.getparent()
-        #if parent is not None:
-            #profile_mode = safe_read(parent,"name",str, "")
-            # self.profile_mode = profile_mode
-
 
         if not skip_root: # skip header processing if set
 
