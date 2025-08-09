@@ -2701,10 +2701,19 @@ class Profile():
         return mode_list
     
     def _ensure_mode_tree(self):
+        
         if not self._mode_tree:
             self._mode_tree = ModeNode()
+        
+            # add default mode
             default_mode = ModeNode("Default")
             default_mode.parent = self._mode_tree
+
+            # add master mode
+            master_mode_name = gremlin.shared_state.master_mode
+            master_mode = ModeNode(master_mode_name)
+            master_mode.parent = self._mode_tree
+
     
     def dumpModeTree(self):
         ''' dumps the current mode tree '''
@@ -3386,8 +3395,9 @@ class Profile():
         # extract the mode list
         mode_node_map = {}
         nodes = {}
-        mode_tree = ModeNode("")
-        nodes[""] = mode_tree
+        mode_root = ModeNode("")  # root mode
+        nodes[""] = mode_root
+        master_mode_name = gremlin.shared_state.master_mode
         mode_nodes = root.xpath("//device//mode")
         for mode_node in mode_nodes:
             mode = mode_node.get("name")
@@ -3400,7 +3410,7 @@ class Profile():
                     tree_parent_mode = ModeNode(parent_mode)
                     nodes[parent_mode] = tree_parent_mode
                     mode_node_map[parent_mode] = tree_parent_mode
-                    tree_parent_mode.parent = mode_tree
+                    tree_parent_mode.parent = mode_root
             else:
                 parent_mode = None
 
@@ -3414,7 +3424,15 @@ class Profile():
                     continue
             
                 # no parent - parent to root
-                tree_node.parent = mode_tree
+                tree_node.parent = mode_root
+
+        if not master_mode_name in mode_node_map:
+            # add new master mode for old profiles for manual edits in case the converter didn't catch it
+            master_mode = ModeNode(master_mode_name)
+            master_mode.parent = mode_root
+            mode_node_map[master_mode_name] = mode_root
+            nodes[master_mode_name] = master_mode
+
 
         mode_list = list(mode_node_map.keys())
 

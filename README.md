@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T40/A/B)
+- Fix: state clear button only deletes filtered states
+- Fix: master mode not added to older profiles in all situations
+- Fix: master mode not added to new profiles
+
 ### (m76T40)
 - Improved: UI interactions related to state editing / state category editing
 - New: confirm prompts on delete actions for key, OSC, MIDI and state inputs.

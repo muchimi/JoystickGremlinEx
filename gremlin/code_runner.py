@@ -254,6 +254,9 @@ class CodeRunner:
             # Update system path list searched by Python
             sys.path = system_paths
 
+            # master mode name
+            master_mode = gremlin.shared_state.master_mode
+
             # Create callbacks fom the user code
             callback_count = 0
             for dev_id, modes in gremlin.input_devices.callback_registry.registry.items():
@@ -284,10 +287,14 @@ class CodeRunner:
             # reset functor latching
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
             container_plugins.reset_functors()
+            
 
             mode_source = gremlin.shared_state.current_profile.traverse_mode()
             mode_source.sort(key = lambda x: x[0]) # sort parent to child
             mode_list = [mode for (_,mode) in mode_source] # parent mode first
+
+            assert master_mode in mode_list, "master mode missing"
+
 
             # ensure all profile modes are in the execution graph if they are defined - this is so we can search them
             mode_nodes = {}
@@ -297,13 +304,17 @@ class CodeRunner:
                 mode_nodes[mode] = mode_node
 
             # Create input callbacks based on the profile's content
-
+            
             verbose = gremlin.config.Configuration().verbose_mode_exec
             for device in profile.devices.values():
                 if verbose:
                     device_name = gremlin.joystick_handling.device_name_from_guid(device.device_guid)
                     syslog.info(f"CALLBACK: device: {device_name}")
+                
                 for mode in device.modes.values():
+                    if not mode.name in mode_nodes:
+                        # special mode or mode not present in profile
+                        continue
                     mode_node = mode_nodes[mode.name]
                     for input_items in mode.config.values():
                         for input_item in input_items.values():
