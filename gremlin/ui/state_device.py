@@ -2201,18 +2201,12 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         import gremlin.ui.ui_common as ui_common
         import gremlin.ui.input_item as input_item
 
-
         # Store parameters
         self.device_profile = device_profile
         self.widget_storage = {}
-   
-
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
-        
-
-
 
         config = gremlin.config.Configuration()
 
@@ -2240,15 +2234,16 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._filter = gremlin.util.decorate_filter(config.state_filter)
         self._category_filter = config.state_category_filter
+        device_data = device_profile.devices[self.device_guid]
 
         # data model
         self.input_item_list_model = input_item.InputItemListModel(
-            device_profile,
+            device_data,
             current_mode,
             [InputType.State], # only allow Mode inputs for this widget,
             custom_update_handler= self._update_handler,
             custom_remove_handler = self._remove_handler,
-            custom_clear_handler = self._clear_handler,
+            #custom_clear_handler = self._clear_handler,
             custom_filter_handler = self._filter_data
         )        
 
@@ -2487,7 +2482,11 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _clear_inputs_cb(self):
         ''' clears all input keys '''
-        self.input_item_list_model.clear(input_types=[InputType.State])
+        sd = StateData()
+        sd.clear()
+        profile = gremlin.shared_state.current_profile
+        profile.state.clear()
+        self.input_item_list_model.reset()
         self.input_item_list_view.redraw()
 
         el = gremlin.event_handler.EventListener()
@@ -2552,15 +2551,11 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._update_handler(model, emit_change)
             
 
-    def _clear_handler(self, model, emit_change = True):
-        ''' clears all state data '''
-        model._index_map = {}
-        model._item_map = {}
-        model.data_changed.emit()
-        sd = StateData()
-        sd.clear()
-        if emit_change:
-            model.data_changed.emit()
+    # def _clear_handler(self, model, emit_change = True):
+    #     ''' clears all state data '''
+    #     sd = StateData()
+    #     sd.clear()
+        
 
     
     def itemAt(self, index):

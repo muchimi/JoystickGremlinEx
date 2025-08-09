@@ -142,6 +142,13 @@ def  is_hardware_device(device_guid) -> bool:
             # assume disconnected
             return True
     return False
+
+def is_vjoy_device(device_guid) -> bool:
+    ''' true if the device is a vjoy device '''
+    info = device_info_from_guid(device_guid)
+    if info:
+        return info.is_virtual
+    return False
     
 
 def vjoy_devices(connected_only = True): # -> list[DeviceSummary]:

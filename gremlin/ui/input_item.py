@@ -161,6 +161,7 @@ class InputItemListModel(ui_common.AbstractModel):
         self._show_master_mode = show_master_mode
         self._index_map = {} # map of index to input item
         self._item_map = {} # map of input_id to index
+        self._source_index_map = {} # map of source states
         if allowed_types is not None:
             self._allowed_input_types  = gremlin.base_classes.TraceableList(allowed_types, self._filter_change_cb)
         else:
@@ -517,7 +518,13 @@ class InputItemListModel(ui_common.AbstractModel):
                 if input_type in input_items.config:
                     input_items.config[input_type] = {}
 
-        self._index_map = {}
+        self.reset()
+
+    def reset(self):
+        ''' clears all data '''
+        self._index_map = {} # map of filtered index to input item
+        self._item_map = {} # map of filtered input_id to index
+        self._source_index_map = {} # map of source data 
         
 
 

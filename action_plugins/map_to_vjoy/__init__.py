@@ -4842,20 +4842,22 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             for data in self._merge_data:
                 merge_device_id = data.device_id
                 merge_input_id = data.input_id
+                merge_input_type = InputType.JoystickAxis
                 if not merge_device_id or merge_input_id is None:
                     # no data
                     continue
                 merge_device_guid = data.device_guid
-                
 
                 v2 = None
 
                 if gremlin.joystick_handling.is_hardware_device(merge_device_guid):
                     v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+                elif gremlin.joystick_handling.is_vjoy_device(merge_device_guid):
+                    v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
                 else:
                     # find the merged device
                     ec = gremlin.execution_graph.ExecutionContext()
-                    input_item = ec.findInputItem(merge_device_guid, merge_input_id)
+                    input_item = ec.findInputItem(merge_device_guid, merge_input_type, merge_input_id, gremlin.shared_state.current_mode)
                     if input_item:
                         v2 = input_item.axis_value
 
