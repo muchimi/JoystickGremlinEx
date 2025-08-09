@@ -4002,19 +4002,26 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # get list of curves that applies to this input
                 curves = self.getCurveData(event, action_value)
 
+                if event.curve_value is not None:
+                    value = event.curve_value
+                else:
+                    value = action_value.current
+
                 # this handles axis merging and applies any curves and axis inversion
-                value = self.action_data.get_filtered_axis_value(action_value.current, curves = curves)
+                filtered_value = self.action_data.get_filtered_axis_value(value, curves = curves)
+                if filtered_value is None:
+                    filtered_value = value
 
-                value = self.action_data.get_ranged_axis_value(value)
+                ranged_value = self.action_data.get_ranged_axis_value(filtered_value)
 
-                if value is None:
-                    value = event.value
+                if ranged_value is None:
+                    value = filtered_value
 
                 # # syslog = logging.getLogger("system")
                 # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
 
-            action_value = gremlin.actions.Value(value = value, raw = event.raw_value, is_pressed = event.is_pressed)
-            event.curve_value = value
+            action_value = gremlin.actions.Value(value = ranged_value, raw = event.raw_value, is_pressed = event.is_pressed)
+            event.curve_value = ranged_value
 
         return self._process_event(event, action_value, extra_data)
 
@@ -4044,12 +4051,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             if verbose: syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current}  Event raw: {event.raw_value}  value: {event.value} curve: {event.curve_value}")
 
-            # read the valuy from the extra data if set
+            # read the value from the extra data if set
             if extra_data is not None and "value" in extra_data:
                 value = extra_data["value"]
             else:
                 # use curve value if any
-                #value = self.action_data.get_filtered_axis_value() # event.curve_value
                 value = event.curve_value
                 if value is None:
                     # use regular value if any
@@ -4787,7 +4793,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         verbose_details = gremlin.config.Configuration().verbose_mode_inputs_extra
         # verbose_details = True
 
-        axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+        if value is not None:
+            axis_value = value
+        else:
+            axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
 
         if axis_value is None:
             # not an axis type 

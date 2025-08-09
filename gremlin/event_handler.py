@@ -119,7 +119,7 @@ class Event:
 		#self._value = value
 		self.value = value
 		self.raw_value = raw_value
-		self.curve_value = curved_value
+		self._curve_value = curved_value
 		self.force_remote = force_remote
 		self.action_id = action_id # the current action id to load
 		self.data = data # extra data passed along with the event
@@ -142,6 +142,13 @@ class Event:
 		if not value and self.event_type == InputType.JoystickHat:
 			pass
 		self._is_pressed = value
+
+	@property
+	def curve_value(self) -> float:
+		return self._curve_value
+	@curve_value.setter
+	def curve_value(self, value : float):
+		self._curve_value = value
 
 
 	def clone(self):

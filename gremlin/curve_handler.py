@@ -1593,6 +1593,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
     def _update_value_ui(self, value):
         ''' updates dot on the curve based on the value -1 to +1 - runs on UI thread '''
+        if not Shiboken.isValid(self):
+            return
         value = gremlin.util.clamp(value)
         # if value < -1 or value > 1:
         #     syslog = logging.getLogger("system")
@@ -1750,7 +1752,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.control_point_editor.setContentsMargins(0,0,0,0)
         self.container_control_layout.addWidget(self.control_point_editor)        
 
-        width = gremlin.ui.common.get_text_width("M") * 8
+        width = gremlin.ui.ui_common.get_text_width("M") * 8
 
         self.input_raw_widget = QtWidgets.QLineEdit()
         self.input_raw_widget.setMaximumWidth(width)

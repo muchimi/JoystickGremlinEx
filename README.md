@@ -14,12 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T40/A/B/C)
+### (m76T40 patch)
 - Fix: state clear button only deletes filtered states (A)
 - Fix: master mode not added to older profiles in all situations (B)
 - Fix: master mode not added on "new profile" (B)
-- Fix: conversion of profile v10 to v11 node parenting in some setups
-- Fix: exception on 
+- Fix: conversion of profile v10 to v11 node parenting in some setups (C)
+- Fix: exception on response curve widget (D)
+- Fix: curve value modified by separate response curve unused in vjoy remap (D)
 
 ### (m76T40)
 - Improved: UI interactions related to state editing / state category editing
