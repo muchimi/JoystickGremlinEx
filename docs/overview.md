@@ -4,15 +4,55 @@ GremlinEx is a universal controller integrator: it allows you to take input from
 
 ## What can GremlinEx do?
 
-GremlinEx can take inputs from any hardware device visible to windows that reports in as a controller (so a device with buttons, hats or axes) and map that to an output.
+### Joystick and game controller integrator
+
+GremlinEx can take inputs from any HID game device and map this input to a virtual joystick (Vjoy), virtual gamepad (Vigem), or keyboard/mouse and OSC output.
+
+### Supports the OSC (Open Sound Control) protocol and Bitfocus Companion for Streamdeck and other OSC compatible control hardware or software
+
+GremlinEx can accept and send OSC messages over the network (and in local bridge mode).  This allows GremlinEx profiles to accept input from any OSC compatible device, such as a glass surface, Elgato Streamdeck or Loupdeck hardware and any controller that supports OSC.  GremlinEx can also send commands to these devices to control, for example, displays on both glass surfaces and Streamdeck/Loupdeck integrated via Bitfocus Companion.
+
+### Supports glass control surfaces (touch screen input) from network devices including tablets and mobile devices
+
+GremlinEx supports, via OSC, input from glass surface control applications like Open Stage Control (open source), Touch/OSC (payware) and OSC/Pilot (payware).
+
+### Supports MIDI inputs
+
+GremlinEx can accept input from a MIDI controller.  These controllers like the Korg Mini include buttons and faders that can be used to map to a game.
+
+### State machine
+
+GremlinEx implements a state machine, or binary inputs that also support boolean expressions.  A state can be set or cleared, and a state can be defined using other states.  States can execute actions when the value of the state changes, allowing for interesting simple grammar based control schemes, such as conditions and compound mappings.  States generally simplify complex mapping scenarios.
+
+### Hierarchical Modes
+
+GremlinEx supports profile modes.  A mode is a mapping template, and modes can be nested.  Parent mode mappings are used if the child mode does not override the mapping definition.  Modes can be changed on the fly by inputs.
+
+Actions can be triggered on mode change, either entry or exit or both.
+
+### Remote control
+
+GremlinEx can send mappings to remote instances of GremlinEx running on the local network.
+
+### Support for conditions
+
+Conditions can be applied to filter output based on state and input button/axis values.
+
+### Support of complex latching of keyboard triggers
+
+GremlinEx can trigger on multiple key combinations, including unusual ones.  Any key and mouse input can be used in the latching trigger.
+
+### Rich set of mapping actions and containers
+
+GremlinEx has a rich set of mapping actions aimed at simulation and game output.  GremlinEx can for example output unusual keys such as F13 to F24 and media keys.  GremlinEx can merge multiple input axis values from multiple inputs to derive a single axis value, or supports breaking up input axis with stepped and gated triggers on specific points or ranges.   Containers group mappings for additional functionality.  GremlinEx supports macros.
 
 For example, a button can be used to trigger a complex macro, set a value on a joystick, say something with Text To Speech (TTS), change a profile mode, or sends keystrokes to an application.
 
 An axis can map to an axis, or can be setup to trigger specific actions based on the position of the axis and the direction of travel.
 
-GremlinEx can also listen for OSC or MIDI button or axis messages from the network and trigger actions based on that input.  This is helpful when using a glass control surface that sends messages to GremlinEx.  GremlinEx translates these messages to game outputs.
+### Custom plugins (advanced)
 
-GremlinEx also maintains a state machine and states can be defined and set by other inputs.  States can also be set from other states.
+GremlinEx exposes much of its internal API to custom Python based modules that can be attached to profiles.  These plugins provide complete custom control of mappings and output using the full Python language.
 
 ## User Interface Overview
 

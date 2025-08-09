@@ -1273,6 +1273,8 @@ class AbstractContainerAction(AbstractAction):
 
         assert current is not None,"Profile nesting error: unable to find InputItem"
 
+        mode_object = get_mode_object(node)
+
 
         for child in container_nodes:
 
@@ -1280,7 +1282,7 @@ class AbstractContainerAction(AbstractAction):
 
             # setup a new input item for these containers and read from config the defined containers
             
-            input_item = InputItem(parent = self)
+            input_item = InputItem(parent = mode_object)
             input_item._input_type = current._input_type
             input_item._device_guid = current._device_guid
             input_item._input_id = current._input_id
@@ -1597,7 +1599,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """Creates a new InputItem instance.
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
         :param custom_mode_name_handler: handler() returns a string, optional, to override the default mode for special inputs that use special modes
-        :param parent: the parent mode of this input item
+        :param parent: the parent mode object of this input item
         """
         # self._id = gremlin.util.get_guid() # unique ID of this object
         # self._guid = gremlin.util.parse_guid(self._id)

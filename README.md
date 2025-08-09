@@ -14,10 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T40/A/B)
-- Fix: state clear button only deletes filtered states
-- Fix: master mode not added to older profiles in all situations
-- Fix: master mode not added to new profiles
+### (m76T40/A/B/C)
+- Fix: state clear button only deletes filtered states (A)
+- Fix: master mode not added to older profiles in all situations (B)
+- Fix: master mode not added on "new profile" (B)
+- Fix: conversion of profile v10 to v11 node parenting in some setups
+- Fix: exception on 
 
 ### (m76T40)
 - Improved: UI interactions related to state editing / state category editing

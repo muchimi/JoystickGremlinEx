@@ -828,7 +828,7 @@ class ProfileConverter:
             if nodes:
                 master_node = nodes[0]
                 # remove any empty profile start/stop nodes
-                nodes = master_node.xpath("//modecontrol[not(*) and (@id='5' or @id='6')]")
+                nodes = master_node.xpath("modecontrol[not(*) and (@id='5' or @id='6')]")
                 for node in nodes:
                     master_node.remove(node)
             else:
