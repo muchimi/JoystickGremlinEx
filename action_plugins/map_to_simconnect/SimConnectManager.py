@@ -450,7 +450,7 @@ class SimConnectManager(QtCore.QObject):
     sim_aircraft_changed = Signal(str) # fires when the aircraft title changes
     sim_aircraft_loaded = Signal(str, str, str) # fires when aircraft title changes (folder, name, title)
     _aircraft_loaded_internal = Signal(str, str) # fires when aircraft (folder, name)
-    
+    sim_aircraft_info_changed = Signal() # fires when aircraft info changes
 
     def __init__(self) -> None:
         ''' manages simconnect connections and interactions 
@@ -500,6 +500,7 @@ class SimConnectManager(QtCore.QObject):
         handler.simconnect_sim_start.connect(self._start_cb)
         handler.simconnect_sim_stop.connect(self._stop_cb)
         handler.status_callback_clicked.connect(self._status_callback_cb) # called when status is clicked on the UI
+
         
         
 
@@ -513,6 +514,10 @@ class SimConnectManager(QtCore.QObject):
 
         self._aircraft_title = None # current title from aircraft.cfg
         self._aircraft_name = None # current name from aicraft cfg path
+        self._aircraft_atc_id = None # ATC registration for the aircraft
+        self._aircraft_atc_model = None # ATC model for the aircraft
+        self._aircraft_atc_type = None # ATC type for the aircraft
+
         self._simvars_xml =  os.path.join(gremlin.shared_state.data_path, "simconnect_simvars.xml")
         self._ensure_simvar_xml() # make srue the simvars file exists
 
@@ -537,7 +542,11 @@ class SimConnectManager(QtCore.QObject):
         self._registered_feed_blocks = {}
         self._registered_requests = {}
         self._registered_events = {}
-        self._ar_aircraft_title = None
+        
+        self._reset_aircraft()
+        
+        self.sim_aircraft_info_changed.connect(self._dump_current_aircraft)
+        
 
         # load simconnect data
         self.reload()
@@ -545,7 +554,19 @@ class SimConnectManager(QtCore.QObject):
         # load internal commands
         self.load_internal()
 
-    
+    def _reset_aircraft(self):
+        self._ar_aircraft_title = None
+        self._ar_aircraft_atc_id = None
+        self._ar_aircraft_atc_model = None
+        self._ar_aircraft_atc_type = None
+
+
+    @property
+    def aircraft_title(self) -> str:
+        return self._aircraft_title
+    @property
+    def aircraft_model(self) -> str:
+        return self._aircraft_atc_model
 
     def registerAircraftChangeCallback(self, callback):
         if not callback in self._aircraft_change_callbacks:
@@ -588,14 +609,19 @@ class SimConnectManager(QtCore.QObject):
     def _profile_start(self):
         ''' occurs on profile start '''
 
+        # reset loaded aircraft data
+        self._reset_aircraft()
+        
         enabled = gremlin.shared_state.getSimConnectEnabled()
         if not enabled:
             # simconnect is not enabled
             syslog.info("SIMCONNECT: not enabled (no mappings found)")
             return False
-        
+                
         self._request_abort = False
         self.activate()
+
+
 
         
     def process_running(self) -> bool:
@@ -633,6 +659,7 @@ class SimConnectManager(QtCore.QObject):
             self._bridge_alive = False
             self.sim_disconnect()
             self._request_abort = True
+
 
 
     def start_bridge(self):
@@ -1032,13 +1059,57 @@ class SimConnectManager(QtCore.QObject):
         if not self._ar_aircraft_title:
             self._ar_aircraft_title = self._get_aicraft_title_request(self._aircraft_title_changed)
         self._ar_aircraft_title.trigger()
+
+    def request_aircraft_atc_id(self):
+        ''' get the ATC ID for the loaded aircraft '''
+        if self.verbose: syslog.info("SIMCONNECT: request aircraft ATC ID")
+        if not self._ar_aircraft_atc_id:
+            self._ar_aircraft_atc_id = self._get_aicraft_atc_id_request(self._aircraft_atc_id_changed)
+        self._ar_aircraft_atc_id.trigger()
+
+    def request_aircraft_atc_model(self):
+        ''' get the ATC model for the loaded aircraft '''
+        if self.verbose: syslog.info("SIMCONNECT: request aircraft ATC ID")
+        if not self._ar_aircraft_atc_model:
+            self._ar_aircraft_atc_model = self._get_aicraft_atc_model_request(self._aircraft_atc_model_changed)
+        self._ar_aircraft_atc_model.trigger()
+
+    def request_aircraft_atc_type(self):
+        ''' get the ATC model for the loaded aircraft '''
+        if self.verbose: syslog.info("SIMCONNECT: request aircraft ATC ID")
+        if not self._ar_aircraft_atc_type:
+            self._ar_aircraft_atc_type = self._get_aicraft_atc_type_request(self._aircraft_atc_type_changed)
+        self._ar_aircraft_atc_type.trigger()        
         
     def _aircraft_title_changed(self, request : Request):
         title = request.buffer
-        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft title: {title if title else '[FAILED]'}")
+        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft title: {title.decode() if title else '[FAILED]'}")
         if title:
             self._aircraft_title = title.decode()
             self.sim_aircraft_changed.emit(self._aircraft_title)
+            self.sim_aircraft_info_changed.emit()
+
+    def _aircraft_atc_id_changed(self, request : Request):
+        data = request.buffer
+        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft atc id: {data.decode() if data else '[FAILED]'}")
+        if data:
+            self._aircraft_atc_id = data.decode()
+            self.sim_aircraft_info_changed.emit()
+
+    def _aircraft_atc_model_changed(self, request : Request):
+        data = request.buffer
+        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft atc model: {data.decode() if data else '[FAILED]'}")
+        if data:
+            self._aircraft_atc_model = data.decode()            
+            self.sim_aircraft_info_changed.emit()
+
+    def _aircraft_atc_type_changed(self, request : Request):
+        data = request.buffer
+        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft atc type: {data.decode() if data else '[FAILED]'}")
+        if data:
+            self._aircraft_atc_type = data.decode()         
+            self.sim_aircraft_info_changed.emit()  
+
 
     # def get_aircraft_title(self, force_update = False):
     #     if not self._aircraft_title or force_update:
@@ -1063,6 +1134,9 @@ class SimConnectManager(QtCore.QObject):
             if self._sm.ok:
                 #self._sm.requestAircraftLoaded()
                 self.request_aircraft_title()
+                #self.request_aircraft_atc_id()
+                #self.request_aircraft_atc_model()
+                #self.request_aircraft_atc_type()
         except:
             pass
 
@@ -1082,9 +1156,15 @@ class SimConnectManager(QtCore.QObject):
         # decode the data into useful bits
         # syslog = logging.getLogger("system")
         title = self.request_aircraft_title()
+        # atc_id = self.request_aircraft_atc_id()
+        # atc_model = self.request_aircraft_atc_model()
+        # atc_type =  self.request_aircraft_atc_type()
         self._aircraft_title = title
         self._aircraft_folder = folder
         self._aircraft_name = name
+        # self._aircraft_atc_id = atc_id
+        # self._aircraft_atc_model = atc_model
+        # self._aircraft_atc_type = atc_type
         self._dump_current_aircraft()
         self.sim_aircraft_loaded.emit(folder, name, title)
         self._run_loaded_callbacks(folder,name,title)
@@ -1101,7 +1181,7 @@ class SimConnectManager(QtCore.QObject):
     def _dump_current_aircraft(self):
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         if verbose:
-            syslog.info(f"SIMCONNECT: current aircraft: folder: [{self._aircraft_folder}] name: [{self._aircraft_name}] title: [{self._aircraft_title}]")
+            syslog.info(f"SIMCONNECT: aircraft info changed: folder: [{self._aircraft_folder}] name: [{self._aircraft_name}] title: [{self._aircraft_title}]") # atc id: [{self._aircraft_atc_id}] atc model: [{self._aircraft_atc_model}] type: [{self._aircraft_atc_type}]")
 
     def reset(self):
         ''' resets the connection '''
@@ -1227,6 +1307,7 @@ class SimConnectManager(QtCore.QObject):
             for request in self._registered_requests.values():
                 self._sm.clear(request)
             self._sm.unload()
+        self._sm.disconnect()
 
     @property
     def valid(self):
@@ -1301,7 +1382,24 @@ class SimConnectManager(QtCore.QObject):
         request = self.registerRequest("title","string", False, callback=callback)
         return request
     
+    def _get_aicraft_atc_id_request(self, callback = None):
+        ''' gets the aircraft ATC ID'''
+        
+        request = self.registerRequest("ATC ID","string", False, callback=callback)
+        return request
     
+    
+    def _get_aicraft_atc_model_request(self, callback = None):
+        ''' gets the aircraft ATC model'''
+        
+        request = self.registerRequest("ATC MODEL","string", False, callback=callback)
+        return request
+    
+    def _get_aicraft_atc_type_request(self, callback = None):
+        ''' gets the aircraft ATC type '''
+        
+        request = self.registerRequest("ATC TYPE","string", False, callback=callback)
+        return request
 
     def save_flight(self, the_path : str, title : str = "", description : str = ""):
         ''' requests to save the flight data '''

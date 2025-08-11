@@ -2979,20 +2979,9 @@ The setting can be overriden by the global mode reload option set in Options for
 
 
     def _delete_mode(self, mode_name):
-        message_box = QtWidgets.QMessageBox()
-        message_box.setText("Delete confirmation")
-        message_box.setInformativeText(f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?")
-        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
-        # pixmap = load_pixmap("warning.svg")
-        # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-        message_box.setIconPixmap(pixmap)
-        message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok |
-            QtWidgets.QMessageBox.StandardButton.Cancel
-            )
-        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-        gremlin.util.centerDialog(message_box)
-        result = message_box.exec()
+        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?")
+        msgbox.show()
+        result = msgbox.show()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self._delete_mode_confirm(mode_name)
 

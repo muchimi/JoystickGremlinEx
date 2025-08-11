@@ -1193,8 +1193,8 @@ class GateEventHandler(QtCore.QObject):
             del self._joystick_event_callbacks[key]
             if verbose: 
                 syslog.info(f"GATE: unregister callback for action [{key}] callback count: {len(self._joystick_event_callbacks)}")
-        else:
-            syslog.warning(f"GATE: unregister callback for action [{key}]: key not registered.")
+        # else:
+        #     syslog.warning(f"GATE: unregister callback for action [{key}]: key not registered.")
         
 
     def registerValueChangedCallback(self, key, callback):

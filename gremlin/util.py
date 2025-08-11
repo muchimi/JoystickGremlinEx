@@ -1966,12 +1966,19 @@ def to_byte_string(source) -> tuple:
     return (source, source.encode('utf-8'))
     
 
+def _singleshot(callback):
+    ''' runs on Ui thread - waits for items to be processed '''
+    QtWidgets.QApplication.processEvents()
+    callback()
+
+def _get_singleshot_callback(callback):
+    return lambda : _singleshot(callback)
+
 def singleShot(callback):
     ''' fires callback in a thread - returns immediately to caller '''
-    thread = threading.Thread(target = callback)
-    thread.name = "SingleShot"
-    thread.start()
-
+    timer = threading.Timer(0, lambda: InvokeUiMethod(_get_singleshot_callback(callback)))
+    timer.start()
+    
 def cubic_progression(num_points, start, end):
     ''' computes a cubic progression between two numbers'''
     progression = []

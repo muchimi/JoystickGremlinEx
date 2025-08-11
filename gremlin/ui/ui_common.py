@@ -589,7 +589,12 @@ class Icons():
     @staticmethod
     def findIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
         return Icons._icon("ei.search", qta_color)
-        #return Icons._icon("fa6s.magnifying-glass", qta_color)
+    @staticmethod
+    def sortUpIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("mdi.sort-ascending", qta_color)
+    @staticmethod
+    def sortDownIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("mdi.sort-descending", qta_color)
     @staticmethod
     def questionIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
         return Icons._icon("fa5s.question-circle", qta_color)
@@ -741,6 +746,14 @@ class Buttons():
     def getCancelWidget(label = "Cancel", tooltip = "Cancel", callback = None, no_keyboard = True, data = None):
         return Buttons._template(label, None, tooltip, callback, no_keyboard, data)
     
+    @staticmethod
+    def getSortUpWidget(label = None, tooltip = "Sort up", callback = None, no_keyboard = True, data = None):
+        icon = Icons.sortUpIcon()
+        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+    @staticmethod
+    def getSortDownWidget(label = None, tooltip = "Sort Down", callback = None, no_keyboard = True, data = None):
+        icon = Icons.sortDownIcon()
+        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
         
 
     @staticmethod
@@ -2555,6 +2568,82 @@ def get_mode_list(profile_data):
     return mode_list
 
 
+class ModeSelectorWidget(QtWidgets.QWidget):
+    ''' displays a mode selector drop down for the current profile modes '''
+
+    modeChanged = Signal(str) # occurs whena mode is selected
+    
+    def __init__(self, 
+                 parent=None):
+        super().__init__(parent)
+
+
+        self._selector_widget = QtWidgets.QComboBox()
+        self._selector_widget.currentIndexChanged.connect(self._handle_mode_changed)
+
+        widgets = [self._selector_widget]
+        widget, layout = getHContainer(widgets,"Mode:")
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.addWidget(widget)
+
+        self._refresh_modes()
+
+    def _handle_mode_changed(self):
+        mode = self._selector_widget.currentData()
+        self.modeChanged.emit(mode)
+
+    def setMode(self, mode : str) -> bool:
+        ''' selects a mode, mode must exist, true if selected '''
+        index = self._selector_widget.findData(mode)
+        if index != -1:
+            self._selector_widget.setCurrentIndex(index)
+            return True
+        return False
+
+    def mode(self) -> str:
+        ''' gets the selected mode'''
+        return self._selector_widget.currentData()
+    
+    def refresh(self, mode_to_select : str = None):
+        ''' refresh '''
+        gremlin.util.InvokeUiMethod(self._refresh_modes(mode_to_select))
+        
+
+    def _refresh_modes(self, mode_to_select : str = None):
+       
+        profile = gremlin.shared_state.current_profile
+
+        with QtCore.QSignalBlocker(self._selector_widget):
+            #modes = gremlin.shared_state.current_profile.get_modes()
+            while self._selector_widget.count() > 0:
+                    self._selector_widget.removeItem(0)
+
+            mode_list_pairs = get_mode_list(profile)
+            self.mode_list = [x[1] for x in mode_list_pairs]
+            
+            # Add properly arranged mode names to the drop down list
+            index = 0
+            select_index = None
+
+            master_mode = gremlin.shared_state.master_mode
+            for display_name, mode_name in mode_list_pairs:
+                if mode_name == master_mode:
+                    continue
+                self._selector_widget.addItem(display_name, mode_name)
+                # self.mode_list.append(mode_name)
+                if mode_to_select and select_index is None and mode_to_select == mode_name:
+                    select_index = index
+                index += 1
+
+            if select_index is None:
+                # select the default mode
+                default_mode = gremlin.shared_state.current_profile.get_default_mode()
+                index = self._selector_widget.findData(default_mode)
+                if index != -1:
+                    self._selector_widget.setCurrentIndex(index)
+
+
 
 class ModeWidget(QtWidgets.QWidget):
 
@@ -2564,7 +2653,10 @@ class ModeWidget(QtWidgets.QWidget):
     edit_mode_changed = QtCore.Signal(str) # when the edit mode changes
 
 
-    def __init__(self, parent=None):
+    def __init__(self, 
+                 label = "Profile Edit Mode",
+                 tooltip = "Selects the active profile mode being edited",
+                 parent=None):
         """Creates a new instance.
 
         :param parent the parent widget
@@ -2574,6 +2666,8 @@ class ModeWidget(QtWidgets.QWidget):
         self.mode_list = []
 
         self.profile = None
+        self._label = label
+        self._tooltip = tooltip
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self._create_widget()
 
@@ -2712,12 +2806,12 @@ class ModeWidget(QtWidgets.QWidget):
 
 
         # Create mode selector and related widgets
-        self.edit_label = QtWidgets.QLabel("Profile Edit Mode")
+        self.edit_label = QtWidgets.QLabel(self._label)
         self.edit_label.setSizePolicy(min_min_sp)
         self.edit_mode_selector = QComboBox()
         self.edit_mode_selector.setSizePolicy(exp_min_sp)
         self.edit_mode_selector.setMinimumContentsLength(20)
-        self.edit_mode_selector.setToolTip("Selects the active profile mode being edited")
+        self.edit_mode_selector.setToolTip(self._tooltip)
 
 
         # add the mode change button
@@ -2764,9 +2858,13 @@ class ModeWidget(QtWidgets.QWidget):
         ''' current selector index '''
         return self.edit_mode_selector.currentIndex()
 
-    def currentMode(self) -> str:
-        ''' gets the current mode '''
+    def currentMode(self):
+        ''' gets the current mode object '''
         return self.edit_mode_selector.currentData()
+    
+    def currentModeName(self) -> str:
+        ''' gets the current mode name '''
+        return self.edit_mode_selector.currentText()
 
 
     def setCurrentIndex(self, index):
@@ -8100,6 +8198,7 @@ def synchronize_grids(grid_widget_list : list, fill_buttons = True):
     g: QtWidgets.QGridLayout
     max_cols = 0
     layouts = [g.layout() for g in grid_widget_list]
+    layouts = [l for l in layouts if isinstance(l, QtWidgets.QGridLayout)]
     max_cols = max(g.columnCount() for g in layouts)
     
     for col in range(max_cols):

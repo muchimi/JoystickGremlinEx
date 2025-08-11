@@ -4922,6 +4922,7 @@ if __name__ == "__main__":
             e.value,
             QtWidgets.QMessageBox.Ok
         )
+        error_display.move
         error_display.show()
 
 

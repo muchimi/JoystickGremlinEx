@@ -145,6 +145,7 @@ class Event:
 
 	@property
 	def curve_value(self) -> float:
+		''' curve value is the modified event value passed to actions as filtered or curved'''
 		return self._curve_value
 	@curve_value.setter
 	def curve_value(self, value : float):

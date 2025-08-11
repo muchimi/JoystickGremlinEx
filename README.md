@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T41)
+- Fix: QT singleShot threading
+- Improved SimConnect: 
+	- detect aircraft change while profile is running
+	- assign profile mode direct from options dialog
+
+
 ### (m76T40 patch)
 - Fix: state clear button only deletes filtered states (A)
 - Fix: master mode not added to older profiles in all situations (B)

@@ -1015,7 +1015,7 @@ class InputItemListView(ui_common.AbstractView):
                     syslog.info(f"\tselected: {data.debug_display}")
 
             # if the list is long - bring the selected widget into view
-            QtCore.QTimer.singleShot(0, lambda: self._scroll_to_item(widget))
+            gremlin.util.singleShot(lambda: self._scroll_to_item(widget))
 
         if emit and index != -1:
             self.item_selected.emit(index, force_update) # load the mapped content for the given index
