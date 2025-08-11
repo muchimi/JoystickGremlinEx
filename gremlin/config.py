@@ -2347,12 +2347,7 @@ class Configuration(QtCore.QObject):
         self._auto_load_disabled = value
 
 
-    @property
-    def stop_profile_on_sim_stop(self) -> bool:
-        return self._get_data("stop_profile_on_sim_stop", False)
-    @stop_profile_on_sim_stop.setter
-    def stop_profile_on_sim_stop(self, value : bool):
-        self._set_data("stop_profile_on_sim_stop", value)
+    
 
     @property
     def tts_enabled(self) -> bool:
@@ -2369,4 +2364,32 @@ class Configuration(QtCore.QObject):
     def tts_mode_switch_enabled(self, value : bool):
         self._set_data("tts_mode_switch_enabled", value)
 
-                
+            
+
+    @property
+    def show_simconnect_options_on_toolbar(self) -> bool:
+        return self._get_data("show_simconnect_options_on_toolbar", False)
+    @show_simconnect_options_on_toolbar.setter
+    def show_simconnect_options_on_toolbar(self, value : bool):
+        self._set_data("show_simconnect_options_on_toolbar", value)
+
+    @property
+    def simconnect_auto_mode_lock(self) -> bool:
+        return self._get_data("simconnect_auto_mode_lock", True)
+    @simconnect_auto_mode_lock.setter
+    def simconnect_auto_mode_lock(self, value : bool):
+        self._set_data("simconnect_auto_mode_lock", value)
+
+    @property
+    def simconnect_auto_mode_select(self) -> bool:
+        return self._get_data("simconnect_auto_mode_select", True)
+    @simconnect_auto_mode_select.setter
+    def simconnect_auto_mode_select(self, value : bool):
+        self._set_data("simconnect_auto_mode_select", value)
+
+    @property
+    def simconnect_stop_profile_on_sim_stop(self) -> bool:
+        return self._get_data("simconnect_stop_profile_on_sim_stop", True)
+    @simconnect_stop_profile_on_sim_stop.setter
+    def simconnect_stop_profile_on_sim_stop(self, value : bool):
+        self._set_data("simconnect_stop_profile_on_sim_stop", value)

@@ -457,9 +457,6 @@ class EventListener(QtCore.QObject):
 	tab_selected = Signal(str) # tab selected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
 	tab_unselected = Signal(str) # tab unselected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
 
-
-	
-
 	# mapping changed - either container or action added -
 	mapping_changed = Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
 	
@@ -551,8 +548,10 @@ class EventListener(QtCore.QObject):
 
 	device_mapping_changed = Signal(str) # fires when device mapping has changed (updates headers) - param = device_id as a string
 	
-	
+	simconnect_show_options = Signal() # fires when the simconnect options dialog should be displayed 
 
+	toolbar_changed = Signal() # fires when the toolbar configuration has changed 
+	
 	def __init__(self):
 		"""Creates a new instance."""
 		import gremlin.windows_event_hook

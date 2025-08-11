@@ -248,6 +248,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.device_mapping_changed.connect(self._update_tab)
         el.mapping_changed.connect(self._mapping_changed)
         el.show_container_id_changed.connect(self._show_container_id_visible_changed)
+        el.toolbar_changed.connect(self._update_toolbar)
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
@@ -394,8 +395,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         GremlinUi.ui = self
 
+        self.ui.update_toolbar()
         el.config_option_changed.connect(self._config_option_changed)
 
+    def _update_toolbar(self):
+        ''' updates the toolbar when the toolbar changes '''
+        self.ui.update_toolbar()
 
     def registerTemporaryProfileLoadFile(self, xml_file : str):
         ''' registers a temporary file that the profile loader will load '''
@@ -1521,25 +1526,20 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionActivate.triggered.connect(self.menu_activate)
         self.ui.actionOpen.triggered.connect(self.load_profile)
         self.ui.actionSave.triggered.connect(self.save_profile)
+        
 
         # Tray icon
         self.ui.tray_icon.activated.connect(self._tray_icon_activated_cb)
 
         # Simconnect configuration
         self.ui.actionSimconnectOptions.triggered.connect(self.showSimconnectOptions)
+        self.ui.actionSimconnectOptionsToolbar.triggered.connect(self.showSimconnectOptions)
 
 
     def showSimconnectOptions(self):
         ''' displays the simconnect options dialog '''
-        from action_plugins.map_to_simconnect import SimconnectOptionsUi
-        from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
-        profile = gremlin.shared_state.current_profile
-        profile_file = profile.profile_file
-        if not profile_file or not os.path.isfile(profile_file):
-            gremlin.ui.ui_common.MessageBox(prompt="Please save the current profile before accessing Simconnect options.")
-            return 
-        dialog = SimconnectOptionsUi(SimConnectManager().simconnect)
-        dialog.exec()
+        el = gremlin.event_handler.EventListener()
+        el.simconnect_show_options.emit()
 
     def _create_1to1_mapping(self):
         ''' maps one to one '''

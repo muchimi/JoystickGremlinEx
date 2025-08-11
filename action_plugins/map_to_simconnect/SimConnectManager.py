@@ -1054,8 +1054,9 @@ class SimConnectManager(QtCore.QObject):
         return self._aircraft_title # use title as the name is meaningless in MSFS 2024 due to streaming AC
     
 
-    def request_aircraft_title(self):
+    def request_aircraft_title(self, callback = None):
         if self.verbose: syslog.info("SIMCONNECT: request aircraft title")
+        self._callback_on_title = callback
         if not self._ar_aircraft_title:
             self._ar_aircraft_title = self._get_aicraft_title_request(self._aircraft_title_changed)
         self._ar_aircraft_title.trigger()
@@ -1085,9 +1086,15 @@ class SimConnectManager(QtCore.QObject):
         title = request.buffer
         if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft title: {title.decode() if title else '[FAILED]'}")
         if title:
-            self._aircraft_title = title.decode()
-            self.sim_aircraft_changed.emit(self._aircraft_title)
-            self.sim_aircraft_info_changed.emit()
+            title = title.decode()
+            self._aircraft_title = title
+            if self._callback_on_title:
+                # run specific callback
+                self._callback_on_title(title)
+            else:
+                # fire regular events
+                self.sim_aircraft_changed.emit(title)
+                self.sim_aircraft_info_changed.emit()
 
     def _aircraft_atc_id_changed(self, request : Request):
         data = request.buffer
@@ -1128,12 +1135,12 @@ class SimConnectManager(QtCore.QObject):
     def _aircraft_title_cb(self):
         ''' callback for the aircraft title '''
     
-    def request_loaded_aircraft(self):
+    def request_loaded_aircraft(self, callback = None):
         ''' gets the current player aircraft in the sim '''
         try:
             if self._sm.ok:
                 #self._sm.requestAircraftLoaded()
-                self.request_aircraft_title()
+                self.request_aircraft_title(callback)
                 #self.request_aircraft_atc_id()
                 #self.request_aircraft_atc_model()
                 #self.request_aircraft_atc_type()
@@ -1296,6 +1303,11 @@ class SimConnectManager(QtCore.QObject):
             return True
         self.reset()
         return self.activate()
+    
+    
+    def disconnect(self):
+        ''' called when sim is stopped'''
+        self.sim_disconnect
 
     def sim_disconnect(self):
         ''' disconnect request '''

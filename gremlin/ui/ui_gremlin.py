@@ -80,6 +80,11 @@ class Ui_Gremlin(object):
         self.toolBar = QtWidgets.QToolBar(main_window)
         self.toolBar.setObjectName("toolBar")
         main_window.addToolBar(QtCore.Qt.ToolBarArea.TopToolBarArea, self.toolBar)
+
+        self.toolbar_options = QtWidgets.QToolBar(main_window)
+        self.toolbar_options.setObjectName("toolbar_options")
+        main_window.addToolBar(QtCore.Qt.ToolBarArea.TopToolBarArea, self.toolbar_options)
+
         self.actionSave = QtGui.QAction(main_window)
         self.actionSave.setObjectName("actionSave")
         self.actionSave.setToolTip("Save a profile")
@@ -214,13 +219,19 @@ class Ui_Gremlin(object):
         widget = QtWidgets.QWidget()
         widget.setMinimumWidth(32)
         #self.toolBar.addWidget(QtWidgets.QLabel(" "*5))
-        self.toolBar.addWidget(widget)
-        self.toolBar.addAction(self.actionInputViewer)
-        self.toolBar.addAction(self.actionOptions)
+        self.toolbar_options.addWidget(widget)
+        self.toolbar_options.addAction(self.actionInputViewer)
+        self.toolbar_options.addAction(self.actionOptions)
+
 
 
         self.actionSimconnectOptions = QtGui.QAction(main_window, text = "Simconnect...")
         self.actionSimconnectOptions.setObjectName("actionSimconnectOptions")
+        self.actionSimconnectOptions.setIcon(gremlin.ui.ui_common.Icons.aircraftIcon())
+
+        self.actionSimconnectOptionsToolbar = QtGui.QAction(main_window)
+        self.actionSimconnectOptionsToolbar.setObjectName("actionSimconnectOptionsToolbar")
+        self.actionSimconnectOptionsToolbar.setIcon(gremlin.ui.ui_common.Icons.aircraftIcon())
 
         self.menuTools.addSeparator()
         self.menuTools.addAction(self.actionSimconnectOptions)
@@ -228,6 +239,19 @@ class Ui_Gremlin(object):
         self.retranslateUi(main_window)
         self.devices.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(main_window)
+
+    def update_toolbar(self):
+        ''' sets / resets the toolbar based on options '''
+        import gremlin.config
+        visible  = gremlin.config.Configuration().show_simconnect_options_on_toolbar
+        if visible:
+            if not self.actionSimconnectOptionsToolbar in self.toolbar_options.actions():
+                self.toolbar_options.addAction(self.actionSimconnectOptionsToolbar)
+        else:
+            if self.actionSimconnectOptionsToolbar in self.toolbar_options.actions():
+                self.toolbar_options.removeAction(self.actionSimconnectOptionsToolbar)
+
+        
 
     def retranslateUi(self, Gremlin):
         _translate = QtCore.QCoreApplication.translate

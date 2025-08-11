@@ -364,6 +364,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._create_verbose_page()
         self._create_osc_page()
         self._create_vigem_page()
+        self._create_simconnect_page()
 
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
@@ -1440,6 +1441,69 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _local_host_ip_changed(self):
         host_ip = self._local_host_ip_widget.text()
         self.config.host_ip = host_ip
+
+    def _create_simconnect_page(self):
+        page_widget = QtWidgets.QWidget()
+        page_layout = QtWidgets.QVBoxLayout(page_widget)
+
+        page_layout.addWidget(QtWidgets.QLabel("MSFS SimConnect options:"))
+        self.tab_container.addTab(page_widget, "MSFS SimConnect")
+
+        widget = QtWidgets.QCheckBox("Show options button on toolbar")
+        widget.setToolTip("Displays the Simconnect options icon on the toolbar for quick access")
+        widget.setChecked(self.config.show_simconnect_options_on_toolbar)
+        widget.clicked.connect(self._show_simconnect_options_on_toolbar)
+
+        page_layout.addWidget(widget)
+
+        widget = QtWidgets.QCheckBox("Change profile mode based on active aicraft")
+        widget.setToolTip("When enabled, the profile mode will automatically change based on the mode associated with the active player aircraft in Flight Simulator")
+        widget.setChecked(self.config.simconnect_auto_mode_select)
+        widget.clicked.connect(self._auto_mode_select_cb)
+
+        page_layout.addWidget(widget)
+
+        widget = QtWidgets.QCheckBox("Lock the mode to the active aicraft")
+        widget.setToolTip("When enabled, the profile mode mapped to the aircraft will stay locked in that mode and other mode changes will be ignored.\nThis prevents inadvertent loss of control due to other GremlinEx actions.")
+        widget.setChecked(self.config.simconnect_auto_mode_lock)
+        widget.clicked.connect(self._auto_mode_lock_cb)
+
+        page_layout.addWidget(widget)
+
+        widget = QtWidgets.QCheckBox("Stop profile on sim exit")
+        widget.setToolTip("When enabled, the profile will stop when the simulator exits.")
+        widget.setChecked(self.config.simconnect_stop_profile_on_sim_stop)
+        widget.clicked.connect(self._stop_profile_on_sim_stop_cb)
+
+        page_layout.addWidget(widget)
+
+        
+        page_layout.addStretch()
+
+
+    @QtCore.Slot(bool)
+    def _auto_mode_select_cb(self, checked):
+        ''' auto mode changed'''
+        self.config.simconnect_auto_mode_select = checked
+
+    @QtCore.Slot(bool)
+    def _auto_mode_lock_cb(self, checked):
+        ''' auto mode lock changed'''
+        self.config.simconnect_auto_mode_lock = checked
+
+    @QtCore.Slot(bool)
+    def _stop_profile_on_sim_stop_cb(self, checked):
+        ''' auto mode lock changed'''
+        self.config.simconnect_stop_profile_on_sim_stop = checked
+
+
+    @QtCore.Slot(bool)
+    def _show_simconnect_options_on_toolbar(self, checked):
+        self.config.show_simconnect_options_on_toolbar = checked
+        el = gremlin.event_handler.EventListener()
+        el.toolbar_changed.emit() # tell the Ui to change the toolbar 
+
+
 
     def _create_vigem_page(self):
         page_widget = QtWidgets.QWidget()

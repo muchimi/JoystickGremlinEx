@@ -649,6 +649,9 @@ class Icons():
     @staticmethod
     def mappedIcon():
         return Icons._icon("fa5.map")
+    @staticmethod
+    def aircraftIcon():
+        return Icons._icon("mdi.airplane")
 
     def _icon(value : str, qta_color = None):
         if qta_color and isinstance(qta_color, str):
@@ -753,6 +756,11 @@ class Buttons():
     @staticmethod
     def getSortDownWidget(label = None, tooltip = "Sort Down", callback = None, no_keyboard = True, data = None):
         icon = Icons.sortDownIcon()
+        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
+    def getRefreshWidget(label = None, tooltip = "Refresh", callback = None, no_keyboard = True, data = None):
+        icon = Icons.refreshIcon()
         return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
         
 

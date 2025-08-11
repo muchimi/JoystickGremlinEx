@@ -181,13 +181,22 @@ class ProcessMonitor(QtCore.QObject):
                 process_list.append(os.path.normpath(executable).replace("\\", "/"))
         return sorted(set(process_list))
 
-    def process_running(self, process_name : str):
+    def process_running(self, process_name : str | list):
         ''' checks if a process is currently running '''
+
+        if not isinstance(process_name, list):
+            process_names = [process_name]
+        else:
+            process_names = process_name
+
+        process_names = [p.casefold() for p in process_names if p]
+
         process_list = self.list_current_processes()
         for item in process_list:
-            base_dir, exe = os.path.split(item)
-            if exe.casefold() == process_name.casefold():
-                return True
+            _, exe = os.path.split(item)
+            for process_name in process_names:
+                if exe.casefold() == process_name:
+                    return True
             
         return False
     

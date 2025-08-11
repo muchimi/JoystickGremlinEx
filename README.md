@@ -15,12 +15,21 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T41)
-- Fix: QT singleShot threading
-- Improved SimConnect: 
-	- detect aircraft change while profile is running
-	- assign profile mode direct from options dialog
+- Improved: removed QT timers and QT SingleShot calls where possible (was determined to cause random QT issues). Replaced with internal calls for similar functionality.
+- Simconnect (MSFS):
+	- reworked: detect aircraft change while profile is running
+	- reworked: view/assign profile mode direct from simconnect options dialog for current aircraft
+	- new options page for simconnect in Gremlin global options
+	- new optional toolbar button for simconnect options dialog
+	- check for MSFS process running before attempting connection
+	- improved: detected aircraft loads will flip profile mode
+	- new: if no profile mode is associated with the aircraft, GremlinEx will prompt for the mode to use while the profile is running.
+	- note: MSFS SDK continues to be unreliable to obtain aircraft by ICAO model preventing grouping of liveries from working reliably. Consequently, profile mode associations are through the title reported by the sim. While the data is pretty consistent with MSFS delivered aircraft, it is highly inconsistent with add-ons, so utterly unreliable to determine aircraft groups that differ only by livery.
+- UI: split toolbars, which changes appearance a bit.
 
 
+ 
+	
 ### (m76T40 patch)
 - Fix: state clear button only deletes filtered states (A)
 - Fix: master mode not added to older profiles in all situations (B)

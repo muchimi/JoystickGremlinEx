@@ -2515,12 +2515,33 @@ class Profile():
         # key_ap, key_cp = key
         # assert key_ap,"Invalid AP key"
         # assert key_cp,"Invalid CP key"
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        if verbose: syslog.info(f"Profile: SimConnectMode: associating [{key}] with profile mode [{mode}]")
+        if not isinstance(key, tuple):
+            key = (key, key) # make it a tuple
         self._simconnect_modes[key] = mode
+
+    def hasSimconnectMode(self, key) -> bool:
+        ''' true if the profile has a simconnect mapping for this key '''
+        if isinstance(key, tuple):
+            return key in self._simconnect_modes
+        # single key mode
+        key = key.casefold()
+        keys = [k for (_, k) in self._simconnect_modes.keys()]
+        return key in keys
+
 
     def getSimconnectMode(self, key):
         ''' gets the simconnect startup mode for a given aicraft key - the key comes from the SimconnectAicraftDefinition for the aircraft'''
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        if not isinstance(key, tuple):
+            key = key.casefold()
+            key = (key, key)
         if key in self._simconnect_modes:
-            return self._simconnect_modes[key]
+            mode = self._simconnect_modes[key]
+            if verbose: syslog.info(f"Profile: SimConnectMode: found [{key}] with profile mode [{mode}]")
+            return mode
+        if verbose: syslog.info(f"Profile: SimConnectMode: no saved mode found for [{key}]")
         return None
 
 
@@ -3626,12 +3647,14 @@ class Profile():
         # simconnect settings
         for key, mode in self._simconnect_modes.items():
             if key:
-                if len(key) != 2:
-                    # only store dual keys
-                    continue
-                key_cp, key_ap = key
-                assert key_cp,"invalid CP key found"
-                assert key_ap,"invalid AP key found"
+                if isinstance(key,tuple):
+                    key_cp, key_ap = key
+                    assert key_cp,"invalid CP key found"
+                    assert key_ap,"invalid AP key found"
+                else:
+                    # single key
+                    key_cp = key
+                    key_ap = key
 
                 child = etree.Element("simconnect")
                 child.set("key_cp",key_cp)

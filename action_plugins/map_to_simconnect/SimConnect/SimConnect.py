@@ -832,9 +832,25 @@ class SimConnect():
 	def connect(self):
 		from pathlib import Path
 		from gremlin.util import display_error, get_dll_version
+		import gremlin.process_monitor
 
+		if self._is_connected:
+			# already connected
+			if verbose: syslog.info("\talready connected")
+			return True
+		
 		if self._connecting:
-			return
+			if verbose: syslog.info("\tconnecting...")
+			return True
+		
+		# check for process running
+		pm = gremlin.process_monitor.ProcessMonitor()
+		if not pm.process_running(["FlightSimulator2024.exe", "FlightSimulator.exe"]):
+			# process not running
+			syslog.warning("Simconnect: connect failed - MSFS process not running")
+			return False
+
+
 		
 
 		# syslog = logging.getLogger("system")
@@ -846,11 +862,9 @@ class SimConnect():
 
 		try:
 		
-			if self._is_connected:
-				# already connected
-				if verbose: syslog.info("\talready connected")
-				return True
 
+
+		
 			
 			el = gremlin.event_handler.EventListener()
 			el.module_state_register.emit("simconnect","SimConnect",None, self._sync_callback)

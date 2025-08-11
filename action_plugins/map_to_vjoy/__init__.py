@@ -3988,8 +3988,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         #     return True
         if event.is_axis:
             # process input options and any merge and curve operation - the current value will already be curved by the input curve if one exists
-
-
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_vjoy or config.verbose_mode_joystick
 
             if event.is_repeater:
                 # use the repeater value
@@ -4004,7 +4004,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                 if event.curve_value is not None:
                     value = event.curve_value
+                    if verbose: source = "input curve value"
                 else:
+                    if verbose: source = "action value"
                     value = action_value.current
 
                 # this handles axis merging and applies any curves and axis inversion
@@ -4015,10 +4017,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 ranged_value = self.action_data.get_ranged_axis_value(filtered_value)
 
                 if ranged_value is None:
-                    value = filtered_value
+                    ranged_value = filtered_value
 
-                # # syslog = logging.getLogger("system")
-                # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
+                if verbose: syslog.info(f"VjoyRemap: using input value source {source}: [{value:0.3f}] -> filtered [{filtered_value:0.3f}] -> range [{ranged_value: 0.3f}] ")
 
             action_value = gremlin.actions.Value(value = ranged_value, raw = event.raw_value, is_pressed = event.is_pressed)
             event.curve_value = ranged_value
@@ -4029,7 +4030,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
         usage_data = gremlin.joystick_handling.VJoyUsageState()
-        verbose = gremlin.config.Configuration().verbose_mode_vjoy
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_vjoy or config.verbose_mode_joystick
         # syslog = logging.getLogger("system")
         if event.force_remote:
             # force remote mode on if specified in the event
@@ -4049,7 +4051,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
 
-            if verbose: syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current}  Event raw: {event.raw_value}  value: {event.value} curve: {event.curve_value}")
+            if verbose: syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current:0.3f}  Event raw: {event.raw_value:0.3f}  value: {event.value:0.3f} curve: {event.curve_value:0.3f}")
 
             # read the value from the extra data if set
             if extra_data is not None and "value" in extra_data:

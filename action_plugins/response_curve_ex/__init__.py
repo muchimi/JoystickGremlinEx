@@ -38,7 +38,7 @@ import gremlin.shared_state
 import gremlin.curve_handler
 import gremlin.input_devices
 import gremlin.spline
-
+syslog = logging.getLogger("system")
 
 
 class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -118,11 +118,19 @@ class ResponseCurveExFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, action_value, extra_data = None):
         if event.is_axis:
+            verbose = gremlin.config.Configuration().verbose_mode_joystick
             if event.curve_value is not None:
                 value = event.curve_value
+                if verbose: source = "curve value"
+                    
             else:
                 value = action_value.current
+                if verbose: source = "action current"
+                
             curved_value = self.curve_data.curve_value(value)
+
+            if verbose: syslog.info(f"CURVE: using input from [{source}] value {value:0.3f} -> curved: {curved_value:0.3f}")
+                
             event.curve_value = curved_value
             action_value.current = curved_value
         return True
