@@ -996,6 +996,7 @@ class SimConnect():
 				error_count -=1
 				if error_count == 0:
 					self._quit = True
+
 		# close the connection
 		try:
 			if self._dll:

@@ -1572,6 +1572,8 @@ def get_mode_object(node):
     '''
 
     nodes = node.xpath("ancestor::mode")
+    if not nodes:
+        return None
     mode_node = nodes.pop()
     mode = safe_read(mode_node, "name", str, "")
     assert len(mode) > 0, "XML hierarchy error - parent mode not found"
