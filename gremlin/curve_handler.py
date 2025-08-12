@@ -1975,6 +1975,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
     def _update_clipboard(self, clipboard = None):
         ''' updates the state of the clipboard buttons '''
+        if not Shiboken.isValid(self):
+            return
         if clipboard is None:
             clipboard = gremlin.clipboard.Clipboard()
         self.paste_button_widget.setEnabled(self._clipboard_valid(clipboard))

@@ -4000,14 +4000,23 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # received = action_value.current
 
                 # get list of curves that applies to this input
-                curves = self.getCurveData(event, action_value)
+                
 
+                
+                curves = None
                 if event.curve_value is not None:
+                    # curve data already applied, use only our own curve if present
+                    if self.action_data.curve_data:
+                        curves = [self.action_data.curve_data]
                     value = event.curve_value
                     if verbose: source = "input curve value"
                 else:
+                    # not using curve data, apply all curves
+                    curves = self.getCurveData(event, action_value)
                     if verbose: source = "action value"
                     value = action_value.current
+
+                if verbose: curve_count = len(curves) if curves else 0
 
                 # this handles axis merging and applies any curves and axis inversion
                 filtered_value = self.action_data.get_filtered_axis_value(value, curves = curves)
@@ -4019,7 +4028,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if ranged_value is None:
                     ranged_value = filtered_value
 
-                if verbose: syslog.info(f"VjoyRemap: using input value source {source}: [{value:0.3f}] -> filtered [{filtered_value:0.3f}] -> range [{ranged_value: 0.3f}] ")
+                if verbose: syslog.info(f"VjoyRemap: using input value source {source}: [{value:0.3f}] -> filtered [{filtered_value:0.3f}] -> range [{ranged_value: 0.3f}] applied curves: {curve_count}")
 
             action_value = gremlin.actions.Value(value = ranged_value, raw = event.raw_value, is_pressed = event.is_pressed)
             event.curve_value = ranged_value
@@ -4791,37 +4800,44 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
     def get_filtered_axis_value(self, value : float = None, curves : list = None) -> float:
         ''' computes the output value for the current configuration - applies curves if curves are provided  '''
-
-        verbose_details = gremlin.config.Configuration().verbose_mode_inputs_extra
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_joystick and gremlin.shared_state.is_running
         # verbose_details = True
 
         if value is not None:
+            if verbose: source = "from value"
             axis_value = value
         else:
+            if verbose: source = "get hardware value"
             axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
-
-        if axis_value is None:
-            # not an axis type 
-            return None
+            if axis_value is None:
+                # not an axis type 
+                return None
         
         if isinstance(axis_value, list) and axis_value:
             axis_value = axis_value[0]
         
         value = axis_value
 
-        if not curves and self.curve_data:
-            # curves not provided - determine curve manually
-            curves = [self.curve_data]
-
-        # if curves:
-        #     for curve_data in curves:
-        #         value = curve_data.curve_value(value)
+        if not curves:
+            if verbose: syslog.info(f"Filter: using source: [{source}] no filter -> filtered [{value:0.3f}]")
+            return value # no curves
+            # if self.curve_data:
+            #     # curves not provided - determine curve manually
+            #     # curves = [self.curve_data]
+            
 
         if self.action_mode == VjoyAction.VJoyAxis:
             # plain axis 
-            if curves:
-                for curve_data in curves:
-                    value = curve_data.curve_value(value)
+            if verbose: curve_msg = f"Applying {len(curves)} curves: "
+            for curve_data in curves:
+                curve_value = curve_data.curve_value(value)
+                if verbose: curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
+                value = curve_value
+
+            if verbose: syslog.info(f"Filter: applied curve: {curve_msg}")
+
+                
 
             # apply scale or invert to input
             is_scaled = self.is_scaled()
@@ -4831,9 +4847,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                         target_min=self.output_range_min,
                         target_max=self.output_range_max,
                         invert = is_reverse)
-                if verbose_details: syslog.info(f"VJOY REMAP: Axis input: {axis_value:0.3f}  scaled: {is_scaled} reversed: {is_reverse} Filtered: {value:0.3f}")    
+                if verbose: syslog.info(f"Filter: using source: [{source}] applied filter: [{axis_value:0.3f}]  scaled: {is_scaled} reversed: {is_reverse} -> Filtered: [{value:0.3f}]")    
             else:
-                if verbose_details: syslog.info(f"VJOY REMAP: Axis input: {axis_value:0.3f} Filtered: {value:0.3f}")
+                if verbose: syslog.info(f"Filter: using source: [{source}] applied filter: [{axis_value:0.3f}] -> Filtered: [{value:0.3f}]")
                 
 
 
