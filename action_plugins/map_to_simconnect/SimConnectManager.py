@@ -470,8 +470,7 @@ class SimConnectManager(QtCore.QObject):
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
         self._aircraft_change_callbacks = []
-
-        self._process_running = False # true if MSFS is detected running
+        
         self._connect_in_progress = False
         self._sm = None
         
@@ -603,6 +602,7 @@ class SimConnectManager(QtCore.QObject):
         
     @QtCore.Slot()
     def _profile_stop(self):
+        
         self._stop()
 
     @QtCore.Slot()
@@ -621,29 +621,6 @@ class SimConnectManager(QtCore.QObject):
         self._request_abort = False
         self.activate()
 
-
-
-        
-    def process_running(self) -> bool:
-         # verify MSFS is running if not already checked
-        if self._process_running:
-            # already running
-            return True
-        # check
-        monitor = gremlin.process_monitor.ProcessMonitor()
-        msfs2020 = "FlightSimulator2020.exe"
-        msfs2024 = "FlightSimulator2024.exe"
-        process_running = monitor.process_running(msfs2024)
-        if not process_running:
-            process_running = monitor.process_running(msfs2020)
-
-        self._process_running = process_running
-        return process_running
-                
-
-
-
-
     @QtCore.Slot()
     def _abort(self):
         if self.connected:
@@ -652,7 +629,6 @@ class SimConnectManager(QtCore.QObject):
                 
 
     def _stop(self):
-        self._process_running = False # force a recheck on start
         if self.connected:
             syslog.info("SIMCONNECT: stop")
             self.bridge.stop()
@@ -930,8 +906,6 @@ class SimConnectManager(QtCore.QObject):
 
         self.setFeedEnabled(False)
 
-
-
     @QtCore.Slot(bool)
     def _paused_state_cb(self, state):
         self._is_paused = state
@@ -1095,6 +1069,7 @@ class SimConnectManager(QtCore.QObject):
                 # fire regular events
                 self.sim_aircraft_changed.emit(title)
                 self.sim_aircraft_info_changed.emit()
+
 
     def _aircraft_atc_id_changed(self, request : Request):
         data = request.buffer
@@ -1272,8 +1247,9 @@ class SimConnectManager(QtCore.QObject):
                             el.module_state_change.emit("simconnect",False)
                             el.request_profile_stop.emit(msg)
                             self._request_abort = True
+                            self._connect_warning_issued = True
                             gremlin.shared_state.profile_state = False # indicate a profile start error occured
-                        syslog.error("SIMCONNECT: failed to start.")
+                            gremlin.shared_state.profile_message_issued = True # indicate the profile error box was issued
                     return False
                 
                 else:
@@ -1288,6 +1264,7 @@ class SimConnectManager(QtCore.QObject):
             return False
         finally:
             self._connect_in_progress = False
+            
 
     def clearRequests(self):
         ''' unregisters all requests '''

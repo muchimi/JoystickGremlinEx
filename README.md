@@ -14,6 +14,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T42)
+- Fix: modified curve logic in vjoy remap to only apply self curve if input is already curved.
+- Simconnect (MSFS):
+	- continued stabilization of UI with MSFS state (aircraft changes and sim exit)
+	- added current aircraft in status bar
+- Documentation update on installation
+- Improved: Force numlock on option added to profile options.  This will force a numlock key on on profile (re)start provided that it does not conflict with the force off settings.
+
 ### (m76T41)
 - Improved: removed QT timers and QT SingleShot calls where possible (was determined to cause random QT issues). Replaced with internal calls for similar functionality.
 - Simconnect (MSFS):

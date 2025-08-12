@@ -18,9 +18,43 @@ Gremlin offers multiple hierarchical modes, each with its own mapping.  A child 
 
 GremlinEx includes a number of built-in containers to solve common mapping scenarios, such as short press versus long press, axis in a certain zone, macros and chaining.
 
-GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and touch-devices on the network, and update the devices back.
+GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and hardware panels connected to devices on the network, including the local machine.  GremlinEx can also send data back to these devices to update their configuration, for example, selecting pages to display based on the active profile or mode loaded in GremlinEx.
 
 GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.
+
+## Installation
+
+GremlinEx comes as a zip file in the [release section of GitHub](https://github.com/muchimi/JoystickGremlinEx/releases) that contains all you need.
+
+The contents of the zip file should be extracted to a folder that is not a system folder such as "Program Files" or "Windows".
+
+The recommendation is to install GremlinEx in its own folder, like "GremlinEx" and if you will use multiple versions, it's recommended you also name the folder after the version.  This is automatic if you extract the zip File using tools like 7Zip or Nanazip as the folder will be the same name as the zip file.  This enables you to have multiple versions installed.
+
+### Required additional tools
+
+GremlinEx works with a number of tools to function as a device integrator, such as VJOY.   Some tools are mandatory (VJOY), others are not (VIGEM, Bitfocus) but recommended.
+
+Please see the [resources section](resources.md) for a list of required and optional tools.
+
+### Optional WASM module
+
+The Microsoft Flight Simulator SimConnect module in GremlinEx requires the installation of the WASM module in the MSFS community folder.  This module is what provides GremlinEx with the ability to execute calculator code in MSFS and thus read/write variables and simulator controls not otherwise exposed by the SimConnect SDK (as of this writing).
+
+### Running from source
+
+While GremlinEx releases are provided as self-contained Python packages, you can run GremlinEx directly from source code, especially if you would like to contribute or just see how GremlinEx does what it does.  The recommended environment is [Visual Studio Code](https://code.visualstudio.com/).  When running in this mode, it is up to you to setup the environment and pre-requisites manually.  The GremlinEx project on GitHub includes a Python requirements file listing dependencies.  This is an advanced topic and requires a strong familiarity with Python development, working with Python and Python libraries, installing and configuring these environments, interfacing with C++, using the QT graphical environment, and working with low level hardware and network protocols. Also of note is the dependencies will vary with new releases as the project matures.
+
+### OSC configuration
+
+OSC (Open Sound Control) is a very important feature support in GremlinEx that allows it to communicate hardware panels like Elgato Streamdeck via [Bitfocus Companion](https://bitfocus.io/companion).  The feature also provides support for glass surfaces (touch screens) via tools like [Open Stage Control](https://openstagecontrol.ammd.net/).  While supported in the box, it does require some ports to be specified.
+
+Please see the [OSC configuration section](usage.md#osc-device-open-sound-control) for OSC specific setup to enable this feature.  
+
+### Virus False positives
+
+Unfortunately, some older anti-virus and anti-malware programs may flag GremlinEx (any Python applications like it) incorrectly, known as a false-positive.  See more on the topic and options in [this section of the documentation](usage.md#-antivirus-false-positives).  It should be noted that most malware and anti-virus tools do not have this issue at all.  This issue is due to the use of the packaging setup used in the Python ecosystem, and outside the scope of GremlinEx.
+
+
 
 ## Resources and help
 

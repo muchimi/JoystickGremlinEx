@@ -154,7 +154,7 @@ class CodeRunner:
         config = gremlin.config.Configuration()
 
         gremlin.shared_state.profile_state = True # assume profile start ok
-        gremlin.shared_state.profile_start_error = None # assume no error
+        gremlin.shared_state.profile_message_issued = False # no message issued
 
         self.disableUi()
 
@@ -165,8 +165,6 @@ class CodeRunner:
         gremlin.shared_state.is_running = True
         gremlin.windows_event_hook.setRunning(True)
 
-        # determine numlock state
-        numlock_off = config.numlock_off
 
         # Reset states to their default values
         self._inheritance_tree = inheritance_tree
@@ -541,14 +539,31 @@ class CodeRunner:
             evt_listener.state_event.connect(self.event_handler.execute_event)
 
             # set keyboard startup state for numlock - use global numlock or profile numlock
-            numlock_off = numlock_off or profile.get_force_numlock()
-            
-            if numlock_off:
+            # determine numlock state
+            global_numlock_off = config.numlock_off
+
+            profile_numlock_off = profile.get_force_numlock()
+            profile_numlock_on = profile.get_force_numlock_on()
+            if verbose: syslog.info(f"NumLock off state: global: {numlock_off}  profile off: {profile_numlock_off} profile on: {profile_numlock_on}")
+
+            numlock_off = global_numlock_off or profile_numlock_off
+            numlock_on = not global_numlock_off and not profile_numlock_off and profile_numlock_on
+
+            if numlock_on:
                 state = gremlin.keyboard.KeyMap.numlock_state()
-                syslog.info(f"Numlock state: {state}")
+                if verbose: syslog.info(f"Numlock state: {state}")
+                if not state:
+                    # toggle numlock on
+                    if verbose: syslog.info(f"Numlock state: Forcing On")
+                    gremlin.keyboard.KeyMap.toggle_numlock()
+
+            
+            elif numlock_off:
+                state = gremlin.keyboard.KeyMap.numlock_state()
+                if verbose: syslog.info(f"Numlock state: {state}")
                 if state:
                     # toggle numlock off
-                    syslog.info(f"Numlock state: Forcing Off")
+                    if verbose: syslog.info(f"Numlock state: Forcing Off")
                     gremlin.keyboard.KeyMap.toggle_numlock()
                 
             
@@ -646,14 +661,12 @@ class CodeRunner:
             # tell GremlinEx the profile started
             # this will also apply default start data and override prior data
             el.profile_start.emit()
+            load_state = gremlin.shared_state.profile_state
+            if load_state:
+                # profile state ok = profile started correctly
+                el.profile_started.emit()
 
-            
-
-
-
-            el.profile_started.emit()
-
-            return True
+            return load_state
 
 
 

@@ -45,6 +45,7 @@ from lxml import etree
 import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
 from gremlin.types import TabDeviceType
+from shiboken6 import Shiboken
 
 import gremlin.joystick_handling
 
@@ -1077,15 +1078,25 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
     def abort(self, message = None):
+        gremlin.util.InvokeUiMethod(self._abort_ui, message) # run on UI thread
+
+    def _abort_ui(self, message = None):
         ''' aborts profile execution on error '''
-        if gremlin.shared_state.aborted:
+        if not gremlin.shared_state.is_running:
+            # nothing to abort
             return
+
         
-        gremlin.shared_state.aborted = True # mark aborting globally
-        el = gremlin.event_handler.EventListener()
-        el.abort.emit()
+        if not gremlin.shared_state.aborted:
+            el = gremlin.event_handler.EventListener()
+            el.abort.emit()
+            gremlin.shared_state.aborted = True # mark aborting globally
+
+        # update UI
         self.ui.actionActivate.setChecked(False)
         self.activate(False)
+        # wait for things to stabilize
+        QtWidgets.QApplication.processEvents()
         if message:
             gremlin.ui.ui_common.MessageBox(prompt = message)
 
@@ -1192,7 +1203,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     with QtCore.QSignalBlocker(self.ui.actionActivate):
                         self.ui.actionActivate.setChecked(False) # toolbar icon "off"
 
-                    gremlin.ui.ui_common.MessageBox(title = "Profile Stat Error", prompt = f"An error occured when starting the profile.\nCheck the log file for specifics.")
+                    if not gremlin.shared_state.profile_message_issued:
+                        # error message not issued = issue it
+                        gremlin.ui.ui_common.MessageBox(title = "Profile Start Error", prompt = f"An error occured when starting the profile.\nCheck the log file for specifics.")
+                        gremlin.shared_state.profile_message_issued = True
 
                     return
 
@@ -1686,11 +1700,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     @QtCore.Slot(str, str, object)
     def registerStatusModule(self, key, label : str, state : object, callback):
-        ''' registers a module with a state '''
-        if not key in self._status_bar_module_states:
+        ''' registersor updates a module with a state '''
+        if key:
             self._status_bar_module_states[key] = (label, state, callback)
-
-            self._update_status_bar_modules_ui()
+            self._update_status_bar_modules()
 
     
     @QtCore.Slot(str, object)
@@ -1703,18 +1716,41 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self._status_bar_module_states[key] = (label, state, callback)
                 self._update_status_bar_modules_ui()
 
-    def _update_status_bar_modules_ui(self):
-        ''' recreates the module status bar UI based on current status'''
-        gremlin.ui.ui_common.clear_layout(self.status_bar_module_container_layout)
-        for label, state, callback in self._status_bar_module_states.values():
-            if state is None:
-                pixmap = self._status_gray
-            else:
-                pixmap = self._status_green if state else self._status_red
+    def _update_status_bar_modules(self):
+        gremlin.util.InvokeUiMethod(self._update_status_bar_modules_ui) # ensure on UI thread
 
+    def _update_status_bar_modules_ui(self):
+        ''' recreates the module status bar UI based on current status - this is used for modules to add content to the status bar at runtime '''
+        if not Shiboken.isValid(self.status_bar_module_container_widget):
+            return
+        gremlin.ui.ui_common.clear_layout(self.status_bar_module_container_layout)
+        index = 0
+        for label, state, callback in self._status_bar_module_states.values():
+            pixmap = None
+            widget = None
+            if state is not None:
+                if isinstance(state, bool):
+                    pixmap = self._status_green if state else self._status_red
+                elif isinstance(state, str):
+                    state = state.casefold()
+                    match state:
+                        case "on":
+                            pixmap = self._status_green
+                        case "off":
+                            pixmap = self._status_red
+                        case "notset":
+                            pixmap = self._status_gray
+                        case "":
+                            pixmap = self._status_gray
+                elif isinstance(state, QtGui.QIcon):
+                    # state is a widget
+                    pixmap = state.pixmap(24,24)
+
+
+            if pixmap is not None:
+                widget = QtWidgets.QLabel()
+                widget.setPixmap(pixmap)
             
-            widget = QtWidgets.QLabel()
-            widget.setPixmap(pixmap)
 
             if callback is not None:
                 action_widget = QtWidgets.QPushButton(label)
@@ -1722,9 +1758,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 action_widget.setStyleSheet("background:transparent; border: 0;")
             else:
                 action_widget = QtWidgets.QLabel(label)
+
+            if index and label: 
+                # add a separator
+                self.status_bar_module_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalSeparator())
+
             self.status_bar_module_container_layout.addWidget(action_widget)
-            self.status_bar_module_container_layout.addWidget(widget)
-            self.status_bar_module_container_layout.addWidget(QtWidgets.QLabel(" "))
+            if widget:
+                self.status_bar_module_container_layout.addWidget(widget)
+
+            index += 1
+
         self.status_bar_module_container_layout.addStretch()
 
         self._update_highlight_toolbar_enabled()

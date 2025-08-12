@@ -31,6 +31,7 @@ import gremlin.config
 import gremlin.event_handler
 import psygnal
 from psygnal import Signal
+from typing import Callable
 
 # Definition of the flags for limited information queries
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
@@ -64,11 +65,41 @@ class ProcessMonitor(QtCore.QObject):
         self._update_thread = None
         self.kernel32 = ctypes.windll.kernel32
         self._enabled = False
+        # self._callback_map = {} # list of processes to monitor and their callback
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.stop)
         el.profile_start.connect(self.start)
         #el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
         el.process_monitor_changed.connect(self._check_monitor)
+
+    # def registerCallback(self, process_list : str | list[str], callback : Callable):
+    #     ''' registers a monitoring callback when the processes change
+    #     :param procesds_list: list of processes to monitor (exes)
+    #     :param callback: callback
+    #     '''
+    #     if not isinstance(process_list, list):
+    #         process_list = [process_list]
+
+    #     for process in process_list:
+    #         process = process.casefold()
+    #         if not process in self._callback_map:
+    #             self._callback_map[process] = []
+    #         if not callback in self._callback_map[process]:
+    #             self._callback_map[process].append(callback)
+        
+    # def unRegisterCallback(self, process_list : str | list[str], callback : Callable):
+    #     ''' unregisters a monitoring callback when the processes change
+    #     :param procesds_list: list of processes to monitor (exes)
+    #     :param callback: callback
+    #     '''
+    #     if not isinstance(process_list, list):
+    #         process_list = [process_list]
+
+    #     for process in process_list:
+    #         process = process.casefold()
+    #         if process in self._callback_map and callback in self._callback_map[process]:
+    #             self._callback_map[process].remove(callback)
+
 
 
     @property

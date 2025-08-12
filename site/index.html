@@ -370,6 +370,66 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-additional-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required additional tools
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-wasm-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional WASM module
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running from source
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virus-false-positives" class="md-nav__link">
+    <span class="md-ellipsis">
+      Virus False positives
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#resources-and-help" class="md-nav__link">
     <span class="md-ellipsis">
       Resources and help
@@ -537,6 +597,66 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-additional-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required additional tools
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-wasm-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional WASM module
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running from source
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virus-false-positives" class="md-nav__link">
+    <span class="md-ellipsis">
+      Virus False positives
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#resources-and-help" class="md-nav__link">
     <span class="md-ellipsis">
       Resources and help
@@ -598,8 +718,24 @@
 <p>GremlinEx can accomplish very sophisticated condition based routing based on one or more concurrent inputs.</p>
 <p>Gremlin offers multiple hierarchical modes, each with its own mapping.  A child mode can inherit mappings from the parent mode if the child does not also map that input.</p>
 <p>GremlinEx includes a number of built-in containers to solve common mapping scenarios, such as short press versus long press, axis in a certain zone, macros and chaining.</p>
-<p>GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and touch-devices on the network, and update the devices back.</p>
+<p>GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and hardware panels connected to devices on the network, including the local machine.  GremlinEx can also send data back to these devices to update their configuration, for example, selecting pages to display based on the active profile or mode loaded in GremlinEx.</p>
 <p>GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.</p>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
+<p>GremlinEx comes as a zip file in the <a href="https://github.com/muchimi/JoystickGremlinEx/releases">release section of GitHub</a> that contains all you need.</p>
+<p>The contents of the zip file should be extracted to a folder that is not a system folder such as "Program Files" or "Windows".</p>
+<p>The recommendation is to install GremlinEx in its own folder, like "GremlinEx" and if you will use multiple versions, it's recommended you also name the folder after the version.  This is automatic if you extract the zip File using tools like 7Zip or Nanazip as the folder will be the same name as the zip file.  This enables you to have multiple versions installed.</p>
+<h3 id="required-additional-tools">Required additional tools<a class="headerlink" href="#required-additional-tools" title="Permanent link">&para;</a></h3>
+<p>GremlinEx works with a number of tools to function as a device integrator, such as VJOY.   Some tools are mandatory (VJOY), others are not (VIGEM, Bitfocus) but recommended.</p>
+<p>Please see the <a href="resources/">resources section</a> for a list of required and optional tools.</p>
+<h3 id="optional-wasm-module">Optional WASM module<a class="headerlink" href="#optional-wasm-module" title="Permanent link">&para;</a></h3>
+<p>The Microsoft Flight Simulator SimConnect module in GremlinEx requires the installation of the WASM module in the MSFS community folder.  This module is what provides GremlinEx with the ability to execute calculator code in MSFS and thus read/write variables and simulator controls not otherwise exposed by the SimConnect SDK (as of this writing).</p>
+<h3 id="running-from-source">Running from source<a class="headerlink" href="#running-from-source" title="Permanent link">&para;</a></h3>
+<p>While GremlinEx releases are provided as self-contained Python packages, you can run GremlinEx directly from source code, especially if you would like to contribute or just see how GremlinEx does what it does.  The recommended environment is <a href="https://code.visualstudio.com/">Visual Studio Code</a>.  When running in this mode, it is up to you to setup the environment and pre-requisites manually.  The GremlinEx project on GitHub includes a Python requirements file listing dependencies.  This is an advanced topic and requires a strong familiarity with Python development, working with Python and Python libraries, installing and configuring these environments, interfacing with C++, using the QT graphical environment, and working with low level hardware and network protocols. Also of note is the dependencies will vary with new releases as the project matures.</p>
+<h3 id="osc-configuration">OSC configuration<a class="headerlink" href="#osc-configuration" title="Permanent link">&para;</a></h3>
+<p>OSC (Open Sound Control) is a very important feature support in GremlinEx that allows it to communicate hardware panels like Elgato Streamdeck via <a href="https://bitfocus.io/companion">Bitfocus Companion</a>.  The feature also provides support for glass surfaces (touch screens) via tools like <a href="https://openstagecontrol.ammd.net/">Open Stage Control</a>.  While supported in the box, it does require some ports to be specified.</p>
+<p>Please see the <a href="usage/#osc-device-open-sound-control">OSC configuration section</a> for OSC specific setup to enable this feature.  </p>
+<h3 id="virus-false-positives">Virus False positives<a class="headerlink" href="#virus-false-positives" title="Permanent link">&para;</a></h3>
+<p>Unfortunately, some older anti-virus and anti-malware programs may flag GremlinEx (any Python applications like it) incorrectly, known as a false-positive.  See more on the topic and options in <a href="usage/#-antivirus-false-positives">this section of the documentation</a>.  It should be noted that most malware and anti-virus tools do not have this issue at all.  This issue is due to the use of the packaging setup used in the Python ecosystem, and outside the scope of GremlinEx.</p>
 <h2 id="resources-and-help">Resources and help<a class="headerlink" href="#resources-and-help" title="Permanent link">&para;</a></h2>
 <p><a class="glightbox" href="assets/discord_small.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="Discord Icon" src="assets/discord_small.png" /></a>&nbsp;Please join our  <a href="https://discord.gg/pNadcReth9">GremlinEx Discord</a> server!</p>
 <h2 id="history">History<a class="headerlink" href="#history" title="Permanent link">&para;</a></h2>

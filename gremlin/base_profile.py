@@ -2392,6 +2392,7 @@ class Profile():
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
         self._profile_data : Profile
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
+        self._force_numlock_on = False # if set, forces numlock ON.  If a conflict, _force_numlock_off takes precedence.
         self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
         self._substitution_map = {} # map of device GUID to any new device GUID for the load process
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
@@ -2519,8 +2520,14 @@ class Profile():
         # assert key_cp,"Invalid CP key"
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         if verbose: syslog.info(f"Profile: SimConnectMode: associating [{key}] with profile mode [{mode}]")
+
         if not isinstance(key, tuple):
+            key = key.casefold()
             key = (key, key) # make it a tuple
+        else:
+            a,b = key
+            key = (a.casefold(), b.casefold())
+
         self._simconnect_modes[key] = mode
 
     def hasSimconnectMode(self, key) -> bool:
@@ -2529,7 +2536,7 @@ class Profile():
             return key in self._simconnect_modes
         # single key mode
         key = key.casefold()
-        keys = [k for (_, k) in self._simconnect_modes.keys()]
+        keys = [k.casefold() for (_, k) in self._simconnect_modes.keys()]
         return key in keys
 
 
@@ -2857,11 +2864,17 @@ class Profile():
 
 
 
-    def get_force_numlock(self):
+    def get_force_numlock(self) -> bool:
         return self._force_numlock_off
     
-    def set_force_numlock(self, value):
+    def set_force_numlock(self, value : bool):
         self._force_numlock_off = value
+
+    def get_force_numlock_on(self) -> bool:
+        return self._force_numlock_on
+
+    def set_force_numlock_on(self, value: bool):
+        self._force_numlock_on = value
     
 
     def mode_list(self):
@@ -3380,7 +3393,9 @@ class Profile():
             self._restore_last_mode = safe_read(root, "restore_last", bool, False)
 
         if "force_numlock" in root.attrib:
-            self._force_numlock_off = safe_read(root, "force_numlock", bool, True)
+            self._force_numlock_off = safe_read(root, "force_numlock", bool, False)
+        if "force_numlock_on" in root.attrib:
+            self._force_numlock_on = safe_read(root, "force_numlock_on", bool, False)
 
         # state data - read first because states can be referenced by nodes
         nodes = root.xpath("//states")
@@ -3413,7 +3428,7 @@ class Profile():
             key_cp = safe_read(child,"key_cp",str, "")
             key_ap = safe_read(child,"key_ap",str, "")
             mode = safe_read(child,"mode", str, "")
-            key = (key_cp, key_ap)
+            key = (key_cp.casefold(), key_ap.casefold())
             self._simconnect_modes[key] = mode
 
 
@@ -3587,6 +3602,7 @@ class Profile():
         root.set("default_mode", self.get_default_start_mode())
         root.set("restore_last", str(self._restore_last_mode))
         root.set("force_numlock", str(self._force_numlock_off))
+        root.set("force_numlock_on", str(self._force_numlock_on))
 
         # mode list
         

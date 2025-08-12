@@ -1095,15 +1095,23 @@ class SimConnectMonitor():
         # syslog = logging.getLogger("system")
         syslog.info("SCMonitor: listening")
         self._manager = SimConnectManager()
+
+        self._handler = SimConnectEventHandler()
+
         #self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
         self._manager.sim_start.connect(self._sim_start)
-        self._manager.sim_stop.connect(self._sim_stop)
+        # self._manager.sim_stop.connect(self._sim_stop)
         self._manager.registerAircraftChangeCallback(self._sim_aircraft_loaded)
         self._manager.sim_aircraft_changed.connect(self._handle_aircraft_changed)
+
+        # look for disconnects
+        self._handler.simconnect_disconnected.connect(self._sim_stop)
+
+
         self._options_visible = False # true if the options UI is visible
 
-        self._pm = gremlin.process_monitor.ProcessMonitor()
-        self._pm.process_changed.connect(self._process_list_changed)
+        # self._pm = gremlin.process_monitor.ProcessMonitor()
+        # self._pm.process_changed.connect(self._process_list_changed)
 
 
         self._started = False
@@ -1133,13 +1141,13 @@ class SimConnectMonitor():
         self._request_aircraft_name = None # name of the returned aircraft from the simconnect call
         self._request_lock = threading.Lock() # interlock for threads
 
-        self._process_list_changed() # update msfs running status
+    #     self._process_list_changed() # update msfs running status
 
-    def _process_list_changed(self):
-        ''' called when list of processes changes '''
-        self._msfs_running = self._pm.process_running(["FlightSimulator2024.exe", "FlightSimulator.exe"])
-        if not self._msfs_running and gremlin.config.Configuration().simconnect_stop_profile_on_sim_stop:
-            self._sim_stop()
+    # def _process_list_changed(self):
+    #     ''' called when list of processes changes '''
+    #     self._msfs_running = self._pm.process_running(["FlightSimulator2024.exe", "FlightSimulator.exe"])
+    #     if not self._msfs_running and gremlin.config.Configuration().simconnect_stop_profile_on_sim_stop:
+    #         self._sim_stop()
             
 
 
@@ -1169,6 +1177,9 @@ class SimConnectMonitor():
         model param is ignored for now because it is not consistent and add-on dependent so is not reliable
         
         '''
+        if name:
+            name = name.casefold()
+
         if name in self._profile_key_map:
             return True # cached already so found
         
@@ -1178,6 +1189,7 @@ class SimConnectMonitor():
         profile = gremlin.shared_state.current_profile
         if not name:
             name = self.getCurrentAircraft()
+            name = name.casefold()
         if not name:
             syslog.warning("SDMONITOR: unable to get current aircraft in hasStartupMode()")
             return False
@@ -1246,7 +1258,7 @@ class SimConnectMonitor():
             self._request_running = False
         self._request_thread.join()
         self._request_thread = None
-
+        self._update_status_bar(name)
         
 
 
@@ -1446,10 +1458,13 @@ class SimConnectMonitor():
             if self._verbose: syslog.info(f"SCMONITOR: Aircraft loaded: [{title}]")
             model = self._manager.aircraft_model
             self.changeModeForAicraft(title, model)
+            self._update_status_bar(title)
         
 
     def changeModeForAicraft(self, title : str, model : str = None):
         ''' changes the mode for the current aircraft '''
+
+        self._update_status_bar(title)
 
         if not self.hasStartupMode(title):
             # nothing in profile
@@ -1463,6 +1478,8 @@ class SimConnectMonitor():
                 self.change_mode(mode)
                 self._last_mode = mode
             return mode
+        
+        
         
     def _request_user_input(self, name : str, model : str = None):        
         gremlin.util.InvokeUiMethod(self._request_user_input_ui, name, model) # ensure on UI thread
@@ -1488,14 +1505,25 @@ class SimConnectMonitor():
         self._last_mode = mode
 
 
-    @QtCore.Slot()
+
+    def _update_status_bar(self, name : str = None):
+        # updates or clears UI status bar with the aicraft name
+        el = gremlin.event_handler.EventListener()
+        if name:
+            icon = gremlin.ui.ui_common.Icons.aircraftIcon()
+            el.module_state_register.emit("simconnect_aicraft",name, icon, None)
+        else:
+            # no aircraft = clear status
+            el.module_state_register.emit("simconnect_aicraft","",None, None)        
+
+
     def _sim_start(self):
         ''' sim started event '''
         # syslog = logging.getLogger("system")
         if self._verbose: syslog.info(f"SCMONITOR: sim start")
 
 
-    @QtCore.Slot()
+    
     def _sim_stop(self):
         ''' sim stop event '''
         if self._verbose: syslog.info(f"SCMONITOR: sim stop")
@@ -1503,6 +1531,12 @@ class SimConnectMonitor():
         if gremlin.shared_state.is_running and gremlin.config.Configuration().simconnect_stop_profile_on_sim_stop:
             el = gremlin.event_handler.EventListener()
             el.request_profile_stop.emit("Sim Stop")
+
+        self._update_status_bar()
+
+
+
+
 
         
 

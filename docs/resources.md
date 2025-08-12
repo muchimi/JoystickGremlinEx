@@ -50,6 +50,17 @@ The project source code is located here:
 
 These companion tools are recommended to work alongside GremlinEx.
 
+### BitFocus Companion
+
+Bitfocus Companion is a panel integrator able to manage from a single environment a number of hardware control panels such as Elgato, LoupeDeck, Razer and other hardware control surfaces.  A key feature of Companion is that it works with the OSC protocol, thus enables two-way communications between hardware panels and GremlinEx.
+
+With BitFocus Companion it becomes easy to press a button on a Streamdeck, rotate a knob on a LoupeDeck and have GremlinEx translate these inputs to games.
+
+While the setup and usage of Companion is beyond the scope of this document, there are some simple setup steps outlined with screenshots in the [GremlinEx discord channel](https://discord.com/channels/1279461873317707827/1292975259003256935) on how to set it up to work with GremlinEx.
+
+[Bitfocus Companion](https://bitfocus.io/companion)
+
+
 ### Glass Surface control tools
 
 These tools let you design an interface for touch-screens to send data to GremlinEx for mapping purposes.  These applications run on separate computers and connect to GremlinEx via the network.  The recommended protocol is OSC because it is much more flexible and easy to use.  MIDI can work as well but it's more difficult to setup in a networked environment because it doesn't natively support this, and because the MIDI protocol was designed decades ago, it is not as flexible as OSC.

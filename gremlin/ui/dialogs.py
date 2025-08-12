@@ -86,10 +86,15 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.numlock_widget = QtWidgets.QCheckBox("Force numlock off on profile start (Profile)")
-        self.numlock_widget.setToolTip("When enabled, the numlock key will be turned off when the profile (re)activates - this avoids issue with keylatching for the numeric keypad.<br>This setting can be overriden by the global numlock configuration on the main options page.")
-        self.numlock_widget.setChecked(self.profile.get_force_numlock())
-        self.numlock_widget.clicked.connect(self._numlock_force_cb)
+        self.numlock_off_widget = QtWidgets.QCheckBox("Force numlock off when profile start (Profile)")
+        self.numlock_off_widget.setToolTip("When enabled, the numlock key will be turned off when the profile (re)activates - this avoids issue with keylatching for the numeric keypad.<br>This setting can be overriden by the global numlock configuration on the main options page.")
+        self.numlock_off_widget.setChecked(self.profile.get_force_numlock())
+        self.numlock_off_widget.clicked.connect(self._numlock_force_cb)
+
+        self.numlock_on_widget = QtWidgets.QCheckBox("Force numlock on when profile start (Profile)")
+        self.numlock_on_widget.setToolTip("When enabled, the numlock key will be turned on when the profile (re)activates")
+        self.numlock_on_widget.setChecked(self.profile.get_force_numlock_on())
+        self.numlock_on_widget.clicked.connect(self._numlock_force_on_cb)
 
         self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self.start_label = QtWidgets.QLabel("Start Mode")
@@ -122,12 +127,14 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         close_button_layout.addStretch()
         close_button_layout.addWidget(self.close_button)
 
-        self.main_layout.addWidget(self.numlock_widget)
+        self.main_layout.addWidget(self.numlock_off_widget)
+        self.main_layout.addWidget(self.numlock_on_widget)
         self.main_layout.addWidget(self.activate_restore_mode)
         self.main_layout.addWidget(self.container_start_mode_widget)
         self.main_layout.addWidget(close_button_widget)
 
         self.populate_selector(mode)
+        self._update_ui()
 
     def populate_selector(self, mode = None):
 
@@ -162,11 +169,19 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot(bool)
     def _numlock_force_cb(self, checked):
         self.profile.set_force_numlock(checked)
+        self._update_ui()
 
+    @QtCore.Slot(bool)
+    def _numlock_force_on_cb(self, checked):
+        self.profile.set_force_numlock_on(checked)
+        
+
+    def _update_ui(self):
+        enabled = not self.numlock_off_widget.isChecked()
+        self.numlock_on_widget.setEnabled(enabled)
 
     @QtCore.Slot(bool)
     def _restore_mode_cb(self, checked):
-
         self.profile.set_restore_mode(checked)
 
     def _close_cb(self):

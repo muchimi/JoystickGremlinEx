@@ -85,6 +85,9 @@ ui_ready = False
 # profile state status = ok - all components loaded, false an error occured
 profile_state = True
 
+# true if a profile message was issued (used for start errors)
+profile_message_issued = False 
+
 # true if profile is loading
 profile_loading = False
 

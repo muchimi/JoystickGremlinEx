@@ -295,7 +295,7 @@ class SimConnectEvent:
 
 
 @SingletonDecorator
-class SimConnectEventHandler(QtCore.QObject):
+class SimConnectEventHandler():
 	''' handles events related to simconnect '''	
 	range_changed = Signal(object, RangeEvent) # fires when the block range values change (block, event)
 	value_changed = Signal(object) # fires when the block output value changes (block)
@@ -314,13 +314,13 @@ class SimConnectEventHandler(QtCore.QObject):
 	simconnect_AircraftLiveriesReceived = Signal(object) # fires when a list of user flyable aircraft is received (AicraftLiveries dict keyed by sim name)
 	simconnect_FacilitiesReceived = Signal(list) # fires when a list of facilities is received
 	AircraftDefinitionsChanged = Signal() # indicates the aircraft definitions have been updated in options
-
+	
 
 @SingletonDecorator
 class SimConnect():
 	''' MSFS simconnect interface '''
 
-	
+	process_list = ["FlightSimulator2024.exe", "FlightSimulator.exe"]
 
 	def __init__(self, handler : SimConnectEventHandler, auto_connect=True):
 		''' initializes sim connect 
@@ -328,6 +328,7 @@ class SimConnect():
 		:param handler: SimConnectEventHandler - the handler to signals
 		
 		'''
+		import gremlin.process_monitor
 		super().__init__()
 
 		self.Requests = {}
@@ -337,7 +338,7 @@ class SimConnect():
 		self.verbose_details = False
 		self._connecting = False # true if connecting
 		self._hSimConnect = HANDLE()
-		self._quit = 0
+		self._running = False
 		self._ok = False
 		self._request_abort = False # true if we're aborting and should stop running
 		self.running = False
@@ -358,10 +359,16 @@ class SimConnect():
 		self._win_dll = None # reference to the loaded DLL
 		self._dll = None # simconnect class
 		self._dll_path = None # path to the dll located in the distribution
+		self._thread_lock = threading.Lock()
 		self._runThread = None
 		self._library_path = None
 		self._critical = False
 		self._state_handled = {} # tracks state change messages 
+
+
+	def _process_changed(self, running_process):
+		''' called when monitored processes change '''
+
 
 	def reset(self):
 		''' resets abort flag set due to a load error - this is necessary upon reconnect'''
@@ -768,7 +775,8 @@ class SimConnect():
 
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_QUIT:
-			self._quit = 1
+			with self._thread_lock:
+				self._running = False
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT_FILENAME:
 			# file name
 			
@@ -843,15 +851,13 @@ class SimConnect():
 			if verbose: syslog.info("\tconnecting...")
 			return True
 		
-		# check for process running
-		pm = gremlin.process_monitor.ProcessMonitor()
-		if not pm.process_running(["FlightSimulator2024.exe", "FlightSimulator.exe"]):
-			# process not running
-			syslog.warning("Simconnect: connect failed - MSFS process not running")
-			return False
+		# # check for process running
+		# pm = gremlin.process_monitor.ProcessMonitor()
+		# if not pm.process_running(self.process_list):
+		# 	# process not running
+		# 	syslog.warning("Simconnect: connect failed - MSFS process not running")
+		# 	return False
 
-
-		
 
 		# syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
@@ -865,7 +871,7 @@ class SimConnect():
 
 
 		
-			
+			# custom status on toolbar 
 			el = gremlin.event_handler.EventListener()
 			el.module_state_register.emit("simconnect","SimConnect",None, self._sync_callback)
 			if not self._dll_path or not os.path.isfile(self._dll_path):
@@ -883,7 +889,8 @@ class SimConnect():
 				self._library_path = self._dll_path
 			
 				self._is_loop_running = False
-				self._quit = 0
+				with self._thread_lock:
+					self._running = False
 			
 			
 		
@@ -896,7 +903,8 @@ class SimConnect():
 				except Exception as err:
 					self._request_abort = True
 					syslog.error(f"SIMCONNECT:DLL load error: {err}")
-					self._quit = 1
+					with self._thread_lock:
+						self._running = False
 					
 					el.request_profile_stop.emit("Error loading DLL")
 					return False
@@ -986,16 +994,17 @@ class SimConnect():
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		if verbose: syslog.info("SIMCONNECT: run loop start")
 		error_count = 5
-		self._quit = 0 # keep on running until stop
-		while self._quit == 0:
+		with self._thread_lock:
+			self._running = True # keep on running until stop
+		while self._running:
 			try:
 				self._dll.CallDispatch(self._hSimConnect, self._my_dispatch_proc_rd, None)
 				time.sleep(.002)
-				
 			except:
 				error_count -=1
 				if error_count == 0:
-					self._quit = True
+					with self._thread_lock:
+						self._running = False
 
 		# close the connection
 		try:
@@ -1027,8 +1036,11 @@ class SimConnect():
 			# syslog = logging.getLogger("system")
 			verbose = gremlin.config.Configuration().verbose_mode_simconnect
 			if verbose: syslog.info("SIMCONNECT: exit requested")
-			self._quit = 1 # kill the thread loop
-			self._runThread.join()
+			with self._thread_lock:
+				self._running = False # kill the thread loop
+			if self._runThread and self._runThread != threading.current_thread():
+				self._runThread.join()
+			
 			# this also resets the flags
 			self._runThread = None
 			self._is_loop_running = False

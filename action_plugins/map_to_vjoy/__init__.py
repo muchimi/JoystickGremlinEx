@@ -4005,13 +4005,13 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 
                 curves = None
                 if event.curve_value is not None:
-                    # curve data already applied, use only our own curve if present
+                    # curve data already applied, only apply our own curve if present
                     if self.action_data.curve_data:
                         curves = [self.action_data.curve_data]
                     value = event.curve_value
                     if verbose: source = "input curve value"
                 else:
-                    # not using curve data, apply all curves
+                    # not using curve data, apply all applicable curves
                     curves = self.getCurveData(event, action_value)
                     if verbose: source = "action value"
                     value = action_value.current
