@@ -4821,10 +4821,11 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         if not curves:
             if verbose: syslog.info(f"Filter: using source: [{source}] no filter -> filtered [{value:0.3f}]")
-            return value # no curves
+            curves = []
+            # # return value # no curves
             # if self.curve_data:
             #     # curves not provided - determine curve manually
-            #     # curves = [self.curve_data]
+            #     curves = [self.curve_data]
             
 
         if self.action_mode == VjoyAction.VJoyAxis:
@@ -4857,6 +4858,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         elif self.action_mode == VjoyAction.VJoyMergeAxis: #and self.merge_mode != MergeOperationType.NotSet:
 
             if gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid):
+                v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+            elif gremlin.joystick_handling.is_vjoy_device(merge_device_guid):
                 v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             else:
                 v1 = self.hardware_input_id.axis_value

@@ -2356,7 +2356,7 @@ class AxisCurveData():
         
         return value
 
-class AxisCurveDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog box for curve configuration '''
 
     def __init__(self, curve_data, parent=None):
@@ -2368,6 +2368,7 @@ class AxisCurveDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         super().__init__(self.__class__.__name__, parent=parent)
 
         self.action_data = curve_data
+        self.setWindowTitle("Curve Editor")
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
@@ -2384,12 +2385,26 @@ class AxisCurveDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
+        # self._size_dialog_widget = gremlin.ui.ui_common.Buttons.getResizeWidget(callback = self._handle_size_window)
+        # widget, _ = gremlin.ui.ui_common.getHContainer(self._size_dialog_widget)
+        # self.main_layout.addWidget(widget)    
+
         self.widget = AxisCurveWidget(curve_data, self)
         self.main_layout.addWidget(self.scroll_area)
         self.scroll_layout.addWidget(self.widget)
 
         self.minimumWidth = 400
         self.minimumHeight = 400
+
+    # def _handle_size_window(self):
+    #     ''' size window '''
+    #     size = self.widget.sizeHint()
+    #     geom = self.geometry()
+    #     geom.setWidth(size.width()+20)
+    #     geom.setHeight(size.height()+20)
+    #     self.setGeometry(geom)
+
+
 
     @property
     def curve_update_handler(self):

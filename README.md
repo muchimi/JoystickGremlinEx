@@ -13,7 +13,9 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
-
+### (m76T43)
+- Fix: resolves more QT garbage collection exceptions linked to new event model.
+- Fix: sequence container not triggering on input release.
 
 ### (m76T42)
 - Fix: modified curve logic in vjoy remap to only apply self curve if input is already curved.

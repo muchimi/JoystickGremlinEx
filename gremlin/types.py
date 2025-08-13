@@ -986,8 +986,9 @@ class VerboseMode(IntFlag):
     State = auto() # state management
     Extra = auto() # extra info for any other mode
     Remote = auto() # remote receive
+    Container = auto() # container debug mode
     
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra | Remote
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra | Remote | Container
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

@@ -25,6 +25,8 @@ import time
 import uuid
 import logging
 import gremlin.types
+from glob import glob
+from pathlib import Path
 
 
 syslog = logging.getLogger("system")
@@ -725,7 +727,7 @@ class DILL:
 
         syslog = logging.getLogger("system")
 
-
+        
         if DILL._dll is None:
 
             dll_folder = os.path.dirname(__file__)
@@ -745,14 +747,35 @@ class DILL:
 
             # truncate the debug file (it gets large otherwise)
 
+            # blits all files starting with dill_debug
+            
+
             debug_file = "dill_debug.txt"
             debug_path = os.path.join(dll_folder, debug_file)
+
+     
+            # debug_files = [f for f in Path(dll_folder).glob("**/dill_debug*.txt")]
+            # index = 1
+            # for f in debug_files:
+            #     try:
+            #         os.unlink(f)
+            #     except:
+            #         syslog.error(f"DILL: unable to truncate debug file: {f}")
+                    
+
             if os.path.isfile(debug_path):
                 # blitz it
                 try:
                     os.unlink(debug_path)
                 except:
-                    syslog.info("DILL: unable to truncate debug file")
+                    syslog.error(f"DILL: unable to truncate debug file: {debug_path}")
+                    exit(1)
+                          
+            
+                    # syslog.error(f"DILL: unable to truncate debug file: {debug_path}")
+                    # while os.path.isfile(debug_path):
+                    #     debug_path = f"dill_debug_{index}.txt"
+                    #     index += 1
 
             dll_version = get_dll_version(_dll_path)
             DILL.version = dll_version

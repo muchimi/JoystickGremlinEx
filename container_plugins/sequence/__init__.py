@@ -176,14 +176,6 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         self.action_sets = []
         self.container = container
   
-        self._macro_id = None
-        #index = 0
-        # for action_set in container.action_sets:
-        #     graph = gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-        #     self.action_sets.append(graph)        
-        #     self.graph_map[index] = graph
-        #     self.index_map[graph] = index
-
         self.index = 0
         self.last_execution = 0.0
         self.last_value = None
@@ -197,56 +189,38 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
+        self._verbose = gremlin.config.Configuration().verbose_mode_container
 
-        eh = gremlin.event_handler.EventListener()
-        eh.macro_step_completed.connect(self._macro_completed)
+        # eh = gremlin.event_handler.EventListener()
+        # eh.macro_step_completed.connect(self._macro_completed)
 
     def profile_start(self):
         ''' occurs at profile start '''
         self.index = 0
         self._event = None
         self._value = None
-        self._macro_id = None
+        
 
     def profile_started(self):
         super().profile_started()        
-        
-        # if self.valid:
-        #     self.graph_map = {} # holds index to graph
-        #     self.index_map = {} # holds graph to index
-        #     for index, node in enumerate(self.action_set_nodes):
-        #         self.graph_map[index] = node
-        #         self.index_map[node] = index
-
-
 
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data : dict = None) -> bool:
         if not self.valid:
             return False
         
-        verbose = gremlin.config.Configuration().verbose
-
-        if self._macro_id is not None:
-            # ignore events while the sequence is still running
-            return True
-        
-        auto_release = False
-
-
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
         elif not isinstance(value.current, bool):
             syslog.warning(f"Invalid data type received in Sequence container: {type(event.value)}")
             return False
         else:
-            is_pressed = value.current
-
+            is_pressed = value.is_pressed
         
         if self.container.trigger_on_release:
             if is_pressed:
                 # ignore pressed event if we're triggering on input release 
-                if verbose: syslog.info(f"SEQUENCE: execute - ignore pressed event")
+                if self._verbose: syslog.info(f"SEQUENCE: execute - ignore pressed event")
                 return False
             
             is_pressed = True # flip it for containers
@@ -256,40 +230,20 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             event.is_pressed = is_pressed
             event.raw_value = is_pressed
 
-        
-        self._macro_id = 0 
-       
 
-        self._execute(event, value, extra_data)    
+        self._execute(event, value, extra_data, self._verbose)    
 
-
-
-        # mgr = gremlin.macro.MacroManager()
-        # macro = gremlin.macro.Macro()
-        # self._macro_id = macro.id
-        # for index in range(count):
-        #     node = self.action_sets[index]
-
-        #     action = gremlin.macro.GraphAction(node, event, value)
-        #     action.data = f"Step {index + 1}"
-        #     macro.add_action(action)
-
-            
-        # queue the work up
-        # mgr.queue_macro(macro)
-        # if verbose: syslog.info(f"SEQUENCE: execute graph sequence - id {self._macro_id}")
-        
         return False # stop execution as the logic is internal to trigger the other nodes
     
-    @QtCore.Slot(int)
-    def _macro_completed(self, id : int):
-        ''' occurs when a macro completes - the id is the id of the macro completed '''
+    # @QtCore.Slot(int)
+    # def _macro_completed(self, id : int):
+    #     ''' occurs when a macro completes - the id is the id of the macro completed '''
         
-        if self._macro_id is not None and id == self._macro_id:
-            syslog = logging.getLogger("system")
-            verbose = gremlin.config.Configuration().verbose
-            if verbose: syslog.info(f"SEQUENCE: completed graph sequence - id {self._macro_id}")
-            self._macro_id = None
+    #     if self._macro_id is not None and id == self._macro_id:
+    #         syslog = logging.getLogger("system")
+    #         verbose = gremlin.config.Configuration().verbose
+    #         if verbose: syslog.info(f"SEQUENCE: completed graph sequence - id {self._macro_id}")
+    #         self._macro_id = None
 
 
 class SequenceContainer(AbstractContainer):

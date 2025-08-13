@@ -602,6 +602,9 @@ class Icons():
     def refreshIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ei.refresh", qta_color)
     @staticmethod
+    def resizeIcon(qta_color = None) -> QtGui.QIcon:
+        return Icons._icon("ph.frame-corners", qta_color)
+    @staticmethod
     def copyIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
         return Icons._icon("fa6.copy", qta_color)
     @staticmethod
@@ -762,7 +765,13 @@ class Buttons():
     def getRefreshWidget(label = None, tooltip = "Refresh", callback = None, no_keyboard = True, data = None):
         icon = Icons.refreshIcon()
         return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
-        
+
+    @staticmethod
+    def getResizeWidget(label = None, tooltip = "AutoSize", callback = None, no_keyboard = True, data = None):
+        icon = Icons.resizeIcon()
+        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+                
+
 
     @staticmethod
     def getPasteWidget(tooltip = "Paste", callback = None):

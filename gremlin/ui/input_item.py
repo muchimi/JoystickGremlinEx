@@ -2546,15 +2546,20 @@ class ContainerSelector(QtWidgets.QWidget):
             config = gremlin.config.Configuration()
             self.container_dropdown.setCurrentText(config.last_container)
     
-
-    @QtCore.Slot(object, str)
     def _last_container_changed(self, widget, name):
+        gremlin.util.InvokeUiMethod(self._last_container_changed_ui, widget, name) # ensure on UI thread
+    
+    def _last_container_changed_ui(self, widget, name):
+        if not Shiboken.isValid(self):
+            return
         if widget != self.container_dropdown:
             with QtCore.QSignalBlocker(self.container_dropdown):
                 self.container_dropdown.setCurrentText(name)
 
     def _container_changed(self):
         ''' remember the selection '''
+        if not Shiboken.isValid(self):
+            return
         name = self.container_dropdown.currentText()
         config = gremlin.config.Configuration()
         config.last_container = name
@@ -2877,6 +2882,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         
 
     def _config_visible(self):
+        if not Shiboken.isValid(self):
+            return
         config = gremlin.config.Configuration()
         self._title_bar_widget.setIdVisible(config.show_container_id)
         
@@ -3653,6 +3660,8 @@ class BasicActionWrapper(AbstractActionWrapper):
         gremlin.util.singleShot(self._config_visible)
 
     def _config_visible(self):
+        if not Shiboken.isValid(self):
+            return
         config = gremlin.config.Configuration()
         self._titlebar_widget.setIdVisible(config.show_container_id)
 

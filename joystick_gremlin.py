@@ -4808,9 +4808,6 @@ def exception_hook(exception_type, value, trace):
 if __name__ == "__main__":
    
 
-
-
-
     gremlin.shared_state.ui_ready = False
 
     # log file configuration

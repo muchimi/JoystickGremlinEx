@@ -330,7 +330,7 @@ class VjoyEvent:
 
 
 @gremlin.singleton_decorator.SingletonDecorator
-class EventListener(QtCore.QObject):
+class EventListener:
 
 	"""Listens for keyboard and joystick events and publishes them
 	via QT's signal/slot interface.
@@ -535,7 +535,7 @@ class EventListener(QtCore.QObject):
 
 
 	# notify when an input is selected (keep this a QT event for thread safety)
-	input_selection_changed = QtCore.Signal(object, object, object) # (device_guid, input_type, input_id)
+	input_selection_changed = Signal(object, object, object) # (device_guid, input_type, input_id)
 
 	# request to paste a condition
 	paste_condition = Signal(object, object) # (container, object_encoder)
@@ -556,7 +556,9 @@ class EventListener(QtCore.QObject):
 	def __init__(self):
 		"""Creates a new instance."""
 		import gremlin.windows_event_hook
-		QtCore.QObject.__init__(self)
+
+
+
 		self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
 		self.keyboard_hook.register(self._keyboard_handler)
 

@@ -510,13 +510,18 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._is_expression = value
 
 
-
     @property
-    def value(self):
-        return self.evaluate()
+    def value(self) -> bool:
+        ''' gets the state value '''
+        value = self.evaluate()
+        # return False on invalid state value
+        return value if value is not None else False
     
     @value.setter
-    def value(self, data):
+    def value(self, data : bool):
+        if data is None or not isinstance(data, bool):
+            syslog.warning(f"State setter: state: [{self.name}] id: [{self.id}] attempt to set invalid value [{data}]")
+            return
         if not self._expression and self._value != data:
             # only set value on non expression states and only if the value has changed
             self._value = data

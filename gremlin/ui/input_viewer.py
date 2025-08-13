@@ -671,6 +671,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         items = sd.getStates().items()
         if items:
             for key, state in items:
+                if state.value is None:
+                    syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
+                    continue
                 if category:
                     # apply filter
                     item_category = state.category if state.category else default_category
@@ -688,6 +691,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                     btn.setStyleSheet(css)
 
                 btn.setCheckable(True)
+
                 btn.setChecked(state.value)
                 if verbose: syslog.info(f"viewer state: {key}  value: {state.value}")
                 btn.clicked.connect(self._state_toggle)

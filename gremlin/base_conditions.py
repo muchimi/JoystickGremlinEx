@@ -631,16 +631,19 @@ class AbstractSelfTriggerFunctor(AbstractTriggerFunctor):
     
         
 
-    def _execute(self, event, value, extra_data) -> bool:
+    def _execute(self, event, value, extra_data, verbose = None) -> bool:
         ''' executes all action set nodes
         
         :param event: the event
         :param value: the action value
         :param extra_data : extra data dictionary, optional
         '''
+        if verbose is None: verbose = gremlin.config.Configuration().verbose_mode_exec
+
         if self.valid:
             result = True # assume ok
             for node in self.action_set_nodes:
+                if verbose: syslog.info(f"Trigger Functor: execute node ID: [{node.id}]")
                 result = result and self._ec.execute_node(node, event, value, extra_data)
             return result
         return False

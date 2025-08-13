@@ -26,7 +26,6 @@ from lxml import etree as ElementTree
 
 import gremlin.error as error
 import gremlin.types as types
-import gremlin.profile_library as profile_library
 import gremlin.util as util
 
 import action_plugins.condition as condition
