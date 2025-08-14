@@ -3710,7 +3710,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # set start button state
-            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = self.start_pressed
+            if verbose: syslog.info(f"VJOY REMAP: startup vjoy: [{self.action_data.vjoy_device_id}] button [{self.action_data.vjoy_button_id}] set to {'pressed' if self.action_data.start_pressed else 'released'}")
+            joystick_handling.VJoyProxy()[self.action_data.vjoy_device_id].button(self.action_data.vjoy_button_id).is_pressed = self.action_data.start_pressed
         if self.input_type == InputType.JoystickAxis:
             # send initial axis values to the output
 

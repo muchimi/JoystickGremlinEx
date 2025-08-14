@@ -13,8 +13,18 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+
+### (m76T44)
+- dialog dynamic positioning is now aware of multiple monitors
+- Fix: state add / delete and UI/filter sync - this was impacting a number of visual issues in the UI.
+- Fix: category/state data structure reset on profile change.
+- Fix: exception when defining a new process map in profile options (ui threading)
+- Fix: exception when automatically changing profiles on process change (ui threading)
+- Added: instrumentation on vjoy remap for default button settings.
+
+
 ### (m76T43)
-- Fix: resolves more QT garbage collection exceptions linked to new event model.
+- Fix: resolves more QT garbage collection desync exceptions
 - Fix: sequence container not triggering on input release.
 
 ### (m76T42)

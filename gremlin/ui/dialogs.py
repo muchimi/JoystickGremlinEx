@@ -406,7 +406,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         if index != self.tab_container.currentIndex():
             self.tab_container.setCurrentIndex(index)
 
-        self.queue_refresh.connect(self.populate_map)
+        self.queue_refresh.connect(self._populate_map)
 
         self._update_highlight_options() # update highlight state for checkboxes
 
@@ -430,7 +430,7 @@ class OptionsUi(ui_common.BaseDialogUi):
             # set the tab to the proper item
 
             # update the map with the errors
-            self.populate_map()
+            self._populate_map()
 
             index = 1 # profile tab
             if index != self.tab_container.currentIndex():
@@ -1165,7 +1165,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         # force a data reload
         self._profile_mapper.load_profile_map()
-        self.populate_map()
+        self._populate_map()
 
         # enable/disable components
         self._autoload_mapped_profile(self.autoload_profile_widget.isChecked())
@@ -2088,18 +2088,18 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _sort_profile_cb(self):
         ''' sorts entries by profile '''
         self._profile_mapper.sort_profile()
-        self.populate_map()
+        self._populate_map()
 
     def _sort_process_cb(self):
         ''' sorts entries by process '''
         self._profile_mapper.sort_process()
-        self.populate_map()
+        self._populate_map()
 
     def _add_profile_map_cb(self):
         ''' adds a new profile mapping '''
         item = gremlin.base_profile.ProfileMapItem()
         self._profile_mapper.register(item)
-        self.populate_map()
+        self._populate_map()
 
     def _save_map_cb(self):
         ''' saves the current mappings and options '''
@@ -2116,7 +2116,11 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         self._profile_mapper.save_profile_map()
         popCursor()
 
-    def populate_map(self):
+
+    def _populate_map(self):
+        gremlin.util.InvokeUiMethod(self._populate_map_ui)
+
+    def _populate_map_ui(self):
         ''' populates the map of executables to profiles '''
 
         # figure out the size of the header part of the control so things line up
@@ -2298,20 +2302,21 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             item.profile = fname
             with QtCore.QSignalBlocker(widget):
                 widget.setText(fname)
-            self.populate_map()
+            self._populate_map()
 
+    def _select_executable(self, widget, fname):
+        gremlin.util.InvokeUiMethod(self._select_executable_ui, widget, fname) # run on UI thread if needed
 
-    def _select_executable(self, fname):
+    def _select_executable_ui(self, widget, fname):
         """Adds the provided executable to the list of configurations.
 
         :param fname the executable for which to add a mapping
         """
-        widget = self.sender()
-        w = widget.data
-        item = w.data
+        #w = widget.data
+        item = widget.data
         item.process = fname
-        with QtCore.QSignalBlocker(w):
-            w.setText(fname)
+        with QtCore.QSignalBlocker(widget):
+            widget.setText(fname)
         self.queue_refresh.emit()
 
 
@@ -2340,7 +2345,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
     def _delete_confirmed_cb(self, item):
         self._profile_mapper.remove(item)
-        self.populate_map()
+        self._populate_map()
 
     def _mapping_duplicate_cb(self):
         ''' duplicates the current entry '''
@@ -2383,7 +2388,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
     """Displays active processes in a window for the user to select."""
 
     # Signal emitted when the user selects a process
-    process_selected = Signal(str)
+    process_selected = Signal(object, str) # (widget, filename)
 
     def __init__(self, text = None, parent=None):
         """Creates a new instance.
@@ -2489,7 +2494,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
     def _select(self):
         """Emits the process_signal when the select button is pressed."""
 
-        self.process_selected.emit(self.list_view.currentIndex().data())
+        self.process_selected.emit(self.data, self.list_view.currentIndex().data())
         self.close()
 
     def _browse(self, text = None):
@@ -2510,7 +2515,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
             "EXE Files (*.exe);"
         )
         if fname != "":
-            self.process_selected.emit(fname)
+            self.process_selected.emit(self.data, fname)
             self.close()
 
 

@@ -243,6 +243,25 @@ class InputItemListModel(ui_common.AbstractModel):
         ''' updates the filters only (does not load new data) '''
         self._filter_data()                
 
+    def _next_source_index(self):
+        ''' gets the next index for a source map '''
+        i_list = [i for i in self._source_index_map]
+        i_list.sort()
+        index = 0
+        while index in i_list:
+            index+=1
+        return index
+    
+    def _next_index(self):
+        ''' gets the next index for a source map '''
+        i_list = [i for i in self._index_map]
+        i_list.sort()
+        index = 0
+        while index in i_list:
+            index+=1
+        return index
+
+
     def _update_data(self, apply_filter = True, emit_change = True):
         ''' loads into the data model all the items for the current mode and device '''
         # load the items for this mode
@@ -299,6 +318,7 @@ class InputItemListModel(ui_common.AbstractModel):
             return self._item_map[input_id]
         return -1
     
+       
     
     
 

@@ -1141,10 +1141,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
 
-        
+    def activate(self, activate: bool):
+        gremlin.util.InvokeUiMethod(self._activate_ui, activate) # ensure on UI thread
         
 
-    def activate(self, activate):
+    def _activate_ui(self, activate : bool):
         """Activates and deactivates the code runner.
 
         :param checked True when the runner is to be activated, False
@@ -3508,8 +3509,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             mode = self.profile.get_last_runtime_mode()
             if verbose: syslog.info(f"PROC MODE: using last saved profile mode mode [{mode}]")
         return mode
+    
+    def _process_changed_cb(self, new_process_path : str):
+        gremlin.util.InvokeUiMethod(self._process_changed_cb_ui, new_process_path) # ensure on UI thread
 
-    def _process_changed_cb(self, new_process_path):
+    def _process_changed_cb_ui(self, new_process_path : str):
         """Handles changes in the active windows process focus
 
         If the active process has a known associated profile it is

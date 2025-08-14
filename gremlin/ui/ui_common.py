@@ -7682,9 +7682,9 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
         assert key,"unique key must be provided"
         self._window_key = key
 
-        
+        self.active_screen = QtWidgets.QApplication.screenAt(self.pos())
         self._apply_window_settings()
-        #gremlin.util.centerDialog(self, parent = parent)
+        
 
 
 
@@ -7697,6 +7697,9 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
             self.resize(window_size[0], window_size[1])
         if window_location:
             self.move(window_location[0], window_location[1])
+        else:
+            self.active_screen = QtWidgets.QApplication.screenAt(self.pos())
+
 
     def moveEvent(self, evt):
         """Handle changing the position of the window.
@@ -7704,7 +7707,12 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
         :param evt event information
         """
         config = gremlin.config.Configuration()
-        config.setWindowLocation(self._window_key, evt.pos().x(), evt.pos().y())
+        pos = evt.pos()
+        config.setWindowLocation(self._window_key, pos.x(), pos.y())
+
+        # track the screen the application is on (used for cursor positioning)
+        self.active_screen = QtWidgets.QApplication.screenAt(pos)
+
         super().moveEvent(evt)
 
     def resizeEvent(self, evt):
@@ -7719,7 +7727,12 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
         self._resize_count += 1
         super().resizeEvent(evt)
 
-
+def get_main_window():
+    """Finds and returns the main QMainWindow instance."""
+    for widget in QtWidgets.QApplication.instance():
+        if isinstance(widget, QtWidgets.QMainWindow):
+            return widget
+    return None
 
 class QShowAtCursorDialog(QtWidgets.QDialog):
     ''' a dialog that pops up near the cursor '''
@@ -7731,8 +7744,14 @@ class QShowAtCursorDialog(QtWidgets.QDialog):
         geom = self.frameGeometry()
         geom.moveCenter(QtGui.QCursor.pos())
 
+        # which screen is the main window on
+        main_window = gremlin.shared_state.ui
+        screen = main_window.active_screen
+        if not screen:
+            screen = QtWidgets.QApplication.primaryScreen()
+
         # stay in bounds if the screen 
-        screen = QtWidgets.QApplication.primaryScreen()
+        
         screen_geometry = screen.availableGeometry()
         a = geom.bottom()
         b = screen_geometry.bottom()

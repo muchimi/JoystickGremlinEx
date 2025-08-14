@@ -112,17 +112,18 @@ class RunProcessWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.executable_dialog.process_selected.connect(self._select_executable)
         self.executable_dialog.show()
 
-    def _select_executable(self, fname):
+    def _select_executable(self, widget, fname):
+        gremlin.util.InvokeUiMethod(self._select_executable_ui, widget, fname) # ensure on UI thread
+
+    def _select_executable_ui(self, widget, fname):
         """Adds the provided executable to the list of configurations.
 
         :param fname the executable for which to add a mapping
         """
-        widget = self.sender()
-        w = widget.data
-        item = w.data
+        item = widget.data
         item.process = fname
-        with QtCore.QSignalBlocker(w):
-            w.setText(fname)
+        with QtCore.QSignalBlocker(widget):
+            widget.setText(fname)
         self.action_data.process = fname
         self._update_ui()
         
