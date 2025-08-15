@@ -719,6 +719,7 @@
 <p>Gremlin offers multiple hierarchical modes, each with its own mapping.  A child mode can inherit mappings from the parent mode if the child does not also map that input.</p>
 <p>GremlinEx includes a number of built-in containers to solve common mapping scenarios, such as short press versus long press, axis in a certain zone, macros and chaining.</p>
 <p>GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and hardware panels connected to devices on the network, including the local machine.  GremlinEx can also send data back to these devices to update their configuration, for example, selecting pages to display based on the active profile or mode loaded in GremlinEx.</p>
+<p>GremlinxEx (as of M76) supports templates: individual mappings can be saved to template files.  These templates can then be loaded into another input, profile, or shared. Templates have no input information - only mappings.</p>
 <p>GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <p>GremlinEx comes as a zip file in the <a href="https://github.com/muchimi/JoystickGremlinEx/releases">release section of GitHub</a> that contains all you need.</p>
@@ -774,6 +775,7 @@
 <li>Comprehensive collection of various action container types to solve common mapping problems without custom programming.</li>
 <li>Custom scripting via Python if needed</li>
 <li>Play audio (.wav) files, and use text to speech (TTS) to convert text to audio cues.</li>
+<li>Save mapping templates for easy recall in other profiles or to share with others.</li>
 </ul>
 <h2 id="what-about-device-conflicts">What about device conflicts?<a class="headerlink" href="#what-about-device-conflicts" title="Permanent link">&para;</a></h2>
 <p>At its core, GremlinEx takes "real" hardware input and maps it to "virtual" joystick outputs via VJOY.<br />
