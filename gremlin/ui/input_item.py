@@ -621,6 +621,7 @@ class InputItemListView(ui_common.AbstractView):
 
 
 
+
     @property
     def current_index(self):
         return self._current_index
@@ -2498,7 +2499,7 @@ class ContainerSelector(QtWidgets.QWidget):
     # Signal emitted when a container type is selected
     container_added = Signal(str) # fires when a container is added (name of the container)
     container_copy =  Signal() # copy all containers
-    container_paste = Signal(object) # paste containers
+    container_paste = Signal(object, object) # paste containers (clipboard data, extra_data [optional])
     container_delete = Signal() # delete all containers
     container_from_template = Signal(dict) # load a new container from template, passes a dictionary (can be null) of data items
     container_to_template = Signal(object) # saves the mappings to a template, passes the input_item as the parameter
@@ -2535,6 +2536,7 @@ class ContainerSelector(QtWidgets.QWidget):
         # clipboard
         self.copy_button_widget = gremlin.ui.ui_common.Buttons.getCopyWidget(callback = self._copy_container, tooltip = "Copy container(s)")
         self.paste_button_widget = gremlin.ui.ui_common.Buttons.getPasteWidget(callback = self._paste_container, tooltip = "Paste container(s)")
+        self.paste_button_widget.data = self.data # input item doing the paste
         
         # delete all containers
         self.delete_button =  QtWidgets.QPushButton()
@@ -2628,9 +2630,13 @@ class ContainerSelector(QtWidgets.QWidget):
     def _paste_container(self):
         ''' handle paste containern '''
         clipboard = Clipboard()
+        widget = self.sender()
+        input_item = widget.data
+        extra_data = input_item.toExtraData()
+
         # validate the clipboard data is an action and is of the correct type for the input/container
         if clipboard.is_container:
-            self.container_paste.emit(clipboard.data)
+            self.container_paste.emit(clipboard.data, extra_data)
     
     @QtCore.Slot()
     def _copy_container(self):
@@ -2651,12 +2657,8 @@ class ContainerSelector(QtWidgets.QWidget):
     @QtCore.Slot()
     def _load_container_from_template(self):
         ''' loads container from template '''
-        extra_data = {}
         input_item : gremlin.base_profile.InputItem = self.data
-        extra_data["device_guid"] = input_item.device_guid
-        extra_data["device_type"] = input_item.device_type
-        extra_data["input_id"] = input_item.input_id
-        extra_data["mode"] = input_item.profile_mode
+        extra_data = input_item.toExtraData()
         self.container_from_template.emit(extra_data)
 
 class ConditionTrackerInfo:
@@ -4203,11 +4205,12 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
 
     @QtCore.Slot(object)
-    def _paste_container(self, container):
+    def _paste_container(self, container, extra_data = None):
         """Adds a new container to the input item.
 
         :param container container to be added
         """
+        import gremlin.base_profile
         el = gremlin.event_handler.EventListener()
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         container_list = []
@@ -4215,6 +4218,8 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         # tracker = gremlin.base_conditions.ConditionTracker()
         import_data = gremlin.base_profile.ProfileImportData()
         verbose = gremlin.config.Configuration().verbose
+
+        
 
         if isinstance(container, ObjectEncoder):
             oc = container
@@ -4224,14 +4229,12 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                 xml = oc.data
                 node = lxml.etree.fromstring(xml)
                 container_type = node.get("type")
-
-               
                 # verify the container is valid for the input
                 if container_type in container_tag_map:
                     container_name = container_tag_map[container_type].name
                     if container_name in valid_containers_names:
                         new_container = container_tag_map[container_type](self.item_data)
-                        new_container.from_xml(node, self.item_data)
+                        new_container.from_xml(node, data = self.item_data, extra_data = extra_data)
                         new_container.generateGuids()
                         if new_container.id in import_data.used_ids:
                             new_id = gremlin.util.get_guid()
@@ -4253,7 +4256,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                         container_name = container_tag_map[container_type].name
                         if container_name in valid_containers_names:
                             new_container = container_tag_map[container_type](self.item_data)
-                            new_container.from_xml(node, self.item_data)
+                            new_container.from_xml(node, data = self.item_data, extra_data = extra_data)
                             new_container.generateGuids()
                             if new_container.id in import_data.used_ids:
                                 new_id = gremlin.util.get_guid()

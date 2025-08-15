@@ -20,6 +20,8 @@ GremlinEx includes a number of built-in containers to solve common mapping scena
 
 GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and hardware panels connected to devices on the network, including the local machine.  GremlinEx can also send data back to these devices to update their configuration, for example, selecting pages to display based on the active profile or mode loaded in GremlinEx.
 
+GremlinxEx (as of M76) supports templates: individual mappings can be saved to template files.  These templates can then be loaded into another input, profile, or shared. Templates have no input information - only mappings.
+
 GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.
 
 ## Installation
@@ -104,6 +106,7 @@ Some examples of what GremlinEx can do:
 - Comprehensive collection of various action container types to solve common mapping problems without custom programming.
 - Custom scripting via Python if needed
 - Play audio (.wav) files, and use text to speech (TTS) to convert text to audio cues.
+- Save mapping templates for easy recall in other profiles or to share with others.
 
 ## What about device conflicts?
 

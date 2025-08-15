@@ -1680,6 +1680,18 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
 
+    def toExtraData(self, extra_data = None) -> dict:
+        ''' creates or adds properties of the input to create an extra data item '''
+        if extra_data is None:
+            extra_data = {}
+
+        extra_data["device_guid"] = self.device_guid
+        extra_data["device_type"] = self.device_type
+        extra_data["input_id"] = self.input_id
+        extra_data["mode"] = self.profile_mode        
+          
+        return extra_data
+
     def setProfileModeCallback(self, callback):
         ''' sets an override callback to change profile mode return value for special cases '''
         self._profile_mode_callback = callback

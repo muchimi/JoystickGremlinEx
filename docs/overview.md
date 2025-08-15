@@ -187,6 +187,13 @@ Load times are typically speedy, however large profiles with lots of modes and i
 
 GremlinEx does not offer in the UI the option to delete a profile.  To remove a profile, you can open File Eplorer to the GremlinEx storage folder via the menu (Actions/Open GremlinEx folder) and delete the file manually.
 
+## Templates
+
+Templates holding setting for containers and actions can be saved to disk as template (XML) file.  The file only contains container and action information.  Templates do not have any input configuration in them.  Templates can then be loaded to another input, or profile, to build a library of mappings.  This is particularly useful for mappings that have OSC or MSFS data as these can get time consuming to setup, although templates can also be seen as a persistent copy/paste of containers and actions.   A benefit of templates is they are input agnostic, although care should be used to ensure that a template for a button isn't loaded into a linear (axis) input, and vice versa as that could cause errors or warnings.
+
+
+![templates](assets/templates.png)
+
 ## Devices
 
 A device is a physical or virtual controller recognized by GremlinEx as an input controler. Examples of devices are joysticks and panels connected to the computer, or a virtual device, such as an OSC input message or a virtual joystick (VJOY).
