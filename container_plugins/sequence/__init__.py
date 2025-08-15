@@ -281,7 +281,7 @@ class SequenceContainer(AbstractContainer):
         self.trigger_on_release = False # true if the sequence triggers on input release instead of input press
         
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container

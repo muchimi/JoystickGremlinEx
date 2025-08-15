@@ -508,7 +508,7 @@ class Remap(gremlin.base_profile.AbstractAction):
             else:
                 return True
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         """Populates the data storage with data from the XML node.
 
         :param node XML node with which to populate the storage

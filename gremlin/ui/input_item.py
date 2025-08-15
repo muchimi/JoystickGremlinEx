@@ -26,10 +26,8 @@ import gremlin.event_handler
 import gremlin.singleton_decorator
 import gremlin.types
 import gremlin.base_conditions
-import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
-import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.ui.axis_calibration
 import gremlin.ui.ui_common
@@ -1204,7 +1202,8 @@ class ActionSetView(ui_common.AbstractView):
             self.action_selector.inputItem = profile_data.parent
             self.action_selector.action_added.connect(self._add_action)
             self.action_selector.action_paste.connect(self._paste_action)
-            self.group_layout.addWidget(self.action_selector, 1, 0)
+            widget,_ = gremlin.ui.ui_common.getHContainer(self.action_selector)
+            self.group_layout.addWidget(widget, 1, 0)
 
         self._widgets = []
 
@@ -2501,9 +2500,10 @@ class ContainerSelector(QtWidgets.QWidget):
     container_copy =  Signal() # copy all containers
     container_paste = Signal(object) # paste containers
     container_delete = Signal() # delete all containers
-    container_from_template = Signal() # load a new container from template
+    container_from_template = Signal(dict) # load a new container from template, passes a dictionary (can be null) of data items
+    container_to_template = Signal(object) # saves the mappings to a template, passes the input_item as the parameter
 
-    def __init__(self, input_type, is_axis = False, parent=None):
+    def __init__(self, input_type, is_axis = False, data = None, parent=None):
         """Creates a new selector instance.
 
         :param parent the parent of this widget
@@ -2511,24 +2511,22 @@ class ContainerSelector(QtWidgets.QWidget):
         super().__init__(parent)
         self.input_type = input_type
         self.is_axis = is_axis
-        is_dark = gremlin.shared_state.is_dark_theme
-
+        self.data = data # input item
+        
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.addWidget(QtWidgets.QLabel("Container"))
 
         self.container_dropdown = ui_common.QComboBox()
-        self.refresh(input_type)
+        
         self.add_container_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds a container", callback = self._add_container)
 
-        self.load_template_widget =  QtWidgets.QPushButton()
-        icon = gremlin.ui.ui_common.load_icon("fa6s.folder-open")
-        self.load_template_widget.setIcon(icon)
-        self.load_template_widget.setToolTip("Load from template")
-        self.load_template_widget.clicked.connect(self._load_container_from_template)
+        self.save_template_widget =  gremlin.ui.ui_common.Buttons.getSaveWidget(callback =self._save_container_to_template,
+                                                                                  tooltip = "Save mappings to template")
+
+        self.load_template_widget =  gremlin.ui.ui_common.Buttons.getFolderWidget(callback =self._load_container_from_template,
+                                                                                  tooltip = "Load mappings from template")
         
-
-
         default_container = gremlin.config.Configuration().last_container
         self.container_dropdown.setCurrentText(default_container)
         self.container_dropdown.currentIndexChanged.connect(self._container_changed)
@@ -2548,10 +2546,13 @@ class ContainerSelector(QtWidgets.QWidget):
 
         self.main_layout.addWidget(self.container_dropdown)
         self.main_layout.addWidget(self.add_container_widget)
+        self.main_layout.addWidget(self.save_template_widget)
         self.main_layout.addWidget(self.load_template_widget)
         self.main_layout.addWidget(self.copy_button_widget)
         self.main_layout.addWidget(self.paste_button_widget)
         self.main_layout.addWidget(self.delete_button)
+
+        self.refresh(input_type)
 
         eh = gremlin.event_handler.EventHandler()
         eh.last_container_changed.connect(self._last_container_changed)
@@ -2565,6 +2566,9 @@ class ContainerSelector(QtWidgets.QWidget):
                 self.container_dropdown.addItem(name)
             config = gremlin.config.Configuration()
             self.container_dropdown.setCurrentText(config.last_container)
+
+        enabled = self.data and len(self.data.containers) > 0
+        self.save_template_widget.setEnabled(enabled)
     
     def _last_container_changed(self, widget, name):
         gremlin.util.InvokeUiMethod(self._last_container_changed_ui, widget, name) # ensure on UI thread
@@ -2639,9 +2643,21 @@ class ContainerSelector(QtWidgets.QWidget):
         self.container_delete.emit()
 
     @QtCore.Slot()
+    def _save_container_to_template(self):
+        ''' saves a complete mapping to a template '''
+        input_item : gremlin.base_profile.InputItem = self.data
+        self.container_to_template.emit(input_item)
+
+    @QtCore.Slot()
     def _load_container_from_template(self):
         ''' loads container from template '''
-        self.container_from_template.emit()
+        extra_data = {}
+        input_item : gremlin.base_profile.InputItem = self.data
+        extra_data["device_guid"] = input_item.device_guid
+        extra_data["device_type"] = input_item.device_type
+        extra_data["input_id"] = input_item.input_id
+        extra_data["mode"] = input_item.profile_mode
+        self.container_from_template.emit(extra_data)
 
 class ConditionTrackerInfo:
     def __init__(self, input_item, device_guid, input_id, container, widget):
@@ -2759,15 +2775,16 @@ class ConditionStateTracker():
      
     def set_condition_tab_state(self, dock_tabs : QtWidgets.QTabWidget, enabled : bool):
         ''' marks the condition tab used or not '''
-        try:
-            for i in range(dock_tabs.count()):
-                if dock_tabs.tabText(i) == "Conditions":
-                    tb = dock_tabs.tabBar()
-                    icon = self._icon_enabled if enabled else self._icon_disabled
-                    tb.setTabIcon(i, icon)
-                    break
-        except:
-            pass
+        if Shiboken.isValid(dock_tabs):
+            try:
+                for i in range(dock_tabs.count()):
+                    if dock_tabs.tabText(i) == "Conditions":
+                        tb = dock_tabs.tabBar()
+                        icon = self._icon_enabled if enabled else self._icon_disabled
+                        tb.setTabIcon(i, icon)
+                        break
+            except:
+                pass
 
     
         
@@ -2881,12 +2898,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         tracker.register(self.profile_data.input_item, self.profile_data, self)
         
 
-        save_widget = QtWidgets.QPushButton("Save") # TitleBarButton()
-        save_widget.setToolTip("Save Template")
-        icon = gremlin.ui.ui_common.load_icon("mdi.content-save")
-        save_widget.setIcon(icon)
-        save_widget.clicked.connect(self._save_template)
-
+        save_widget = gremlin.ui.ui_common.Buttons.getSaveWidget(tooltip="Save this container to a template", callback = self._save_template)
         
         #self._title_bar_widget.extra_layout.addWidget(open_widget)
         self._title_bar_widget.extra_layout.addWidget(save_widget)
@@ -2922,7 +2934,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                 tree = etree.parse(fname, parser=parser)
                 root = tree.getRoot()
                 if root.tag == "container_template":
-                    for node in root.xpath("//container"):
+                    # get root containers only
+                    nodes = root.xpath("//container[not(ancestor::container)]")
+                    for node in nodes:
                         container_type = node.get("type")
                         container_plugins = gremlin.plugin_manager.ContainerPlugins()
                         container_tag_map = container_plugins.tag_map
@@ -4097,9 +4111,39 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             syslog.info(f"multi container copied to clipboard")
     
 
-    @QtCore.Slot(object)    
-    def _load_container_from_template(self):
+    def _save_container_to_template(self, item):
+        input_item : gremlin.base_profile.InputItem = item
+        ''' saves a mapping set to a template '''
+        fname, _ = QtWidgets.QFileDialog.getSaveFileName(
+            None,
+            "Save template",
+            gremlin.util.userprofile_path(),
+            "XML files (*.xml)"
+        )
 
+        if fname:
+            root = etree.Element("container_template")
+            # get the xml for every container in the mapping
+            for container in input_item.containers:
+                node = container.to_xml()
+                root.append(node)
+            # save the xml
+            tree = etree.ElementTree(root)
+            try:
+                if os.path.isfile(fname):
+                    # blitz existing file
+                    os.unlink(fname)
+                tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            except:
+                syslog.error(f"Error writing template to: {fname}")
+                return False
+            return True
+        
+        return False
+
+
+    def _load_container_from_template(self, extra_data = None):
+        ''' loads a container from a template '''
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Container template",
@@ -4115,7 +4159,9 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                 tree = etree.parse(fname, parser=parser)
                 root = tree.getroot()
                 if root.tag == "container_template":
-                    for node in root.xpath("//container"):
+                    # get root containers only
+                    nodes = root.xpath("//container[not(ancestor::container)]")
+                    for node in nodes:
                         container_type = node.get("type")
                         container_plugins = gremlin.plugin_manager.ContainerPlugins()
                         container_tag_map = container_plugins.tag_map
@@ -4126,8 +4172,8 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                             container_name = container_tag_map[container_type].name
                             if container_name in valid_containers_names:
                                 new_container = container_tag_map[container_type](self.item_data)
-                                new_container.from_xml(node, self.item_data)
-                                new_container.generateGuids()
+                                new_container.from_xml(node, self.item_data, extra_data)
+                                new_container.generateGuids() # replace IDs to avoid conflicts
                                 container_list.append(new_container)
                         else:
                             msg = f"Container {container_type.name} is not valid for the current input"
@@ -4290,12 +4336,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.description_field.textChanged.connect(self._edit_description_cb)
         self.description_layout.addWidget(self.description_field)
         self.description_field.setReadOnly(self.item_data.descriptionReadOnly)        
-        del_icon = gremlin.util.load_icon("mdi.delete")
-        self.description_clear_button = QtWidgets.QPushButton()
-        self.description_clear_button.setIcon(del_icon)
-        self.description_clear_button.clicked.connect(self._delete_description_cb)
-        self.description_clear_button.setMaximumWidth(20)
-        self.description_clear_button.setToolTip("Reset description to default")
+        self.description_clear_button = gremlin.ui.ui_common.Buttons.getEraserWidget(callback = self._delete_description_cb, tooltip="Reset description to default", width = 20, height = 20)
         self.description_layout.addWidget(self.description_clear_button)
 
         self.main_layout.addLayout(self.description_layout)
@@ -4307,8 +4348,8 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         """
         import gremlin.ui.input_item as input_item
         import gremlin.ui.ui_common as ui_common
-        self.dropdown_widget = QtWidgets.QWidget()
-        self.dropdown_layout = QtWidgets.QHBoxLayout(self.dropdown_widget)
+        
+        
 
         # default input type
         input_type = self._input_type
@@ -4321,21 +4362,27 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
 
-        self.container_selector = input_item.ContainerSelector(input_type, self.item_data.is_axis)
+        self.container_selector = input_item.ContainerSelector(input_type, self.item_data.is_axis, data = self.item_data)
+        
         self.container_selector.container_added.connect(self._add_container)
         self.container_selector.container_copy.connect(self._copy_container)
         self.container_selector.container_paste.connect(self._paste_container)
 
         self.container_selector.container_from_template.connect(self._load_container_from_template)
+        self.container_selector.container_to_template.connect(self._save_container_to_template)
         self.container_selector.container_delete.connect(self._delete_container)
         self.always_execute = QtWidgets.QCheckBox("Always execute")
+        self.always_execute.setToolTip("If enabled, the mapping continues to process triggers even if the profile is paused.")
         self.always_execute.setChecked(self.item_data.always_execute)
         self.always_execute.stateChanged.connect(self._always_execute_cb)
 
-        self.dropdown_layout.addWidget(self.action_selector)
-        self.dropdown_layout.addStretch()
-        self.dropdown_layout.addWidget(self.container_selector)
-        self.dropdown_layout.addWidget(self.always_execute)
+        widgets = [self.action_selector,
+                   "||",
+                   self.container_selector,
+                   self.always_execute
+                   ]
+
+        self.dropdown_widget, self.dropdown_layout = gremlin.ui.ui_common.getHContainer(widgets)
         self.main_layout.addWidget(self.dropdown_widget)
 
 

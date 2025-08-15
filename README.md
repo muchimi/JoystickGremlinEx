@@ -13,6 +13,11 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T45)
+- Fix: mapping template import no longer add sub-containers as root containers.
+- New: multi-container templates.  A new save button is added to a general container set to enable saving a template containing all the containers in the current mapping.  The template can then be applied to another profile or input.
+- Improved: gated axis: added context menus on right click to ranges and gates.
+
 
 ### (m76T44)
 - dialog dynamic positioning is now aware of multiple monitors

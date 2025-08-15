@@ -243,7 +243,7 @@ class RunProcess(gremlin.base_profile.AbstractAction):
             InputType.JoystickHat
         ]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         if "process" in node.attrib:
             self.process = node.get("process")
         if "args" in node.attrib:

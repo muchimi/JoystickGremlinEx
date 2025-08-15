@@ -175,7 +175,7 @@ class PauseAction(gremlin.base_profile.AbstractAction):
             InputType.JoystickHat
         ]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         if "mode" in node.attrib:
             mode = node.get("mode")
             match mode:

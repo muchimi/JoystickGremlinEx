@@ -191,7 +191,7 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
             InputType.JoystickHat
         ]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         self._mode = node.get("name")
         verbose = gremlin.config.Configuration().verbose_mode_outputs
         if verbose: syslog.info(f"Read mode: {self._mode} from XML - edit mode: {gremlin.shared_state.edit_mode}")

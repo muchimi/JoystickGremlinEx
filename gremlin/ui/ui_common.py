@@ -98,6 +98,10 @@ class Color():
     def borderColor():
         return "#444444" if gremlin.shared_state.is_dark_theme else "#111111"
     @staticmethod
+    def menuSeparatorColor():
+        return "#CACACA" if gremlin.shared_state.is_dark_theme else "#111111"
+
+    @staticmethod
     def titleBackgroundColor():
         return "#222222" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
     @staticmethod
@@ -575,6 +579,15 @@ class Icons():
     def trashIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
         return Icons._icon("ei.trash", qta_color)
     @staticmethod
+    def eraserIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+        return Icons._icon("fa6s.eraser", qta_color)
+    @staticmethod
+    def folderIcon(qta_color = "#ebd034") -> QtGui.QIcon:
+        return Icons._icon("fa5s.folder-open", qta_color)
+    @staticmethod
+    def saveIcon(qta_color = "#ebd034") -> QtGui.QIcon:
+        return Icons._icon("fa5s.save", qta_color)
+    @staticmethod
     def keyboardIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
         return Icons._icon("fa6s.keyboard", qta_color)
     @staticmethod
@@ -674,7 +687,7 @@ class Buttons():
     maxHeight = 24 # max height in pixels
 
     @staticmethod
-    def _template(label = "", icon_source : str = "", tooltip = None, callback = None, no_keyboard = True, data = None, width : int = None):
+    def _template(label = "", icon_source : str = "", tooltip = None, callback = None, no_keyboard = True, data = None, width : int = None, height : int = None):
         if no_keyboard:
             widget = NoKeyboardPushButton()
         else:
@@ -701,15 +714,21 @@ class Buttons():
         widget.setMaximumHeight(Buttons.maxHeight)
         if width is not None:
             widget.setMaximumWidth(width)
+        if height is not None:
+            widget.setMaximumHeight(height)
         return widget
     
     @staticmethod
     def getDeleteWidget(label = None, tooltip = "Delete", callback = None, no_keyboard = True, data = None):
         return Buttons._template(label, "mdi6.delete", tooltip, callback, no_keyboard, data)
+        
     
     @staticmethod
     def getAddWidget(label = "Add", tooltip = "Add", callback = None, no_keyboard = True, data = None):
-        return Buttons._template(label, "ri.add-line", tooltip, callback, no_keyboard, data)
+        button =  Buttons._template(label, "ri.add-line", tooltip, callback, no_keyboard, data)
+        button.setMinimumHeight(24)
+        button.setStyleSheet(f" QPushButton {{margin-left: none;}}")
+        return button
     
     @staticmethod
     def getRemoveWidget(label = "Remove", tooltip = "Remove", callback = None, no_keyboard = True, data = None):
@@ -743,6 +762,19 @@ class Buttons():
     @staticmethod
     def getClearWidget(label = "Clear", tooltip = "Clear", callback = None, no_keyboard = True, data = None):
         return Buttons._template(label, Icons.trashIcon(), tooltip, callback, no_keyboard, data)
+    
+    @staticmethod
+    def getEraserWidget(label = None, tooltip = "Clear", callback = None, no_keyboard = True, data = None, width = 24, height = 24):
+        return Buttons._template(label, Icons.eraserIcon(), tooltip, callback, no_keyboard, data, width=width, height=height)
+    
+    @staticmethod
+    def getFolderWidget(label = None, tooltip = None, callback = None, no_keyboard = True, data = None, width = 24, height = 24):
+        return Buttons._template(label, Icons.folderIcon(), tooltip, callback, no_keyboard, data, width = width, height = height)
+
+    @staticmethod
+    def getSaveWidget(label = None, tooltip = None, callback = None, no_keyboard = True, data = None, width = 24, height = 24):
+        return Buttons._template(label, Icons.saveIcon(), tooltip, callback, no_keyboard, data, width = width, height = height)
+
 
     @staticmethod
     def getOkWidget(label = "Ok", tooltip = "Accept", callback = None, no_keyboard = True, data = None):
@@ -2382,29 +2414,27 @@ class ActionSelector(QtWidgets.QWidget):
 
 
 
-        self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.action_label = QtWidgets.QLabel("Action")
-        self.main_layout.addWidget(self.action_label)
-
+        
 
         self.action_dropdown = QComboBox()
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
         self.refresh(input_type)
         
-        self.add_button = QtWidgets.QPushButton("Add")
-        self.add_button.clicked.connect(self._add_action)
+        self.add_button = Buttons.getAddWidget(callback = self._add_action)
 
         # clipboard
         self.paste_button = gremlin.ui.ui_common.Buttons.getPasteWidget(callback=self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
 
+        self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.main_layout.addWidget(self.action_dropdown)
-        self.main_layout.addWidget(self.add_button)
-        self.main_layout.addWidget(self.paste_button)
-        self.main_layout.addStretch(1)
+        widget, _ = getHContainer([self.action_dropdown,
+                                          self.add_button,
+                                          self.paste_button       
+                                          ],'Actions')
 
+        self.main_layout.addWidget(widget)
         eh = gremlin.event_handler.EventHandler()
         eh.last_action_changed.connect(self._last_action_changed)
         self._container = None

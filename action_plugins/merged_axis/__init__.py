@@ -627,7 +627,7 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         # load gate data
         self.entries = []
         for entry_node in node:

@@ -226,7 +226,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             InputType.JoystickHat
         ]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         self.sound_file = node.get("file")
         self.volume = int(node.get("volume", 50))
 

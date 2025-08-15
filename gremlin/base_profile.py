@@ -151,12 +151,12 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         return get_generic_icon()
 
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Initializes this node's values based on the provided XML node.
 
         :param node the XML node to use to populate this instance
         """
-        self._parse_xml(node, data)
+        self._parse_xml(node, data, extra_data)
 
     def to_xml(self):
         """Returns the XML representation of this instance.
@@ -323,7 +323,7 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         return self.get_device_name()
 
     @abstractmethod
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         """Implementation of the XML parsing.
 
         :param node the XML node to use to populate this instance
@@ -447,7 +447,7 @@ class AbstractContainer(ProfileData):
         el.mapping_changed.emit(self._input_item)
 
     def generateGuids(self):
-        ''' called when GUIDs for this container, actions and conditions need to be re-set '''
+        ''' called when GUIDs for this container need to be reset so they are unique, such as when pasting or importing. Actions and conditions IDs also need to be reset '''
 
         tracker = ConditionTracker()
 
@@ -628,13 +628,13 @@ class AbstractContainer(ProfileData):
         return callbacks
     
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the instance with data from the given XML node.
 
         :param node the XML node to populate fields with
         """
         
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
         
 
         if "container_id" in node.attrib:
@@ -655,7 +655,7 @@ class AbstractContainer(ProfileData):
             comment = node.get("comment")
         if comment:
             self.comment = comment
-        self._parse_action_set_xml(node, data)
+        self._parse_action_set_xml(node, data, extra_data)
         self._parse_virtual_button_xml(node, data)
         self._parse_activation_condition_xml(node, data)
 
@@ -682,7 +682,7 @@ class AbstractContainer(ProfileData):
 
         return node
 
-    def _parse_action_set_xml(self, node, data = None):
+    def _parse_action_set_xml(self, node, data = None, extra_data = None):
         """Parses the XML content related to actions.
 
         :param node the XML node to process
@@ -693,10 +693,10 @@ class AbstractContainer(ProfileData):
                 continue
             elif child.tag == "action-set":
                 action_set = ActionSet()
-                self._parse_action_xml(child, action_set, data)
+                self._parse_action_xml(child, action_set, data, extra_data)
                 self.action_sets.append(action_set)
  
-    def _parse_action_xml(self, node, action_set, data = None):
+    def _parse_action_xml(self, node, action_set, data = None, extra_data = None):
         """Parses the XML content related to actions in an action-set.
 
         :param node the XML node to process
@@ -726,7 +726,7 @@ class AbstractContainer(ProfileData):
 
             entry = action_name_map[tag](self)
             input_item = data
-            entry.from_xml(child, (input_item, self)) # pass input item, container as a tuple
+            entry.from_xml(child, (input_item, self), extra_data) # pass input item, container as a tuple
             action_set.append(entry)
 
 
@@ -894,7 +894,7 @@ class Device:
 
         return mode
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates this device based on the xml data.
 
         :param node the xml node to parse to populate this device
@@ -920,7 +920,7 @@ class Device:
 
         for child in node:
             mode = Mode(self)
-            mode.from_xml(child, data)
+            mode.from_xml(child, data, extra_data)
             self.modes[mode.name] = mode
 
 
@@ -1117,7 +1117,7 @@ class AbstractAction(ProfileData):
         return "N/A"
     
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the instance with data from the given XML node.
 
         :param node the XML node to populate fields with
@@ -1146,7 +1146,7 @@ class AbstractAction(ProfileData):
             self.comment = comment
 
 
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
 
 
         self.activation_condition = ActivationCondition([],ActivationRule.All)
@@ -1245,7 +1245,7 @@ class AbstractContainerAction(AbstractAction):
             return self._item_data_map[index]
         return None
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the instance with data from the given XML node.
 
         :param node the XML node to populate fields with
@@ -1273,8 +1273,9 @@ class AbstractContainerAction(AbstractAction):
 
         assert current is not None,"Profile nesting error: unable to find InputItem"
 
-        mode_object = get_mode_object(node)
-
+        
+        mode_object = get_mode_object(node, extra_data)
+        assert mode_object is not None,"Unable to derive mode object"
 
         for child in container_nodes:
 
@@ -1293,7 +1294,7 @@ class AbstractContainerAction(AbstractAction):
             if child is not None:
                 child.tag = child.get("type")
                 index = safe_read(child,"index",int,0)
-                input_item.from_xml(child, data)
+                input_item.from_xml(child, data, extra_data)
 
             self._item_data_map[index] = input_item
 
@@ -1403,7 +1404,7 @@ class Settings:
 
         return node
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the data storage with the XML node's contents.
 
         :param node the node containing the settings data
@@ -1564,34 +1565,57 @@ class ProfileRegistry():
         return None # not found
     
 
-def get_mode_object(node):
+def get_mode_object(node, extra_data = None):
     ''' gets the mde object corresponding to a profile XML node 
     
-    :param node: lxml element to scan ancestors for 
+    :param node: lxml element to scan ancestors for, or a dictionary of parameters used to derive the mode object
+    
     
     '''
 
-    nodes = node.xpath("ancestor::mode")
-    if not nodes:
-        return None
-    mode_node = nodes.pop()
-    mode = safe_read(mode_node, "name", str, "")
-    assert len(mode) > 0, "XML hierarchy error - parent mode not found"
-
-    nodes = node.xpath("ancestor::device")
-    device_node = nodes.pop()
-    device_id = safe_read(device_node, "device-guid", str, "")
-    assert device_id, "XML hierarchy error - parent device not found"
-    device_guid = gremlin.util.parse_guid(device_id)
-    device_type = safe_read(device_node,"type", str, "")
-    device_type = DeviceType.to_enum(device_type)
     
-    profile = gremlin.shared_state.current_profile
-    device_modes = profile.get_device_modes(device_guid,device_type,DeviceType.to_string(device_type))
-    mode_object = device_modes.ensure_mode_exists(mode)    
+    if extra_data:
+        if "mode_object" in extra_data:
+            # object already stored
+            return extra_data["mode_object"]
+        if "mode" in extra_data and "device_guid" in extra_data and "device_type" in extra_data:
+            # derive from compoments
+            profile = gremlin.shared_state.current_profile
+            device_guid = extra_data["device_guid"]
+            device_type = extra_data["device_type"]
+            input_id = extra_data["input_id"]
+            mode = extra_data["mode"]
 
-    return mode_object
+            device_modes = profile.get_device_modes(device_guid, device_type,DeviceType.to_string(device_type))
+            mode_object = device_modes.ensure_mode_exists(mode)
+            return mode_object
+    
+    if node is not None and isinstance(node, lxml.etree._Element):
 
+
+        # xml node
+        nodes = node.xpath("ancestor::mode")
+        if not nodes:
+            return None
+        mode_node = nodes.pop()
+        mode = safe_read(mode_node, "name", str, "")
+        assert len(mode) > 0, "XML hierarchy error - parent mode not found"
+
+        nodes = node.xpath("ancestor::device")
+        device_node = nodes.pop()
+        device_id = safe_read(device_node, "device-guid", str, "")
+        assert device_id, "XML hierarchy error - parent device not found"
+        device_guid = gremlin.util.parse_guid(device_id)
+        device_type = safe_read(device_node,"type", str, "")
+        device_type = DeviceType.to_enum(device_type)
+        
+        profile = gremlin.shared_state.current_profile
+        device_modes = profile.get_device_modes(device_guid,device_type,DeviceType.to_string(device_type))
+        mode_object = device_modes.ensure_mode_exists(mode)    
+
+        return mode_object
+    
+    return None
 
 class InputItem(gremlin.base_classes.AbstractInputItem):
 
@@ -2021,7 +2045,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
     
 
-    def from_xml(self, node, data, skip_root = False):
+    def from_xml(self, node, data, extra_data = None, skip_root = False):
         """Parses an InputItem node.
 
         :param node XML node to parse
@@ -2039,10 +2063,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             self._description = safe_read(node, "description", str, "")
             self.always_execute = read_bool(node, "always-execute", False)
 
+            mode_object = get_mode_object(node, extra_data)
+            assert mode_object is not None,"Unable to derive mode object"
             
-       
-            mode_object = get_mode_object(node)
-            assert mode_object is not None,"Mode object could not be derived"
 
             if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
                 from gremlin.ui.keyboard_device import KeyboardInputItem
@@ -2169,7 +2192,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 )
                 continue
             entry = container_tag_map[container_type](self)
-            entry.from_xml(child, data)
+            entry.from_xml(child, data, extra_data)
             self.add_container(entry)
             if hasattr(entry, "action_model"):
                 entry.action_model = self.containers
@@ -3358,7 +3381,7 @@ class Profile():
             return modes[0]
 
 
-    def from_xml(self, fname, data = None):
+    def from_xml(self, fname, data = None, extra_data = None):
         """Parses the profile XML document into the profile data structure.
 
         :param fname the path to the XML file to parse
@@ -3412,14 +3435,14 @@ class Profile():
         devices = root.xpath("//profile/devices/device")
         for child in devices:
             device = Device(self)
-            device.from_xml(child, data)
+            device.from_xml(child, data, extra_data)
             self.devices[device.device_guid] = device
 
 
         # Parse each vjoy device into separate DeviceConfiguration objects
         for child in root.iter("vjoy-device"):
             device = Device(self)
-            device.from_xml(child, data)
+            device.from_xml(child, data, extra_data)
             self.vjoy_devices[device.device_guid] = device
 
         # parse simconnect startup entries
@@ -3508,12 +3531,12 @@ class Profile():
             self.merge_axes.append(self._parse_merge_axis(child))
 
         # Parse settings entries
-        self.settings.from_xml(root.find("settings"), data)
+        self.settings.from_xml(root.find("settings"), data, extra_data)
 
         # Parse plugin entries
         for child in root.findall("plugins/plugin"):
             plugin = Plugin(self)
-            plugin.from_xml(child, data)
+            plugin.from_xml(child, data, extra_data)
             self.plugins.append(plugin)
 
         if not self._start_mode:
@@ -4057,7 +4080,7 @@ class Mode:
     def setName(self, value : str):
         self._name = value.strip() if value else ""
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Parses the XML mode data.
 
         :param node XML node to parse
@@ -4078,7 +4101,7 @@ class Mode:
         
         for child in node:
             item = InputItem(parent = self)
-            item.from_xml(child, item) # send owner item to sub components as the data member
+            item.from_xml(child, item, extra_data) # send owner item to sub components as the data member
             item.device_guid = self.parent.device_guid
 
             store_item = True
@@ -4188,7 +4211,7 @@ class Plugin:
         self.file_name = None
         self.instances = []
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         self.file_name = safe_read(node, "file-name", str, None)
         for child in node.iter("instance"):
             instance = PluginInstance(self)
@@ -4239,7 +4262,7 @@ class PluginInstance:
 
         return self.variables[name]
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         verbose = gremlin.config.Configuration().verbose
         self.name = safe_read(node, "name", str, "")
         for child in node.iter("variable"):
@@ -4317,7 +4340,7 @@ class PluginVariable:
         
         
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         ''' save user plugin variable data '''
         self.name = safe_read(node, "name", str, "")
         self.type = PluginVariableType.to_enum(

@@ -1923,7 +1923,7 @@ class Macro(gremlin.base_profile.AbstractAction):
             InputType.JoystickHat
         ]
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         """Parses the XML node corresponding to a macro action.
 
         :param node the XML node to parse.

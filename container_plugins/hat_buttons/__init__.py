@@ -332,7 +332,7 @@ class HatButtonsContainer(AbstractContainer):
         self.action_sets = [[], [], [], []]
 
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container

@@ -935,7 +935,7 @@ class ProfileInputNode(ProfileBaseNode):
         return self._calibration
 
 
-    def from_xml(self, node : Element, data = None):
+    def from_xml(self, node : Element, data = None, extra_data = None):
         ''' reads an input node '''
         self.input_type = InputType.to_enum(node.tag)
         self.description = safe_read(node, "description", str, "")
@@ -944,8 +944,9 @@ class ProfileInputNode(ProfileBaseNode):
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_tag_map = container_plugins.tag_map
 
-        mode_object = gremlin.base_profile.get_mode_object(node)
-        assert mode_object is not None,"Mode object could not be derived"
+        mode_object = gremlin.base_profile.get_mode_object(node, extra_data)
+        assert mode_object is not None,"Unable to derive mode object"
+        
 
         input_entry = None
         if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):

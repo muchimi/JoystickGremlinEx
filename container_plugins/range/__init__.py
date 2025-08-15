@@ -752,7 +752,7 @@ class RangeContainer(AbstractContainer):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"        
 
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         ''' reads configuration '''
         try:
             if "any" in node.attrib:

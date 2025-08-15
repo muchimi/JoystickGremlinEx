@@ -237,7 +237,7 @@
     
   
     
-#     def _parse_xml(self, node, data = None):
+#     def _parse_xml(self, node, data = None, extra_data = None):
 #         self.mode = None
 #         self.device_guid = None
 #         self.target_input_item = None

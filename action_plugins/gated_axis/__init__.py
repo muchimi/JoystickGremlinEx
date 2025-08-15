@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 import os
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtWidgets, QtCore, QtGui
 from lxml import etree as ElementTree
 import threading
 
@@ -702,11 +702,11 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._slider_widget.setMarkerValue(value)
         self._slider_widget.valueChanged.connect(self._slider_value_changed_cb)
         self._slider_widget.handleDoubleClicked.connect(self._slider_gate_configure_cb) # calls up gate actions
-        self._slider_widget.rangeRightClicked.connect(self._slider_range_add_gate_cb) # adds a gate
+        self._slider_widget.rangeRightClicked.connect(self._slider_range_context_cb) # calls up range context menuy
         self._slider_widget.rangeDoubleClicked.connect(self._slider_range_configure_cb) # calls up range actions
         self._slider_widget.handleDragStart.connect(self._slider_drag_start_cb)
-        
- 
+        self._slider_widget.handleRightClicked.connect(self._slider_gate_context_cb) # calls up gate context menu
+
         
 
         self.slider_frame_layout.addWidget(self._slider_widget)
@@ -841,7 +841,6 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         gh = GateEventHandler()
         gh.slider_update_event.connect(self._handle_slider_update)
 
-        #gh.registerValueChangedCallback(self.id, self._update_slider_marker)
 
         # create range data 
               
@@ -1095,7 +1094,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             widget.valueChanged.connect(self._gate_value_changed)
 
             table.setCellWidget(row, col, widget)
-            self._gwi_map[gate] = (row, col)
+            self._gwi_map[gate] = ((row, col), widget)
             if verbose: syslog.info(f"\t{gate.to_display()} ({row},{col})")
 
             col += 1
@@ -1249,16 +1248,14 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     def get_gate_gwi(self, gate : GateInfo) -> GateWidgetInfo:
         ''' gets the gate widget info for a given gate '''
         if gate in self._gwi_map.keys():
-            return self._gwi_map[gate]
+            _, widget = self._gwi_map[gate]  # contains (row, col), widget
+            if Shiboken.isValid(widget):
+                return widget
         return None
     
-    def get_gate_widget(self, gate : GateInfo):
+    def get_gate_widget(self, gate : GateInfo) -> GateWidgetInfo:
         ''' returns the widget for the corresponding gate '''
-        if gate in self._gwi_map.keys():
-            row,col = self._gwi_map[gate]
-            widget =  self.gate_table_widget.cellWidget(row, col)
-            return widget
-        return None
+        return self.get_gate_gwi(gate)
     
     def get_range_widget(self, rng : RangeInfo):
         ''' returns the widget for the corresponding range '''
@@ -1376,7 +1373,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         gate : GateInfo
         gate, widget = self.sender().data  # the button's data field contains the widget to update
-        gwi : GateWidgetInfo = self._gwi_map[gate]
+        gwi : GateWidgetInfo
+        _, gwi = self._gwi_map[gate]
         if Shiboken.isValid(gwi):
             value = self._axis_value
             gwi.setValue(value)
@@ -1393,7 +1391,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._remove_gate(gate)
 
     def _remove_gate(self, gate):
-        gremlin.util.InvokeUiMethod(self._remove_gate, gate)
+        gremlin.util.InvokeUiMethod(self._remove_gate_ui, gate)
 
     def _remove_gate_ui(self, gate):
 
@@ -1404,7 +1402,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             gremlin.ui.ui_common.MessageBox(prompt="Unable to remove this gate.  At least two gates must be defined.")
             return # do not allow fewer than 2 gates
 
-        message_box = QtWidgets.QMessageBox()
+        message_box = gremlin.ui.ui_common.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText("This will delete this gate.\nAre you sure?")
         # pixmap = gremlin.util.load_pixmap("warning.svg")
@@ -1416,7 +1414,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             QtWidgets.QMessageBox.StandardButton.Cancel
             )
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-        gremlin.util.centerDialog(message_box)
+        
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self._delete_confirmed_cb(gate)
@@ -1449,9 +1447,108 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             dialog.exec()
             gh = GateEventHandler()
             gh.range_configuration_changed.emit(rng)
-            
 
-    @QtCore.Slot(int)
+
+
+    def _slider_range_context_cb(self, value):
+        gremlin.util.InvokeUiMethod(self._slider_range_context_cb_ui, value) # ensure on Ui thread
+        
+    def _slider_range_context_cb_ui(self, value):
+        ''' right click on range = show context menu '''
+        menu = QtWidgets.QMenu(self)
+        rng = self._gate_data.findRangeByValue(value)
+
+        msg = f"<b>Range {rng.to_display()}</b>"
+        line = gremlin.ui.ui_common.QHLine()
+        color = gremlin.ui.ui_common.Color.menuSeparatorColor()
+        line.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color};}} ")
+        widget,_ = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg),
+                                                       line])
+
+        action_range_info = QtWidgets.QWidgetAction(menu)
+        action_range_info.setDefaultWidget(widget)
+
+        action_add_gate = QtGui.QAction("Add Gate...", self, triggered = self._trigger_add_gate)
+        action_add_gate.setData(value)
+
+        action_configure = QtGui.QAction("Configure...", self, triggered = self._trigger_configure_range)
+        action_configure.setIcon(gremlin.ui.ui_common.Icons.gearIcon())
+        action_configure.setData(value)
+   
+
+        menu.addAction(action_range_info)
+        menu.addAction(action_configure)
+        menu.addAction(action_add_gate)
+        
+        menu.exec_(QtGui.QCursor.pos())
+            
+    
+
+    def _slider_gate_context_cb(self, handle_index):
+        gremlin.util.InvokeUiMethod(self._slider_gate_context_cb_ui, handle_index) # ensure on UI thread
+
+    def _slider_gate_context_cb_ui(self, handle_index):
+        ''' right click on gate = show context menu '''
+
+        menu = QtWidgets.QMenu(self)
+
+        
+
+        gate = self._gate_data.getGateSliderIndex(handle_index)
+        msg = f"<b>Gate [{handle_index+1}]</b> {gate.value:0.{_decimals}f}"
+        line = gremlin.ui.ui_common.QHLine()
+        color = gremlin.ui.ui_common.Color.menuSeparatorColor()
+        line.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color};}} ")
+        widget,_ = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg),
+                                                       line])
+
+        action_gate_info = QtWidgets.QWidgetAction(menu)
+        action_gate_info.setDefaultWidget(widget)
+
+        action_configure = QtGui.QAction("Configure...", self, triggered = self._trigger_configure_gate)
+        action_configure.setIcon(gremlin.ui.ui_common.Icons.gearIcon())
+        action_configure.setData(handle_index)
+
+        action_delete = QtGui.QAction("Delete Gate", self, triggered = self._trigger_delete_gate)
+        action_delete.setIcon(gremlin.ui.ui_common.Icons.trashIcon())
+        action_delete.setData(handle_index)
+
+        
+                
+        
+        menu.addAction(action_gate_info)
+        menu.addAction(action_configure)
+        menu.addAction(action_delete)
+        menu.exec_(QtGui.QCursor.pos())
+
+    def _trigger_add_gate(self):
+        ''' context menu add gate trigger '''
+        action = self.sender()
+        value = action.data()
+        self._slider_range_add_gate_cb(value)
+
+    def _trigger_configure_range(self):
+        ''' context menu configure range trigger '''
+        action = self.sender()
+        value = action.data()
+        rng = self._gate_data.findRangeByValue(value)
+        self._configure_range_exec(rng)
+
+    def _trigger_delete_gate(self):
+        ''' context menu delete gate trigger '''
+        action = self.sender()
+        handle_index = action.data()
+        gate = self._gate_data.getGateSliderIndex(handle_index)
+        self._remove_gate(gate) # prompts
+        
+    def _trigger_configure_gate(self):
+        ''' context menu configure gate trigger '''
+        action = self.sender()
+        handle_index = action.data()
+        self._slider_gate_configure_cb(handle_index)
+
+
+    
     def _slider_gate_configure_cb(self, handle_index):
         ''' handle right clicked - pass event along '''
         connected = gremlin.util.isSignalConnected(self, "configure_gate_requested")
@@ -1467,7 +1564,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             dialog.exec()
             
 
-    @QtCore.Slot()
+    
     def _configure_gate_cb(self):
         ''' gate configure button clicked '''
         widget = self.sender()  # the button's data field contains the widget to update
@@ -1874,11 +1971,13 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         '''
         Updates gate tooltip values 
         '''
-        gates = self._gate_data.getGates()
-        gate : GateInfo
-        if Shiboken.isValid(self._slider_widget):
-            for index, gate in enumerate(gates):
-                self._slider_widget.setHandleTooltip(index, f"Gate {gate.value:0.{_decimals}f}")            
+        return # avoid tooltips due to right context menu context 
+    
+        # gates = self._gate_data.getGates()
+        # gate : GateInfo
+        # if Shiboken.isValid(self._slider_widget):
+        #     for index, gate in enumerate(gates):
+        #         self._slider_widget.setHandleTooltip(index, f"Gate {gate.value:0.{_decimals}f}")            
 
     def _update_gate_icons(self):
         if not Shiboken.isValid(self):
@@ -1982,12 +2081,13 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             self._update_slider(self._gate_data.getGateValues())
             self._update_output_value()
 
-    def deletegate(self, gate):
+    def deleteGate(self, gate):
         gremlin.util.InvokeUiMethod(self._delete_gate_ui, gate)
 
     def _delete_gate_ui(self, gate : GateInfo):
         ''' remove a gate from this widget '''
-        gwi : GateWidgetInfo = self._gwi_map[gate]
+        gwi : GateWidgetInfo
+        _, gwi = self._gwi_map[gate]
         gwi.setUsed(False)
         #self._gate_data.deleteGate(gwi)
         #self._gate_data._update_gate_index()
@@ -2131,7 +2231,7 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node, data = None):
+    def _parse_xml(self, node, data = None, extra_data = None):
         # load gate data
         import gremlin.util
         
@@ -2144,7 +2244,7 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
         if not gate_node is None:
             for child in gate_node:
                 gate_data = gremlin.gated_handler.GateData(profile_mode, action_data = self)
-                gate_data.from_xml(child, data)
+                gate_data.from_xml(child, data, extra_data)
                 gate_data.profile_mode = profile_mode
                 gates.append(gate_data)
 
