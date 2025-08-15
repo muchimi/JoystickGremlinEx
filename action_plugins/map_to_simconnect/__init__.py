@@ -57,6 +57,7 @@ from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+import gremlin.repeater
 
 syslog = logging.getLogger("system")
 
@@ -87,7 +88,7 @@ class CommandValidator(QtGui.QValidator):
         except:
             # invalid regex - probably a special char
             pass
-        return QtGui.QValidator.State.Invalid
+        return QtGui.QValidator.State.Intermediate
     
 class LvarValidator(QtGui.QValidator):
     ''' validator for lvars selection '''
@@ -108,7 +109,7 @@ class LvarValidator(QtGui.QValidator):
         except:
             # invalid regex - probably a special char
             pass
-        return QtGui.QValidator.State.Invalid    
+        return QtGui.QValidator.State.Intermediate 
     
     @property
     def lvars(self):
@@ -3031,12 +3032,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._autorepeat_container_layout = QtWidgets.QHBoxLayout(self._autorepeat_container_widget)
 
 
-        self._autorepeat_widget = QtWidgets.QCheckBox("Autorepeat")
+        self._autorepeat_widget = QtWidgets.QCheckBox("Pulse")
         self._autorepeat_widget.setChecked(self.action_data.auto_repeat)
         self._autorepeat_widget.clicked.connect(self._auto_repeat_state_changed)
         self._autorepeat_widget.setToolTip("When enabled, the command will repeat at set interval while the input is pressed")
 
-        self._autorepeat_delay_label = QtWidgets.QLabel("Repeat Interval (ms)")
+        self._autorepeat_delay_label = QtWidgets.QLabel("Interval (ms)")
         self._autorepeat_delay_widget = gremlin.ui.ui_common.QIntLineEdit()
         self._autorepeat_delay_widget.setRange(0, 20000)
         width = gremlin.ui.ui_common.get_char_width(8)
@@ -3051,15 +3052,13 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._release_command_widget.clicked.connect(self._is_release_command_changed)
 
 
-        self._autorepeat_container_layout.addWidget(self._release_command_widget)
+        self._calculator_container_layout.addWidget(self._release_command_widget)
+
+
         self._autorepeat_container_layout.addWidget(self._autorepeat_widget)
         self._autorepeat_container_layout.addWidget(self._autorepeat_delay_label)
         self._autorepeat_container_layout.addWidget(self._autorepeat_delay_widget)
         self._autorepeat_container_layout.addStretch()
-
-
-
-        self._calculator_container_layout.addWidget(self._autorepeat_container_widget)
         
 
         #self.action_selector_layout.addWidget(self.category_widget)
@@ -3361,6 +3360,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self._lvar_lookup_container_widget)
         self.main_layout.addWidget(self._type_container_widget)
         self.main_layout.addWidget(self._output_container_widget)
+        self.main_layout.addWidget(self._autorepeat_container_widget)
         self.main_layout.addWidget(self._button_mode_container_widget)
         self.main_layout.addWidget(self.container_repeater_widget)
             
@@ -4084,6 +4084,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _trigger_turnoff_cb(self, checked):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.TurnOff
+
+    @QtCore.Slot(bool)
+    def _trigger_pulse_cb(self, checked):
+        if checked:
+            self.action_data.trigger_mode = SimConnectTriggerMode.Pulse           
             
 
     @QtCore.Slot(bool)
@@ -4172,6 +4177,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self._significant = gremlin.input_devices.JoystickInputSignificant()
         self._profile_started = False
         self._last_event = None
+        self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
         
         self.reconnect_timeout = 5
         self.last_reconnect_time = None
@@ -4186,9 +4192,11 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self._auto_repeat_event = threading.Event()
         self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command, daemon=False)
         self._auto_repeat_thread.name = "SIMCONNECT autorepeat"
-        
+        self.pulse_worker_map = {}  # map of (state_name) to pulse worker object 
         
         self.valid = True
+       
+       
 
     
     def profile_start(self):
@@ -4202,7 +4210,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             self.last_reconnect_time = None
             
             self.manager.activate()
-            
+            self.pulse_worker_map = {} 
 
 
     def profile_stop(self):
@@ -4429,18 +4437,29 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 if not event.is_axis:
                     value = 1 if self.action_data.trigger_mode != SimConnectTriggerMode.InputValue else action_value.current
                     trigger = (self.action_data.trigger_on_press and event.is_pressed) or \
-                            self.action_data.trigger_on_release and not event.is_pressed
+                            (self.action_data.trigger_on_release and not event.is_pressed)
                     if trigger:
+                        pulse_data = {}
+                        pulse_data["command_type"] = command_type
+                        pulse_data["value"] = value
                         if command_type == SimConnectCommandType.LVar:
                             if verbose: syslog.info(f"SIMCONNECT: {comment} Trigger singleton {self.action_data.command}")
                             request = manager.registerRequest(self.action_data.command, "number", settable = True)
                             request.value = value
                             request.transmit()
+                            pulse_data["request"] = request
+                            
                         else:
                             if verbose: syslog.info(f"SIMCONNECT: {comment} Trigger singleton {block.command}")
                             block.execute(value)
+                            pulse_data["block"] = block
+
+                        if self.action_data.auto_repeat:
+                            self.pulse_start("trigger", -1, self.action_data.auto_repeat_interval/1000, data = pulse_data)
                     else:
                         # not executed
+                        if self.action_data.auto_repeat:
+                            self.pulse_stop("trigger")
                         return False
 
             elif output_mode == SimConnectActionMode.SetValue:
@@ -4496,6 +4515,64 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         # syslog = logging.getLogger("system")
         if verbose_details: syslog.info("autorepeat: thread stop")
+
+
+        
+    def _pulse_on(self, data):
+        ''' called when pulse is on '''
+        key, pulse_data = data
+        if not pulse_data:
+            return
+        if self.verbose: syslog.info(f"Pulse ON")
+        match key:
+            case "trigger":
+                command_type = pulse_data["command_type"] 
+                value = pulse_data["value"]
+                if command_type == SimConnectCommandType.LVar:
+                    request = pulse_data["request"]
+                    request.value = value
+                    request.transmit()
+                else:
+                    block = pulse_data["block"]
+                    block.execute(value)
+
+                if self.action_data.auto_repeat:
+                    self.pulse_start(key, None, self.action_data.auto_repeat_interval/1000, data = pulse_data)
+
+
+
+    def _pulse_off(self, data):
+        ''' called when pulse is off '''
+        key, pulse_data = data
+        if self.verbose: syslog.info(f"Pulse OFF")
+        match key:
+            case "trigger":
+                pass
+        
+
+    def pulse_start(self, key : str, duration : float, interval : float, data = None):
+        ''' pulse setup '''
+        worker : gremlin.repeater.PulseWorker 
+        if key in self.pulse_worker_map:
+            worker = self.pulse_worker_map[key]
+            if worker.is_running:
+                # worker already running - ignore pulse request
+                return
+        else:
+            worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = (key, data))
+            self.pulse_worker_map[key] = worker
+
+        if self.verbose: syslog.info(f"\activate")
+        worker.start()
+
+    def pulse_stop(self, key: str):
+        ''' request a pulse abort '''
+        if self.verbose: syslog.info(f"Pulse STOP {key}")
+        if key in self.pulse_worker_map:
+            worker : gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
+            worker.stop()
+            del self.pulse_worker_map[key]
+
 
     
 
@@ -4572,6 +4649,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         self.auto_repeat = False
         self.auto_repeat_interval = 250 # how often to repeat the command while pressed in ms
+        self.auto_repeat_delay = 250 # delay between pulses in ms
 
         # the value to output if any
         
@@ -4972,6 +5050,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         if "delay" in node.attrib:
             self.auto_repeat_interval = safe_read(node, "delay", int, 250)
+
 
         if "autorepeat" in node.attrib:
             self.auto_repeat = safe_read(node,"autorepeat", bool, False)

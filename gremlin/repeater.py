@@ -223,8 +223,8 @@ class Repeater(QtCore.QObject):
 
 
 
-class PulseWorker(QtCore.QObject):
-
+#class PulseWorker(QtCore.QObject):
+class PulseWorker():
     ''' helper object to schedule repeated triggers (callback) at a given interval until the object is stopped. '''
 
     def __init__(self, pulse_duration : float, repeat_interval : float, on_callback, off_callback = None, data = None):
@@ -235,10 +235,10 @@ class PulseWorker(QtCore.QObject):
         :param on_callback: function to call when the pulse is on - if data is provided, that will be passed as an argument
         :param off_callback: function to call when the pusle if off (optional) - if data is provided, that will be passed as an argument
         """
-        QtCore.QObject.__init__(self)
+        #QtCore.QObject.__init__(self)
         self.is_running = False
-        self._pulse_duration = pulse_duration
-        self._repeat_interval = repeat_interval
+        self._pulse_duration = pulse_duration # singleton if none or 0
+        self._repeat_interval = repeat_interval # repeat delay, none 
         self._on_callback = on_callback
         self._off_callback = off_callback 
         self._is_pulse = False # true when the signal is active

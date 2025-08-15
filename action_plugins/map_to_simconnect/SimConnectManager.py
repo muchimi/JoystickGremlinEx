@@ -191,6 +191,7 @@ class SimConnectTriggerMode(enum.Enum):
     Toggle = 3 # toggle
     NoOp = 4 # send nothing (trigger command only)
     InputValue = 5 # send value as the parameter (used for buttons)
+    Pulse = 6 # pulse the command
 
     @staticmethod
     def to_string(value):
@@ -1201,7 +1202,7 @@ class SimConnectManager(QtCore.QObject):
         if self._connect_in_progress:
             # already connecting
             return
-        if self._request_abort:
+        if self._request_abort and not force_retry:
             # abort requested
             return
         
@@ -1264,6 +1265,7 @@ class SimConnectManager(QtCore.QObject):
             return False
         finally:
             self._connect_in_progress = False
+            self._request_abort = False
             
 
     def clearRequests(self):
