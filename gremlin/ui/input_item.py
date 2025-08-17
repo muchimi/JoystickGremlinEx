@@ -143,6 +143,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
     """Model storing a device's input item list."""
 
+    lockedChanged = Signal(object) # signal when lock state changes - passes the input_item that had a locked state change
 
 
     def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None, show_master_mode = False):
@@ -273,6 +274,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
         input_items = self._device_data.modes[self._mode]
         index = 0
+
         self._index_map = {} # map of index to value
         self._item_map = {}  # map of values to their index
         for input_type in self._allowed_input_types:
@@ -284,6 +286,7 @@ class InputItemListModel(ui_common.AbstractModel):
                     data.device_guid = self._device_data.device_guid
                     self._index_map[index] = data
                     self._item_map[data.input_id] = index
+                    
                     index += 1
 
         if self._show_master_mode:
@@ -299,6 +302,7 @@ class InputItemListModel(ui_common.AbstractModel):
                             # add hardware GUID reference to data block so we have an easier reference to it
                             data.device_guid = self._device_data.device_guid
                             self._index_map[index] = data
+                            
                             self._item_map[data.input_id] = index
                             index += 1
 
@@ -407,6 +411,8 @@ class InputItemListModel(ui_common.AbstractModel):
             new_index = len(self._index_map)
             self._item_map[item] = new_index
             self._index_map[new_index] = item
+
+            item.lockedChanged.disconnect(self._handle_lock_changed)
 
             self._update_source()
             self._update_filter()
@@ -1198,7 +1204,7 @@ class ActionSetView(ui_common.AbstractView):
                 self.profile_data.get_device_type() != DeviceType.VJoy:
             self.action_selector = gremlin.ui.ui_common.ActionSelector(
                 profile_data.parent.getInputType(),
-                profile_data
+                profile_data.input_item
             )
             self.action_selector.inputItem = profile_data.parent
             self.action_selector.action_added.connect(self._add_action)
@@ -1475,6 +1481,14 @@ class InputItemWidget(QBoxFrame):
         self._container_layout.setSpacing(0)
         self.main_layout.addWidget(self._container_widget)
 
+        # lock icon
+        icon_lock = gremlin.ui.ui_common.Icons.lockIcon()
+        icon_unlock = gremlin.ui.ui_common.Icons.unlockIcon()
+        self._lock_widget = gremlin.ui.ui_common.QIconCheckbox(icon_lock, icon_unlock, size = 16)
+        self._lock_widget.clicked.connect(self._handle_lock_changed)
+
+        
+
 
         # top row
         # title bar
@@ -1503,7 +1517,7 @@ class InputItemWidget(QBoxFrame):
         
         self._container_layout.addWidget(self._title_bar_widget)
         
-        
+
         # icon setup
         size = self._getIconSize() # icon size
         active_color = gremlin.ui.ui_common.Color.activeColor()
@@ -1566,6 +1580,8 @@ class InputItemWidget(QBoxFrame):
             self.clear_curve_widget.clicked.connect(self._clear_curve_cb)            
             self._curve_container_layout.addWidget(self.clear_curve_widget)
 
+
+        self._title_icon_layout.addWidget(self._lock_widget)
 
         # axis repeater object
         self.axis_widget = None
@@ -1686,7 +1702,9 @@ class InputItemWidget(QBoxFrame):
         gremlin.util.clear_layout(self._custom_container_layout)
         self._custom_container_widget.setMaximumHeight(0)
         
-    
+    @QtCore.Slot(bool)
+    def _handle_lock_changed(self, checked):
+        self.data.locked = checked
 
     def _update_title(self):
         ''' updates the title bar stylesheet based on the selection state '''
@@ -2538,6 +2556,8 @@ class ContainerSelector(QtWidgets.QWidget):
         self.load_template_widget =  gremlin.ui.ui_common.Buttons.getFolderWidget(callback =self._load_container_from_template,
                                                                                   tooltip = "Load mappings from template")
         
+        self.data.lockedChanged.connect(self._handle_lock_changed)
+        
         default_container = gremlin.config.Configuration().last_container
         self.container_dropdown.setCurrentText(default_container)
         self.container_dropdown.currentIndexChanged.connect(self._container_changed)
@@ -2568,6 +2588,19 @@ class ContainerSelector(QtWidgets.QWidget):
 
         eh = gremlin.event_handler.EventHandler()
         eh.last_container_changed.connect(self._last_container_changed)
+
+    def _handle_lock_changed(self, input_item):
+        gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item) # ensure on UI thread
+
+    def _handle_lock_changed_ui(self, input_item):
+        if Shiboken.isValid(self):
+            unlocked = not input_item.locked
+            self.load_template_widget.setEnabled(unlocked)
+            self.add_container_widget.setEnabled(unlocked)
+            self.paste_button_widget.setEnabled(unlocked)
+            self.delete_button.setEnabled(unlocked)
+
+
 
     def refresh(self, input_type):
         ''' reloads the selector based on the input '''
@@ -2909,6 +2942,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         tracker = ConditionStateTracker()
         tracker.register(self.profile_data.input_item, self.profile_data, self)
         
+        self.profile_data.input_item.lockedChanged.connect(self._handle_lock_changed)
 
         save_widget = gremlin.ui.ui_common.Buttons.getSaveWidget(tooltip="Save this container to a template", callback = self._save_template)
         
@@ -2930,6 +2964,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             return
         config = gremlin.config.Configuration()
         self._title_bar_widget.setIdVisible(config.show_container_id)
+
+    def _handle_lock_changed(self, input_item):
+        ''' enable/disable based on lock state '''
+        gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item) # ensure on UI thread
+
+    def _handle_lock_changed_ui(self, input_item):
+        ''' enable/disable based on lock state '''
+        if Shiboken.isValid(self):
+            self.setEnabled(not input_item.locked)
         
         
     @QtCore.Slot()
@@ -3048,6 +3091,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     def _cleanup_ui(self):
         tracker = ConditionStateTracker()
         tracker.unregister(self.profile_data.input_item, self.profile_data)
+        self.profile_data.input_item.lockedChanged.disconnect(self._handle_lock_changed)
         
 
 

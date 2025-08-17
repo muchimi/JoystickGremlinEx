@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T47)
+- New: ability to lock inputs to prevent inadvertent changes.
+
 ### (m76T46)
 - Fix: simconnect autorepeat refactor for calc code + pulse API
 - Fix: state profile load derive mode

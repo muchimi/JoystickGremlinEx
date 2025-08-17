@@ -110,6 +110,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             current_mode
         )
         self.input_item_list_view = gremlin.ui.input_item.InputItemListView(name=device.name, custom_widget_handler = self._custom_widget_handler)
+        
 
         # Handle vJoy as input and vJoy as output devices properly
         vjoy_as_input = self.device_profile.parent.settings.vjoy_as_input
@@ -227,6 +228,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # update all curve icons
         self.update_curve_icons()
+
 
 
     def _cleanup_ui(self):
@@ -376,6 +378,13 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def running(self):
         return gremlin.shared_state.is_running
     
+    
+    def getSelectedItem(self):
+        index = self._last_selected_index
+        if index == -1:
+            return None
+        return self.input_item_list_model.data(index)
+    
 
     @QtCore.Slot()
     def _select_item_cb(self, index, force_update = False, emit = True):
@@ -461,7 +470,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 # make the widget visible
                 self.selectRegisteredWidget(key)
                 #self.input_item_list_view.select_item(index, False)
-
+                
 
                 if verbose:
                     syslog.info(f"Show widget:  {widget.id} {item_data.debug_display}")

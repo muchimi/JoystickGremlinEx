@@ -1633,6 +1633,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     """Represents a single input item such as a button or axis, containers and parameters/options associated with that input mapping """
 
+    lockedChanged = Signal(object) # fires when the lock state changes - passes the input item as the parameter
+
     def __init__(self, custom_name_handler = None, custom_mode_name_handler = None, parent = None):
         """Creates a new InputItem instance.
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
@@ -1669,6 +1671,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._is_button = False # true if the item is a button input
         self._calibration = None # calibration data if the item is an input axis
         self._curve_data = None # true if the item has its input curved
+        self._locked = False # true if the input is locked (cannot make mapping changes)
+
         # self._profile_mode = None
         self._enabled = True # enabled flag
         if parent is not None:
@@ -1725,7 +1729,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         return None
     
         
-      
+    @property
+    def locked(self) -> bool:
+        return self._locked
+    @locked.setter
+    def locked(self, value : bool):
+        if self._locked != value:
+            self._locked = value
+            self.lockedChanged.emit(self)
 
     @property
     def message_key(self):
@@ -2090,6 +2101,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             mode_object = get_mode_object(node, extra_data)
             assert mode_object is not None,"Unable to derive mode object"
             
+            if "locked" in node.attrib:
+                self._locked = safe_read(node,"locked", bool, False)
+            else:
+                self._locked = False
 
             if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
                 from gremlin.ui.keyboard_device import KeyboardInputItem
@@ -2304,6 +2319,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             node.set("description", safe_format(self._description, str))
         else:
             node.set("description", "")
+
+        # lock state
+        node.set("locked", safe_format(self._locked, bool))
         
         for entry in self.containers:
             # gremlinex change: containers can still be saved if they are invalid if they are still being configured:

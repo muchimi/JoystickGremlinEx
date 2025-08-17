@@ -448,10 +448,13 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.setModel(self.input_item_list_model)
         self.input_item_list_view.redraw()
         self._select_item_cb(self._last_selected_index)
+        
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
 
+
+    
 
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
@@ -583,6 +586,13 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     #     ''' gets the content widget compound key for the item / input combination'''
     #     return (self.device_guid, input_id)
 
+    def getSelectedItem(self):
+        index = self._last_selected_index
+        if index == -1:
+            return None
+        return self.input_item_list_model.data(index)
+
+
     def _select_item_cb(self, index, emit = True):
         ''' called when a key has been selected - refreshes the view panel '''
 
@@ -619,12 +629,15 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
+            self.rightPanelLocked = item_data.locked
+
 
             #self.input_item_list_view.select_item(index, False)
             self.selectRegisteredWidget(key)
         else:
             widget = InputItemMappingWidget(object_name = "Blank inputitemconfig for keyhboard device (select item cb - no item data)")
             self.setRightPanelWidget(widget)
+            
 
         self._last_selected_index = index           
 

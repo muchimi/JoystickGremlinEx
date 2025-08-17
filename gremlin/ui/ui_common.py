@@ -668,6 +668,13 @@ class Icons():
     @staticmethod
     def aircraftIcon():
         return Icons._icon("mdi.airplane")
+    @staticmethod
+    def lockIcon(qta_color = "#c47418"):
+        return Icons._icon("fa5s.lock", qta_color = qta_color)
+    @staticmethod
+    def unlockIcon(qta_color = "#2abd38"):
+        return Icons._icon("fa5s.lock-open", qta_color = qta_color)
+    
 
     def _icon(value : str, qta_color = None):
         if qta_color and isinstance(qta_color, str):
@@ -2403,7 +2410,7 @@ class ActionSelector(QtWidgets.QWidget):
     action_paste = QtCore.Signal(object, object) # paste button pressed
 
 
-    def __init__(self, input_type, input_item, parent=None):
+    def __init__(self, input_type, item, parent=None):
         """Creates a new selector instance.
 
         :param input_type the input type for which the action selector is being created
@@ -2411,9 +2418,11 @@ class ActionSelector(QtWidgets.QWidget):
         :param parent the parent of this widget
         """
         super().__init__(parent)
+        import gremlin.base_profile
 
-
-
+        assert isinstance(item, gremlin.base_profile.InputItem), "expected an input item, wrong type passed"
+        self._input_item = item
+        self._input_item.lockedChanged.connect(self._handle_lock_changed)
         
 
         self.action_dropdown = QComboBox()
@@ -2439,6 +2448,15 @@ class ActionSelector(QtWidgets.QWidget):
         eh.last_action_changed.connect(self._last_action_changed)
         self._container = None
 
+    def _handle_lock_changed(self, input_item):
+        gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item) # ensure on UI thread
+
+    def _handle_lock_changed_ui(self, input_item):
+        if Shiboken.isValid(self):
+            unlocked = not input_item.locked
+            self.add_button.setEnabled(unlocked)
+            self.paste_button.setEnabled(unlocked)
+        
     def refresh(self, input_type):
         ''' reloads the selector based on the input '''
         self.input_type = input_type
@@ -6265,6 +6283,39 @@ def get_char_width(count = 1):
     return get_text_width("W") * count
 
 
+class QIconCheckbox(QCheckBox):
+    ''' custom checkbox icons for checked/unchecked '''
+    def __init__(self,
+                checked_icon,
+                unchecked_icon,
+                size = 24,
+                parent=None,
+                ):
+        ''' :param checked_icon: QIcon for the checked state 
+            :param unchecked_icon: QIcon for the unchecked state
+            :param size: size in pixels (height and width)
+            :param parent: owner widget 
+            '''
+
+        super().__init__(parent)
+        self._checked_pixmap =  Icons.to_pixmap(checked_icon, pixels = size) if checked_icon else None
+        self._unchecked_pixmap =  Icons.to_pixmap(unchecked_icon, pixels = size) if unchecked_icon else None
+        self._size = size
+        
+
+    def sizeHint(self):
+        return QSize(self._size, self._size)
+        
+    def paintEvent(self, e: QPaintEvent):
+        
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+
+        pixmap = self._checked_pixmap if self.isChecked() else self._unchecked_pixmap
+        p.drawPixmap(0, 0, pixmap)
+        p.end()
+
+
 
 
 class QToggle(QCheckBox):
@@ -6370,7 +6421,17 @@ class QToggle(QCheckBox):
         self._pulse_radius = pos
         self.update()
 
+class QLockToggle(QtWidgets.QWidget):
+    ''' toggle for a lock '''
 
+    def __init__(self, parent = None):
+        super().__init__(parent)
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+        self._toggle_widget = QToggle()
+        label = QtWidgets.QLabel()
+        pixmap = Icons.to_pixmap(Icons.warningIcon())
+        label.setPixmap(pixmap)
 
 class QAnimatedToggle(QToggle):
 
@@ -7438,6 +7499,15 @@ class QSplitTabWidget(QDataWidget):
 
         self._blank_input()
 
+    @property
+    def rightPanelLocked(self) -> bool:
+        ''' true if right panel is locked '''
+        unlocked = self._right_panel_widget.isEnabled()
+        return not unlocked
+    @rightPanelLocked.setter
+    def rightPanelLocked(self, locked : bool):
+        self._right_panel_widget.setEnabled(not locked)
+
 
     def _cleanup_ui(self):
         ''' remove '''
@@ -7657,18 +7727,7 @@ class QSplitTabWidget(QDataWidget):
     def setRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the right panel widget (only contains a single widget)'''
         pass
-        # widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
-        # found = False
-        # for w in widgets:
-        #     if w == widget:
-        #         w.setVisible(True)
-        #         found = True
-        #     w.setVisible(False)
 
-        # if not found and widget is not None:
-        #     self._right_container_layout.addWidget(widget)
-        #     widget.setVisible(True)
-        
         
 
 
