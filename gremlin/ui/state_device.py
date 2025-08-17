@@ -450,6 +450,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._input_item = item
 
 
+
         el = gremlin.event_handler.EventListener()
         el.state_name_change.connect(self._state_name_change)
         el.state_category_delete.connect(self._state_category_delete)
@@ -2230,6 +2231,13 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         config = gremlin.config.Configuration()
 
+        
+        # lock widget
+        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
+        widget, _ = gremlin.ui.ui_common.getHContainer(["State Inputs", "||", lock_widget])
+        self.addLeftPanelWidget(widget)
+
+
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
             width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
@@ -2328,11 +2336,11 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.redraw()
 
         
-
-        # el = gremlin.event_handler.EventListener()
-        # el.mode_name_changed.connect(self._mode_name_changed)
-        # el.edit_mode_changed.connect(self._edit_mode_changed_cb) # edit mode changed or mode added/removed
-        
+        # refresh on configuration change
+        el = gremlin.event_handler.EventListener()
+        # lock all inputs
+        el.lock_inputs.connect(self._handle_lock_inputs)
+        el.unlock_inputs.connect(self._handle_unlock_inputs)
 
         # last index selected, -1 means none
         self._last_selected_index = -1 
@@ -2346,12 +2354,35 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._select_item_cb(selected_index)
 
 
+    def _handle_lock_inputs(self, data):
+        ''' lock all inputs event'''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = len(input_item.containers) > 0 # don't lock if not mapped
+            self.setUpdatesEnabled(True)
+    
+    def _handle_unlock_inputs(self, data):
+        ''' unlock all inputs event '''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = False
+            self.setUpdatesEnabled(True)
+
+
+
+
     def _show_clear_cb(self):
         return self.input_item_list_model.rows() > 0
 
     def _config_changed_cb(self):
         ''' called when configuraition has changed '''
         self.refresh()      
+
+
 
     @QtCore.Slot(bool)
     def _filter_enabled_changed(self, is_filter):
@@ -2723,7 +2754,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         '''
         import gremlin.ui.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
         input_id : StateInputItem = data.input_id

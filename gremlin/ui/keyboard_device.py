@@ -373,6 +373,12 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
 
+
+        # lock widget
+        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
+        widget, _ = gremlin.ui.ui_common.getHContainer(["Keyboard/Mouse Inputs", "||", lock_widget])
+        self.addLeftPanelWidget(widget)
+
         config = gremlin.config.Configuration()
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
@@ -428,11 +434,34 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # update on an edit mode change so we update the display
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         el.config_changed.connect(self._config_changed_cb)
+        # lock all inputs
+        el.lock_inputs.connect(self._handle_lock_inputs)
+        el.unlock_inputs.connect(self._handle_unlock_inputs)
+
 
         # Select default entry
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None and selected_index != -1:
             self._select_item_cb(selected_index)
+
+
+    def _handle_lock_inputs(self, data):
+        ''' lock all inputs event'''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = len(input_item.containers) > 0 # don't lock if not mapped
+            self.setUpdatesEnabled(True)
+    
+    def _handle_unlock_inputs(self, data):
+        ''' unlock all inputs event '''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = False
+            self.setUpdatesEnabled(True)
 
 
 

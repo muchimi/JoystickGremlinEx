@@ -552,6 +552,10 @@ class EventListener:
 	simconnect_show_options = Signal() # fires when the simconnect options dialog should be displayed 
 
 	toolbar_changed = Signal() # fires when the toolbar configuration has changed 
+
+	lock_inputs = Signal(object) # fires when all inputs should be locked, object = device_guid of the device to lock
+	unlock_inputs = Signal(object) # fires when all inputs should be unlocked, object = device_guid of the device to unlock
+	
 	
 	def __init__(self):
 		"""Creates a new instance."""

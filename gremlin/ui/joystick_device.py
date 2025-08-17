@@ -150,7 +150,15 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         icon = gremlin.ui.ui_common.Icons.hatIcon()
         label_hat = gremlin.ui.ui_common.QIconLabel(icon, f"{device.hat_count}")
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([label_axis, label_button, label_hat])
+        # lock widget
+        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
+
+
+        widget, _ = gremlin.ui.ui_common.getHContainer([label_axis,
+                                                        label_button,
+                                                        label_hat,
+                                                        "||",
+                                                        lock_widget])
         self.addLeftPanelWidget(widget)
 
         width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
@@ -215,6 +223,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
+        # lock all inputs
+        el.lock_inputs.connect(self._handle_lock_inputs)
+        el.unlock_inputs.connect(self._handle_unlock_inputs)
 
         self.updating = False
         self.last_event = None
@@ -385,6 +396,23 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return None
         return self.input_item_list_model.data(index)
     
+    def _handle_lock_inputs(self, data):
+        ''' lock all inputs event'''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = len(input_item.containers) > 0 # don't lock if not mapped
+            self.setUpdatesEnabled(True)
+    
+    def _handle_unlock_inputs(self, data):
+        ''' unlock all inputs event '''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = False
+            self.setUpdatesEnabled(True)
 
     @QtCore.Slot()
     def _select_item_cb(self, index, force_update = False, emit = True):

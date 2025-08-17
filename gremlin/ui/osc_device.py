@@ -3596,6 +3596,12 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
         
         
+        # lock widget
+        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
+        widget, _ = gremlin.ui.ui_common.getHContainer(["OSC Inputs", "||", lock_widget])
+        self.addLeftPanelWidget(widget)
+
+        
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
             width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
@@ -3665,18 +3671,39 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(button_container_widget)
 
-
         el = gremlin.event_handler.EventListener()
         # update on an edit mode change so we update the display
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         el.config_changed.connect(self._config_changed_cb)
-
+        # lock all inputs
+        el.lock_inputs.connect(self._handle_lock_inputs)
+        el.unlock_inputs.connect(self._handle_unlock_inputs)
 
 
         # Select default entry
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None:
             self._select_item_cb(selected_index)
+
+
+    def _handle_lock_inputs(self, data):
+        ''' lock all inputs event'''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = len(input_item.containers) > 0 # don't lock if not mapped
+            self.setUpdatesEnabled(True)
+    
+    def _handle_unlock_inputs(self, data):
+        ''' unlock all inputs event '''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = False
+            self.setUpdatesEnabled(True)
+
 
     def _filter_data(self, input_item) -> bool:
         ''' custom filter handler - true if the data is included in the filter, false otherwise '''
@@ -3912,7 +3939,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         '''
         import gremlin.ui.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
         widget.setInputDescription(data.input_id.display_name)

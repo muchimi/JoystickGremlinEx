@@ -15,7 +15,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T47)
-- New: ability to lock inputs to prevent inadvertent changes.
+- New: ability to lock inputs to prevent inadvertent changes. Locked inputs don't allow changes to the mappings. A lock status is now on every input. Devices also have a lock/unlock buttons at the top that apply to all mapped items.  Inputs that have no maps cannot be locked.
+
 
 ### (m76T46)
 - Fix: simconnect autorepeat refactor for calc code + pulse API

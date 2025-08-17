@@ -2448,6 +2448,9 @@ class ActionSelector(QtWidgets.QWidget):
         eh.last_action_changed.connect(self._last_action_changed)
         self._container = None
 
+
+        self._handle_lock_changed_ui(self._input_item) # initial lock state
+
     def _handle_lock_changed(self, input_item):
         gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item) # ensure on UI thread
 
@@ -10147,3 +10150,34 @@ class QWarningWidget(QtWidgets.QWidget):
 #         self.setIcon(Icons.warningIcon())
 #         if text:
 #             self.setText(text)
+
+class QInputLockWidget(QtWidgets.QWidget):
+    ''' displays the global lock/unlock buttons '''
+    def __init__(self, data = None, parent = None):
+        super().__init__(parent)
+        
+        self.data = data # holds anything
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        lock_widget = QtWidgets.QPushButton()
+        lock_widget.setIcon(Icons.lockIcon())
+        lock_widget.clicked.connect(self._handle_lock)
+        lock_widget.setToolTip("Lock all inputs")
+
+        unlock_widget = QtWidgets.QPushButton()
+        unlock_widget.setIcon(Icons.unlockIcon())
+        lock_widget.setToolTip("Unlock all inputs")
+        unlock_widget.clicked.connect(self._handle_unlock)
+
+        widget, _ = getHContainer([lock_widget, unlock_widget],left_stretch=True)
+        main_layout.addWidget(widget)
+
+    def _handle_lock(self):
+        import gremlin.event_handler
+        el = gremlin.event_handler.EventListener()
+        el.lock_inputs.emit(self.data)
+
+    def _handle_unlock(self):
+        import gremlin.event_handler
+        el = gremlin.event_handler.EventListener()
+        el.unlock_inputs.emit(self.data)

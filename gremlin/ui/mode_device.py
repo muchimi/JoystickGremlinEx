@@ -141,6 +141,13 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
 
+        
+        # lock widget
+        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
+        widget, _ = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True)
+        self.addLeftPanelWidget(widget)
+
+
         config = gremlin.config.Configuration()
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
@@ -174,6 +181,10 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el = gremlin.event_handler.EventListener()
         el.mode_name_changed.connect(self._mode_name_changed)
         el.edit_mode_changed.connect(self._edit_mode_changed_cb) # edit mode changed or mode added/removed
+        # lock all inputs
+        el.lock_inputs.connect(self._handle_lock_inputs)
+        el.unlock_inputs.connect(self._handle_unlock_inputs)
+
         
 
         # last index selected, -1 means none
@@ -187,6 +198,23 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             selected_index = -1
         self._select_item_cb(selected_index)
 
+    def _handle_lock_inputs(self, data):
+        ''' lock all inputs event'''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = len(input_item.containers) > 0 # don't lock if not mapped
+            self.setUpdatesEnabled(True)
+    
+    def _handle_unlock_inputs(self, data):
+        ''' unlock all inputs event '''
+        if data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = False
+            self.setUpdatesEnabled(True)
 
 
     @QtCore.Slot(str)
@@ -424,7 +452,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         '''
         import gremlin.ui.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
         widget.setTitle(self._custom_name_handler(data))

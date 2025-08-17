@@ -139,12 +139,30 @@ class InputIdentifier(QtCore.QObject):
         ''' true if the item is a hat '''
         return self._input_type == InputType.JoystickHat
     
+    def getInputItem(self):
+        ''' gets the input item for this identifier '''
+        profile = gremlin.shared_state.current_profile
+        if self._device_type == DeviceType.State:
+            mode = gremlin.shared_state.master_mode
+            device_guid = gremlin.shared_state.state_tab_guid
+        else:
+            mode = gremlin.shared_state.edit_mode
+            device_guid = self._device_guid
+        
+        if device_guid in profile.devices:
+            if mode in profile.devices[device_guid].modes:
+                if self._input_type in profile.devices[device_guid].modes[mode].config:
+                    input_items = profile.devices[device_guid].modes[mode].config[self._input_type]
+                    if self._input_id in input_items:
+                        input_item = input_items[self._input_id]
+                        return input_item
+            
+        return None # not found
+
+    
 class InputItemListModel(ui_common.AbstractModel):
 
     """Model storing a device's input item list."""
-
-    lockedChanged = Signal(object) # signal when lock state changes - passes the input_item that had a locked state change
-
 
     def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None, show_master_mode = False):
         """Creates a new instance.
@@ -1485,8 +1503,25 @@ class InputItemWidget(QBoxFrame):
         icon_lock = gremlin.ui.ui_common.Icons.lockIcon()
         icon_unlock = gremlin.ui.ui_common.Icons.unlockIcon()
         self._lock_widget = gremlin.ui.ui_common.QIconCheckbox(icon_lock, icon_unlock, size = 16)
-        self._lock_widget.clicked.connect(self._handle_lock_changed)
+        
 
+        if self._input_type == InputType.State:
+            pass
+
+        if isinstance(data, gremlin.base_profile.InputItem):
+            input_item = data
+        else:
+            input_item = identifier.getInputItem()
+        if input_item:
+            input_item.lockedChanged.connect(self._handle_input_item_lock_changed)
+        else:
+            pass
+
+        self._input_item = input_item
+
+        if input_item:
+            self._lock_widget.setChecked(input_item.locked)
+        self._lock_widget.clicked.connect(self._handle_lock_changed)
         
 
 
@@ -1501,15 +1536,24 @@ class InputItemWidget(QBoxFrame):
 
         
         # title bar left side
+
         self._title_text_widget = gremlin.ui.ui_common.QIconLabel()
         self._title_text_widget.setContentsMargins(0,0,0,0)
         self._title_text_widget.setText("Input not configured")
         self._title_text_widget.setObjectName("title")
 
+        
+        self._title_text_container_widget, _ = gremlin.ui.ui_common.getHContainer([
+                                                                            self._lock_widget,
+                                                                            self._title_text_widget    
+                                                                        ])
+
+
         # title bar right side - holds the icons
         self._title_icon_widget, self._title_icon_layout = gremlin.ui.ui_common.getHContainer()
     
-        self._title_container_layout.addWidget(self._title_text_widget, 0, 0)
+        
+        self._title_container_layout.addWidget(self._title_text_container_widget, 0, 0)
         self._title_container_layout.addWidget(QtWidgets.QWidget(), 0, 1)
         self._title_container_layout.addWidget(self._title_icon_widget, 0, 2, alignment = QtCore.Qt.AlignmentFlag.AlignRight)
         self._title_container_layout.setColumnStretch(1,1)
@@ -1581,7 +1625,6 @@ class InputItemWidget(QBoxFrame):
             self._curve_container_layout.addWidget(self.clear_curve_widget)
 
 
-        self._title_icon_layout.addWidget(self._lock_widget)
 
         # axis repeater object
         self.axis_widget = None
@@ -1701,10 +1744,33 @@ class InputItemWidget(QBoxFrame):
         ''' clears the custom container layout and hides it '''
         gremlin.util.clear_layout(self._custom_container_layout)
         self._custom_container_widget.setMaximumHeight(0)
+
+    
+    def _handle_input_item_lock_changed(self, input_item):
+        if input_item == self._input_item:
+            gremlin.util.InvokeUiMethod(self._handle_input_item_lock_changed_ui, input_item)
+
+    def _handle_input_item_lock_changed_ui(self, input_item):
+        
+        if Shiboken.isValid(self._lock_widget):
+            with QtCore.QSignalBlocker(self._lock_widget):
+                self._lock_widget.setChecked(input_item.locked)
+        
+        # enable the delete button if not locked
+        if self._close_button_widget and Shiboken.isValid(self._close_button_widget):
+            self._close_button_widget.setEnabled(not input_item.locked)
         
     @QtCore.Slot(bool)
     def _handle_lock_changed(self, checked):
         self.data.locked = checked
+        if self.data.locked != checked:
+            # input cannot be locked/unlocked - undo the check
+            with QtCore.QSignalBlocker(self._lock_widget):
+                self._lock_widget.setChecked(not checked)
+
+
+
+
 
     def _update_title(self):
         ''' updates the title bar stylesheet based on the selection state '''
@@ -2586,6 +2652,8 @@ class ContainerSelector(QtWidgets.QWidget):
 
         self.refresh(input_type)
 
+        self._handle_lock_changed_ui(self.data)
+
         eh = gremlin.event_handler.EventHandler()
         eh.last_container_changed.connect(self._last_container_changed)
 
@@ -2955,6 +3023,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         self.activation_count_widget = None
         el.condition_state_changed.emit(self.container)
+
+        self._handle_lock_changed_ui(self.profile_data.input_item)
 
         gremlin.util.singleShot(self._config_visible)
         

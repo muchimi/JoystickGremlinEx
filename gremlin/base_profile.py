@@ -1735,6 +1735,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @locked.setter
     def locked(self, value : bool):
         if self._locked != value:
+            if value and not self.containers:
+                return # cannot lock an input that has no mappings
             self._locked = value
             self.lockedChanged.emit(self)
 
