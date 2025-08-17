@@ -3037,14 +3037,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._autorepeat_widget.clicked.connect(self._auto_repeat_state_changed)
         self._autorepeat_widget.setToolTip("When enabled, the command will repeat at set interval while the input is pressed")
 
-        self._autorepeat_delay_label = QtWidgets.QLabel("Interval (ms)")
-        self._autorepeat_delay_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self._autorepeat_delay_widget.setRange(0, 20000)
-        width = gremlin.ui.ui_common.get_char_width(8)
-        self._autorepeat_delay_widget.setMaximumWidth(width)
-        self._autorepeat_delay_widget.setValue(self.action_data.auto_repeat_interval)
-        self._autorepeat_delay_widget.valueChanged.connect(self._auto_repeat_delay_changed)
-
+        self._autorepeat_delay_widget = gremlin.ui.ui_common.QDelayWidget(self.action_data.auto_repeat_interval, callback = self._auto_repeat_delay_changed, label = "Interval (ms)")
 
         self._release_command_widget = QtWidgets.QCheckBox("Separate Release Expression")
         self._release_command_widget.setToolTip("If enabled, a separate expression will be sent on input release")
@@ -3056,7 +3049,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self._autorepeat_container_layout.addWidget(self._autorepeat_widget)
-        self._autorepeat_container_layout.addWidget(self._autorepeat_delay_label)
         self._autorepeat_container_layout.addWidget(self._autorepeat_delay_widget)
         self._autorepeat_container_layout.addStretch()
         
@@ -4188,10 +4180,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             self.valid = False
             return
         
-        self._auto_repeat_thread = None
-        self._auto_repeat_event = threading.Event()
-        self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command, daemon=False)
-        self._auto_repeat_thread.name = "SIMCONNECT autorepeat"
+        # self._auto_repeat_thread = None
+        # self._auto_repeat_event = threading.Event()
+        # self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command, daemon=False)
+        # self._auto_repeat_thread.name = "SIMCONNECT autorepeat"
         self.pulse_worker_map = {}  # map of (state_name) to pulse worker object 
         
         self.valid = True
@@ -4217,11 +4209,11 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         ''' occurs wen the profile stops'''
         if self._profile_started:
             self._profile_started = False
-            self._auto_repeat_event.set()
-            if self._auto_repeat_thread:
-                # clear any running autorepeat
-                if self._auto_repeat_thread.is_alive():
-                    self._auto_repeat_thread.join()
+            #self._auto_repeat_event.set()
+            # if self._auto_repeat_thread:
+            #     # clear any running autorepeat
+            #     if self._auto_repeat_thread.is_alive():
+            #         self._auto_repeat_thread.join()
                 
             # unregister any prior requests
             self.manager.clearRequests()
@@ -4267,8 +4259,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         super().process_event(event, action_value)
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_simconnect
+        verbose_details = verbose and config.verbose_mode_extra
         verbose_exec = config.verbose_mode_exec
-        verbose_details = False # config.verbose_mode_details
         #verbose = True
         manager : SimConnectManager = self.manager
    
@@ -4353,14 +4345,22 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             else:
                 # non axis command
                 if self.action_data.auto_repeat:
-                    if trigger:
-                        # calculator expression
-                        if not self._auto_repeat_thread.is_alive():
-                            # command auto repeats while pressed - not started
-                            if verbose_details: syslog.info(f"auto repeat start")
-                            self._auto_repeat_thread.start()
-                            return True
-                
+                    pulse_data = {}
+                    pulse_data["command"] = self.action_data.command
+                    self.pulse_start("calc", -1, self.action_data.auto_repeat_interval/1000, data = pulse_data)
+                else:
+                    # not executed
+                    if self.action_data.auto_repeat:
+                        self.pulse_stop("calc")
+                        # if self.action_data.auto_repeat:
+                        #     if trigger:
+                        #         # calculator expression
+                        #         if not self._auto_repeat_thread.is_alive():
+                        #             # command auto repeats while pressed - not started
+                        #             if verbose_details: syslog.info(f"auto repeat start")
+                        #             self._auto_repeat_thread.start()
+                        #             return True
+                        
                 if trigger:
                     # regular calculate
                     command = self.action_data.command
@@ -4369,12 +4369,14 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         manager.calculate(command) # run RPN script
                 else:
                     # release calculate auto repeat
-                    if self.action_data.auto_repeat and self._auto_repeat_thread:
-                        # released
-                        if verbose_details: syslog.info(f"auto repeat stopping...")
-                        self._auto_repeat_event.set()
-                        self._auto_repeat_thread.join()
-                        if verbose_details: syslog.info(f"auto repeat stopped")
+                        # if self.action_data.auto_repeat and self._auto_repeat_thread:
+                        #     # released
+                        #     if verbose_details: syslog.info(f"auto repeat stopping...")
+                        #     # self._auto_repeat_event.set()
+                        #     # self._auto_repeat_thread.join()
+                        #     if verbose_details: syslog.info(f"auto repeat stopped")
+                    if self.action_data.auto_repeat:
+                        self.pulse_stop("calc")
 
                     if self.action_data.is_release_command:
                         # execute release command
@@ -4389,7 +4391,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
             if command_type == SimConnectCommandType.SimVar:
                 if block is None:
-                    syslog.warning(f"SIMCONNECT: {comment} Error: Simvar Block not set")    
+                    if verbose_details: syslog.warning(f"SIMCONNECT: {comment} Error: Simvar Block not set")    
                     return True        
                 if not block.valid:
                     # invalid command
@@ -4507,14 +4509,14 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         return True
     
-    def _auto_repeat_command(self):
-        verbose_details = False
-        while not self._auto_repeat_event.is_set():
-            self.manager.calculate(self.action_data.command)
-            time.sleep(self.action_data.auto_repeat_interval)
+    # def _auto_repeat_command(self):
+    #     verbose_details = False
+    #     while not self._auto_repeat_event.is_set():
+    #         self.manager.calculate(self.action_data.command)
+    #         time.sleep(self.action_data.auto_repeat_interval)
 
-        # syslog = logging.getLogger("system")
-        if verbose_details: syslog.info("autorepeat: thread stop")
+    #     # syslog = logging.getLogger("system")
+    #     if verbose_details: syslog.info("autorepeat: thread stop")
 
 
         
@@ -4526,6 +4528,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         if self.verbose: syslog.info(f"Pulse ON")
         match key:
             case "trigger":
+                # sngle command auto repeat
                 command_type = pulse_data["command_type"] 
                 value = pulse_data["value"]
                 if command_type == SimConnectCommandType.LVar:
@@ -4538,16 +4541,25 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
                 if self.action_data.auto_repeat:
                     self.pulse_start(key, None, self.action_data.auto_repeat_interval/1000, data = pulse_data)
+            case "calc":
+                # calculator auto repeat
+                command = pulse_data["command"]
+                self.manager.calculate(command)
 
+                if self.action_data.auto_repeat:
+                    self.pulse_start(key, None, self.action_data.auto_repeat_interval/1000, data = pulse_data)
 
 
     def _pulse_off(self, data):
         ''' called when pulse is off '''
-        key, pulse_data = data
-        if self.verbose: syslog.info(f"Pulse OFF")
-        match key:
-            case "trigger":
-                pass
+
+        # ignore
+        pass  
+        # key, pulse_data = data
+        # if self.verbose: syslog.info(f"Pulse OFF")
+        # match key:
+        #     case "trigger":
+        #         pass
         
 
     def pulse_start(self, key : str, duration : float, interval : float, data = None):
@@ -4650,6 +4662,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.auto_repeat = False
         self.auto_repeat_interval = 250 # how often to repeat the command while pressed in ms
         self.auto_repeat_delay = 250 # delay between pulses in ms
+        
 
         # the value to output if any
         
@@ -5107,6 +5120,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         node.set("trigger", SimConnectTriggerMode.to_string(self.trigger_mode))
         node.set("autorepeat", safe_format(self.auto_repeat, bool))
         node.set("delay", safe_format(self.auto_repeat_interval, int))
+        
         node.set("norm_min_range", safe_format(self.normalized_min_range, float)) 
         node.set("norm_max_range", safe_format(self.normalized_max_range, float)) 
         node.set("command_min_range", safe_format(self.command_min_range, float)) 

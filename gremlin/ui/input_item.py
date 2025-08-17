@@ -1705,7 +1705,17 @@ class InputItemWidget(QBoxFrame):
             grids = []
             rh = self._getRowHeight()
             
+
             if self.data:
+                # input id
+                line_edit = gremlin.ui.ui_common.QDataLineEdit()
+                line_edit.setMinimumWidth(width)
+                line_edit.setText(gremlin.util.idString(self.data.id))
+                line_edit.setReadOnly(True)
+                widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, f"Input ID:")
+                self._container_id_layout.addWidget(widget)
+                grids.append(widget)
+
                 container_count = len(self.data.containers)
                 if container_count:
                     for index, container in enumerate(self.data.containers):

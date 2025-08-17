@@ -694,6 +694,16 @@ def get_guid(strip=True,no_brackets = False) -> str:
         guid = guid.replace("{",'').replace("}",'')
     return guid
 
+def idString(value):
+    ''' converts a value to an id string'''
+    if not isinstance(value, str):
+        value = str(value)
+    value = value.casefold()
+    value = value.replace("-",'')
+    value = value.replace("{",'').replace("}",'')
+    return value
+    
+
 def compare_guid(first, other):
     ''' compares GUIDs DINPUT or str - True if equal'''
     if first is None and other is None:

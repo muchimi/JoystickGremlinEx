@@ -2997,6 +2997,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     def _validate(self):
         ''' validates the input to ensure it does not conflict with an existing input '''
         # assume ok
+        if not Shiboken.isValid(self):
+            return True
         valid = True
         try:
             self._validation_message_widget.setText("")

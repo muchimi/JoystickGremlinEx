@@ -13,6 +13,11 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+
+### (m76T46)
+- Fix: simconnect autorepeat refactor for calc code + pulse API
+- Fix: state profile load derive mode
+
 ### (m76T45)
 - Fix: mapping template import no longer add sub-containers as root containers.
 - New: multi-container templates.  A new save button is added to a general container set to enable saving a template containing all the containers in the current mapping.  The template can then be applied to another profile or input.

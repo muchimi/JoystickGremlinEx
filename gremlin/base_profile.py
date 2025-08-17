@@ -1572,7 +1572,6 @@ def get_mode_object(node, extra_data = None):
     
     
     '''
-
     
     if extra_data:
         if "mode_object" in extra_data:
@@ -1583,7 +1582,7 @@ def get_mode_object(node, extra_data = None):
             profile = gremlin.shared_state.current_profile
             device_guid = extra_data["device_guid"]
             device_type = extra_data["device_type"]
-            input_id = extra_data["input_id"]
+            
             mode = extra_data["mode"]
 
             device_modes = profile.get_device_modes(device_guid, device_type,DeviceType.to_string(device_type))
@@ -1592,12 +1591,25 @@ def get_mode_object(node, extra_data = None):
     
     if node is not None and isinstance(node, lxml.etree._Element):
 
+        nodes = node.xpath("ancestor::state")
+        if nodes:
+            # state container
+            device_guid = gremlin.shared_state.state_tab_guid
+            device_type = DeviceType.State
+            mode = gremlin.shared_state.master_mode
+            profile = gremlin.shared_state.current_profile
 
+            device_modes = profile.get_device_modes(device_guid, device_type,DeviceType.to_string(device_type))
+            mode_object = device_modes.ensure_mode_exists(mode)
+            return mode_object
+            
         # xml node
         nodes = node.xpath("ancestor::mode")
         if not nodes:
             return None
+        
         mode_node = nodes.pop()
+
         mode = safe_read(mode_node, "name", str, "")
         assert len(mode) > 0, "XML hierarchy error - parent mode not found"
 
@@ -2204,6 +2216,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 )
                 continue
             entry = container_tag_map[container_type](self)
+            mode_object = gremlin.base_profile.get_mode_object(node, extra_data)
+            if mode_object:
+                if extra_data is None:
+                    extra_data = {}
+                extra_data["mode_object"] = mode_object
+
+            
             entry.from_xml(child, data, extra_data)
             self.add_container(entry)
             if hasattr(entry, "action_model"):
@@ -4029,7 +4048,8 @@ class Profile():
                 backup_file = os.path.join(backup_path, f"{base_name}.{backup_count}.xml")
                 try:
                     shutil.copyfile(use_name, backup_file)
-                    syslog.error(f"BACKUP: backup profile: {backup_file}")
+                    verbose = gremlin.config.Configuration().verbose
+                    if verbose: syslog.info(f"BACKUP: backup profile: {backup_file}")
                 except Exception as err:
                     syslog.error(f"BACKUP: save error: Unable to backup profile: {err}")
                     return
