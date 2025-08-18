@@ -34,6 +34,8 @@ The contents of the zip file should be extracted to a folder that is not a syste
 
 The recommendation is to install GremlinEx in its own folder, like "GremlinEx" and if you will use multiple versions, it's recommended you also name the folder after the version.  This is automatic if you extract the zip File using tools like 7Zip or Nanazip as the folder will be the same name as the zip file.  This enables you to have multiple versions installed.
 
+The master repository can be found here on GitHub: https://github.com/muchimi/JoystickGremlinEx
+
 ### Required additional tools
 
 GremlinEx works with a number of tools to function as a device integrator, such as VJOY.   Some tools are mandatory (VJOY), others are not (VIGEM, Bitfocus) but recommended.
@@ -115,4 +117,6 @@ Some examples of what GremlinEx can do:
 At its core, GremlinEx takes "real" hardware input and maps it to "virtual" joystick outputs via VJOY.  
 This can create confusion with in-game control mapping utilities because the game will usually get inputs concurrently from the "real" device and from the "virtual" device.
 To avoid this, [HIDHide](https://github.com/nefarius/HidHide) is recommended to "hide" the input devices from the target application.  This is also recommended because many games unfortunately only support a limited of game controllers.
+
+
 
