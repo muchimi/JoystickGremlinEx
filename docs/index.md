@@ -34,7 +34,8 @@ The contents of the zip file should be extracted to a folder that is not a syste
 
 The recommendation is to install GremlinEx in its own folder, like "GremlinEx" and if you will use multiple versions, it's recommended you also name the folder after the version.  This is automatic if you extract the zip File using tools like 7Zip or Nanazip as the folder will be the same name as the zip file.  This enables you to have multiple versions installed.
 
-The master repository can be found here on GitHub: https://github.com/muchimi/JoystickGremlinEx
+The master repository can be found here on GitHub: [https://github.com/muchimi/JoystickGremlinEx
+](https://github.com/muchimi/JoystickGremlinEx).
 
 ### Required additional tools
 
