@@ -462,6 +462,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#input-lockunlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      Input lock/unlock
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#linear-inputs" class="md-nav__link">
     <span class="md-ellipsis">
       Linear inputs
@@ -2586,6 +2595,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#input-lockunlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      Input lock/unlock
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#linear-inputs" class="md-nav__link">
     <span class="md-ellipsis">
       Linear inputs
@@ -4649,6 +4667,9 @@
 <h3 id="input-area">Input area<a class="headerlink" href="#input-area" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/input_panel.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="input panel" src="../assets/input_panel.png" /></a></p>
 <p>The left of the user interface (UI) is the input area.  It shows a list of available inputs on the currently selected device.</p>
+<h3 id="input-lockunlock">Input lock/unlock<a class="headerlink" href="#input-lockunlock" title="Permanent link">&para;</a></h3>
+<p>Each input can be locked, which prevents inadvertent editing of its mappings.</p>
+<p><a class="glightbox" href="../assets/input_lock.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="input locksl" src="../assets/input_lock.png" /></a></p>
 <h3 id="linear-inputs">Linear inputs<a class="headerlink" href="#linear-inputs" title="Permanent link">&para;</a></h3>
 <p>Linear inputs indicate an axis type input is detected.   The input can change values.  Examples of linear inputs are a joystick axis, a slider, a fader, or rotary knob.</p>
 <p>Linear inputs that have multiple axes, such as an XY pad, will show as one input per axis.</p>
@@ -4810,9 +4831,16 @@ This container was specifically created for output needs that have "gates", such
 <p>This action maps to a Gamepad (VIGEM) output.</p>
 <h3 id="map-to-simconnect">Map to SimConnect<a class="headerlink" href="#map-to-simconnect" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_map_to_simconnect.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to simconnect action" src="../assets/action_map_to_simconnect.png" /></a></p>
-<p>This action lets you send a SimConnect command to Microsoft Flight Simulator via the SimConnect SDK.  </p>
-<p>This includes sending calculation and expressions via the GremlinEX WASM module to read or modify internal simulator parameters defined by addons that are not exposed by the SimConnect API (in this example, execute the "(&gt;K:AP_MASTER)" internal command.</p>
+<p>This action lets you send a SimConnect command to Microsoft Flight Simulator via the SimConnect SDK.   This bypasses the need to map any controls inside Microsoft Flight Simulator, and sends the data direct to the simulator to control aircrafts.  This way you completely bypass the MSFS control mapper and send control data directly to the sim, and the add-on.</p>
+<p>This includes sending calculation and expressions via the GremlinEX WASM module to read or modify internal simulator parameters defined by addons that are not exposed by the SimConnect API.  In this example, execute the "(&gt;K:AP_MASTER)" internal command.</p>
 <p><a class="glightbox" href="../assets/action_map_to_simconnect_calculator.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to simconnect calculator action" src="../assets/action_map_to_simconnect_calculator.png" /></a></p>
+<p>Using the SimConnect mapper from sim variables to calculator expressions requires knowledge of the <a href="https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/SimConnect_SDK.htm">Microsoft Flight Simulator SDK</a>.  </p>
+<p>The recommended setup is to have a single profile for Microsoft Flight Simulator, and have a mode for each aircraft type, and under that if needed, a mode for each subtype/variant.  Recommendations including having a setup for Boeing, Airbus, single prop, dual prop, single turboprop and dual turboprop, and quad engine as the base.  The Simconnect options page in GremlinEx while the sim is running will pull the current aircraft and let you associate a mode with that aircraft.  If you find the aircraft uses the default mode, it means it's being reported as a new type and likely needs to be associated with a profile mode for that type.</p>
+<p>For aircraft with detents, such as for spoiler or throttles, use the Gated Axis as it was designed precisely for this complicated need and in conjunction with other mapping features make mapping complex throttle assignments relatively easy.</p>
+<p>It is also recommended to use calculator expressions as much as a possible due to the capabilities to access add-on variables that are not in SimConnect.  A <a href="https://hubhop.mobiflight.com/presets/">guide to calculator expressions can be found here</a> with examples for commond add-ons.  All these work as-is in GremlinEx and allow you to access variables defined by each add-on.  </p>
+<p>SimConnect itself is a bit of an arcane art due to the historically poor documentation, lack of examples and errors / ommissions which combined with bugs make controlling MSFS via SimConnect an interesting challenge, however one miles better than using the built-in MSFS control mapper.  A number of add-ons also define variables that are not part of the base simulator, so are not exposed by the SimConnect SDK.  The only way to set them is to use calculator expressions, and consult the add-on manual and the MSFS user commmunity for what the variables are.</p>
+<p>I often use the built-in debug tools in MSFS to determine what variable to set or what the values should be, including the SimConnect inspector and the example Simvars explorer that comes as a sample project to compile with the Simconnect SDK.</p>
+<p>Another avanced used of Simconnect is to have a user plugin capture sim state, for example parking brakes, and update a glass surface widget with the state. This can be done via a custom plugin in GremlinEx using the existing event model and API fro Simconnect via Simconnect Manager, an internal control class in GremlinEx.</p>
 <h3 id="map-to-osc">Map to OSC<a class="headerlink" href="#map-to-osc" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_map_to_osc.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to osc action" src="../assets/action_map_to_osc.png" /></a></p>
 <p>This action lets you send an OSC message to the network.</p>
