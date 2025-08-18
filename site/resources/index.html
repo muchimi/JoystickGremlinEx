@@ -673,7 +673,8 @@
 <h2 id="required-modules">Required modules<a class="headerlink" href="#required-modules" title="Permanent link">&para;</a></h2>
 <h3 id="vjoy">VJOY<a class="headerlink" href="#vjoy" title="Permanent link">&para;</a></h3>
 <p>VJOY is an open source virtual joystick driver used by GremlinEx as output.  VJOY can be installed from: <a href="https://github.com/jshafer817/vJoy/releases">https://github.com/jshafer817/vJoy/releases</a> </p>
-<p>Version recommended: 2.1.9.1 for Windows 10/11 x64</p>
+<p>Version recommended: 2.1.9.1 for Windows 10/11 x64.</p>
+<p>Other versions may work, however the DLLs must match as the DLL included in GremlinEx is only for 2.1.9.1.</p>
 <h3 id="hidhide">HIDHide<a class="headerlink" href="#hidhide" title="Permanent link">&para;</a></h3>
 <p>HIDHide is an open source tool to manage by process device visibility.  In other words, HIDHide is used to "hide" inputs from games so that the game only sees VJOY as mapped through GremlinEx.  The tool is essential to avoid confusion in the game's own mapper.</p>
 <p>HIDHide and documentation is available here: <a href="https://github.com/nefarius/HidHide">https://github.com/nefarius/HidHide</a></p>
@@ -709,6 +710,12 @@
 <h4 id="oscpilot">OSC/Pilot<a class="headerlink" href="#oscpilot" title="Permanent link">&para;</a></h4>
 <p>OSC/Pilot is an OSC/MIDI glass surface controller application (payware).  This application supports graphics and images but does not currently support internal scripting.   OSC/Pilot is similar to Touch/OSC.</p>
 <p><a href="https://oscpilot.com/">https://oscpilot.com/</a></p>
+<h4 id="midi-over-the-network">MIDI over the network<a class="headerlink" href="#midi-over-the-network" title="Permanent link">&para;</a></h4>
+<p>RTP-MIDI is a MIDI virtual driver (freeware) that lets you network MIDI data over the network.  Useful to accept input from a MIDI device hooked up to a machine on the network back into GremlinEx.</p>
+<p><a href="https://www.tobias-erichsen.de/software/rtpmidi.html">rtpMidi</a>. </p>
+<h4 id="midi-loop">MIDI loop<a class="headerlink" href="#midi-loop" title="Permanent link">&para;</a></h4>
+<p>Another utility that is useful lets you define a loopback port on the local machine.  The MIDI device connected locally can send to that MIDI device, and GremlinEx can get MIDI input from it without connecting directly to each MIDI device.</p>
+<p><a href="https://www.tobias-erichsen.de/software/loopmidi.html">loopMidi</a>.  </p>
 
 
 

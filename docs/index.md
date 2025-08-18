@@ -1,4 +1,4 @@
-# Overview
+# Introduction
 
 (this documentation is a work in progress)
 
@@ -6,23 +6,25 @@
 
 GremlinEx is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.
 
+The audience for this tool is anyone looking to easily integrate multiple hardware devices from joysticks to control panels and map it to a game.  GremlinEx supports can be used to map simpits to flight simulators and other simulation game that rely on a lot of inputs.   Gremlin supports glass surfaces (touch screens), hardware panels like StreamDeck, and even MIDI control panels.
+
+A more detailed look at features supported by GremlinEx can be found in the [overview section](overview.md) of the documentation.
+
 GremlinEx is independent from any controller software.  It does not require you to run any specific software from a hardware manufacturer to "map" the device.  So long as the device shows up on Windows as an HID device with axes and buttons, GremlinEx will let you map this input.  It is vendor agnostic and relies on standard APIs that are not vendor specific. GremlinEx works with any HID compliant controller device, so supports any device up to eight (8) axes, up to a hundred and twenty eight (128) buttons, and up to four (4) hats.
 
 There is no limit to the number of input devices GremlinEx supports.
 
 Some of these inputs can be virtual, so GremlinEx can also accept inputs from VJOY while sending outputs to VJOY so long as the input device is not the same as the output device to avoid a loop.
 
-GremlinEx can accomplish very sophisticated condition based routing based on one or more concurrent inputs.
-
-Gremlin offers multiple hierarchical modes, each with its own mapping.  A child mode can inherit mappings from the parent mode if the child does not also map that input.
-
-GremlinEx includes a number of built-in containers to solve common mapping scenarios, such as short press versus long press, axis in a certain zone, macros and chaining.
+GremlinEx can accomplish very sophisticated condition based routing based on one or more concurrent inputs using conditions and states.
 
 GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and hardware panels connected to devices on the network, including the local machine.  GremlinEx can also send data back to these devices to update their configuration, for example, selecting pages to display based on the active profile or mode loaded in GremlinEx.
 
 GremlinxEx (as of M76) supports templates: individual mappings can be saved to template files.  These templates can then be loaded into another input, profile, or shared. Templates have no input information - only mappings.
 
 GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.
+
+
 
 ## Installation
 

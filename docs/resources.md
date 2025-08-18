@@ -8,7 +8,9 @@ GremlinEx includes all dependencies in the release.  There are however some comp
 
 VJOY is an open source virtual joystick driver used by GremlinEx as output.  VJOY can be installed from: [https://github.com/jshafer817/vJoy/releases](https://github.com/jshafer817/vJoy/releases) 
 
-Version recommended: 2.1.9.1 for Windows 10/11 x64
+Version recommended: 2.1.9.1 for Windows 10/11 x64.
+
+Other versions may work, however the DLLs must match as the DLL included in GremlinEx is only for 2.1.9.1.
 
 ### HIDHide
 
@@ -83,4 +85,14 @@ OSC/Pilot is an OSC/MIDI glass surface controller application (payware).  This a
 
 [https://oscpilot.com/](https://oscpilot.com/)
 
+#### MIDI over the network
 
+RTP-MIDI is a MIDI virtual driver (freeware) that lets you network MIDI data over the network.  Useful to accept input from a MIDI device hooked up to a machine on the network back into GremlinEx.
+
+[rtpMidi](https://www.tobias-erichsen.de/software/rtpmidi.html). 
+
+#### MIDI loop
+
+ Another utility that is useful lets you define a loopback port on the local machine.  The MIDI device connected locally can send to that MIDI device, and GremlinEx can get MIDI input from it without connecting directly to each MIDI device.
+ 
+ [loopMidi](https://www.tobias-erichsen.de/software/loopmidi.html).  
