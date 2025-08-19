@@ -706,6 +706,8 @@
 <p>GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.</p>
 <h2 id="general-architecture">General Architecture<a class="headerlink" href="#general-architecture" title="Permanent link">&para;</a></h2>
 <p><a class="glightbox" href="assets/gremlinex_diagram.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="general_architecture" src="assets/gremlinex_diagram.png" /></a></p>
+<p>GremlinEx takes inputs from multiple sources, local and network, performs the transformations and mappings specififed in the profile based on the current profile options, container and action configurations, and sends the output as required.</p>
+<p>There should be no expectation that a single input always results in a single output. A single input can produce multiple outputs, and multiple inputs can provide a single output.  It's also possible that no output is produced if the input(s) should be ignored based on the particular context.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <p>GremlinEx comes as a zip file in the <a href="https://github.com/muchimi/JoystickGremlinEx/releases">release section of GitHub</a> that contains all you need.</p>
 <p>The contents of the zip file should be extracted to a folder that is not a system folder such as "Program Files" or "Windows".</p>
