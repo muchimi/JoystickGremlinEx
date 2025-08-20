@@ -429,8 +429,6 @@ class InputItemListModel(ui_common.AbstractModel):
             self._item_map[item] = new_index
             self._index_map[new_index] = item
 
-            item.lockedChanged.disconnect(self._handle_lock_changed)
-
             self._update_source()
             self._update_filter()
 
