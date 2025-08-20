@@ -293,6 +293,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_ui()
 
     def _update_ui(self):
+        if not Shiboken.isValid(self):
+            return
         
         input_type = self._get_input_type()
         hat_visible = input_type == InputType.JoystickHat
