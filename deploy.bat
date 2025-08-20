@@ -1,4 +1,4 @@
-@echo "Starting to build Gremlin Ex..."
+@echo "Starting to build GremlinEx..."
 cd /d %0\..
 cd dist
 if exist gremlinEx\ (

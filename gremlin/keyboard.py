@@ -1436,8 +1436,8 @@ class KeyMap:
 
 
         "mediaprevtrack": ("Prev Track", 0x23, True, win32con.VK_MEDIA_PREV_TRACK),
-        "mediaplay": ("Play", 0x22, True, win32con.VK_PLAY),
-        "mediapause": ("Pause", 0x22, True, win32con.VK_MEDIA_PLAY_PAUSE),
+        #"mediaplay": ("Play", 0x22, True, win32con.VK_PLAY),
+        "mediapause": ("Play/Pause", 0x22, True, win32con.VK_MEDIA_PLAY_PAUSE),
         "medianexttrack": ("Next Track", 0x21, True, win32con.VK_MEDIA_NEXT_TRACK),
         
         "mediavolmute": ("Mute", 0x20, True, win32con.VK_VOLUME_MUTE),

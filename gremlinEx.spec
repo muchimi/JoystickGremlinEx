@@ -50,7 +50,7 @@ added_binaries = [
 
 
 a = Analysis(
-    ["joystick_gremlin.py"],
+    ["gremlinEx.py"],
     pathex=['C:/JoystickGremlin-develop'],
     binaries=added_binaries,
     datas=added_files,

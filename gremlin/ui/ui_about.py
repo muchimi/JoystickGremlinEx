@@ -12,7 +12,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 class Ui_About(object):
     def setupUi(self, About):
-        import joystick_gremlin
+        import gremlinEx
         import gremlin.util
         About.setObjectName("About")
         About.setWindowModality(QtCore.Qt.WindowModal)
@@ -32,7 +32,7 @@ class Ui_About(object):
         self.about_box_widget = QtWidgets.QWidget()
         self.about_box_widget.setLayout(self.about_box_layout)
 
-        self.version_widget = QtWidgets.QLabel(f"Version: {joystick_gremlin.Version().version}")
+        self.version_widget = QtWidgets.QLabel(f"Version: {gremlinEx.Version().version}")
         self.about_box_layout.addWidget(self.version_widget)
         self.about_box_layout.addWidget(QtWidgets.QLabel(f"Python: {gremlin.util.getPythonVersion()}"))
         self.about_box_layout.addWidget(self.about)

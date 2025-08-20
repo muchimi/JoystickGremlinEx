@@ -1,0 +1,9 @@
+- module-name: 'gremlinEx'
+  dlls:
+  - from_filenames:
+      prefixes:
+      - 'dill'
+      - 'ViGEmClient'
+      - 'SimConnect'
+      - 'vJoyInterface'
+      - 'hidapi'

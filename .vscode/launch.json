@@ -9,7 +9,7 @@
             "name": "Python: Current File",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/joystick_gremlin.py",
+            "program": "${workspaceFolder}/gremlinEx.py",
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
             //"args": ["--np"]

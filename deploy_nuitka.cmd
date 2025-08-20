@@ -1,0 +1,1 @@
+python -m nuitka --user-package-configuration-file=gremlinEx_nuitka.yml --onefile --enable-plugin=pyside6 --enable-plugin=mido.backends.rtmidi  --enable-plugin=pyttsx3 -include-data-dir= --windows-icon-from-ico=gfx/icon.ico gremlinEx.py
