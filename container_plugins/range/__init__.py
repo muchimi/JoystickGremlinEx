@@ -34,7 +34,7 @@ from gremlin.base_profile import AbstractContainer
 from action_plugins.map_to_keyboard import *
 from action_plugins.map_to_mouse import *
 import gremlin.config
-
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -54,7 +54,8 @@ class RangeContainerWidget(AbstractContainerWidget):
 
     def _create_action_ui(self):
         ''' creates the UI for the container '''
-
+        if not Shiboken.isValid(self):
+            return
 
         # get container parent widget
 
@@ -80,10 +81,10 @@ class RangeContainerWidget(AbstractContainerWidget):
         # self.profile_data.create_or_delete_virtual_button()
         self.action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type(),
-            self.profile_data,
+            self.profile_data.input_item,
         )
 
-        self.action_selector.inputItem = self.profile_data
+        self.action_selector.inputItem = self.profile_data.input_item
         action_data: RangeContainer
         action_data = self.profile_data
 

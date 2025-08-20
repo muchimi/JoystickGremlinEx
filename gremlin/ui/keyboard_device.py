@@ -37,6 +37,7 @@ from gremlin.util import *
 from gremlin.input_types import InputType
 import gremlin.base_classes
 from lxml import etree as ElementTree
+from lxml import etree
 import gremlin.ui.ui_common
 from gremlin.base_classes import AbstractInputItem
 
@@ -215,9 +216,9 @@ class KeyboardInputItem(AbstractInputItem):
 
     def to_xml(self):
         # saves itself to xml
-        node = ElementTree.Element("input")
+        node = etree.Element("input")
         node.set("guid", str(self.id))
-        child = ElementTree.Element("key")
+        child = etree.Element("key")
         root_key = self._key
         child.set("virtual-code", str(root_key.virtual_code))
         child.set("scan-code", str(root_key.scan_code))
@@ -226,13 +227,17 @@ class KeyboardInputItem(AbstractInputItem):
         child.set("description", root_key.lookup_name)
         node.append(child)
         for key in root_key.latched_keys:
-            latched_child = ElementTree.Element("latched")
+            comment = f"virtual: 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.extended}"
+            latched_child = etree.Element("latched")
             latched_child.set("virtual-code", str(key.virtual_code))
             latched_child.set("scan-code", str(key.scan_code))
             latched_child.set("extended", str(key.is_extended))
             latched_child.set("mouse", str(key.is_mouse))
             latched_child.set("description", key.lookup_name)
+            node_comment = etree.Comment(comment)
+            child.append(node_comment)
             child.append(latched_child)
+            
         return node
 
     

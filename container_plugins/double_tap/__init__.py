@@ -29,7 +29,7 @@ import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
-
+from shiboken6 import Shiboken
 
 
 syslog = logging.getLogger("system")
@@ -48,6 +48,8 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
 
     def _create_action_ui(self):
         """Creates the UI components."""
+        if not Shiboken.isValid(self):
+            return
         self.profile_data.create_or_delete_virtual_button()
 
         self.options_layout = QtWidgets.QHBoxLayout()

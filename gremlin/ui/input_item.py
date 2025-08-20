@@ -41,7 +41,6 @@ import gremlin.ui.ui_common as ui_common
 from gremlin.ui.ui_common import QBoxFrame
 from functools import partial
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
-
 import logging
 import lxml
 from shiboken6 import Shiboken
@@ -1220,11 +1219,12 @@ class ActionSetView(ui_common.AbstractView):
         # not associated with a vJoy device
         if self.view_type == ui_common.ContainerViewTypes.Action and \
                 self.profile_data.get_device_type() != DeviceType.VJoy:
+            
             self.action_selector = gremlin.ui.ui_common.ActionSelector(
                 profile_data.parent.getInputType(),
                 profile_data.input_item
             )
-            self.action_selector.inputItem = profile_data.parent
+            self.action_selector.inputItem = profile_data.input_item
             self.action_selector.action_added.connect(self._add_action)
             self.action_selector.action_paste.connect(self._paste_action)
             widget,_ = gremlin.ui.ui_common.getHContainer(self.action_selector)

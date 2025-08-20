@@ -2410,7 +2410,7 @@ class ActionSelector(QtWidgets.QWidget):
     action_paste = QtCore.Signal(object, object) # paste button pressed
 
 
-    def __init__(self, input_type, item, parent=None):
+    def __init__(self, input_type, input_item, parent=None):
         """Creates a new selector instance.
 
         :param input_type the input type for which the action selector is being created
@@ -2420,8 +2420,8 @@ class ActionSelector(QtWidgets.QWidget):
         super().__init__(parent)
         import gremlin.base_profile
 
-        assert isinstance(item, gremlin.base_profile.InputItem), "expected an input item, wrong type passed"
-        self._input_item = item
+        assert isinstance(input_item, gremlin.base_profile.InputItem), "expected an input item, wrong type passed"
+        self._input_item = input_item
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
         
 
@@ -2438,10 +2438,13 @@ class ActionSelector(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        widget, _ = getHContainer([self.action_dropdown,
-                                          self.add_button,
-                                          self.paste_button       
-                                          ],'Actions')
+        self.action_label = QtWidgets.QLabel("Actions")
+
+        widget, _ = getHContainer([self.action_label, 
+                                   self.action_dropdown,
+                                   self.add_button,
+                                   self.paste_button       
+                                   ])
 
         self.main_layout.addWidget(widget)
         eh = gremlin.event_handler.EventHandler()

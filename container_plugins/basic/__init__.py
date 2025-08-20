@@ -29,6 +29,7 @@ from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_conditions import AbstractFunctor
+from shiboken6 import Shiboken
 import logging
 
 syslog = logging.getLogger("system")
@@ -47,6 +48,8 @@ class BasicContainerWidget(AbstractContainerWidget):
 
     def _create_action_ui(self):
         """Creates the UI components."""
+        if not Shiboken.isValid(self):
+            return
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
         if verbose_ui: syslog.info("BasicContainerWidget: create action UI start")

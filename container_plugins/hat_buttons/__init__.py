@@ -33,6 +33,7 @@ from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
 import gremlin.config
 import logging
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -80,6 +81,8 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
     def _create_action_ui(self):
         """Creates the UI components."""
+        if not Shiboken.isValid(self):
+            return
         gremlin.ui.ui_common.clear_layout(self.action_layout)
 
         self.options_layout = QtWidgets.QHBoxLayout()

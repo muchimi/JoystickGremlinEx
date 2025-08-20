@@ -33,6 +33,7 @@ from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.util import safe_read, safe_format
 from gremlin.input_types import InputType
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -56,6 +57,8 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
     def _create_action_ui(self):
         """Creates the UI components."""
+        if not Shiboken.isValid(self):
+            return
         self.profile_data.create_or_delete_virtual_button()
 
         self.autorelease_widget = QtWidgets.QCheckBox("Auto-release")

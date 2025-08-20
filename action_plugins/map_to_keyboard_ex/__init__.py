@@ -18,6 +18,7 @@
 
 import os
 from lxml import etree as ElementTree
+from lxml import etree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
@@ -964,12 +965,15 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
                 assert True, f"Don't know how to handle: {code}"
 
             if key.name:
+                comment = f"virtual: 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
                 key_node = ElementTree.Element("key")
                 key_node.set("virtual-code", str(virtual_code))
                 key_node.set("scan-code", str(scan_code))
                 key_node.set("extended", str(is_extended))
                 # useful for xml readability purposes = what scan code is this
                 key_node.set("description", key.name)
+                node_comment = etree.Comment(comment)
+                node.append(node_comment)
                 node.append(key_node)
         return node
 

@@ -914,17 +914,20 @@ class KeyMap:
     @staticmethod
     def register(key):
         assert key.lookup_name
+
+
         
         if key.virtual_code > 0:
-            KeyMap._g_virtual_code_to_key[key.virtual_code] = key
+            if not key.virtual_code in KeyMap._g_virtual_code_to_key:
+                KeyMap._g_virtual_code_to_key[key.virtual_code] = key
         
         index = (key.scan_code, key.is_extended)
         if not index in KeyMap._g_scan_code_to_key.keys():
             KeyMap._g_scan_code_to_key[index] = key
-        if key.name:
-            name = key.lookup_name.lower().replace(" ", "")
-            if name:
-                KeyMap._key_map[name] = key
+            if key.name:
+                name = key.lookup_name.lower().replace(" ", "")
+                if name:
+                    KeyMap._key_map[name] = key
 
     @staticmethod
     def find(scan_code, is_extended):
@@ -963,7 +966,7 @@ class KeyMap:
     
     @staticmethod
     def find_virtual(virtual_code):
-        if virtual_code in KeyMap._g_virtual_code_to_key.keys():
+        if virtual_code in KeyMap._g_virtual_code_to_key:
             return KeyMap._g_virtual_code_to_key[virtual_code].duplicate()
         return None
             
@@ -1016,6 +1019,8 @@ class KeyMap:
 
         if scan_code: 
             value = scan_code
+            if scan_code == 0xE037:
+                pass
             if is_extended:
                 value = 0xe0 << 8 | scan_code
 
@@ -1038,6 +1043,7 @@ class KeyMap:
 
         if not virtual_code:
             return None
+        
 
         keyboard_layout = _get_keyboard_layout(0)
         output_buffer = ctypes.create_unicode_buffer(8)
@@ -1337,6 +1343,9 @@ class KeyMap:
         (0x48,False): ((0x48, False), win32con.VK_NUMPAD8),
         (0x49,False): ((0x49, False), win32con.VK_NUMPAD9),
 
+        (0x37,True): ((0x37, True), win32con.VK_SNAPSHOT),
+
+
         (0x36,True): ((0x36, False), win32con.VK_RSHIFT),  # combine rshift and rshift 2
     }
 
@@ -1371,7 +1380,7 @@ class KeyMap:
         "f23": ("F23", 0x6e, False, win32con.VK_F23),    
         "f24": ("F24", 0x76, False, win32con.VK_F24),   
         # Control keys
-        "printscreen": ("Print Screen", 0x37, True, win32con.VK_PRINT),
+        "printscreen": ("Print Screen", 0x37, True, win32con.VK_SNAPSHOT),
         "scrolllock": ("Scroll Lock", 0x46, False, win32con.VK_SCROLL),
         "pause": ("Pause", 0x45, False, win32con.VK_PAUSE),
         # 6 control block
@@ -1485,6 +1494,8 @@ for mouse_button in MouseButton:
 
 # Populate the scan code based lookup table
 for name_, data in KeyMap._g_name_map.items():
+    if "name_" == "printscreen":
+        pass
     key = Key(*data)
     key._lookup_name = name_
     KeyMap._g_map[(data[1],data[2])] = key

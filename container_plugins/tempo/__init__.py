@@ -32,6 +32,7 @@ from gremlin.input_types import InputType
 from gremlin.util import safe_read, safe_format
 import gremlin.execution_graph
 import gremlin.base_profile
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 class TempoContainerWidget(AbstractContainerWidget):
@@ -48,6 +49,8 @@ class TempoContainerWidget(AbstractContainerWidget):
 
     def _create_action_ui(self):
         """Creates the UI components."""
+        if not Shiboken.isValid(self):
+            return
         self.profile_data.create_or_delete_virtual_button()
 
         self.options_layout = QtWidgets.QHBoxLayout()
@@ -137,9 +140,9 @@ class TempoContainerWidget(AbstractContainerWidget):
         """
         action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type(),
-            self.profile_data,
+            self.profile_data.input_item,
         )
-        action_selector.inputItem = self.profile_data
+        action_selector.inputItem = self.profile_data.input_item
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
 

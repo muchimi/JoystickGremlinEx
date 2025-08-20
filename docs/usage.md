@@ -2097,9 +2097,8 @@ There is no known solution as the false positive, if it occurs, is unfortunate y
 
 ### Options
 
-- You can run it through  [www.virustotal.com](www.virustotal.com) and it will tell you how many malware solutions detect the false positive.  You will see that very few, if any, detect this issue.
-
-- You can run the code directly from the python source.
+- You can run it through [www.virustotal.com](https://www.virustotal.com/gui/home/upload) and it will tell you how many malware solutions detect the false positive.
+- You can run the code directly from the Python source
 
 You can build the executable yourself using the deploy.bat file in the source folder which is the mechanism I use to build the EXE from source. Unfortunately this doesn't seem to fix the issue for many people even if you are the one building on your own computer.
 

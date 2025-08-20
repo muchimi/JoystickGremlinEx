@@ -39,6 +39,7 @@ import gremlin.util
 from gremlin.util import safe_format, safe_read
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -338,15 +339,17 @@ class SwitchContainerWidget(AbstractContainerWidget):
 
     def _create_action_ui(self):
         """Creates the UI components."""
+        if not Shiboken.isValid(self):
+            return
         self._widget_map = {} # map of widgets by position index
 
         self.profile_data.create_or_delete_virtual_button()
         self.action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type(),
-            self.profile_data,
+            self.profile_data.input_item,
         )
 
-        self.action_selector.inputItem = self.profile_data
+        self.action_selector.inputItem = self.profile_data.input_item
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
 

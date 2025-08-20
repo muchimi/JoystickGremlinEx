@@ -38,7 +38,7 @@ from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 from gremlin.util import safe_format, safe_read
-
+from shiboken6 import Shiboken
 class TickContainerWidget(AbstractContainerWidget):
 
     """Container with two actions, one for input button is pressed, the other for when the input button is released
@@ -59,7 +59,8 @@ class TickContainerWidget(AbstractContainerWidget):
 
     def _create_action_ui(self):
         """Creates the UI components."""
-
+        if not Shiboken.isValid(self):
+            return
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_handler)
 

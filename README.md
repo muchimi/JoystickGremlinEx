@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T48)
+- Fix: PrintScreen key virtual code now resolves to VK_SNAPSHOT
+- Fix: Container API failing parameter type validation causing container exceptions when added to a profile.
+- Fix: recompiled the PyInstaller bootloaders in MSVC under Windows 11 as a suggested potential workaround solution for false-positives with some AV solution. 
+
 ### (m76T47)
 - New: ability to lock inputs to prevent inadvertent changes. Locked inputs don't allow changes to the mappings. A lock status is now on every input. Devices also have a lock/unlock buttons at the top that apply to all mapped items.  Inputs that have no maps cannot be locked.
 

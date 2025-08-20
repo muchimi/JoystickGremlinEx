@@ -4,9 +4,11 @@
 
 ## What is GremlinEx?
 
-GremlinEx is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.
+GremlinEx is a universal game/simpit controller integrator: it allows you to take input hardware devices from different manufacturers connected to a local machine, or those connected on a remote machine, such as joysticks, panels,  and HID game controllers, Audio-Visual hardware and software that supports OSC (Open Source Control), MIDI, keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.  GremlinEx maps this input to a simplified and consolidated set of outputs, and it is vendor agnostic.   GremlinEx also has the ability to directly send data to Microsoft Flight Simulator via the SimConnect API.
 
-The audience for this tool is anyone looking to easily integrate multiple hardware devices from joysticks to control panels and map it to a game.  GremlinEx supports can be used to map simpits to flight simulators and other simulation game that rely on a lot of inputs.   Gremlin supports glass surfaces (touch screens), hardware panels like StreamDeck, and even MIDI control panels.
+Gremlin supports glass surfaces (touch screens), hardware panels like StreamDeck, and even MIDI control panels and works well with tools like Bitfocus Companion and Open Stage Control.
+
+The audience for GremlinEx is anyone looking to easily integrate multiple hardware input devices from joysticks to control panels and map it to a game without having to use proprietary vendor software.  GremlinEx includes a rich set of mapping tools for the transformations, from joystick curve editing to conditional output, modes and management of profiles.
 
 A more detailed look at features supported by GremlinEx can be found in the [overview section](overview.md) of the documentation.
 
@@ -23,6 +25,14 @@ GremlinEx supports the Open Sound Control (OSC) protocol which allows it to rece
 GremlinxEx (as of M76) supports templates: individual mappings can be saved to template files.  These templates can then be loaded into another input, profile, or shared. Templates have no input information - only mappings.
 
 GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.
+
+## General Architecture
+
+![general_architecture](assets/gremlinex_diagram.png)
+
+GremlinEx takes inputs from multiple sources, local and network, performs the transformations and mappings specififed in the profile based on the current profile options, container and action configurations, and sends the output as required.
+
+There should be no expectation that a single input always results in a single output. A single input can produce multiple outputs, and multiple inputs can provide a single output.  It's also possible that no output is produced if the input(s) should be ignored based on the particular context.
 
 
 
@@ -59,9 +69,7 @@ Please see the [OSC configuration section](usage.md#osc-device-open-sound-contro
 
 ### Virus False positives
 
-Unfortunately, some older anti-virus and anti-malware programs may flag GremlinEx (any Python applications like it) incorrectly, known as a false-positive.  See more on the topic and options in [this section of the documentation](usage.md#-antivirus-false-positives).  It should be noted that most malware and anti-virus tools do not have this issue at all.  This issue is due to the use of the packaging setup used in the Python ecosystem, and outside the scope of GremlinEx.
-
-
+Unfortunately, some older anti-virus and anti-malware programs may flag GremlinEx (and any Python packaged applications) incorrectly, known as a false-positive.  See more on the topic and options in [this section of the documentation](usage.md#antivirus-false-positives).  It should be noted that most malware and anti-virus tools correctly handle the false-positive.
 
 ## Resources and help
 
@@ -72,52 +80,24 @@ Unfortunately, some older anti-virus and anti-malware programs may flag GremlinE
 GremlinEx is based on a fork from the 2019 [Joystick Gremlin by Whitemagic](https://whitemagic.github.io/JoystickGremlin/).  GremlinEx builds on that excellent software and its concepts, and incorporates notable modifications and enhancements:
 
 - x64 bit support and current Python environments/libraries
-- networking support for multiple GremlinEx instances
-- [OSC](https://en.wikipedia.org/wiki/Open_Sound_Control) and [MIDI](https://en.wikipedia.org/wiki/MIDI) built in support to enable inputs from StreamDeck, LoupeDeck and networked glass control surfaces like Open Stage Control, OSC/Pilot, Touch/OSC for a "GameGlass" type experience.
-- Built in-support for Microsoft Flight Simulator 2020 and 2024 via the SimConnect SDK including a custom WASM module
-- Sophisticated containers like Gated Axis
-- Highly responsive runtime through a graph based execution model (starting with m73 dev branch)
-- Sophisticated latched keyboard and mouse inputs
-- Support for all extended keys including F13 to F24
-- Playback speed and voice selection for text to speech
-- User interface enhancements
+- remote control of GremlinEx instances
+- Built-in state machine with user defined states, including support for boolean state expressions and state triggered mappings
+- Built-in support for the [OSC](https://en.wikipedia.org/wiki/Open_Sound_Control) protocol and [MIDI](https://en.wikipedia.org/wiki/MIDI) devices.
+- Streamdeck, Loupedeck and other panel two way control.  To simplify and greatly enhance capabilities, highly recommended via [Bitfocus Companion](https://bitfocus.io/companion)) to simplify the setup with GremlinEx
+- Support for custom glass surface controller support (touch screen use-case)
+- Built in-support for Microsoft Flight Simulator 2020 and 2024 control via the SimConnect SDK including a custom WASM module for calculator expressions and access to custom sim variables
+- Advanced containers and actions included.
+- High performance runtime execution graph engine (starting with m73)
+- Advanced latched keyboard and mouse inputs
+- Support for extended keys including F13 to F24 and media keys
+- Selectable voice and playback speed for text to speech prompts
+- Modern user interface with dark UI theme support
 
-While GremlinEx is based on Joystick Gremlin, it's important to note that it is not the same software.  GremlinEx may differ significantly from the original in behavior and compatibility with Joystick Gremlin profile is mostly supported but not guaranteed.
+While GremlinEx is based on Joystick Gremlin, it's important to note they are not the same software, certainly not internally, but also from the standpoint of behaviors.  GremlinEx is heavily event based, has a completely different execution engine.  While legacy profiles may load in GremlinEx, complete compatibility is not assured.
 
-The 2019 repository was forked, and then substantially modified in the last few years to achieve the goals of GremlinEx. While the base concept was preserved, however are substantial changes to the internal API, logic, flows and classes to support GremlinEx's needs and feature set that did not exist, or are heavily modified, deprecated or just replaced with different modules.
-
-GremlinEx makes an attempt to keep with the philosophy of the original project as much as possible, and I am grateful to WhiteMagic and his excellent ideas and concept: Joystick Gremlin remains one of the best mapping utilities I have ever seen or used in decades of simulation and hardware input mapping to games.  The architecture is elegant and served as a launchpad for GremlinEx.
+GremlinEx makes an attempt to keep with the philosophy and concepts of the original project as much as possible, and I am grateful to WhiteMagic and his excellent work on Joystick Gremlin and for the inspiration. Joystick Gremlin remains one of the best mapping utilities I have ever seen or used in decades of simpit simulation.  The architecture is elegant and served as a launchpad for GremlinEx.
 
 GremlinEx is in active development and thus may include bugs and issues refered to as dragons.  Rather than releasing new features and fixes sporadically, I have adopted an open development model where pre-releases are posted to the dev branch for you to use as the features and fixes are implemented.  Some are more bleeding edge than others.
 
-The benefits of open development outweigh the drawbacks, it encourages feedback and input from the community. I appreciate the patience as not everything will work in every pre-release patch as expected, that is part of the process.
+I am a firm believer that open development outweighs the drawbacks, it encourages feedback and input and participation from the community. I appreciate the patience as not everything will work in every pre-release patch as expected, that is part of the process.
   
-
-## What can I do with GremlinEx?
-
-Some examples of what GremlinEx can do:
-
-- Integrate devices from multiple vendors without the need to use any vendor specific proprietary software.  GremlinEx works with any HID compliant game input device without requiring any special software.  Most of this can be done without ever installing proprietary software from hardware vendors to "program" their devices.   GremlinEx is designed to use the default behavior of an input device and through profiles, map that to a game.
-- Take input from one or more devices, physical or virtual, local or networked, and remap that output to a VJOY joystick, and local keyboard and mouse.
-- Take input from a game controller like an XBox 360 controller and map it to VJOY.
-- If [VIGEM](https://github.com/nefarius/ViGEmBus) is installed, output to virtual game controller for games that do not support joysticks (usually because they are console ports) (VIGEM is technically retired but works well with Windows 10 and Windows 11).
-- Map a joystick axis and split it up into multiple zones or trigger specific actions when the input axis is moving, passing through specific points, or within a specific zones (Gated Axis, range container and virtual input).
-- Execute actions based on multiple input keys pressed concurrently and other conditions
-- Execute macros that combine joystick, mouse, keyboard actions.
-- Use touch-surface input (glass surface) via the OSC protocol. While OSC is used for music and stage control, GremlinEx uses OSC to work with Open Stage Control (open source) and other OSC protocol enabled touch control surfaces to map touch-screen inputs to a game over the network.  Because software like [Open Stage Control](https://openstagecontrol.ammd.net/docs/getting-started/introduction/) lets you design any control surface using buttons, faders, knobs, encoders, this becomes an extremely powerful custom touch-screen input mapped to a game via GremlinEx.   GremlinEx also supports two-way communications so that state data can be returned to the touch surface via a plugin or the "map to OSC" action.
-- Control Microsoft Flight Simulator (MSFS) 2020 or 2024 via the SimConnect API and a custom WASM module.  This enables GremlinEx to do direct control mappings in MSFS without having to map controllers in MSFS.  GremlinEx can also execute what's called "RPN expressions" and access internal commands and variables, including custom ones created by add-ons).
-- Sophisticated condition based execution
-- (as of 1.0ex m74) GremlinEx adds a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) to the behavior model. See [more information on states](overview.md#state-device) in the overview.
-- Comprehensive collection of various action container types to solve common mapping problems without custom programming.
-- Custom scripting via Python if needed
-- Play audio (.wav) files, and use text to speech (TTS) to convert text to audio cues.
-- Save mapping templates for easy recall in other profiles or to share with others.
-
-## What about device conflicts?
-
-At its core, GremlinEx takes "real" hardware input and maps it to "virtual" joystick outputs via VJOY.  
-This can create confusion with in-game control mapping utilities because the game will usually get inputs concurrently from the "real" device and from the "virtual" device.
-To avoid this, [HIDHide](https://github.com/nefarius/HidHide) is recommended to "hide" the input devices from the target application.  This is also recommended because many games unfortunately only support a limited of game controllers.
-
-
-
