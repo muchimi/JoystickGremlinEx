@@ -384,6 +384,10 @@ class MacroManager(QtCore.QObject):
         """
         verbose = gremlin.config.Configuration().verbose_mode_macro
 
+        if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
+            self.terminate_macro(macro)
+            return
+
         if macro.state != MacroState.Idle:
             if verbose: syslog.info(f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle.")
             return
