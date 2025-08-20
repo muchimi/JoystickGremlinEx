@@ -974,6 +974,8 @@ class KeyMap:
     @staticmethod
     def find_by_name(name):
         name = name.replace(" ","").lower()
+        if name in KeyMap._g_translate_names:
+            name = KeyMap._g_translate_names[name]
         if name in KeyMap._key_map:
             return KeyMap._key_map[name].duplicate()
         return None
@@ -1019,8 +1021,6 @@ class KeyMap:
 
         if scan_code: 
             value = scan_code
-            if scan_code == 0xE037:
-                pass
             if is_extended:
                 value = 0xe0 << 8 | scan_code
 
@@ -1443,8 +1443,11 @@ class KeyMap:
         "mediavolmute": ("Mute", 0x20, True, win32con.VK_VOLUME_MUTE),
         "mediavolup": ("Volume Up", 0x30, True, win32con.VK_VOLUME_UP),
         "mediavoldn": ("Volume Down", 0x1e, True, win32con.VK_VOLUME_DOWN),
-        
+    }
 
+    # equivalent keys names
+    _g_translate_names = {
+        "rightalt2" : "rightalt"
     }
 
     # icons to use for a key, (lookup_name, (icon, icon_color))
@@ -1494,10 +1497,11 @@ for mouse_button in MouseButton:
 
 # Populate the scan code based lookup table
 for name_, data in KeyMap._g_name_map.items():
-    if "name_" == "printscreen":
-        pass
+    if name_ in KeyMap._g_translate_names:
+        # skip equivalents
+        continue
     key = Key(*data)
-    key._lookup_name = name_
+    key._lookup_name =  name_
     KeyMap._g_map[(data[1],data[2])] = key
     KeyMap.register(key)
 
