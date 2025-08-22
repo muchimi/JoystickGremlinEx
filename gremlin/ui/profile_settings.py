@@ -92,6 +92,8 @@ class ProfileSettingsWidget(QDataWidget):
     def _create_ui(self):
         """Creates the UI elements of this widget."""
         # Default start mode selection
+        if not Shiboken.isValid(self):
+            return
 
         from functools import partial
         self.scroll_layout.addWidget(DefaultModeSelector(self.profile_settings))
@@ -188,6 +190,8 @@ class DefaultDelay(QtWidgets.QGroupBox):
 
     def _create_ui(self):
         """Creates the UI of this widget."""
+        if not Shiboken.isValid(self):
+            return
         self.setTitle("Default Macro Action Delay")
 
         self.delay_value = gremlin.ui.ui_common.DynamicDoubleSpinBox()
@@ -229,6 +233,8 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
 
     def _create_ui(self):
         """Creates the UI used to configure the startup mode."""
+        if not Shiboken.isValid(self):
+            return
         self.setTitle("Startup Mode")
 
         self.dropdown = gremlin.ui.ui_common.QComboBox()
@@ -507,6 +513,8 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
 
     def _create_ui(self):
         """Creates the UI elements."""
+        if not Shiboken.isValid(self):
+            return
         vjoy_proxy = gremlin.joystick_handling.VJoyProxy()
         self._spin_boxes.clear()
         row = 0
@@ -688,6 +696,9 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
 
     def _create_ui(self):
         """Creates the UI to set physical input state."""
+        if not Shiboken.isValid(self):
+            return
+        
         for dev in sorted(gremlin.joystick_handling.vjoy_devices(),key=lambda x: x.vjoy_id):
             widget = gremlin.ui.ui_common.QDataCheckbox(dev.name, data = dev.vjoy_id)
             if self.profile_data.vjoy_as_input.get(dev.vjoy_id, False):

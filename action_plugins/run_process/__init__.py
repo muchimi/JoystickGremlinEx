@@ -31,7 +31,7 @@ import subprocess
 import logging
 import psygnal
 from psygnal import Signal
-
+from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
@@ -44,7 +44,8 @@ class RunProcessWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, RunProcess)
 
     def _create_ui(self):
-
+        if not Shiboken.isValid(self):
+            return
         
         
         self.process_widget = gremlin.ui.ui_common.QPathLineItem("Process:",self.action_data.process, self.action_data)

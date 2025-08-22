@@ -29,7 +29,7 @@ from gremlin.util import load_icon, userprofile_path
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
 import threading
-
+from shiboken6 import Shiboken
 
 class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -44,6 +44,8 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, PlaySound)
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         content_widget = QtWidgets.QWidget()
         content_widget.setContentsMargins(0,0,0,0)
         content_layout = QtWidgets.QHBoxLayout(content_widget)

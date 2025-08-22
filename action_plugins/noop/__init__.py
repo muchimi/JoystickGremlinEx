@@ -23,7 +23,7 @@ from lxml import etree as ElementTree
 import gremlin.base_profile
 from gremlin.input_types import InputType
 from gremlin.ui.input_item import AbstractActionWidget
-
+from shiboken6 import Shiboken
 
 class NoOpActionWidget(AbstractActionWidget):
     """Widget for the NoOp action."""
@@ -38,6 +38,8 @@ class NoOpActionWidget(AbstractActionWidget):
         return "Noop"
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         self.label = QtWidgets.QLabel("NoOp")
         self.main_layout.addWidget(self.label)
 

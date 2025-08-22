@@ -26,7 +26,7 @@ from psygnal import Signal
 import enum, threading,time, random
 
 import gremlin.util
-
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -47,6 +47,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
         # Layouts to use
+        if not Shiboken.isValid(self):
+            return
         self.mode_layout = QtWidgets.QHBoxLayout()
 
         self.button_widget = QtWidgets.QWidget()

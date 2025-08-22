@@ -1715,18 +1715,23 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @property
     def profile_mode(self) -> str:
+        mode = None
         if self._input_type == InputType.ModeControl:
             if self._input_id in (gremlin.ui.mode_device.ModeInputModeType.ModeProfileLoad,
                                   gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
                                   gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop):
-                return gremlin.shared_state.master_mode
-
-        if self._profile_mode_callback:
-            return self._profile_mode_callback(self)
-        mode : Mode = self.parent
-        if mode:
-            return mode.name
-        return None
+                mode = gremlin.shared_state.master_mode
+        elif self._input_type == InputType.State:
+            mode = gremlin.shared_state.master_mode
+        if not mode:
+            if self._profile_mode_callback:
+                mode = self._profile_mode_callback(self)
+            else:
+                mode_object = self.parent
+                if mode_object:
+                    mode = mode_object.name
+        
+        return mode
     
         
     @property

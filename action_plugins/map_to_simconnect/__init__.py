@@ -1094,10 +1094,14 @@ class SimConnectMonitor():
     '''
     def __init__(self):
         # syslog = logging.getLogger("system")
-        syslog.info("SCMonitor: listening")
-        self._manager = SimConnectManager()
+        
 
+        self._manager = SimConnectManager()
         self._handler = SimConnectEventHandler()
+        enabled = self._manager.simconnect_enabled
+        msg = "listening" if enabled else "Simconnect is disabled" 
+        syslog.info(f"SCMonitor: {msg}")
+
 
         #self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
         self._manager.sim_start.connect(self._sim_start)
@@ -1141,16 +1145,6 @@ class SimConnectMonitor():
         self._request_running = False # true if a request is running to get data from simconnect
         self._request_aircraft_name = None # name of the returned aircraft from the simconnect call
         self._request_lock = threading.Lock() # interlock for threads
-
-    #     self._process_list_changed() # update msfs running status
-
-    # def _process_list_changed(self):
-    #     ''' called when list of processes changes '''
-    #     self._msfs_running = self._pm.process_running(["FlightSimulator2024.exe", "FlightSimulator.exe"])
-    #     if not self._msfs_running and gremlin.config.Configuration().simconnect_stop_profile_on_sim_stop:
-    #         self._sim_stop()
-            
-
 
 
     def showOptionsDialog(self):
@@ -1211,6 +1205,10 @@ class SimConnectMonitor():
     
     def getCurrentAircraft(self, timeout_seconds = 10) -> str:
         ''' gets the aircraft from Simconnect - blocks while the call is running '''
+
+        if not self._manager.simconnect_enabled:
+            # not enabled
+            return None
         
         if not self._request_running:
 
@@ -1267,6 +1265,10 @@ class SimConnectMonitor():
 
     def getStartupMode(self, name : str = None, model : str = None):
         ''' gets the startup mode for the current aicraft (profile mode)'''
+        if not self._manager.simconnect_enabled:
+            # disabled
+            return None
+        
         profile = gremlin.shared_state.current_profile
 
         if not name:
@@ -1662,12 +1664,17 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
 
+        self.config = gremlin.config.Configuration()
+        
+
         self._manager = SimConnectManager()
+        enabled = self._manager.simconnect_enabled
         self._manager.activate()
+
         self._monitor = SimConnectMonitor()
         self._manager.sim_state.connect(self._sim_state)
         
-        self._verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        self._verbose = self.config.verbose_mode_simconnect
         
         self.options = SimconnectOptions(simconnect)
         self._data = None # sorted list of aircraft definitions
@@ -1717,7 +1724,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._splitter.setCollapsible(1, False)
 
         # Actual configuration object being managed
-        self.config = gremlin.config.Configuration()
+        
         self.setMinimumWidth(600)
 
         self.mode_list = []
@@ -1729,7 +1736,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.mode_pair_list = gremlin.ui.ui_common.get_mode_list(self.profile)
 
         is_dark = gremlin.shared_state.is_dark_theme   
-        prefix = "dark_" if is_dark else ""
+        
 
         self.setWindowTitle("Simconnect Options")
         self.installEventFilter(self) # trap some events
@@ -1753,6 +1760,15 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self._mode_from_aircraft_button_widget = QtWidgets.QPushButton("Mode from Aicraft")
         self._mode_from_aircraft_button_widget.clicked.connect(self._mode_from_aircraft_button_cb)
+
+        # enabled box
+
+        
+        self._simconnect_enabled_widget = QtWidgets.QCheckBox("Enable SimConnect")
+        self._simconnect_enabled_widget.setChecked(enabled)
+        self._simconnect_enabled_widget.clicked.connect(self._handle_simconnect_enabled_changed)
+        self.main_layout.addWidget(self._simconnect_enabled_widget)
+
 
         # toolbar for map
         self.container_bar_widget, self.container_bar_layout = gremlin.ui.ui_common.getHContainer()
@@ -1947,11 +1963,12 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         top_bar_container_layout.addWidget(self._auto_mode_switch)
         top_bar_container_layout.addWidget(self._auto_mode_lock)
         top_bar_container_layout.addStretch()
+
         
-        self.main_layout.addWidget(top_bar_container_widget)
-        self.main_layout.addWidget(self._msfs_path_widget)
-        self.main_layout.addWidget(self.container_bar_widget)
-        self.main_layout.addWidget(self.container_navigation_widget)
+
+        
+        
+        
         self._top_panel_layout.addWidget(self.container_map_widget)
         self._top_panel_layout.addWidget(self.container_paginator_widget)
         #self._bottom_panel_layout.addWidget(self.manual_container_map_widget)
@@ -1964,9 +1981,18 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.warning_widget.setVisible(False)
         warning_layout.addWidget(self.warning_widget)
         warning_layout.addStretch()
+
+
+        widgets = [top_bar_container_widget,
+                   self._msfs_path_widget,
+                   self.container_bar_widget,
+                   self.container_navigation_widget,
+                   self._content_widget
+        ]
+
         
-        
-        self.main_layout.addWidget(self._content_widget, stretch = 3)
+        self._containers_widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
+        self.main_layout.addWidget(self._containers_widget)
 
         self.main_layout.addWidget(warning_container)
 
@@ -1990,6 +2016,24 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self._update_current_aircraft() # refresh sim data
         self._update_data() # update display
+
+        self._update_ui()
+
+
+    @QtCore.Slot(bool)
+    def _handle_simconnect_enabled_changed(self, checked):
+        self.config.simconnect_enabled = checked
+        if checked:
+            self._manager.activate()
+        self._update_ui()
+
+    def _update_ui(self):
+        enabled = self._manager.simconnect_enabled
+        if not enabled:
+            self._set_warning("Simconnect is currently disabled.")
+        else:
+            self._set_warning(None)
+        self._containers_widget.setEnabled(enabled)
 
     def mode(self) -> str:
         ''' current mode in drop down '''
@@ -2084,6 +2128,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
     @QtCore.Slot()
     def _scan_aircraft_cb(self):
+        if not self._manager.simconnect_enabled:
+            # disabled
+            return
         if not self._manager.connected:
             self._manager.activate()
         QtWidgets.QApplication.processEvents()
@@ -2094,6 +2141,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
     def _update_current_aircraft(self):
         ''' request an update from simconnect on the current aircraft '''
+        if not self._manager.simconnect_enabled:
+            # disabled
+            return
         if not self._manager.connected:
             self._manager.activate()
         QtWidgets.QApplication.processEvents()
@@ -2854,6 +2904,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
         #import gremlin.gated_handler
+        if not Shiboken.isValid(self):
+            return
 
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         # syslog = logging.getLogger("system")

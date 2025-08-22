@@ -3114,8 +3114,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         dock_tabs = self.dock_tabs
         if dock_tabs.data == container:
             tracker = gremlin.base_conditions.ConditionTracker()
+            input_item = container.input_item
+            count = tracker.getInputItemConditionCount(input_item)
             enabled = tracker.getContainerConditionCount(container) > 0
-            count = self.container.condition_count
+            # count = self.container.condition_count
             enabled = count > 0 or enabled
             virtual_enabled = self.profile_data.virtual_button_user_enabled
             try:

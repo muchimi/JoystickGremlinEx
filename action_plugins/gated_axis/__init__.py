@@ -2109,6 +2109,8 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         self._deleted = False
         
         self.container_widget = QtWidgets.QWidget()

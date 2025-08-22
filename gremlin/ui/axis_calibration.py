@@ -35,7 +35,7 @@ import gremlin.singleton_decorator
 import psygnal
 from psygnal import Signal
 import gremlin.ui.ui_common
-
+from shiboken6 import Shiboken
 syslog = logging.getLogger("system♂")
 
 class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
@@ -60,6 +60,8 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
 
     def _create_ui(self):
         """Creates all widgets required for the user interface."""
+        if not Shiboken.isValid(self):
+            return
         # If there are no devices available show a message about this and abort
         if len(self.devices) == 0:
             label = QtWidgets.QLabel("No devices present for calibration")

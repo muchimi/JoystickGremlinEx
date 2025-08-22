@@ -64,7 +64,7 @@ from gremlin.input_types import InputType
 import gremlin.util
 from gremlin.util import safe_read
 
-
+from shiboken6 import Shiboken
 
 import psygnal
 from psygnal import Signal
@@ -538,6 +538,8 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _create_ui(self):
         from gremlin.ui import ui_common
+        if not Shiboken.isValid(self):
+            return
         self.setMinimumWidth(600)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)

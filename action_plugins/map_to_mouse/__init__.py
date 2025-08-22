@@ -35,6 +35,7 @@ import gremlin.sendinput
 from gremlin import input_devices
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -53,6 +54,8 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
         # Layouts to use
+        if not Shiboken.isValid(self):
+            return
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
 

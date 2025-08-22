@@ -398,7 +398,8 @@ class MergedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data = action_data
 
     def _create_ui(self):
-
+        if not Shiboken.isValid(self):
+            return
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
         self.container_widget.setContentsMargins(0,0,0,0)

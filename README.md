@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T49)
+- Improved: OSC will not start the server on options exit or just start.  This should alleviate prompts for firewall rules when not actively using OSC.
+- Improved: new option to enable or disable SimConnect in the simconnect page.  OFF by default.
+- Fix: Resolved a C++ garbage collection exception in Conditions UI refresh
+- Fix: condition enabled status icon
+
 ### (m76T48)
 - Fix: PrintScreen key virtual code now resolves to VK_SNAPSHOT
 - Fix: Container API failing parameter type validation causing container exceptions when added to a profile.

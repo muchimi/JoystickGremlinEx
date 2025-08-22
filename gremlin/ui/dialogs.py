@@ -715,6 +715,7 @@ class OptionsUi(ui_common.BaseDialogUi):
     # --------------------------------------------------------------------------------------------------------------------
     def _create_ui_options_page(self):
         ''' ui related options '''
+
         page_widget, page_layout = gremlin.ui.ui_common.getGridContainer()
 
         col1_widget, col1_layout = gremlin.ui.ui_common.getVContainer()
@@ -1464,6 +1465,12 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         page_layout.addWidget(QtWidgets.QLabel("MSFS SimConnect options:"))
         self.tab_container.addTab(page_widget, "MSFS SimConnect")
 
+        enabled = gremlin.config.Configuration().simconnect_enabled
+        widget = QtWidgets.QCheckBox("Enable SimConnect")
+        widget.setChecked(enabled)
+        widget.clicked.connect(self._handle_simconnect_enabled_changed)
+        page_layout.addWidget(widget)
+
         widget = QtWidgets.QCheckBox("Show options button on toolbar")
         widget.setToolTip("Displays the Simconnect options icon on the toolbar for quick access")
         widget.setChecked(self.config.show_simconnect_options_on_toolbar)
@@ -1495,6 +1502,11 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         
         page_layout.addStretch()
 
+
+
+    @QtCore.Slot(bool)
+    def _handle_simconnect_enabled_changed(self, checked):
+        gremlin.config.Configuration().simconnect_enabled = checked
 
     @QtCore.Slot(bool)
     def _auto_mode_select_cb(self, checked):

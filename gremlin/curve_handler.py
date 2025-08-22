@@ -1635,6 +1635,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
     def _create_ui(self):
         """Creates the required UI elements."""
+        if not Shiboken.isValid(self):
+            return
 
 
         self.container_options_widget = QtWidgets.QWidget()

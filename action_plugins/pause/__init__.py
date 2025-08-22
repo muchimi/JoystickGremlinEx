@@ -33,6 +33,7 @@ import time
 import logging
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -55,7 +56,8 @@ class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         return "Pause Action"
 
     def _create_ui(self):
-
+        if not Shiboken.isValid(self):
+            return
         self.mode_container_widget = QtWidgets.QWidget()
         self.mode_container_layout = QtWidgets.QHBoxLayout(self.mode_container_widget)
         self.mode_delay_widget = gremlin.ui.ui_common.QDataRadioButton("Delay")

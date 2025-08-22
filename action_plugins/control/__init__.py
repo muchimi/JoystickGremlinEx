@@ -56,6 +56,8 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         
     def _create_ui(self):
         """Creates the UI components."""
+        if not Shiboken.isValid(self):
+            return
         self.action_widget = gremlin.ui.ui_common.NoWheelComboBox()
         index = 0
         set_index = None

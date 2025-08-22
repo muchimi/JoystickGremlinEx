@@ -129,7 +129,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
-        
+        if not Shiboken.isValid(self):
+            return
         
         self.state_selector = gremlin.ui.ui_common.QComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)

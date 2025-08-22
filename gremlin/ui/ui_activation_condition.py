@@ -79,7 +79,8 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
     def _create_ui(self):
         """Creates the configuration UI."""
-
+        if not Shiboken.isValid(self):
+            return
         self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint)
 
         self.controls_layout = QtWidgets.QHBoxLayout()
@@ -175,9 +176,6 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         
-        self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
-        self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
-
         self._create_ui()
 
     def _create_ui(self):
@@ -212,7 +210,8 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
-        
+        if not Shiboken.isValid(self):
+            return
 
         ui_common.clear_layout(self.main_layout)
 
@@ -226,6 +225,9 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         self.key_label = QtWidgets.QLabel("")
         if self.condition.input_item:
             self.key_label.setText(f"<b>{self.condition.input_item.display_name}</b>")
+
+        self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
+        self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
         
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label = "Listen", callback = self._request_user_input)
         self.select_button_widget = gremlin.ui.ui_common.Buttons.getKeyboardWidget(label = "Select Keys", callback = self._select_user_input)
@@ -351,7 +353,8 @@ class StateConditionWidget(AbstractConditionWidget):
         self.setTitle("State Condition")
 
     def _create_ui(self):
-
+        if not Shiboken.isValid(self):
+            return
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
         widget, layout = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True)
         self.main_layout.addWidget(widget)
@@ -460,8 +463,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
+        if not Shiboken.isValid(self):
+            return
 
         ui_common.clear_layout(self.main_layout)
+
+        self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
+        self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
+   
 
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label = "Listen", callback = self._request_user_input)
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
@@ -956,6 +965,8 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
+        if not Shiboken.isValid(self):
+            return
         ui_common.clear_layout(self.main_layout)
 
         self.grid_widget =  QtWidgets.QWidget()
@@ -974,6 +985,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self.condition.vjoy_id,
             self.condition.input_id
         )
+
+        self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
+        self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
  
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label = "Listen", callback = self._request_user_input)
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
@@ -1235,10 +1249,15 @@ class InputActionConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
-
+        if not Shiboken.isValid(self):
+            return
         ui_common.clear_layout(self.main_layout)
         self.grid_widget =  QtWidgets.QWidget()
         self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
+
+        self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
+        self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
+   
 
         self.state_dropdown = ui_common.QComboBox()
         self.state_dropdown.addItem("Pressed")

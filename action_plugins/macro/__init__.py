@@ -92,6 +92,8 @@ class CountRepeatMacroWidget(AbstractRepeatMacroWidget):
         super().__init__(data, parent)
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         self.delay = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay.setMaximum(3600)
         self.delay.setSingleStep(0.1)
@@ -171,6 +173,8 @@ class ToggleRepeatMacroWidget(AbstractRepeatMacroWidget):
         super().__init__(data, parent)
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         self.delay = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay.setMaximum(3600)
         self.delay.setSingleStep(0.1)
@@ -272,6 +276,8 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _create_ui(self):
         """Creates the editor UI."""
+        if not Shiboken.isValid(self):
+            return
 
         if MacroActionEditor.locked:
             return
@@ -1113,6 +1119,8 @@ class HoldRepeatMacroWidget(AbstractRepeatMacroWidget):
         super().__init__(data, parent)
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         self.delay = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay.setMaximum(3600)
         self.delay.setSingleStep(0.1)
@@ -1171,6 +1179,8 @@ class MacroSettingsWidget(QtWidgets.QWidget):
 
     def _create_ui(self):
         """Creates the UI elements"""
+        if not Shiboken.isValid(self):
+            return
         # Create UI elements
         self.exclusive_checkbox = QtWidgets.QCheckBox("Exclusive")
         self.force_remote_checkbox = QtWidgets.QCheckBox("Remote Only")
@@ -1291,7 +1301,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI of this widget."""
         
-
+        if not Shiboken.isValid(self):
+            return
         if MacroWidget.locked:
             return
         

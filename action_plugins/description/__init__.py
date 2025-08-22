@@ -25,6 +25,7 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.input_item
 import logging
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -37,6 +38,8 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert(isinstance(action_data, DescriptionAction))
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         self.inner_layout = QtWidgets.QHBoxLayout()
         self.label = QtWidgets.QLabel("<b>Action description</b>")
         self.description = QtWidgets.QLineEdit()

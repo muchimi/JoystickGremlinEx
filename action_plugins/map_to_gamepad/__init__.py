@@ -48,7 +48,7 @@ from enum import Enum, auto
 
 import gremlin.util
 from gremlin.types import GamePadOutput
-
+from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
@@ -67,7 +67,9 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
-
+        
+        if not Shiboken.isValid(self):
+            return
         el = gremlin.event_handler.EventListener()
         el.gamepad_change_event.connect(self._gamepad_count_changed)
 

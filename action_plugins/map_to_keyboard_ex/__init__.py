@@ -51,7 +51,7 @@ import gremlin.util
 from gremlin import input_devices
 import gremlin.repeater
 import gremlin.windows_event_hook
-
+from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -70,7 +70,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
-
+        if not Shiboken.isValid(self):
+            return
 
         self.key_combination = QtWidgets.QLabel("<b>Current key combination:</b>")
         self.key_map = {} # map of key to widgets

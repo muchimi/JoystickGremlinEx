@@ -613,7 +613,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
-
+        if not Shiboken.isValid(self):
+            return
         config = gremlin.config.Configuration()
         self.verbose_inputs = config.verbose_mode_inputs
         self.verbose = config.verbose

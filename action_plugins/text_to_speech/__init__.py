@@ -26,7 +26,7 @@ import gremlin.ui.input_item
 import gremlin.tts
 import gremlin.ui.ui_common
 import gremlin.util
-
+from shiboken6 import Shiboken
 
 class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -37,7 +37,8 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, TextToSpeech)
 
     def _create_ui(self):
-
+        if not Shiboken.isValid(self):
+            return
 
         self.voice_widget = gremlin.ui.ui_common.QComboBox()
         tts = gremlin.tts.TextToSpeech()

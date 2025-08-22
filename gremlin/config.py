@@ -2400,3 +2400,10 @@ class Configuration(QtCore.QObject):
     @simconnect_stop_profile_on_sim_stop.setter
     def simconnect_stop_profile_on_sim_stop(self, value : bool):
         self._set_data("simconnect_stop_profile_on_sim_stop", value)
+
+    @property
+    def simconnect_enabled(self) -> bool:
+        return self._get_data("simconnect_enabled", False)
+    @simconnect_enabled.setter
+    def simconnect_enabled(self, value: bool):
+        self._set_data("simconnect_enabled", value)

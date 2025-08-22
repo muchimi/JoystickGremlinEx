@@ -31,6 +31,7 @@ import gremlin.user_plugin
 import gremlin.ui.ui_common
 from gremlin.ui.ui_common import QBoxFrame
 import os
+from shiboken6 import Shiboken
 
 import gremlin.util
 
@@ -497,9 +498,9 @@ class InstanceWidget(QtWidgets.QWidget):
         self._create_ui()
 
     def _create_ui(self):
-
+        if not Shiboken.isValid(self):
+            return
         
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
         icon_color = gremlin.ui.ui_common.Color.normalColor()
 
         self.label_name = QtWidgets.QLabel(self.name)

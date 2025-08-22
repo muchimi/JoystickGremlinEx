@@ -36,6 +36,7 @@ import gremlin.util
 import gremlin.shared_state
 from gremlin.curve_handler import Point2D
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -1176,7 +1177,8 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the required UI elements."""
-
+        if not Shiboken.isValid(self):
+            return
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
         warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Response Curve Ex</i> for additional functionality", use_wrap=False)

@@ -38,6 +38,7 @@ import gremlin.shared_state
 import gremlin.curve_handler
 import gremlin.input_devices
 import gremlin.spline
+from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
@@ -61,6 +62,8 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the required UI elements."""
+        if not Shiboken.isValid(self):
+            return
         self.curve_widget = gremlin.curve_handler.AxisCurveWidget(self.action_data.curve_data, self)
         self.main_layout.addWidget(self.curve_widget)
 

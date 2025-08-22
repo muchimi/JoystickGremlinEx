@@ -757,13 +757,17 @@ class ConditionTracker():
     
     def getContainerConditionCount(self, container, mode : str = None):
         ''' gets a count of registered condition for a specific owner - owner is an input_item'''
-        import gremlin.shared_state
+        
         if not mode:
             input_item = container.parent
-            mode = mode = input_item.profile_mode #gremlin.shared_state.current_mode
+            mode = input_item.profile_mode #gremlin.shared_state.current_mode
         if mode in self._cache:
             id_list = [item.condition.id for item in self._cache[mode].values() if item.container == container]
             return len(id_list)
+        else:
+            # not in cache
+            input_item = container.input_item
+
         return 0
 
     

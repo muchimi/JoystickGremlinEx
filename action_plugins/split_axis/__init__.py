@@ -27,7 +27,7 @@ from gremlin.profile import safe_read, safe_format
 from gremlin import util
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
-
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -44,6 +44,8 @@ class SplitAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         # Slider and readout setup
+        if not Shiboken.isValid(self):
+            return
         self.split_slider_layout = QtWidgets.QHBoxLayout()
         self.split_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.split_slider.setRange(-1e5, 1e5)

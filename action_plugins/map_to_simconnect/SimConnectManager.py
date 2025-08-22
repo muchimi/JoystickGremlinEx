@@ -610,15 +610,15 @@ class SimConnectManager(QtCore.QObject):
     def _profile_start(self):
         ''' occurs on profile start '''
 
-        # reset loaded aircraft data
-        self._reset_aircraft()
-        
         enabled = gremlin.shared_state.getSimConnectEnabled()
         if not enabled:
             # simconnect is not enabled
-            syslog.info("SIMCONNECT: not enabled (no mappings found)")
+            syslog.info("SIMCONNECT: disabled or not used ")
             return False
-                
+
+        # reset loaded aircraft data
+        self._reset_aircraft()                
+        # reset abort code to try again
         self._request_abort = False
         self.activate()
 
@@ -1093,20 +1093,6 @@ class SimConnectManager(QtCore.QObject):
             self._aircraft_atc_type = data.decode()         
             self.sim_aircraft_info_changed.emit()  
 
-
-    # def get_aircraft_title(self, force_update = False):
-    #     if not self._aircraft_title or force_update:
-    #         self._aircraft_title = None
-    #         if not self._ar_title:
-    #             self._ar_title = self.registerRequest('title','string')
-            
-    #         title = self._ar_title.value
-    #         # trigger = ar.find("TITLE")
-    #         # title = trigger.get()
-    #         if title:
-    #             title = title.decode()
-    #         self._aircraft_title = title
-    #     return self._aircraft_title
     
     def _aircraft_title_cb(self):
         ''' callback for the aircraft title '''
@@ -1185,6 +1171,8 @@ class SimConnectManager(QtCore.QObject):
     @property
     def connected(self) -> bool:
         ''' true if GremlinEx is connected to the simulator '''
+        if not self.simconnect_enabled:
+            return False
         return self._sm.ok
 
     @property
@@ -1192,10 +1180,17 @@ class SimConnectManager(QtCore.QObject):
         ''' returns the simconnect interface instance'''
         return self._sm
     
+    @property
+    def simconnect_enabled(self) -> bool:
+        ''' true if simconnect is enabled in GremlinEx'''
+        return gremlin.config.Configuration().simconnect_enabled
+    
 
     def activate(self, force_retry = False):
         ''' connect to simconnect if not connected '''
-
+        if not self.simconnect_enabled:
+            # not enabled
+            return
         if self.connected:
             # already connected
             return
@@ -1278,6 +1273,7 @@ class SimConnectManager(QtCore.QObject):
 
     def sim_connect(self):
         ''' connects to the sim (has to be different from connect() due to event processing )'''
+        
         if self._sm.is_connected() and self._bridge_alive:
             return True
         self.reset()

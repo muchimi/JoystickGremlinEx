@@ -73,7 +73,8 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
         import gremlin.shared_state
-
+        if not Shiboken.isValid(self):
+            return
         if not gremlin.shared_state.vjoy_enabled:
             self.main_layout.addWidget(QtWidgets.QLabel("VJOY is not available.  Ensure VJOY is installed and configured."))
             return

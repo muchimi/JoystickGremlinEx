@@ -23,7 +23,7 @@ from lxml import etree as ElementTree
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.ui.input_item
-
+from shiboken6 import Shiboken
 
 class PreviousModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -34,6 +34,8 @@ class PreviousModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert(isinstance(action_data, PreviousMode))
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         self.label = QtWidgets.QLabel("Switches to the previously active mode")
         self.main_layout.addWidget(self.label)
 

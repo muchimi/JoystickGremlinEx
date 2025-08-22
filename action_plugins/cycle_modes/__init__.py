@@ -30,7 +30,7 @@ from gremlin.input_types import InputType
 import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
-
+from shiboken6 import Shiboken
 
 
 class CycleModeModel(QtCore.QAbstractItemModel):
@@ -121,6 +121,9 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
     def _create_ui(self):
+
+        if not Shiboken.isValid(self):
+            return
 
         from gremlin.util import load_icon
 

@@ -29,7 +29,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.keyboard import key_from_code
 import gremlin.util
-
+from shiboken6 import Shiboken
 class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to keyboard key combinations."""
@@ -44,6 +44,8 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
+        if not Shiboken.isValid(self):
+            return
         self.key_combination = QtWidgets.QLabel()
         self.record_button = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._record_keys_cb)
 

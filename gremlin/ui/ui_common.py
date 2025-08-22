@@ -1453,7 +1453,7 @@ class QFloatLineEdit(QtWidgets.QWidget):
 
 
     def _focus_out(self):
-        syslog.info("focus loss")
+        # syslog.info("focus loss")
         value = self._widget.text()
         try:
             value = float(value)
@@ -1518,7 +1518,7 @@ class QFloatLineEdit(QtWidgets.QWidget):
                 return True # skip the event
         elif t == QtCore.QEvent.Type.FocusOut:
             # format the input to the correct decimals
-            syslog.info("focus loss")
+            # syslog.info("focus loss")
             self.setValue(self.value())
         elif t == QtCore.QEvent.Type.MouseButtonDblClick:
             self.doubleClick.emit()

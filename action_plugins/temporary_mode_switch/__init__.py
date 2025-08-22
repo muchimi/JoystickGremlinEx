@@ -34,6 +34,7 @@ import logging
 import gremlin.execution_graph
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -47,6 +48,8 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, TemporaryModeSwitch)
 
     def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return
         self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
         self.mode_selector_widget.currentIndexChanged.connect(self._mode_list_changed_cb)
         self.main_layout.addWidget(self.mode_selector_widget)

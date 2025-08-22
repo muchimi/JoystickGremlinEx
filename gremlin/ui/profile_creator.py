@@ -26,7 +26,7 @@ from gremlin import common, joystick_handling, macro, util
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.input_types import InputType
-
+from shiboken6 import Shiboken
 # TODO: Retire this entire bit here as the action library will replace it
 #       in it's entirety
 
@@ -107,6 +107,8 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
 
     def _create_ui(self):
         """Creates the UI of this dialog."""
+        if not Shiboken.isValid(self):
+            return
         gremlin.ui.ui_common.clear_layout(self.main_layout)
         self.mode_index = {}
 
@@ -219,6 +221,8 @@ class ModeBindings(QtWidgets.QWidget):
 
     def _create_ui(self):
         """Creates the UI elements for each bindable action."""
+        if not Shiboken.isValid(self):
+            return
         all_input_types = [
             common.InputType.Keyboard,
             common.InputType.JoystickAxis,

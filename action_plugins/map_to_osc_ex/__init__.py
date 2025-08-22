@@ -973,6 +973,8 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
         # Layouts to use
+        if not Shiboken.isValid(self):
+            return
         self._container_widget = QtWidgets.QWidget()
         self._container_layout = QtWidgets.QVBoxLayout(self._container_widget)
 
