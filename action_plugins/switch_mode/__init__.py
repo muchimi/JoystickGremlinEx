@@ -94,6 +94,8 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
     def _mode_selected_changed(self):
+        if not Shiboken.isValid(self.mode_selector_widget):
+            return
         mode = self.mode_selector_widget.currentData()
         self.action_data.mode = mode
 
