@@ -2013,8 +2013,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._width = width
         self._char_width = char_width
 
-
-        self._update_current_aircraft() # refresh sim data
+        if self._manager.simconnect_enabled:
+            self._manager.activate()
+            self._update_current_aircraft() # refresh sim data
         self._update_data() # update display
 
         self._update_ui()
@@ -4373,21 +4374,19 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 
                 process_input = self._significant.should_process_axis(event, 0.01)
                 if process_input:
-                    
-
                     command = None
                     if command_mode == SimConnectCommandMode.CalculatorParam:
-                        if self.action_data.mode == SimConnectActionMode.Ranged:
-                            # compute the output value based on the range setup
-                            min_range = self.action_data.command_min_range
-                            max_range = self.action_data.command_max_range
-                            value = gremlin.util.scale_to_range(event.value, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
-                            command = self.action_data._get_value_command(value)
-                        elif self.action_data.mode == SimConnectActionMode.SetValue:
+                        if self.action_data.mode == SimConnectActionMode.SetValue:
                             value = self.action_data.value
                             command = self.action_data._get_value_command(value)
-                        else:
-                            command = self.action_data.command
+                        else: # ranged
+                            min_range = self.action_data.command_min_range
+                            max_range = self.action_data.command_max_range
+                            input_value = event.value
+                            value = gremlin.util.scale_to_range(input_value, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
+                            command = self.action_data._get_value_command(value)
+                            if verbose:
+                                syslog.info(f"SIMCONNECT: calc parameter: input: {input_value:0.3f} derived: {value:0.3f} command range: [{min_range:0.3f},{max_range:0.3f}] output expression: [{command}]")
                     elif command_mode == SimConnectCommandMode.Calculator:
                         command = self.action_data.command
                     if command:
@@ -4760,7 +4759,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             if "{#}" in command:
                 command = command.replace("{#}", f"{value:0.3f}")
             else:
-                command = f"{value:0.3f} {command}"
+                command = f"{value:0.4f} {command}"
         return command
 
     def _is_value_command(self):

@@ -8451,8 +8451,16 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
 
          # output range                 
+        border_color = gremlin.ui.ui_common.Color.warningColor()
+        css = f'''
+            QLineEdit {{
+                border: 1px solid {border_color};
+            }}
+            '''
         self._command_min_widget = QFloatLineEdit()
         self._command_min_widget.setRange(min_range, max_range)
+        self._command_min_widget.setStyleSheet(css)
+
 
         self._command_min_widget.setValue(min_cmd)
         self._command_min_widget.valueChanged.connect(self._update_command_min_range)
@@ -8472,6 +8480,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._command_max_widget.setValue(max_cmd)
         self._command_max_widget.setMinimumWidth(w)
         self._command_max_widget.valueChanged.connect(self._update_command_max_range)
+        self._command_max_widget.setStyleSheet(css)
         
 
         # output min
@@ -8570,6 +8579,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                 QtWidgets.QLabel("Output Value:"),
                 self._data_min_widget,
                 self._data_max_widget,
+                ""
             ]
         )
 
@@ -8580,6 +8590,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                 QtWidgets.QLabel("Normalized:"),
                 self._normalized_min_widget,
                 self._normalized_max_widget,
+                ""
             ]
         )
 
@@ -8590,6 +8601,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                 QtWidgets.QLabel("Percent:"),
                 self._percent_min_widget,
                 self._percent_max_widget,
+                ""
             ]
         )
 
@@ -8602,6 +8614,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                 QtWidgets.QLabel("Command Range:"),
                 self._command_min_widget,
                 self._command_max_widget,
+                "(output is scaled to this range)"
             ]
         )
 

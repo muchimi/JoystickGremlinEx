@@ -213,7 +213,7 @@ class SimConnectBridge(QtCore.QObject):
                 case BridgeCommands.SimConnectError:
                     data = packet.data.decode('ascii',errors='replace')
                     data = data.replace('\ufffd','')
-                    syslog.error(f"WASM: error: {data}")
+                    #syslog.error(f"WASM: error: {data}")
 
                 case BridgeCommands.Ping:
                     data = packet.data.decode('ascii',errors='replace')

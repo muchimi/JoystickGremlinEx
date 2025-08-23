@@ -2072,16 +2072,17 @@ class JoystickInputSignificant:
         Returns:
             True if it should be processed, False otherwise
         """
+        offset = 0.25 # quarter second
         key = event.callbackKey
         if key in self._event_registry:
-            # Reset everything if we have no recent data (10 seconds)
-            if self._time_registry[key] + 10.0 < time.time():
+            if self._time_registry[key] >= time.time():
+                # enough time passed
                 self._event_registry[key] = event
-                self._time_registry[key] = time.time()
+                self._time_registry[key] = time.time() + 0.25
                 return True
-            # Update state
             else:
-                self._time_registry[key] = time.time()
+
+                self._time_registry[key] = time.time() + offset
                 
                 if abs(self._event_registry[key].value - event.value) > deviation:
                     self._event_registry[key] = event
