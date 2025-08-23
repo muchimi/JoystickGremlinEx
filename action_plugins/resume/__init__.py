@@ -80,7 +80,7 @@ class ResumeAction(gremlin.base_profile.AbstractAction):
     widget = ResumeActionWidget
 
     def icon(self):
-        return "ei.play-circle-o"
+        return "ei.play-circle"
         #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def __init__(self, parent):

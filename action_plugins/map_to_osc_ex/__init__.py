@@ -43,6 +43,8 @@ from gremlin.ui.osc_device import OscInterface, OscClient
 import psygnal
 from psygnal import Signal
 import logging
+from shiboken6 import Shiboken
+
 syslog = logging.getLogger("system")
 
 class OscArg(QtCore.QObject):

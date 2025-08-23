@@ -35,6 +35,7 @@ import anytree
 import logging
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 
 syslog = logging.getLogger("system")
