@@ -67,6 +67,8 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _update_modes(self):
         ''' called when mode list needs to be updated '''
         # update the list of available modes 
+        if not Shiboken.isValid(self.mode_selector_widget):
+            return
         with QtCore.QSignalBlocker(self.mode_selector_widget):
             current_mode = self.action_data.mode # current mode
             self.mode_selector_widget.clear()
