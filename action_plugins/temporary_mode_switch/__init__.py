@@ -160,6 +160,8 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
 
     name = "Temporary Mode Switch"
     tag = "temporary-mode-switch"
+    hint = '''This action switches the profile mode while triggered.
+When the trigger is released, the mode reverts to the prior mode.'''    
 
 
     default_button_activation = (True, False)

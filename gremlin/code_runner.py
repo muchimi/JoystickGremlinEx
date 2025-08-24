@@ -707,7 +707,7 @@ class CodeRunner:
         gremlin.input_devices.remote_server.stop()
 
         # call stop function in plugins
-        #gremlin.input_devices.stop_registry.start()
+        gremlin.input_devices.stop_registry.start()
         gremlin.input_devices.stop_registry.stop()
         gremlin.input_devices.stop_registry.clear()
         gremlin.input_devices.mode_registry.clear()

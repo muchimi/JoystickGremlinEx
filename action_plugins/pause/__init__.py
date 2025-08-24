@@ -140,6 +140,9 @@ class PauseAction(gremlin.base_profile.AbstractAction):
 
     name = "Pause"
     tag = "pause"
+    hit = '''Pauses the profile.
+Note: containers that are marked as always execute
+do not pause even if the profile is paused.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)

@@ -1386,6 +1386,7 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
 
     name = "Map to OSC Ex"
     tag = "map-to-osc-ex"
+    hint = "Sends OSC data out (enhanced)"
 
     
     default_button_activation = (True, True)

@@ -302,6 +302,7 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
 
     name = "Map to GamePad"
     tag = "map-to-gamepad"
+    hint = 'Sends game controller data.'
     
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

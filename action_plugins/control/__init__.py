@@ -327,6 +327,7 @@ class Control(gremlin.base_profile.AbstractAction):
 
     name = "Control"
     tag = "gremlin-control"
+    hint = "Maps to a GremlinEx control option."
 
     default_button_activation = (True, True)
 

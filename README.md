@@ -14,10 +14,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T51)
+- Improved: added option to map to TTS to clear prior TTS messages when executed.  This won't stop TTS in progress but will remove queued TTS items.  TTS takes time to "speak", so inbound TTS requests get stored in a queue.
+- Improved: added hints to container and actions. Clicking on these help buttons will display information about the action or the container.
+- Fix: SmartToggle container exception on profile start.
+- Fix: more hardening for QT C++ garbage collection sync issues with dynamic UI elements.
+
 ### (m76T50)
 - Fix: OSC parameterized output to SimConnect calculated value expressions (see MSFS channel for setup instructions).  This resolves an issue where the parameter was ignored due to GremlinEx API changes.  
 - Fix: Resolved a C++ garbage collection exception  
-- Fix: Resolved a missing icon 
+- Fix: Resolved use of a deprecated icon in QTAwesome
 
 ### (m76T49)
 - Improved: OSC will not start the server on options exit or just start.  This should alleviate prompts for firewall rules when not actively using OSC.

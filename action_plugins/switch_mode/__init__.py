@@ -142,6 +142,8 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
 
     name = "Switch Mode"
     tag = "switch-mode"
+    hint = '''This action changes the profile mode to the specified mode.
+To change the mode temporarily, use the temporary mode switch action.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)

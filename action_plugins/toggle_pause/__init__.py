@@ -61,6 +61,10 @@ class TogglePauseAction(gremlin.base_profile.AbstractAction):
 
     name = "Toggle Pause & Resume"
     tag = "toggle-pause"
+    hint = '''Toggles profile pause on/off.
+Note that containers that have the always execute flag on
+continue to run even if the profile is paused.'''
+    
 
     default_button_activation = (True, False)
     # override default allowed inputs here

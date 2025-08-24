@@ -289,6 +289,9 @@ class CycleModes(gremlin.base_profile.AbstractAction):
 
     name = "Cycle Modes"
     tag = "cycle-modes"
+    hint = '''Changes profile modes modes based
+on a round robin sequence.'''
+
 
     default_button_activation = (True, False)
 

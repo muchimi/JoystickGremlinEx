@@ -764,6 +764,8 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
 
     name = "Map to Keyboard Ex"
     tag = "map-to-keyboard-ex"
+    hint = '''Enhanced keyboard mapper.
+Can also send mouse buttons, mouse wheel events.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

@@ -38,6 +38,7 @@ import gremlin.util
 import gremlin.actions
 import psygnal
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 
 

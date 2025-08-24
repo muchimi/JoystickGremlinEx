@@ -4658,6 +4658,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
     name = "Map to SimConnect"
     tag = "map-to-simconnect"
+    hint = '''Sends commands to Microsoft Flight Simulator
+via the SimConnect SDK.  Supports simvars and calculator expressions.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

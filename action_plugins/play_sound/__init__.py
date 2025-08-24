@@ -188,6 +188,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     name = "Play Sound"
     tag = "play-sound"
+    hint = "Play a sound."
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)

@@ -467,6 +467,7 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
 
     name = "Map to Mouse"
     tag = "map-to-mouse"
+    hint = "Legacy mouse mapper."
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

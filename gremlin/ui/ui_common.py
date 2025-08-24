@@ -695,6 +695,7 @@ class Buttons():
 
     @staticmethod
     def _template(label = "", icon_source : str = "", tooltip = None, callback = None, no_keyboard = True, data = None, width : int = None, height : int = None):
+        
         if no_keyboard:
             widget = NoKeyboardPushButton()
         else:
@@ -704,6 +705,7 @@ class Buttons():
         if label:
             widget.setText(label)
 
+        
         if icon_source:
             if isinstance(icon_source, str):
                 icon = gremlin.util.load_icon(icon_source)
@@ -2431,6 +2433,8 @@ class ActionSelector(QtWidgets.QWidget):
         
         self.add_button = Buttons.getAddWidget(callback = self._add_action)
 
+        self.help_widget = Buttons.getHelpWidget(callback = self._handle_help)
+
         # clipboard
         self.paste_button = gremlin.ui.ui_common.Buttons.getPasteWidget(callback=self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
@@ -2442,8 +2446,9 @@ class ActionSelector(QtWidgets.QWidget):
 
         widget, _ = getHContainer([self.action_label, 
                                    self.action_dropdown,
+                                   self.help_widget,
                                    self.add_button,
-                                   self.paste_button       
+                                   self.paste_button,
                                    ])
 
         self.main_layout.addWidget(widget)
@@ -2533,6 +2538,21 @@ class ActionSelector(QtWidgets.QWidget):
         return sorted(action_list)
 
 
+    def _handle_help(self):
+        ''' handles the help box on an action '''
+        action_name = self.action_dropdown.currentText()
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action = plugin_manager.get_class(action_name)(self._input_item)
+        if hasattr(action,"hint"):
+            hint = action.hint
+        else:
+            hint = gremlin.hints.hint.get(action.tag, "")  
+        if hint:
+            gremlin.ui.ui_common.MessageBox(title = f"About the {action_name} action:", prompt = hint, width = 300, is_warning=False)
+
+
+
+
     def _add_action(self, clicked=False):
         """Handles selecting of an action to be added.
 
@@ -2540,6 +2560,7 @@ class ActionSelector(QtWidgets.QWidget):
             a click
         """
         self.action_added.emit(self.action_dropdown.currentText())
+        
 
     def _paste_action(self):
         ''' handle paste action '''
@@ -3544,10 +3565,10 @@ class QMessageBox(QtWidgets.QMessageBox):
 
 
 class MessageBox():
-    def __init__(self, title = "Notice", prompt = "Operation", is_warning = True, parent = None):
+    def __init__(self, title = "Notice", prompt = "Operation", is_warning = True, parent = None, width = 200):
 
         from gremlin.util import load_pixmap
-        self._message_box = QMessageBox(parent = parent)
+        self._message_box = QMessageBox(parent = parent, width = width)
 
         # force the cursor
         

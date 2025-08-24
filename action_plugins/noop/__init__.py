@@ -64,6 +64,7 @@ class NoOpAction(gremlin.base_profile.AbstractAction):
 
     name = "NoOp"
     tag = "noop"
+    hint = "Do nothing action (place holder)"
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)

@@ -400,6 +400,8 @@ class Remap(gremlin.base_profile.AbstractAction):
 
     name = "Remap"
     tag = "remap"
+    hint = '''Legacy VJOY mapper.
+Use Vjoy Remap instead.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

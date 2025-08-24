@@ -152,6 +152,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
 
     name = "Map to Keyboard"
     tag = "map-to-keyboard"
+    hint = "Legacy keyboard mapper."
     
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

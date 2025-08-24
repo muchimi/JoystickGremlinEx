@@ -853,6 +853,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         eh.keyboard_event.connect(self._keyboard_handler)
 
     def _cleanup_ui(self):
+        if not Shiboken.isValid(self):
+            return
         if not self._deleted:
             verbose_ui = gremlin.config.Configuration().verbose_mode_ui
             if verbose_ui: syslog.info(f"GATE Widget: {self.objectName()} cleanup")
@@ -1058,6 +1060,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     
     def _sort_gate_layout_ui(self):
         ''' updates and sorts the gate container layout '''
+        if not Shiboken.isValid(self):
+            return
 
         if not Shiboken.isValid(self.gate_table_widget):
             return
@@ -1118,6 +1122,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
    
     def _reload_ranges(self):
         ''' when gates change, reload ranges '''
+        if not Shiboken.isValid(self):
+            return
         gremlin.util.assert_ui_thread()
 
         self._rwi_map.clear()
@@ -1175,7 +1181,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
     def _update_range_display(self):
         ''' called when the range display mode changes '''
-        
+        if not Shiboken.isValid(self):
+            return
         widgets = [self.get_range_widget(rwi) for rwi in self._rwi_map.keys()]
         # widgets = [widget for widget in widgets if widgets is not None]
         widget : RangeWidgetInfo
@@ -1342,6 +1349,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             values -- tuple of values -1.0 to 1.0, list of values, or dict of values indexed by gate position (zero based)
         '''
         if self._deleted:
+            return
+        if not Shiboken.isValid(self):
             return
         
         self.lock.acquire() # critical path
@@ -1591,6 +1600,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.duplicate_requested.emit(self._gate_data)
 
     def _handle_slider_update(self, event):
+        if not Shiboken.isValid(self):
+            return
         if not event.is_axis:
             return
         if not gremlin.util.compare_guid(self.action_data.hardware_device_id, event.device_guid) or event.identifier != self.action_data.hardware_input_id:
@@ -1924,6 +1935,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             
     
     def _set_steps_confirm_cb(self, value):
+        if not Shiboken.isValid(self):
+            return
         self._pushState()
         self._set_gate_count(value)
         self._normalize_cb(save_state = False)
@@ -1934,6 +1947,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         ''' normalize button  '''
         #value = self.sb_steps_widget.value()
         #self._gate_data.gates = value
+        if not Shiboken.isValid(self):
+            return
         if save_state: self._pushState()
         self._gate_data.normalize_steps(True)
         self._update_values_cb(self._gate_data, save_state)
@@ -1943,6 +1958,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         ''' normalize reset button  '''
         #value = self.sb_steps_widget.value()
         #self._gate_data.gates = value
+        if not Shiboken.isValid(self):
+            return
         if save_state: self._pushState()
         self._gate_data.normalize_steps(False)
         self._update_values_cb(self._gate_data, save_state)
@@ -1951,6 +1968,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     @QtCore.Slot(object)
     def _update_steps_cb(self, gate_data):
         ''' updates gate steps on the widget and their positions '''
+        if not Shiboken.isValid(self):
+            return
         if self._gate_data == gate_data:
             self._update_values_cb(self._gate_data)
         
@@ -1958,6 +1977,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     @QtCore.Slot(object)
     def _update_values_cb(self, gate_data, save_state = True):
         ''' called when gate data values are changed '''
+        if not Shiboken.isValid(self):
+            return
         if self._gate_data == gate_data:
             values = self._gate_data.getGateValues()
             if values != self._slider_widget.value():
@@ -2047,6 +2068,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
     QtCore.Slot()
     def _min_changed_cb(self):
+        if not Shiboken.isValid(self):
+            return
         if Shiboken.isValid(self._slider_widget):
             value = self.sb_min_widget.value()
             self._gate_data.min = value
@@ -2061,6 +2084,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
     QtCore.Slot()
     def _max_changed_cb(self):
+        if not Shiboken.isValid(self):
+            return
         if Shiboken.isValid(self._slider_widget):
             value = self.sb_max_widget.value()
             self._gate_data.max = value
@@ -2074,9 +2099,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     
     def _update_ui(self):
         ''' updates visibility of UI components based on the active options '''
-        # update the slider configuration
-        # print ("gate axis: update ui")
-        #self._load_gates()
+        if not Shiboken.isValid(self):
+            return
         if Shiboken.isValid(self._slider_widget):
             self._update_slider(self._gate_data.getGateValues())
             self._update_output_value()
@@ -2086,6 +2110,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
     def _delete_gate_ui(self, gate : GateInfo):
         ''' remove a gate from this widget '''
+        if not Shiboken.isValid(self):
+            return
         gwi : GateWidgetInfo
         _, gwi = self._gwi_map[gate]
         gwi.setUsed(False)
@@ -2129,7 +2155,6 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                             show_configuration=False,
                                                             parent=self,
                                                             object_name = object_name
-
                                                             )
         
         
@@ -2146,6 +2171,8 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _cleanup_ui(self):
         ''' cleanup the UI and widget hooks '''
+        if not Shiboken.isValid(self):
+            return
         if not self._deleted:
             verbose_ui = gremlin.config.Configuration().verbose_mode_ui
             if verbose_ui: syslog.info(f"Gated Axis Action: cleanup : {self.objectName()}")
@@ -2189,6 +2216,11 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
 
     name = "Gated Axis"
     tag = "gated-axis"
+    hint = '''Advanced axis (linear) input splitter.
+Splits an axis into customizable gates and ranges.
+Contains containers and actions that can trigger when 
+the input is in a specific range of values, or crosses gates.
+'''
 
     default_button_activation = (True, False)
     # override default allowed input types here if not all

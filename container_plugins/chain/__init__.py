@@ -234,6 +234,9 @@ class ChainContainer(AbstractContainer):
 
     name = "Chain"
     tag = "chain"
+    hint = '''This container runs all actions one after the other on each trigger. 
+A trigger executes the step, and moves to the next step in roundrobin fashion.
+Unlike a macro or sequence container, only one step is executed for each trigger.'''
 
     # override default allowed inputs here
     # input_types = [

@@ -191,11 +191,6 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFun
         self.long_press_time = 0.0
         self.is_pressed = False # assume output is not pressed
 
-        # Disable the auto release feature which clashes with the toggle logic
-        for functor in self.action_set.functors:
-            if "needs_auto_release" in functor.__dict__:
-                functor.needs_auto_release = False
-
     def profile_start(self):
         action_data = self.action_data
         self.delay = action_data.delay
@@ -314,6 +309,12 @@ class SmartToggleContainer(AbstractContainer):
 
     name = "Smart Toggle"
     tag = "smart_toggle"
+    hint = '''This container toggles the action on short press, and works like a regular input on long press.
+Each short press will toggle the output on/off.  Each long press will function like a regular input trigger.
+The delay between short and long press can be adjusted.
+Toggling the action means the action will receive a press input and no release input, or a release input on a short press.
+On long press the action receives a press input when the input is pressed, and a release when the input is released if held long enough.
+'''
 
     # override default allowed inputs here
     # input_types = [

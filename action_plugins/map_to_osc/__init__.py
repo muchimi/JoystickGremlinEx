@@ -891,6 +891,7 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
 
     name = "Map to OSC"
     tag = "map-to-osc"
+    hint = "Sends OSC data out (simple)"
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

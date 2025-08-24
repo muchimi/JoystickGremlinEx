@@ -368,6 +368,8 @@ class TickContainer(AbstractContainer):
 
     name = "Tick"
     tag = "tick_container"
+    hint = '''Use this container to split an axis (linear) input and trigger actions at each tick position.
+For a more advanced way to split an axis and trigger actions at specific points, look at the Gated Axis action.'''
     functor = TickContainerFunctor
     widget = TickContainerWidget
     # override default allowed inputs here

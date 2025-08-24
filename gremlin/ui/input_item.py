@@ -1193,26 +1193,32 @@ class ActionSetView(ui_common.AbstractView):
         self.group_widget = QtWidgets.QGroupBox(self.label)
         self.main_layout.addWidget(self.group_widget)
 
+        left_panel, left_layout = gremlin.ui.ui_common.getHContainer()
+        right_panel, right_layout = gremlin.ui.ui_common.getHContainer()
+
+        group_widget, _ = gremlin.ui.ui_common.getHContainer([left_panel,
+                                                            "||",
+                                                            right_panel,
+                                                            ])
+
         self.setObjectName(f"ActionSetView: {label}")
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
         if verbose_ui: syslog.info(f"ActionSetView: create: {self.objectName()}")
 
-        
+       
         # Create group box contents
-        self.group_layout = QtWidgets.QGridLayout(self.group_widget)
         self.action_widget, self.action_layout = gremlin.ui.ui_common.getVContainer()
         
 
         # Only show edit controls in the basic tab
         if self.view_type == ui_common.ContainerViewTypes.Action:
             self._create_edit_controls()
-            self.group_layout.addWidget(self.action_widget, 0, 0)
-            self.group_layout.addWidget(self.controls_widget, 0, 1)
+            left_layout.addWidget(self.action_widget)
+            right_layout.addWidget(self.controls_widget)
         else:
-            self.group_layout.addWidget(self.action_widget, 0, 0)
-        self.group_layout.setColumnStretch(0, 2)
-
+            left_layout.addWidget(self.action_widget)
+        
         # Only permit adding actions from the basic tab and if the tab is
         # not associated with a vJoy device
         if self.view_type == ui_common.ContainerViewTypes.Action and \
@@ -1226,7 +1232,12 @@ class ActionSetView(ui_common.AbstractView):
             self.action_selector.action_added.connect(self._add_action)
             self.action_selector.action_paste.connect(self._paste_action)
             widget,_ = gremlin.ui.ui_common.getHContainer(self.action_selector)
-            self.group_layout.addWidget(widget, 1, 0)
+            left_layout.addWidget(widget)
+            
+
+        self.main_layout.addWidget(group_widget)
+        self.left_layout = left_layout
+        self.right_layout = right_layout
 
         self._widgets = []
 
@@ -1251,7 +1262,7 @@ class ActionSetView(ui_common.AbstractView):
         if verbose_ui: object_name = self.objectName()
         if verbose_ui: syslog.info(f"ActionSet: redraw start: {object_name}")
 
-        widgets = gremlin.util.get_layout_widgets(self.action_layout)
+        widgets = gremlin.util.get_layout_widgets(self.left_layout)
         if widgets:
             if verbose_ui: syslog.info(f"ActionSet: redraw cleanup start: {object_name}")
             for widget in widgets:
@@ -1262,18 +1273,19 @@ class ActionSetView(ui_common.AbstractView):
                 widget.setParent(None)
                 widget.deleteLater()
             self._widgets.clear()
+            
 
             if verbose_ui: syslog.info(f"ActionSet: redraw cleanup complete: {object_name}")
-        
+
 
         #ui_common.clear_layout(self.action_layout)
-        self.group_layout.removeWidget(self.action_widget)
+        self.left_layout.removeWidget(self.action_widget)
         self.action_widget.hide()
         self.action_widget.deleteLater()
         
         
         self.action_widget, self.action_layout = gremlin.ui.ui_common.getVContainer()
-        self.group_layout.addWidget(self.action_widget, 0, 0)
+        self.left_layout.addWidget(self.action_widget)
 
         
         if self.model is None:
@@ -2614,6 +2626,8 @@ class ContainerSelector(QtWidgets.QWidget):
         
         self.add_container_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds a container", callback = self._add_container)
 
+        self.help_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._handle_help)
+
         self.save_template_widget =  gremlin.ui.ui_common.Buttons.getSaveWidget(callback =self._save_container_to_template,
                                                                                   tooltip = "Save mappings to template")
 
@@ -2641,7 +2655,9 @@ class ContainerSelector(QtWidgets.QWidget):
         self.delete_button.setToolTip("Delete container(s)")
 
         self.main_layout.addWidget(self.container_dropdown)
+        self.main_layout.addWidget(self.help_widget)
         self.main_layout.addWidget(self.add_container_widget)
+
         self.main_layout.addWidget(self.save_template_widget)
         self.main_layout.addWidget(self.load_template_widget)
         self.main_layout.addWidget(self.copy_button_widget)
@@ -2674,7 +2690,7 @@ class ContainerSelector(QtWidgets.QWidget):
         with QtCore.QSignalBlocker(self.container_dropdown):
             self.container_dropdown.clear()
             for name in self._valid_container_list(input_type):
-                self.container_dropdown.addItem(name)
+                self.container_dropdown.addItem(name )
             config = gremlin.config.Configuration()
             self.container_dropdown.setCurrentText(config.last_container)
 
@@ -2724,6 +2740,21 @@ class ContainerSelector(QtWidgets.QWidget):
         :param clicked flag indicating whether or not the button was pressed
         """
         self.container_added.emit(self.container_dropdown.currentText())
+
+    def _handle_help(self):
+        ''' help button '''
+        import gremlin.base_profile
+        container_name = self.container_dropdown.currentText()
+        plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+        
+        input_item = self.data
+        container = plugin_manager.get_class(container_name)(input_item)
+        if hasattr(container,"hint"):
+            hint = container.hint
+        else:
+            hint = gremlin.hints.hint.get(container.tag, "")
+        if hint:
+            gremlin.ui.ui_common.MessageBox(title = f"About the {container_name} container:", prompt = hint, width = 300, is_warning = False)
 
 
     def _clipboard_changed(self, clipboard):
@@ -2969,9 +3000,13 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         mode = self.profile_data.get_mode()
         if mode == gremlin.shared_state.master_mode:
             mode = "[Master]"
+        if hasattr(self.profile_data,"hint"):
+            hint = self.profile_data.hint
+        else:
+            hint = gremlin.hints.hint.get(self.profile_data.tag, "")
         self._title_bar_widget = TitleBar(
             f"{self._get_window_title()} ({mode})",
-            gremlin.hints.hint.get(self.profile_data.tag, ""),
+            hint,
             self._container_remove,
             self._container_copy,
             data = profile_data)
@@ -3805,9 +3840,16 @@ class BasicActionWrapper(AbstractActionWrapper):
         mode = action_widget.action_data.get_mode()
         self.action_widget = action_widget
 
+        action = self.action_widget.action_data
+        if hasattr(action,"hint"):
+            hint = action.hint
+        else:
+            hint = gremlin.hints.hint.get(action.tag, "")  
+        
+
         self._titlebar_widget = TitleBar(
             f"{action_widget.action_data.name} ({mode})",
-            gremlin.hints.hint.get(self.action_widget.action_data.tag, ""),
+            hint,
             self._remove,
             self._clipboard_copy,
             data = action_widget.action_data)
@@ -4504,13 +4546,15 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.always_execute.stateChanged.connect(self._always_execute_cb)
 
         widgets = [self.action_selector,
-                   "||",
                    self.container_selector,
                    self.always_execute
                    ]
 
         self.dropdown_widget, self.dropdown_layout = gremlin.ui.ui_common.getHContainer(widgets)
         self.main_layout.addWidget(self.dropdown_widget)
+        desired_width = self.dropdown_widget.sizeHint().width()
+        self.dropdown_widget.setMinimumWidth(desired_width)
+        
 
 
     def updateSelectors(self, input_type, item_data):

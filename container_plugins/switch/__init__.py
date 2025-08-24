@@ -606,6 +606,9 @@ class SwitchContainer(AbstractContainer):
 
     name = "Switch"
     tag = "switch"
+    hint = '''Use this container to define multiple input triggers and perform them when the input changes, is pressed, or is released.
+This feature is primarily intended for three way switches but can be used for any other use that requires an action to trigger on
+an input toggle, press or release.  Multiple inputs can be specified for latching purposes.'''
 
     # override default allowed inputs here
     input_types = [

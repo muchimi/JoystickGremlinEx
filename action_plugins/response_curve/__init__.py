@@ -1442,6 +1442,12 @@ class ResponseCurve(gremlin.base_profile.AbstractAction):
 
     name = "Response Curve"
     tag = "response-curve"
+    hint = '''Legacy response curve mapper.
+Applies a response curve to the input.
+This effect is cummulative and is applied before any actions are executed, 
+even if this action appears after other actions.
+If applying a curve to an output axis, use VJOY Remap instead for improved performance.
+If needing a separate curve mapper, use the more advanced Response Curve Ex action.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

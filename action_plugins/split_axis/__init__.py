@@ -204,6 +204,8 @@ class SplitAxis(gremlin.base_profile.AbstractAction):
 
     name = "Split Axis"
     tag = "split-axis"
+    hint = '''Splits an input axis into regions.
+For advanced axis splitting options, please use Gated Axis instead.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

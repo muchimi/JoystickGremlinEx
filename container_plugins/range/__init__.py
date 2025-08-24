@@ -698,6 +698,9 @@ class RangeContainer(AbstractContainer):
     
     name = "Range"
     tag = "range"
+    hint = '''Use this container to split an axis (linear) input into actions based on input range.
+For more advanced axis splitting capability, look at the Gated Axis action.
+    '''
 
     # this container only works with axis inputs
     input_types = [InputType.JoystickAxis]

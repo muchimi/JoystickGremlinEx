@@ -1888,6 +1888,9 @@ class Macro(gremlin.base_profile.AbstractAction):
 
     name = "Macro"
     tag = "macro"
+    hint = '''Creates macros.
+All steps in a macro execute on trigger.
+To send complex sequences, please look at the sequence container.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

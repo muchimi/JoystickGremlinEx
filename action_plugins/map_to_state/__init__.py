@@ -835,6 +835,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
 
     name = "Map to State"
     tag = "map_to_state"
+    hint = "Sets, clear or toggles a state."
     
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

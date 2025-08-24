@@ -170,6 +170,7 @@ class BasicContainer(AbstractContainer):
 
     name = "Basic"
     tag = "basic"
+    hint = '''This is a simple container that contains an action.'''
 
     # input_types = [
     #     InputType.JoystickAxis,

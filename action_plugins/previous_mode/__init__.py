@@ -60,6 +60,7 @@ class PreviousMode(gremlin.base_profile.AbstractAction):
 
     name = "Switch to previous Mode"
     tag = "previous-mode"
+    hint = "Selects the previous profile mode."
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)

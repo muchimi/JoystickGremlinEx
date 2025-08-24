@@ -60,7 +60,7 @@ class ResumeAction(gremlin.base_profile.AbstractAction):
 
     name = "Resume"
     tag = "resume"
-
+    hint = "Resumes profile execution paused by the pause action."
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
     # override default allowed inputs here

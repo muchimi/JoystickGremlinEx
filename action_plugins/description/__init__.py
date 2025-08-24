@@ -88,6 +88,10 @@ class DescriptionAction(gremlin.base_profile.AbstractAction):
 
     functor = DescriptionActionFunctor
     widget = DescriptionActionWidget
+    hint = '''Legacy description action.
+Adds a description to profiles.
+Also see notes on actions and containers.
+'''
 
     def __init__(self, parent):
         super().__init__(parent)

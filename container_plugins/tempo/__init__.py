@@ -396,6 +396,10 @@ class TempoContainer(AbstractContainer):
 
     name = "Tempo"
     tag = "tempo"
+    hint = '''Use this container to trigger actions based on short press or long press.
+The delay between short and long press is customizable.
+This container only supports single actions.
+Look at Tempo Ex for a container that allows more than one action per short or long press.'''
     functor = TempoContainerFunctor
     widget = TempoContainerWidget
 

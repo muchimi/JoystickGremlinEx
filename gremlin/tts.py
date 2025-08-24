@@ -116,7 +116,7 @@ class TextToSpeech:
                     syslog.error(f"TTS: unable to activate TTS: {err}")
 
 
-    def speak(self, text, rate = 100, threaded = True):     
+    def speak(self, text, rate = 100, clear = False):     
         if not self.valid:
             return
         # syslog = logging.getLogger("system")
@@ -124,7 +124,8 @@ class TextToSpeech:
         if verbose: syslog.info(f"TTS: SPEAK add to queue: {text}")
 
         self._lock.acquire_lock()
-        self._queue.clear()
+        if clear:
+            self._queue.clear()
         self._queue.append(lambda : self._speak(text, rate))
         self._lock.release_lock()
 
@@ -143,13 +144,14 @@ class TextToSpeech:
         except Exception as err:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
-    def speak_single(self, text, rate = None, threaded = True):        
+    def speak_single(self, text, rate = None, clear = False, threaded = True):        
         if text and self.valid:
             # syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose
             if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
             self._lock.acquire_lock()
-            self._queue.clear()
+            if clear:
+                self._queue.clear()
             self._queue.append(lambda : self._speak_single(text, rate))
             self._lock.release_lock()
 
@@ -205,8 +207,10 @@ class TextToSpeech:
         if not self._started:
             syslog.info("TTS: start")
             self._tts_thread = gremlin.threading.AbortableThread(target = self._tts_runner)
+            self._tts_thread.name = "TTS engine"
             self._tts_thread.start()
             self._queue_thread = gremlin.threading.AbortableThread(target= self._queue_runner)
+            self._queue_thread.name = "TTS queue"
             self._queue_thread.start()
             self._started = True
 

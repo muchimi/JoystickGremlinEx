@@ -175,13 +175,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         super().__init__(container, parent)
 
 
-        self.action_sets = []
         self.container = container
   
-        self.index = 0
-        self.last_execution = 0.0
-        self.last_value = None
-
         # Determine if we need to switch the action index after a press or
         # release event. Only for container conditions this is necessary to
         # ensure proper cycling.
@@ -192,19 +187,6 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                     self.switch_on_press = True
 
         self._verbose = gremlin.config.Configuration().verbose_mode_container
-
-        # eh = gremlin.event_handler.EventListener()
-        # eh.macro_step_completed.connect(self._macro_completed)
-
-    def profile_start(self):
-        ''' occurs at profile start '''
-        self.index = 0
-        self._event = None
-        self._value = None
-        
-
-    def profile_started(self):
-        super().profile_started()        
 
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data : dict = None) -> bool:
@@ -226,7 +208,6 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 return False
             
             is_pressed = True # flip it for containers
-            auto_release = True
             value.is_pressed = is_pressed
             value.current = is_pressed
             event.is_pressed = is_pressed
@@ -237,16 +218,6 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
         return False # stop execution as the logic is internal to trigger the other nodes
     
-    # @QtCore.Slot(int)
-    # def _macro_completed(self, id : int):
-    #     ''' occurs when a macro completes - the id is the id of the macro completed '''
-        
-    #     if self._macro_id is not None and id == self._macro_id:
-    #         syslog = logging.getLogger("system")
-    #         verbose = gremlin.config.Configuration().verbose
-    #         if verbose: syslog.info(f"SEQUENCE: completed graph sequence - id {self._macro_id}")
-    #         self._macro_id = None
-
 
 class SequenceContainer(AbstractContainer):
 
@@ -258,6 +229,8 @@ class SequenceContainer(AbstractContainer):
 
     name = "Sequence"
     tag = "sequence"
+    hint = '''This container runs all actions sequentially like a macro.
+Unlike a macro, any action suitable for the input can be used.'''
 
     #override default allowed inputs here
     input_types = [

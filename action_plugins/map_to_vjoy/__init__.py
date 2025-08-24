@@ -4642,6 +4642,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
     name = "Vjoy Remap"
     tag = "vjoyremap"
+    hint = '''Advanced VJOY mapper. 
+This action maps an input to a VJOY device.
+Supports axis merging, curved output, command, hat and button mappings.
+'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

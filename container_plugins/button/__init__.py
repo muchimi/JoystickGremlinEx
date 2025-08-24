@@ -289,6 +289,8 @@ class ButtonContainer(AbstractContainer):
 
     name = "Button"
     tag = "button_container"
+    hint = '''This container is used to trigger one action on trigger press,
+and another action on trigger release in a single container.'''
     functor = ButtonContainerFunctor
     widget = ButtonContainerWidget
     # override default allowed inputs here

@@ -358,6 +358,8 @@ class DoubleTapContainer(AbstractContainer):
 
     name = "Double Tap"
     tag = "double_tap"
+    hint = '''Use this container to trigger an action on single trigger click/tap,
+and another action on input double-click (tap)'''
     functor = DoubleTapContainerFunctor
     widget = DoubleTapContainerWidget
 

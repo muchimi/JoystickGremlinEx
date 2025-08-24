@@ -832,6 +832,8 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
 
     name = "Map to Mouse EX"
     tag = "map_to_mouse_ex"
+    hint = '''Sends mouse data (enhanced).
+Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.'''
     
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)

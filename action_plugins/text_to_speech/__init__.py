@@ -26,6 +26,7 @@ import gremlin.ui.input_item
 import gremlin.tts
 import gremlin.ui.ui_common
 import gremlin.util
+from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
 
 class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -72,34 +73,40 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._play_cb)
 
+        self.clear_queue_widget = QtWidgets.QCheckBox("Clear voice queue")
+        self.clear_queue_widget.setToolTip("When enabled, any prior TTS messages still in queue will be removed")
+        self.clear_queue_widget.setChecked(self.action_data.clearQueue)
+        self.clear_queue_widget.clicked.connect(self._handle_clear_queue_changed)
 
-        self.container_widget = QtWidgets.QWidget()
-        self.container_layout = QtWidgets.QHBoxLayout()
-        self.container_widget.setLayout(self.container_layout)
+        widgets = [
+            "Voice:",
+            self.voice_widget,
+            "Volume:",
+            self.voice_widget,
+            "Rate (wpm):",
+            self.rate_widget,
+            self.play_widget,
+            self.clear_queue_widget,
+        ]
 
-        self.container_layout.addWidget(QtWidgets.QLabel("Voice:"))
-        self.container_layout.addWidget(self.voice_widget)
-
-        self.container_layout.addWidget(QtWidgets.QLabel("Volume:"))
-        self.container_layout.addWidget(self.volume_widget)
-
-        self.container_layout.addWidget(QtWidgets.QLabel("Playback rate (wpm):"))
-        self.container_layout.addWidget(self.rate_widget)
-
-        self.container_layout.addWidget(self.play_widget)
-
-        self.container_layout.addStretch()
+        self.container_widget,self.container_layout = gremlin.ui.ui_common.getHContainer(widgets)
 
         self.main_layout.addWidget(self.text_field)
         self.main_layout.addWidget(self.container_widget)
 
         self._content_changed_cb() # update buttons
 
+    
+
     def eventFilter(self, object, event):
         t = event.type()
         if t == QtCore.QEvent.Type.FocusOut:
             self.action_data.text = self.text_field.toPlainText()
         return False
+    
+    @QtCore.Slot(bool)
+    def _handle_clear_queue_changed(self, checked):
+        self.action_data.clearQueue = checked
     
     @QtCore.Slot()
     def _rate_reset_cb(self):
@@ -154,16 +161,11 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
             voice = self.tts.getVoices()[self.action_data.voice_index]
             self.tts.set_voice(voice)
             self.tts.set_volume(self.action_data.volume)
-            self.tts.speak(self.action_data.text, self.action_data.rate)
+            self.tts.speak(self.action_data.text, self.action_data.rate, self.action_data.clearQueue)
     
     def profile_start(self):
         if self.action_data.enabled:
             self.tts.start()
-        
-    
-    # def profile_stop(self):
-    #     if self.action_data.enabled:
-    #         self.tts.end()
     
     def process_event(self, event, value, extra_data = None):
         if not self.action_data.enabled:
@@ -181,6 +183,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
 
     name = "Text to Speech"
     tag = "text-to-speech"
+    hint = "Converts a text string to voice using the TTS API."
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
@@ -208,6 +211,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self.rate = 0
         self.voice_index = 0
         self._voice_name = ''
+        self.clearQueue = False # true if pending items are cleared when new voice items are queued
 
     @property
     def voice_name(self):
@@ -260,24 +264,28 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
             
             
         if "volume" in node.attrib:
-            self.volume = int(node.get("volume"))
+            self.volume = safe_read(node, "volume", int, 50)
         else:
             self.volume = 50 # default
         self.volume =gremlin.util.clamp(self.volume, 0, 100)    
         if "rate" in node.attrib:
-            self.rate = int(node.get("rate"))
+            self.rate = safe_read(node, "rate", int, 100)
         if self.rate == 0:
             self.rate = 100 # default
         self.rate =gremlin.util.clamp(self.rate, tts.rate_offset_min, tts.rate_offset_max)
         if "text" in node.attrib:
             self.text = node.get("text")
+        if "clear-queue" in node.attrib:
+            self.clearQueue = safe_read(node,"clear-queue",bool, False)
+
 
     def _generate_xml(self):
         node = ElementTree.Element("text-to-speech")
-        node.set("voice_id", str(self.voice_index))
+        node.set("voice_id", safe_format(self.voice_index, int))
         node.set("text", self.text)
-        node.set("volume",str(self.volume))
-        node.set("rate",str(int(self.rate)))
+        node.set("volume",safe_format(self.volume, int))
+        node.set("rate", safe_format(self.rate, int))
+        node.set("clear-queue", safe_format(self.clearQueue, bool))
         return node
 
     def _is_valid(self):
