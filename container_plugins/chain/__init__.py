@@ -81,10 +81,11 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.action_layout.addLayout(self.widget_layout)
 
         # Insert action widgets
-        for i, action in enumerate(self.profile_data.action_sets):
+        action_sets = [action_set for action_set in self.profile_data.action_sets if action_set]
+        for i, action_set in enumerate(action_sets):
             widget = self._create_action_set_widget(
-                self.profile_data.action_sets[i],
-                f"Action {i:d}",
+                action_set,
+                f"Action {i+1:d}",
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.action_layout.addWidget(widget)
@@ -212,7 +213,7 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
                 self.index = 0
             self.last_execution = time.time()
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_container
         if verbose:
             syslog.info(f"Chain: index {self.index}")
         self._trigger(self.index, event, value, extra_data)

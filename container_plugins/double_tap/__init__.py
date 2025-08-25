@@ -55,15 +55,9 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         self.options_layout = QtWidgets.QHBoxLayout()
 
         # Activation delay
-        self.options_layout.addWidget(
-            QtWidgets.QLabel("<b>Double-tap delay: </b>")
-        )
-        self.delay_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.delay_input.setRange(0.1, 2.0)
-        self.delay_input.setSingleStep(0.1)
-        self.delay_input.setValue(0.5)
+        self.delay_input = gremlin.ui.ui_common.QDelayWidget(label = "<b>Double-tap delay: </b>",
+                                                             callback = self._delay_changed_cb)
         self.delay_input.setValue(self.profile_data.delay)
-        self.delay_input.valueChanged.connect(self._delay_changed_cb)
         self.options_layout.addWidget(self.delay_input)
         self.options_layout.addStretch()
 
@@ -75,6 +69,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
             self.activate_combined.setChecked(True)
         else:
             self.activate_exclusive.setChecked(True)
+
         self.activate_combined.toggled.connect(self._activation_changed_cb)
         self.activate_exclusive.toggled.connect(self._activation_changed_cb)
         self.options_layout.addWidget(self.activate_exclusive)
@@ -134,9 +129,10 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         :param add_action_cb function to call when an action is added
         :param label the description of the action selector
         """
+        input_item = self.profile_data.input_item
         action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type(),
-            self.profile_data,
+            input_item,
         )
         action_selector.inputItem = self.profile_data
         action_selector.action_added.connect(add_action_cb)
@@ -377,7 +373,9 @@ and another action on input double-click (tap)'''
     ]
 
     interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Edit,
+        #gremlin.ui.input_item.ActionSetView.Interactions.Edit,
+        gremlin.ui.input_item.ActionSetView.Interactions.Add,
+        gremlin.ui.input_item.ActionSetView.Interactions.Delete
     ]
 
     def __init__(self, parent=None, node = None):
@@ -409,11 +407,12 @@ and another action on input double-click (tap)'''
         node.set("type", DoubleTapContainer.tag)
         node.set("delay", str(self.delay))
         node.set("activate-on", self.activate_on)
-        for actions in self.action_sets:
-            as_node = ElementTree.Element("action-set")
-            for action in actions:
-                as_node.append(action.to_xml())
-            node.append(as_node)
+        for action_set in self.action_sets:
+            if action_set:
+                as_node = ElementTree.Element("action-set")
+                for action in action_set:
+                    as_node.append(action.to_xml())
+                node.append(as_node)
         return node
 
     def _is_container_valid(self):

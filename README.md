@@ -15,10 +15,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T51)
-- Improved: added option to map to TTS to clear prior TTS messages when executed.  This won't stop TTS in progress but will remove queued TTS items.  TTS takes time to "speak", so inbound TTS requests get stored in a queue.
-- Improved: added hints to container and actions. Clicking on these help buttons will display information about the action or the container.
+- Improved: added option to map to TTS to clear any prior queued TTS messages when executed.  This won't stop TTS in progress but will remove queued TTS items when enabled. TTS takes time to "speak", so inbound TTS requests get stored in a queue.  This can cause significant lag by some actions as many triggers may have occurred while the TTS was speaking.
+- Improved: added hints to container and actions. Clicking on these help buttons will display information about the action or the container does.
+- Improved: TempoEx gains a new double tap mode.  TempoEx will thus have three modes:
+	+ short button trigger (input held a short time)
+	+ long button trigger (input held a long time)
+	+ double tap button trigger (input double tapped in a short time)
+	Behavior change: TempoEx can only trigger items on release.  The reason is it cannot distinguish between single, double or long hold until the input is released.  Warning: delays need to make sense, so double click should be shorter than long.
 - Fix: SmartToggle container exception on profile start.
-- Fix: more hardening for QT C++ garbage collection sync issues with dynamic UI elements.
+- Fix: additional hardening for QT C++ garbage collection sync issues with dynamic UI elements in GatedAxis
+- Fix: blank entries in chain and tempoEx containers
+
 
 ### (m76T50)
 - Fix: OSC parameterized output to SimConnect calculated value expressions (see MSFS channel for setup instructions).  This resolves an issue where the parameter was ignored due to GremlinEx API changes.  
