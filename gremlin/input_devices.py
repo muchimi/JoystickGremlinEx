@@ -61,27 +61,6 @@ import gremlin.singleton_decorator
 syslog = logging.getLogger("system")
 
 
-class ControlAction(enum.Enum):
-    ''' defines the available control actions for the control plugin'''
-    EnableInput = 0 # enables an input
-    DisableInput = 1 # disable an input
-    ToggleInput = 2 # toggle the input
-
-    @staticmethod
-    def to_string(action):
-        return action.name
-    
-    @staticmethod
-    def to_display_name(action):
-        return _control_action_display[action]
-        
-        
-_control_action_display = {
-    ControlAction.EnableInput: "Enable Input",
-    ControlAction.DisableInput: "Disable Input",
-    ControlAction.ToggleInput: "Toggle Input",
-}
-
 
 
 
@@ -380,6 +359,23 @@ class RemoteControl():
     def say(self, msg):
         speech = InternalSpeech()
         speech.speak(msg)
+
+    def setLocal(self, value : bool):
+        ''' enable/disable local '''
+        if value:
+            self._update(VjoyAction.VJoyEnableLocal)
+        else:
+            self._update(VjoyAction.VJoyDisableLocal)
+
+    def setRemote(self, value : bool):
+        ''' enable/disable local '''
+        if value:
+            self._update(VjoyAction.VJoyEnableRemote)
+        else:
+            self._update(VjoyAction.VJoyDisableRemote)
+
+    def toggleRemote(self):
+        self._update(VjoyAction.VJoyToggleRemote)
 
     def _broadcast_changed(self, event):
         config = gremlin.config.Configuration()

@@ -412,7 +412,7 @@ class EventListener:
 	profile_stopping = Signal() # profile is about to stop (before a profile stops)
 	profile_stop_toolbar = Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
 	profile_unload = Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
-	request_profile_stop = Signal(str) # request the profile to stop (reason: str)
+	request_profile_stop = Signal(str) # request the profile to stop (message to display: str)
 	request_profile_reload = Signal(str, bool) # request a profile to load (str = profile file, bool = as new profile flag)
 	request_reload = Signal() # request a reload of the current profile data
 	

@@ -53,8 +53,16 @@ class BasicContainerWidget(AbstractContainerWidget):
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
         if verbose_ui: syslog.info("BasicContainerWidget: create action UI start")
-        if len(self.profile_data.action_sets) > 0:
+        has_actions = False
+        for action_set in self.profile_data.action_sets:
+            if action_set:
+                has_actions = True
+                break
+         
+        if has_actions:
             assert len(self.profile_data.action_sets) == 1
+
+            
 
             self.profile_data.create_or_delete_virtual_button()
             widget = self._create_action_set_widget(
@@ -62,19 +70,21 @@ class BasicContainerWidget(AbstractContainerWidget):
                 "Basic",
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
+
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
+            input_item = self.profile_data.input_item
             if self.profile_data.get_device_type() == gremlin.types.DeviceType.VJoy:
                 action_selector = gremlin.ui.ui_common.ActionSelector(
                     gremlin.types.DeviceType.VJoy,
-                    self.profile_data,
+                    input_item,
                 )
             else:
                 action_selector = gremlin.ui.ui_common.ActionSelector(
-                    self.profile_data.parent.getInputType(),
-                    self.profile_data,
+                    input_item.get_input_type(),
+                    input_item,
                 )
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
@@ -139,10 +149,12 @@ class BasicContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
+        title = "Basic: "
         if len(self.profile_data.action_sets) > 0:
-            return ", ".join(a.name for a in self.profile_data.action_sets[0])
-        else:
-            return "Basic"
+            stub =  ", ".join(a.name for a in self.profile_data.action_sets[0])
+            title += stub
+        
+        return title
 
 
 class BasicContainerFunctor(AbstractFunctor):

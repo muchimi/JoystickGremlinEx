@@ -1181,6 +1181,8 @@ class ActionSetView(ui_common.AbstractView):
     ):
 
         super().__init__(parent)
+
+        self.has_edit_controls = False # assume no edit controls
         self.view_type = view_type
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
@@ -1190,16 +1192,25 @@ class ActionSetView(ui_common.AbstractView):
         self._selected = False # true if the object is selected
 
         # Create a group box widget in which everything else will be placed
-        self.group_widget = QtWidgets.QGroupBox(self.label)
-        self.main_layout.addWidget(self.group_widget)
+        #self.group_widget = QtWidgets.QGroupBox(self.label)
+
+        title = QtWidgets.QLabel(self.label)
+        self.main_layout.addWidget(title)
+        hline = gremlin.ui.ui_common.QHorizontalLine()
+        self.main_layout.addWidget(hline)
+
+        #self.main_layout.addWidget(self.group_widget)
 
         left_panel, left_layout = gremlin.ui.ui_common.getHContainer()
         right_panel, right_layout = gremlin.ui.ui_common.getHContainer()
+        right_panel.setMaximumWidth(0) # use no space by default unless needed
 
-        group_widget, _ = gremlin.ui.ui_common.getHContainer([left_panel,
-                                                            "||",
-                                                            right_panel,
-                                                            ])
+        action_container, action_layout = gremlin.ui.ui_common.getGridContainer()
+        action_layout.addWidget(left_panel, 0, 0)
+        action_layout.addWidget(right_panel, 0, 1)
+        
+
+        self.main_layout.addWidget(action_container)
 
         self.setObjectName(f"ActionSetView: {label}")
 
@@ -1215,7 +1226,10 @@ class ActionSetView(ui_common.AbstractView):
         if self.view_type == ui_common.ContainerViewTypes.Action:
             self._create_edit_controls()
             left_layout.addWidget(self.action_widget)
-            right_layout.addWidget(self.controls_widget)
+            if self.has_edit_controls:
+                right_layout.addWidget(self.controls_widget)
+                right_panel.setMaximumWidth(34)
+                right_panel.setMinimumWidth(34)
         else:
             left_layout.addWidget(self.action_widget)
         
@@ -1235,7 +1249,7 @@ class ActionSetView(ui_common.AbstractView):
             left_layout.addWidget(widget)
             
 
-        self.main_layout.addWidget(group_widget)
+        # self.main_layout.addWidget(group_widget)
         self.left_layout = left_layout
         self.right_layout = right_layout
 
@@ -1386,6 +1400,7 @@ class ActionSetView(ui_common.AbstractView):
         """
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.Red)
+        self.has_edit_controls = False
 
         self.controls_widget = QtWidgets.QWidget()
         self.controls_layout = QtWidgets.QVBoxLayout(self.controls_widget)
@@ -1398,6 +1413,7 @@ class ActionSetView(ui_common.AbstractView):
                 lambda: self.interacted.emit(ActionSetView.Interactions.Up)
             )
             self.controls_layout.addWidget(self.control_move_up)
+            self.has_edit_controls = True
         if ActionSetView.Interactions.Down in self.allowed_interactions:
             self.control_move_down = QtWidgets.QPushButton(
                 load_icon(f"gfx/{prefix}button_down.png"), ""
@@ -1406,6 +1422,7 @@ class ActionSetView(ui_common.AbstractView):
                 lambda: self.interacted.emit(ActionSetView.Interactions.Down)
             )
             self.controls_layout.addWidget(self.control_move_down)
+            self.has_edit_controls = True
         if ActionSetView.Interactions.Delete in self.allowed_interactions:
 
             self.control_delete = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Delete))
@@ -1417,6 +1434,7 @@ class ActionSetView(ui_common.AbstractView):
             #     lambda: self.interacted.emit(ActionSetView.Interactions.Delete)
             # )
             self.controls_layout.addWidget(self.control_delete)
+            self.has_edit_controls = True
         if ActionSetView.Interactions.Edit in self.allowed_interactions:
             self.control_edit = gremlin.ui.ui_common.Buttons.getEditWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Edit))
             # self.control_edit = QtWidgets.QPushButton(
@@ -1426,9 +1444,11 @@ class ActionSetView(ui_common.AbstractView):
             #     lambda: self.interacted.emit(ActionSetView.Interactions.Edit)
             # )
             self.controls_layout.addWidget(self.control_edit)
+            self.has_edit_controls = True
         if ActionSetView.Interactions.Copy in self.allowed_interactions:
             self.control_edit = gremlin.ui.ui_common.Buttons.getCopyWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Copy))
             self.controls_layout.addWidget(self.control_edit)
+            self.has_edit_controls = True
 
 
         self.controls_layout.addStretch(1)
@@ -4118,6 +4138,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
             self.action_model = ActionContainerModel(self.item_data.containers, self.item_data, self._input_type)
             self.container_view = ActionContainerView(self)
+            self.container_view.input_item = self.item_data
             self.container_view.setContentsMargins(0,0,0,0)
             self.container_view.setModel(self.action_model)
             self.main_layout.addWidget(self.container_view)
@@ -4749,6 +4770,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         self.redraw_lock = threading.Lock()
         self._deleted = False
 
+        self.input_item = None
+
         self.scroll_area = QtWidgets.QScrollArea()
 
         # Configure the widget holding the layout with all the buttons
@@ -4799,6 +4822,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
     def redraw(self):
         """Redraws the entire view."""
         import gremlin.util
+        import gremlin.ui.ui_common
         gremlin.util.assert_ui_thread()
         if not Shiboken.isValid(self):
             return
@@ -4811,7 +4835,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
             try:
                 self.redraw_lock.acquire()
                 self._clear_widgets()
-                container_count = self.model.rows()
+                container_count = self.model.rows()    
                 if container_count:
                     for index in range(container_count):
                         widget = self.model.data(index).widget(self.model.data(index))
@@ -4821,10 +4845,13 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                         self._widgets.append(widget)
                         
                 else:
-                    input_type = self.model.input_type # InputType.JoystickAxis
+                    # input_type = self.model.input_type # InputType.JoystickAxis
                     label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}") # ({InputType.to_display_name(input_type)})")
-                    label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
-                    self.scroll_layout.addWidget(label)
+                    
+                    widget, _ = gremlin.ui.ui_common.getVContainer(label)
+                    widget.setContentsMargins(4,4,4,4)
+                    #widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+                    self.scroll_layout.addWidget(widget)
                 #self.scroll_layout.addStretch(1)
             finally:
                 self.redraw_lock.release()

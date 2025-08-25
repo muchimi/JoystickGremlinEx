@@ -14,6 +14,19 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T52)
+- Fix: state value change triggers a change event twice.
+- Fix: some empty containers would not show "blank" if no actions.
+- New: Control action enabled by default.
+- New: added control actions:
+	- Stop TTS: stops current TTS speech and clears current queue.
+	- Enable remote control (remote output off)
+	- Disable remote control (remote output on)
+	- Enable local control (local output on)
+	- Disable local control (local output off)
+	- Toggle remote (toggles remote control)
+	- Stop Profile
+
 ### (m76T51)
 - Improved: added option to map to TTS to clear any prior queued TTS messages when executed.  This won't stop TTS in progress but will remove queued TTS items when enabled. TTS takes time to "speak", so inbound TTS requests get stored in a queue.  This can cause significant lag by some actions as many triggers may have occurred while the TTS was speaking.
 - Improved: added hints to container and actions. Clicking on these help buttons will display information about the action or the container does.

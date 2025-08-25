@@ -239,12 +239,12 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
+        title = "Tempo (legacy):"
         if self.profile_data.is_valid() \
             and len(self.profile_data.action_sets) == 2 \
                 and None not in self.profile_data.action_sets:
-            return f"Tempo: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
-        else:
-            return "Tempo"
+            title += f"({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
+        return title
 
 
 class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):

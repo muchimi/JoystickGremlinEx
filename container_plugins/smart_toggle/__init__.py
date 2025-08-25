@@ -168,10 +168,10 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
+        title = "Smart Toggle: "
         if len(self.profile_data.action_sets) > 0:
-            return ", ".join(a.name for a in self.profile_data.action_sets[0])
-        else:
-            return "Smart Toggle"
+            title += ", ".join(a.name for a in self.profile_data.action_sets[0])
+        return title
 
 
 class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):

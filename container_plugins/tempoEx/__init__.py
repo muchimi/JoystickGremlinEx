@@ -487,12 +487,12 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
+        title = "TempoEx: "
         if self.profile_data.is_valid() \
             and len(self.profile_data.action_sets) == 2 \
                 and None not in self.profile_data.action_sets:
-            return f"TempoEx: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
-        else:
-            return "TempoEx"
+            title += f"({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
+        return title
         
    
 

@@ -1159,13 +1159,13 @@ class StateData(QtCore.QObject):
             return
         
         key = key.casefold().strip()
-        trigger = not key in self._data or self._data[key].value != value
+        #trigger = not key in self._data or self._data[key].value != value
         verbose = gremlin.config.Configuration().verbose_mode_state
         if verbose: syslog.info(f"STATE: [{key}] -> {value}")
         self._data[key].value = value
-        if emit and trigger:
-            self.changed.emit(self._data[key])   
-            QtWidgets.QApplication.processEvents()
+        # if emit and trigger:
+        #     self.changed.emit(self._data[key])   
+        #     QtWidgets.QApplication.processEvents()
     
     def description(self, key : str) -> str:
         ''' gets the description for the state '''

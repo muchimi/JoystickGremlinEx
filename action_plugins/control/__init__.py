@@ -26,7 +26,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import os
 import enum
-from gremlin.input_devices import ControlAction, remote_state
+from gremlin.types import ControlAction
 from gremlin.util import *
 import gremlin.util
 import psygnal
@@ -59,6 +59,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
         self.action_widget = gremlin.ui.ui_common.NoWheelComboBox()
+
         index = 0
         set_index = None
         for index, action in enumerate(ControlAction):
@@ -92,29 +93,38 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.device_guid = self.device_widget.currentData().device_guid
         self._update_input_list()
 
-        self.grid_widget = QtWidgets.QWidget()
-        self.grid_layout = QtWidgets.QGridLayout(self.grid_widget)
+        
+        self.grid_input_widget, grid_input_layout = gremlin.ui.ui_common.getGridContainer()
+
+        self.grid_action_widget, grid_action_layout = gremlin.ui.ui_common.getGridContainer()
 
         row = 0
-        self.grid_layout.addWidget(QtWidgets.QLabel("Action:"), row, 0)
-        self.grid_layout.addWidget(self.action_widget, row, 1)
-        row +=1
-        self.grid_layout.addWidget(QtWidgets.QLabel("Mode:"), row, 0)
-        self.grid_layout.addWidget(self.mode_selector, row, 1)
-        row +=1
-        self.grid_layout.addWidget(QtWidgets.QLabel("Device:"), row, 0)
-        self.grid_layout.addWidget(self.device_widget, row, 1)
-        row +=1
-        self.grid_layout.addWidget(QtWidgets.QLabel("Input:"), row, 0)
-        self.grid_layout.addWidget(self.input_widget, row, 1)
+        grid_action_layout.addWidget(QtWidgets.QLabel("Action:"), row, 0)
+        grid_action_layout.addWidget(self.action_widget, row, 1)
+        grid_action_layout.addWidget(QtWidgets.QWidget(),row, 2)
 
-        self.grid_layout.addWidget(QtWidgets.QLabel(),row, 2)
-        self.grid_layout.setColumnStretch(3,1)
-
-        self.main_layout.addWidget(self.grid_widget)
+        row = 0
+        grid_input_layout.addWidget(QtWidgets.QLabel("Mode:"), row, 0)
+        grid_input_layout.addWidget(self.mode_selector, row, 1)
+        grid_input_layout.addWidget(QtWidgets.QWidget(),row, 2)
+        row +=1
+        grid_input_layout.addWidget(QtWidgets.QLabel("Device:"), row, 0)
+        grid_input_layout.addWidget(self.device_widget, row, 1)
+        row +=1
+        grid_input_layout.addWidget(QtWidgets.QLabel("Input:"), row, 0)
+        grid_input_layout.addWidget(self.input_widget, row, 1)
 
         
+        grid_action_layout.setColumnStretch(2,2)
+        grid_input_layout.setColumnStretch(2,2)
+
+        self.main_layout.addWidget(self.grid_action_widget)
+        self.main_layout.addWidget(self.grid_input_widget)
+
+        gremlin.ui.ui_common.synchronize_grids([self.grid_action_widget, self.grid_input_widget])
+
         
+        self._update_ui()
         
         
 
@@ -234,6 +244,18 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _action_changed_cb(self):
         action = self.action_widget.currentData()
         self.action_data.action = action
+        gremlin.config.Configuration().last_control_action = action
+        self._update_ui()
+        
+
+    def _update_ui(self):
+        ''' updates UI config '''
+        action = self.action_data.action
+        show_device = action in (ControlAction.EnableInput, 
+                                 ControlAction.EnableInput,
+                                 ControlAction.ToggleInput)
+        self.grid_input_widget.setVisible(show_device)
+
 
                     
     @QtCore.Slot()
@@ -277,6 +299,7 @@ class ControlFunctor(gremlin.base_conditions.AbstractFunctor):
     def __init__(self, action_data, parent = None):
         super().__init__(action_data, parent)
         self.action_data = action_data
+     
 
 
     def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
@@ -284,7 +307,40 @@ class ControlFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.is_pressed is None:
             return
         is_pressed = event.is_pressed
+        el = gremlin.event_handler.EventListener()
         if is_pressed:
+            match self.action_data.action:
+                case ControlAction.TTSAbort:
+                    tts = gremlin.tts.TextToSpeech()
+                    tts.abort()
+                    return True
+                case ControlAction.ProfileStop:
+                    # stop the profile
+                    el.request_profile_stop.emit(None)
+                    return True
+                case ControlAction.LocalDisable:
+                    # disable local output
+                    input_devices.remote_state.setLocal(False)
+                    return True
+                case ControlAction.LocalEnable:
+                    # disable local output
+                    input_devices.remote_state.setLocal(True)
+                    return True
+                case ControlAction.RemoteDisable:
+                    # disable local output
+                    input_devices.remote_state.setRemote(False)
+                    return True
+                case ControlAction.RemoteEnable:
+                    # disable local output
+                    input_devices.remote_state.setRemote(True)
+                    return True
+                case ControlAction.RemoteToggle:
+                    # disable local output
+                    input_devices.remote_state.toggleRemote()
+                    return True
+
+
+
             # find the actionable input
             verbose = gremlin.config.Configuration().verbose
             profile = gremlin.shared_state.current_profile
@@ -343,10 +399,12 @@ class Control(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.action : ControlAction = ControlAction.ToggleInput
+        self.action : ControlAction = ControlAction.TTSAbort
         self.mode = gremlin.shared_state.edit_mode # selected mode
         self.device_guid = None
         self.target_input_item = None
+        self.setPriority(899) # run ahead of other actions in the same content but before mode change 
+      
 
     def icon(self):
         return "fa6s.gears"
@@ -362,6 +420,13 @@ class Control(gremlin.base_profile.AbstractAction):
         self.target_input_item = None
 
         #input_items = self._get_input_items()
+        if "action" in node.attrib:
+            action = safe_read(node,"action", str, 0)
+            action = ControlAction.from_string(action)
+            if action is None:
+                action = ControlAction.TTSAbort
+            
+            self.action = action
         
         if "mode" in node.attrib:
             self.mode = node.get("mode")
@@ -378,6 +443,9 @@ class Control(gremlin.base_profile.AbstractAction):
     
     def _generate_xml(self):
         node = ElementTree.Element(Control.tag)
+
+        node.set("action", safe_format(self.action.name.casefold(), str))
+
         if self.mode is not None:
             node.set("mode", self.mode)
         if self.device_guid is not None:
@@ -396,9 +464,10 @@ class Control(gremlin.base_profile.AbstractAction):
     
 
     def _is_valid(self):
-        if self.device_guid is not None and self.target_input_item is not None:
-            return True
-        return False
+        return True
+        # if self.device_guid is not None and self.target_input_item is not None:
+        #     return True
+        # return False
 
 
 

@@ -1755,6 +1755,16 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def callbackKey(self):
         ''' callback key unique to the input type, input id '''
         return (self._device_guid, self._input_type, self._input_id)
+    
+    @property
+    def hasActions(self):
+        ''' true if the input item has at least one action '''
+        for container in self.containers:
+            for action_set in container.action_sets:
+                if action_set:
+                    return True
+        return False
+        
 
     @property
     def hasCalibration(self):
@@ -2246,6 +2256,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
             
             entry.from_xml(child, data, extra_data)
+            # verify the entry has data
             self.add_container(entry)
             if hasattr(entry, "action_model"):
                 entry.action_model = self.containers

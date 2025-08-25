@@ -215,6 +215,53 @@ class xIntEnum(IntEnum):
     
     def __hash__(self) -> int:
         return hash(self.value)
+    
+class ControlAction(IntEnum):
+    ''' defines the available control actions for the control plugin'''
+    EnableInput = 0 # enables an input
+    DisableInput = 1 # disable an input
+    ToggleInput = 2 # toggle the input
+    TTSAbort = 3 # abort current text to speech (clears queue and aborts current speech if any)
+    RemoteEnable = 4 # enable remote output
+    RemoteDisable = 5 # disable remote output
+    RemoteToggle = 6 # toggle remote control
+    LocalEnable = 7 # enable local output
+    LocalDisable = 8 # disable local output
+    ProfileStop = 9 # stop current profile
+
+
+    @staticmethod
+    def to_string(action):
+        return action.name.casefold()
+    
+    @staticmethod
+    def from_string(name):
+        name = name.casefold()
+        for action in ControlAction:
+            if action.name.casefold() == name:
+                return action
+        return None
+    
+    
+    @staticmethod
+    def to_display_name(action):
+        return _control_action_display[action]
+        
+        
+_control_action_display = {
+    ControlAction.EnableInput: "Enable Input",
+    ControlAction.DisableInput: "Disable Input",
+    ControlAction.ToggleInput: "Toggle Input",
+    ControlAction.TTSAbort: "Stop TTS",
+    ControlAction.RemoteEnable: "Enable remote control",
+    ControlAction.RemoteDisable: "Disable remote control",
+    ControlAction.LocalEnable: "Enable local control",
+    ControlAction.LocalDisable: "Disable local control",
+    ControlAction.ProfileStop: "Stop profile",
+    ControlAction.RemoteToggle: "Toggle Remote",
+}
+
+
         
 
 class DeviceType(IntEnum):

@@ -2525,15 +2525,15 @@ class ActionSelector(QtWidgets.QWidget):
 
         #all_entries = [entry.name for entry in gremlin.plugin_manager.ActionPlugins().repository.values()]
         for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
-            if entry.tag == "map_to_state":
-                pass
+            # if entry.tag == "gremlin-control":
+            #     pass
             if not entry.input_types or input_type in entry.input_types:
                 if convert_vjoy and entry.name == "Remap":
                     continue
                 elif convert_curve and entry.name == "Response Curve":
                     continue
-                if entry.name == "Control" and not control_enabled:
-                    continue
+                # if entry.name == "Control" and not control_enabled:
+                #     continue
                 action_list.append(entry.name)
         return sorted(action_list)
 

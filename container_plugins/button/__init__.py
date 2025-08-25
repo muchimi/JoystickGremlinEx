@@ -216,9 +216,9 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         if self.profile_data.is_valid():
-            return f"ButtonContainer: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
+            return f"Button: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
         else:
-            return "ButtonContainer"
+            return "Button:"
 
 
 class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):

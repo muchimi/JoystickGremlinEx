@@ -2407,3 +2407,14 @@ class Configuration(QtCore.QObject):
     @simconnect_enabled.setter
     def simconnect_enabled(self, value: bool):
         self._set_data("simconnect_enabled", value)
+
+    @property
+    def last_control_action(self):
+        import gremlin.types
+        value =  self._get_data("last_control_action", gremlin.types.ControlAction.TTSAbort)
+        return gremlin.types.ControlAction(value)
+    @last_control_action.setter
+    def last_control_action(self, value):
+        self._set_data("last_control_action", value)
+
+        

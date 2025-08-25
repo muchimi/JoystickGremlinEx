@@ -199,10 +199,10 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
+        title = "Hat Buttons: "
         if len(self.profile_data.action_sets) > 0:
-            return ", ".join(a.name for a in self.profile_data.action_sets[0])
-        else:
-            return "Hat Buttons"
+            title += ", ".join(a.name for a in self.profile_data.action_sets[0])
+        return title
 
     def _change_button_type(self, state):
         """Handles changing the number of buttons being used.

@@ -224,7 +224,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         if self.profile_data.is_valid():
             return f"Double Tap: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
         else:
-            return "DoubleTap"
+            return "Double Tap"
 
 
 class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):

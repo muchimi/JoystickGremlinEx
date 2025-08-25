@@ -170,6 +170,9 @@ class TextToSpeech:
             self.engine.setProperty('rate', new_rate)
             self.engine.say(text)
 
+            verbose = gremlin.config.Configuration().verbose
+            if verbose: syslog.info(f"TTS: Engine speech requested: {text}")
+
             try:
                 if not self.engine._inLoop:
                     self.engine.runAndWait()
@@ -180,6 +183,12 @@ class TextToSpeech:
         except Exception as err:
             syslog.error(f"Error in TTS: {err}")
 
+    def abort(self):
+        ''' aborts current speech and resets the queue '''
+        self.engine.stop()
+        self._lock.acquire_lock()
+        self._queue.clear()
+        self._lock.release_lock()
 
     def stop(self):
         ''' stops any speech '''
@@ -198,7 +207,7 @@ class TextToSpeech:
             self._started = False
 
         except Exception as err:
-            logging.getLogger(f"system").error(f"Error in TTS: {err}")
+            syslog.error(f"Error in TTS: {err}")
 
     def start(self):
         ''' starts the loop '''
