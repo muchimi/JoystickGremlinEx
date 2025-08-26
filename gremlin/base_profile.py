@@ -640,15 +640,6 @@ class AbstractContainer(ProfileData):
         if "container_id" in node.attrib:
             self._id = node.get("container_id")
 
-        # import_data = gremlin.base_profile.ProfileImportData()    
-        # if self._id in import_data.used_ids:
-        #     new_id = gremlin.util.get_guid()
-        #     verbose = gremlin.config.Configuration().verbose
-        #     if verbose: syslog.warning(f"PROFILE: duplicate ID found - Container: [{id}] - assigning new id: [{new_id}]")
-        #     self._id = new_id
-        
-        # import_data.used_ids[self._id] = self
-
 
         comment = None
         if "comment" in node.attrib:
@@ -694,7 +685,8 @@ class AbstractContainer(ProfileData):
             elif child.tag == "action-set":
                 action_set = ActionSet()
                 self._parse_action_xml(child, action_set, data, extra_data)
-                self.action_sets.append(action_set)
+                if action_set:
+                    self.action_sets.append(action_set)
  
     def _parse_action_xml(self, node, action_set, data = None, extra_data = None):
         """Parses the XML content related to actions in an action-set.

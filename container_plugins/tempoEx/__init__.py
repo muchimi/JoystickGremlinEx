@@ -592,10 +592,11 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         assert container_node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container,"Logic error: Node is not a container node"
 
         group_node = container_node.children[0] # group node is the only child of the container node
-        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set]
-        self.short_nodes = [node for node in self.action_set_nodes if node.has_actions and node.action_set.data == "short"]
-        self.long_nodes = [node for node in self.action_set_nodes if node.has_actions and node.action_set.data == "long"]
-        self.dtap_nodes = [node for node in self.action_set_nodes if node.has_actions and node.action_set.data == "double"]
+        action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set]
+        self.action_set_nodes = [node for node in action_set_nodes if node.has_actions and node.action_set.data]
+        self.short_nodes = [node for node in self.action_set_nodes if node.action_set.data == "short"]
+        self.long_nodes = [node for node in self.action_set_nodes if node.action_set.data == "long"]
+        self.dtap_nodes = [node for node in self.action_set_nodes if node.action_set.data == "double"]
 
         # true if double tap enabled if we have double tap nodes to execute and not running in release mode
 
@@ -767,80 +768,115 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
             
             if self.verbose: syslog.info(f"press detected trigger mode: {self.trigger_mode}")
 
-            if self.dtap_enabled:
-                if not self.trigger_mode:
+            if self.activate_on == "press":
+                # double tap not active in this mode
 
-                    # assume single tap
-                    self.trigger_mode = "single" # single tap detected
-
-                    # trigger short press unless we detect another click or release
-                    #if verbose: syslog.info("start short press timer")
-                    self.short_press_timer = threading.Timer(self.dtap_offset, lambda: self._timer_short_press(self.event_press, self.value_press, extra_data))
-                    self.short_press_timer.start()
+                # trigger long press (timers are reset if a release comes)
+                if verbose: syslog.info("start long press timer")
+                self.long_press_timer = threading.Timer(self.delay, lambda: self._timer_long_press_mode_press(self.event_press, self.value_press, extra_data))
+                self.long_press_timer.start()
 
 
-                    # trigger long press (timers are reset if a release comes)
-                    if verbose: syslog.info("start long press timer")
-                    self.long_press_timer = threading.Timer(self.delay, lambda: self._timer_long_press(self.event_press, self.value_press, extra_data))
-                    self.long_press_timer.start()
 
+            else:
+                # activate on release mode
+
+
+                if self.dtap_enabled:
+                    if not self.trigger_mode:
+
+                        # assume single tap
+                        self.trigger_mode = "single" # single tap detected
+
+                        # trigger short press unless we detect another click or release
+                        #if verbose: syslog.info("start short press timer")
+                        self.short_press_timer = threading.Timer(self.dtap_offset, lambda: self._timer_short_press(self.event_press, self.value_press, extra_data))
+                        self.short_press_timer.start()
+
+
+                        # trigger long press (timers are reset if a release comes)
+                        if verbose: syslog.info("start long press timer")
+                        self.long_press_timer = threading.Timer(self.delay, lambda: self._timer_long_press(self.event_press, self.value_press, extra_data))
+                        self.long_press_timer.start()
+
+                    else:
+                        # detected another click while short press timer running
+                        if self.short_press_timer:
+                            self.short_press_timer.cancel()
+                            self.short_press_timer = None
+                        
+                        #if self.trigger_mode == "single":
+                            # double tap trigger
+                            #if verbose: syslog.info("double tap detect")
+                        self.trigger_mode = "double"
+                    
+                        
+                        
                 else:
-                    # detected another click while short press timer running
+                    # single tap
+                    #if verbose: syslog.info("single tap detect")
+                    self.trigger_mode = "short" # assume a short tap, if the timer lapses, will be set to long tap
                     if self.short_press_timer:
                         self.short_press_timer.cancel()
                         self.short_press_timer = None
                     
-                    #if self.trigger_mode == "single":
-                        # double tap trigger
-                        #if verbose: syslog.info("double tap detect")
-                    self.trigger_mode = "double"
-                
-                    
-                    
-            else:
-                # single tap
-                #if verbose: syslog.info("single tap detect")
-                self.trigger_mode = "short" # assume a short tap, if the timer lapses, will be set to long tap
-                if self.short_press_timer:
-                    self.short_press_timer.cancel()
-                    self.short_press_timer = None
-                
-                # trigger long press (timers are reset if a release comes)
-                #if verbose: syslog.info("start long press timer")
-                self.long_press_timer = threading.Timer(self.delay, lambda: self._timer_long_press(self.event_press, self.value_press, extra_data))
-                self.long_press_timer.start()
+                    # trigger long press (timers are reset if a release comes)
+                    #if verbose: syslog.info("start long press timer")
+                    self.long_press_timer = threading.Timer(self.delay, lambda: self._timer_long_press(self.event_press, self.value_press, extra_data))
+                    self.long_press_timer.start()
 
             self.start_time = time_now # reset start
 
         else:
-
             # release
 
-            self.trigger_release = True # indicate a release trigger occured
-
-            if self.long_press_timer:
-                #if self.verbose: syslog.info("stop long press timer")
-                self.long_press_timer.cancel()
-                self.long_press_timer = None
-
-            if self.verbose: syslog.info(f"release detected: {self.trigger_mode}")
-
-            if self.trigger_mode:
-                # release the corresponding press
+            if self.activate_on == "press":
+                # kill long press timer
                 
-                match self.trigger_mode:
-                    case "short":
-                        # short release
-                        self._short_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
-                        self.trigger_mode = None
-                    case "double":
-                        # double tap
-                        self._double_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
-                        self.trigger_mode = None
-                    case "long":
-                        # long release
-                        self._long_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
-                        self.trigger_mode = None
+                if self.long_press_timer:
+                    # release occured before long press timer finished
+                    self.long_press_timer.cancel()
+                    self.long_press_timer = None
+
+                if not self.trigger_mode:
+                    # long press didn't execute, trigger short press release cycle
+                    self._short_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
+
+                elif self.trigger_mode == "long":
+                    # long press was already triggered, release it on release
+                    self._trigger_long_press(event, value, extra_data)
+                
+                self.trigger_mode = None # reset
+
+            else:
+                # release mode
+            
+
+                self.trigger_release = True # indicate a release trigger occured
+
+                if self.long_press_timer:
+                    #if self.verbose: syslog.info("stop long press timer")
+                    self.long_press_timer.cancel()
+                    self.long_press_timer = None
+
+                if self.verbose: syslog.info(f"release detected: {self.trigger_mode}")
+
+                if self.trigger_mode:
+                    # release the corresponding press
+                    
+                    match self.trigger_mode:
+                        case "short":
+                            # short release
+                            self._short_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
+                            self.trigger_mode = None
+                        case "double":
+                            # double tap
+                            self._double_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
+                            self.trigger_mode = None
+                        case "long":
+                            # long release
+                            self._long_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
+                            self.trigger_mode = None
 
         return False # stop execution because it's handled internally
     
@@ -867,6 +903,14 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         if self.trigger_release:
             self.trigger_mode = None
             self._long_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
+
+
+    def _timer_long_press_mode_press(self, event, value, extra_data):
+        ''' short press timer callback for pressed mode '''
+        # trigger the long press 
+        self.long_press_timer = None
+        self.trigger_mode = "long"
+        self._trigger_long_press(event, value, extra_data)
 
 
     def _short_press(self, event_p, value_p, event_r, value_r, extra_data):

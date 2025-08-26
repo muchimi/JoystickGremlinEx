@@ -1201,16 +1201,19 @@ class ActionSetView(ui_common.AbstractView):
 
         #self.main_layout.addWidget(self.group_widget)
 
-        left_panel, left_layout = gremlin.ui.ui_common.getHContainer()
-        right_panel, right_layout = gremlin.ui.ui_common.getHContainer()
+        left_panel, left_layout = gremlin.ui.ui_common.getVContainer()
+        right_panel, right_layout = gremlin.ui.ui_common.getVContainer()
         right_panel.setMaximumWidth(0) # use no space by default unless needed
 
         action_container, action_layout = gremlin.ui.ui_common.getGridContainer()
         action_layout.addWidget(left_panel, 0, 0)
         action_layout.addWidget(right_panel, 0, 1)
+
+        add_action_container, add_action_layout = gremlin.ui.ui_common.getVContainer()
         
 
         self.main_layout.addWidget(action_container)
+        self.main_layout.addWidget(add_action_container)
 
         self.setObjectName(f"ActionSetView: {label}")
 
@@ -1246,7 +1249,7 @@ class ActionSetView(ui_common.AbstractView):
             self.action_selector.action_added.connect(self._add_action)
             self.action_selector.action_paste.connect(self._paste_action)
             widget,_ = gremlin.ui.ui_common.getHContainer(self.action_selector)
-            left_layout.addWidget(widget)
+            add_action_layout.addWidget(widget)
             
 
         # self.main_layout.addWidget(group_widget)

@@ -264,9 +264,8 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         self.autorelease_delay = container.autorelease_delay
         self.long_nodes = []
         self.short_nodes = []
+        self.trigger_mode = None 
 
-        # el = gremlin.event_handler.EventListener()
-        # el.profile_start.connect(self._profile_start)
 
     def profile_started(self):
         # reset any prior values before start
@@ -287,6 +286,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
         self.short_nodes = [self.action_set_nodes[0]]
         self.long_nodes = [self.action_set_nodes[1]]
+        self.trigger_mode = None 
 
 
     def _trigger_short_press(self, event, value, extra_data : dict = None):
@@ -326,43 +326,28 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
             self.timer = threading.Timer(self.delay, self._long_press)
             self.timer.start()
 
-            if self.activate_on == "press":
-                #print ("tempo short (activate on press)")
-                #self.short_set.process_event(event, value)
-                self._trigger_short_press(event, value, extra_data)
-
                 
         else:
             # input release event
-            
-            if (self.start_time + self.delay) > time.time():
+
+            if self.trigger_mode == "long":
+                # trigger long press release
+                self._trigger_long_press(event, value, extra_data)
+            else:
                 if self.timer:
                     self.timer.cancel()
+                    self.timer = None
+                thread = threading.Thread(target=lambda: self._short_press(
+                    self.event_press, # send a press event to the functors
+                    self.value_press,
+                    event,
+                    value
+                ), daemon=False)
+                thread.name = "TEMPO short"
+                thread.start()
 
-                if self.activate_on == "release":
-                    #print ("tempo short (activate on release)")
-
-                    thread = threading.Thread(target=lambda: self._short_press(
-                        self.event_press, # send a press event to the functors
-                        self.value_press,
-                        event,
-                        value
-                    ), daemon=False)
-                    thread.name = "TEMPO release"
-                    thread.start()
-                else:
-                    #self.short_set.process_event(event, value)
-                    self._trigger_short_press(event, value, extra_data)
-
-            # Long press
-            else:
-                #self.long_set.process_event(event, value)
-                self._trigger_long_press(event, value, extra_data)
-                if self.activate_on == "press":
-                    #self.short_set.process_event(event, value)
-                    self._trigger_short_press(event, value, extra_data)
-
-            self.timer = None
+            
+            self.trigger_mode = None
 
         return False # stop execution as the logic is internal to trigger the other nodes
 
@@ -382,6 +367,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
 
 
     def _long_press(self):
+        self.trigger_mode = "long" # indicate long press triggered
         self._trigger_long_press(self.event_press, self.value_press)
 
 
