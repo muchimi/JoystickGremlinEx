@@ -174,7 +174,6 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
                     
                     self.data.input_id = selected_input_id
 
-
         if not self._merge_enabled:
             return
 
@@ -282,6 +281,11 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
                 self.merge_selector_input_widget.setCurrentIndex(select_index)
             
             self.last_merge_device_id = device.device_id
+
+        # update merge data block
+        self.data.device_guid = device.device_guid
+        self.data.device_id = device.device_id
+        self.data.input_id = self.merge_selector_input_widget.currentData()
 
 
         
@@ -4578,8 +4582,13 @@ class MergeData():
         node = ElementTree.Element("merge-data")
         node.set("device-id", self.device_id)
         node.set("input-id", safe_format(self.input_id, int))
-        node.set("operation", safe_format(MergeOperationType.to_string(self.operation), str))
+        operation = MergeOperationType.to_string(self.operation)
+        node.set("operation", safe_format(operation, str))
         node.set("invert", safe_format(self.invert, bool))
+        device = gremlin.joystick_handling.device_info_from_guid(self.device_id)
+        comment = f"Merged Device: {device.name}/[{self.device_id}] Axis: [{self.input_id}]/{device.get_axis_name(self.input_id)} Operation: [{operation}]"
+        node_comment = ElementTree.Comment(comment)
+        node.append(node_comment)
         return node
 
     def from_xml(self, node):
@@ -4878,12 +4887,13 @@ Supports axis merging, curved output, command, hat and button mappings.
             for data in self._merge_data:
                 merge_device_id = data.device_id
                 merge_input_id = data.input_id
+                merge_device_guid = data.device_guid
                 merge_input_type = InputType.JoystickAxis
-                if not merge_device_id or merge_input_id is None:
+                if not merge_device_id or merge_input_id is None or merge_device_guid is None:
                     # no data
                     continue
-                merge_device_guid = data.device_guid
-
+                
+                
                 v2 = None
 
                 if gremlin.joystick_handling.is_hardware_device(merge_device_guid):

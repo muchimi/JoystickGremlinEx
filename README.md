@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T53A)
+- Fix: merge data could be blank
+- Fix: hardened handling of unexpected data in code runner and device type detection
+
 ### (m76T53)
 - Fix: temporary mode switch display and mode selection
 - Fix: mode switch could store incorrect initial mode

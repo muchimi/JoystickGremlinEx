@@ -401,41 +401,63 @@ class CodeRunner:
  
 
             # Create merge axis callbacks
-            for entry in profile.merge_axes:
-                merge_axis = MergeAxis(
-                    entry["vjoy"]["vjoy_id"],
-                    entry["vjoy"]["axis_id"],
-                    entry["operation"]
-                )
-                self._merge_axes.append(merge_axis)
+            try:
+                if profile.merge_axes:
+                    syslog.warning("CodeRunner: MERGE AXIS: detected legacy merge axis in profile - use merge feature in Vjoy remap instead.  ")
+                
+                    # for entry in profile.merge_axes:
+                        
 
-                # Lower axis callback
-                event = gremlin.event_handler.Event(
-                    event_type=InputType.JoystickAxis,
-                    device_guid=entry["lower"]["device_guid"],
-                    identifier=entry["lower"]["axis_id"]
-                )
-                self.event_handler.add_callback(
-                    event.device_guid,
-                    entry["mode"],
-                    event,
-                    merge_axis.update_axis1,
-                    False
-                )
+                    #     if not "vjoy" in entry:
+                    #         syslog.error("vjoy entry not found in merge axis.")
+                    #         break
+                    #     if not "vjoy_id" in entry["vjoy"]:
+                    #         syslog.error("vjoy_id entry not found in merge axis.")
+                    #         break
+                    #     if not "axis_id" in entry["vjoy"]:
+                    #         syslog.error("axis_id entry not found in merge axis.")
+                    #         break
+                    #     if not "operation" in entry:
+                    #         syslog.error("operation entry not found in merge axis.")
+                    #         break
 
-                # Upper axis callback
-                event = gremlin.event_handler.Event(
-                    event_type=InputType.JoystickAxis,
-                    device_guid=entry["upper"]["device_guid"],
-                    identifier=entry["upper"]["axis_id"]
-                )
-                self.event_handler.add_callback(
-                    event.device_guid,
-                    entry["mode"],
-                    event,
-                    merge_axis.update_axis2,
-                    False
-                )
+                    #     merge_axis = MergeAxis(
+                    #         entry["vjoy"]["vjoy_id"],
+                    #         entry["vjoy"]["axis_id"],
+                    #         entry["operation"]
+                    #     )
+                    #     self._merge_axes.append(merge_axis)
+
+                    #     # Lower axis callback
+                    #     event = gremlin.event_handler.Event(
+                    #         event_type=InputType.JoystickAxis,
+                    #         device_guid=entry["lower"]["device_guid"],
+                    #         identifier=entry["lower"]["axis_id"]
+                    #     )
+                    #     self.event_handler.add_callback(
+                    #         event.device_guid,
+                    #         entry["mode"],
+                    #         event,
+                    #         merge_axis.update_axis1,
+                    #         False
+                    #     )
+
+                    #     # Upper axis callback
+                    #     event = gremlin.event_handler.Event(
+                    #         event_type=InputType.JoystickAxis,
+                    #         device_guid=entry["upper"]["device_guid"],
+                    #         identifier=entry["upper"]["axis_id"]
+                    #     )
+                    #     self.event_handler.add_callback(
+                    #         event.device_guid,
+                    #         entry["mode"],
+                    #         event,
+                    #         merge_axis.update_axis2,
+                    #         False
+                    #     )
+            except Exception as err:
+                syslog.error("Error occured in CodeRunner MergeAxis - legacy merge axis disabled")
+                syslog.error(err)
 
             # setup callbacks for state data changes
             sd = gremlin.ui.state_device.StateData()

@@ -280,23 +280,29 @@ class DeviceType(IntEnum):
 
     @staticmethod
     def to_string(value):
-        try:
+        if value in _DeviceType_to_string_lookup:
             return _DeviceType_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
+        syslog.error(f"DeviceType lookup failed in to_string(): unable to find type: [{value}] - defaulting to NotSet")
+        return "invalid"
+        
 
     @staticmethod
     def to_enum(value):
-        try:
+        if isinstance(value, int):
+            return DeviceType.VJoy
+        value = value.casefold()
+        if value in _DeviceType_to_enum_lookup:
             return _DeviceType_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
+        syslog.error(f"DeviceType lookup failed in to_enum(): unable to find type: [{value}] - defaulting to NotSet")
+        return DeviceType.NotSet
+        
         
     @staticmethod
     def to_display_name(value):
-        return _DeviceType_to_display_name[value]
-    
-  
+        if value in _DeviceType_to_display_name:
+            return _DeviceType_to_display_name[value]
+        syslog.error(f"DeviceType lookup failed in to_display_name(): unable to find : [{value}]")
+        return f"Unknown device type: [{value}]"
 
 _DeviceType_to_display_name = {
     DeviceType.NotSet: "(invalid)",
