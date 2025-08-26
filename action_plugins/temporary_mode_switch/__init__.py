@@ -51,60 +51,68 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
         self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
-        self.mode_selector_widget.currentIndexChanged.connect(self._mode_list_changed_cb)
+        self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
         self.main_layout.addWidget(self.mode_selector_widget)
+        self.ec = gremlin.execution_graph.ExecutionContext()
+        el = gremlin.event_handler.EventListener()
+        el.edit_mode_changed.connect(self._update_modes)
+        el.execution_context_changed.connect(self._update_modes)
         self._update_modes()
 
-        el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.connect(self._update_modes)        
-        el.profile_modes_changed.connect(self._update_modes)
 
+    @QtCore.Slot()
     def _update_modes(self):
-
-        current_mode = self.action_data.mode_name
-        index = 0
-        select_index = None
-
-        # remove the current mode so we cannot switch to ourselves
-        ec = gremlin.execution_graph.ExecutionContext()
-        modes = ec.getModeNames(as_tuple=True, include_current = False) # (display, mode)
-        if not modes:
-            # allow to select self if that's the only option
-            modes = ec.getModeNames(as_tuple=True)
-
-
+        ''' called when mode list needs to be updated '''
+        # update the list of available modes 
+        if not Shiboken.isValid(self.mode_selector_widget):
+            return
         with QtCore.QSignalBlocker(self.mode_selector_widget):
+            current_mode = self.action_data.mode # current mode
             self.mode_selector_widget.clear()
+            
+
+            # remove the current mode so we cannot switch to ourselves
+            
+            modes = self.ec.getModeNames(as_tuple=True, include_current = False) # (display, mode)
+            if not modes:
+                # allow to select self if that's the only option (display, mode)
+                modes = self.ec.getModeNames(as_tuple=True)
+                
+            index = 0
+            select_index = None
             for display, mode in modes:
+                #print (f"Mode: {display} -> {mode}")
                 self.mode_selector_widget.addItem(display, mode)
-                if current_mode and select_index is None and mode == current_mode:
+                if select_index is None and mode == current_mode and current_mode is not None:
                     select_index = index
                 index += 1
-
             if select_index is not None:
-                self.mode_selector_widget.setCurrentIndex(select_index)
-            elif self.mode_selector_widget.count():
-                self.mode_selector_widget.setCurrentIndex(0)
+                with QtCore.QSignalBlocker(self.mode_selector_widget):
+                    self.mode_selector_widget.setCurrentIndex(select_index)
 
+        # ensure the displayed mode is saved
+        mode = self.mode_selector_widget.currentData()
+        self.action_data.mode = mode                
 
-    def _mode_list_changed_cb(self):
-        self.action_data.mode_name = self.mode_selector_widget.currentText()
-        self.action_modified.emit()
+    def _mode_selected_changed(self):
+        if not Shiboken.isValid(self.mode_selector_widget):
+            return
+        mode = self.mode_selector_widget.currentData()
+        self.action_data.mode = mode                
+
 
     def _populate_ui(self):
         assert self.mode_selector_widget.count() > 0
-        mode = self.action_data.mode_name
+        mode = self.action_data.mode
         if mode is None:
             index = 0
         else:
             index = self.mode_selector_widget.findData(mode)
             if index == -1:
                 index = 0
-        self.mode_selector_widget.setCurrentIndex(index)
-        if not mode:
-            # set the default mode if not set
-            self.action_data.mode_name = self.mode_selector_widget.currentText()
 
+        self.mode_selector_widget.setCurrentIndex(index)
+            
 
 class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
 
@@ -116,27 +124,14 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
         import gremlin.control_action
         import gremlin.shared_state
         verbose = gremlin.config.Configuration().verbose
-        if verbose:
-            syslog = logging.getLogger("system")
-        if verbose: 
-            # get attached mode
-            mode = self.action_data.get_mode()
-            device_name = self.action_data.get_device_name()
-            input_id = self.action_data.get_input_id()
-            input_type = self.action_data.get_input_type()
 
-            syslog.info(f"Temporary mode change event:")
-            syslog.info(f"\tAttached device: {device_name} input type: {InputType.to_display_name(input_type)} input: {input_id} mode: {mode}")
-            syslog.info(f"\tevent pressed: [{event.is_pressed}]  saved restore mode: [{self.action_data.restore_mode}]")
-            syslog.info(f"\tcurrent profile mode: {gremlin.shared_state.runtime_mode} mode to set: {self.action_data.mode_name}")
+
+
         if event.is_pressed:
-            next_mode = self.action_data.mode_name
+            next_mode = self.action_data.mode
             current_mode = gremlin.shared_state.runtime_mode
             if next_mode != current_mode:
-                if verbose: syslog.info(f"Temporary mode change: saved current mode [{current_mode}] as the restore mode")
                 self.action_data.restore_mode = current_mode
-                if verbose: syslog.info(f"Temporary mode change: change mode to [{next_mode}] (the restore mode is [{current_mode}])")
-                if verbose: syslog.info(f"Temporary mode change: register callback")
                 gremlin.input_devices.ButtonReleaseActions().register_callback(lambda : self._restore_callback(current_mode), event)
                 gremlin.event_handler.EventHandler().change_mode(next_mode)
              
@@ -145,6 +140,19 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
                 if verbose: syslog.info(f"Temporary mode change: [{current_mode}] (no change because current mode is the same as the requested temporary mode)")
                 self.action_data.restore_mode = None
         
+
+            if verbose: 
+                # get attached mode
+                mode = self.action_data.get_mode()
+                device_name = self.action_data.get_device_name()
+                input_id = self.action_data.get_input_id()
+                input_type = self.action_data.get_input_type()
+
+                syslog.info(f"Temporary mode change event:")
+                syslog.info(f"\tAttached device: {device_name} input type: {InputType.to_display_name(input_type)} input: {input_id} mode: {mode}")
+                syslog.info(f"\tevent pressed: [{event.is_pressed}]  saved restore mode: [{self.action_data.restore_mode}]")
+                syslog.info(f"\tcurrent profile mode: {gremlin.shared_state.runtime_mode} mode to set: {self.action_data.mode}")
+
         return True
     
     def _restore_callback(self, mode):
@@ -165,13 +173,7 @@ When the trigger is released, the mode reverts to the prior mode.'''
 
 
     default_button_activation = (True, False)
-    # override default allowed inputs here
-    # input_types = [
-    #     InputType.JoystickAxis,
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
+
 
     widget = TemporaryModeSwitchWidget
     functor = TemporaryModeSwitchFunctor
@@ -183,6 +185,7 @@ When the trigger is released, the mode reverts to the prior mode.'''
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         self.setPriority(999)
         profile = gremlin.shared_state.current_profile
         current_mode = gremlin.shared_state.edit_mode
@@ -194,21 +197,32 @@ When the trigger is released, the mode reverts to the prior mode.'''
                 mode = node.children[0].name
             elif node.parent:
                 mode = node.parent.name
-            else:
-                mode = current_mode
-        
-        self.mode_name = mode
-        self.parent = parent
+        self._mode = mode
+        self.restore_mode = None # set at runtime - holds the mode to restore
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+    
+    @mode.setter
+    def mode(self, value: str):
+        if value != self._mode:
+            self._mode = value
+            syslog = logging.getLogger("system")
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                input_item = self.get_input_item()
+                syslog.info(f"TEMPSWITCHMODE: mode set to: {value}  input: {str(input_item)}")
+
         self.restore_mode = None
     
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"Switch to: {self.mode_name}"
+        return f"Switch to: {self._mode}"
 
     def icon(self):
         return "ei.fork"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         return self.get_input_type() in [
@@ -217,11 +231,11 @@ When the trigger is released, the mode reverts to the prior mode.'''
         ]
 
     def _parse_xml(self, node, data = None, extra_data = None):
-        self.mode_name = node.get("name")
+        self._mode = node.get("name")
 
     def _generate_xml(self):
         node = ElementTree.Element("temporary-mode-switch")
-        node.set("name", self.mode_name)
+        node.set("name", self._mode)
         return node
 
     def _is_valid(self):

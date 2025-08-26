@@ -84,13 +84,18 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
             index = 0
             select_index = None
             for display, mode in modes:
-                print (f"Mode: {display} -> {mode}")
+                #print (f"Mode: {display} -> {mode}")
                 self.mode_selector_widget.addItem(display, mode)
                 if select_index is None and mode == current_mode and current_mode is not None:
                     select_index = index
                 index += 1
             if select_index is not None:
-                self.mode_selector_widget.setCurrentIndex(select_index)
+                with QtCore.QSignalBlocker(self.mode_selector_widget):
+                    self.mode_selector_widget.setCurrentIndex(select_index)
+
+            # ensure the displayed mode is saved
+            mode = self.mode_selector_widget.currentData()
+            self.action_data.mode = mode
         
 
     def _mode_selected_changed(self):
@@ -188,11 +193,11 @@ To change the mode temporarily, use the temporary mode switch action.'''
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"Switch to: {self.mode}"
+        return f"Switch to: {self._mode}"
 
     def icon(self):
         return "ei.fork"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        
     
 
     def requires_virtual_button(self):

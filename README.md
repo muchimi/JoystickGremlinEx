@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T53)
+- Fix: temporary mode switch display and mode selection
+- Fix: mode switch could store incorrect initial mode
+
 ### (m76T52)
 - Fix: state value change triggers a change event twice.
 - Fix: some empty containers would not show "blank" if no actions.
