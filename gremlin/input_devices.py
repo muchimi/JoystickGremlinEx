@@ -171,7 +171,7 @@ class VjoyAction(enum.Enum):
             case VjoyAction.VJoyButtonRelease:
                 return "Releases a button"
             case VjoyAction.VJoyMergeAxis:
-                return "Merges two axes into one"
+                return "Merges two (or more) axes into one"
             case VjoyAction.VJoySetAxisStepped:
                 return "Steps through set axis values"
             case VjoyAction.VJoyButton:

@@ -1126,7 +1126,7 @@ def safe_read(node, key, type_cast, default_value):
                     value = value.strip().casefold()
                     value = value == "true"
             else:
-                if value == "none":
+                if value == "none" or value == "None":
                     value = None
                 elif value == "special":
                     value = 0

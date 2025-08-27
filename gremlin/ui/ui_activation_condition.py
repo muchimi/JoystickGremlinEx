@@ -270,6 +270,8 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         """
         from gremlin.ui.keyboard_device import KeyboardInputItem
         input_item = KeyboardInputItem()
+        if isinstance(key, list):
+            key = key.pop()
         input_item.key = key
         self.condition.input_item = input_item
         self.condition.scan_code = key.scan_code

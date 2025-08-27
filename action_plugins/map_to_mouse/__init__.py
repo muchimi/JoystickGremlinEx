@@ -260,7 +260,11 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_mouse_button_ui(self, event):
         ''' mouse event - runs on UI thread'''
-        self.action_data.button_id = event.identifier
+        if isinstance(event, list):
+            key = event.pop()
+            self.action_data.button_id = key.mouse_button
+        else:
+            self.action_data.button_id = event.identifier
         self.mouse_button.setText(
             gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )

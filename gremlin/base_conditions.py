@@ -18,6 +18,7 @@ import dinput
 import lxml
 import gremlin.execution_graph
 from psygnal import Signal
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -737,7 +738,8 @@ class ConditionTracker():
                 del self._owner_map[id]
                 # (input_item, mode, condition)
                 self._el.condition_removed.emit(data.input_item, data.mode, data.condition)
-                self._el.condition_state_changed.emit(data.container)
+                if Shiboken.isValid(data.container):
+                    self._el.condition_state_changed.emit(data.container)
                 return
             
 
