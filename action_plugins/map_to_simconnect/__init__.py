@@ -4870,10 +4870,8 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
 
     def display_name(self):
         ''' returns a string for this action for display purposes '''
-        if self.block:
-            return self.block.display_name
-        return "n/a"
-      
+        return f"Simconnect: ({self.command_mode.name}) command: [{self._command}] range: [{self._command_min_range}, {self._command_max_range}"
+        
 
     def icon(self):
         """Returns the icon to use for this action.

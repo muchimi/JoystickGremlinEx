@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T54)
+- Fix: More work on legacy tempo container for older profiles/execution method including hardening for unexpected values.
+- Fix: UI width in options not scaling horizontally to dialog width
+- Fix: View input tree updated for updated structure
+- Fix: PDF disabled for now as that doesn't understand the new structure at all at this point.  Not ideal but prevents a hard crash until I have time to update this part of the older code.
+
+
 ### (m76T53A)
 - Fix: merge data could be blank
 - Fix: hardened handling of unexpected data in code runner and device type detection

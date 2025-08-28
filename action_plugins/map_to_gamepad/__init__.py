@@ -338,7 +338,7 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
  
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"[{GamePadOutput.to_display_name(self.output_mode)}]"
+        return f"Gamepad: [{GamePadOutput.to_display_name(self.output_mode)}]"
     
     def icon(self):
         """Returns the icon to use for this action.

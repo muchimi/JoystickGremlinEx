@@ -455,7 +455,7 @@ Use Vjoy Remap instead.'''
             input_string = "Button"
         elif self.input_type == InputType.JoystickHat:
             input_string = "Hat"
-        return f"VJOY #{self.vjoy_device_id} Mode: {input_string} Output: {self.vjoy_input_id}"
+        return f"Remap (legacy): Vjoy [{self.vjoy_device_id}] Mode: [{input_string}] Output: [{self.vjoy_input_id}]"
 
     def icon(self):
         """Returns the icon corresponding to the remapped input.

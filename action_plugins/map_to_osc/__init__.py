@@ -981,7 +981,10 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"OSC [{self.command}]"
+        if self.v1_map_to_axis:
+            return f"OSC: [{self.command}] mode: [axis] EOR: [{self.trigger_on_release}] range: [{self.v1_min_range:0.3f},{self.v1_max_range:0.3f}]"
+        else:
+            return f"OSC: [{self.command}] mode: button EOR: [{self.trigger_on_release}]"
     
     def icon(self):
         """Returns the icon to use for this action.

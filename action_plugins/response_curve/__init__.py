@@ -1479,6 +1479,9 @@ If needing a separate curve mapper, use the more advanced Response Curve Ex acti
         self.symmetry_mode = SymmetryMode.NoSymmetry
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
 
+    def display_name(self):
+        return "ResponseCurve (legacy)"
+
     def icon(self):
         """Returns the icon representing the action."""
         return "mdi.chart-bell-curve"

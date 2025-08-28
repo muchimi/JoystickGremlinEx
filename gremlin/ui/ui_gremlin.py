@@ -132,11 +132,17 @@ class Ui_Gremlin(object):
         self.actionManageModes.setObjectName("actionManageModes")
         self.actionHTMLCheatsheet = QtGui.QAction(main_window)
         self.actionHTMLCheatsheet.setObjectName("actionHTMLCheatsheet")
+        self.actionHTMLCheatsheet.setEnabled(False)
+
         self.actionPDFCheatsheet = QtGui.QAction(main_window)
         self.actionPDFCheatsheet.setObjectName("actionPDFCheatsheet")
+        self.actionPDFCheatsheet.setEnabled(False)
+
         self.actionViewInput = QtGui.QAction(main_window)
         self.actionViewInput.setObjectName("actionViewInput")
         self.actionViewInput.setCheckable(True)
+        #self.actionViewInput.setEnabled(False)
+
         self.actionExit = QtGui.QAction(main_window)
         self.actionExit.setObjectName("actionExit")
         self.actionOptions = QtGui.QAction(main_window)

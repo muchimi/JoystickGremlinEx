@@ -33,6 +33,13 @@ import gremlin.util
 from PySide6 import QtWidgets, QtCore, QtGui
 from enum import Enum, auto
 import gremlin.ui.ui_common
+import anytree
+from shiboken6 import Shiboken
+import gremlin.execution_graph
+import gremlin.joystick_handling
+import logging
+
+syslog = logging.getLogger("system")
 
 hat_direction_abbrev = {
     "center": "C",
@@ -177,7 +184,7 @@ class InputItemData:
         return "\n".join(descriptions)
 
 
-def recursive(device, tree, storage):
+def recursive(device, node, storage):
     """Recursively parses a profile and stores the contents in
     the required form.
 
@@ -185,34 +192,37 @@ def recursive(device, tree, storage):
     :param tree the subtree currently being processed
     :param storage the storage for the extracted data
     """
-    for parent, children in tree.items():
-        # Ensure the storage structure is correctly initialized
-        if parent not in storage:
-            storage[parent] = {}
-        for child in children:
-            if child not in storage:
-                storage[child] = {}
+    
+    for pre, fill, node in anytree.RenderTree(node, style=anytree.AsciiStyle()):
+        syslog.info(f"{pre}{node.name} [{node.mode}]")
 
-        # In case the parent mode doesn't exist skip this recursion level
-        if parent not in device.modes:
-            continue
 
-        # Insert actions of parent into parent
-        mode = device.modes[parent]
+    pass
+    # parent = node
+    # if parent not in storage:
+    #     storage[parent] = {}    
+    # for child in node.children:
+    #     # Ensure the storage structure is correctly initialized
+    #     if child not in storage:
+    #         storage[child] = {}
 
-        # Aggregate all input items into a single list
-        for items in mode.config.values():
-            for item in items.values():
-                if len(item.containers) > 0:
-                    storage[parent][(item.input_type, item.input_id)] = \
-                        InputItemData(item, None)
+    
+    #     # Insert actions of parent into parent
+    #     mode = device.modes[parent]
 
-                    for child in children:
-                        storage[child][(item.input_type, item.input_id)] = \
-                            InputItemData(item, parent)
+    #     # Aggregate all input items into a single list
+    #     for items in mode.config.values():
+    #         for item in items.values():
+    #             if len(item.containers) > 0:
+    #                 storage[parent][(item.input_type, item.input_id)] = \
+    #                     InputItemData(item, None)
 
-        # Recursively process the remainder of the inheritance tree
-        recursive(device, children, storage)
+    #                 for child in children:
+    #                     storage[child][(item.input_type, item.input_id)] = \
+    #                         InputItemData(item, parent)
+
+    #     # Recursively process the remainder of the inheritance tree
+    #     recursive(device, children, storage)
 
 
 def sort_data(data):
@@ -352,7 +362,7 @@ def generate_cheatsheet(fname, profile):
     device_storage = {}
     for key, device in profile.devices.items():
         device_storage[device] = {}
-        recursive(device, inheritance_tree, device_storage[device])
+        recursive(device, profile.devices, device_storage[device])
 
     for dev, dev_data in device_storage.items():
         dev_float_added = False
@@ -429,13 +439,20 @@ class ViewInput(gremlin.ui.ui_common.QRememberDialog):
 
         profile = gremlin.shared_state.current_profile
 
-        # get a list of mapped objects
-         # Build device actions considering inheritance
-        inheritance_tree = profile.build_inheritance_tree()
-        map_data = {}
-        for _, device in profile.devices.items():
-            map_data[device] = {}
-            recursive(device, inheritance_tree, map_data[device])
+
+
+
+
+   
+
+
+        # # get a list of mapped objects
+        #  # Build device actions considering inheritance
+        # inheritance_tree = profile.build_inheritance_tree()
+        # map_data = {}
+        # for _, device in profile.devices.items():
+        #     map_data[device] = {}
+        #     recursive(device, inheritance_tree, map_data[device])
 
         self._display_mode = ViewInputMode.Mode
 
@@ -462,7 +479,7 @@ class ViewInput(gremlin.ui.ui_common.QRememberDialog):
         self.option_container_layout.addStretch()
 
 
-        self._map_data = map_data
+        #self._map_data = map_data
         self._tree_widget = QtWidgets.QTreeWidget()
         self._tree_widget.setColumnCount(3)
         self._tree_widget.setHeaderLabels(["Input","Mapping", "Value"])
@@ -516,75 +533,63 @@ class ViewInput(gremlin.ui.ui_common.QRememberDialog):
 
     def _update(self):
         
-        nodes = []
-        
-        is_mode = self._display_mode == ViewInputMode.Mode
+        node_map = {}
 
-        if is_mode:
-            # display data by mode
-            mode_nodes = {}
-            for dev, dev_data in  self._map_data.items():
-                for mode_name, mode_data in dev_data.items():
-                    # Only proceed if we actually have input items available
-                    if len(mode_data.values()) == 0:
-                        continue
-                    if is_mode:
-                        if not mode_name in mode_nodes.keys():
-                            mode_node = QtWidgets.QTreeWidgetItem([f"Mode: [{mode_name}]"])
-                            mode_nodes[mode_name] = mode_node
-                        else:
-                            mode_node = mode_nodes[mode_name]
-                    else:
-                        mode_node = QtWidgets.QTreeWidgetItem([mode_name])
+        ec = gremlin.execution_graph.ExecutionContext()
+        ec.reset(force_rebuild = True) # rebuild the execution tree
+        build_error = ec.getLastBuildError()
+        if build_error:
+            syslog.error("Error building execution tree - aborting")
+            return False
 
-                    device_node = QtWidgets.QTreeWidgetItem([f"Device: '{dev.name}'"])
 
-                    has_containers = False
-                    for entry in mode_data.values():
-                        if entry.input_item.containers:
-                            for container in entry.input_item.containers:
-                                for action_set in container.action_sets:
-                                    for action in action_set:
-                                        action_node = QtWidgets.QTreeWidgetItem([entry.input_item.display_name, action.name, action.display_name()])
-                                        device_node.addChild(action_node)
-                            has_containers = True
+        root = ec.graph
+        tree_root = QtWidgets.QTreeWidgetItem(["Profile"])
+        node_map[root] = tree_root
 
-                    if has_containers:
-                        # has data
-                        mode_node.addChild(device_node)
-                        if not mode_node in nodes:
-                            nodes.append(mode_node)
+        # visual tree
+        profile = gremlin.shared_state.current_profile
+        for device_guid in profile.devices:
+            device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+            tree_device_item = QtWidgets.QTreeWidgetItem([f"Device: [{device.name}]"])
+            add_device = False
             
-        else:
-            # display data by device
-            for dev, dev_data in  self._map_data.items():
-                device_node = QtWidgets.QTreeWidgetItem([f"Device: '{dev.name}'"])
-                nodes.append(device_node)
+
+            for mode in profile.devices[device_guid].modes:
+                add_mode = False
+                mode_object = profile.devices[device_guid].modes[mode]
+                if mode == gremlin.shared_state.master_mode:
+                    mode_name = "Master"
+                else:
+                    mode_name = mode_object.name
+                tree_mode_item = QtWidgets.QTreeWidgetItem([f"Mode: [{mode_name}]"])
                 
-                for mode_name, mode_data in dev_data.items():
-                    # Only proceed if we actually have input items available
-                    if len(mode_data.values()) == 0:
-                        continue
-                    mode_node = QtWidgets.QTreeWidgetItem([f"Mode: [{mode_name}]"])
-                    
-                    has_containers = False
-                    for entry in mode_data.values():
-                        if entry.input_item.containers:
-                            for container in entry.input_item.containers:
+                # inputs
+                for input_type in mode_object.config:
+                    for input_item in mode_object.config[input_type].values():
+                        if input_item.containers:
+                            # has containers
+                            tree_input_item = QtWidgets.QTreeWidgetItem([f"Input: {input_item.display_name}"])
+                            tree_mode_item.addChild(tree_input_item)
+                            for container in input_item.containers:
+                                tree_container_item = QtWidgets.QTreeWidgetItem([f"Container: {container.name}"])
+                                tree_input_item.addChild(tree_container_item)
                                 for action_set in container.action_sets:
                                     for action in action_set:
-                                        action_node = QtWidgets.QTreeWidgetItem([entry.input_item.display_name, action.name, action.display_name()])
-                                        mode_node.addChild(action_node)
-                            has_containers = True
+                                        tree_action_item = QtWidgets.QTreeWidgetItem([f"Action: {action.display_name()}"])
+                                        tree_container_item.addChild(tree_action_item)
+                                        add_mode = True
+                          
+                if add_mode:
+                    tree_device_item.addChild(tree_mode_item)
+                    add_device = True
+            if add_device:
+                tree_root.addChild(tree_device_item)
+                
 
-                    if has_containers:
-                        # has data
-                        device_node.addChild(mode_node)
-                        if not device_node in nodes:
-                            nodes.append(device_node)
 
         self._tree_widget.clear()
-        self._tree_widget.insertTopLevelItems(0, nodes)
+        self._tree_widget.insertTopLevelItems(0, [tree_root])
         self._tree_widget.expandAll()
 
 

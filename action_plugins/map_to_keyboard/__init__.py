@@ -238,7 +238,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         for key in self.keys:
             names.append(key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
-        return text
+        return f"Keyboard (legacy): {text}"
 
 version = 1
 name = "map-to-keyboard"

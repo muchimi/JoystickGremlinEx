@@ -2248,6 +2248,9 @@ the input is in a specific range of values, or crosses gates.
         gremlin.util.singleShot(self.gate_data.hook)
     
 
+    def display_name(self):
+        return f"Gated Axis: gates: [{len(self.gates)}]"
+
     def _cleanup_ui(self):
         ''' clean ourselves up '''
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui

@@ -340,11 +340,12 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.dialog_layout = QtWidgets.QVBoxLayout(self)
 
-        self.main_layout = QtWidgets.QGridLayout()
+        #self.main_layout = QtWidgets.QGridLayout()
+        self.main_layout = QtWidgets.QVBoxLayout(self)
 
 
         self.tab_container = QtWidgets.QTabWidget()
-        self.tab_container.setMaximumWidth(self._max_content_width)
+        #self.tab_container.setMaximumWidth(self._max_content_width)
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
@@ -364,9 +365,10 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.scroll_layout.addLayout(self.main_layout)
 
-        self.main_layout.addWidget(self.tab_container,0,0)
-        self.main_layout.addWidget(QtWidgets.QWidget(),0,4)
-        self.main_layout.setColumnStretch(4,2)
+        #self.main_layout.addWidget(self.tab_container,0,0)
+        self.main_layout.addWidget(self.tab_container)
+        #self.main_layout.addWidget(QtWidgets.QWidget(),0,4)
+        #self.main_layout.setColumnStretch(4,2)
 
 
         self.closed.connect(self._save_on_close_cb)
@@ -411,6 +413,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._update_highlight_options() # update highlight state for checkboxes
 
         self.tab_container.currentChanged.connect(self._tab_changed_cb)
+        self.setMinimumWidth(self._max_content_width)
 
         
 
@@ -1181,7 +1184,7 @@ This setting is also available on a profile by profile basis on the profile tab,
     def _create_verbose_page(self):
         """Creates the profile options page."""
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
-        page_widget.setMaximumWidth(self._max_content_width)
+        #page_widget.setMaximumWidth(self._max_content_width)
 
         column_widget = QtWidgets.QWidget()
         column_widget.setContentsMargins(0,0,0,0)

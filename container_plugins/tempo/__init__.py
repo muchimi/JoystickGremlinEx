@@ -283,10 +283,16 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
             return
 
         group_node = container_node.children[0] # group node is the only child of the container node
-        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
-        self.short_nodes = [self.action_set_nodes[0]]
-        self.long_nodes = [self.action_set_nodes[1]]
-        self.trigger_mode = None 
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set]
+        
+        self.short_nodes = []
+        self.long_nodes = []
+        if self.action_set_nodes:
+            self.short_nodes.append(self.action_set_nodes[0])
+            if len(self.action_set_nodes) == 2:
+                self.long_nodes.append(self.action_set_nodes[1])
+            
+        self.trigger_mode = None
 
 
     def _trigger_short_press(self, event, value, extra_data : dict = None):
@@ -294,16 +300,22 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
 
         # syslog.info(f"execute short press {self.short_index}")
         ec = gremlin.execution_graph.ExecutionContext()
-        node = self.short_nodes[0]
-        ec.execute_node(node, event, value, extra_data)
+        if self.short_nodes:
+            for node in self.short_nodes:
+                ec.execute_node(node, event, value, extra_data)
+        else:
+            syslog.warning("TEMPO: no short action to trigger")
         
 
     def _trigger_long_press(self, event, value, extra_data : dict = None):
         ''' triggers a long press '''
         # syslog.info(f"execute long press {self.long_index}")
         ec = gremlin.execution_graph.ExecutionContext()
-        node = self.long_nodes[0]
-        ec.execute_node(node, event, value, extra_data)
+        if self.long_nodes:
+            for node in self.long_nodes:
+                ec.execute_node(node, event, value, extra_data)
+        else:
+            syslog.warning("TEMPO: no long action to trigger")
 
 
     def process_event(self, event, value, extra_data = None):
@@ -437,6 +449,8 @@ Look at Tempo Ex for a container that allows more than one action per short or l
                     action_set = gremlin.base_profile.ActionSet("long")
                     self.long_action_sets.append(action_set)
                 self._parse_action_xml(as_node, action_set, data)
+
+        
                 
           
 

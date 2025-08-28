@@ -233,7 +233,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"Say: [{self.text}]" # Voice: [{self.voice_name}]"
+        return f"TTS: WPM: [{self.rate}] Volume: [{self.volume}] Voice: [{self.voice_name}] Say: [{self.text}] " # Voice: [{self.voice_name}]"
 
     def icon(self):
         return "mdi.playlist-music"

@@ -398,6 +398,7 @@ class MergedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert(isinstance(action_data, MergedAxis))
         self.action_data = action_data
 
+
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
@@ -597,6 +598,10 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
         item_data._profile_mode = current_item_data._profile_mode
         item_data._device_name = current_item_data._device_name
         self.item_data : gremlin.base_profile.InputItem = item_data
+
+    def display_name(self):
+        return "Merge Axis"
+
 
 
     def computeValue(self) -> float:

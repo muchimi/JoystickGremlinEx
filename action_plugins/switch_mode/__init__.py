@@ -193,7 +193,7 @@ To change the mode temporarily, use the temporary mode switch action.'''
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"Switch to: {self._mode}"
+        return f"Switch Mode: [{self._mode}]"
 
     def icon(self):
         return "ei.fork"

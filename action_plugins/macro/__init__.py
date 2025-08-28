@@ -1924,8 +1924,10 @@ To send complex sequences, please look at the sequence container.'''
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        #TODO: build something more meaningful
-        return f"Macro sequence"
+        stub = ""
+        if self.repeat:
+            stub = f" (repeat)"
+        return f"Macro sequence: steps: [{len(self.sequence)}] exclusive: [{self.exclusive}] EOR: [{self.execute_on_release}] AutoRestart: [{self.auto_restart}] AutoStop: [{self.auto_stop}]{stub}"
 
     def icon(self):
         return "ei.cogs"

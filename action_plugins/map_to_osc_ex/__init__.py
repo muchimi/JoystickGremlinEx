@@ -1463,7 +1463,7 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"OSC [{self.command}]"
+        return f"OSC Ex: [{self.command}]"
     
     def icon(self):
         """Returns the icon to use for this action.

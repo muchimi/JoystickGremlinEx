@@ -4773,6 +4773,24 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
         self.refresh_vjoy()
+
+    def display_name(self):
+        match self._action_mode:
+            case VjoyAction.VJoyButton:
+                return f"Vjoy Button: Vjoy [{self._vjoy_device_id}] Button: {self.vjoy_button_id}"
+            case VjoyAction.VJoyButtonPress:
+                return f"Vjoy Button Press: Vjoy [{self._vjoy_device_id}] Button: {self.vjoy_button_id}"
+            case VjoyAction.VJoyButtonRelease:
+                return f"Vjoy Button Release: Vjoy [{self._vjoy_device_id}] Button: {self.vjoy_button_id}"
+            case VjoyAction.VJoyAxis:
+                return f"Vjoy Axis: Vjoy [{self._vjoy_device_id}] Axis: {self.vjoy_axis_id}"
+            case VjoyAction.VJoyAxisToButton:
+                return f"Vjoy Axis: Vjoy Axis To button: Vjoy [{self._vjoy_device_id}] Axis: {self.vjoy_axis_id}"
+            case VjoyAction.VJoyHat:
+                return f"Vjoy Axis: Vjoy Hat: Vjoy [{self._vjoy_device_id}] Hat: {self.vjoy_hat_id}"
+            case _:
+                return f"Vjoy Axis: Vjoy Hat: Vjoy [{self._vjoy_device_id}] generic"
+
        
     @property
     def target_step_direction(self) -> int:

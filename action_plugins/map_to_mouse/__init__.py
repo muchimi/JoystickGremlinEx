@@ -513,7 +513,10 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"[{self.button_id.name}]"
+        if self.motion_input:
+            return f"Map to Mouse: (motion) angle: [{self.direction}] speed: [{self.min_speed}] [{self.max_speed}] TTMS: [{self.time_to_max_speed:0.3f}]"    
+        else:
+            return f"Map to Mouse: (button) [{self.button_id.name}]"
     
     def icon(self):
         """Returns the icon to use for this action.

@@ -890,7 +890,11 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"[{self.button_id.name}]"
+        if self.motion_input:
+            return f"Map to Mouse Ex: (motion) angle: [{self.direction}] speed: [{self.min_speed}] [{self.max_speed}] TTMS: [{self.time_to_max_speed:0.3f}] invert: [{self.invert}]"    
+        else:
+            return f"Map to Mouse Ex: (button) [{self.button_id.name}] Mode: [{self.click_mode.name}] Exec on release: [{self.exec_on_release}]"
+        
 
     def icon(self):
         """Returns the icon to use for this action.

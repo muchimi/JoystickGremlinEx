@@ -878,7 +878,10 @@ class MapToState(gremlin.base_profile.AbstractAction):
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"[{self.key}]"
+        stub = ""
+        if self.pulse_repeat:
+            stub = f" (pulse) delay (ms): [{self.pulse_delay}] repeat (ms): [{self.pulse_repeat_delay}]"  
+        return f"State: ({self.mode}]) [{self.key}] EOR: [{self.exec_on_release}]{stub}"
 
     def icon(self):
         """Returns the icon to use for this action.

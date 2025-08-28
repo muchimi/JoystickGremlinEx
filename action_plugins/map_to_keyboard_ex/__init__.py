@@ -858,7 +858,12 @@ Can also send mouse buttons, mouse wheel events.'''
         return text
 
     def display_name(self):
-        return self._get_display_keys()
+        stub = ""
+        match self.mode:
+            case KeyboardOutputMode.Pulse:
+                stub = f" (pulse) delay (ms): [{self._delay}] repeat (ms): [{self._autorepeat_delay}]"  
+            
+        return f"KeyboardEx: ({self.mode.name}) {self._get_display_keys()}{stub}"
 
 
     def icon(self):
