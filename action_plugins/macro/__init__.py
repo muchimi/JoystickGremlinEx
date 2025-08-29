@@ -793,25 +793,34 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.action_layout.addWidget(widget)
 
         widgets = []
-        rb = gremlin.ui.ui_common.QDataRadioButton("Press",data = (action, True))
+        rb = gremlin.ui.ui_common.QDataRadioButton("Press",data = (action, "press"))
         rb.setToolTip("Sets the state")
         if action.value is None:
-            action.value = False
-        if action.value:
+            action.action = "press"
+        if action.action == "press":
             rb.setChecked(True)
         rb.clicked.connect(self._state_mode_changed)
         widgets.append(rb)
         self.ui_elements["state_press"] = rb
         
-        rb = gremlin.ui.ui_common.QDataRadioButton("Release",data = (action, False))
+        rb = gremlin.ui.ui_common.QDataRadioButton("Release",data = (action, "release"))
         rb.setToolTip("Releases the state")
-        if not action.value:
+        if action.action == "release":
             rb.setChecked(True)
         rb.clicked.connect(self._state_mode_changed)
         widgets.append(rb)
         self.ui_elements["state_release"] = rb
 
-        widget, layout = gremlin.ui.ui_common.getHContainer(widgets,"Action:")
+        rb = gremlin.ui.ui_common.QDataRadioButton("Toggle", data = (action, "toggle"))
+        rb.setToolTip("Toggles the state")
+        if action.action == "toggle":
+            rb.setChecked(True)
+        rb.clicked.connect(self._state_mode_changed)
+        widgets.append(rb)
+        self.ui_elements["state_toggle"] = rb
+
+
+        widget, layout = gremlin.ui.ui_common.getVContainer(widgets,"Action:")
         self.action_layout.addWidget(widget)
 
         self.populate_state_selector(action)
@@ -820,7 +829,7 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _state_mode_changed(self):
         widget = self.sender()
         action, value = widget.data
-        action.value = value
+        action.action = value
         self._update_model()
 
     def populate_state_selector(self, action):
@@ -1849,7 +1858,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
                   self.action_data.execute_on_release and not event.is_pressed
         
         config = gremlin.config.Configuration()
-        verbose = config.verbose
+        verbose = config.verbose_mode_macro
         
         if verbose: syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} {str(event)}")        
 
@@ -2068,17 +2077,17 @@ To send complex sequences, please look at the sequence container.'''
                         state = sd.getState(key)
                     description = None
 
-                value = safe_read(child,"value", bool, False)                    
+                   
+                if "action" in child.attrib:          
+                    action = safe_read(child,"action", str, "press")
+                else:
+                    value = safe_read(child,"value", bool, False)
+                    action = "press" if value else "release"
 
                 if not state and key:
                     state = sd.register(key, value, description)
 
-
-                # state_action.state = state
-
-                # state_action.key = key
-                # state_action.description = description
-                state_action.value = value
+                state_action.action = action
                 state_action.state = state
                 self.sequence.append(state_action)
 
@@ -2161,9 +2170,7 @@ To send complex sequences, please look at the sequence container.'''
                 state_node = ElementTree.Element("state")
                 state_node.set("id", entry._state_id)
                 state_node.set("key", entry.key)
-                # if entry.description:
-                #     state_node.set("description", entry.description)
-                state_node.set("value", safe_format(entry.value, bool))
+                state_node.set("action", entry.action)
                 action_list.append(state_node)
 
         node.append(action_list)

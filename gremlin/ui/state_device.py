@@ -1155,9 +1155,6 @@ class StateData(QtCore.QObject):
 
     def setValue(self, key : str, value, emit = True):
         ''' sets state value (and registers if needed) '''
-        if not key:
-            return
-        
         key = key.casefold().strip()
         #trigger = not key in self._data or self._data[key].value != value
         verbose = gremlin.config.Configuration().verbose_mode_state

@@ -1302,9 +1302,11 @@ class StateAction(MacroAbstractAction):
         self._state = None
         self._state_id = None
         self._register_check = True
-        self.value = None
+        self.action = "press" # action requested 
+        self.value = True # press by default
         sd = gremlin.ui.state_device.StateData()
         sd.crud.connect(self._data_changed)
+
 
     def __getstate__(self):
         ''' serialize '''
@@ -1314,6 +1316,7 @@ class StateAction(MacroAbstractAction):
         state['state_id'] = self._state_id
         state['register_check'] = self._register_check
         state['value'] = self.value
+        state['action'] = self._action
         return state
 
     def __setstate__(self, state):
@@ -1323,7 +1326,8 @@ class StateAction(MacroAbstractAction):
         #self._state  = state['state']
         self._state_id =  state['state_id']
         self._register_check = state['register_check']
-        self.value = state['value']        
+        self._action = state['action']
+        self.value = state['value'] 
         sd = gremlin.ui.state_device.StateData()
         self._state = sd.getStateById(self._state_id)
         # sd.crud.connect(self._data_changed)
@@ -1333,6 +1337,11 @@ class StateAction(MacroAbstractAction):
         if self._state:
             return self._state.key
         return None
+    
+    @key.setter
+    def key(self, value):
+        if self._state:
+            self._state.key = value
     
     @property
     def description(self):
@@ -1367,8 +1376,19 @@ class StateAction(MacroAbstractAction):
             self._register_check = False
 
         verbose = gremlin.config.Configuration().verbose_mode_macro
-        if verbose: syslog.info(f"MACRO: set state [{self.key}] -> {self.value}")
-        sd.setValue(self.key, self.value)
+        
+        match self.action:
+            case "press":
+                sd.setValue(self.key, True)
+                if verbose: syslog.info(f"MACRO: set state [Pressed]")
+            case "release":
+                sd.setValue(self.key, False)
+                if verbose: syslog.info(f"MACRO: set state [Released]")
+            case "toggle":
+                sd.toggle(self.key)
+                if verbose: syslog.info(f"MACRO: set state [Toggle] (new state: [{'Pressed' if sd.value(self.key) else 'Released'}])")
+        
+
 
 
 

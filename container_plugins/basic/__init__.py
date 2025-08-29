@@ -60,13 +60,12 @@ class BasicContainerWidget(AbstractContainerWidget):
                 break
          
         if has_actions:
-            assert len(self.profile_data.action_sets) == 1
-
-            
+            action_sets = [action_set for action_set in self.profile_data.action_sets if action_set]
+            assert len(action_sets) == 1, "invalid action set count - expected a single action set"
 
             self.profile_data.create_or_delete_virtual_button()
             widget = self._create_action_set_widget(
-                self.profile_data.action_sets[0],
+                action_sets[0],
                 "Basic",
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )

@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T55)
+- Fix: macro state save state
+- New: toggle action added to macro set state
+
 ### (m76T54)
 - Fix: More work on legacy tempo container for older profiles/execution method including hardening for unexpected values.
 - Fix: UI width in options not scaling horizontally to dialog width
