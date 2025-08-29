@@ -8184,9 +8184,12 @@ class QHorizontalSeparator(QtWidgets.QLabel):
         self.setPixmap(pixmap)
 
 class QHorizontalLine(QtWidgets.QFrame):
-    def __init__(self, parent = None):
+    def __init__(self, size = 1, parent = None):
         super().__init__(parent)
         self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        self.setLineWidth(size)
+        
+
 
    
 def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, alignment = None, set_alignment = True, min_height = None):
@@ -8263,7 +8266,10 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, parent 
     if widget_or_list:
         if isinstance(widget_or_list, list)  or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
-                layout.addWidget(item)
+                if isinstance(item, str):
+                    layout.addWidget(QtWidgets.QLabel(item))    
+                else:
+                    layout.addWidget(item)
         else:
             layout.addWidget(widget_or_list)
         stretch = True
@@ -10218,3 +10224,13 @@ class QInputLockWidget(QtWidgets.QWidget):
         import gremlin.event_handler
         el = gremlin.event_handler.EventListener()
         el.unlock_inputs.emit(self.data)
+
+
+class QHeaderLabel(QtWidgets.QWidget):
+    ''' header label widget'''
+    def __init__(self, label = None, size = 3, data = None, parent = None):
+        super().__init__(parent)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.addWidget(QHorizontalLine(size))
+        self.main_layout.addWidget(QtWidgets.QLabel(label))
+        self.data = data

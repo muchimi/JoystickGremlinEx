@@ -248,7 +248,7 @@ class ExecutionGraphFunctorNode(ExecutionGraphNode):
 
 class ExecutionGraphActionSetNode(ExecutionGraphNode):
     ''' holds an input item in the execution graph '''
-    def __init__(self, action_set : gremlin.base_profile.ActionSet = []):
+    def __init__(self, action_set : list):
         super().__init__(ExecutionGraphNodeType.ActionSet)
         self.action_set = action_set
 
@@ -1110,6 +1110,15 @@ class ExecutionContext():
             )
         
 
+    def _ensure_action_set(self, items):
+        ''' ensure an action set is not just a list, but a list with a data attribute '''
+        if isinstance(items, gremlin.base_profile.ActionSet):
+            return items
+        action_set = gremlin.base_profile.ActionSet()
+        action_set.extend(items)
+        return action_set
+        
+
     def _build_container_tree(self, container, parent_group, mode_name, device_node, input_item, m_input_node ) -> ExecutionGraphNode:
         ''' builds a tree branch for the given container '''
 
@@ -1191,6 +1200,8 @@ class ExecutionContext():
 
                 # a container usually has a single action set, but some like tempo/tempoEx have multipe action sets so each is grouped by an action set
                 # sort actions by priority low to high
+
+                #action_set = self._ensure_action_set(action_set) # convert to ActionSet if a plain list
 
                 action_set_node = ExecutionGraphActionSetNode(action_set)
                 action_set_group_node = ExecutionGraphGroupNode()
@@ -1983,43 +1994,43 @@ class AbstractExecutionGraph(QtCore.QObject):
         """
         return True
     
-        self.run_event.clear()
+        # self.run_event.clear()
 
-        ec = ExecutionContext()
-        # functor_map = ec.functor_map
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_condition
-        # validate = verbose
-        # verbose_detailed = False
-        if verbose:
-            gremlin.shared_state.pushLog()
+        # ec = ExecutionContext()
+        # # functor_map = ec.functor_map
+        # config = gremlin.config.Configuration()
+        # verbose = config.verbose_mode_condition
+        # # validate = verbose
+        # # verbose_detailed = False
+        # if verbose:
+        #     gremlin.shared_state.pushLog()
 
-        try:
+        # try:
      
             
-            # regular functors
-            for functor in self.functors:
+        #     # regular functors
+        #     for functor in self.functors:
 
-                #result = True # assume pass
+        #         #result = True # assume pass
 
-                if isinstance(functor, gremlin.actions.ActivationCondition):
-                    # if not event.is_pressed:
-                    #     pass
-                    result = functor.process_event(event, value, extra_data)
-                    if not result:
-                        return False
-                    continue # next functor
+        #         if isinstance(functor, gremlin.actions.ActivationCondition):
+        #             # if not event.is_pressed:
+        #             #     pass
+        #             result = functor.process_event(event, value, extra_data)
+        #             if not result:
+        #                 return False
+        #             continue # next functor
 
-                id = functor.id
-                result = ec.execute_functor_id(id, event, value, extra_data)
-                if not result:
-                    break
+        #         id = functor.id
+        #         result = ec.execute_functor_id(id, event, value, extra_data)
+        #         if not result:
+        #             break
              
-            return result
-        finally:
-            self.graph_completed.emit(self)
-            if verbose:
-                gremlin.shared_state.popLog()
+        #     return result
+        # finally:
+        #     self.graph_completed.emit(self)
+        #     if verbose:
+        #         gremlin.shared_state.popLog()
 
     def _build_graph(self, instance, parent_node = None):
         """Builds the graph structure based on the given object's content.

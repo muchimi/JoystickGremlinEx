@@ -688,11 +688,15 @@ class AbstractContainer(ProfileData):
                 if action_set:
                     self.action_sets.append(action_set)
  
-    def _parse_action_xml(self, node, action_set, data = None, extra_data = None):
+    def _parse_action_xml(self, node, action_set, input_item = None, extra_data = None, data = None):
         """Parses the XML content related to actions in an action-set.
 
         :param node the XML node to process
-        :param action_set storage for the processed action nodes
+        :param action_set: storage for the processed action nodes (usually a list)
+        :param input_item: input item this action is attached to
+        :param extra_data: any data for extra XML processing
+        :param data: data to set the loaded action to
+
         """
         action_name_map = ActionPlugins().tag_map
         config = gremlin.config.Configuration()
@@ -717,9 +721,10 @@ class AbstractContainer(ProfileData):
 
 
             entry = action_name_map[tag](self)
-            input_item = data
             entry.from_xml(child, (input_item, self), extra_data) # pass input item, container as a tuple
             action_set.append(entry)
+            if data is not None:
+                entry.data = data
 
 
 

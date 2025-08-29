@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### Hotfix (m76T55B)
+- fix: macro profile load error
+- fix: tempoEx action set data revamp (could cause an issue on new profile or older profile load)
+
 ### (m76T55)
 - Fix: macro state save state
 - New: toggle action added to macro set state

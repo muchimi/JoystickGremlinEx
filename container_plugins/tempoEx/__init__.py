@@ -61,31 +61,13 @@ class TempoExContainerWidget(AbstractContainerWidget):
         if not Shiboken.isValid(self):
             return
         self.profile_data.create_or_delete_virtual_button()
-        self.short_layout = QtWidgets.QVBoxLayout()
-        self.long_layout = QtWidgets.QVBoxLayout()
-        self.double_layout = QtWidgets.QVBoxLayout()
-
-        self.short_group_widget = QtWidgets.QGroupBox("Short Press Action Sets")
-        self.short_group_widget.setStyleSheet("QGroupBox { font-weight: bold; }")
-        self.short_group_widget.setLayout(self.short_layout)
-
-        self.long_group_widget = QtWidgets.QGroupBox("Long Press Action Sets")
-        self.long_group_widget.setStyleSheet("QGroupBox { font-weight: bold; }")
-        self.long_group_widget.setLayout(self.long_layout)
-
-        self.double_group_widget = QtWidgets.QGroupBox("Double Tap Action Sets")
-        self.double_group_widget.setStyleSheet("QGroupBox { font-weight: bold; }")
-        self.double_group_widget.setLayout(self.double_layout)
-
-
-        self.options_layout = QtWidgets.QHBoxLayout()
-
-        delay_container_layout = QtWidgets.QVBoxLayout()
-
-
-
-        self.options_layout = QtWidgets.QHBoxLayout()
-        self.options2_layout = QtWidgets.QHBoxLayout()
+        self.short_widget, self.short_layout = gremlin.ui.ui_common.getVContainer()
+        self.short_widget.setContentsMargins(8,0,0,0)
+        self.long_widget, self.long_layout = gremlin.ui.ui_common.getVContainer()
+        self.long_widget.setContentsMargins(8,0,0,0)
+        self.double_widget, self.double_layout = gremlin.ui.ui_common.getVContainer()
+        self.double_widget.setContentsMargins(8,0,0,0)
+        self.options_widget, self.options_layout = gremlin.ui.ui_common.getVContainer()
 
         self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Long Press Delay (ms):")
         self.longpress_delay_widget.setToolTip("Delay to detect long press, should be greater than double tap delay")
@@ -108,16 +90,21 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.autorelease_delay_widget,
         ]
 
-        widget, layout = gremlin.ui.ui_common.getVContainer(widgets)
-
+        widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
         self.options_layout.addWidget(widget)
-        self.options_layout.addStretch()
-
+       
 
         # Activation moment
-        self.options_layout.addWidget(QtWidgets.QLabel("<b>Activate on: </b>"))
         self.activate_press = QtWidgets.QRadioButton("on press")
         self.activate_release = QtWidgets.QRadioButton("on release")
+
+        widgets = ["<b>Activate On:</b",
+                   self.activate_press,
+                   self.activate_release]
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+
+        self.options_layout.addWidget(widget)
 
 
         if self.profile_data.activate_on == "press":
@@ -129,14 +116,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.activate_press.toggled.connect(self._activation_changed_cb)
         self.activate_release.toggled.connect(self._activation_changed_cb)
 
-        self.options_layout.addWidget(self.activate_press)
-        self.options_layout.addWidget(self.activate_release)
-
         # chain options
-
-
-
-        
         self.chain_short_widget = QtWidgets.QCheckBox("short actions")
         self.chain_short_widget.setChecked(self.profile_data.chain_short)
         self.chain_short_widget.clicked.connect(self._chain_short_changed_cb)
@@ -154,31 +134,40 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.chain_long_widget, 
             self.chain_double_widget,
         ]
-
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"<b>Chain </b>")
-
-        self.options2_layout.addWidget(widget)
-
         
         # chain timeout
-        self.options2_layout.addWidget(QtWidgets.QLabel("<b>Chain Timeout:</b> "))
+
+
+
         self.timeout_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.timeout_input.setRange(0.0, 3600.0)
         self.timeout_input.setSingleStep(0.5)
         self.timeout_input.setValue(0)
         self.timeout_input.setValue(self.profile_data.timeout)
         self.timeout_input.valueChanged.connect(self._timeout_changed_cb)
-        self.options2_layout.addWidget(self.timeout_input)
-
-
-        self.action_layout.addLayout(self.options_layout)
-        self.action_layout.addLayout(self.options2_layout)
-
-        self.action_layout.addWidget(self.short_group_widget)
-        self.action_layout.addWidget(self.long_group_widget)
-        self.action_layout.addWidget(self.double_group_widget)
         
 
+        widgets = ["<b>Chain Timeout:</b>",
+                   self.timeout_input,
+                   ]
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.options_layout.addWidget(widget)
+
+
+
+        widgets = [
+            self.options_widget,
+            gremlin.ui.ui_common.QHeaderLabel("Short Press Action Sets"),
+            self.short_widget,
+            gremlin.ui.ui_common.QHeaderLabel("Long Press Action Sets"),
+            self.long_widget,
+            gremlin.ui.ui_common.QHeaderLabel("Double Tap Press Action Sets"),
+            self.double_widget,
+
+        ]
+
+        self.content_widget, self.content_layout = gremlin.ui.ui_common.getVContainer(widgets)
         
 
         self.short_action_selector = gremlin.ui.ui_common.ActionSelector(
@@ -265,8 +254,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
-
-
+        self.action_layout.addWidget(self.content_widget)
     
 
     def _create_condition_ui(self):
@@ -592,12 +580,21 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         assert container_node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container,"Logic error: Node is not a container node"
 
         group_node = container_node.children[0] # group node is the only child of the container node
-        action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set]
-        self.action_set_nodes = [node for node in action_set_nodes if node.has_actions and node.action_set.data]
-        self.short_nodes = [node for node in self.action_set_nodes if node.action_set.data == "short"]
-        self.long_nodes = [node for node in self.action_set_nodes if node.action_set.data == "long"]
-        self.dtap_nodes = [node for node in self.action_set_nodes if node.action_set.data == "double"]
-
+        action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set and node.has_actions]
+        self.short_nodes = []
+        self.long_nodes = []
+        self.dtap_nodes = []
+        for node in action_set_nodes:
+            if node.has_actions:
+                for action in node.action_set:
+                    match action.data:
+                        case "short":
+                            self.short_nodes.append(node)
+                        case "long":
+                            self.long_nodes.append(node)
+                        case "double":
+                            self.dtap_nodes.append(node)
+        
         # true if double tap enabled if we have double tap nodes to execute and not running in release mode
 
         self.dtap_enabled =  len(self.dtap_nodes) > 0 
@@ -1029,7 +1026,7 @@ More than one action per short press or long press can be added.'''
         pass
 
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, input_item = None, extra_data = None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
@@ -1039,7 +1036,7 @@ More than one action per short press or long press can be added.'''
         self.short_action_sets = []
         self.long_action_sets = []
         self.double_action_sets = []
-        super()._parse_xml(node, data)
+        super()._parse_xml(node, input_item)
         self.delay = safe_read(node,"delay", float, 0.5)
         self.doubletap_delay = safe_read(node,"tap-delay",float,0.25)
         self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
@@ -1052,17 +1049,17 @@ More than one action per short press or long press can be added.'''
         for as_node in node:
             if as_node.tag == "short-action-set":
                 action_set = gremlin.base_profile.ActionSet("short")
-                self._parse_action_xml(as_node, action_set, data)
+                self._parse_action_xml(as_node, action_set, input_item, extra_data, "short")
                 self.short_action_sets.append(action_set)
                 self.action_sets.append(action_set)
             if as_node.tag == "long-action-set":
                 action_set = gremlin.base_profile.ActionSet("long")
-                self._parse_action_xml(as_node, action_set, data)
+                self._parse_action_xml(as_node, action_set, input_item, extra_data, "long")
                 self.long_action_sets.append(action_set)
                 self.action_sets.append(action_set)
             if as_node.tag == "double-action-set":
                 action_set = gremlin.base_profile.ActionSet("double")
-                self._parse_action_xml(as_node, action_set, data)
+                self._parse_action_xml(as_node, action_set, input_item, extra_data, "double")
                 self.double_action_sets.append(action_set)
                 self.action_sets.append(action_set)                
 

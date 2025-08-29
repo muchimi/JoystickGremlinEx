@@ -2077,7 +2077,7 @@ To send complex sequences, please look at the sequence container.'''
                         state = sd.getState(key)
                     description = None
 
-                   
+                value = False
                 if "action" in child.attrib:          
                     action = safe_read(child,"action", str, "press")
                 else:
