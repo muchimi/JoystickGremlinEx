@@ -278,6 +278,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         container_node = ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
 
         if not container_node:
+            # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
             syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
             self.valid = False
             return

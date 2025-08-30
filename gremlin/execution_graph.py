@@ -412,8 +412,12 @@ class ExecutionContext():
         el.edit_mode_changed.connect(self._edit_mode_changed) # reload data on mode changes
         #el.runtime_mode_changed.connect(self._runtime_mode_changed)
         el.profile_start.connect(self._profile_start) # reload data on profile start
+        el.profile_started.connect(self._profile_started) # called when profile has started and all is initialized
+        el.profile_stopped.connect(self._profile_stopped) # called when profile has stopped
         el.profile_changed.connect(self.reset) # reload data on profile change
         el.profile_modes_changed.connect(self.reset) # modes changed
+        el.profile_loaded.connect(self._handle_profile_load) # reload data on profile load
+        self._functors = []
         self._reset()
 
     def _reset(self):
@@ -438,6 +442,11 @@ class ExecutionContext():
         self._verbose_condition = config.verbose_mode_condition
         self.used_items = {}  # nodes can only be used once
         self._build_error = False # no error
+
+        if self._functors:
+            for functor in self._functors:
+                functor.unhook() # ensure prior used functors are unhook so they can release
+        self._functors = [] # list of functors in the execution graph
         
 
     @property
@@ -482,12 +491,17 @@ class ExecutionContext():
             return gremlin.actions.StateCondition(condition)
         
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
+
+    def _handle_profile_load(self):
+        # ensure data is reset on a new profile
+        self._reset() 
+
         
     def reset(self, force_rebuild = False, no_rebuild = False):
         ''' reloads the execution context to capture changes '''
         # syslog = logging.getLogger("system")
 
-        self._reset() # reset tracking data
+        
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
         if verbose: syslog.info("CONTEXT: reload")
@@ -503,6 +517,7 @@ class ExecutionContext():
 
         # builds the tree
         if rebuild and not no_rebuild:
+            self._reset() # reset tracking data
             self._last_hash = profile_hash
             if gremlin.shared_state.is_running or force_rebuild:
                 self._rebuild()
@@ -541,7 +556,22 @@ class ExecutionContext():
         config = gremlin.config.Configuration() 
         self._verbose_exec = config.verbose_mode_execution
         self._verbose_condition = config.verbose_mode_condition
-        pass
+        self.reset()
+
+    def _profile_started(self):
+        ''' hook registered functors '''
+        for functor in self._functors:
+            functor.hook()
+        config = gremlin.config.Configuration() 
+        if config.verbose: syslog.info(f"CONTEXT: profile started with {len(self._functors):,} functors")
+
+    def _profile_stopped(self):
+        ''' unhook registered functors '''
+        for functor in self._functors:
+            functor.unhook()
+        config = gremlin.config.Configuration() 
+        if config.verbose: syslog.info(f"CONTEXT: profile stopped {len(self._functors):,} functors")
+
 
 
     def _walk_mode_tree(self, node, branch):
@@ -699,6 +729,11 @@ class ExecutionContext():
         
         '''
         for node in anytree.PreOrderIter(self.graph):
+            if node.id == item.id:
+                # find by ID
+                if node.nodeType != node_type:
+                    syslog.warning(f"ExecGraph: warning: search by type for item {item.id} - found different node from type requested [{item.id}]  node type: [{node.nodeType.name}]")
+                return node
             if node.nodeType != node_type:
                 continue
             if hasattr(node,"container"):
@@ -1156,7 +1191,10 @@ class ExecutionContext():
             container_node.description = f"Container type: [{container.__class__.__name__}] ID: [{container.id}]"
 
             # container functor - this is what calls the process_events() method on container functors
-            container_node.functors = self._get_container_functor(container, container_node)
+            functor = self._get_container_functor(container, container_node)
+            container_node.functors = functor
+            self._functors.append(functor)
+
 
             # container condition
 
@@ -1548,7 +1586,7 @@ class ExecutionContext():
                         if hasattr(callback, "id"):
                             id = callback.id
                         else:
-                            syslog.error(f"EXEC: cannot find execution node for callback: {callback}")
+                            syslog.warning(f"EXEC: cannot find execution node for callback: {callback}")
                             continue
 
                         if self._verbose_exec: syslog.info(f"Looking for id: {id}")

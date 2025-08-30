@@ -818,7 +818,9 @@ class VJoy:
             hat_states[i] = hat.direction
 
         # Perform reset using default vJoy functionality
-        success = VJoyInterface.ResetVJD(self.vjoy_id)
+        success = False
+        if self.vjoy_id is not None:
+            success = VJoyInterface.ResetVJD(self.vjoy_id)
 
         # Restore input states based on what we recorded
         if success:
@@ -828,10 +830,7 @@ class VJoy:
                 self._button[i].is_pressed = button_states[i]
             for i in self._hat:
                 self._hat[i].direction = hat_states[i]
-        # else:
-        #     syslog.info(
-        #         "Could not reset vJoy device, are we using it?"
-        #     )
+        
 
     def used(self):
         """Updates the timestamp of the last time the device has been used."""

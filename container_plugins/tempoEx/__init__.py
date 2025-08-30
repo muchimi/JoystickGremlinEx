@@ -573,7 +573,8 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         container_node = ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
 
         if not container_node:
-            syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
+            # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
+            syslog.error(f"Unable to find a container in the execution tree: {str(self.action_data)} - missing container ID: [{self.action_data.id}]")
             self.valid = False
             return
         
@@ -596,6 +597,13 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                             self.dtap_nodes.append(node)
         
         # true if double tap enabled if we have double tap nodes to execute and not running in release mode
+
+        active_nodes = self.short_nodes + self.long_nodes + self.dtap_nodes
+        if not active_nodes:
+            syslog.warning(f"TEMPOEX: warning: no action nodes found to execute for container [{self.action_data.id}].")
+            self.valid = False
+            return
+
 
         self.dtap_enabled =  len(self.dtap_nodes) > 0 
         if self.dtap_enabled and self.activate_on != "release":

@@ -34,22 +34,24 @@ class ContainerPlugins:
     def __init__(self):
         """Initializes the container plugin manager."""
         self.reset()
+        
 
     def reset(self):
         ''' resets the plugins '''
+        import gremlin.event_handler
         self._plugins = {}
         self._discover_plugins()
 
         self._tag_to_type_map = {}
         self._name_to_type_map = {}
         # tracks all functors
+
         self._functors = []
 
         self._create_maps()
 
         self._parent_widget_map = {} # map of item data to QT widget main UI container widget
         self._input_data_container_map = {} # map of item data to the actual containers created for it
-
 
     def reset_functors(self):
         ''' clears functor tracking '''

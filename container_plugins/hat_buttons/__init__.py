@@ -239,7 +239,16 @@ class HatButtonsContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor)
 
     def profile_start(self):
         ec = gremlin.execution_graph.ExecutionContext()
-        self.container_node = ec.find(self.container, gremlin.execution_graph.ExecutionGraphNodeType.Container)
+        container_node = ec.find(self.container, gremlin.execution_graph.ExecutionGraphNodeType.Container)
+
+        if not container_node:
+            # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
+            syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
+            self.valid = False
+            return
+
+        self.container_node = container_node
+
         self.button_count = self.container.button_count
         self.lookup = _four_lookup
         if self.button_count == 8:

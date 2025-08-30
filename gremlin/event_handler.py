@@ -410,6 +410,8 @@ class EventListener:
 	profile_started = Signal() # profile started signal (after a profile starts and all process start functions are completed)
 	profile_stop = Signal() # profile stop signal (when a profile stops)
 	profile_stopping = Signal() # profile is about to stop (before a profile stops)
+	profile_stopped = Signal() # profile stopped (after a profile stopped)
+
 	profile_stop_toolbar = Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
 	profile_unload = Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
 	request_profile_stop = Signal(str) # request the profile to stop (message to display: str)
@@ -1442,6 +1444,7 @@ class EventHandler(QtCore.QObject):
 		el = gremlin.event_handler.EventListener()
 		el.profile_start.connect(self._profile_start)
 		el.profile_stop.connect(self._profile_stop)
+		el.profile_started.connect(self._profile_started)
 		el.runtime_mode_changed.connect(self._update_mode_change)
 		self._started = False
 		self.reset()
@@ -1459,27 +1462,23 @@ class EventHandler(QtCore.QObject):
 			self._last_axis_values[key] = current_value
 		return True
 
-	@QtCore.Slot()
+	
 	def _profile_start(self):
 		if not self._started:
 			self._started = True
 			self._update_mode_change(gremlin.shared_state.runtime_mode)
-			
-			# el = gremlin.event_handler.EventListener()
-			# syslog.info("EVENT: listen to joystick events ON")
-			# el.joystick_event.connect(self.execute_event)   # this is connected in coderunner
-			
 
-	@QtCore.Slot()
+
+	def _profile_started(self):
+		''' occurs when profile has started - hook functors '''
+		pass
+	
 	def _profile_stop(self):
 		if self._started:
 			self._started = False
 			self._last_tts_notify = None
 			self._last_tts_notify_time = None
-			# el = gremlin.event_handler.EventListener()
-			# el.joystick_event.disconnect(self.execute_event) # this is disconnected in coderunner
-			# syslog.info("EVENT: listen to joystick events OFF")
-
+	
 	def registerModeValidator(self, callback):
 		assert callable(callback)
 		self._mode_validator_callbacks[callback] = callback
@@ -1504,6 +1503,7 @@ class EventHandler(QtCore.QObject):
 		
 
 	def reset(self):
+		''' reset even handling for runtime '''
 		config =  gremlin.config.Configuration()
 		verbose = config.verbose
 		if verbose:
@@ -1842,6 +1842,8 @@ class EventHandler(QtCore.QObject):
 					self._install_plugins(callback),
 					permanent
 				))
+
+
 
 	def _matching_event_keys(self, event):
 		''' gets the list of latched keys for this event '''

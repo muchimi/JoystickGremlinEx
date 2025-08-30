@@ -463,13 +463,30 @@ class AbstractFunctor(QtCore.QObject):
         self.action_data = action_data
         self._id = action_data.id
         self.manual_callback = False # functor uses automatic mode
-
+        self._hooked = False
         el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self.profile_start)
-        el.profile_stop.connect(self.profile_stop)
-        el.profile_stopping.connect(self.profile_stopping)
-        el.profile_started.connect(self.profile_started)
-        el.abort.connect(self.profile_stop) # abort also stops the profile
+
+        
+    def hook(self):
+        if not self._hooked:
+            self._hooked = True
+            el = gremlin.event_handler.EventListener()
+            el.profile_start.connect(self.profile_start)
+            el.profile_stop.connect(self.profile_stop)
+            el.profile_stopping.connect(self.profile_stopping)
+            el.profile_started.connect(self.profile_started)
+            el.abort.connect(self.profile_stop) # abort also stops the profile
+
+    def unhook(self):
+        if self._hooked:
+            el = gremlin.event_handler.EventListener()
+            el.profile_start.disconnect(self.profile_start)
+            el.profile_stop.disconnect(self.profile_stop)
+            el.profile_stopping.disconnect(self.profile_stopping)
+            el.profile_started.disconnect(self.profile_started)
+            el.abort.disconnect(self.profile_stop) # abort also stops the profile
+            self._hooked = False
+
 
     
     @property

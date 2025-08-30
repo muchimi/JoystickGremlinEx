@@ -139,12 +139,13 @@ class CodeRunner:
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
 
-        eh.reset() # reset any prior run data 
+        eh.reset() # reset processing data before any new run
         vs = gremlin.joystick_handling.VjoyStart()
         vs.reset()  # reset the vjoy start data
         
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(force_rebuild = True) # rebuild the execution tree
+
         build_error = ec.getLastBuildError()
         if build_error:
             syslog.error("Error building execution tree - aborting start.")
@@ -566,7 +567,7 @@ class CodeRunner:
 
             profile_numlock_off = profile.get_force_numlock()
             profile_numlock_on = profile.get_force_numlock_on()
-            if verbose: syslog.info(f"NumLock off state: global: {numlock_off}  profile off: {profile_numlock_off} profile on: {profile_numlock_on}")
+            if verbose: syslog.info(f"NumLock off state: global: {global_numlock_off}  profile off: {profile_numlock_off} profile on: {profile_numlock_on}")
 
             numlock_off = global_numlock_off or profile_numlock_off
             numlock_on = not global_numlock_off and not profile_numlock_off and profile_numlock_on
@@ -718,7 +719,7 @@ class CodeRunner:
         # tell components we're stopping
         el.profile_stopping.emit() # about to stop
         el.profile_stop.emit() # stop
-
+       
 
         # unhook vjoy debug data
         vjoy_debug = vjoy.VjoyDebug()
@@ -776,12 +777,15 @@ class CodeRunner:
         # restore the startup mode and profile
         gremlin.shared_state.is_running = False
         gremlin.windows_event_hook.setRunning(False)
+
         
         if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:
             eh.change_profile(self._startup_profile)
         # change back to edit mode
         eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update = False)
         
+
+        el.profile_stopped.emit() # stopped
       
         # re-enable tabs
         self.enableUI()

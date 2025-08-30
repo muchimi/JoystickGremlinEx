@@ -13,10 +13,13 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### Hotfix (m76T55C)
+- Fix: rework profile start/stop logic to ensure functors connect/disconnect from profile events when profile starts/stops
+- Fix: check for vjoy ID initialized before attempting a reset on keep awake
 
 ### Hotfix (m76T55B)
-- fix: macro profile load error
-- fix: tempoEx action set data revamp (could cause an issue on new profile or older profile load)
+- Fix: macro profile load error
+- Fix: tempoEx action set data revamp (could cause an issue on new profile or older profile load)
 
 ### (m76T55)
 - Fix: macro state save state
