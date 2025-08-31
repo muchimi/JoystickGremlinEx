@@ -213,6 +213,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         super().__init__(parent)
         self.model = model
         self.index = index
+        
 
         self.action_types = {
             "Joystick": MacroActionEditor.ActionTypeData(
@@ -841,7 +842,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             items = sd.getStates().items()
             if items:
                 for key, state in items:
-                    self.state_selector.addItem(key, (action, state))
+                    self.state_selector.addItem(key, (action, state)) # store the associated action and the state
                 state = action.state
                 key = action.state.key if state else None
                 if key:
@@ -860,9 +861,11 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _state_changed(self):
-        action, data = self.state_selector.currentData()
-        self.setStateDescription(data.description)
-        action.key = data.key
+        verbose = gremlin.config.Configuration().verbose_mode_macro
+        action, state = self.state_selector.currentData() # data field contains the MacroAction the state applies to, and the state
+        self.setStateDescription(state.description)
+        action.state = state
+        if verbose: syslog.info(f"MACRO: set state [{state.key}] for entry [{action.id}]")
         self._update_model()
 
 

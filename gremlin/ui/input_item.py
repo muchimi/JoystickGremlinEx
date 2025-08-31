@@ -1186,6 +1186,12 @@ class ActionSetView(ui_common.AbstractView):
         self.view_type = view_type
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
+        # self.collapsible_container = gremlin.ui.ui_common.QCollapsible(label)
+        # self.collapsible_container.setLocked(True)
+
+
+        #self.main_layout.addWidget(self.collapsible_container)
+
         self.profile_data = profile_data
         self.allowed_interactions = profile_data.interaction_types
         self.label = label
@@ -1194,10 +1200,10 @@ class ActionSetView(ui_common.AbstractView):
         # Create a group box widget in which everything else will be placed
         #self.group_widget = QtWidgets.QGroupBox(self.label)
 
-        title = QtWidgets.QLabel(self.label)
+        title = QtWidgets.QLabel(f"{self.label} action:")
         self.main_layout.addWidget(title)
-        hline = gremlin.ui.ui_common.QHorizontalLine()
-        self.main_layout.addWidget(hline)
+        # hline = gremlin.ui.ui_common.QHorizontalLine()
+        # self.main_layout.addWidget(hline)
 
         #self.main_layout.addWidget(self.group_widget)
 
@@ -1211,9 +1217,13 @@ class ActionSetView(ui_common.AbstractView):
 
         add_action_container, add_action_layout = gremlin.ui.ui_common.getVContainer()
         
+        widgets = [action_container, add_action_container]
+        content_widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
 
-        self.main_layout.addWidget(action_container)
-        self.main_layout.addWidget(add_action_container)
+        #self.collapsible_container.setContent(content_widget)
+        self.main_layout.addWidget(content_widget)
+
+        
 
         self.setObjectName(f"ActionSetView: {label}")
 
@@ -1257,6 +1267,9 @@ class ActionSetView(ui_common.AbstractView):
         self.right_layout = right_layout
 
         self._widgets = []
+
+
+
 
     def setSelected(self, value:bool):
         ''' sets selected state'''
@@ -1686,8 +1699,6 @@ class InputItemWidget(QBoxFrame):
         self._input_description_widget = None
         self._input_description_icon = None
 
-        # self._container_layout.addWidget(gremlin.ui.ui_common.QHLine())
-
         # repeater
         self._repeater_container_widget, self._repeater_container_layout = gremlin.ui.ui_common.getVContainer()
         self._repeater_container_widget.setContentsMargins(0,0,0,2)
@@ -1696,16 +1707,11 @@ class InputItemWidget(QBoxFrame):
         self._container_layout.addWidget(self._repeater_container_widget)
         # self._container_layout.addWidget(QtWidgets.QLabel("A"))
 
-        # self._container_layout.addWidget(gremlin.ui.ui_common.QHLine())
-
         # comment row
         self._comment_container_widget, self._comment_container_layout = gremlin.ui.ui_common.getHContainer()
         self._setWidgetHeight(self._comment_container_widget, 0)
         if debug_layout:self._comment_container_widget.setStyleSheet("background: orange;")
         self._container_layout.addWidget(self._comment_container_widget)
-        
-
-        # self._container_layout.addWidget(gremlin.ui.ui_common.QHLine())
 
         # custom content row
         self._custom_container_widget, self._custom_container_layout = gremlin.ui.ui_common.getVContainer()
@@ -1714,9 +1720,6 @@ class InputItemWidget(QBoxFrame):
         if debug_layout:self._custom_container_widget.setStyleSheet("background: cyan;")
         self._container_layout.addWidget(self._custom_container_widget)
 
-        
-        # self._container_layout.addWidget(gremlin.ui.ui_common.QHLine())
-
         # status row
         self._status_container_widget, self._status_container_layout = gremlin.ui.ui_common.getVContainer()
         if debug_layout:self._status_container_widget.setStyleSheet("background: gray;")
@@ -1724,8 +1727,6 @@ class InputItemWidget(QBoxFrame):
 
         self._status_widget = None
         self._container_layout.addWidget(self._status_container_widget)
-
-        # self._container_layout.addWidget(gremlin.ui.ui_common.QHLine())
         
         # container ID row
         self._container_id_widget, self._container_id_layout = gremlin.ui.ui_common.getVContainer()
@@ -1733,9 +1734,6 @@ class InputItemWidget(QBoxFrame):
         self._setWidgetHeight(self._container_id_widget, 0)
         
         self._container_layout.addWidget(self._container_id_widget)
-        
-
-        # self._container_layout.addWidget(gremlin.ui.ui_common.QHLine())
         
         self._container_layout.addStretch(2)
     
@@ -3003,7 +3001,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         css = f"background-color:{background_color}"
         self.setStyleSheet(css)
 
-        
+        self.content_widget, self.content_layout = gremlin.ui.ui_common.getVContainer()
 
         el = gremlin.event_handler.EventListener()
         el.condition_redraw.connect(self._condition_redraw) # hook the condition redraw event so we can remove existing references to the UI going away on redraw
@@ -3036,8 +3034,12 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         
         
         self._title_bar_widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
+        self.collapsible_widget = gremlin.ui.ui_common.QCollapsible(title_widget = self._title_bar_widget)
+        self.collapsible_widget.toggled.connect(self._handle_toggled)
         
-        self.setTitleBarWidget(self._title_bar_widget)
+        #self.setTitleBarWidget(self._title_bar_widget)
+        self.setTitleBarWidget(self.collapsible_widget)
+        
 
         # Create tab widget to display various UI controls in
         self.dock_tabs =  gremlin.ui.ui_common.QDataTab()
@@ -3047,7 +3049,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.dock_tabs.setStyleSheet(f"QTabBar::tab:selected {{ background-color: {background_color}; }}")
         
         self.dock_tabs.setTabPosition(QtWidgets.QTabWidget.East)
-        self.setWidget(self.dock_tabs)
+        
+        self.content_layout.addWidget(self.dock_tabs)
+        self.setWidget(self.content_widget)
+
         self.dock_tabs.data = self.container # associated the data tab with the container
         
         # Create the individual tabs
@@ -3083,7 +3088,37 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self._handle_lock_changed_ui(self.profile_data.input_item)
 
         gremlin.util.singleShot(self._config_visible)
+
+        if self.container.collapsed:
+            self.collapsible_widget.collapse(False)
+        else:
+            self.collapsible_widget.expand(False)
         
+
+        self.collapsible_widget.setContent(self.content_widget, own = False)
+
+        el = gremlin.event_handler.EventListener()
+        el.collapse_all_containers.connect(self._handle_collapse)
+        el.expand_all_containers.connect(self._handle_expand)
+
+    @QtCore.Slot()
+    def _handle_toggled(self):
+        self.container.collapsed = self.collapsible_widget.isCollapsed()
+
+
+    def _handle_collapse(self):
+        gremlin.util.InvokeUiMethod(self._handle_collapse_ui)
+
+    def _handle_collapse_ui(self):
+        ''' collapse the container - ui thread'''
+        self.collapsible_widget.collapse(False)
+
+    def _handle_expand(self):
+        gremlin.util.InvokeUiMethod(self._handle_expand_ui)
+
+    def _handle_expand_ui(self):
+        ''' expand the container - ui thread '''
+        self.collapsible_widget.expand(False)
 
     def _config_visible(self):
         if not Shiboken.isValid(self):
@@ -3993,10 +4028,20 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.connect(self._mapping_changed)
+        el.ui_ready.connect(self._handle_ui_ready)
 
         self._deleted = False
 
+    def _handle_ui_ready(self):
+        gremlin.util.InvokeUiMethod(self._handle_ui_ready_ui)
+
+    def _handle_ui_ready_ui(self):
+        syslog.info("invalidate Ui")
+        layout = self.layout()
+        layout.invalidate()
+        layout.activate()
         
+
     def _mapping_changed(self, item_data):
         ''' occurs when a device mapping changed through user interaction with the UI '''
         from gremlin.event_handler import DeviceChangeEvent
@@ -4154,13 +4199,18 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             plugin_manager.set_widget(self.item_data, self)
 
       
-            self.container_view.redraw()
+            
 
             
 
         finally:
             self.setUpdatesEnabled(True)
+            self.container_view.redraw()
             self.update()
+
+
+            #gremlin.util.singleShot(lambda: self.container_view.redraw())
+            #
 
 
     def _add_action(self, action_name):
@@ -4569,8 +4619,14 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.always_execute.setChecked(self.item_data.always_execute)
         self.always_execute.stateChanged.connect(self._always_execute_cb)
 
+        self.collapse_all_widget = gremlin.ui.ui_common.Buttons.getCollapseAllWidget(callback = self._handle_collapse_all)
+        self.expand_all_widget = gremlin.ui.ui_common.Buttons.getExpandAllWidget(callback = self._handle_expand_all)
+
         widgets = [self.action_selector,
                    self.container_selector,
+                   self.collapse_all_widget,
+                   self.expand_all_widget,
+                   "|",
                    self.always_execute
                    ]
 
@@ -4580,6 +4636,15 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.dropdown_widget.setMinimumWidth(desired_width)
         
 
+    def _handle_collapse_all(self):
+        ''' collapses all containers '''
+        el = gremlin.event_handler.EventListener()
+        el.collapse_all_containers.emit()
+
+    def _handle_expand_all(self):
+        ''' expands all containers '''
+        el = gremlin.event_handler.EventListener()
+        el.expand_all_containers.emit()
 
     def updateSelectors(self, input_type, item_data):
         self.action_selector.refresh(input_type, item_data)
@@ -4795,6 +4860,13 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
         self._widgets = []
 
+    # def doLayout(self):
+    #     layout = self.scroll_layout
+    #     if layout:
+    #         layout.invalidate()
+    #         layout.activate()
+
+
 
     def _cleanup_ui(self):
         ''' widget cleanup '''
@@ -4820,6 +4892,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         self.scroll_widget, self.scroll_layout = gremlin.ui.ui_common.getVContainer()
         self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.scroll_area.setWidget(self.scroll_widget)
+
 
 
     def redraw(self):
@@ -4855,9 +4928,12 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                     widget.setContentsMargins(4,4,4,4)
                     #widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
                     self.scroll_layout.addWidget(widget)
-                #self.scroll_layout.addStretch(1)
+                self.scroll_layout.addStretch()
             finally:
                 self.redraw_lock.release()
+
+
+        # gremlin.util.singleShot(lambda: self.doLayout())
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.

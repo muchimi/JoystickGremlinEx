@@ -100,63 +100,63 @@ class MacroListModel(QtCore.QAbstractListModel):
         if idx >= len(self._data):
             return ""
 
-        entry = self._data[idx]
+        action = self._data[idx]
         
         if role == QtCore.Qt.SizeHintRole:
             # size hint
             return QtCore.QSize(200, 26)
         elif role == QtCore.Qt.UserRole:
-            return entry
+            return action
         elif role == QtCore.Qt.DecorationRole:
-            if isinstance(entry, gremlin.macro.PauseAction):
+            if isinstance(action, gremlin.macro.PauseAction):
                 return MacroListModel.icon_lookup["pause"]
-            elif isinstance(entry, gremlin.macro.KeyAction):
-                action = "press" if entry.is_pressed else "release"
+            elif isinstance(action, gremlin.macro.KeyAction):
+                action = "press" if action.is_pressed else "release"
                 return MacroListModel.icon_lookup[action]
-            elif isinstance(entry, gremlin.macro.MouseButtonAction):
-                action = "press" if entry.is_pressed else "release"
+            elif isinstance(action, gremlin.macro.MouseButtonAction):
+                action = "press" if action.is_pressed else "release"
                 return MacroListModel.icon_lookup[action]
             else:
                 return None
         elif role == QtCore.Qt.DisplayRole:
-            if isinstance(entry, gremlin.macro.JoystickAction):
+            if isinstance(action, gremlin.macro.JoystickAction):
                 device_name = "Unknown"
                 for joy in gremlin.joystick_handling.joystick_devices():
-                    if joy.device_guid == entry.device_guid:
+                    if joy.device_guid == action.device_guid:
                         device_name = joy.name
-                display =  f"{device_name} {InputType.to_string(entry.input_type).capitalize()} {entry.input_id} - {MacroListModel.value_format[entry.input_type](entry)}"
-            elif isinstance(entry, gremlin.macro.KeyAction):
-                display =  f"{'Press' if entry.is_pressed else 'Release'} key {entry.key.name}"
-            elif isinstance(entry, gremlin.macro.MouseButtonAction):
-                if entry.button in [
+                display =  f"{device_name} {InputType.to_string(action.input_type).capitalize()} {action.input_id} - {MacroListModel.value_format[action.input_type](action)}"
+            elif isinstance(action, gremlin.macro.KeyAction):
+                display =  f"{'Press' if action.is_pressed else 'Release'} key {action.key.name}"
+            elif isinstance(action, gremlin.macro.MouseButtonAction):
+                if action.button in [
                     gremlin.types.MouseButton.WheelDown,
                     gremlin.types.MouseButton.WheelUp,
                 ]:
-                    display =  f"{gremlin.types.MouseButton.to_string(entry.button)}"
+                    display =  f"{gremlin.types.MouseButton.to_string(action.button)}"
                 else:
-                    display =  f"{'Press' if entry.is_pressed else 'Release'} {gremlin.types.MouseButton.to_string(entry.button)} mouse button"
-            elif isinstance(entry, gremlin.macro.MouseMotionAction):
-                display =  f"Move mouse by x: {entry.dx:d} y: {entry.dy:d}"
-            elif isinstance(entry, gremlin.macro.PauseAction):
-                msg = f"Pause for {entry.duration:.3f} s"
-                if entry.duration_max != 0:
-                    msg += f" to {entry.duration_max:.3f} s"
-                if entry.is_random:
+                    display =  f"{'Press' if action.is_pressed else 'Release'} {gremlin.types.MouseButton.to_string(action.button)} mouse button"
+            elif isinstance(action, gremlin.macro.MouseMotionAction):
+                display =  f"Move mouse by x: {action.dx:d} y: {action.dy:d}"
+            elif isinstance(action, gremlin.macro.PauseAction):
+                msg = f"Pause for {action.duration:.3f} s"
+                if action.duration_max != 0:
+                    msg += f" to {action.duration_max:.3f} s"
+                if action.is_random:
                     msg += " (random)"
                 display = msg
 
 
-            elif isinstance(entry, gremlin.macro.VJoyMacroAction):
-                display =  f"vJoy {entry.vjoy_id} {InputType.to_string(entry.input_type).capitalize()} {entry.input_id} - {MacroListModel.value_format[entry.input_type](entry)}"
+            elif isinstance(action, gremlin.macro.VJoyMacroAction):
+                display =  f"vJoy {action.vjoy_id} {InputType.to_string(action.input_type).capitalize()} {action.input_id} - {MacroListModel.value_format[action.input_type](action)}"
 
-            elif isinstance(entry, gremlin.macro.RemoteControlAction):
-                display = f"Remote control: {VjoyAction.to_name(entry.command)}"
-            elif isinstance(entry, gremlin.macro.StateAction):
-                if entry.state:
+            elif isinstance(action, gremlin.macro.RemoteControlAction):
+                display = f"Remote control: {VjoyAction.to_name(action.command)}"
+            elif isinstance(action, gremlin.macro.StateAction):
+                if action.state:
                     if gremlin.config.Configuration().show_container_id:
-                        display = f"Set state [{entry.state.key}] [{entry.state.id}] {f'Press/On' if entry.value else 'Release/Off'}"    
+                        display = f"Set state [{action.state.key}] state ID: [{action.state.id}] {f'Press/On' if action.value else 'Release/Off'} action ID: [{action.id}]"    
                     else:
-                        display = f"Set state [...] {'Press/On' if entry.value else 'Release/Off'}"
+                        display = f"Set state [{action.state.key}] {'Press/On' if action.value else 'Release/Off'}"
                 else:
                     display = "Set State (no state data found)"
             else:

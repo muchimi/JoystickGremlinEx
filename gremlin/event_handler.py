@@ -557,6 +557,9 @@ class EventListener:
 
 	lock_inputs = Signal(object) # fires when all inputs should be locked, object = device_guid of the device to lock
 	unlock_inputs = Signal(object) # fires when all inputs should be unlocked, object = device_guid of the device to unlock
+
+	collapse_all_containers = Signal() # collapse all containers
+	expand_all_containers = Signal() # expand all containers
 	
 	
 	def __init__(self):

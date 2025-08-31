@@ -803,12 +803,21 @@ class MacroAbstractAction(QtCore.QObject):
     """Base class for all macro action."""
 
     changed = Signal() # fires when the action changes
+    idChanged = Signal() # fires if the ID changed
 
     def __init__(self, data = None):
         super().__init__()    
         self._data = data
-        self.id = gremlin.util.get_guid() # unique ID of the macro
+        self._id = gremlin.util.get_guid() # unique ID of the macro
 
+    @property
+    def id(self):
+        return self._id
+    @id.setter
+    def id(self, value):
+        if self._id != value:
+            self._id = value
+            self.idChanged.emit()
    
 
     @property
@@ -820,11 +829,11 @@ class MacroAbstractAction(QtCore.QObject):
 
     def __getstate__(self):
         state = {}
-        state['id'] = self.id
+        state['id'] = self._id
         return state
 
     def __setstate__(self, state):
-        self.id = state['id']
+        self._id = state['id']
 
 
 
@@ -1316,7 +1325,7 @@ class StateAction(MacroAbstractAction):
         state['state_id'] = self._state_id
         state['register_check'] = self._register_check
         state['value'] = self.value
-        state['action'] = self._action
+        state['action'] = self.action
         return state
 
     def __setstate__(self, state):
@@ -1326,11 +1335,13 @@ class StateAction(MacroAbstractAction):
         #self._state  = state['state']
         self._state_id =  state['state_id']
         self._register_check = state['register_check']
-        self._action = state['action']
+        self.action = state['action']
         self.value = state['value'] 
         sd = gremlin.ui.state_device.StateData()
         self._state = sd.getStateById(self._state_id)
         # sd.crud.connect(self._data_changed)
+
+    
 
     @property
     def key(self):

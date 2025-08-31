@@ -54,29 +54,6 @@ from gremlin.base_classes import AbstractInputItem
 import psygnal
 from psygnal import Signal
 
-
-# class ModeInputModeType(enum.IntEnum):
-#     ''' possible input modes '''
-#     ModeEnter = 0  # executes on mode enter
-#     ModeExit = 1 # executes on mode exit
-#     ModeGlobalEnter = 2 # executes on any mode change (activate)
-#     ModeGlobalExit = 3 # executes on any mode change (deactivate)
-
-#     @staticmethod
-#     def to_display_name(value):
-#         match value:
-#             case ModeInputModeType.ModeEnter:
-#                 return "Mode Activate"
-#             case ModeInputModeType.ModeExit:
-#                 return "Mode Deactivate"
-#             case ModeInputModeType.ModeGlobalEnter:
-#                 return "Mode Activate (any)"
-#             case ModeInputModeType.ModeGlobalExit:
-#                 return "Mode Deactivate (any)"
-        
-#         return f"Unknown mode: {value}"
-    
-
 class StateCategory():
     ''' holds a state category '''
     def __init__(self, name : str, id = None):
@@ -99,8 +76,6 @@ class StateCategory():
             # tell UI of category name change
             el = gremlin.event_handler.EventListener()
             el.state_category_name_change.emit(self)
-
-
 
 
     @property
@@ -434,6 +409,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._expression = expression # expression to evaluate to derive a state
         self._is_expression = is_expression
         self._expression_stack = [] # expression stack to evaluate
+        self._expression_dependencies = [] # reference to state dependencies for expressions
         self._dirty = True # indicates the state is stale and must be recomputed (expressions only)
         self._expression_states = [] # dependent expression states - list of states that need to be evaluated when they change
         self._last_expression_value = False # last computed expression result
@@ -450,11 +426,8 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._input_item = item
 
 
-
-        el = gremlin.event_handler.EventListener()
-        el.state_name_change.connect(self._state_name_change)
-        el.state_category_delete.connect(self._state_category_delete)
-        el.state_category_name_change.connect(self._state_category_name_change)
+        self._hooked = False
+        self.hook() # hook on creation
 
 
     def clone(self):
@@ -466,6 +439,45 @@ class StateInputItem(gremlin.base_profile.InputItem):
     def getOverrideInputType(self):
         ''' override type '''
         return InputType.JoystickButton
+    
+    def hook(self):
+        ''' called when the state is being created - hooks into the event model'''
+        if not self._hooked:
+            
+            self._hooked = True
+            el = gremlin.event_handler.EventListener()
+            el.state_name_change.connect(self._state_name_change)
+            el.state_category_delete.connect(self._state_category_delete)
+            el.state_category_name_change.connect(self._state_category_name_change)
+            el.profile_unloaded.connect(self._handle_profile_unload)
+            verbose = gremlin.config.Configuration().verbose_mode_state
+            if verbose: syslog.info(f"STATE: hook [{self._key}] id: [{self._id}]")
+
+    def unhook(self):
+        ''' called when the state should unhook itself because it is being discarded '''
+        if self._hooked:
+
+            # clear any dependencies
+            for state in self._expression_dependencies:
+                state.changed.disconnect(self._dependency_changed)
+            self._expression_dependencies.clear()
+
+
+            el = gremlin.event_handler.EventListener()
+            el.state_name_change.disconnect(self._state_name_change)
+            el.state_category_delete.disconnect(self._state_category_delete)
+            el.state_category_name_change.disconnect(self._state_category_name_change)
+            el.profile_unloaded.disconnect(self._handle_profile_unload)
+            self._hooked = False
+            verbose = gremlin.config.Configuration().verbose_mode_state
+            if verbose: syslog.info(f"STATE: unhook [{self._key}]  id: [{self._id}]")
+
+
+    def _handle_profile_unload(self):
+        ''' occurs on profile unload before a new profile is loaded  '''
+        self.unhook()
+
+
     
     @property
     def id(self) -> str:
@@ -614,12 +626,10 @@ class StateInputItem(gremlin.base_profile.InputItem):
             self._category = default_category  # replace with default category
             self.category_changed.emit(self)
 
-
     def _state_category_name_change(self, category : StateCategory):
         ''' called when a category is changed '''
         if self._category == category:
             self.category_changed.emit(self)
-
     
 
     @property
@@ -873,6 +883,11 @@ class StateInputItem(gremlin.base_profile.InputItem):
         while stack:
             output.append(stack.pop())
 
+        # clean hooks from any prior dependencies
+        for state in self._expression_dependencies:
+            state.changed.disconnect(self._dependency_changed)
+        self._expression_dependencies.clear()
+
 
         # hook the dependent states
         for key in self._expression_states:
@@ -885,6 +900,10 @@ class StateInputItem(gremlin.base_profile.InputItem):
                     return ([],True, msg)
                 return []
             state.changed.connect(self._dependency_changed)
+            # remember the dependencies so we can clean them up later
+            if not state in self._expression_dependencies:
+                self._expression_dependencies.append(state)
+
 
         if as_tuple:
             return (output,False,None)
@@ -1069,12 +1088,12 @@ class StateData(QtCore.QObject):
             # already in the list
             return self._data[key]
         
-        item = StateInputItem(key, value, description)    
-        self._data[key] = item
-        self._id_map[item.id] = item
+        state_data = StateInputItem(key, value, description)    
+        self._data[key] = state_data
+        self._id_map[state_data.id] = state_data
         self.crud.emit()
-        item.key_changed.connect(self._key_changed)
-        return item
+        state_data.key_changed.connect(self._key_changed)
+        return state_data
     
     @QtCore.Slot()
     def _key_changed(self):
@@ -1092,7 +1111,11 @@ class StateData(QtCore.QObject):
         ''' removes a state from the list '''
         key = key.casefold().strip()
         if key in self._data:
-            id = self._data[key].id
+            state_data = self._data[key]
+            state_data.unhook()
+            state_data.key_changed.disconnect(self._key_changed)
+
+            id = state_data.id
             del self._data[key]
             del self._id_map[id]
 
@@ -1156,13 +1179,10 @@ class StateData(QtCore.QObject):
     def setValue(self, key : str, value, emit = True):
         ''' sets state value (and registers if needed) '''
         key = key.casefold().strip()
-        #trigger = not key in self._data or self._data[key].value != value
         verbose = gremlin.config.Configuration().verbose_mode_state
         if verbose: syslog.info(f"STATE: [{key}] -> {value}")
         self._data[key].value = value
-        # if emit and trigger:
-        #     self.changed.emit(self._data[key])   
-        #     QtWidgets.QApplication.processEvents()
+
     
     def description(self, key : str) -> str:
         ''' gets the description for the state '''
@@ -1210,6 +1230,7 @@ class StateData(QtCore.QObject):
         key = key.casefold().strip()
         if key in self._data:
             data = self._data[key]
+            data.unhook()
             del self._data[key]
             del self._id_map[data.id]
             self.crud.emit()
@@ -1217,6 +1238,7 @@ class StateData(QtCore.QObject):
     def removeId(self, id: str):
         if id in self._id_map:
             data = self._id_map[id]
+            data.unhook()
             key = data.key
             del self._data[key]
             del self._id_map[data.id]
@@ -1545,7 +1567,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self._edit_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._edit_widget.setTriggerOnFocusOnly(False) # trigger on every character
-        #self._edit_widget.lostFocus.connect(self._new_category_changed_cb)
+        
         self._edit_widget.valueChanged.connect(self._new_category_changed_cb)
 
         widget, layout = gremlin.ui.ui_common.getHContainer([self._edit_widget, self._add_button, self._delete_button],"New Category:")
@@ -1868,15 +1890,6 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         ''' clears and hides the status text '''
         self._set_status(None)
 
-    # def _category_changed_cb(self, index):
-    #     ''' called when selected command changes '''
-    #     category = self._category_selector_widget.currentData()
-    #     index = self._category_selector_widget.findData(category)
-    #     if index == -1:
-    #         self._cm.updateSelector(self._category_selector_widget)
-    #         index = self._category_selector_widget.findData(category)
-    #     if index != -1:
-    #         self._category_selector_widget.setCurrentIndex(index)
         
     def category(self) -> StateCategory:
         ''' gets the current selected category '''

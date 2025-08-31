@@ -13,6 +13,14 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T56)
+- Fix: log message invalid property on some execution nodes
+- Fix: state name appearing as ellispis (...) in macro step if container IDs are hidden
+- Fix: state duplication exception when a state is duplicated in a macro
+- Rework: profile load/unload state object optimizations
+- New: collapsible containers - containers (right panel) can be collapsed or expanded and should remember the last state if the profile is saved.  There is an arrow next to the container title bar to toggle the collapsed/expanded state.  Defaults to expanded.
+
+
 ### Hotfix (m76T55C)
 - Fix: rework profile start/stop logic to ensure functors connect/disconnect from profile events when profile starts/stops
 - Fix: check for vjoy ID initialized before attempting a reset on keep awake

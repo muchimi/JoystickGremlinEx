@@ -402,6 +402,7 @@ class AbstractContainer(ProfileData):
         self.parent_node = node
         self.comment = None # user comment
         self._callbacks_enabled = True # callbacks are enabled by default for this container
+        self._collapsed = False # true if the container is collapsed
 
         el = gremlin.event_handler.EventListener()
         el.virtual_button_changed.connect(self._virtual_button_changed)
@@ -431,6 +432,14 @@ class AbstractContainer(ProfileData):
         #     self.device_input_id = None
         #     self.device_input_type = None
         #     self.device = None
+
+    @property
+    def collapsed(self) -> bool:
+        return self._collapsed
+    
+    @collapsed.setter
+    def collapsed(self, value: bool):
+        self._collapsed = value
 
     @QtCore.Slot(object, object, object)
     def _virtual_button_changed(self, input_item, container, action):
@@ -646,6 +655,9 @@ class AbstractContainer(ProfileData):
             comment = node.get("comment")
         if comment:
             self.comment = comment
+
+        self._collapsed = safe_read(node,"collapsed",bool, False)
+
         self._parse_action_set_xml(node, data, extra_data)
         self._parse_virtual_button_xml(node, data)
         self._parse_activation_condition_xml(node, data)
@@ -661,6 +673,8 @@ class AbstractContainer(ProfileData):
 
         if self.comment:
             node.set("comment", self.comment)
+
+        node.set("collapsed", safe_format(self._collapsed, bool)) # collapsed state
 
         # Add activation condition if needed
         if self.virtual_button:

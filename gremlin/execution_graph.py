@@ -686,7 +686,14 @@ class ExecutionContext():
                     break
                 # bump to parent node if not found
                 node = node.parent
-                if verbose: syslog.info(f"\tNot found, using parent node: {node.name}")
+                if verbose:
+                    stub = "n/a"
+                    if hasattr(node,"display"):
+                        stub = node.display
+                    elif hasattr(node,"name"):
+                        stub = node.name
+                    syslog.info(f"\tNot found, using parent node: {stub}")
+
         return callback_list
 
     def getMappedInputs(self, input_type : InputType) -> list[ExecutionContextInputData]:
@@ -1621,10 +1628,6 @@ class ExecutionContext():
         if self._verbose_detailed: 
             logtabs = gremlin.shared_state.logTabs()
             syslog.info(f"{logtabs}Register container node functors node id {node.id} {node.description} : {len(functors)} functors")
-
-
-
-
 
     def dumpFunctors(self, functor_list):
         ''' dumps functors to the log file for debug purposes '''
