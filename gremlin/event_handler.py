@@ -1121,7 +1121,7 @@ class EventListener:
 			key = (device_id, input_id)
 
 			if not key in self._hat_state:
-				self._hat_state[key] = value
+				self._hat_state[key] = False
 
 			current = self._hat_state[key]
 			if current != value:
@@ -1156,7 +1156,10 @@ class EventListener:
 				event_list.append(new_event)
 				
 				if not gremlin.shared_state.is_running:
-					gremlin.util.singleShot(lambda : self.button_state_change.emit(new_event))
+					for evt in event_list:
+						gremlin.util.singleShot(lambda : self.button_state_change.emit(evt))
+
+
 
 		if event_list:		
 			for event in event_list:
@@ -2429,7 +2432,7 @@ class EventHandler(QtCore.QObject):
 			verbose = config.verbose_mode_osc and config.verbose_mode_extra
 			if verbose and not callback_list:
 				# syslog = logging.getLogger("system")
-				syslog.info(f"EVENT: OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
+				syslog.info(f"EVENT: OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]. This is normal if OSC input has no mappings.")
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:
@@ -2452,8 +2455,7 @@ class EventHandler(QtCore.QObject):
 
 			verbose = gremlin.config.Configuration().verbose_mode_state
 			if verbose and not callback_list:
-				# syslog = logging.getLogger("system")
-				syslog.info(f"EVENT: STATE: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
+				syslog.info(f"STATE: state: [{key}] mode: [{self.runtime_mode}] has no callbacks. This is normal if state has no mappings.")
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:

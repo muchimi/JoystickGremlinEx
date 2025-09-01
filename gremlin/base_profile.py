@@ -433,6 +433,53 @@ class AbstractContainer(ProfileData):
         #     self.device_input_type = None
         #     self.device = None
 
+    def dumpActionSets(self, action_sets : list, label = None):
+        ''' dumps the container's action sets to the output '''
+
+        if label:
+            syslog.info(f"Container action sets: {label}")
+        else:
+            syslog.info("Container action sets:")
+
+        if not action_sets:
+            syslog.info("\tno action sets found")
+        
+        for index, action_set in enumerate(action_sets):
+            self.dumpActionSet(action_set, label = f"Action set [{index}]:", indent = "\t")
+
+        
+
+    def dumpActionSet(self, action_set : list, label = None, indent = ""):
+        ''' dumps a single action set'''
+        if label:
+            syslog.info(f"{indent}{label}")
+        else:
+            syslog.info(f"{indent}Action set:")
+        
+        if not action_set:
+            syslog.info(f"{indent}\tset is empty")
+            return
+        
+        empty_sets = [action for action in action_set if not action]
+        actions = [action for action in action_set if action]
+        syslog.info(f"{indent}\tFound: {len(action_set)} actions, {len(empty_sets)} empty actions, {len(actions)} actions")
+        
+        action: AbstractAction
+        for index, action in enumerate(action_set):
+            if action:
+                if hasattr(action, "display_name"):
+                    display_name = action.display_name()
+                else:
+                    display_name = f"class: {action.__class__.__name__}"
+                syslog.info(f"{indent}\t\tAction [{index}]: {display_name} id: [{action.id}] priority: [{action.priority}] has conditions: [{action.has_conditions}] is axis: [{action.input_is_axis()}]  is button: [{action.input_is_button()}] enabled: [{action.enabled}]")
+
+
+
+
+
+        
+
+
     @property
     def collapsed(self) -> bool:
         return self._collapsed
@@ -1068,6 +1115,9 @@ class AbstractAction(ProfileData):
 
         if verbose and value:
             syslog.info(f"Functor: {self.name} {type(self).__name__} enabled")
+
+    def enabled(self)-> bool:
+        return self._enabled
 
     def input_is_axis(self):
         ''' true if the input is an axis type input '''

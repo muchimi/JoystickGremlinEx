@@ -13,6 +13,20 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+
+### (m76T57)
+- Added additional instrumentation to TempoEx to output configuration and logic flow to the log file (requires container verbose mode).
+- Added additional instrumentation to Vjoy Remap to output more data to the log file (requires vjoy or joystick verbose mode).
+- Fix: double tap tempoEx executing short press nodes
+- Fix: tempoEx not displaying sub-condition for actions preventing conditions from being set on individual actions
+- Fix: automatic select device input on start if no device is found will now log the issue and ignore the request rather than causing a general exception
+- Fix: macro state actions shows correct action instead of the deprecated data
+- Fix: hourglass not on UI thread in some cases with the new non QT event model
+- Fix: hat auto input select UI could confuse the UI
+- Fix: more QT C++ garbage collection shenanigans checks
+
+
+
 ### (m76T56)
 - Fix: log message invalid property on some execution nodes
 - Fix: state name appearing as ellispis (...) in macro step if container IDs are hidden

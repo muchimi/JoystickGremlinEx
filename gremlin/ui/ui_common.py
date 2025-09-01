@@ -4629,16 +4629,15 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def _update_value(self, is_pressed):
         ''' updates a button position '''
-        
         if self._last_state_value is None or self._last_state_value != is_pressed:
-
             gremlin.util.InvokeUiMethod(self._update_pixmap_ui, is_pressed)
-
             self._last_state_value = is_pressed
               
 
     def _update_pixmap_ui(self, state):
         # updates the visual, on UI thread
+        if not Shiboken.isValid(self._button_widget):
+            return
         if state:
             self._button_widget.setPixmap(self._on_pixmap)
         else:
@@ -4646,6 +4645,8 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def _update_hat(self, position):
         ''' updates a hat position '''
+        if not Shiboken.isValid(self._button_widget):
+            return
         if self._deleted:
             return
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""

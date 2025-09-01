@@ -154,9 +154,9 @@ class MacroListModel(QtCore.QAbstractListModel):
             elif isinstance(action, gremlin.macro.StateAction):
                 if action.state:
                     if gremlin.config.Configuration().show_container_id:
-                        display = f"Set state [{action.state.key}] state ID: [{action.state.id}] {f'Press/On' if action.value else 'Release/Off'} action ID: [{action.id}]"    
+                        display = f"Set state [{action.state.key}] state ID: [{action.state.id}] action: [{action.action}] action ID: [{action.id}]"    
                     else:
-                        display = f"Set state [{action.state.key}] {'Press/On' if action.value else 'Release/Off'}"
+                        display = f"Set state [{action.state.key}] action: [{action.action}]"
                 else:
                     display = "Set State (no state data found)"
             else:

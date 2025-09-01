@@ -211,6 +211,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._process_runtime_map = {} # map of MODE to process associated with a profile - the process executable is the key
         self._active_process_path = None # active mapped process path 
         self._last_toast_message = None
+        self._change_input_lock = threading.Lock() # true when changing inputs
 
         self._resize_count = 0
 
@@ -2843,8 +2844,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if gremlin.shared_state.is_input_selection_suspended:
             return # skip if disabled
         gremlin.util.pushCursor()
-        eh = gremlin.event_handler.EventListener()
-        eh.select_input.emit(device_guid, input_type, input_id, force_update, force_switch, tab_changed)
+        el = gremlin.event_handler.EventListener()
+        el.select_input.emit(device_guid, input_type, input_id, force_update, force_switch, tab_changed)
         gremlin.util.popCursor()
 
 
@@ -2892,44 +2893,51 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         import gremlin.util
         import gremlin.shared_state
 
+        if self._change_input_lock.locked():
+            return
+        
         verbose = gremlin.config.Configuration().verbose_mode_inputs
         
-
         
-        if gremlin.shared_state.is_input_selection_suspended:
-            return # skip if disabled
-
-
-        el = gremlin.event_handler.EventListener()
-
-        if not device_guid:
-            # no device selected - ignore
-            return
-
-        if self._selection_locked:
-            return
-        
-        # avoid spamming
-        if not force_update and self._last_input_change_timestamp + self._input_delay > time.time():
-                # delay not occured yet
-                return
-        self._last_input_change_timestamp = time.time()
-
-        
-        # syslog = logging.getLogger("system")
-        input_id = restore_input_id
-        input_type = restore_input_type
-        
-        switch_input = force_switch # true if inputs are switched or forcing refresh
-
-        switch_enabled = self.is_highligthing_enabled
-        if not force_switch and gremlin.util.compare_guid(gremlin.shared_state.current_tab_device_guid,device_guid) and not switch_enabled:
-            if verbose:
-                syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)")
-            return
-
-
         try:
+        
+            self._change_input_lock.acquire_lock()
+
+            
+            
+            if gremlin.shared_state.is_input_selection_suspended:
+                return # skip if disabled
+
+
+            el = gremlin.event_handler.EventListener()
+
+            if not device_guid:
+                # no device selected - ignore
+                return
+
+            if self._selection_locked:
+                return
+            
+            # avoid spamming
+            if not force_update and self._last_input_change_timestamp + self._input_delay > time.time():
+                    # delay not occured yet
+                    return
+            self._last_input_change_timestamp = time.time()
+
+            
+            # syslog = logging.getLogger("system")
+            input_id = restore_input_id
+            input_type = restore_input_type
+            
+            switch_input = force_switch # true if inputs are switched or forcing refresh
+
+            switch_enabled = self.is_highligthing_enabled
+            if not force_switch and gremlin.util.compare_guid(gremlin.shared_state.current_tab_device_guid,device_guid) and not switch_enabled:
+                if verbose:
+                    syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)")
+                return
+
+
 
             gremlin.util.pushCursor()
 
@@ -2941,7 +2949,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # index of current device tab
             index = self.ui.devices.currentIndex()
+            if index == -1:
+                # no current index 
+                return
             tabdata = self.ui.devices.tabData(index)
+            if not tabdata:
+                # no current data
+                return
+
             current_device_guid = tabdata.device_guid
             current_input_type, current_input_id = self._get_last_input(current_device_guid)
 
@@ -3087,13 +3102,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # save settings as the last input
             el.input_selection_changed.emit(device_guid, input_type, input_id)
             el.update_input_state.emit(device_guid)
+        except Exception as err:
+            # something went south with the selection
+            syslog.error("TabIndex generic unhandled error occured in _select_input_handler_ui():")
+            syslog.error(err)
+
             
 
         finally:
             
             # allow UI to refresh / update
-            QtWidgets.QApplication.processEvents()
-
             
 
             # validation check
@@ -3127,6 +3145,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             self._selection_locked = False
             gremlin.util.popCursor()
+            self._change_input_lock.release_lock()
+            # QtWidgets.QApplication.processEvents()
 
             
     @QtCore.Slot(object, object, object)
