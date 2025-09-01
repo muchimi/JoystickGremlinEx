@@ -14,3 +14,4 @@ python-rtmidi >= 1.5.8
 hid >= 1.0.7
 psygnal >= 0.13.0
 lxml >= 6.0.0
+msgpack >= 1.1.0
