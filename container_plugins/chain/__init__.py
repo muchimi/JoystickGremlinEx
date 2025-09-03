@@ -109,17 +109,25 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        self.profile_data.add_action(action_item)
-        self.container_modified.emit()
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            self.profile_data.add_action(action_item)
+            self.container_modified.emit()
+        finally:
+            gremlin.util.popCursor()
 
     def _paste_action(self, action, container):
         ''' pastes an action '''
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        self.profile_data.add_action(action_item)
-        self.container_modified.emit()
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.duplicate(action, self.profile_data)
+            self.profile_data.add_action(action_item)
+            self.container_modified.emit()
+        finally:
+            gremlin.util.popCursor()
 
     def _timeout_changed_cb(self, value):
         """Stores changes to the timeout element.

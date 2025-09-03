@@ -122,7 +122,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def _update_conditions_ui(self):
         ''' updates the condition UI for this container '''
-        self.activation_condition_modified.emit()
+        #self.activation_condition_modified.emit()
         self.container_condition_view.redraw()
 
 
@@ -1505,8 +1505,8 @@ class ConditionView(ui_common.AbstractView):
     def redraw(self):
         """Redraws the entire view."""
 
-        el = gremlin.event_handler.EventListener()
-        el.condition_redraw.emit(self.model.action_data)
+        # el = gremlin.event_handler.EventListener()
+        # el.condition_redraw.emit(self.model.action_data)
         
         ui_common.clear_layout(self.conditions_layout)
 
@@ -1523,7 +1523,7 @@ class ConditionView(ui_common.AbstractView):
             self.conditions_layout.addWidget(condition_widget)
 
         
-        el.condition_state_changed.emit(self.model.action_data)
+        #el.condition_state_changed.emit(self.model.action_data)
 
     def _add_condition(self):
         """Adds a condition to the view's model."""

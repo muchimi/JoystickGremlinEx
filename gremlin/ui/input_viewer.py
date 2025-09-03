@@ -53,15 +53,7 @@ class VisualizationConfig():
         self._config = {}  # map of device guid, input_type, input_id - selected flag
         self.reload()
 
-    def getEnabled(self, device_id, input_type : VisualizationType) -> bool:
-        if not isinstance(device_id, str):
-            device_id = str(device_id)
-        if device_id in self._config:
-            if input_type in self._config[device_id]:
-                return self._config[device_id][input_type]
-        return False
-    
-    def register(self, device_id, input_type : VisualizationType, enabled : bool):
+    def register(self, device_id, input_type : VisualizationType):
         ''' registers a configuration entry 
         
         :param device_id: id (str) or guid - device id
@@ -72,7 +64,8 @@ class VisualizationConfig():
             device_id = str(device_id)
         if not device_id in self._config:
             self._config[device_id] = {}
-        self._config[device_id][input_type] = enabled
+        if not input_type in self._config[device_id]:
+            self._config[device_id][input_type] = None
 
 
     def save(self):
@@ -85,18 +78,21 @@ class VisualizationConfig():
             syslog.info("INPUT VIEWER: save configuration")
 
         root = etree.Element("config")
-        for device_guid in self._config:
-            for id in self._config[device_guid]:
-                value = self._config[device_guid][id]
+        for device_id in self._config:
+            for id in self._config[device_id]:
+                value = self._config[device_id][id]
                 node = etree.Element("data")
-                node.set("device-guid", device_guid)
-                node.set("id",str(int(id))) # visualization type
-                node.set("value", str(value))
+                node.set("device-guid", device_id)
+                node.set("id", gremlin.util.safe_format(id, int)) # visualization type
+                node.set("value", gremlin.util.safe_format(value, bool))
                 root.append(node)
-                device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                input_type = VisualizationType(id).name
-                node_comment = etree.Comment(f"{device_name}  {device_guid} type: {input_type}")
-                node.addprevious(node_comment)
+                if gremlin.joystick_handling.joystick_initialized():
+                    device_name = gremlin.joystick_handling.device_name_from_guid(device_id)
+                else:
+                    device_name = ""
+                    input_type = VisualizationType(id).name
+                    node_comment = etree.Comment(f"{device_name} {device_id} type: {input_type}")
+                    node.addprevious(node_comment)
 
 
         try:
@@ -109,6 +105,26 @@ class VisualizationConfig():
         ''' clears config selection '''
         self._config.clear()
 
+    def setValue(self, device_id, input_id, value):
+        ''' saves a viewer config item '''
+        if not isinstance(device_id, str):
+            device_id = str(device_id)
+        self.register(device_id, input_id)
+        self._config[device_id][input_id] = value
+        self.save()
+
+    def getValue(self, device_id, input_id, default_value = None):
+        ''' gets a value '''
+        if not isinstance(device_id, str):
+            device_id = str(device_id)
+        self.register(device_id, input_id)
+        value = self._config[device_id][input_id]
+        if value is None:
+            value = default_value
+        return value
+        
+
+
 
     def reload(self):
         fname = self.get_config()
@@ -118,10 +134,11 @@ class VisualizationConfig():
                 parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
                 t = etree.parse(fname, parser=parser)
                 for node in t.findall(".//data"):
-                    device_guid = node.get("device-guid")
-                    id = VisualizationType(int(node.get("id")))
-                    value = bool(node.get("value"))
-                    self.register(device_guid, id, value)
+                    device_id = node.get("device-guid")
+                    id = VisualizationType(gremlin.util.safe_read(node, "id", int, 0))
+                    value = gremlin.util.safe_read(node, "value", bool, False)
+                    self.register(device_id, id)
+                    self._config[device_id][id] = value
                 load_successful = True
             except ValueError:
                 pass
@@ -221,15 +238,15 @@ class VisualizationSelector(QtWidgets.QWidget):
 
             # update based on settings
             device_guid = dev.device_guid
-            checked = config.getEnabled(device_guid, VisualizationType.AxisTemporal)
+            checked = config.getValue(device_guid, VisualizationType.AxisTemporal, False)
             at_cb.setChecked(checked)
             if checked: change_callback(dev, VisualizationType.AxisTemporal,True)
 
-            checked = config.getEnabled(device_guid, VisualizationType.AxisCurrent)
+            checked = config.getValue(device_guid, VisualizationType.AxisCurrent, False)
             ac_cb.setChecked(checked)
             if checked: change_callback(dev, VisualizationType.AxisCurrent, True)
 
-            checked = config.getEnabled(device_guid, VisualizationType.ButtonHat)
+            checked = config.getValue(device_guid, VisualizationType.ButtonHat, False)
             bh_cb.setChecked(checked)
             if checked: change_callback(dev, VisualizationType.ButtonHat, True)
 
@@ -255,8 +272,17 @@ class VisualizationSelector(QtWidgets.QWidget):
                 widget.setChecked(False)
             self._create_callback(dev, visualization, widget)()
 
+    @QtCore.Slot()
+    def _select_vjoy(self):
+        widget = self.sender()
+        id = widget.data
 
-                    
+        for widget in self._selector_widgets:
+            visualization, dev = widget.data
+            if visualization != VisualizationType.AxisTemporal and dev.is_virtual and dev.vjoy_id == id:
+                with QtCore.QSignalBlocker(widget):
+                    widget.setChecked(True)
+                self._create_callback(dev, visualization, widget)()
         
     @QtCore.Slot()
     def _select_all(self):
@@ -285,7 +311,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
         checked = cb.isChecked()
         config = VisualizationConfig()
-        config.register(device.device_id, vis_type, checked)
+        config.setValue(device.device_id, vis_type, checked)
         self.changed.emit(device,vis_type,checked)
 
 class InputViewerUi(ui_common.BaseDialogUi):
@@ -354,14 +380,14 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         self.keyboard_widget_selector = gremlin.ui.ui_common.QDataCheckbox("Keyboard")
         self.keyboard_widget_selector.setIgnoreKeyboard(True)
-        checked = v_config.getEnabled(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+        checked = v_config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, False)
         self._keyboard_visible = checked
         self.keyboard_widget_selector.setChecked(checked)
         self.keyboard_widget_selector.clicked.connect(self._toggle_keyboard_widget)
 
         self.state_widget_selector = gremlin.ui.ui_common.QDataCheckbox("State")
         self.state_widget_selector.setIgnoreKeyboard(True)
-        checked = v_config.getEnabled(gremlin.shared_state.state_tab_guid, VisualizationType.State)
+        checked = v_config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, False)
         self._state_visible = checked
         self.state_widget_selector.setChecked(checked)
         self.state_widget_selector.clicked.connect(self._toggle_state_widget)
@@ -396,10 +422,22 @@ class InputViewerUi(ui_common.BaseDialogUi):
         select_real_widget.setToolTip("Selects all hardware inputs")
         select_real_widget.clicked.connect(self.vis_selector._select_real)
 
+        widgets = [clear_widget,
+                   select_real_widget,
+                   select_all_widget
+        ]
+
+        vjoy_ids = [dev.vjoy_id for dev in gremlin.joystick_handling.vjoy_devices()]
+        vjoy_ids = vjoy_ids[:3]
+        for i in vjoy_ids:
+            widget = gremlin.ui.ui_common.QDataPushButton(f"Select VJOY #{i}", data = i)
+            widget.setToolTip(f"Select VJOY #{i} axis and buttons")
+            widget.clicked.connect(self.vis_selector._select_vjoy)
+            widgets.append(widget)
        
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
 
-        options_widget, _ = gremlin.ui.ui_common.getHContainer((clear_widget, select_real_widget, select_all_widget))
+        options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
         options_widget.setMaximumHeight(32)
 
         self.main_layout.addWidget(options_widget)
@@ -456,9 +494,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.vis_selector._clear_selection()
         config = VisualizationConfig()
         config.clear()
-        config.register(gremlin.shared_state.state_tab_guid, VisualizationType.State, False)
-        config.register(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, False)
-        config.save()
+        config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, False)
+        config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, False)
+        
 
 
     def _select_all(self):
@@ -469,9 +507,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._update_view()
 
         config = VisualizationConfig()
-        config.register(gremlin.shared_state.state_tab_guid, VisualizationType.State, True)
-        config.register(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, True)
-        config.save()
+        config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, True)
+        config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, True)
+        
 
     
     def _joystick_event_handler(self, event):
@@ -566,8 +604,8 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.hideKeyboard()
         config = VisualizationConfig()
         config.clear()
-        config.register(gremlin.shared_state.state_tab_guid, VisualizationType.State, False)
-        config.register(gremlin.shared_state.keyboard_tab_guid, VisualizationType.State, False)
+        config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, False)
+        config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.State, False)
         config.save()
 
 
@@ -590,6 +628,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 self._lock.acquire()
                 self._joystick_widgets[key] = widget
                 self._lock.release()
+                widget.hook()
                 if verbose: syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
             else:
                 if verbose: syslog.info(f"Use existing vis: {device.name}: {visualization.name}")
@@ -806,7 +845,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     
     @QtCore.Slot(bool)
-    def _toggle_keyboard_widget(self, checked):
+    def _toggle_keyboard_widget(self, checked : bool):
         if checked:
             self.showKeyboard()
         else:
@@ -814,7 +853,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         self._keyboard_visible = checked
         config = VisualizationConfig()
-        config.register(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, checked)
+        config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, checked)
 
     @QtCore.Slot(bool)
     def _toggle_state_widget(self, checked):
@@ -825,7 +864,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         self._state_visible  = checked
         config = VisualizationConfig()
-        config.register(gremlin.shared_state.state_tab_guid, VisualizationType.State, checked)
+        config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, checked)
            
 
     def _update_view(self):

@@ -502,6 +502,18 @@ class AbstractContainer(ProfileData):
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.emit(self._input_item)
 
+    def getActions(self) -> list:
+        ''' gets a list of all the actions in this container '''
+        action_list = []
+        for action_set in self.get_action_sets():
+            for action in action_set:
+                if action:
+                    action_list.append(action)
+
+        return action_list
+
+
+
     def generateGuids(self):
         ''' called when GUIDs for this container need to be reset so they are unique, such as when pasting or importing. Actions and conditions IDs also need to be reset '''
 
@@ -633,6 +645,24 @@ class AbstractContainer(ProfileData):
         count = sum(len(action_list) for action_list in self.action_sets)
         return count
         
+
+    def getFlatActionSetList(self, action_sets):
+        ''' flattens the action set list if needed '''
+        return self._flatten_list(action_sets)
+        
+
+    def _flatten_list(self, items):
+        data = []
+        if isinstance(items, list):
+            for item in items:
+                data.extend(self._flatten_list(item))
+        else:
+            data.append(items)
+
+        return data
+
+
+            
 
     def create_or_delete_virtual_button(self):
         """Creates activation condition data as required."""
@@ -1098,6 +1128,11 @@ class AbstractAction(ProfileData):
     def get_container(self):
         return self.parent_container
         
+
+    def get_sibblings(self):
+        ''' gets action sibblings in the same container '''
+        container = self.get_container()
+        return container.getActions()
 
     def setEnabled(self, value):
         ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called

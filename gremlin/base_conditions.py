@@ -556,7 +556,6 @@ class AbstractFunctor(QtCore.QObject):
         ''' gets the container node the action belongs to '''
         import gremlin.execution_graph
         if self.node:
-            container_node = None
             for node in self.node.ancestors:
                 if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container:
                     return node

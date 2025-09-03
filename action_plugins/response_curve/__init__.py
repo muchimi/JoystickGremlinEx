@@ -1478,6 +1478,16 @@ If needing a separate curve mapper, use the more advanced Response Curve Ex acti
         self.control_points = [(-1.0, -1.0), (1.0, 1.0)]
         self.symmetry_mode = SymmetryMode.NoSymmetry
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
+    
+    def getCurveData(self):
+        ''' returns the curve data '''
+        import gremlin.curve_handler
+        curve_data = gremlin.curve_handler.AxisCurveData()
+        curve_data.control_points = self.control_points
+        curve_data.mapping_type = self.mapping_type
+        curve_data.symmetry_mode = self.symmetry_mode
+        curve_data.deadzone = self.deadzone
+        return curve_data
 
     def display_name(self):
         return "ResponseCurve (legacy)"

@@ -14,6 +14,22 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T58)
+- Fix: Input Viewer does not always update VJOY output data (axis or buttons) because API calls do not trigger an input event into GremlinEx.  Reworked internal messaging to capture these more reliably.
+- Fix: Input Viewer does not always remember device selections between sessions.
+- Fix: Input Viewer visuals updated to handle non UI thread events.
+- Fix: TempoEx does not always update the conditions tab on action add/remove
+- Fix: more QT C++ garbage collection shenanigans checks
+- Added: Input Viewer quick VJOY select buttons for the first three VJOY devices.
+- Added: Hourglass on action/container add.
+- Added: VjoyRemap: Multiply and Trim axis merge modes added to merge function
+- Added: VjoyRemap: re-enabled design time axis repeater for axis and merge outputs. Limitation: any applied curves may not reliably reflect at design time because the execution graph does not exist at design time so all runtime computations are not in effect.
+
+#### Known issues
+- Condition status button may not turn off in some situations when conditions are removed if they were previously added.  This is cosmetic and will be fixed eventually.
+
+
+
 ### (m76T57)
 - Added additional instrumentation to TempoEx to output configuration and logic flow to the log file (requires container verbose mode).
 - Added additional instrumentation to Vjoy Remap to output more data to the log file (requires vjoy or joystick verbose mode).

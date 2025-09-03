@@ -29,6 +29,7 @@ from PySide6.QtCore import Slot
 import gremlin.base_conditions
 from  gremlin.clipboard import Clipboard
 import gremlin
+import gremlin.util
 import gremlin.base_classes
 import gremlin.config
 import gremlin.plugin_manager
@@ -40,6 +41,7 @@ from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
 import gremlin.base_profile
 from gremlin.input_types import InputType
+import gremlin.event_handler
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 class TempoExContainerWidget(AbstractContainerWidget):
@@ -53,6 +55,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
         :param parent the parent of this widget
         """
         super().__init__(profile_data, parent)
+
+        el = gremlin.event_handler.EventListener()
+        el.action_delete.connect(self._delete_action)
         
 
 
@@ -255,13 +260,23 @@ class TempoExContainerWidget(AbstractContainerWidget):
             widget.model.data_changed.connect(self.container_modified.emit)
 
         self.action_layout.addWidget(self.content_widget)
-    
+
+
+
 
     def _create_condition_ui(self):
-        ''' creates the condition UI for action sets '''
-        if self.profile_data.short_action_sets:
-            for action_set in self.profile_data.short_action_sets:
-                if action_set is not None:
+        ''' creates the condition UI for action sets - called whenever the conditions are refreshed or actions change in the container 
+        the layout has alredy been cleared by the time this is called so we recreate the widgets for each action and don't need to worry
+        about the ones removed.
+        
+        '''
+        gremlin.util.clear_layout(self.activation_condition_layout)
+        short_actions = self.profile_data.short_action_sets
+        long_actions =  self.profile_data.long_action_sets
+        double_actions =self.profile_data.double_action_sets
+        if short_actions:
+            for action_set in short_actions:
+                if action_set:
                     self._create_action_widget(
                         action_set,
                         "Short Press",
@@ -269,9 +284,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
                         gremlin.ui.ui_common.ContainerViewTypes.Conditions
                     )
 
-        if self.profile_data.long_action_sets:
-            for action_set in self.profile_data.short_action_sets:
-                if action_set is not None:
+        if long_actions:
+            for action_set in long_actions:
+                if action_set:
                     self._create_action_widget(
                         action_set,
                         "Long Press",
@@ -279,9 +294,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
                         gremlin.ui.ui_common.ContainerViewTypes.Conditions
                     )
 
-        if self.profile_data.double_action_sets:
-            for action_set in self.profile_data.double_action_sets:
-                if action_set is not None:
+        if double_actions:
+            for action_set in double_actions:
+                if action_set:
                     self._create_action_widget(
                         action_set,
                         "Double Tap",
@@ -305,6 +320,14 @@ class TempoExContainerWidget(AbstractContainerWidget):
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
+
+
+    def _delete_action(self, input_item, container, action):
+        ''' removes an action '''
+        if self.container != container:
+            # not ours
+            return 
+        gremlin.util.InvokeUiMethod(self._update_condition_ui)
 
     def _add_short_action(self, action_name):
         """Adds a new action to the short action list
@@ -1043,9 +1066,9 @@ More than one action per short press or long press can be added.'''
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.short_action_sets = [gremlin.base_profile.ActionSet("short")]
-        self.long_action_sets = [gremlin.base_profile.ActionSet("long")]
-        self.double_action_sets = [gremlin.base_profile.ActionSet("double")]
+        self.short_action_sets = []
+        self.long_action_sets = []
+        self.double_action_sets = []
         self.delay = 0.5 # default long press delay in seconds
         self.doubletap_delay = 0.25 # default double tap delay in seconds
         self.autorelease_delay = 0.25 # autorelease in seconds
@@ -1064,7 +1087,6 @@ More than one action per short press or long press can be added.'''
     @action_sets.setter
     def action_sets(self, value):
         pass
-
 
     def _parse_xml(self, node, input_item = None, extra_data = None):
         """Populates the container with the XML node's contents.
@@ -1156,7 +1178,7 @@ More than one action per short press or long press can be added.'''
     
     def get_action_sets(self):
         """ override method: returns action sets - override because we have custom sets """
-        return self.short_action_sets + self.long_action_sets
+        return self.action_sets
 
 
 # Plugin definitions

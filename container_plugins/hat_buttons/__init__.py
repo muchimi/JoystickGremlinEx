@@ -180,11 +180,15 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        action_item.data = index
-        self.profile_data.add_action(action_item)
-        self.container_modified.emit()
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            action_item.data = index
+            self.profile_data.add_action(action_item)
+            self.container_modified.emit()
+        finally:
+            gremlin.util.popCursor()
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.

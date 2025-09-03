@@ -466,8 +466,11 @@ class MergeOperationType (enum.IntEnum):
     Center = 3 # centered (left - right)/2
     Min = 4 # min of two axes
     Max = 5 # max of two axes
-    ScaleFull = 6,
-    ScaleHalf = 7
+    ScaleFull = 6, # scale -1 to +1
+    ScaleHalf = 7, # scale 0 to + 1
+    Multiply = 8, # multiplies one axis with the value of another
+    Trim = 9, # 
+
 
     @staticmethod
     def to_display_name(value : MergeOperationType):
@@ -495,6 +498,8 @@ _merge_operation_to_enum_lookup = {
     "max" : MergeOperationType.Max,
     "scalefull": MergeOperationType.ScaleFull,
     "scalehalf": MergeOperationType.ScaleHalf,
+    "multiply": MergeOperationType.Multiply,
+    "trim": MergeOperationType.Trim
 
 }
 
@@ -507,6 +512,8 @@ _merge_operation_to_string_lookup = {
     MergeOperationType.Max : "max",
     MergeOperationType.ScaleFull : "scalefull",
     MergeOperationType.ScaleHalf : "scalehalf",
+    MergeOperationType.Multiply : "multiply",
+    MergeOperationType.Trim : "trim"
 }
 
 
@@ -519,6 +526,8 @@ _merge_operation_display_lookup = {
     MergeOperationType.Max : "Maximum",
     MergeOperationType.ScaleFull : "Scale ",
     MergeOperationType.ScaleHalf : "Scale half (0..1)",
+    MergeOperationType.Multiply : "Multiply",
+    MergeOperationType.Trim : "Trim"
 
 }
 
@@ -531,6 +540,8 @@ _merge_operation_to_description_lookup = {
     MergeOperationType.Max : "Max(A, B)",
     MergeOperationType.ScaleFull : "Scale 0..1 is derived from full deviation",
     MergeOperationType.ScaleHalf : "Scale 0..1 is derived from half axis value - use for centered scale inputs",
+    MergeOperationType.Multiply : "A * B",
+    MergeOperationType.Trim: "Trim A with B - B is scaled 0 to 1 and applies a trim value to A"
 
 }
 
@@ -611,7 +622,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert(isinstance(action_data, VjoyRemap))
 
     def _create(self, action_data):
-        pass
+        self._update_merge_data()
 
 
 
@@ -687,6 +698,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._create_override_input_type()
             self._create_selector()
+            self._create_repeater()
             self._create_input_axis()
             self._create_range_widgets()
             self._create_button_modes()
@@ -695,7 +707,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._create_merge_ui()
             self._create_step_ui()
             self._create_info()
-            self._create_repeater()
+            
             self._create_input_grid()
 
 
@@ -712,34 +724,92 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             # set the action type from the input type
             self.load_actions_from_input_type()
 
+            # hook repeater 
+            self._update_merge_data()
+            el.joystick_event.connect(self._event_handler)
+            
+
         finally:
             VJoyRemapWidget.locked = False
             self._ui_loaded = True
 
+    def _add_merge_data(self, device_guid, input_id):
+        ''' adds a mapping to the tracking data '''
+        if not device_guid in self._merge_device_input_map:
+            self._merge_device_input_map[device_guid] = []
+        if not input_id in self._merge_device_input_map[device_guid]:
+            self._merge_device_input_map[device_guid].append(input_id)
+
+    def _update_merge_data(self):
+        ''' build map of ID to axis ID for merge operations '''
+        self._merge_device_input_map = {}
+        if self.action_data.get_input_type() == InputType.JoystickAxis:
+            for data in self.action_data._merge_data:
+                self._add_merge_data(data.device_guid, data.input_id)
+
+            self._add_merge_data(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)                
+        
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                syslog.info("Merge data update: ")
+                for device_guid, input_id in self._merge_device_input_map.items():
+                    device : dinput.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(device_guid)
+                    syslog.info(f"\t{device.name} [{device.device_id}] -> axis {input_id} ({device.get_axis_name(input_id)})")
 
 
-    def _event_handler(self, event):
+
+    def getCurveData(self, event, value):
+        ''' returns active curve data that applies to the container through included response curve actions '''
+        curves = []
+
+        actions = self.action_data.get_sibblings()
+        for action in actions:
+            if hasattr(action,"getCurveData"):
+                curve_data = action.getCurveData()
+                if curve_data:
+                    curves.append(curve_data)
+
+        # add self
+        if self.action_data.curve_data is not None:
+            curves.append(self.action_data.curve_data)
+
+        return curves
+
+    def _event_handler(self, event : gremlin.event_handler.Event):
         ''' event handler:  type of event: gremlin.event_handler.VjoyEvent '''
+        if gremlin.shared_state.is_running:
+            # only process when not running
+            return
         match self.action_data.action_mode:
             case VjoyAction.VJoyAxis:
                 # straight axis
-                curves = self.getCurveData(event, action_value)
+                curves = self.getCurveData(event, event.value)
                 value = self.action_data.get_filtered_axis_value(curves = curves)
                 value = self.action_data.get_ranged_axis_value(value)
 
                 
 
             case VjoyAction.VJoyAxisToButton:
-                device_guid = self.action_data.hardware_device_guid
-                input_id = self.action_data.hardware_input_id
-                value = joystick_handling.get_curved_axis(device_guid, input_id)
-                action_value = gremlin.actions.Value(value)
-                event = gremlin.event_handler.Event(gremlin.input_types.InputType.JoystickAxis,
-                                                    device_guid = device_guid,
-                                                    identifier=input_id,
-                                                    is_axis=True,
-                                                    value = action_value)
-                self.process_event(event, action_value)
+                pass # todo: button repeater?
+                # device_guid = self.action_data.hardware_device_guid
+                # input_id = self.action_data.hardware_input_id
+                # value = joystick_handling.get_curved_axis(device_guid, input_id)
+                # action_value = gremlin.actions.Value(value)
+                # event = gremlin.event_handler.Event(gremlin.input_types.InputType.JoystickAxis,
+                #                                     device_guid = device_guid,
+                #                                     identifier=input_id,
+                #                                     is_axis=True,
+                #                                     value = action_value)
+                # self.process_event(event, action_value)
+
+            case VjoyAction.VJoyMergeAxis:
+                # see if one of ours
+                device_guid = event.device_guid
+                if device_guid in self._merge_device_input_map:
+                    # match by device
+                    if event.identifier in self._merge_device_input_map[device_guid]:
+                        # match by input
+                        self._update_repeater()
 
 
     @QtCore.Slot(int)
@@ -773,6 +843,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._repeater_axis_widget = gremlin.ui.ui_common.AxisStateWidget(orientation = QtCore.Qt.Orientation.Horizontal,  show_percentage=False, show_label=False, show_value = True, decimals = 3)
         #self._repeater_button_widget = gremlin.ui.ui_common.ButtonStateWidget()
         widgets = [
+            "Output:",
             self._repeater_axis_widget,
             #self._repeater_button_widget,
         ]
@@ -785,10 +856,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' updates the input repeater '''
         if not self._ui_loaded:
             return
-        if not Shiboken.isValid(self._repeater_range_widget):
-            return
-        if not Shiboken.isValid(self._repeater_axis_widget):
-            return
+        
         range_widget_visible = False
         axis_widget_visible = False
         if self.action_data.input_is_axis():
@@ -799,6 +867,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 return # nothing to update
             match self.action_data.action_mode:
                 case VjoyAction.VJoyAxisToButton:
+                    if not Shiboken.isValid(self._repeater_range_widget):
+                        return
                     range_widget_visible = True
                     v1 = self.action_data.button_range_min
                     v2 = self.action_data.button_range_max
@@ -812,6 +882,16 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                         self._repeater_range_widget.setIcon(gremlin.ui.ui_common.Icons.invalidIcon())
                         #self._repeater_button_widget.setValue(False)
                 case VjoyAction.VJoyAxis:
+                    # plain axis output
+                    if not Shiboken.isValid(self._repeater_axis_widget):
+                        return
+                    axis_widget_visible = True
+                    self._repeater_axis_widget.setValue(value)
+                case VjoyAction.VJoyMergeAxis:
+                    # axis merging
+                    if not Shiboken.isValid(self._repeater_axis_widget):
+                        return
+                    
                     axis_widget_visible = True
                     self._repeater_axis_widget.setValue(value)
            
@@ -1418,15 +1498,18 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             # can only delete if there is more than one entry
             self.action_data._merge_data.remove(data)
             self._update_merge_widgets()
+            self._update_merge_data()
 
     @QtCore.Slot(object)
     def _changed_merge_widget(self, data : MergeData):
         ''' called when merge axis data changes '''
         self._update_axis_widget()
+        self._update_merge_data()
 
     def _add_merge_axis(self):
         self.action_data._merge_data.append(MergeData())
         self._update_merge_widgets()
+        self._update_merge_data()
 
     def _clear_merge_axis(self):
 
@@ -1447,9 +1530,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             if result == QtWidgets.QMessageBox.StandardButton.Ok:
                 self._delete_confirmed_cb()
 
+
     def _delete_confirmed_cb(self):
         self.action_data._merge_data.clear()
         self._update_merge_widgets()
+        self._update_merge_data()
 
 
 
@@ -1605,7 +1690,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             # merge - check two sets
             if event.device_guid == self.action_data.hardware_device_guid and self.action_data.isMergeDeviceGuid(event.device_guid): # == self.action_data.merge_device_guid:
                 # merge hardware is the same as current input - accept only the two input itds
-                if event.identifier != self.action_data.hardware_input_id and event.identifier != self.action_data.merge_input_id:
+                if event.identifier != self.action_data.hardware_input_id: # and event.identifier != self.action_data.merge_input_id:
                     return
             else:
                 # not the same:
@@ -2925,6 +3010,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 output_mode_visible = True
             case VjoyAction.VJoyRangeAxis:
                 grid_visible = False
+            # case VjoyAction.VJoyMergeAxis:
+            #     output_mode_visible = True
             case VjoyAction.VJoySetAxis:
                 output_range_visible = False
                 relative_visible = True
@@ -3028,6 +3115,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.input_id = self.action_data.get_input_id()
             self._update_ui()
             self._update_vjoy_device_input_list()
+            self._update_merge_data()
             self._update_repeater()
             self.notify_device_changed()
 
@@ -3568,8 +3656,6 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self._relative_pulse_worker = None # pulse worker for relative mode
         
         
-
-
     def getCurveActions(self):
         ''' finds curve action siblings to this remap action '''
         actions = []
@@ -3603,7 +3689,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if self.action_data.curve_data is not None:
             curves.append(self.action_data.curve_data)
 
-        return curves
+        return curves       
+
 
     def _convert_condition(self, condition):
         ''' converts a base condition to an action condition '''
@@ -4617,7 +4704,6 @@ class  MergeData():
         match self.operation:
             case MergeOperationType.Add:
                 new_value = value + current
-
             case MergeOperationType.Substract:
                 new_value = value - current
             case MergeOperationType.Average:
@@ -4769,6 +4855,9 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
         self.refresh_vjoy()
+
+
+ 
 
     def display_name(self):
         match self._action_mode:
@@ -4964,6 +5053,14 @@ Supports axis merging, curved output, command, hat and button mappings.
                     case MergeOperationType.ScaleHalf:
                         scale = abs(v2)
                         value = scale_to_range(v1*scale)
+                    case MergeOperationType.Multiply:
+                        value = scale_to_range(v1 * v2)
+                    case MergeOperationType.Trim:
+                        v2 = scale_to_range(v2, target_min=0, target_max = 1) # scale v2 0 to 1
+                        if v1 > 0:
+                            value = v2 + ( (1 - v2) * v1 )
+                        else:
+                            value = v2 + ( (v2 + 1) * v1 )
 
                 v1 = value
 

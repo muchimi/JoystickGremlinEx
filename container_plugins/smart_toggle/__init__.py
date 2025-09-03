@@ -121,26 +121,34 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        if self.profile_data.action_sets[0] is None:
-            self.profile_data.action_sets[0] = []
-        self.profile_data.action_sets[0].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            if self.profile_data.action_sets[0] is None:
+                self.profile_data.action_sets[0] = []
+            self.profile_data.action_sets[0].append(action_item)
+            self.profile_data.create_or_delete_virtual_button()
+            self.container_modified.emit()
+        finally:
+            gremlin.util.popCursor()
 
     def _paste_action(self, action, container):
         """Adds a new action to the container.
 
         :param action_name the name of the action to add
         """
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        if self.profile_data.action_sets[0] is None:
-            self.profile_data.action_sets[0] = []
-        self.profile_data.action_sets[0].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()        
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.duplicate(action, self.profile_data)
+            if self.profile_data.action_sets[0] is None:
+                self.profile_data.action_sets[0] = []
+            self.profile_data.action_sets[0].append(action_item)
+            self.profile_data.create_or_delete_virtual_button()
+            self.container_modified.emit()        
+        finally:
+            gremlin.util.popCursor()
 
     def _delay_changed_cb(self, value):
         self.profile_data.delay = value / 1000 # in seconds

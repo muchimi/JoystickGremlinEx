@@ -166,13 +166,17 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        if self.profile_data.action_sets[index] is None:
-            self.profile_data.action_sets[index] = []
-        self.profile_data.action_sets[index].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            if self.profile_data.action_sets[index] is None:
+                self.profile_data.action_sets[index] = []
+            self.profile_data.action_sets[index].append(action_item)
+            self.profile_data.create_or_delete_virtual_button()
+            self.container_modified.emit()
+        finally:
+            gremlin.util.popCursor()
 
 
     def _paste_action(self, index, action):

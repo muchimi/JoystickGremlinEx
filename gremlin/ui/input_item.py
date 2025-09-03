@@ -1107,13 +1107,13 @@ class ActionSetModel(ui_common.AbstractModel):
 
 
     def remove_action(self, action):
-        
+        ''' runs when an action should be deleted '''
         if action in self._action_set:
             input_item = action.get_input_item()
             container : gremlin.base_profile.AbstractContainer = action.get_container()
             del self._action_set[self._action_set.index(action)]
             el = gremlin.event_handler.EventListener()
-            el.action_delete.emit(input_item, container, action)
+            el.action_delete.emit(input_item, container, action) # tell the UI the action is being deleted
             if hasattr(action,"_cleanup"):
                 action._cleanup()
 
@@ -1365,38 +1365,49 @@ class ActionSetView(ui_common.AbstractView):
         import gremlin.plugin_manager
         import gremlin.base_profile
         import gremlin.ui.ui_common
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
 
-        action = plugin_manager.get_class(action_name)(self.profile_data)
-        if action.singleton:
-            input_item : gremlin.base_profile.InputItem = self.profile_data.input_item
-            if input_item.is_action:
-                gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add [{action_name}].  The action cannot be added to a sub-container.")    
-                return
-            if input_item.hasAction(action_name):
-                gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add: [{action_name}]. The action can only appear once per input.")
-                return
-                
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
 
-        self.model.add_action(action)
+            action = plugin_manager.get_class(action_name)(self.profile_data)
+            if action.singleton:
+                input_item : gremlin.base_profile.InputItem = self.profile_data.input_item
+                if input_item.is_action:
+                    gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add [{action_name}].  The action cannot be added to a sub-container.")    
+                    return
+                if input_item.hasAction(action_name):
+                    gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add: [{action_name}]. The action can only appear once per input.")
+                    return
+                    
+
+            self.model.add_action(action)
+
+        finally:
+            gremlin.util.popCursor()
 
     def _paste_action(self, action, container):
         ''' handles action paste operation '''
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        if isinstance(action, ObjectEncoder):
-            oc = action
-            if oc.encoder_type == EncoderType.Action:
-                xml = oc.data
-                node = lxml.etree.fromstring(xml)
-                action_tag = node.tag
-                action_tag_map = plugin_manager.tag_map
-                new_action = action_tag_map[action_tag](self.profile_data)
-                new_action.from_xml(node)
-                new_action.setId(get_guid())
-                self.model.add_action(new_action)
-        else:
-            action_item = plugin_manager.duplicate(action,self.profile_data)
-            self.model.add_action(action_item)
+
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            if isinstance(action, ObjectEncoder):
+                oc = action
+                if oc.encoder_type == EncoderType.Action:
+                    xml = oc.data
+                    node = lxml.etree.fromstring(xml)
+                    action_tag = node.tag
+                    action_tag_map = plugin_manager.tag_map
+                    new_action = action_tag_map[action_tag](self.profile_data)
+                    new_action.from_xml(node)
+                    new_action.setId(get_guid())
+                    self.model.add_action(new_action)
+            else:
+                action_item = plugin_manager.duplicate(action,self.profile_data)
+                self.model.add_action(action_item)
+        finally:
+            gremlin.util.popCursor()
 
 
     def _create_closed_cb(self, widget):
@@ -3007,7 +3018,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         el.condition_redraw.connect(self._condition_redraw) # hook the condition redraw event so we can remove existing references to the UI going away on redraw
         el.condition_changed.connect(self._condition_changed) # hook condition changed so we can update the UI
 
-        el.ui_ready.connect(self._ui_ready)
+        #el.ui_ready.connect(self._ui_ready)
         self._icon_enabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.activeColor())
         self._icon_disabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.inactiveColor())
 
@@ -3083,7 +3094,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         el.condition_state_changed.connect(self._update_ui)
 
         self.activation_count_widget = None
-        el.condition_state_changed.emit(self.container)
+        #el.condition_state_changed.emit(self.container)
 
         self._handle_lock_changed_ui(self.profile_data.input_item)
 
@@ -3100,6 +3111,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         el = gremlin.event_handler.EventListener()
         el.collapse_all_containers.connect(self._handle_collapse)
         el.expand_all_containers.connect(self._handle_expand)
+
+        self._update_ui(self.container)
 
     @QtCore.Slot()
     def _handle_toggled(self):
@@ -3231,6 +3244,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         if self.container == container:
             self._update_counts()
+            self.activation_condition_widget._update_conditions_ui()
+
 
     @QtCore.Slot(object, object)
     def _condition_changed(self, container):
@@ -3238,9 +3253,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         if container.id == self.container.id:
             self.activation_condition_widget._update_conditions_ui()
 
-    def _ui_ready(self):
-        ''' called when UI is loaded '''
-        self._update_ui(self.container)
+    # def _ui_ready(self):
+    #     ''' called when UI is loaded '''
+    #     self._update_ui(self.container)
 
     @QtCore.Slot()
     def _condition_redraw(self, data):
@@ -3472,6 +3487,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             "AbstractContainerWidget._create_condition_ui not "
             "implemented in subclass"
         )
+    
+    def _update_condition_ui(self):
+        ''' updates the condition UI for the widget '''
+        pass
 
     def _get_window_title(self):
         """Returns the title to show on the widget."""
@@ -4028,7 +4047,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.connect(self._mapping_changed)
-        el.ui_ready.connect(self._handle_ui_ready)
+        #el.ui_ready.connect(self._handle_ui_ready)
 
         self._deleted = False
 
@@ -4221,39 +4240,45 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         import container_plugins.basic
         import gremlin.plugin_manager
         import gremlin.ui.ui_common
-        # If this is a vJoy item then do not permit adding an action if
-        # there is already one present, as only response curves can be added
-        # and only one of them makes sense to exist
-        if self.item_data.get_device_type() == DeviceType.VJoy:
-            if len(self.item_data.containers) > 0:
-                return
+
+        gremlin.util.pushCursor()
+
+        try:
+
+            # If this is a vJoy item then do not permit adding an action if
+            # there is already one present, as only response curves can be added
+            # and only one of them makes sense to exist
+            if self.item_data.get_device_type() == DeviceType.VJoy:
+                if len(self.item_data.containers) > 0:
+                    return
+                
             
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            container = container_plugins.basic.BasicContainer(self.item_data)
+            action = plugin_manager.get_class(action_name)(container)
+
+            if action.singleton:
+                # action can only exist once in the container list
+                if self.item_data.is_action:
+                    gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add [{action_name}].  The action cannot be added to a sub-container.")    
+                    return
+                if self.item_data.hasAction(action_name):
+                    gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add: [{action_name}]. The action can only appear once per input.")
+                    return 
+
+
+            container.add_action(action)
         
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        container = container_plugins.basic.BasicContainer(self.item_data)
-        action = plugin_manager.get_class(action_name)(container)
+            if len(container.action_sets) > 0:
+                self.action_model.add_container(container)
+            
+            self.action_model.data_changed.emit()
 
-        if action.singleton:
-            # action can only exist once in the container list
-            if self.item_data.is_action:
-                gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add [{action_name}].  The action cannot be added to a sub-container.")    
-                return
-            if self.item_data.hasAction(action_name):
-                gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add: [{action_name}]. The action can only appear once per input.")
-                return 
-
-
-        container.add_action(action)
-      
-        if len(container.action_sets) > 0:
-            self.action_model.add_container(container)
-        
-        self.action_model.data_changed.emit()
-
-        el = gremlin.event_handler.EventListener()
-        el.mapping_changed.emit(self.item_data)
-        self.notify_changed()
-        
+            el = gremlin.event_handler.EventListener()
+            el.mapping_changed.emit(self.item_data)
+            self.notify_changed()
+        finally:
+            gremlin.util.popCursor()
 
     def notify_changed(self):
         ''' notifies the item has changed'''
@@ -4326,15 +4351,21 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
         :param container_name name of the container to be added
         """
-        plugin_manager = gremlin.plugin_manager.ContainerPlugins()
-        container = plugin_manager.get_class(container_name)(self.item_data)
-        if hasattr(container, "action_model"):
-            container.action_model = self.action_model
-        self.action_model.add_container(container)
-        plugin_manager.set_container_data(self.item_data, container)
 
-        eh = gremlin.event_handler.EventListener()
-        eh.mapping_changed.emit(self.item_data)
+        gremlin.util.pushCursor()
+        try:
+
+            plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+            container = plugin_manager.get_class(container_name)(self.item_data)
+            if hasattr(container, "action_model"):
+                container.action_model = self.action_model
+            self.action_model.add_container(container)
+            plugin_manager.set_container_data(self.item_data, container)
+
+            eh = gremlin.event_handler.EventListener()
+            eh.mapping_changed.emit(self.item_data)
+        finally:
+            gremlin.util.popCursor()
 
         return container
     

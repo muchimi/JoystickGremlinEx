@@ -255,20 +255,21 @@ class Axis:
         elif p_value > 1.0:
             p_value = 1.0
 
-        el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, p_value)
-        el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
-        el.vjoy_callback(event)
-
-        self.vjoy_dev.ensure_ownership()
-
-      
         # Normalize value to [-1, 1] and apply response curve and deadzone
         # settings
         self._value = self._response_curve_fn(
             self._deadzone_fn(min(1.0, max(-1.0, p_value)))
         )
 
+        el = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, self._value)
+        el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
+        el.vjoy_callback(event)
+
+
+        self.vjoy_dev.ensure_ownership()
+
+      
 
         if not VJoyInterface.SetAxis(
                 int(self._half_range + self._half_range * self._value),
@@ -277,7 +278,8 @@ class Axis:
         ):
             from gremlin.util import log_sys_warn
             log_sys_warn(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
-           
+
+
         self.vjoy_dev.used()
 
     def set_absolute_value(self, value):

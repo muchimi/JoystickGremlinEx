@@ -173,6 +173,10 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
         self.curve_data.curve_update()
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
 
+    def getCurveData(self):
+        ''' returns the curve data '''
+        return self.curve_data
+
     def display_name(self):
         return "ResponseCurveEx"
         

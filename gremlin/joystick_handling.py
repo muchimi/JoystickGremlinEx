@@ -862,6 +862,10 @@ def joystick_devices_initialization():
     # register special devices
     registerSpecialDevices()
 
+def joystick_initialized():
+    
+    return _joystick_initialized
+
 
 def joystick_devices_update():
     ''' updates any missing dynamic devices like VIGEM '''

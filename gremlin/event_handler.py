@@ -448,6 +448,10 @@ class EventListener:
 
 	virtual_button_changed = Signal(object, object, object) # runs when the action has modified its input mode (input_item, container, action) as parameters
 
+	# called when vjoy button usage has changed in the profile so displays can update themselves
+	button_usage_changed = Signal(int)  # (vjoy_device_id) the vjoy device that changed
+
+
 	# selection event - tells the UI to show a different input
 	select_input = Signal(object, object, object, bool, bool, bool) # selects a particular input (device_guid, input_type, input_id, force_update, force_switch, tab_changed)
 	select_input_completed = Signal(object, object, object) # indicates input selection is completed (device_guid, input_type, input_id)
@@ -465,8 +469,6 @@ class EventListener:
 	# suspend keyboard input
 	suspend_keyboard_input = Signal(bool) # arg = state, true = suspend, false = resume
 
-	# called when vjoy button usage has changed in the profile so displays can update themselves
-	button_usage_changed = Signal(int)  # (vjoy_device_id) the vjoy device that changed
 
 	# called when a condition state changes - used to update the UI
 	condition_redraw = Signal(object) # fires when a condition is redrawing
@@ -475,6 +477,7 @@ class EventListener:
 
 	condition_added = Signal(object, str, object) # fires when a condition is added - params (input_item, mode, condition)
 	condition_removed = Signal(object, str, object) # fires when a condition is removed - params (input_item, mode, condition)
+	
 
 	# container deleted 
 	container_delete = Signal(object, object) # fires when a container is about to be deleted, passes the input item, container as parameters
@@ -1447,7 +1450,7 @@ class EventHandler(QtCore.QObject):
 		self._mode_validator_callbacks = {}  # list of validators (callbacks) that return a boolean True if the mode change can occur - signature must be callable(str)->bool
 		self._last_tts_data = TTSNotifyData() # last mode that triggered a TTS verbal notice
 		self._last_axis_values = {}
-		el = gremlin.event_handler.EventListener()
+		el = EventListener()
 		el.profile_start.connect(self._profile_start)
 		el.profile_stop.connect(self._profile_stop)
 		el.profile_started.connect(self._profile_started)

@@ -405,11 +405,15 @@ class SwitchContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        self.profile_data.add_action(action_item)
-        self.container_modified.emit()
-        self.action_widget.redraw()
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            self.profile_data.add_action(action_item)
+            self.container_modified.emit()
+            self.action_widget.redraw()
+        finally:
+            gremlin.util.popCursor()
 
     def _add_position(self):
         index = len(self.profile_data.position_data)

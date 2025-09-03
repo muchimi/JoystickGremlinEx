@@ -114,26 +114,38 @@ class BasicContainerWidget(AbstractContainerWidget):
         from gremlin.clipboard import Clipboard
         if action_data is None:
             return
-        if isinstance(action_data, str):
-            action_name = action_data
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        elif isinstance(action_data, Clipboard):
-            # paste operation
-            if action_data.is_action:
-                # verify the action in the clipboard is appropriate for this input
+        
+        gremlin.util.pushCursor()
 
-                action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
+        try:
 
-        self.profile_data.add_action(action_item)
-        self.container_modified.emit()
+            if isinstance(action_data, str):
+                action_name = action_data
+                plugin_manager = gremlin.plugin_manager.ActionPlugins()
+                action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            elif isinstance(action_data, Clipboard):
+                # paste operation
+                if action_data.is_action:
+                    # verify the action in the clipboard is appropriate for this input
+
+                    action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
+
+            self.profile_data.add_action(action_item)
+            self.container_modified.emit()
+        finally:
+            gremlin.util.popCursor()
 
     def _paste_action(self, action, container):
         ''' paste action'''
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        self.profile_data.add_action(action_item)
-        self.container_modified.emit()
+
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.duplicate(action, self.profile_data)
+            self.profile_data.add_action(action_item)
+            self.container_modified.emit()
+        finally:
+            gremlin.util.popCursor()
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
