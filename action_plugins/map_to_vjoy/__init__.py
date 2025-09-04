@@ -749,7 +749,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._add_merge_data(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)                
         
-            verbose = gremlin.config.Configuration().verbose
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
                 syslog.info("Merge data update: ")
                 for device_guid, input_id in self._merge_device_input_map.items():

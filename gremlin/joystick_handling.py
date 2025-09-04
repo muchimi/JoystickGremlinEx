@@ -673,6 +673,12 @@ def joystick_devices_initialization():
     for device_index in range(device_count):
         # these are all connected devices
         dev = dinput.DILL.get_device_information_by_index(device_index)
+
+        # Octavi IFR1 exception
+        #Vendor: 0x1240 Product: 0x59094
+        if dev.product_id == 0x59094 and dev.vendor_id == 0x1240:
+            continue
+
         devices.append(dev)
         syslog.info(f"\tindex: [{device_index}] {str(dev)}")
         _joystick_devices.append(dev)

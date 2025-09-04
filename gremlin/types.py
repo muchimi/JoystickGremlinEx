@@ -1040,8 +1040,9 @@ class VerboseMode(IntFlag):
     Extra = auto() # extra info for any other mode
     Remote = auto() # remote receive
     Container = auto() # container debug mode
+    Octavi = auto()
     
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra | Remote | Container
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra | Remote | Container | Octavi
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value
@@ -1061,6 +1062,7 @@ class TabDeviceType(int, Enum):
     Plugins = 8
     ModeControl = 9
     State = 10
+    OctaviIFR1 = 11
 
 
 class GamePadOutput(Enum):

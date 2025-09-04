@@ -856,7 +856,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                     else:
                         # detected another click while short press timer running
                         if self.short_press_timer:
-                            if verbose: syslog.info("\tdouble tap detect \ stop short press timer")
+                            if verbose: syslog.info("\tdouble tap detect \\ stop short press timer")
                             self.short_press_timer.cancel()
                             self.short_press_timer = None
                             self.trigger_mode = "double"

@@ -1325,7 +1325,10 @@ class Configuration(QtCore.QObject):
         ''' true if verbose mode is in container logic  mode '''
         return self.verbose and VerboseMode.Container in self.verbose_mode
     
-    
+    @property
+    def verbose_mode_octavi(self):
+        ''' true if verbose mode is in output mode '''
+        return self.verbose and VerboseMode.Octavi in self.verbose_mode
     
     @property
     def verbose_mode_output(self):

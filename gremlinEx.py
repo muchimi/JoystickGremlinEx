@@ -83,6 +83,7 @@ import gremlin.gamepad_handling
 import gremlin.import_profile
 import gremlin.windows_event_hook # reference needed for packaging
 import gremlin.macro_handler # reference needed for packaging
+import gremlin.ui.octavi_device
 
 
 
@@ -2410,6 +2411,30 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 widget.data = (TabDeviceType.Osc, device_guid, index)
                 
                 index += 1
+
+            # =======================================================
+            # create Octavi IFR1 if it exists
+            oo = gremlin.ui.octavi_device.OctaviInterface()
+            if oo.deviceFound():
+                guid = gremlin.shared_state.octavi_tab_guid
+                device_guid = str(guid)
+                device_profile = self.profile.get_device_modes(
+                    gremlin.ui.octavi_device.OctaviDeviceTabWidget.device_guid,
+                    DeviceType.Joystick,
+                    DeviceType.to_string(DeviceType.Joystick)
+                )         
+                
+                widget = self.getRegisteredWidget(device_guid)
+                if not widget:
+                    widget = gremlin.ui.octavi_device.OctaviDeviceTabWidget(
+                        device_profile,
+                        self.current_mode
+                    )
+                    self.registerWidget(device_guid, widget)
+                    self._state_device_guid = device_guid
+
+                widget.data = (TabDeviceType.OctaviIFR1, device_guid, index)
+                self._add_tab(device_guid, TabDeviceType.OctaviIFR1)                
                 
 
             # =======================================================
@@ -2436,6 +2461,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             widget.data = (TabDeviceType.ModeControl, device_guid, index)
             self._add_tab(device_guid, TabDeviceType.ModeControl)
 
+          
+
+            
             # =======================================================
             # create state tab
             guid = gremlin.shared_state.state_tab_guid
@@ -5034,6 +5062,10 @@ if __name__ == "__main__":
     ec = gremlin.execution_graph.ExecutionContext()
 
     gremlin.shared_state.char_width = gremlin.ui.ui_common.get_text_width("M")
+
+
+    # octavi test
+    test = gremlin.ui.octavi_device.OctaviInterface()
 
     # Run UI
     
