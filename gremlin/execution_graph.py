@@ -1866,7 +1866,8 @@ class ContainerCallback:
             InputType.Mouse,
             InputType.VirtualButton,
             InputType.ModeControl,
-            InputType.State
+            InputType.State,
+            InputType.OctaviIfr1,
         ]:
             value = gremlin.actions.Value(event.is_pressed)
         else:
@@ -2007,71 +2008,8 @@ class AbstractExecutionGraph(QtCore.QObject):
   
 
     def process_event(self, event, value, extra_data : dict = None):
-        """
-        
-        Runs the execution graph for the input.
-
-
-        #### CRITICAL EXECUTION PATH ####
-
-        :param event the raw event that caused the execution of this graph
-        :param value the possibly modified value extracted from the event
-
-
-        The list of functors is precomputed by ExecutionContext() when the profile is started as a sequence of functors that each take (event, value) as parameters and return True
-        if the execution should continue.  A graph is used to represent all possible execution paths for a profile, including any nested items and dependencies as needed.
-
-        The build phase when the profile starts constructs the execution list in the correct order of evaluation for each bound input.  The hierarchy is observed, so high level conditions get evaluated before lower level conditions.
-
-        Execution list contains functors, which can be grouped.  Grouped functors are evaluated as "any", or "on of" so any PASS (true) value means PASS for the whole group.
-        The build phase constructs the groups as needed based on "any" or "all" condition states.
-        
-        If that at any point a functor returns False, the chain aborts (unless the functor is part of a group of functors, in which case all functors in the group would need to FAIL to fail the whole evaluation).
-
-        The tail end of the functor chain are the actions to execute.  
-
-        This means execution follows the short-cut model if conditions fail.
-
-        """
         return True
     
-        # self.run_event.clear()
-
-        # ec = ExecutionContext()
-        # # functor_map = ec.functor_map
-        # config = gremlin.config.Configuration()
-        # verbose = config.verbose_mode_condition
-        # # validate = verbose
-        # # verbose_detailed = False
-        # if verbose:
-        #     gremlin.shared_state.pushLog()
-
-        # try:
-     
-            
-        #     # regular functors
-        #     for functor in self.functors:
-
-        #         #result = True # assume pass
-
-        #         if isinstance(functor, gremlin.actions.ActivationCondition):
-        #             # if not event.is_pressed:
-        #             #     pass
-        #             result = functor.process_event(event, value, extra_data)
-        #             if not result:
-        #                 return False
-        #             continue # next functor
-
-        #         id = functor.id
-        #         result = ec.execute_functor_id(id, event, value, extra_data)
-        #         if not result:
-        #             break
-             
-        #     return result
-        # finally:
-        #     self.graph_completed.emit(self)
-        #     if verbose:
-        #         gremlin.shared_state.popLog()
 
     def _build_graph(self, instance, parent_node = None):
         """Builds the graph structure based on the given object's content.

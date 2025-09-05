@@ -51,6 +51,7 @@ _all_joystick_devices = [] # [DeviceSummary] of all devices, virtual, connected 
 _vjoy_devices = [] # real vjoy devices
 
 _joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID
+_ignored_device_list = [] # [device_guid] - list of hardware devices to ignore
 
 
 # Joystick initialization lock
@@ -207,19 +208,7 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
         result = target_max
     return result + 0
 
-def get_axis(guid, index, normalized = True):
-    ''' gets the value of the specified axis
-     
-    :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
-       
-    '''
-    if isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
-    if is_hardware_device(guid):
-        value = dinput.DILL.get_axis(guid, index)
-        if normalized:
-            return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
-    return 0.0
+
         
 def get_axis_name(input_id):
     ''' gets the axis name based on the input # '''
@@ -266,17 +255,36 @@ def get_curved_axis(guid, identifier):
     return None
             
 
+def get_axis(guid, index, normalized = True):
+    ''' gets the value of the specified axis
+     
+    :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
+       
+    '''
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
+    if is_hardware_device(guid):
+        value = dinput.DILL.get_axis(guid, index)
+        if normalized:
+            return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+    return 0.0
+
 def get_hat(guid, index):
     ''' gets the current hat value '''
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
-    return dinput.DILL.get_hat(guid, index)
+    device = get_device(guid)
+    return device.get_hat(index)
 
 def get_button(guid, index) -> bool:
     ''' gets the button pressed state '''
+    
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
-    return dinput.DILL.get_button(guid, index)
+    device = get_device(guid)
+    return device.get_button(index)
+       
+
 
 def set_button(guid, index : int, is_pressed : bool):
     ''' sets a vjoy device button if the index and guid exists '''
@@ -324,11 +332,11 @@ def physical_devices():
 def default_device():
     ''' gets the default device '''
     device = None
-    devices = physical_devices
+    devices = physical_devices()
     if devices:
         device = devices[0]
     if not device:
-        devices = joystick_devices
+        devices = joystick_devices()
     if devices:
         device = devices[0]
     return device
@@ -508,9 +516,20 @@ def reset_devices():
 
     el.device_change_event.emit()
 
+def noOpCallback(self, value):
+    ''' dummy callback for special devices that don't have a particular axis, hat or button '''
+    return None
+
+def noOpHatCallback(self, value):
+    ''' dummy callback for special devices that don't have a hat (returns neutral position)'''
+    return -1
+
 
 def registerSpecialDevices():
     ''' registers special devices '''
+    import gremlin.ui.octavi_device
+    import gremlin.ui.osc_device
+    import gremlin.ui.midi_device
 
     # keyboard
     device_guid = str(gremlin.shared_state.keyboard_tab_guid)
@@ -520,6 +539,7 @@ def registerSpecialDevices():
     device.device_id = device_guid
     device.device_type = DeviceType.Keyboard
     device.is_special = True
+
     registerSpecialDevice(device)
 
     # MIDI
@@ -540,6 +560,20 @@ def registerSpecialDevices():
     device.device_id = device_guid
     device.is_special = True
     device.device_type = DeviceType.Osc
+    registerSpecialDevice(device)
+
+    # Octavi IFR1
+    device_guid = str(gremlin.shared_state.octavi_tab_guid)
+    device = dinput.DeviceSummary()
+    device.name = "Octavi IFR1"
+    device.device_guid = gremlin.shared_state.octavi_tab_guid
+    device.device_id = device_guid
+    device.is_special = True
+    device.device_type = DeviceType.OctaviIFR1
+    device.setAxisCallback(noOpCallback)
+    device.setHatCallback(noOpHatCallback)
+    oo = gremlin.ui.octavi_device.OctaviInterface()
+    device.setButtonCallback(oo.get_button)
     registerSpecialDevice(device)
 
     # mode
@@ -621,7 +655,7 @@ def joystick_devices_initialization():
 
     import gremlin.util
     import time
-    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map, _vjoy_devices, _all_joystick_devices
+    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map, _vjoy_devices, _all_joystick_devices, _ignored_device_list
 
     _joystick_initialized = False
     config = gremlin.config.Configuration()
@@ -670,13 +704,16 @@ def joystick_devices_initialization():
     virtual_count = 0
     real_count = 0
     virtual_devices = {}
+    _ignored_device_list.clear() # [device_guid] - list of hardware devices to ignore
     for device_index in range(device_count):
         # these are all connected devices
         dev = dinput.DILL.get_device_information_by_index(device_index)
 
-        # Octavi IFR1 exception
+        # Octavi IFR1 exception - this is ignored because the device also reports in as a game controller - however we read data from it using HID directly, not dinput
         #Vendor: 0x1240 Product: 0x59094
-        if dev.product_id == 0x59094 and dev.vendor_id == 0x1240:
+        if dev.product_id == 59094 and dev.vendor_id == 1240 and dev.name == 'IFR1':
+            # discard
+            _ignored_device_list.append(dev.device_guid)
             continue
 
         devices.append(dev)
@@ -1306,10 +1343,11 @@ class VJoyUsageState():
         for dev in devices.values():
             for mode in dev.modes.values():
                 for input_type in all_input_types:
-                    for item in mode.config[input_type].values():
-                        for container in item.containers:
-                            action_list = extract_remap_actions(container.action_sets)
-                            remap_actions.append([dev, input_type, item.input_id, action_list])
+                    if input_type in mode.config:
+                        for item in mode.config[input_type].values():
+                            for container in item.containers:
+                                action_list = extract_remap_actions(container.action_sets)
+                                remap_actions.append([dev, input_type, item.input_id, action_list])
         
         action_map = {}
         # Remove all remap actions from the list of available inputs

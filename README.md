@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T59)
+- Added: direct HID device read/write API support.
+- Added: API filter mechanism for "ignore" hardware devices
+- Added: direct support for Octavi IFR1 hardware. If you have an Octavi IFR1 connected, it wil show up in GremlinEx as "Octavi IFR1" and provide access to all 24 buttons (the last four are the knob rotations inner and outer).
+- Fix: various UI issues.
+
 ### (m76T58)
 - Fix: Input Viewer does not always update VJOY output data (axis or buttons) because API calls do not trigger an input event into GremlinEx.  Reworked internal messaging to capture these more reliably.
 - Fix: Input Viewer does not always remember device selections between sessions.

@@ -1946,8 +1946,6 @@ class OscInterface(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.heartbeat.disconnect(self._keep_alive)
             
-            
-
 
     def _loopback_handler(self, data : OscMessage):
         ''' handles a loopback osc message '''

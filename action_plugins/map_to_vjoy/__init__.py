@@ -2758,14 +2758,15 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' occurs when the type of input is changed '''
         with QtCore.QSignalBlocker(self.cb_action_list):
             self.cb_action_list.clear()
+            input_type = self.action_data.get_input_type()
 
             actions = ()
-            if self.action_data.input_is_axis():
+            if self.action_data.input_is_axis() or input_type == InputType.JoystickAxis:
                 # axis can only set an axis
                 actions = (VjoyAction.VJoyAxis, VjoyAction.VJoyAxisToButton, VjoyAction.VJoyMergeAxis)
 
 
-            elif self.action_data.input_is_button():
+            elif self.action_data.input_is_button() or input_type == InputType.JoystickButton:
                 # various button modes
                 actions = ( 
                             VjoyAction.VJoyButton,
@@ -2796,7 +2797,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 actions = [VjoyAction.VJoyHat, VjoyAction.VJoyHatToButton]
 
             else:
-                log_sys_warn(f"VJOYREMAP: don't know what actions to load for input type: {self.action_data.input_type}")
+                syslog.warning(f"VJOYREMAP: don't know what actions to load for input type: {input_type}")
 
             for action in actions:
                 self.cb_action_list.addItem(VjoyAction.to_name(action), action)

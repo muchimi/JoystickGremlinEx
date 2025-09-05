@@ -103,11 +103,183 @@ class OctaviButton(enum.IntEnum):
     OUTER_DEC = 25 # outer knob decrement
     OUTER_INC = 26 # outer knob increment
 
+    @staticmethod
+    def to_tooltip(button : OctaviButton):
+        match button:
+            case OctaviButton.MODEAP:
+                return "AP button (lower bar)"
+            case OctaviButton.MODEHDG:
+                return "HDG button (lower bar)"
+            case OctaviButton.MODENAV:
+                return "NAV button (lower bar)"
+            case OctaviButton.MODEAPR:
+                return "APR button (lower bar)"
+            case OctaviButton.MODEALT:
+                return "ALT button (lower bar)"
+            case OctaviButton.MODEVS:
+                return "VS button (lower bar)"
+            case OctaviButton.COM1:
+                return "COM1 selector"
+            case OctaviButton.COM2:
+                return "COM2 selector"
+            case OctaviButton.NAV1:
+                return "NAV1 selector"
+            case OctaviButton.NAV2:
+                return "NAV2 selector"
+            case OctaviButton.FMS1:
+                return "FMS1 selector"
+            case OctaviButton.FMS2:
+                return "FMS2 selector"
+            case OctaviButton.AP:
+                return "AP selector"
+            case OctaviButton.XPDR:
+                return "XPDR selector"
+            case OctaviButton.DIRECT:
+                return "DCT button"
+            case OctaviButton.MENU:
+                return "MENU button"
+            case OctaviButton.CLR:
+                return "CLR button"
+            case OctaviButton.ENT:
+                return "ENT button"
+            case OctaviButton.EXC:
+                return "SQWAP button"
+            case OctaviButton.PRESS:
+                return "Knob push"
+            case OctaviButton.INNER:
+                return "INNER knob direction, -1, 0 or +1"
+            case OctaviButton.OUTER:
+                return "Outer knob direction, -1, 0 or +1"
+            case OctaviButton.INNER_DEC:
+                return "Inner knob rotate left (counterclockwise)"
+            case OctaviButton.INNER_INC:
+                return "Inner knob rotate right (clockwise)"
+            case OctaviButton.OUTER_DEC: 
+                return "Outer knob rotate left (counterclockwise)"
+            case OctaviButton.OUTER_INC:
+                return "Outer knob rotate right (clockwise)"
+            
+        return f"Don't know how to handle: {button}"
+    
+    @staticmethod 
+    def to_display_name(button: OctaviButton):
+        match button:
+            case OctaviButton.MODEAP:
+                return "AP (bottom)"
+            case OctaviButton.MODEHDG:
+                return "HDG (bottom)"
+            case OctaviButton.MODENAV:
+                return "NAV (bottom)"
+            case OctaviButton.MODEAPR:
+                return "APR (bottom)"
+            case OctaviButton.MODEALT:
+                return "ALT (bottom)"
+            case OctaviButton.MODEVS:
+                return "VS (bottom)"
+            case OctaviButton.COM1:
+                return "COM1"
+            case OctaviButton.COM2:
+                return "COM2"
+            case OctaviButton.NAV1:
+                return "NAV1"
+            case OctaviButton.NAV2:
+                return "NAV2"
+            case OctaviButton.FMS1:
+                return "FMS1"
+            case OctaviButton.FMS2:
+                return "FMS2"
+            case OctaviButton.AP:
+                return "AP"
+            case OctaviButton.XPDR:
+                return "XPDR"
+            case OctaviButton.DIRECT:
+                return "DCT"
+            case OctaviButton.MENU:
+                return "MENU"
+            case OctaviButton.CLR:
+                return "CLR"
+            case OctaviButton.ENT:
+                return "ENT"
+            case OctaviButton.EXC:
+                return "SQWAP"
+            case OctaviButton.PRESS:
+                return "Knob press"
+            case OctaviButton.INNER:
+                return "INNER knob "
+            case OctaviButton.OUTER:
+                return "Outer knob"
+            case OctaviButton.INNER_DEC:
+                return "Inner knob"
+            case OctaviButton.INNER_INC:
+                return "Inner knob"
+            case OctaviButton.OUTER_DEC: 
+                return "Outer knob"
+            case OctaviButton.OUTER_INC:
+                return "Outer knob"
+            case _:
+                return "N/A"
+    @staticmethod     
+    def get_icon(button : OctaviButton):
+        
+        match button:
+            case OctaviButton.MODEAP:
+                return "fa5s.minus-square"
+            case OctaviButton.MODEHDG:
+                return "fa5s.minus-square"
+            case OctaviButton.MODENAV:
+                return "fa5s.minus-square"
+            case OctaviButton.MODEAPR:
+                return "fa5s.minus-square"
+            case OctaviButton.MODEALT:
+                return "fa5s.minus-square"
+            case OctaviButton.MODEVS:
+                return "fa5s.minus-square"
+            case OctaviButton.COM1:
+                return "ph.rectangle-fill"
+            case OctaviButton.COM2:
+                return "ph.rectangle-fill"
+            case OctaviButton.NAV1:
+                return "ph.rectangle-fill"
+            case OctaviButton.NAV2:
+                return "ph.rectangle-fill"
+            case OctaviButton.FMS1:
+                return "ph.rectangle-fill"
+            case OctaviButton.FMS2:
+                return "ph.rectangle-fill"
+            case OctaviButton.AP:
+                return "ph.rectangle-fill"
+            case OctaviButton.XPDR:
+                return "ph.rectangle-fill"
+            case OctaviButton.DIRECT:
+                return "fa6s.arrow-right-to-bracket"
+            case OctaviButton.MENU:
+                return "ph.rectangle-fill"
+            case OctaviButton.CLR:
+                return "ph.rectangle-fill"
+            case OctaviButton.ENT:
+                return "ph.rectangle-fill"
+            case OctaviButton.EXC:
+                return "ri.swap-box-line"
+            case OctaviButton.PRESS:
+                return "fa6.circle-down"
+            case OctaviButton.INNER:
+                return "fa6s.arrows-rotate"
+            case OctaviButton.OUTER:
+                return "fa6s.arrows-rotate"
+            case OctaviButton.INNER_DEC:
+                return "fa6s.arrow-rotate-left"
+            case OctaviButton.INNER_INC:
+                return "fa6s.arrow-rotate-right"
+            case OctaviButton.OUTER_DEC: 
+                return "fa6s.arrow-rotate-left"
+            case OctaviButton.OUTER_INC:
+                return "fa6s.arrow-rotate-right"
+            case _:
+                return "mdi.help-rhombus"
+        
     
 @SingletonDecorator
 class OctaviInterface():
-
-    changed = Signal(dict) # sent when the data changes - sends a dictionary of changed values
 
     def __init__(self):
         self._device_found = False # true if the device is found
@@ -119,15 +291,22 @@ class OctaviInterface():
         self._last_buttons = {} # last buttons
         self._core_buttons = [button for button in OctaviButton if button < OctaviButton.INNER]
         self._timers = {}
+        self._device_guid = gremlin.shared_state.octavi_tab_guid
+        self._last_led = 0 # last status LED
         for button in OctaviButton:
             self._buttons[button] = False
             self._last_buttons[button] = False
         
         
         self._autorelease_delay = 0.25 # delay for autorelease
-        self.changed.connect(self._dump)
         if self.deviceFound():
             self._start()
+
+    def get_button(self, button : OctaviButton):
+        ''' gets the current button state '''
+        if button in self._buttons:
+            return self._buttons[button]
+        return False
 
     @property
     def delay(self) -> float:
@@ -214,8 +393,10 @@ class OctaviInterface():
 
                 if v1 > 0:
                     button = OctaviButton.OUTER_INC
+                    callback =self._autorelease_outer_inc
                 elif v1 < 0:
                     button = OctaviButton.OUTER_DEC
+                    callback =self._autorelease_outer_dec
 
                 if v1:
                     changed_data[button] = True
@@ -223,14 +404,16 @@ class OctaviInterface():
                         timer = self._timers[button]
                         timer.cancel()
 
-                    timer = threading.Timer(self._autorelease_delay, lambda: self._autorelease_knobs(button)) # autorelease
+                    timer = threading.Timer(self._autorelease_delay, callback) # autorelease
                     self._timers[button] = timer
                     timers.append(timer)
 
                 if v2 > 0:
                     button = OctaviButton.INNER_INC
+                    callback =self._autorelease_inner_inc
                 elif v2 < 0:
                     button = OctaviButton.INNER_DEC
+                    callback =self._autorelease_inner_dec
 
                 if v2:
                     changed_data[button] = True
@@ -238,7 +421,7 @@ class OctaviInterface():
                         timer = self._timers[button]
                         timer.cancel()
 
-                    timer = threading.Timer(self._autorelease_delay, lambda: self._autorelease_knobs(button)) # autorelease
+                    timer = threading.Timer(self._autorelease_delay, callback) # autorelease
                     self._timers[button] = timer
                     timers.append(timer)
 
@@ -268,14 +451,14 @@ class OctaviInterface():
                             self._last_buttons[button] = value
 
                     if changed_data:
-                        self.changed.emit(changed_data)
+                        self._process_input(changed_data)
 
                     for timer in timers:
                         timer.start()
                         
                         
                 else:
-                    self.changed.emit(self._buttons)
+                    self._process_input(self._buttons)
 
                     # copy the data over
                     for button in self._buttons:
@@ -288,22 +471,63 @@ class OctaviInterface():
         
         # done running
 
+    def _autorelease_inner_dec(self):
+        self._autorelease_knobs(OctaviButton.INNER_DEC)
+    def _autorelease_inner_inc(self):
+        self._autorelease_knobs(OctaviButton.INNER_INC)
+    def _autorelease_outer_dec(self):
+        self._autorelease_knobs(OctaviButton.OUTER_DEC)
+    def _autorelease_outer_inc(self):
+        self._autorelease_knobs(OctaviButton.OUTER_INC)
+
 
     def _autorelease_knobs(self, button : OctaviButton):
         ''' called when timer lapses after a knob trigger '''
         changed_data = {}
+        syslog.info(f"autorelease knob : {button.name}")
         self._buttons[button] = False
         changed_data[button] = False
-        self.changed.emit(changed_data)
+        self._process_input(changed_data)
+        
             
+
+    def _process_input(self, data):
+        ''' handles octavi input events and convert them to joystick events '''
+        verbose = gremlin.config.Configuration().verbose_mode_octavi
+        if verbose: self._dump(data)
+        el = gremlin.event_handler.EventListener()
+        
+        is_running = gremlin.shared_state.is_running
+        for button in data:
+            is_pressed = data[button]
+            event = gremlin.event_handler.Event(InputType.OctaviIfr1, button, self._device_guid, is_pressed = is_pressed, value = is_pressed, raw_value = is_pressed, override_input_type=InputType.JoystickButton)
+            if not is_running:
+                el.joystick_event.emit(event)
+                gremlin.util.singleShot(self._create_button_change_callback(event))
+            else:
+                gremlin.util.singleShot(self._create_execute_callback(event))
+
+
+            
+    def _create_execute_callback(self, event):
+        return lambda: self._execute_event(event)
+    
+    def _create_button_change_callback(self, event):
+        return lambda: self._button_change(event)
+    
+    def _execute_event(self, event):
+        eh = gremlin.event_handler.EventHandler()
+        eh.execute_event(event)
+
+    def _button_change(self, event):
+        el = gremlin.event_handler.EventListener()
+        el.button_state_change.emit(event)
 
 
     def _dump(self, data):
         ''' dump to the log file '''
-        verbose = gremlin.config.Configuration().verbose_mode_octavi
-        if verbose:
-            for button in data:
-                syslog.info(f"{button.name} -> {data[button]}")
+        for button in data:
+            syslog.info(f"{button.name} -> {data[button]}")
 
     def _stop(self):
         if self._running:
@@ -322,16 +546,44 @@ class OctaviInterface():
         ''' closes the device '''
         pass
 
-    def setLed(self, button : OctaviButton, state : bool):
+    def setLed(self, button : OctaviButton, action : str):
         ''' turn LED on or off '''
-        # match button:
-        #     case OctaviButton.MODEAP:
-        pass
+        if not self._device:
+            return # device not found
+        match button:
+            case gremlin.ui.octavi_device.OctaviButton.MODEAP:
+                mask = 1
+            case gremlin.ui.octavi_device.OctaviButton.MODEHDG:
+                mask = 2
+            case gremlin.ui.octavi_device.OctaviButton.MODENAV:
+                mask = 4
+            case gremlin.ui.octavi_device.OctaviButton.MODEAPR:
+                mask = 8
+            case gremlin.ui.octavi_device.OctaviButton.MODEALT:
+                mask = 16
+            case gremlin.ui.octavi_device.OctaviButton.MODEVS:
+                mask = 64
+            case _:
+                return # don't know how to handle a different button
 
 
-            
+        led = self._last_led
+        match action:
+            case "on":
+                # flip bit on
+                led = led | mask
+            case "off":
+                # flip bit off
+                mask = ~mask
+                led = led & mask
+            case "toggle":
+                # toggle bit
+                led = led ^ mask 
 
-
+        if led != self._last_led:
+            # report number 11, LED value
+            self._device.write(bytes([11, led]))
+            self._last_led = led
         
 
     def deviceFound(self, refresh = False) -> bool:
@@ -357,63 +609,9 @@ class OctaviInterface():
         return False
 
 
-
+# main instance
 _octavi_device = OctaviInterface() 
 
-  
-class OctaviInputItem(gremlin.base_profile.InputItem):
-    ''' holds octavi input data '''
-
-
-    def __init__(self, button : OctaviButton, parent = None):
-        super().__init__(parent=parent) # parent is the mode object this input belongs to
-        self.verbose = gremlin.config.Configuration().verbose_mode_octavi
-        self._input_type = InputType.JoystickButton
-        self._button = button
-
-    def getOverrideInputType(self):
-        return InputType.JoystickButton
-    
-    def parse_xml(self, node, data = None):
-        ''' reads an input item from xml '''
-        if node.tag == "input":
-            self.id = read_guid(node, "guid")
-            button = safe_read(node,"button",int,1)
-            self._button = OctaviButton(button)
-
-    @property
-    def title_name(self) -> str:
-        ''' title for this input '''
-        return self._button.name            
-
-    @property
-    def display_name(self):
-        return self._button.name
-    
-    @property
-    def display_tooltip(self):
-        ''' detailed tooltip '''
-        return f"Octavi IFR1 input {self._button.name}"
-    
-    @property
-    def is_axis(self) -> bool:
-        return False
-    
-    @property
-    def is_button(self) -> bool:
-        return True
-
-    
-    def to_xml(self):
-        ''' writes the input item to XML'''
-        node = ElementTree.Element("input")
-        node.set("guid", str(self.id))
-        node.set("button", safe_format(self._button, int))
-
-    def __hash__(self):
-        # if self._message_key:
-        #     return str(self._message_key).__hash__()
-        return str(self.id).__hash__()
 
 class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
@@ -444,8 +642,8 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model = input_item.InputItemListModel(
             device_profile,
             current_mode,
-            [InputType.JoystickButton],
-            show_master_mode = True
+            [InputType.OctaviIfr1],
+            show_master_mode = False
         )
 
 
@@ -535,6 +733,16 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_item.locked = False
             self.setUpdatesEnabled(True)
 
+    def find_input(self, device_guid, input_type, input_id):
+        ''' finds the given input '''
+        if compare_guid(device_guid, OctaviDeviceTabWidget.device_guid):
+            if input_type == InputType.JoystickButton:
+                index = self.input_item_list_model.indexOf(input_id)
+                if index != -1:
+                    return self.input_item_list_model.data(index)
+        return None
+
+
 
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
@@ -559,17 +767,26 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         '''
         current_mode = gremlin.shared_state.edit_mode
         mode_object = self.device_profile.ensure_mode_exists(current_mode)
-        config = self.device_profile.modes[current_mode].config
+        config = mode_object.config
         
         changed = False
+        input_type = InputType.OctaviIfr1
 
         for button in OctaviButton:
+            if button in (OctaviButton.INNER, OctaviButton.OUTER):
+                continue # skip direction knobs
 
-            if not button in config[InputType.ModeControl]:
-                input_item = OctaviInputItem(button, parent = mode_object)
-                config[InputType.ModeControl][button] = input_item
+            if not button in config[input_type]:
+                input_item = gremlin.base_profile.InputItem(parent = mode_object)
+                input_item.input_id = button
+                input_item.input_type = input_type
+                input_item.description = OctaviButton.to_display_name(button)
+                config[input_type][button] = input_item
+                changed = True
             else:
-                input_item = config[InputType.ModeControl][button]
+                input_item = config[input_type][button]
+
+            input_item.setOverrideInputType(InputType.JoystickButton)
              
         if changed or refresh:
             self.input_item_list_model.refresh()    
@@ -591,10 +808,8 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
-        widget.setInputDescription(data.input_id.display_name)
-        # widget.enable_close()
-        # widget.enable_edit()
-        widget.setIcon("mdi6.airplane")
+        icon_name = OctaviButton.get_icon(data.input_id)
+        widget.setIcon(icon_name)
         
 
         # remember what widget is at what index
@@ -604,25 +819,13 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
-        data : OctaviInputItem = input_widget.identifier.input_id 
-        data._update_display_name()
-        input_widget.setTitle(data.title_name)
-        input_widget.setInputDescription(data.display_name)
-        input_widget.setToolTip(data.display_tooltip)
-
-        status_text = ''
-        is_warning = False
-        if not data.message:
-            is_warning = True
-            status_text = "Not configured"
-       
-        icon = None
-        if is_warning:
-            warning_color = gremlin.ui.ui_common.Color.warningColor()
-            icon_color= QtGui.QColor(warning_color)
-            icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=icon_color)
-
-        input_widget.setStatus(status_text, icon)
+        data : gremlin.base_profile.InputItem = input_widget.identifier 
+        button = data.input_id
+        name = OctaviButton.to_display_name(button)
+        tooltip = OctaviButton.to_tooltip(button)
+        input_widget.setTitle(name)
+        input_widget.setInputDescription(None)
+        input_widget.setToolTip(tooltip)
 
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):
@@ -671,8 +874,8 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         device_guid = self.device_guid
         input_id = item_data.input_id if item_data else None
-        input_type = InputType.JoystickButton
-
+        input_type = InputType.OctaviIfr1
+        
         if item_data:
             device_guid = self.device_guid
             key = self.getWidgetKey(input_type, input_id)
@@ -694,7 +897,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             device_guid = gremlin.shared_state.octavi_tab_guid
             device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Joystick))
             mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-            item_data = OctaviInputItem(mode_object)
+            item_data = gremlin.base_profile.InputItem(mode_object)
             widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="IFR1 Blank InputConfigItem (no item data)")     
 
         #self.setRightPanelWidget(widget)

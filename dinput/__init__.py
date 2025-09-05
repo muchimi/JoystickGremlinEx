@@ -484,6 +484,43 @@ class DeviceSummary:
         self.is_special = False
         self.data={}  # tracked data for this device, example, stepped index data for an axis
 
+        self._get_button_callback = None # custom callback to read a button value from this device if a special device
+        self._get_axis_callback = None # custom callback to read an axis value from this device if a special device
+        self._get_hat_callback = None # custom callback to read a hat value if this device is a special device 
+
+    def setAxisCallback(self, callback):
+        ''' sets a custom axis callback to get an axis value (parameter is the axis number) '''
+        self._get_axis_callback = callback
+
+    def setButtonCallback(self, callback):
+        ''' sets a custom button callback to get a button value (parameter is the button number)'''
+        self._get_button_callback = callback
+
+    def setHatCallback(self, callback):
+        ''' sets a custom hat callback to get a hat value (parameter is the hat number)'''
+        self._get_hat_callback = callback
+
+    def get_button(self, button):
+        ''' gets a button for this device '''
+        if self._get_button_callback:
+            return self._get_button_callback(button)
+        if self.is_special:
+            return False
+        return DILL.get_button(self.device_guid, button)
+    
+    def get_axis(self, axis):
+        ''' gets an axis for this device '''
+        if self._get_axis_callback:
+            return self._get_axis_callback(axis)
+        return DILL.get_axis(self.device_guid, axis)
+    
+    def get_hat(self, hat):
+        ''' gets a hat position for this device '''
+        if self._get_hat_callback:
+            return self._get_hat_callback(hat)
+        return DILL.get_hat(self.device_guid, hat)
+        
+
     @property
     def device_type(self):
         return self._device_type

@@ -937,6 +937,7 @@ class ProfileInputNode(ProfileBaseNode):
 
     def from_xml(self, node : Element, data = None, extra_data = None):
         ''' reads an input node '''
+        import gremlin.ui.octavi_device
         self.input_type = InputType.to_enum(node.tag)
         self.description = safe_read(node, "description", str, "")
         self.always_execute = read_bool(node, "always-execute", False)
@@ -1040,6 +1041,11 @@ class ProfileInputNode(ProfileBaseNode):
             # special mode
             if "id" in node.attrib:
                 self.input_id = safe_read(node,"id",int,0)
+        elif self.input_type == InputType.OctaviIfr1:
+            if "id" in node.attrib:
+                button = safe_read(node,"id", int, 0)
+                button = gremlin.ui.octavi_device.OctaviButton(button)
+                self.input_id = button
         
         registry = gremlin.base_profile.ProfileRegistry()
         if not self.input_item:

@@ -1013,7 +1013,7 @@ class EventListener:
 			dinput.DILL.init()
 		syslog.info("DILL: start listen")
 		dinput.DILL.set_device_change_callback(self._joystick_device_handler)
-		dinput.DILL.set_input_event_callback(self._joystick_event_handler)
+		dinput.DILL.set_input_event_callback(self._dinput_event_handler)
 		while self._running and not self._run_event.is_set():
 			# Keep this thread alive until we are done
 			time.sleep(0.05)
@@ -1031,7 +1031,7 @@ class EventListener:
 				notify_time = time.time() + 60*2 # 2 minutes
 			time.sleep(1)
 
-	def _joystick_event_handler(self, data):
+	def _dinput_event_handler(self, data):
 		"""Callback for joystick events.
 
 		The handler converts the event data into a signal which is then
@@ -1052,6 +1052,9 @@ class EventListener:
 		verbose = gremlin.config.Configuration().verbose_mode_joystick
 		
 		event = dinput.InputEvent(data)
+
+		if event.device_guid in gremlin.joystick_handling._ignored_device_list:
+			return # ignore
 
 		event_list = []
 
@@ -2211,6 +2214,7 @@ class EventHandler(QtCore.QObject):
 		m_list = []
 		f_list = []
 
+
 		# mode to act on
 		mode = event.mode if event.mode else self.runtime_mode  
 
@@ -2325,7 +2329,7 @@ class EventHandler(QtCore.QObject):
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
 			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
-		elif event.event_type in (InputType.JoystickButton, InputType.JoystickHat):
+		elif event.event_type in (InputType.JoystickButton, InputType.JoystickHat, InputType.OctaviIfr1):
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
 			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")

@@ -180,7 +180,7 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         if self.override_input_type is not None:
             return self.override_input_type
         if self._input_item is not None:
-            return self._input_item.input_type
+            return self._input_item.get_input_type()
         return None
 
     def get_input_id(self):
@@ -419,6 +419,8 @@ class AbstractContainer(ProfileData):
 
         if not input_item:
             input_item = _get_input_item(parent)
+            if input_item is None:
+                input_item = _get_input_item(parent)
 
         self._input_item = input_item
         assert input_item is not None
@@ -1156,7 +1158,9 @@ class AbstractAction(ProfileData):
 
     def input_is_axis(self):
         ''' true if the input is an axis type input '''
-
+        input_item = self.input_item
+        if hasattr(input_item, "is_axis"):
+            return input_item.is_axis
         is_axis = False
         if hasattr(self, "hardware_input_type"):
             input_type : InputType = self.hardware_input_type
@@ -1174,12 +1178,20 @@ class AbstractAction(ProfileData):
     def input_is_button(self):
         ''' true if the input is a button '''
         is_button = False
+        input_item = self.input_item
+        if hasattr(input_item, "is_button"):
+            return input_item.is_button
         if hasattr(self, "hardware_input_type"):
             input_type : InputType = self.hardware_input_type
             return input_type == InputType.JoystickButton
+        
+        if hasattr(self.hardware_input_id, "is_button"):
+            is_button = self.hardware_input_id.is_button
                 
         if hasattr(self.hardware_input_id, "is_axis"):
             is_button = not self.hardware_input_id.is_axis
+
+        
         
         return is_button
 
@@ -2188,6 +2200,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             elif self._input_type == InputType.OpenSoundControl:
                 self._is_axis = self.input_id.is_axis
                 self._is_button = self.input_id.is_button
+            elif self._input_type == InputType.OctaviIfr1:
+                self._is_axis = False
+                self._is_button = True
                 
             else:
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
@@ -2200,6 +2215,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """
 
         #assert data is not None, "InputItem must be provided"
+        import gremlin.ui.octavi_device
 
         container_node = node # node that holds the container information
         container_plugins = ContainerPlugins()
@@ -2321,6 +2337,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                         self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
                     else:
                         self.input_id = safe_read(node,"id",int,0)
+            elif self.input_type == InputType.OctaviIfr1:
+                if "id" in node.attrib:
+                    button = safe_read(node,"id",int,0)
+                    self.input_id = gremlin.ui.octavi_device.OctaviButton(button)
+
             
 
             assert self.input_id is not None,"Error processing input - check types"
@@ -2386,10 +2407,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """
         from gremlin.keyboard import Key
         if parent_node is None:
-            if self.input_type == InputType.ModeControl:
-                pass
-                
             node = etree.Element(InputType.to_string(self.input_type))
+            if node.tag == "none":
+                pass
             container_node = node # default container node to the input node
             if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
                 if isinstance(self.input_id, Key):
@@ -2447,6 +2467,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     syslog.info(f"SaveProfile: input: {self.input_type} {InputType.to_display_name(self.input_type)} input id: {self.input_id} container has no data - won't save {entry.name}")
 
         return node
+    
+
+
 
     def get_device_type(self):
         """Returns the DeviceType of this input item.
@@ -2493,6 +2516,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             return f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
         elif self._input_type == InputType.State:
             return f"State: {self._input_id}"
+        elif self._input_type == InputType.OctaviIfr1:
+            return f"IFR1: {self._input_id.name}"
         return f"Unknown input: {self._input_type}"
     
 
@@ -4209,6 +4234,7 @@ class Mode:
             InputType.OpenSoundControl,
             InputType.Midi,
             InputType.ModeControl,
+            InputType.OctaviIfr1,
         ]
 
     def __init__(self, device : Device, is_system = False):
@@ -4230,7 +4256,8 @@ class Mode:
             InputType.KeyboardLatched: {},
             InputType.OpenSoundControl: {},
             InputType.Midi: {},
-            InputType.ModeControl: {}
+            InputType.ModeControl: {},
+            InputType.OctaviIfr1: {},
         }
 
     @property
@@ -4279,6 +4306,8 @@ class Mode:
                     store_item = joy.is_axis_valid(item.input_id)
 
             if store_item:
+                if not item.input_type in self.config:
+                    self.config[item.input_type] = {}
                 self.config[item.input_type][item.input_id] = item
 
             registry.registerInputItem(item)
@@ -4298,10 +4327,9 @@ class Mode:
             node.set("inherit", safe_format(self.inherit, str))
         input_types = Mode.SaveInputTypes
         for input_type in input_types:
-            item_list = sorted(
-                self.config[input_type].values(),
-                key=lambda x: x.input_id
-            )
+            item_list = self.config[input_type].values()
+            if item_list:            
+                item_list = sorted(item_list, key=lambda x: x.input_id)
             for item in item_list:
                 #if item.is_valid_for_save():
                 node.append(item.to_xml())

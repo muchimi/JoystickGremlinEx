@@ -35,6 +35,7 @@ class InputType(enum.IntEnum):
     Midi = 9 # midi input
     ModeControl = 10 # mode actions
     State = 11 # state input
+    OctaviIfr1 = 12 # octavi IFR1
 
 
     @staticmethod
@@ -102,7 +103,8 @@ _InputType_to_string_lookup = {
     InputType.OpenSoundControl: "osc",
     InputType.Midi: "midi",
     InputType.ModeControl : "modecontrol",
-    InputType.State: "state"
+    InputType.State: "state",
+    InputType.OctaviIfr1: "ifr1",
 }
 
 _InputType_to_display_lookup = {
@@ -114,7 +116,8 @@ _InputType_to_display_lookup = {
     InputType.OpenSoundControl: "OSC Button",
     InputType.Midi: "MIDI",
     InputType.ModeControl: "Mode Control",
-    InputType.State: "State"
+    InputType.State: "State",
+    InputType.OctaviIfr1: "Octavi IFR1"
 }
 
 
@@ -128,6 +131,7 @@ _InputType_to_enum_lookup = {
     "osc": InputType.OpenSoundControl,
     "midi": InputType.Midi,
     "modecontrol" : InputType.ModeControl,
-    "state" : InputType.State
+    "state" : InputType.State,
+    "ifr1" : InputType.OctaviIfr1
 }
 

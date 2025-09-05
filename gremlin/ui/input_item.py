@@ -289,16 +289,16 @@ class InputItemListModel(ui_common.AbstractModel):
             if apply_filter: self._filter_data()
             return
 
-        input_items = self._device_data.modes[self._mode]
+        mode_object = self._device_data.modes[self._mode]
         index = 0
 
         self._index_map = {} # map of index to value
         self._item_map = {}  # map of values to their index
         for input_type in self._allowed_input_types:
-            if input_type in input_items.config.keys():
-                sorted_keys = sorted(input_items.config[input_type].keys())
+            if input_type in mode_object.config.keys():
+                sorted_keys = sorted(mode_object.config[input_type].keys())
                 for data_key in sorted_keys:
-                    data = input_items.config[input_type][data_key]
+                    data = mode_object.config[input_type][data_key]
                     # add hardware GUID reference to data block so we have an easier reference to it
                     data.device_guid = self._device_data.device_guid
                     self._index_map[index] = data
@@ -310,12 +310,12 @@ class InputItemListModel(ui_common.AbstractModel):
             master_mode = gremlin.shared_state.master_mode
             if master_mode in self._device_data.modes:
                 # older profile may not have master mode defined until saved
-                input_items = self._device_data.modes[master_mode]
+                mode_object = self._device_data.modes[master_mode]
                 for input_type in self._allowed_input_types:
-                    if input_type in input_items.config.keys():
-                        sorted_keys = sorted(input_items.config[input_type].keys())
+                    if input_type in mode_object.config.keys():
+                        sorted_keys = sorted(mode_object.config[input_type].keys())
                         for data_key in sorted_keys:
-                            data = input_items.config[input_type][data_key]
+                            data = mode_object.config[input_type][data_key]
                             # add hardware GUID reference to data block so we have an easier reference to it
                             data.device_guid = self._device_data.device_guid
                             self._index_map[index] = data
