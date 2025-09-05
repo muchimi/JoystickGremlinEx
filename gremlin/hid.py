@@ -80,7 +80,7 @@ class Hid():
                         
             if device.Usage in (4, 5) and device.UsagePage == 1:
                 # devices 4,5 are controllers, require usage page 1
-                syslog.info(f"HID device: [{index}] Manufacturer: {device.Manufacturer} Product: {device.ProductString} VendorID: 0x{device.VendorId:X} ProductID: 0x{device.ProductId:X} Usage: {device.Usage} Page: {device.UsagePage} Interface: {device.InterfaceNumber}")
+                syslog.info(f"HID device: [{index}] Manufacturer: {device.Manufacturer} Product: {device.ProductString} VendorID: 0x{device.VendorId:X}({device.VendorId}) ProductID: 0x{device.ProductId:X}({device.ProductId}) Usage: {device.Usage} Page: {device.UsagePage} Interface: {device.InterfaceNumber}")
                 index +=1
                 self._devices.append(device)
             self._all_devices.append(device)

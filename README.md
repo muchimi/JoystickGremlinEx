@@ -17,8 +17,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 ### (m76T59)
 - Added: direct HID device read/write API support.
 - Added: API filter mechanism for "ignore" hardware devices
-- Added: direct support for Octavi IFR1 hardware. If you have an Octavi IFR1 connected, it wil show up in GremlinEx as "Octavi IFR1" and provide access to all 24 buttons (the last four are the knob rotations inner and outer).
-- Fix: various UI issues.
+- Added: (experimental) direct support for Octavi IFR1 hardware. If you have an Octavi IFR1 connected, it wil show up in GremlinEx as "Octavi IFR1" and provide access to all 24 buttons (the last four are the knob rotations inner and outer).
+- Added: (experimental) map to IFR1 - lets you set the LEDs on the IRF1.
+- Fix: old property in state diagnostics message for invalid data set on a state.
+- Fix: state editing was not persisting the default value of the state if changed.
+- Fix: added workaround for QT splitter position bug (negative position) causing part of the UI to become invisible because it was shifted.
+
+
 
 ### (m76T58)
 - Fix: Input Viewer does not always update VJOY output data (axis or buttons) because API calls do not trigger an input event into GremlinEx.  Reworked internal messaging to capture these more reliably.

@@ -537,7 +537,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
     @value.setter
     def value(self, data : bool):
         if data is None or not isinstance(data, bool):
-            syslog.warning(f"State setter: state: [{self.name}] id: [{self.id}] attempt to set invalid value [{data}]")
+            syslog.warning(f"State setter: state: [{self.key}] id: [{self.id}] attempt to set invalid value [{data}]")
             return
         if not self._expression and self._value != data:
             # only set value on non expression states and only if the value has changed
@@ -1988,6 +1988,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         widget = self.sender()
         self.data.default_value = widget.data
 
+
     def _ok_button_cb(self):
         ''' ok button pressed '''
         # ensure the item is unique and not already used
@@ -2528,6 +2529,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._edit_item.description = data.description
         self._edit_item.setCategory(data.category)
+        self._edit_item.default_value = data.default_value
         self._edit_item.expression = data.expression
         self._edit_item.isExpression = data.isExpression
         self.input_item_list_model.refresh()

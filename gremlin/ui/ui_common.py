@@ -7537,15 +7537,19 @@ class QSplitTabWidget(QDataWidget):
         self._content_widget.setContentsMargins(0,0,0,0)
 
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self._content_widget)
+        self._splitter.splitterMoved.connect(self._splitter_moved)
+        self._splitter.setChildrenCollapsible(False)
+        self._last_sizes = None
 
 
         self._left_panel_widget, self._left_panel_layout = getVContainer()
-        self._left_panel_widget.setMinimumWidth(200)
+        #self._left_panel_widget.setMinimumWidth(200)
 
         self._right_panel_widget, self._right_panel_layout = getVContainer()
 
         # left panel, list view on top, buttons on bottom
         self._left_container_widget, self._left_container_layout = getVContainer()
+        #self._left_container_widget.setMinimumWidth(200)
 
         # right panel content
         self._right_container_widget, self._right_container_layout = getVContainer()
@@ -7562,15 +7566,15 @@ class QSplitTabWidget(QDataWidget):
 
         self._splitter.addWidget(self._left_panel_widget)
         self._splitter.addWidget(self._right_panel_widget)
-        self._splitter.setStretchFactor(0,1)
-        self._splitter.setStretchFactor(1,3)
+        # self._splitter.setStretchFactor(0,1)
+        # self._splitter.setStretchFactor(1,3)
 
-        width = self.frameGeometry().width()
-        w1 = width // 5
-        self._splitter.setSizes((w1, w1*4))
+        # width = self.frameGeometry().width()
+        # w1 = width // 5
+        # self._splitter.setSizes((w1, w1*4))
 
-        self._splitter.setCollapsible(0, False)
-        self._splitter.setCollapsible(1, False)
+        # self._splitter.setCollapsible(0, False)
+        # self._splitter.setCollapsible(1, False)
         self.main_layout.addWidget(self._content_widget)
 
         #_tabsplitter_tracker.registerWidget(self)
@@ -7578,6 +7582,30 @@ class QSplitTabWidget(QDataWidget):
         syslog.info(f"Created Device content: [{self._id}] {self.objectName()}")
 
         self._blank_input()
+
+    @QtCore.Slot(int, int)
+    def _splitter_moved(self, pos, index):
+        sizes = self._splitter.sizes()
+        if pos < 0:
+            # QT bug - position should never be negative
+            if self._last_sizes:
+                sizes = self._last_sizes
+            else:
+                width = self._content_widget.frameGeometry().width()
+                sizes = [200, width - 200]
+            self._splitter.setSizes(sizes)        
+        self._last_sizes = sizes
+        
+    @QtCore.Slot(QtCore.QSize)
+    def _content_resized(self, size : QtCore.QSize):
+        ''' called when the container object is resized '''
+
+        # resize the splitter to the container's size as it doesn't happen by itself for some reason
+        width = self._content_widget.frameGeometry().width()
+        height = self._content_widget.frameGeometry().height()
+        if width > 400:
+            self._splitter.setFixedWidth(width)
+        self._splitter.setFixedHeight(height)
 
     @property
     def rightPanelLocked(self) -> bool:
@@ -7781,16 +7809,7 @@ class QSplitTabWidget(QDataWidget):
 
 
 
-    @QtCore.Slot(QtCore.QSize)
-    def _content_resized(self, size : QtCore.QSize):
-        ''' called when the container object is resized '''
-
-        # resize the splitter to the container's size as it doesn't happen by itself for some reason
-        width = self._content_widget.frameGeometry().width()
-        height = self._content_widget.frameGeometry().height()
-        if width > 0:
-            self._splitter.setFixedWidth(width)
-            self._splitter.setFixedHeight(height)
+   
 
 
     def setLeftPanelWidget(self, widget : QtWidgets.QWidget):

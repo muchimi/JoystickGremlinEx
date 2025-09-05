@@ -84,6 +84,7 @@ import gremlin.import_profile
 import gremlin.windows_event_hook # reference needed for packaging
 import gremlin.macro_handler # reference needed for packaging
 import gremlin.ui.octavi_device
+import gremlin.ui.virpil_device
 
 
 
@@ -2136,6 +2137,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         the different connected devices.
         """
         try:
+
 
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_device
@@ -5070,8 +5072,7 @@ if __name__ == "__main__":
     gremlin.shared_state.char_width = gremlin.ui.ui_common.get_text_width("M")
 
 
-    # octavi test
-    test = gremlin.ui.octavi_device.OctaviInterface()
+
 
     # Run UI
     

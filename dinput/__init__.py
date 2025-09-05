@@ -680,8 +680,8 @@ class DeviceSummary:
 
     def __str__(self):
         vjoy_stub = f"VjoyID: {self.vjoy_id}" if self.vjoy_id != -1 else ""
-        vendor_string = f"0x{self.vendor_id}" if self.vendor_id else "N/A"
-        product_string = f"0x{self.product_id}" if self.product_id else "N/A"
+        vendor_string = f"0x{self.vendor_id:x}" if self.vendor_id else "N/A"
+        product_string = f"0x{self.product_id:x}" if self.product_id else "N/A"
         return f"Device: {self.name} {self.device_id}  Connected: {self.connected} Axis: {self.axis_count} Buttons: {self.button_count} Hats: {self.hat_count} Vendor: {vendor_string} Product: {product_string} Virtual: {self.is_virtual} {vjoy_stub}"
 
 

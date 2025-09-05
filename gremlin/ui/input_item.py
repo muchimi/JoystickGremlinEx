@@ -614,6 +614,7 @@ class InputItemListView(ui_common.AbstractView):
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.scroll_area = QtWidgets.QScrollArea()
+        
 
         # self.scroll_container_widget, self.scroll_container_layout = gremlin.ui.ui_common.getVContainer()
         # self.scroll_container_widget.setSizePolicy(
@@ -4878,7 +4879,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         # Configure the scroll area
-        self.scroll_area.setMinimumWidth(400)
+        #self.scroll_area.setMinimumWidth(300)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_widget = None
         self.scroll_layout = None

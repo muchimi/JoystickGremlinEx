@@ -2460,9 +2460,9 @@ class EventHandler(QtCore.QObject):
 				# search callbacks for mode hierarchy
 				callback_list = ec.getCallbacks(self.state_callbacks[event.device_guid], key, self.runtime_mode)
 
-			verbose = gremlin.config.Configuration().verbose_mode_state
-			if verbose and not callback_list:
-				syslog.info(f"STATE: state: [{key}] mode: [{self.runtime_mode}] has no callbacks. This is normal if state has no mappings.")
+			# verbose = gremlin.config.Configuration().verbose_mode_state
+			# if verbose and not callback_list:
+			# 	syslog.info(f"STATE: state: [{key}] mode: [{self.runtime_mode}] has no callbacks. This is normal if state has no mappings.")
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:
