@@ -2219,12 +2219,19 @@ def normalize_guid(device_guid) -> str:
     return device_guid.casefold().replace("-","")
 
 def compare_guid(id1, id2) -> bool:
-    ''' compares two GUIDs and returns true if equal '''
+    ''' compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against '''
     if id1 is None and id2 is None: return True
     if id1 is None or id2 is None: return False
     id1 = normalize_guid(id1)
-    id2 = normalize_guid(id2)
-    return id1 == id2
+    if hasattr(id2, '__iter__'):
+        for id in id2:
+            id2 = normalize_guid(id2)
+            if id1 == id2:
+                return True
+        return False
+    else:
+        id2 = normalize_guid(id2)
+        return id1 == id2
 
 def getTemporaryFile(ext = None):
     ''' gets a temporary file '''

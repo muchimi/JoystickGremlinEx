@@ -66,15 +66,15 @@ class ProfileSettingsWidget(QDataWidget):
 
         self._create_ui()
 
-    def refresh_ui(self, emit_change=False):
+    def refresh_ui(self, emit=False):
         """Refreshes the entire UI."""
         gremlin.ui.ui_common.clear_layout(self.scroll_layout)
         self._create_ui()
-        if emit_change:
+        if emit:
             self.changed.emit()
 
-    def refresh(self):
-        self.refresh_ui()
+    def refresh(self, emit = True):
+        self.refresh_ui(emit)
 
     @QtCore.Slot(int, bool)
     def vjoy_as_input_changed(self, vid : int, enabled : bool):

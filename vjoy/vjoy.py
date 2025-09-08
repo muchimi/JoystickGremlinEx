@@ -546,7 +546,7 @@ class VJoy:
     """Represents a vJoy device present in the system."""
 
     # Duration of inactivity after which the keep alive routine is run
-    keep_alive_timeout = 60
+    keep_alive_timeout = 120
 
     # Axis name mapping
     axis_equivalence = {
@@ -855,7 +855,10 @@ class VJoy:
         If the device hasn't been used in the last 60 seconds the device will
         be reset to ensure it doesn't time out.
         """
+        import gremlin.config
         if self._last_active + VJoy.keep_alive_timeout < time.time():
+            verbose = gremlin.config.Configuration().verbose_mode_vjoy
+            if verbose: syslog.info("VJOY: keep alive reset initiated")
             self.reset()
         self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
         self._keep_alive_timer.daemon = True

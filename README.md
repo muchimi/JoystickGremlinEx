@@ -14,6 +14,14 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T60)
+- New: state name changes propagate to expression references
+- New: sort state input buttons (sorts by name)
+- Fix: settings or plugins page blank content on general device refresh
+- Fix: code runner does not fully disconnect hooks on profile stop
+- Fix: some state selectors do not update on state name changes
+
+
 ### (m76T59)
 - Added: direct HID device read/write API support.
 - Added: API filter mechanism for "ignore" hardware devices

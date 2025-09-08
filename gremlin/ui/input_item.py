@@ -1825,6 +1825,8 @@ class InputItemWidget(QBoxFrame):
 
     def _update_container_id_ui(self):
         ''' updates container ID display for associated containers with this input '''
+        if not Shiboken.isValid(self._container_id_widget):
+            return
         config = gremlin.config.Configuration()
         gremlin.util.clear_layout(self._container_id_layout)
         if config.show_container_id:
@@ -1905,7 +1907,8 @@ class InputItemWidget(QBoxFrame):
     
     def _setWidgetHeight(self, widget : QtWidgets.QWidget, h):
         ''' sets min/max height'''
-        widget.setMinimumHeight(h)
+        if Shiboken.isValid(widget):
+            widget.setMinimumHeight(h)
         widget.setMaximumHeight(h)
 
 
@@ -2093,8 +2096,9 @@ class InputItemWidget(QBoxFrame):
 
     def _mapping_changed_cb_ui(self, item_data):
             ''' update the widget on mapping change '''
-            self._update_container_id_ui()
-            self._update_action_icons_ui()
+            if Shiboken.isValid(self):
+                self._update_container_id_ui()
+                self._update_action_icons_ui()
         
                 
 

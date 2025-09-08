@@ -1045,8 +1045,8 @@ class VerboseMode(IntFlag):
     Remote = auto() # remote receive
     Container = auto() # container debug mode
     Octavi = auto()
-    
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra | Remote | Container | Octavi
+    dinput = auto()
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra | Remote | Container | Octavi | dinput
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

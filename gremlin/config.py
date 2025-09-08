@@ -1331,6 +1331,11 @@ class Configuration(QtCore.QObject):
         return self.verbose and VerboseMode.Octavi in self.verbose_mode
     
     @property
+    def verbose_mode_dinput(self):
+        ''' true if verbose mode is in output mode '''
+        return self.verbose and VerboseMode.dinput in self.verbose_mode
+    
+    @property
     def verbose_mode_output(self):
         return self.verbose_mode_outputs
 

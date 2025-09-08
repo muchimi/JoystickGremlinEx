@@ -29,6 +29,7 @@ import enum, threading,time, random
 
 import gremlin.util
 from gremlin.util import *
+import gremlin.ui.state_device
 
 syslog = logging.getLogger("system")
 
@@ -48,6 +49,8 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         self.state_widget = gremlin.ui.ui_common.QDataLineEdit()
         widget, layout = gremlin.ui.ui_common.getGridContainer(["State:", self.state_widget])
         widgets.append(widget)
+
+        self._state = None
 
         main_layout.addWidget(widget)
 
@@ -89,15 +92,17 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _ok_button_cb(self):
         ''' ok button pressed '''
-        state = self.state_widget.text()
-        if not state:
+        key = self.state_widget.text()
+        if not key:
             gremlin.ui.ui_common.MessageBox(title = "Invalid State", prompt = f"State cannot be blank", parent = self)
             return
         sd = gremlin.ui.state_device.StateData()
-        if sd.exists(state):
-            gremlin.ui.ui_common.MessageBox(title = "Duplicate State", prompt = f"State {state} already exists", parent = self)
+        if sd.exists(key):
+            gremlin.ui.ui_common.MessageBox(title = "Duplicate State", prompt = f"State {key} already exists", parent = self)
+            self._state = sd.getState(key)
             return
-        sd.register(state, self.default_value, self.description_widget.text())
+        self._state = sd.register(key, self.default_value, self.description_widget.text())
+        
         self.accept()
         
     def _cancel_button_cb(self):
@@ -109,10 +114,14 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
     @property
     def key(self) -> str:
         return self.state_widget.text()
+    @property
+    def state(self) -> gremlin.ui.state_device.StateInputItem:
+        return self._state
     
     @property
     def description(self) -> str:
         return self.description_widget.text()
+    
     
 class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -243,13 +252,19 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _state_added(self):
-        key = self.button_press_dialog.key
-        description = self.button_press_dialog.description
-        self.action_data.key = key
+        state = self.button_press_dialog.state
+        self.action_data.state = state
+        self.populate_selector()
+
+    def _state_crud(self):
+        # update the selector
         self.populate_selector()
 
 
     def populate_selector(self):
+        gremlin.util.InvokeUiMethod(self._populate_selector_ui) # ensure on UI thread
+
+    def _populate_selector_ui(self):
         ''' updates the available states '''
         with QtCore.QSignalBlocker(self.state_selector):
             self.state_selector.clear()
@@ -257,14 +272,20 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
             for key, data in sd.getStates().items():
                 self.state_selector.addItem(key, data)
 
-            key = self.action_data.key
-            if key:
-                index = self.state_selector.findText(key)
+            state = self.action_data.state
+            if state:
+                index = self.state_selector.findData(state)
                 if index >= 0:
-                    self.state_selector.setCurrentIndex(index)
+                    self.state_selector.setCurrentIndex(index)                
             else:
-                # pick the first as the default
-                self.action_data.key = self.state_selector.currentText()
+                key = self.action_data.key
+                if key:
+                    index = self.state_selector.findText(key)
+                    if index >= 0:
+                        self.state_selector.setCurrentIndex(index)
+                else:
+                    # pick the first as the default
+                    self.action_data.state = self.state_selector.currentData()
             
             if self.state_selector.count():
                 data = self.state_selector.currentData()
@@ -277,9 +298,9 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _state_changed(self):
-        data = self.state_selector.currentData()
-        self.setDescription(data.description)
-        self.action_data.key = data.key
+        state = self.state_selector.currentData()
+        self.setDescription(state.description)
+        self.action_data.state = state
        
 
     def _populate_ui(self):
@@ -856,7 +877,8 @@ class MapToState(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         
-        self.key = None # state key
+        
+        self.state = None # mapped state
         self.description = None # state description (used to recreate the state if needed)
         self.mode = "toggle" # valid modes are "pressed", "released", "toggle", "pulse"
         self.pulse_delay = 250 # delay for pulse mode in milliseconds
@@ -875,6 +897,11 @@ class MapToState(gremlin.base_profile.AbstractAction):
                 self.hat_mode_map[position] = ButtonOutputMode.Hold # hold by default
             
 
+    @property
+    def key(self) -> str:
+        if self.state:
+            return self.state.key
+        return None
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -905,8 +932,20 @@ class MapToState(gremlin.base_profile.AbstractAction):
         :param node the node whose content should be used to populate this
             instance
         """
+        sd = gremlin.ui.state_device.StateData()
         if "key" in node.attrib:
-            self.key = node.get("key")
+            key = node.get("key")
+        if "state-id" in node.attrib:
+            state_id = node.get("state-id")
+            state = sd.getStateById(state_id)
+        else:
+            # grab state ID for legacy profiles
+            state = sd.getState(key)
+        if state:
+            self.state = state
+        else:
+            syslog.error(f"State: [{key}] does not exist - was it removed or changed?")
+
         if "description" in node.attrib:
             self.description = node.get("description")
         if "mode" in node.attrib:
@@ -958,6 +997,8 @@ class MapToState(gremlin.base_profile.AbstractAction):
         node = ElementTree.Element(MapToState.tag)
         if self.key:
             node.set("key", self.key)
+            if self.state:
+                node.set("state-id", self.state.id)
             if self.description:
                 node.set("description", self.description)
             node.set("mode", self.mode)

@@ -742,11 +742,13 @@ class CodeRunner:
         # Disconnect all signals
 
         kb = gremlin.input_devices.Keyboard()
+        el.mouse_event.disconnect(self.event_handler.execute_event)
         el.keyboard_event.disconnect(self.event_handler.execute_event)
         el.joystick_event.disconnect(self.event_handler.execute_event)
         el.virtual_event.disconnect(self.event_handler.execute_event)
         el.midi_event.disconnect(self.event_handler.execute_event)
         el.osc_event.disconnect(self.event_handler.execute_event)
+        el.state_event.disconnect(self.event_handler.execute_event)
 
         el.keyboard_event.disconnect(kb.keyboard_event)
         el.gremlin_active = False

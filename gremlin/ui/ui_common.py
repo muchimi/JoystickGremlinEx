@@ -601,6 +601,9 @@ class Icons():
     def addIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
         return Icons._icon("msc.diff-added", qta_color)
     @staticmethod
+    def sortIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+        return Icons._icon("fa5s.sort-amount-down-alt", qta_color)
+    @staticmethod
     def removeIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
         return Icons._icon("fa6s.minus", qta_color)
     @staticmethod
@@ -3642,8 +3645,10 @@ class QIconLabel(QtWidgets.QWidget):
 
     HorizontalSpacing = 2
 
-    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = False, icon_size = 16, parent = None):
+    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = False, icon_size = 16, data = None, parent = None):
         super().__init__(parent)
+
+        self.data = data
 
         if text is None and isinstance(icon_path, str):
             text = icon_path
@@ -7566,8 +7571,8 @@ class QSplitTabWidget(QDataWidget):
 
         self._splitter.addWidget(self._left_panel_widget)
         self._splitter.addWidget(self._right_panel_widget)
-        # self._splitter.setStretchFactor(0,1)
-        # self._splitter.setStretchFactor(1,3)
+        self._splitter.setStretchFactor(0,1)
+        self._splitter.setStretchFactor(1,4)
 
         # width = self.frameGeometry().width()
         # w1 = width // 5

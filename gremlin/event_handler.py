@@ -608,6 +608,7 @@ class EventListener:
 
 		# calibration data access
 		self._calibrationManager = None
+		self._verbose_dinput = False
 
 		self.profile_start.connect(self._profile_start)
 		self.profile_stopping.connect(self._profile_stopping_cb)
@@ -712,6 +713,9 @@ class EventListener:
 
 	def _profile_start(self):
 		''' occurs on profile start '''
+
+		config = gremlin.config.Configuration()
+		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
 
 		# enable mouse hooks 
 		self.enableMouse(True)
@@ -1049,7 +1053,7 @@ class EventListener:
 			return
 
 		from gremlin.util import dill_hat_lookup
-		verbose = gremlin.config.Configuration().verbose_mode_joystick
+		verbose = self._verbose_dinput
 		
 		event = dinput.InputEvent(data)
 
@@ -1373,7 +1377,13 @@ class EventListener:
 	def _apply_calibration_ex(self, device_guid, input_id, value, filter : bool = False) -> tuple:
 		''' applies calibration and deadzone data to the raw input - value -32768 to 32767, returns -1, +1 and optionally inverts the input, and sets the process flag '''
 		calibration = self.calibrationManager.getCalibration(device_guid, input_id)
-		return calibration.getValue(value, filter = filter)
+		verbose = gremlin.config.Configuration().verbose_mode_joystick
+		new_value = calibration.getValue(value, filter = filter)
+		if verbose:
+			device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+			syslog.info(f"CALIBRATION: filter: device: [{device.name}] id: [{device_guid}] filter: [{filter}] in: {value:0.3f} out: {new_value[0]:0.3f}") 
+
+		return new_value
 
 		
 	def _apply_curve_ex(self, device_guid, input_id, value : float):
@@ -1382,8 +1392,12 @@ class EventListener:
 		if key in self._joystick_input_item_map:
 			item = self._joystick_input_item_map[key]
 			if item.curve_data is not None:
+				
 				curved_value = item.curve_data.curve_value(value)
-				#print(f"curved: {value:0.4f} -> {curved_value:0.4f}")
+				verbose = gremlin.config.Configuration().verbose_mode_joystick
+				if verbose:
+					device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+					syslog.info(f"APPLY CURVE: device: [{device.name}] id: [{device_guid}] in: {value:0.4f} out: {curved_value:0.4f}")
 				return curved_value
 		return value
 	
