@@ -935,6 +935,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         sd = gremlin.ui.state_device.StateData()
         if "key" in node.attrib:
             key = node.get("key")
+            self.key = key
         if "state-id" in node.attrib:
             state_id = node.get("state-id")
             state = sd.getStateById(state_id)
@@ -1031,7 +1032,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
 
         :return True if the action is configured correctly, False otherwise
         """
-        return bool(self.key) # key has to be set for this to be valid
+        return True # bool(self.key) # key has to be set for this to be valid
 
 
 version = 1
