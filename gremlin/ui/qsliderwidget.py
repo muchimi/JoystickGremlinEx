@@ -296,8 +296,12 @@ class QSliderWidget(QtWidgets.QWidget):
         except:
             syslog.error(f"Unable to set value index {index} - out of index range error")
 
+
+    def setValue(self, value : int | float | list | tuple):            
+        gremlin.util.InvokeUiMethod(self._setValue_ui, value) # ensure on UI thread
+
         
-    def setValue(self, value : int | float | list | tuple):
+    def _setValue_ui(self, value : int | float | list | tuple):
         ''' input values expected to be -1 to +1 floating point '''
         self.lock.acquire()
         try:

@@ -762,7 +762,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
     physical input being pressed or released.
     """
 
-    name = "Map to Keyboard Ex"
+    name = "Map to Keyboard/Mouse Ex"
     tag = "map-to-keyboard-ex"
     hint = '''Enhanced keyboard mapper.
 Can also send mouse buttons, mouse wheel events.'''

@@ -3017,7 +3017,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         css = f"background-color:{background_color}"
         self.setStyleSheet(css)
 
-        self.content_widget, self.content_layout = gremlin.ui.ui_common.getVContainer()
+        self._abstract_container_content_widget, self._abstract_container_content_layout = gremlin.ui.ui_common.getVContainer()
 
         el = gremlin.event_handler.EventListener()
         el.condition_redraw.connect(self._condition_redraw) # hook the condition redraw event so we can remove existing references to the UI going away on redraw
@@ -3066,18 +3066,19 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         
         self.dock_tabs.setTabPosition(QtWidgets.QTabWidget.East)
         
-        self.content_layout.addWidget(self.dock_tabs)
-        self.setWidget(self.content_widget)
+        self._abstract_container_content_layout.addWidget(self.dock_tabs)
+        self.setWidget(self._abstract_container_content_widget)
 
         self.dock_tabs.data = self.container # associated the data tab with the container
+        self.activation_condition_widget = None
         
         # Create the individual tabs
         self._create_action_tab()
-        if self.profile_data.get_device_type() != DeviceType.VJoy:
-            if self.profile_data.condition_enabled:
-                self._create_activation_condition_tab()
-            if self.profile_data.virtual_button_enabled:
-                self._create_virtual_button_tab()
+        # if self.profile_data.get_device_type() != DeviceType.VJoy:
+        if self.profile_data.condition_enabled:
+            self._create_activation_condition_tab()
+        if self.profile_data.virtual_button_enabled:
+            self._create_virtual_button_tab()
 
         self.dock_tabs.currentChanged.connect(self._tab_changed)
 
@@ -3111,7 +3112,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self.collapsible_widget.expand(False)
         
 
-        self.collapsible_widget.setContent(self.content_widget, own = False)
+        self.collapsible_widget.setContent(self._abstract_container_content_widget, own = False)
 
         el = gremlin.event_handler.EventListener()
         el.collapse_all_containers.connect(self._handle_collapse)
@@ -3247,7 +3248,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             except:
                 pass
 
-        if self.container == container:
+        if self.container == container and self.activation_condition_widget:
             self._update_counts()
             self.activation_condition_widget._update_conditions_ui()
 
@@ -3255,7 +3256,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     @QtCore.Slot(object, object)
     def _condition_changed(self, container):
         ''' called when conditions change '''
-        if container.id == self.container.id:
+        if container.id == self.container.id and self.activation_condition_widget:
             self.activation_condition_widget._update_conditions_ui()
 
     # def _ui_ready(self):

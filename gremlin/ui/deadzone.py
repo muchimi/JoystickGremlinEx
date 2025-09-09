@@ -23,6 +23,7 @@ from PySide6 import QtWidgets, QtCore, QtGui #QtWebEngineWidgets
 from gremlin.ui import ui_common
 from gremlin.ui.qsliderwidget import QSliderWidget
 from gremlin.util import *
+import gremlin.util
 from gremlin.types import *
 import gremlin.ui.ui_common 
 import enum
@@ -270,7 +271,11 @@ class DeadzoneWidget(QtWidgets.QWidget):
             self._centered = value
             self._update()
 
-    def setValues(self, values, emit = False):
+
+    def setValues(self, values, emit = False):            
+        gremlin.util.InvokeUiMethod(self._setValues_ui, values, emit) # ensure on UI thread
+
+    def _setValues_ui(self, values, emit = False):
         """Sets the deadzone values.
 
         :param values the new deadzone values [min, min center, max center, max]
@@ -305,6 +310,8 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         if emit:
             self.changed.emit()
+
+
 
 
     def values(self):

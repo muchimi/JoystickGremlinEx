@@ -807,8 +807,9 @@ For more advanced axis splitting capability, look at the Gated Axis action.
 
         # write children out
         as_node = ElementTree.Element("action-set")
-        for action in self.action_sets[0]:
-            as_node.append(action.to_xml())
+        for action_set in self.action_sets:
+            for action in self.action_sets[0]:
+                as_node.append(action.to_xml())
         node.append(as_node)
 
         return node

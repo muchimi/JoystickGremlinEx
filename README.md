@@ -20,7 +20,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 - Fix: settings or plugins page blank content on general device refresh
 - Fix: code runner does not fully disconnect hooks on profile stop
 - Fix: some state selectors do not update on state name changes
-
+- Fix: condition widget exception for containers that do not support conditions.
+- Fix: range container exception on save when empty.
+- Fix: calibration exception due to new event model threading.  
+- Fix: TempoEx collapse does not collapse tab headers in the container.
+  
+  Still in research: possible drift of vjoy output in some situations.
 
 ### (m76T59)
 - Added: direct HID device read/write API support.
