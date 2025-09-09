@@ -65,7 +65,7 @@ class ProfileConverter:
     """Handle converting and checking profiles."""
 
     # Current profile version number
-    current_version = 11
+    current_version = 12
 
     def __init__(self):
         pass
@@ -125,7 +125,8 @@ class ProfileConverter:
             8: self._convert_from_v8,
             9: None,
             10: self._convert_from_v10,
-            11: None,
+            11: self._convert_from_v11,
+            12: None,
         }
 
         # Create a backup of the outdated profile
@@ -847,6 +848,86 @@ class ProfileConverter:
 
         return root
 
+
+    def _convert_from_v11(self, root, fname = None):
+        ''' convert from V11 - convert from state keys to state key and IDs '''
+        import gremlin.ui.state_device
+
+        id_map = {}
+        state_map = {}
+        map_to_state_map = {}
+
+        root.attrib["version"] = "12" # change version
+
+        # calatog map to state nodes
+        map_nodes = root.xpath("//map_to_state")
+        for node in map_nodes:
+            key = safe_read(node, "key", str, "")
+            map_to_state_map[key] = node
+        
+        #root = node.getroottree().getroot()
+        state_nodes = root.xpath("//profile/states/state")
+        for node in state_nodes:
+            id = safe_read(node,"id", str, "")
+            key = safe_read(node,"key", str, "")
+            if key:
+                # state exists check for ID field
+                if not id:
+                    id = gremlin.util.getguid()
+                    node.set("id", id)
+                id_map[key] = id
+                state_map[key] = node
+
+        # identify any missing states (states referenced in map to state but not in states )
+        missing_state_keys = [key for key in map_to_state_map if not key in state_map]
+        
+        # look for state nodes
+        nodes = root.xpath("//profile/states")
+        if nodes:
+            state_root = nodes[0]
+        else:
+            # state root entry does not exist - create it
+            nodes = root.xpath("//profile")
+            profile_root = nodes[0]
+            state_root = ElementTree.Element("states")
+            profile_root.append(state_root)
+
+        # add missing state keys 
+        for key in missing_state_keys:
+            state = gremlin.ui.state_device.StateInputItem(key)
+            node = state.to_xml()
+            state_root.append(node)
+            state_map[key] = node
+            
+
+        
+        # look for state entries under the states node
+        for key in state_map:
+            state = gremlin.ui.state_device.StateInputItem(key)
+            node = state_map[key]
+            state.from_xml(node)
+
+            id = id_map[key]
+            if state.id != id:
+                state.id = id
+                
+
+        # look for map to state entries in the profile
+        # and add the ID attribute if needed
+        for node in map_nodes:
+            key = safe_read(node,"key", str, "")
+            id = safe_read(node,"state-id", str, "")
+            if not id:
+                # missing id in map to state - add it
+                id = id_map[key]
+                node.set("state-id",id)
+                
+        return root
+
+
+        
+
+            
 
             
 

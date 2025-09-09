@@ -933,9 +933,9 @@ class MapToState(gremlin.base_profile.AbstractAction):
             instance
         """
         sd = gremlin.ui.state_device.StateData()
+
         if "key" in node.attrib:
             key = node.get("key")
-            self.key = key
         if "state-id" in node.attrib:
             state_id = node.get("state-id")
             state = sd.getStateById(state_id)
@@ -945,7 +945,12 @@ class MapToState(gremlin.base_profile.AbstractAction):
         if state:
             self.state = state
         else:
-            syslog.error(f"State: [{key}] does not exist - was it removed or changed?")
+            # state not found - see if we can find the missing datas 
+         
+            if state:
+                self.state = state
+            else:
+                syslog.error(f"State: [{key}] does not exist - was it removed or changed?")
 
         if "description" in node.attrib:
             self.description = node.get("description")
