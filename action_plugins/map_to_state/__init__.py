@@ -934,6 +934,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         """
         sd = gremlin.ui.state_device.StateData()
         key = None
+        state = None
 
         if "key" in node.attrib:
             key = node.get("key")
