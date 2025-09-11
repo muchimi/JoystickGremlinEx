@@ -7929,6 +7929,8 @@ def get_main_window():
 
 class QShowAtCursorDialog(QtWidgets.QDialog):
     ''' a dialog that pops up near the cursor '''
+    dialog_closed = Signal(object)
+
     def __init__(self, key = None, parent = None):
         super().__init__(parent)
 
@@ -7971,9 +7973,15 @@ class QShowAtCursorDialog(QtWidgets.QDialog):
 
         super().showEvent(event)
 
+    def closeEvent(self, arg__1):
+        self.dialog_closed.emit(self)
+        return super().closeEvent(arg__1)
+
 
 class QRememberDialog(QtWidgets.QDialog):
     ''' a dialog window that remembers its size and location '''
+
+    dialog_closed = Signal(object)
 
     def __init__(self, key: str, parent = None):
         super().__init__(parent)
@@ -8031,6 +8039,7 @@ class QRememberDialog(QtWidgets.QDialog):
     def closeEvent(self, event):
         ''' occurs when window is closed '''
         self._visible = False
+        self.dialog_closed.emit(self)
         return super().closeEvent(event)
 
     def hasConfig(self) -> bool:

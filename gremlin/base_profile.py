@@ -990,6 +990,7 @@ class Device:
         :param node the xml node to parse to populate this device
         """
         self.name = node.get("name")
+
         self.label = safe_read(node, "label", str, self.name)
         dt = safe_read(node, "type", str, "")
         if not dt:
@@ -2520,6 +2521,81 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             return f"IFR1: {self._input_id.name}"
         return f"Unknown input: {self._input_type}"
     
+    def save_container_to_template(self, fname : str):
+        if fname:
+            root = etree.Element("container_template")
+            # get the xml for every container in the mapping
+            for container in self.containers:
+                node = container.to_xml()
+                root.append(node)
+            # save the xml
+            tree = etree.ElementTree(root)
+            try:
+                if os.path.isfile(fname):
+                    # blitz existing file
+                    os.unlink(fname)
+                tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            except:
+                syslog.error(f"Error writing template to: {fname}")
+                return False
+            return True
+        
+        return False
+    
+    
+
+
+
+    def load_container_from_template(self, fname, extra_data = None):
+        ''' loads new containers from a template - returns a list of containers '''
+        if fname and os.path.isfile(fname):
+            container_list = []
+            plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
+            msg_list = []
+            try:
+                tree = etree.parse(fname, parser=parser)
+                root = tree.getroot()
+                if root.tag == "container_template":
+                    # get root containers only
+                    nodes = root.xpath("//container[not(ancestor::container)]")
+                    for node in nodes:
+                        container_type = node.get("type")
+                        container_plugins = gremlin.plugin_manager.ContainerPlugins()
+                        container_tag_map = container_plugins.tag_map
+
+                        # verify the container is valid for the input type
+                        valid_containers_names = self.get_valid_container_list()
+                        if container_type in container_tag_map:
+                            container_name = container_tag_map[container_type].name
+                            if container_name in valid_containers_names:
+                                new_container = container_tag_map[container_type](self)
+                                new_container.from_xml(node, self, extra_data)
+                                new_container.generateGuids() # replace IDs to avoid conflicts
+                                container_list.append(new_container)
+                        else:
+                            msg = f"Container {container_type.name} is not valid for the current input"
+                            msg_list.append(msg)
+                            syslog.warning(msg)
+
+
+                if msg_list:
+                    prompt = "".join((msg + "\n" for msg in msg_list))
+                    gremlin.ui.ui_common.MessageBox(title="Load Template", prompt = prompt)
+
+            except:
+                pass
+            if container_list:
+                for new_container in container_list:
+                    if hasattr(new_container, "action_model"):
+                        #new_container.action_model = self.action_model
+                    
+                        plugin_manager.set_container_data(self, new_container)
+                        #new_container.action_model.add_container(new_container)
+
+            self.containers.extend(container_list)
+            
+            return container_list
 
     
 
@@ -4217,7 +4293,57 @@ class Profile():
             self._profile_fname = None
             self._dirty = False
 
+    def copy_devices(self, source_guid, target_guid):
+        ''' copies data between two devices '''
+        if not source_guid or not target_guid or target_guid == source_guid:
+            # nothing to do
+            return
         
+        if isinstance(source_guid, str):
+            source_guid = gremlin.util.parse_guid(source_guid)
+
+        if isinstance(target_guid, str):
+            target_guid = gremlin.util.parse_guid(target_guid)
+        
+        source_device = gremlin.joystick_handling.device_info_from_guid(source_guid)
+        if not source_device  or not target_guid in self.devices:
+            syslog.warning(f"DEVICE COPY: source device [{source_guid}] not found")
+            return
+        target_device = gremlin.joystick_handling.device_info_from_guid(target_guid)
+        if not target_device or not target_guid in self.devices:
+            syslog.warning(f"DEVICE COPY: target device [{target_guid}] not found")
+
+        copy_axis = True
+        copy_buttons = True
+        tmp_file = gremlin.util.getTemporaryFile(".xml")
+
+        updated = False
+        for mode_name in self.devices[source_guid].modes:
+            # find the corresponding mode
+            source_mode_object = self.devices[source_guid].modes[mode_name]
+            target_mode_object = self.devices[target_guid].modes[mode_name]
+            for input_type in source_mode_object.config:
+                if input_type in target_mode_object.config:
+                    # matching input type
+                    if input_type in target_mode_object.config:
+                        for input_id in source_mode_object.config[input_type]:
+                            if input_id in target_mode_object.config[input_type]:
+                                source_input_item = source_mode_object.config[input_type][input_id]
+                                if source_input_item.containers:
+                                # source has mappings
+                                    target_input_item = target_mode_object.config[input_type][input_id]
+                                    source_input_item.save_container_to_template(tmp_file)
+                                    target_input_item.load_container_from_template(tmp_file)
+                                    updated = True
+
+        # cleanup after ourselves
+        if os.path.isfile(tmp_file):
+            os.unlink(tmp_file)
+
+        if updated:
+            # indicate the profile has to be reloaded
+            el = gremlin.event_handler.EventListener()
+            el.request_reload.emit()
 
 
 class Mode:

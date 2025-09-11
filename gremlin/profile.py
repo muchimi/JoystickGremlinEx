@@ -975,14 +975,14 @@ class ProfileModifier:
 
         :return list of devices used in the profile and information about them
         """
-        from gremlin.base_classes import JoystickCondition
+        import gremlin.base_conditions
         device_guids = []
         device_names = {}
         for guid, dev in self.profile.devices.items():
             device_guids.append(guid)
             device_names[guid] = dev.name
         for cond in self.all_conditions():
-            if isinstance(cond, gremlin.base_classes.JoystickCondition):
+            if isinstance(cond, gremlin.base_conditions.JoystickCondition):
                 device_guids.append(cond.device_guid)
                 device_names[cond.device_guid] = cond.device_name
         for entry in self.profile.merge_axes:
@@ -1142,13 +1142,14 @@ class ProfileModifier:
         :param target_guid identifier of the target device
         """
         # TODO: Does not ensure conditions are valid, i.e. missing inputs
+        import gremlin.base_conditions
         target_hardware_device = None
         for dev in joystick_handling.all_joystick_devices():
             if dev.device_guid == target_guid:
                 target_hardware_device = dev
 
         for condition in self.all_conditions():
-            if isinstance(condition, gremlin.base_classes.JoystickCondition):
+            if isinstance(condition, gremlin.base_conditions.JoystickCondition):
                 if condition.device_guid == source_guid:
                     condition.device_guid = target_guid
                     condition.device_name = target_hardware_device.name
@@ -1171,11 +1172,12 @@ class ProfileModifier:
 
         :return mapping of hardware ids to device names
         """
+        import gremlin.base_conditions
         name_map = {}
         for device in self.profile.devices.values():
             name_map[device.device_guid] = device.name
         for cond in self.all_conditions():
-            if isinstance(cond, gremlin.base_classes.JoystickCondition):
+            if isinstance(cond, gremlin.base_conditions.JoystickCondition):
                 name_map[cond.device_guid] = cond.device_name
         return name_map
 

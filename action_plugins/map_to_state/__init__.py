@@ -933,24 +933,26 @@ class MapToState(gremlin.base_profile.AbstractAction):
             instance
         """
         sd = gremlin.ui.state_device.StateData()
+        key = None
 
         if "key" in node.attrib:
             key = node.get("key")
         if "state-id" in node.attrib:
             state_id = node.get("state-id")
             state = sd.getStateById(state_id)
-        else:
+
+        if not state and key:
             # grab state ID for legacy profiles
             state = sd.getState(key)
+
         if state:
             self.state = state
         else:
-            # state not found - see if we can find the missing datas 
-         
-            if state:
-                self.state = state
-            else:
-                syslog.error(f"State: [{key}] does not exist - was it removed or changed?")
+            # state not found - see if we can find the missing datas  
+            syslog.error(f"State: [{key}] does not exist - creating state")
+            state = sd._register(key)
+            self.state = state
+
 
         if "description" in node.attrib:
             self.description = node.get("description")

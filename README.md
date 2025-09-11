@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T61)
+- New: profile version V12 with V11 to V12 converter for state data changes.
+- New: (experimental) copy device mappings - this is available on the context menu for device and lets you copy a device to another.  Right now there are no smarts and no guardrails if devices are mismatched.  This is meant primarily for GUID changes to copy mappings between the old device and the new device.  This feature may not be stable, use at your own risk while this is being tested.
+- Fix: force profile reload if profile updated during load due to conversions.
+- Fix: device swap exception.
+- Modified: missing states will be created for older profiles without a state entry in them.
+
 ### (m76T60)
 - New: state name changes propagate to expression references
 - New: sort state input buttons (sorts by name)

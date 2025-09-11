@@ -180,6 +180,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     ui = None
 
     # input_lock =  threading.Lock() # critical code operations - prevents reentry
+    
 
 
 
@@ -732,8 +733,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' adds custom tools to the menu '''
         self._actionTabSort = QtGui.QAction("Sort Devices", self, triggered = self._tab_sort_cb)
         self._actionTabSort.setToolTip("Sorts input hardware devices in alphabetical order")
+
+        self._ationTabCopyAssignments = QtGui.QAction("Copy to device...", self, triggered = self._tab_copy_cb)
+        self._ationTabCopyAssignments.setToolTip("Copies assignments to specified target device")
+
         self._actionTabSubstitute = QtGui.QAction("Device Swap...", self, triggered = self._tab_substitute_cb)
         self._actionTabSubstitute.setToolTip("Swap one device ID for another device ID")
+
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered = self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
         self._actionTabRemoveDevice  = QtGui.QAction("Remove device", self, triggered = self._tab_remove_device_cb)
@@ -743,7 +749,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         menuTools.addSeparator()
         menuTools.addAction(self._actionTabSort)
+        menuTools.addAction(self._ationTabCopyAssignments)
         menuTools.addAction(self._actionTabSubstitute)
+
         menuTools.addAction(self._actionTabRemoveDevice)
         #menuTools.addAction(self._actionTabImport)
         menuTools.addAction(self._actionTabClearMap)
@@ -764,6 +772,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._actionTabSubstitute.setEnabled(is_enabled)
         menu = QtWidgets.QMenu(self)
         menu.addAction(self._actionTabSort)
+        menu.addAction(self._ationTabCopyAssignments)
         menu.addAction(self._actionTabSubstitute)
         #menu.addAction(self._actionTabImport)
         menu.addAction(self._actionTabRemoveDevice)
@@ -841,6 +850,38 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         dialog.accepted.connect(self._substitute_complete_cb)
         gremlin.util.centerDialog(dialog)
         dialog.show()
+
+    def _tab_copy_cb(self, pos):
+        if self._context_menu_tab_index is None:
+            # not setup yet - use the first discovered device in the profile
+            profile = gremlin.shared_state.current_profile
+            if len(profile.devices) > 0:
+                self._context_menu_tab_index = 0
+
+        if self._context_menu_tab_index is None:
+            # no hardware tab found
+            gremlin.ui.dialogs.ok_message_box("No input hardware was found to substitute.")
+            return
+
+        # verify we have hardware to substitute with
+        data : TabData = self.ui.devices.tabData(self._context_menu_tab_index)
+        device_guid = data.device_guid
+
+        dialog = gremlin.profile_graph.DeviceCopyDialogUI(device_guid)
+        dialog.dialog_closed.connect(self._device_copy)
+        dialog.exec()
+
+
+    def _device_copy(self, dialog):
+        if not dialog.result():
+            return
+        
+        target_device = dialog.target_device
+        source_device = dialog.source_device
+        current_profile = gremlin.shared_state.current_profile
+        current_profile.copy_devices(source_device.device_guid, target_device.device_guid)
+
+
 
     def _substitute_complete_cb(self):
         ''' substitution complete - reload profile '''
@@ -4134,6 +4175,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 # Attempt to load the new profile
                 try:
+
                     new_profile = gremlin.base_profile.Profile()
 
                     if not os.path.isfile(source_xml):
@@ -4160,6 +4202,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     # trip over insignificant input item additions.
                     if profile_updated:
                         new_profile.to_xml(source_xml)
+
+                        # reload the profile
+                        syslog.info("Profile: reload due to conversion.")
+                        new_profile = gremlin.base_profile.Profile()
+                        gremlin.shared_state.current_profile = new_profile
+                        new_profile.from_xml(source_xml)
+
 
 
 

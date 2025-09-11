@@ -227,6 +227,68 @@ class RemapData():
         self.target_device : DeviceSummary = target_device # target device to remap to
         self.device_node : ProfileDeviceNode = device_node  # source device node
 
+
+class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
+    def __init__(self, device_guid = None, parent = None):
+        super().__init__(self.__class__.__name__, parent)
+
+        self.setWindowTitle("Device Assignment Copy")
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        warning_widget = gremlin.ui.ui_common.QWarningWidget("This is an experimental feature.")
+        self.main_layout.addWidget(warning_widget)
+
+        self.source_device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+        if not self.source_device:
+            syslog.error(f"Device copy: source [{device_guid}] device not found")
+            self.close()
+
+        self.device_selector = gremlin.ui.ui_common.NoWheelComboBox()
+        devices = gremlin.joystick_handling.all_joystick_devices()
+        devices = [dev for dev in devices if dev.device_guid != self.source_device.device_guid and dev.device_type == self.source_device.device_type]
+
+        if not devices:
+            syslog.error("Device copy: no valid target devices found.")
+            self.close()
+
+        for device in devices:
+            self.device_selector.addItem(device.name, device)
+
+
+        self.target_device = self.device_selector.currentData()
+        self.device_selector.currentIndexChanged.connect(self._device_changed)
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(["Target Device:", self.device_selector])
+        self.main_layout.addWidget(widget)
+
+        self.main_layout.addWidget(QtWidgets.QWidget()) # separator
+        ok_button_widget =  QtWidgets.QPushButton("Ok")
+        ok_button_widget.clicked.connect(self._execute_cb)
+        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget.clicked.connect(self._close_cb)
+        button_container_widget, _ = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True)
+        
+        self.main_layout.addWidget(button_container_widget)
+
+    @QtCore.Slot()
+    def _device_changed(self):
+        self.target_device = self.device_selector.currentData()
+
+
+    @QtCore.Slot()
+    def _execute_cb(self):
+        self.setResult(QtWidgets.QDialog.DialogCode.Accepted)
+        self.close()
+        
+
+
+    @QtCore.Slot()
+    def _close_cb(self):
+        self.setResult(QtWidgets.QDialog.DialogCode.Rejected)
+        self.close()
+
+
 class DeviceRemapDialogUI(ui_common.BaseDialogUi):
     ''' dialog box to handle a profile remap between like devices '''
     def __init__(self, graph : ProfileGraph, parent=None, device_guid = None):

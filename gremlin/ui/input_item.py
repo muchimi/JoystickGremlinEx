@@ -4419,6 +4419,9 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             return True
         
         return False
+    
+    
+
 
 
     def _load_container_from_template(self, extra_data = None):

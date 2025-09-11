@@ -393,6 +393,8 @@ class EventListener:
 
 	# profile unloaded - trigger when a profile is being unloaded
 	profile_unloaded = Signal()
+
+	
 	
 	# signal emitted when the selected hardware device changes
 	profile_device_changed = Signal(DeviceChangeEvent)
