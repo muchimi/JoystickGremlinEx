@@ -1500,6 +1500,7 @@ class Settings:
 
         # Process vJoy axis initial values
         for vid, data in self.vjoy_initial_values.items():
+                
             vjoy_node = etree.Element("vjoy")
             vjoy_node.set("id", safe_format(vid, int))
             for aid in data:
@@ -1512,14 +1513,23 @@ class Settings:
             node.append(vjoy_node)
 
         return node
+    
+    def vjoyAsInput(self, vid : int):
+        ''' true if vjoy device is setup as input in the profile options'''
+        return vid in self.vjoy_as_input
 
     def from_xml(self, node, data = None, extra_data = None):
         """Populates the data storage with the XML node's contents.
 
         :param node the node containing the settings data
         """
+        
+
         if node is None:
             return
+        
+        sd = gremlin.event_handler.JoystickState()
+        
 
         # Startup mode
         self.startup_mode = None
@@ -1535,7 +1545,14 @@ class Settings:
         self.vjoy_as_input = {}
         for vjoy_node in node.findall("vjoy-input"):
             vid = safe_read(vjoy_node, "id", int, 0)
+            device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vid)
+            if device:
+                device_guid = device.device_guid
+                sd.setOutputIgnored(device_guid, True) # ignore as output
+                sd.setInputIgnored(device_guid, False) # allow as input
             self.vjoy_as_input[vid] = True
+            
+            
 
         # vjoy initialization values
         self.vjoy_initial_values = {}
@@ -1552,6 +1569,8 @@ class Settings:
 
                 self.vjoy_initial_values[vid][aid] = (enabled, value)
 
+        # update the data from the profile
+        sd.reset()
 
     def get_vjoy_axis_enabled(self, vid, aid) -> bool:
         ''' true if the value is enabled for this axis '''

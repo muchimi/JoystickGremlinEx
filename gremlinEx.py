@@ -1435,6 +1435,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         eh.reset()
 
 
+
+
         new_profile =  gremlin.base_profile.Profile()
         self.profile = new_profile
         
@@ -1453,8 +1455,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # non regular devices
         self.profile.initialize_regular_devices()
 
+        # reset joystick input/output flags
+        sd = gremlin.event_handler.JoystickState()
+        sd.reset()
+
         # Update profile information
         self._update_window_title()
+
+        
 
         # Create device tabs
         self._create_tabs()
@@ -1469,6 +1477,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # Update everything to the new mode
         #self._mode_configuration_changed()
+
+
 
 
         self._update_status_bar()
@@ -2179,6 +2189,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """
         try:
 
+            sd = gremlin.event_handler.JoystickState()
 
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_device
@@ -2321,13 +2332,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             
             # Create vJoy as input device tabs
+
             
             for device in sorted(all_vjoy_devices, key=lambda x: x.vjoy_id):
                 # Ignore vJoy as output devices
                 
                 device_guid = device.device_guid
                 device_name = device.name
-                input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+                input_enabled = sd.inputEnabled(device.device_guid) #  self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
                 if not input_enabled:
                     if verbose: syslog.info(f"VJOY TAB: {device_name} not created because input is disabled on this device.")
                     continue
@@ -3154,7 +3166,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if not switch_input:
                 widget = self.getRegisteredWidget(device_guid)
-                if widget:
+                if widget and isinstance(widget, gremlin.ui.ui_common.QSplitTabWidget):
                     current_input_id = widget.getContentInputId()
                     if current_input_id:
                         switch_input = current_input_id != input_id
@@ -3163,31 +3175,33 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if input_id is not None and switch_input:
                 # select a particular input within a tab
                 widget = self.getRegisteredWidget(device_guid)
+
                 if widget:
-                    self.selectRegisteredWidget(device_guid)
-                    if verbose: syslog.info(f"Select input: select widget {input_type} {input_id}")
-                    if tab_changed or not hasattr(widget, "input_item_list_view"):
-                        widget.refresh(emit = False)
-                    if not force_update:
-                        force_update = current_input_id != input_id or current_input_type != current_input_id or gremlin.util.compare_guid(current_device_guid, device_guid)
+                    if isinstance(widget, gremlin.ui.ui_common.QSplitTabWidget): # some tabs are not the standard widget - ignore those as they have no inputs
+                        self.selectRegisteredWidget(device_guid)
+                        if verbose: syslog.info(f"Select input: select widget {input_type} {input_id}")
+                        if tab_changed or not hasattr(widget, "input_item_list_view"):
+                            widget.refresh(emit = False)
+                        if not force_update:
+                            force_update = current_input_id != input_id or current_input_type != current_input_id or gremlin.util.compare_guid(current_device_guid, device_guid)
 
-                    emit = gremlin.shared_state.profile_loading #True #not has_containers
-                    
-                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
-                    index = widget.input_item_list_view.current_index
-                    widget.input_item_list_view.redraw_index(index)
-                    widget._select_item_cb(index)
-                    #widget.refresh(False)
+                        emit = gremlin.shared_state.profile_loading #True #not has_containers
+                        
+                        widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
+                        index = widget.input_item_list_view.current_index
+                        widget.input_item_list_view.redraw_index(index)
+                        widget._select_item_cb(index)
+                        #widget.refresh(False)
 
-                    item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
-                    # if not item:
-                    #     item = widget.input_item_list_view.select_item(index, emit = False)
-                    if verbose: assert item is not None, f"SELECT: sync issue: no selection"
-                    item = widget.input_item_list_view.selected_item()
-                    if verbose: assert item is not None, f"SELECT: sync issue: no selection"
+                        item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
+                        # if not item:
+                        #     item = widget.input_item_list_view.select_item(index, emit = False)
+                        if verbose: assert item is not None, f"SELECT: sync issue: no selection"
+                        item = widget.input_item_list_view.selected_item()
+                        if verbose: assert item is not None, f"SELECT: sync issue: no selection"
 
-                    #widget.select_item(index)
-                    widget.setContentWidget(input_type, input_id)
+                        #widget.select_item(index)
+                        widget.setContentWidget(input_type, input_id)
 
           
                     if verbose: syslog.info(f"Select input: selected widget {input_type} {input_id}")
@@ -5133,6 +5147,12 @@ if __name__ == "__main__":
 
     # Create Gremlin UI
     ui = GremlinUi()
+
+    # joystick state
+    sd = gremlin.event_handler.JoystickState()
+    sd.hook()
+    sd.reset() # initial state
+
 
     
 

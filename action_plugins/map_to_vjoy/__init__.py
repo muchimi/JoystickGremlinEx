@@ -3610,10 +3610,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         super().__init__(action_data, parent)
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_vjoy or config.verbose_mode_joystick
+        self.verbose_extra = self.verbose and config.verbose_mode_extra
         self.vjoy_device_id = action_data.vjoy_device_id
         self.vjoy_input_id = action_data.vjoy_input_id
         self.input_type = action_data.get_input_type()
-        self.axis_mode = action_data.axis_mode
+        
         self.axis_scaling = action_data.axis_scaling
         self.action_mode = action_data.action_mode
         self.pulse_delay = action_data.pulse_delay
@@ -4123,6 +4124,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         (is_local, is_remote) = input_devices.remote_state.state
         usage_data = gremlin.joystick_handling.VJoyUsageState()
         verbose = self.verbose
+        verbose_extra = self.verbose_extra
+        verbose_extra = verbose
         # syslog = logging.getLogger("system")
         if event.force_remote:
             # force remote mode on if specified in the event
@@ -4143,6 +4146,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             # axis response mode
 
             if verbose: syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current:0.3f}  Event raw: {event.raw_value:0.3f} value: {event.value:0.3f} curve: {event.curve_value:0.3f}")
+
+            axis_mode = self.action_data.axis_mode
 
             # read the value from the extra data if set
             if extra_data is not None and "value" in extra_data:
@@ -4225,7 +4230,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, is_pressed)
 
                 case _:
-                    if self.axis_mode == "absolute":
+                    if axis_mode == "absolute":
                         # apply any range function to the raw position
 
 
@@ -4238,7 +4243,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                                 
                         if is_remote:
                             self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
-                    else:
+                    elif axis_mode == "relative":
                         # relative mode
 
                         if self.action_data.use_relative_value:
@@ -4266,14 +4271,14 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         self.lock.release()
 
 
-                        syslog.info(f"Tick value: {direction * scale_factor : 0.3f}")
+                        if verbose_extra: syslog.info(f"Tick value: {direction * scale_factor : 0.3f}")
 
                         if scale_factor >= 0.02:
                             if not self._relative_pulse_worker.is_running:
-                                syslog.info("Tick start")
+                                if verbose_extra: syslog.info("VJOY: Tick start")
                                 self._relative_pulse_worker.start() # start pulsing updates to the axis while deviated
                         else:
-                            syslog.info("Tick stop")
+                            if verbose_extra: syslog.info("VJOY: Tick stop")
                             self._relative_pulse_worker.stop() # stop pulsing updates to the axis if not deviated
 
                         return True # done 
@@ -4858,7 +4863,13 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.refresh_vjoy()
 
 
- 
+    # @property
+    # def axis_mode(self) -> str:
+    #     return self._axis_mode
+    # @axis_mode.setter
+    # def axis_mode(self, value : str):
+    #     self._axis_mode = value
+            
 
     def display_name(self):
         match self._action_mode:
@@ -4920,14 +4931,19 @@ Supports axis merging, curved output, command, hat and button mappings.
     def get_filtered_axis_value(self, value : float = None, curves : list = None) -> float:
         ''' computes the output value for the current configuration - applies curves if curves are provided  '''
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_joystick and gremlin.shared_state.is_running
-        # verbose_details = True
+        verbose = config.verbose_mode_curve and gremlin.shared_state.is_running
+        source_value = value
+
+        if verbose:
+            device = gremlin.joystick_handling.device_info_from_guid(self.hardware_device_guid)
+            device_stub = f"[{device.name}/{device.get_axis_name(self.hardware_input_id)}]"
+            
 
         if value is not None:
-            if verbose: source = "from value"
+            if verbose : source = f"{device_stub} from value"
             axis_value = value
         else:
-            if verbose: source = "get hardware value"
+            if verbose: source = f"{device_stub} get hardware value"
             axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             if axis_value is None:
                 # not an axis type 
@@ -4939,23 +4955,20 @@ Supports axis merging, curved output, command, hat and button mappings.
         value = axis_value
 
         if not curves:
-            if verbose: syslog.info(f"Filter: using source: [{source}] no filter -> filtered [{value:0.3f}]")
+            #if verbose: syslog.info(f"Filter: using source: [{source}] input: {source_value:0.3f} no filter -> filtered [{value:0.3f}]")
             curves = []
-            # # return value # no curves
-            # if self.curve_data:
-            #     # curves not provided - determine curve manually
-            #     curves = [self.curve_data]
-            
+
 
         if self.action_mode == VjoyAction.VJoyAxis:
             # plain axis 
-            if verbose: curve_msg = f"Applying {len(curves)} curves: "
-            for curve_data in curves:
-                curve_value = curve_data.curve_value(value)
-                if verbose: curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
-                value = curve_value
+            if curves:
+                if verbose: curve_msg = f"Applying {len(curves)} curves: "
+                for curve_data in curves:
+                    curve_value = curve_data.curve_value(value)
+                    if verbose: curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
+                    value = curve_value
 
-            if verbose: syslog.info(f"Filter: applied curve: {curve_msg}")
+                if verbose: syslog.info(f"Filter: applied curve: {curve_msg}")
 
                 
 

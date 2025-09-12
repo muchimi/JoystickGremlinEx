@@ -1139,7 +1139,8 @@ class StateData(QtCore.QObject):
 
         self._data = {}
         self._id_map = {}
-        
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: syslog.info("STATE: clear data")
         sc = StateCategories()
         sc.clear()
 
@@ -1157,6 +1158,9 @@ class StateData(QtCore.QObject):
         # evaluate expressions based on initial data values
         for data in to_evaluate:
             data.evaluate(force=True)
+
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: syslog.info("STATE: reset data")
 
     def _register(self, key : str, value = None, description = None) -> StateInputItem:
         ''' registers a new state '''

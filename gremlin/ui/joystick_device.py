@@ -198,17 +198,15 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if device is not None and \
                 device.is_virtual and \
                 not vjoy_as_input.get(device.vjoy_id, False):
-            label = QtWidgets.QLabel(
-                "This tab allows assigning a response curve to virtual axis. "
-                "The purpose of this is to enable split and merge axis to be "
-                "customized to a user's needs with regards to dead zone and "
-                "response curve."
-            )
-            label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
-            label.setWordWrap(True)
-            label.setFrameShape(QtWidgets.QFrame.Box)
-            label.setMargin(10)
-            self.addLeftPanelWidget(label)
+            
+            msg = '''
+                This tab allows assigning a response curve to virtual axis. 
+                The purpose of this is to enable split and merge axis to be
+                customized to a user's needs with regards to dead zone and
+                response curve.
+                '''
+            widget = gremlin.ui.ui_common.QInfoBox(msg)
+            self.addLeftPanelWidget(widget)
 
 
         config = gremlin.config.Configuration()

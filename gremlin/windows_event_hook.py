@@ -20,7 +20,7 @@ import ctypes
 from ctypes import wintypes
 import threading
 import time
-from gremlin.singleton_decorator import SingletonDecorator
+import gremlin.singleton_decorator 
 
 
 
@@ -382,7 +382,7 @@ def _queue_wheel_release(button_id):
 
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class KeyboardHook:
 
     """Hooks into the event stream and grabs keyboard related events
@@ -452,7 +452,7 @@ class KeyboardHook:
 
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class MouseHook:
 
     """Hooks into the event stream and grabs mouse related events

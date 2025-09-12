@@ -86,7 +86,7 @@ class ProfileSettingsWidget(QDataWidget):
         el = gremlin.event_handler.EventListener()
         el.vjoy_as_input_changed.emit(vid, enabled)
         el.device_change_event.emit()
-        
+
 
 
     def _create_ui(self):

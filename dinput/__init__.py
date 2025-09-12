@@ -50,6 +50,15 @@ class _GUID(ctypes.Structure):
         ("Data4", ctypes.c_uint8 * 8)
     ]
 
+      
+    def toId(self):
+        ''' converts to short string lowercase format '''
+        s = f"{self.Data1:08x}{self.Data2:04x}{self.Data3:04x}"
+        for b in self.Data4:
+            s += f"{b:02x}"
+        return s
+
+
 
 _GUID_SysKeyboard = _GUID()
 _GUID_SysKeyboard.Data1 = 0x6F1D2B61
@@ -179,6 +188,9 @@ class GUID:
             Mapping of a C GUID structure
         """
         return self._ctypes_guid
+    
+    def toId(self):
+        return f"{self.guid[0]:08x}{self.guid[1]:04x}{self.guid[2]:04x}{self.guid[3]:04X}{self.guid[4]:012x}"
 
     def __str__(self):
         """Returns a string representation of the GUID.
@@ -204,6 +216,7 @@ class GUID:
             True if the two GUIDs are equal, False otherwise
         """
         return hash(self) == hash(other)
+
 
     def __lt__(self, other):
         """Returns the result of the < operator.

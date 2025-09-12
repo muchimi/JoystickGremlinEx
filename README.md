@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T61A)
+- Added: curve verbose mode to provide information on curve processing in the log file.
+- Updated: refactored input and output devices to filter out unwanted directinput data.
+
+
 ### (m76T61)
 - New: profile version V12 with V11 to V12 converter for state data changes.
 - New: (experimental) copy device mappings - this is available on the context menu for device and lets you copy a device to another.  Right now there are no smarts and no guardrails if devices are mismatched.  This is meant primarily for GUID changes to copy mappings between the old device and the new device.  This feature may not be stable, use at your own risk while this is being tested.

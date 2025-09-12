@@ -23,16 +23,15 @@ import threading
 import dinput
 import time
 
-import gremlin.base_classes
+
 import gremlin.config
-import gremlin.event_handler
-import gremlin.input_types
-import gremlin.joystick_handling
+
+
 import gremlin.shared_state
 import gremlin.types
 from gremlin.types import DeviceType
 import gremlin.hid
-from gremlin.singleton_decorator import SingletonDecorator
+import gremlin.singleton_decorator
 import gremlin.util
 
 
@@ -51,7 +50,7 @@ _all_joystick_devices = [] # [DeviceSummary] of all devices, virtual, connected 
 _vjoy_devices = [] # real vjoy devices
 
 _joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID
-_ignored_device_list = [] # [device_guid] - list of hardware devices to ignore
+
 
 
 # Joystick initialization lock
@@ -72,6 +71,7 @@ class VJoyProxy:
     """Manages the usage of vJoy and allows shared access all callbacks."""
 
     vjoy_devices = {}
+    
 
     def __getitem__(self, vid):
         """Returns the requested vJoy instance.
@@ -240,11 +240,17 @@ def get_curved_axis(guid, identifier):
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
 
+    verbose = gremlin.config.Configuration().verbose_mode_curve
+
     device = get_device(guid)
     if not device.is_special:
         eh = gremlin.event_handler.EventListener()
         value = dinput.DILL.get_axis(guid, identifier)
-        return eh.apply_transforms(guid, identifier, value)
+        curved = eh.apply_transforms(guid, identifier, value)
+        if verbose:
+            syslog.info(f"APPLY CURVE: {device.name} axis: [{identifier}] input: {value:0.3f} curved: {curved:0.3f}")
+        return curved
+    
     else:
         if device.device_type == DeviceType.Osc and isinstance(identifier, gremlin.ui.osc_device.OscInputItem) and identifier.is_axis:
             osc = gremlin.ui.osc_device.InputOscClient()
@@ -288,8 +294,18 @@ def get_button(guid, index) -> bool:
 
 def set_button(guid, index : int, is_pressed : bool):
     ''' sets a vjoy device button if the index and guid exists '''
+    import gremlin.event_handler
+    sd = gremlin.event_handler.JoystickState()
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
+    
+    if sd.outputIgnored(guid):
+        # output ignored 
+        verbose = gremlin.config.Configuration().verbose_mode_vjoy
+        if verbose:
+            device = device_info_from_guid(guid)
+            syslog.info(f"VJOY SET BUTTON: {device.name} output ignored [{index}] pressed: {is_pressed}")
+        return
     device = get_device(guid)
     if device and device.is_virtual:
         vjoy_id = device.vjoy_id
@@ -299,6 +315,15 @@ def set_button(guid, index : int, is_pressed : bool):
     
 def set_axis(guid, index : int, value : float):
     ''' sets a vjoy axis '''
+    import gremlin.event_handler
+    sd = gremlin.event_handler.JoystickState()
+    if sd.outputIgnored(guid):
+        # output ignored 
+        verbose = gremlin.config.Configuration().verbose_mode_vjoy
+        if verbose:
+            device = device_info_from_guid(guid)
+            syslog.info(f"VJOY SET AXIS: {device.name} output ignored [{index}] value: {value: 0.3f}")
+        return
     device = get_device(guid)
     if device and device.is_virtual:
         vjoy_id = device.vjoy_id
@@ -655,7 +680,7 @@ def joystick_devices_initialization():
 
     import gremlin.util
     import time
-    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map, _vjoy_devices, _all_joystick_devices, _ignored_device_list
+    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map, _vjoy_devices, _all_joystick_devices
 
     _joystick_initialized = False
     config = gremlin.config.Configuration()
@@ -704,17 +729,12 @@ def joystick_devices_initialization():
     virtual_count = 0
     real_count = 0
     virtual_devices = {}
-    _ignored_device_list.clear() # [device_guid] - list of hardware devices to ignore
+    
     for device_index in range(device_count):
         # these are all connected devices
         dev = dinput.DILL.get_device_information_by_index(device_index)
 
-        # Octavi IFR1 exception - this is ignored because the device also reports in as a game controller - however we read data from it using HID directly, not dinput
-        #Vendor: 0x1240 Product: 0x59094
-        if dev.product_id == 59094 and dev.vendor_id == 1240 and dev.name == 'IFR1':
-            # discard
-            _ignored_device_list.append(dev.device_guid)
-            continue
+
 
         devices.append(dev)
         syslog.info(f"\tindex: [{device_index}] {str(dev)}")
@@ -894,6 +914,8 @@ def joystick_devices_initialization():
     vjoy_devices_list.sort(key = lambda x: x.vjoy_id)
     for dev in regular_devices_list:
         syslog.info(f"\tDevice: (regular) {str(dev)}")
+
+    
     for dev in vjoy_devices_list:
         syslog.info(f"\tDevice: (vjoy) {str(dev)}")
 
@@ -1501,3 +1523,8 @@ class VjoyStart():
 
 # instance
 _vjoy_start = VjoyStart()
+
+
+
+
+

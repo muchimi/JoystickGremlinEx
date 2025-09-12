@@ -2215,8 +2215,10 @@ def isNumeric(input_string):
 def normalize_guid(device_guid) -> str:
     ''' normalizes a device GUID to a string'''
     if not isinstance(device_guid, str):
-        device_guid = str(device_guid)
-    return device_guid.casefold().replace("-","")
+        device_guid = device_guid.toId()
+    else:
+        device_guid = device_guid.casefold().replace("-","")
+    return device_guid
 
 def compare_guid(id1, id2) -> bool:
     ''' compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against '''
@@ -2225,8 +2227,8 @@ def compare_guid(id1, id2) -> bool:
     id1 = normalize_guid(id1)
     if hasattr(id2, '__iter__'):
         for id in id2:
-            id2 = normalize_guid(id2)
-            if id1 == id2:
+            a = normalize_guid(id)
+            if id1 == a:
                 return True
         return False
     else:

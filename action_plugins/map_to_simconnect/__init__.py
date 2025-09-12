@@ -4858,7 +4858,10 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
     def get_local_curve_value(self, value : float) -> float:
         # apply local curve if any
         if self.curve_data:
-            value = self.curve_data.curve_value(value)
+            verbose = gremlin.config.Configuration().verbose_mode_curve
+            curved = self.curve_data.curve_value(value)
+            if verbose: syslog.info(f"SIMCONNECT CURVE: apply curve source {value:0.3f} -> {curved:0.3f}")
+            return curved
         return value
 
 

@@ -1217,6 +1217,11 @@ class Configuration(QtCore.QObject):
         return self.verbose and VerboseMode.VJoy in self.verbose_mode
     
     @property
+    def verbose_mode_curve(self):
+        ''' true if verbose mode is in UI mode '''
+        return self.verbose and VerboseMode.Curve in self.verbose_mode
+    
+    @property
     def verbose_mode_joystick(self):
         ''' true if verbose mode is in joystick mode '''
         return self.verbose and VerboseMode.Joystick in self.verbose_mode
