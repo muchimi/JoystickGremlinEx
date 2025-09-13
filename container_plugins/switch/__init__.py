@@ -570,7 +570,7 @@ class SwitchData():
         self.device_guid = device_guid
         self.input_id = input_id
         self.mode = mode
-        self.device_id = str(device_guid)
+        self.device_id = gremlin.util.normalize_guid(device_guid)
         self.action_set = None # data associated with this set
 
     def _generate_xml(self):

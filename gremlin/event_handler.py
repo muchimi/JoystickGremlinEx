@@ -24,6 +24,7 @@ import time
 import queue
 import threading
 import anytree
+from typing import NamedTuple, Optional
 from threading import Thread, Timer
 from typing import Callable
 import math
@@ -228,7 +229,7 @@ class Event:
 		''' unique key to use to identify the specific callback '''
 		device_guid = self.device_guid
 		if not isinstance(device_guid, str):
-			device_guid = str(device_guid)
+			device_guid = gremlin.util.normalize_guid(device_guid)
 		if self.event_type == InputType.Keyboard:
 			data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
 			return (
@@ -491,9 +492,7 @@ class EventListener:
 	# occurs when input enabled state changes
 	input_enabled_changed = Signal(object) # param - InputItem
 
-	# occurs when calibration data changes
-	calibration_changed = Signal(object) # param - CalibrationData object
-	calibration_options_changed = Signal() # fires when calibration options are changed for the UI to update
+	
 
 	# occurs when a macro step completes
 	macro_step_completed = Signal(int) # param - macro ID returned by the queue_macro function
@@ -567,9 +566,11 @@ class EventListener:
 	expand_all_containers = Signal() # expand all containers
 	curve_added = Signal(object) # fires when a curve is added from an input item (InputItem)
 	curve_deleted = Signal(object) # fires when a curve is deleted from an input item (InputItem)
+	# occurs when calibration data changes
 	calibration_added = Signal(object) # fires when a calibration is added from an input item (InputItem)
 	calibration_deleted = Signal(object) # fires when a calibration is deleted from an input item (InputItem)
-	
+	calibration_changed = Signal(object) # param - CalibrationData object (InputItem)
+	calibration_options_changed = Signal(object) # fires when calibration options are changed for the UI to update (InputItem)
 	
 	def __init__(self):
 		"""Creates a new instance."""
@@ -1467,7 +1468,7 @@ class EventHandler(QtCore.QObject):
 		self.plugins = {}
 		self._mode_validator_callbacks = {}  # list of validators (callbacks) that return a boolean True if the mode change can occur - signature must be callable(str)->bool
 		self._last_tts_data = TTSNotifyData() # last mode that triggered a TTS verbal notice
-		self._last_axis_values = {}
+		
 		el = EventListener()
 		el.profile_start.connect(self._profile_start)
 		el.profile_stop.connect(self._profile_stop)
@@ -1475,20 +1476,6 @@ class EventHandler(QtCore.QObject):
 		el.runtime_mode_changed.connect(self._update_mode_change)
 		self._started = False
 		self.reset()
-
-	def shouldProcess(self, event):
-		''' true if event should be filtered for an axis event '''
-		key = event.callbackKey
-		current_value = event.value
-		if key in self._last_axis_values:
-			last_value = self._last_axis_values[key]
-			if math.isclose(last_value, current_value, abs_tol = 0.001):
-				return False
-			self._last_axis_values[key] = current_value
-		else:
-			self._last_axis_values[key] = current_value
-		return True
-
 	
 	def _profile_start(self):
 		if not self._started:
@@ -2338,9 +2325,6 @@ class EventHandler(QtCore.QObject):
 			m_list = self._matching_state_callbacks(event)
 			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [STATE] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
 		elif event.event_type == InputType.JoystickAxis:
-			# if not self.shouldProcess(event):
-			# 	return
-
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
 			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
@@ -2699,8 +2683,31 @@ class JoystickState():
 			self.setOutputIgnored(device_guid, enabled) # vjoy used as input cannot be used as output
 			self.setInputIgnored(device_guid, not enabled)
 
+class AxisValues(NamedTuple):
+	#("AxisValue", "actual raw calibrated curved")
+	actual : float
+	raw : Optional[float] = None
+	calibrated: Optional[float] = None
+	curved: Optional[float] = None
+	merged: Optional[list] = None # list of all merge components
 
-
+	def toList(self, strip = True) -> list:
+		''' converts to a list - if strip is enabled - returns the sparse value without NULL entries '''
+		if strip:
+			has_calibration = self.calibrated is not None
+			has_curve = self.curved is not None
+			if has_calibration and has_curve:
+				return [self.raw, self.actual, self.calibrated, self. curved]  # 4 bars = raw, computed, calibrated only, curve only, raw is top channel
+			if has_calibration or has_curve:
+				return [self.raw, self.actual] # 2 bars (actual is calibrated or curved, second bar is raw input) - raw is top channel
+			
+			if self.merged:
+				return [self.actual, self.merged] # merged data
+			
+			return [self.actual] # 1 bar no transforms
+		
+		return [self.raw, self.actual, self.calibrated, self.curved, self.merged] # all channels
+	
 class AxisData():
 	''' holds axis data '''
 	def __init__(self, device_guid, input_id):
@@ -2745,21 +2752,14 @@ class AxisData():
 		return None
 
 	
-	def getAxisValues(self, value : float = None):
-		''' gets the axis value as [actual, raw, calibrated, curved]
-		 
-		actual value is the raw
-		   
-			 '''
+	def getAxisValues(self, value : float = None) -> AxisValues:
+		''' gets the axis value as an AxisValues named tuple '''
 		import gremlin.ui.axis_calibration
 		device_guid = self.device_guid
 		input_id = self.input_id
-		if value is None:
-			# get the axis value
-			raw_value = gremlin.joystick_handling.get_axis(device_guid, input_id)
-		else:
-			raw_value = value
-		values = [raw_value]
+
+		# input value (raw value from stick)
+		raw_value = value if value is not None else gremlin.joystick_handling.get_axis(device_guid, input_id)
 		actual_value = raw_value
 		self.raw_value = raw_value
 
@@ -2770,8 +2770,7 @@ class AxisData():
 
 		calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(device_guid, input_id)
 		if calibration and calibration.hasData:
-			calibrated_value = calibration.getValue(raw_value)
-			values.append(calibrated_value)
+			calibrated_value = calibration.getValue(raw_value, False) # do not normalize, input is already -1 to +1
 			actual_value = calibrated_value
 			has_calibration = True
 
@@ -2788,14 +2787,35 @@ class AxisData():
 		if not curve_data and not has_calibration:
 			self.raw_value = None # remove the raw value unless we also have a calibrated or curve value - the repeater only displays one value that way
 
+		
+
 		if has_curve and has_calibration:
-			return [self.actual_value, self.raw_value, self.calibrated_value]
+			data = AxisValues(
+				actual = self.actual_value,
+				raw = raw_value,
+				calibrated = self.calibrated_value,
+				curved = self.curve_value
+			)		
+			return data
+			
 		if has_calibration:
-			return [self.actual_value, self.raw_value]
+			data = AxisValues(
+				actual = self.actual_value,
+				raw = raw_value,
+				calibrated = self.calibrated_value
+			)
+			return data
 		if has_curve:
-			return [self.actual_value, self.raw_value]
+			data = AxisValues(
+				actual = self.actual_value,
+				raw = raw_value,
+				curved = self.curve_value
+			)
+			return data
+			
 		# no curve, no calibration
-		return [self.actual_value]
+		data = AxisValues(actual = self.actual_value)
+		return data
 
 
 
@@ -2808,6 +2828,9 @@ class AxisState():
 
 		# map of axis input items that could be curved
 		self._joystick_input_item_map = {}
+		self._last_axis_values = {} # last value
+		self._last_axis_time = {} # time when last modified
+		self._delay = 0 # delay in seconds for filter - 0 = disabled
 
 		el = EventListener()
 		el.profile_unload.connect(self.reset)
@@ -2900,6 +2923,11 @@ class AxisState():
 				return data.getAxisValues(value)
 		return None
 	
+	def getRawAxisValue(self, device_guid, input_id):
+		''' gets the raw axis input '''
+		import gremlin.joystick_handling
+		return gremlin.joystick_handling.get_axis(device_guid, input_id)
+	
 	def getAxisCurve(self, device_guid, input_id):
 		''' returns the curve data if the axis has a curve applied '''
 		if device_guid:
@@ -2942,4 +2970,31 @@ class AxisState():
 		return None
 
 	
+	def shouldProcess(self, event : Event, process_key = None):
+		''' true if event should be filtered for an axis event 
+		
+		this is an anti-spam mechanism for noisy inputs
+		
+		'''
+		if event.is_axis:
+			key = event.callbackKey # unique key for this event, device, and input
+			if process_key is not None:
+				key = (key, process_key) # hook to that key only 
+				
+			current_value = event.value
+			now = time.time()
+			if key in self._last_axis_values:
+				last_value = self._last_axis_values[key]
+				last_modified = self._last_axis_time[key]
+				if self._delay > 0 and (last_modified + self._delay) >= now:
+					# fail: too soon
+					return False
+				if math.isclose(last_value, current_value, abs_tol = 0.001):
+					# fail: same value as before
+					self._last_axis_time[key]  = now
+					return False
+				
+			self._last_axis_values[key] = current_value
+			self._last_axis_time[key]  = now
+		return True
 

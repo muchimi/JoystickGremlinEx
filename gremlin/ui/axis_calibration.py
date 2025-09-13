@@ -1,10 +1,10 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
+# -*- coding: utf-8; -*-
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -23,6 +23,7 @@ import gremlin.util
 from gremlin.util import parse_guid, safe_read, safe_format
 from . import ui_common
 from gremlin.input_types import InputType
+from typing import cast
 
 import gremlin.event_handler
 import gremlin.shared_state
@@ -448,14 +449,11 @@ class CalibrationData:
         ''' gets the deadzoned, calibrated value for the input value -1.0 to +1.0 - if normalized is enabled, expects a dinput range value, if not, expects a -1 to +1 value
         
         :param raw_value: the raw input value to process
-        :param normalize: normalizes the raw input to -1 +1
+        :param normalize: normalizes the raw input to -1 +1 if coming from RAW data
         :param filter: enables axis filtering (also requires configuration options to enable filtering)
         :returns : single float value, or (value, should_process) flag - if the filter is set - the value exceeds the min deviation threshold
         
         '''
-
-        should_process = True
-
 
         if normalize:
             normalized_value = gremlin.util.scale_to_range(raw_value, source_min = -32768, source_max = 32767)
@@ -465,37 +463,30 @@ class CalibrationData:
         if self.inverted:
             normalized_value = gremlin.util.scale_to_range(normalized_value, invert = self.inverted) # just handle the inversion
         
-        if self._trigger_threshold_enabled and filter and self._trigger_threshold != 0:
-            if self._last_value is None:
-                self._last_value = normalized_value
-            else:
-                # see if we meet the deviation required
-                should_process = abs(self._last_value - normalized_value) > self._trigger_threshold
-
         value = 0.0
 
-        if should_process:
-            
-            if self._is_centered:
-                # account for center calibration left/right
-                value = gremlin.util.axis_calibration(normalized_value, self._calibrated_min, self.calibrated_center, self._calibrated_max)
-            else:
-                value = gremlin.util.slider_calibration(normalized_value, self._calibrated_min, self._calibrated_max)
+        if self._is_centered:
+            # account for center calibration left/right
+            value = gremlin.util.axis_calibration(normalized_value, self._calibrated_min, self.calibrated_center, self._calibrated_max)
+        else:
+            value = gremlin.util.slider_calibration(normalized_value, self._calibrated_min, self._calibrated_max)
 
-            if self._is_centered:
-                if value > self.deadzone_center_min and value < self.deadzone_center_max:
-                    value = 0.0
-                elif value <= self.deadzone_center_min:
-                    # center deadzone set - update the range as it's been reduced
-                    value = gremlin.util.scale_to_range(value, source_min = self.deadzone_min, source_max = self.deadzone_center_min, target_max = 0)
-                elif value >= self.deadzone_center_max:
-                    value = gremlin.util.scale_to_range(value, source_min = self.deadzone_center_max, source_max = self.deadzone_max, target_min = 0)
-            else:
-                value = gremlin.util.scale_to_range(value, source_min=self.deadzone_min, source_max=self.deadzone_max)
+        if self._is_centered:
+            if value > self.deadzone_center_min and value < self.deadzone_center_max:
+                value = 0.0
+            elif value <= self.deadzone_center_min:
+                # center deadzone set - update the range as it's been reduced
+                value = gremlin.util.scale_to_range(value, source_min = self.deadzone_min, source_max = self.deadzone_center_min, target_max = 0)
+            elif value >= self.deadzone_center_max:
+                value = gremlin.util.scale_to_range(value, source_min = self.deadzone_center_max, source_max = self.deadzone_max, target_min = 0)
+        else:
+            value = gremlin.util.scale_to_range(value, source_min=self.deadzone_min, source_max=self.deadzone_max)
+
+        value += 0.0 # flip negative zero in python (why?)
             
         if filter:
-            return (value + 0.0, should_process)
-        return value + 0.0
+            return (value, True)
+        return value
     
 
     def from_xml(self, node, data = None):
@@ -669,7 +660,7 @@ class CalibrationManager():
 
 class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
     ''' gremlinex single input calibration window '''
-    def __init__(self, device_guid, input_id, parent = None):
+    def __init__(self, input_item, parent = None):
         '''
         Setup single real hardware axis calibration data
 
@@ -683,6 +674,14 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         from gremlin.curve_handler import DeadzoneWidget
 
         self.setModal(True)
+        self.input_item = input_item
+        input_type = input_item.get_input_type()
+        if input_type != InputType.JoystickAxis:
+            self.close()
+            return
+        device_guid = input_item.device_guid
+        input_id = input_item.input_id
+        self.calibrated_on_entry = input_item.calibration.hasData # true if the item has calibration data on entry
 
         self.mgr : CalibrationManager = CalibrationManager()
 
@@ -803,19 +802,24 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         self._calibrated_center_widget.setToolTip("For centered inputs, this is the position of the input when it is at the center detent or midpoint of travel.<br>Press the center button to set this value when the axis is in the center position.<br>can also be set manually.")
         
 
-        self._calibration_container_widget = QtWidgets.QWidget()
-        self._calibration_container_layout = QtWidgets.QGridLayout(self._calibration_container_widget)
+        widgets = [
+            QtWidgets.QLabel("Center:"),
+            self._calibrated_center_widget
+        ]
+        self._container_center_widget, _ = ui_common.getHContainer(widgets)
 
+        widgets = [
+            QtWidgets.QLabel("Min:"),
+            self._calibrated_min_widget,
+            "||",
+            self._container_center_widget,
+            "||",
+            QtWidgets.QLabel("Max:"),
+            self._calibrated_max_widget
+        ]
 
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
 
-        self._calibration_container_layout.addWidget(QtWidgets.QLabel("Min:"),0,0)
-        self._calibration_container_layout.addWidget(self._calibrated_min_widget, 0,1)
-        self._center_label = QtWidgets.QLabel("Center:")
-        self._calibration_container_layout.addWidget(self._center_label,0,2)
-        self._calibration_container_layout.addWidget(self._calibrated_center_widget, 0,3)
-        self._calibration_container_layout.addWidget(QtWidgets.QLabel("Max:"),0,4)
-        self._calibration_container_layout.addWidget(self._calibrated_max_widget, 0,5)
-        
 
         self._raw_container_repeater_layout.addWidget(QtWidgets.QLabel("Input:"))
         self._raw_container_repeater_layout.addWidget(self._raw_value_widget)
@@ -833,7 +837,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout.addWidget(self._options_container_repeater_widget)
         self.main_layout.addWidget(self._slider)
         self.main_layout.addWidget(self._repeater)
-        self.main_layout.addWidget(self._calibration_container_widget)
+        self.main_layout.addWidget(widget)
         self.main_layout.addWidget(self._raw_container_repeater_widget)
         self.main_layout.addWidget(self._calibrated_container_repeater_widget)
         
@@ -857,9 +861,17 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         else:
             is_changed = self.action_data != self.cloned_action_data
             if is_changed:
-                self.mgr.saveCalibration(self.action_data)
+                # save new data
+                self.mgr.saveCalibration(self.action_data) 
+                # determine what events to fire
                 el = gremlin.event_handler.EventListener()
-                el.calibration_changed.emit(self.action_data)
+                if self.action_data.hasData:
+                    if not self.calibrated_on_entry:
+                        el.calibration_added.emit(self.input_item)
+                else:
+                    if self.calibrated_on_entry:
+                        el.calibration_deleted.emit(self.input_item)
+                el.calibration_changed.emit(self.input_item)
         return super().closeEvent(event)
 
 
@@ -990,7 +1002,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
        
 
         self._deadzone_widget.isCentered = is_centered
-        self._center_label.setVisible(is_centered)
+        self._container_center_widget.setVisible(is_centered)
         self._calibrated_center_widget.setVisible(is_centered)
 
         raw_value = gremlin.joystick_handling.get_axis(self.action_data.device_guid, self.action_data.input_id) # raw value from dinput

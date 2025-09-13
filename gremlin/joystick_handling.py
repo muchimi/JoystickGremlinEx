@@ -469,6 +469,8 @@ def removeDevice(dev):
 def device_name_from_guid(device_guid) -> str:
     ''' gets device name from GUID '''
     assert (_joystick_initialized)
+    if isinstance(device_guid, str):
+        device_guid = gremlin.util.parse_guid(device_guid) # GUID expected
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
     joystick_devices_update()

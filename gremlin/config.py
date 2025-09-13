@@ -1589,7 +1589,7 @@ class Configuration(QtCore.QObject):
     @last_device_guid.setter
     def last_device_guid(self, device_guid):
         ''' stores the last device GUID '''
-        device_guid = str(device_guid)
+        device_guid = gremlin.util.normalize_guid(device_guid)
         self._data["last_device_guid"] = device_guid # general config 
         self._profile_data["last_device_guid"] = device_guid # profile specific config
         self.save()
@@ -1610,7 +1610,7 @@ class Configuration(QtCore.QObject):
 
         
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
 
         
 
@@ -1806,7 +1806,7 @@ class Configuration(QtCore.QObject):
             device_name = gremlin.shared_state.get_device_name(device_guid)
         if not isinstance(device_guid, str):
             dinput_device_guid = device_guid
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         else:
             dinput_device_guid = gremlin.util.parse_guid(device_guid)
         data : dict = self._profile_data.get("last_input", {})

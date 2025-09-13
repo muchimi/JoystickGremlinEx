@@ -15,7 +15,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T62)
-- New: Input Viewer: shows "raw" value and "curved" value for an input.
+- Refactor: handling of axis input and tracking of calibrated and curve data is now centralized.
+- New: axis repeaters will include multiple channels. The base channel is the output value. If the output value has transforms, they will be displayed as additional channels (bars). If the input is both calibrated and curved, the repeater will display three bars, output, calibrated and curved.  GremlinEx applies calibration first, followed by curves.  This was added to better visualize axis data and transforms at design time.
+
 
 ### (m76T61A)
 - Added: curve verbose mode to provide information on curve processing in the log file.

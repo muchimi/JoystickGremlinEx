@@ -386,7 +386,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
         if device_guid:
             # remap a single device 
-            device_id = str(device_guid) if not isinstance(device_guid, str) else device_guid
+            device_id = gremlin.util.normalize_guid(device_guid) if not isinstance(device_guid, str) else device_guid
             device_nodes = [node for node in device_nodes if node.device_id == device_id]
         else:
             # remap all disconnected devices
@@ -835,7 +835,7 @@ class ProfileDeviceNode(ProfileBaseNode):
             # create a fake device
             device = DeviceSummary()
             device.device_guid = device_guid
-            device.device_id = str(device_guid)
+            device.device_id = gremlin.util.normalize_guid(device_guid)
             device.name = device_name
             assert device_type is not None,"Invalid device type provided"
             device.device_type = device_type
@@ -1299,7 +1299,7 @@ class ProfileGraph():
 
     def get_device_node(self, device_guid) -> ProfileDeviceNode:
         ''' gets the profile device node for the given device_guid, None if not found '''
-        device_id = str(device_guid) if not isinstance(device_guid, str) else device_guid
+        device_id = gremlin.util.normalize_guid(device_guid) if not isinstance(device_guid, str) else device_guid
         return next((node for node in self._root.children if node.nodeType == ProfileNodeType.Device and node.device_id == device_id),None)
     
     

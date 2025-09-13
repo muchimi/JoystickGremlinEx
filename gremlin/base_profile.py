@@ -2626,13 +2626,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         ''' debug string for this item'''
         return f"InputItem: {gremlin.shared_state.get_device_name(self.device_guid)} Input: {InputType.to_display_name(self.input_type)} Type: {self.display_name} mode: {self.profile_mode}"
 
-    # def __eq__(self, other):
-    #     """Checks whether or not two InputItem instances are identical.
-
-    #     :return True if they are identical, False otherwise
-    #     """
-    #     return self.__hash__() == other.__hash__()
-
+    def __eq__(self, other):
+        ''' true if the input item are the same object '''
+        if other is None:
+            return False
+        if not isinstance(other, InputItem):
+            return False
+        return self.id == other.id
+    
     def __hash__(self):
         """Returns the hash of this input item.
 

@@ -630,13 +630,15 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
+        self.id = gremlin.util.get_guid() # unique id
         config = gremlin.config.Configuration()
         self.verbose_inputs = config.verbose_mode_inputs
         self.verbose = config.verbose
         self.verbose_details = config.verbose_mode_inputs_extra
         self.last_merge_device_id = None # id of the last populated merge axis target
-
+        self._as = gremlin.event_handler.AxisState()
         self.container_height = 42
+        
 
 
         if VJoyRemapWidget.locked:
@@ -729,7 +731,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # hook repeater 
             self._update_merge_data()
-            el.joystick_event.connect(self._event_handler)
+            
             
 
         finally:
@@ -738,10 +740,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _add_merge_data(self, device_guid, input_id):
         ''' adds a mapping to the tracking data '''
-        if not device_guid in self._merge_device_input_map:
-            self._merge_device_input_map[device_guid] = []
-        if not input_id in self._merge_device_input_map[device_guid]:
-            self._merge_device_input_map[device_guid].append(input_id)
+        device_id = gremlin.util.normalize_guid(device_guid)
+        if not device_id in self._merge_device_input_map:
+            self._merge_device_input_map[device_id] = []
+        if not input_id in self._merge_device_input_map[device_id]:
+            self._merge_device_input_map[device_id].append(input_id)
 
     def _update_merge_data(self):
         ''' build map of ID to axis ID for merge operations '''
@@ -778,41 +781,46 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         return curves
 
-    def _event_handler(self, event : gremlin.event_handler.Event):
-        ''' event handler:  type of event: gremlin.event_handler.VjoyEvent '''
-        if gremlin.shared_state.is_running:
-            # only process when not running
-            return
-        match self.action_data.action_mode:
-            case VjoyAction.VJoyAxis:
-                # straight axis
-                curves = self.getCurveData(event, event.value)
-                value = self.action_data.get_filtered_axis_value(curves = curves)
-                value = self.action_data.get_ranged_axis_value(value)
+    # def _event_handler(self, event : gremlin.event_handler.Event):
+    #     ''' event handler:  type of event: gremlin.event_handler.VjoyEvent '''
+    #     if gremlin.shared_state.is_running:
+    #         # only process when not running
+    #         return
+        
+    #     if not self._as.shouldProcess(event):
+    #         return
+    #     match self.action_data.action_mode:
+    #         case VjoyAction.VJoyAxis:
+    #             # straight axis
+    #             self._update_repeater()
+
+    #             # curves = self.getCurveData(event, event.value)
+    #             # value = self.action_data.get_filtered_axis_value(curves = curves, channels=True)
+    #             # value = self.action_data.get_ranged_axis_value(value)
 
                 
 
-            case VjoyAction.VJoyAxisToButton:
-                pass # todo: button repeater?
-                # device_guid = self.action_data.hardware_device_guid
-                # input_id = self.action_data.hardware_input_id
-                # value = joystick_handling.get_curved_axis(device_guid, input_id)
-                # action_value = gremlin.actions.Value(value)
-                # event = gremlin.event_handler.Event(gremlin.input_types.InputType.JoystickAxis,
-                #                                     device_guid = device_guid,
-                #                                     identifier=input_id,
-                #                                     is_axis=True,
-                #                                     value = action_value)
-                # self.process_event(event, action_value)
+    #         case VjoyAction.VJoyAxisToButton:
+    #             pass # todo: button repeater?
+    #             # device_guid = self.action_data.hardware_device_guid
+    #             # input_id = self.action_data.hardware_input_id
+    #             # value = joystick_handling.get_curved_axis(device_guid, input_id)
+    #             # action_value = gremlin.actions.Value(value)
+    #             # event = gremlin.event_handler.Event(gremlin.input_types.InputType.JoystickAxis,
+    #             #                                     device_guid = device_guid,
+    #             #                                     identifier=input_id,
+    #             #                                     is_axis=True,
+    #             #                                     value = action_value)
+    #             # self.process_event(event, action_value)
 
-            case VjoyAction.VJoyMergeAxis:
-                # see if one of ours
-                device_guid = event.device_guid
-                if device_guid in self._merge_device_input_map:
-                    # match by device
-                    if event.identifier in self._merge_device_input_map[device_guid]:
-                        # match by input
-                        self._update_repeater()
+    #         case VjoyAction.VJoyMergeAxis:
+    #             # see if one of ours
+    #             device_guid = event.device_guid
+    #             if device_guid in self._merge_device_input_map:
+    #                 # match by device
+    #                 if event.identifier in self._merge_device_input_map[device_guid]:
+    #                     # match by input
+    #                     self._update_repeater()
 
 
     @QtCore.Slot(int)
@@ -854,11 +862,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._repeater_value_widget
         ]
         
-        self.container_repeater_widget, self.container_repeater_layout = gremlin.ui.ui_common.getHContainer(widgets)
+        # wrap horizontal setup in vertical containers for independent height
+        self.container_repeater_widget, self.container_repeater_layout = gremlin.ui.ui_common.getHContainer(widgets, use_vcontainers=True)
         self.main_layout.addWidget(self.container_repeater_widget)
         #self.container_repeater_widget.setStyleSheet("background: orange;")
-        h = gremlin.ui.ui_common.getLayoutWidgetHeight(self.container_repeater_layout, 32)
-        self.container_repeater_widget.setMaximumHeight(h + 8)
+        
         
     def _update_repeater_value(self, value):
         ''' callback for the output repeater when it changes values '''
@@ -877,8 +885,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         range_widget_visible = False
         axis_widget_visible = False
         if self.action_data.input_is_axis():
-            if value is None:
-                value = self.get_axis_value()
+            if not value:
+                value = self.action_data.get_raw_axis_value()
 
             if value is None:
                 return # nothing to update
@@ -900,24 +908,36 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                         #self._repeater_button_widget.setValue(False)
                 case VjoyAction.VJoyAxis:
                     # plain axis output
+                    if self.action_data.curve_data:
+                        pass
+                    data = self.action_data.get_filtered_axis_value(channels = True)
                     if not Shiboken.isValid(self._repeater_axis_widget):
                         return
                     axis_widget_visible = True
-                    self._repeater_axis_widget.setValue(value)
-                    self._repeater_value_widget.setText(f"{value:+0.4f}")
+                    
+                    self._repeater_axis_widget.setValue(data)
+                    self._repeater_value_widget.setText(f"{data.actual:+0.4f}")
                 case VjoyAction.VJoyMergeAxis:
                     # axis merging
                     if not Shiboken.isValid(self._repeater_axis_widget):
                         return
-                    
+                    data = self.action_data.get_filtered_axis_value(channels = True)
                     axis_widget_visible = True
-                    self._repeater_axis_widget.setValue(value)
-           
+                    self._repeater_axis_widget.setValue(data)
+                    self._repeater_value_widget.setText(f"{data.actual:+0.4f}")
             
 
 
         self._repeater_range_widget.setVisible(range_widget_visible)
         self._repeater_axis_widget.setVisible(axis_widget_visible)
+
+        # grow based on channel count
+        count = self._repeater_axis_widget.channels
+        ch = self._repeater_axis_widget.channelHeight
+
+        h = max(gremlin.ui.ui_common.getLayoutWidgetHeight(self.container_repeater_layout, 32), 32 + ch * (count-1))
+        self.container_repeater_widget.setMaximumHeight(h)
+        self.container_repeater_widget.setMinimumHeight(h)
 
     def _create_range_widgets(self):
 
@@ -1607,8 +1627,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             curve_data.curve_update()
             self.action_data.curve_data = curve_data
 
+        syslog.info(f"Before curve update: {self.action_data.curve_data}")
+
         dialog = gremlin.curve_handler.AxisCurveDialog(self.action_data.curve_data)
         util.centerDialog(dialog, dialog.width(), dialog.height())
+        # setup the update handler for value inputs into the curve
         self.curve_update_handler = dialog.curve_update_handler
         self._update_axis_widget()
 
@@ -1617,6 +1640,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         dialog.exec()
         gremlin.shared_state.pop_suspend_highlighting()
         self.curve_update_handler = None
+        self.action_data.curve_data = dialog.getCurveData()
+        self.action_data.curve_data.curve_update() # update any changes to the curve
+
+        syslog.info(f"After curve update: {self.action_data.curve_data}")
 
         self._update_curve_icon()
 
@@ -1696,43 +1723,37 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         if gremlin.shared_state.is_running:
             return
         
-        
-
         if not event.is_axis:
             return
         
-        value = event.value
-
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
-
-            # merge - check two sets
-            if event.device_guid == self.action_data.hardware_device_guid and self.action_data.isMergeDeviceGuid(event.device_guid): # == self.action_data.merge_device_guid:
-                # merge hardware is the same as current input - accept only the two input itds
-                if event.identifier != self.action_data.hardware_input_id: # and event.identifier != self.action_data.merge_input_id:
-                    return
-            else:
-                # not the same:
-                if event.device_guid == self.action_data.hardware_device_guid and event.identifier != self.action_data.hardware_input_id:
-                    return
-                
-                if not self.action_data.isMergeDeviceGuid(event.device_guid):
-                    return
-                        
-
-            # compute the merged value    
-            value = self.action_data.get_filtered_axis_value(value)
-
-
-
-        else:
-            if event.device_id != self.action_data.hardware_device_id:
-                # event not for us
+            # allow any device part of the merge operation to update 
+            valid_guids = [data.device_id for data in self.action_data._merge_data]
+            valid_guids.append(gremlin.util.normalize_guid(self.action_data.hardware_device_guid))
+            device_guid = gremlin.util.normalize_guid(event.device_guid)
+            if not device_guid in valid_guids:
                 return
-            if event.identifier != self.action_data.hardware_input_id:
-                # event not for us
+            valid_inputs = [data.input_id for data in self.action_data._merge_data]
+            valid_inputs.append(self.action_data.hardware_input_id)
+            if not event.identifier in valid_inputs:
                 return
-
-        self._update_axis_widget()
+        else:            
+            if not event.device_guid == self.action_data.hardware_device_guid:
+                return
+            if not event.identifier == self.action_data.hardware_input_id:
+                return
+        
+        if not self._as.shouldProcess(event, self.id):
+            return
+        
+        value = event.value
+        
+        if self.curve_update_handler:
+            # update the dynamic curve widget 
+            self.curve_update_handler(value)
+        
+        gremlin.util.InvokeUiMethod(self._update_repeater, value) # ensure on UI thread
+        
 
 
     def _current_input_axis(self):
@@ -2573,11 +2594,18 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.update_steps()
 
 
-    def get_axis_value(self):
-        ''' gets the current axis value'''
+    def get_axis_value(self, channels = False):
+        ''' gets the current axis value - if channels enabled, returns a list of the transforms '''
         #value = gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+        if channels:
+            raw_value = self.action_data.get_raw_axis_value()
+            curve_value = self.action_data.get_curved_axis_value(raw_value)
+            data = gremlin.event_handler.AxisValues()
+
+
         value = self.action_data.get_filtered_axis_value()
         return value
+    
     
     def _update_start_value(self):
         ''' updates the start value widget repeater '''
@@ -4637,10 +4665,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 class  MergeData():
     ''' defines a merge axis input '''
     def __init__(self, device_id = None, input_id = None, operation : MergeOperationType = MergeOperationType.Center, invert = False):
-        if not isinstance(device_id, str):
-            device_id = str(device_id)
-
-        self._device_id = device_id
+        self._device_id = gremlin.util.normalize_guid(device_id)
         self._device_guid = gremlin.util.parse_guid(device_id)
         self._input_id = input_id
         self.operation = operation
@@ -4656,12 +4681,12 @@ class  MergeData():
     
     @device_id.setter
     def device_id(self, value):
-        self._device_id = value
+        self._device_id = gremlin.util.normalize_guid(value)
         self._device_guid = gremlin.util.parse_guid(value)
 
     @device_guid.setter
     def device_guid(self, value):
-        self._device_id = str(value)
+        self._device_id = gremlin.util.normalize_guid(value)
         self._device_guid = value
 
     @property
@@ -4705,6 +4730,7 @@ class  MergeData():
         device_id = safe_read(node,"device-id", str, "")
         if not device_id:
             return
+        device_id = gremlin.util.normalize_guid(device_id)
         device_guid = gremlin.util.parse_guid(device_id)
         self.device_id = device_id
         self.device_guid = device_guid
@@ -4946,11 +4972,14 @@ Supports axis merging, curved output, command, hat and button mappings.
             return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
         return self.hardware_input_id.getAxisValue()
 
-    def get_filtered_axis_value(self, value : float = None, curves : list = None) -> float:
-        ''' computes the output value for the current configuration - applies curves if curves are provided  '''
+    def get_filtered_axis_value(self, value : float = None, curves : list = None, channels = False) -> float:
+        ''' computes the output value for the current configuration - applies curves if curves are provided 
+            if channels is enabled, returns the data as an AxisValue object with channels
+        '''
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_curve and gremlin.shared_state.is_running
-        source_value = value
+        curve_value = None
+        merged_values = None
 
         if verbose:
             device = gremlin.joystick_handling.device_info_from_guid(self.hardware_device_guid)
@@ -4962,6 +4991,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             axis_value = value
         else:
             if verbose: source = f"{device_stub} get hardware value"
+            # get the calibrated, curved input (if input is curved and calibrated)
             axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             if axis_value is None:
                 # not an axis type 
@@ -4971,22 +5001,28 @@ Supports axis merging, curved output, command, hat and button mappings.
             axis_value = axis_value[0]
         
         value = axis_value
+        raw_value = value
 
         if not curves:
-            #if verbose: syslog.info(f"Filter: using source: [{source}] input: {source_value:0.3f} no filter -> filtered [{value:0.3f}]")
-            curves = []
+            # process curves
+            curves = [self.curve_data] if self.curve_data else []
 
+
+        
 
         if self.action_mode == VjoyAction.VJoyAxis:
             # plain axis 
+
             if curves:
                 if verbose: curve_msg = f"Applying {len(curves)} curves: "
+
                 for curve_data in curves:
-                    curve_value = curve_data.curve_value(value)
+                    curve_value = curve_data.curve_value(value) # remember to make sure curve_data had curve_update() called or the data will be incorrect
+                    # syslog.info(f"Apply curve data: {curve_data} input: {value:0.3f} output: {curve_value:0.3f}")
                     if verbose: curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
                     value = curve_value
 
-                if verbose: syslog.info(f"AXIS Filter: applied curve: {curve_msg}")
+                if verbose: syslog.info(f"AXIS Filter: applied curve: {curve_msg} final curve value: {curve_value:0.3f}  input: {raw_value:0.3f}")
 
                 
 
@@ -5018,6 +5054,8 @@ Supports axis merging, curved output, command, hat and button mappings.
                 for curve_data in curves:
                     v1 = curve_data.curve_value(v1)
 
+            # include in merged data the input axis
+            merged_values = [v1]
             value = v1
             for data in self._merge_data:
                 merge_device_id = data.device_id
@@ -5052,6 +5090,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     for curve_data in curves:
                         v2 = curve_data.curve_value(v2)
 
+                merged_values.append(v2) # add the merge value
 
                 match data.operation:
                     case MergeOperationType.Add:
@@ -5059,42 +5098,55 @@ Supports axis merging, curved output, command, hat and button mappings.
                                             target_min=self.output_range_min,
                                             target_max=self.output_range_max,
                                             invert = self.merge_invert)
+                        
                     case MergeOperationType.Average:
                         value = scale_to_range((v1+v2)/2,
                                                 target_min=self.output_range_min,
                                                 target_max=self.output_range_max,
                                                 invert = self.merge_invert)
+                        
                     case MergeOperationType.Center:
                         value = scale_to_range((v1-v2)/2,
                                                 target_min=self.output_range_min,
                                                 target_max=self.output_range_max,
                                                 invert = self.merge_invert)
+                        
                     case MergeOperationType.Min:
                         value = scale_to_range(min(v1,v2),
                                                 target_min=self.output_range_min,
                                                 target_max=self.output_range_max,
                                                 invert = self.merge_invert)
+                        
                     case MergeOperationType.Max:
                         value = scale_to_range(max(v1,v2),
                                                 target_min=self.output_range_min,
                                                 target_max=self.output_range_max,
                                                 invert = self.merge_invert)
+                        
                     case MergeOperationType.ScaleFull:
                         scale = scale_to_range(v2, target_min=0, target_max = 1)
                         value = scale_to_range(v1*scale)
+                        
                     case MergeOperationType.ScaleHalf:
                         scale = abs(v2)
                         value = scale_to_range(v1*scale)
+                        
                     case MergeOperationType.Multiply:
                         value = scale_to_range(v1 * v2)
+                        
                     case MergeOperationType.Trim:
                         v2 = scale_to_range(v2, target_min=0, target_max = 1) # scale v2 0 to 1
                         if v1 > 0:
                             value = v2 + ( (1 - v2) * v1 )
                         else:
                             value = v2 + ( (v2 + 1) * v1 )
+                        
 
                 v1 = value
+
+        if channels:
+            data = gremlin.event_handler.AxisValues(actual = value, raw = raw_value, curved = curve_value, merged=merged_values)
+            return data
 
         return value
     
@@ -5110,18 +5162,6 @@ Supports axis merging, curved output, command, hat and button mappings.
         if v1 != -1.0 or v2 != 1.0 or s != 1.0:
             value = gremlin.util.scale_to_range(value*s,target_min=v1,target_max=v2)
         return value
-
-    # @property
-    # def merge_mode(self) -> MergeOperationType:
-    #     return self._merge_mode
-    # @merge_mode.setter
-    # def merge_mode(self, value : MergeOperationType):
-    #     self._merge_mode = value
-    #     self.merged = value != MergeOperationType.NotSet
-
-    # @property
-    # def merge_device_id(self) -> str:
-    #     return self._merge_device_id
 
     def isMergeDeviceGuid(self, device_guid):
         for data in self._merge_data:
@@ -5520,6 +5560,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 # legacy
                 if "merge_device_id" in node.attrib and "merge_input_id" in node.attrib:
                     device_id = node.get("merge_device_id")
+                    device_id = gremlin.util.normalize_guid(device_id)
                     input_id = safe_read(node,"merge_input_id", int, 0)
                     if "merge_input_type" in node.attrib:
                         merge_input_type = safe_read(node,"merge_input_type", str, "")

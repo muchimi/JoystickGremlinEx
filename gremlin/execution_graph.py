@@ -715,7 +715,7 @@ class ExecutionContext():
         ''' true if a device has inputs defined '''
         node: ExecutionGraphNode
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if self.graph is None:
             self._rebuild()
         if self.graph:

@@ -24,6 +24,7 @@ import os
 from typing import Optional
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
+from typing import NamedTuple
 
 import gremlin.base_classes
 import gremlin.config
@@ -132,6 +133,22 @@ class Color():
     @staticmethod
     def alternateSelectEndGradientColor():
         return "#ACC425"
+    @staticmethod
+    def ChannelColors():
+        ''' pairs of channel colors'''
+        return [
+            ("#448044","#61BB61"),
+            ("#677517","#ACC425"),
+            ("#177533","#25C4B7"),
+            ("#5F1775","#B725C4"),
+            ("#174875","#504EC0"),
+            ("#A7A7A7","#E4E4E4"),
+        ]
+    
+    @staticmethod
+    def extraChannelC1Color():
+        return "#ACC425"
+    
     @staticmethod
     def selectGradientAltColor():
         return "#448080" if gremlin.shared_state.is_dark_theme else "#568c8f"
@@ -903,7 +920,7 @@ class DeviceWidgetTracker():
         if not mode:
             mode = self.any_mode
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if not device_guid in self._widget_cache:
             self._widget_cache[device_guid] = {}
         if not mode in self._widget_cache[device_guid]:
@@ -919,7 +936,7 @@ class DeviceWidgetTracker():
         if not mode:
             mode = self.any_mode
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._widget_cache:
             for mode in self._widget_cache[device_guid]:
                 if input_type in self._widget_cache[device_guid][mode]:
@@ -938,7 +955,7 @@ class DeviceWidgetTracker():
         if not mode:
             mode = self.any_mode
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._widget_cache:
             for mode in self._widget_cache[device_guid]:
                 if input_type in self._widget_cache[device_guid][mode]:
@@ -951,7 +968,7 @@ class DeviceWidgetTracker():
         if not mode:
             mode = self.any_mode
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._widget_cache:
             for mode in self._widget_cache[device_guid]:
                 if input_type in self._widget_cache[device_guid][mode]:
@@ -987,7 +1004,7 @@ class StateTracker():
 
     def registerButtonState(self, widget, device_guid, input_type, input_id):
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if not device_guid in self._button_cache:
             self._button_cache[device_guid] = {}
         if not input_type in self._button_cache[device_guid]:
@@ -1000,7 +1017,7 @@ class StateTracker():
 
     def unregisterButtonState(self, device_guid, input_type, input_id):
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._button_cache:
             if input_type in self._button_cache[device_guid]:
                 key = self._key(input_id)
@@ -1012,7 +1029,7 @@ class StateTracker():
         if hasattr(widget,"deleted"):
             widget.deleted.connect(self._widget_deleted)
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if not device_guid in self._axis_cache:
             self._axis_cache[device_guid] = {}
         if not input_type in self._axis_cache[device_guid]:
@@ -1043,7 +1060,7 @@ class StateTracker():
 
     def unregisterAxisState(self, device_guid, input_type, input_id):
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._axis_cache:
             if input_type in self._axis_cache[device_guid]:
                 key = self._key(input_id)
@@ -1108,7 +1125,7 @@ class StateTracker():
         
         from shiboken6 import Shiboken
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         # syslog = logging.getLogger("system")
         #device_name = gremlin.shared_state.get_device_name(device_guid)
         if device_guid in self._button_cache:
@@ -1135,7 +1152,7 @@ class StateTracker():
     def _store_state(self, device_guid, input_type, input_id, state):
         ''' stores the last button state for the given input '''
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if not device_guid in self._state_cache:
             self._state_cache[device_guid] = {}
         if not input_type in self._state_cache[device_guid]:
@@ -1147,7 +1164,7 @@ class StateTracker():
     def _get_state(self, device_guid, input_type, input_id):
         ''' gets the last button state for the given input '''
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._state_cache:
             if input_type in self._state_cache[device_guid]:
                 if input_id in self._state_cache[device_guid][input_type]:
@@ -1170,7 +1187,7 @@ class StateTracker():
         input_id = event.identifier
         value = event.value
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._axis_cache:
             if input_type in self._axis_cache[device_guid]:
                 key = self._key(input_id)
@@ -1189,7 +1206,7 @@ class StateTracker():
     def getButtonWidget(self, device_guid, input_type, input_id):
         ''' gets the widget registered for a button state tracking'''
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._button_cache:
             if input_type in self._button_cache[device_guid]:
                 key = self._key(input_id)
@@ -1201,7 +1218,7 @@ class StateTracker():
     
     def getAxisWidget(self, device_guid, input_type, input_id):
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._axis_cache:
             if input_type in self._axis_cache[device_guid]:
                 key = self._key(input_id)
@@ -1223,7 +1240,7 @@ class StateTracker():
     def _update_input_state(self, device_guid):
         ''' updates all the state widgets related to a single device based on stored state '''
         if not isinstance(device_guid, str):
-            device_guid = str(device_guid)
+            device_guid = gremlin.util.normalize_guid(device_guid)
             # buttons
         if device_guid in self._button_cache:
             for input_type in self._button_cache[device_guid]:
@@ -4278,6 +4295,7 @@ class QProgressBar(QtWidgets.QWidget):
     def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None, parent = None):
         super().__init__()
         self.parent = parent
+        
         if orientation == Qt.Orientation.Vertical:
             self._desired_width = 10
             self._desired_height = 100
@@ -4290,9 +4308,11 @@ class QProgressBar(QtWidgets.QWidget):
         self._readOnly = readonly
         self._data = data
         self._percent = {} # percent valuess of the progress bar by value index
+        self._colors = {} # color gradient assigned to a specific channel
+
         self._start_color = {} # color for each value band (start gradient)
         self._end_color = {} # color for each value band (end gradient)
-        self.setRange(min, max)
+        
 
         # self.setMinimumSize(self.sizeHint())
         # self.setMaximumSize(self.sizeHint())
@@ -4300,14 +4320,19 @@ class QProgressBar(QtWidgets.QWidget):
         self._background_color = Color.actionBackgroundColor()
         self._border_color = Color.selectBorderColor()
 
-        # default gradients - two by default to alternate
-        self._start_color[0] = Color.selectGradientColor()
-        self._end_color[0] = Color.selectEndGradientColor()
-        self._start_color[1] = Color.alternateSelectGradientColor()
-        self._end_color[1] = Color.alternateSelectEndGradientColor()
+        index = 0
+        pairs = Color.ChannelColors()
+        for (c1,c2) in pairs:
+            # channel gradients
+            self._start_color[index] = c1
+            self._end_color[index] = c2
+            index += 1
+        
+        self._sub_color_start = c1
+        self._sub_color_end = c2
 
         
-        
+        self.setRange(min, max)
         self.installEventFilter(self)
         
     @property
@@ -4351,6 +4376,17 @@ class QProgressBar(QtWidgets.QWidget):
             return True # filter the wheel event
         return False
 
+    @property
+    def channels(self) -> int:
+        ''' returns the number of channels based on the last data set '''
+        if self._percent:
+            return len(self._percent)
+        return 1
+    
+    @property
+    def channelHeight(self) -> int:
+        ''' height in pixels of a single channel '''
+        return self._desired_height if self._orientation == Qt.Orientation.Horizontal else self._desired_width
 
     @property
     def backgroundColor(self):
@@ -4419,6 +4455,27 @@ class QProgressBar(QtWidgets.QWidget):
 
         if Shiboken.isValid(self):
             self.update() # repaint
+
+
+    @property
+    def gradientSubStartColor(self):
+        return self._sub_color_start
+    
+    @gradientSubStartColor.setter
+    def gradientSubStartColor(self, value : str):
+        self._sub_color_start = value
+        if Shiboken.isValid(self):
+            self.update()
+
+    @property
+    def gradientSubEndColor(self):
+        return self._sub_color_start
+    
+    @gradientSubEndColor.setter
+    def gradientSubEndColor(self, value : str):
+        self._sub_color_end = value
+        if Shiboken.isValid(self):
+            self.update()
         
 
 
@@ -4451,8 +4508,11 @@ class QProgressBar(QtWidgets.QWidget):
         gremlin.util.InvokeUiMethod(self._set_value_ui, value)
 
     def _set_value_ui(self, value):
+        if hasattr(value,"toList"):
+            value = value.toList()
         if hasattr(value,"__iter__"):
             # count non null entries
+            #syslog.info(f"ProgressBar: {value}")
             if value[0] is not None:
                 count = sum(1 for item in value if item is not None)
                 if count == 1:
@@ -4484,15 +4544,52 @@ class QProgressBar(QtWidgets.QWidget):
         else:
             values = [self._value]
         self._percent.clear()
-        for index, value in enumerate(values):
+        self._colors.clear()
+        start_index = 0
+        end_index = 0
+        index = 0
+        for value in values:
+            bump_start = True
+            bump_end = True
+            c1 = self._start_color[start_index]
+            c2 = self._end_color[end_index] 
             if value is None:
                 self._percent[index] = None
             else:
-                self._percent[index] = gremlin.util.scale_to_range(value, 
-                                source_min= self._min_range, 
-                                source_max = self._max_range,
-                                target_min = 0.0,
-                                target_max = 1.0)
+                if hasattr(value,"__iter__"):
+                    # sublist of values, like merged data
+                    subvalues = value
+                    if self._sub_color_start:
+                        c1 = self._sub_color_start
+                        bump_start = False
+                    if self._sub_color_end:
+                        c2 = self._sub_color_end
+                        bump_end = False
+                else:
+                    subvalues = [value]
+                for value in subvalues:
+                    self._percent[index] = gremlin.util.scale_to_range(value, 
+                                    source_min= self._min_range, 
+                                    source_max = self._max_range,
+                                    target_min = 0.0,
+                                    target_max = 1.0)
+                    self._colors[index] = (c1,c2)
+                    
+                    # round robin the colors
+                    if bump_start:
+                        start_index += 1
+                        if not start_index in self._start_color:
+                            start_index = 0
+
+                    if bump_end:
+                        end_index += 1
+                        if not end_index in self._end_color:
+                            end_index = 0
+
+                    # next channel
+                    index += 1
+            
+
         self.updateGeometry() # indicate desired size changed 
         self.update() # repaint
 
@@ -4529,17 +4626,15 @@ class QProgressBar(QtWidgets.QWidget):
 
 
             painter.drawRoundedRect(x, y, mw, mh, r, r)
-            
 
-            start_index = 0
-            end_index = 0
             index = 0
             for percent in self._percent.values():
+                c1,c2 = self._colors[index]
                 if is_vertical:
                     gradient = QLinearGradient(QPoint(x, y), QPoint(w,h))
                     
-                    gradient.setColorAt(0, self._start_color[start_index])
-                    gradient.setColorAt(1, self._end_color[end_index])
+                    gradient.setColorAt(0, c1)
+                    gradient.setColorAt(1, c2)
                     painter.setBrush(gradient)
                     if percent is None:
                         v = 0
@@ -4551,8 +4646,8 @@ class QProgressBar(QtWidgets.QWidget):
                 else:
                     # horizontal
                     gradient = QLinearGradient(QPoint(x, y), QPoint(w,h))
-                    gradient.setColorAt(0, self._start_color[start_index])
-                    gradient.setColorAt(1, self._end_color[end_index]) 
+                    gradient.setColorAt(0, c1)
+                    gradient.setColorAt(1, c2)
                     painter.setBrush(gradient)
                     if percent is None:
                         v = 0
@@ -4560,14 +4655,7 @@ class QProgressBar(QtWidgets.QWidget):
                         v = int(w * percent)
                     painter.drawRoundedRect(x, y, x + v, h, r, r)
                     y += h # next band
-
-                # round robin the colors
-                start_index += 1
-                if not start_index in self._start_color:
-                    start_index = 0
-                end_index += 1
-                if not end_index in self._end_color:
-                    end_index = 0
+               
                 index += 1
 
         painter.end()
@@ -7664,7 +7752,7 @@ class QSplitTabWidget(QDataWidget):
         self._id = gremlin.util.get_guid() # unique ID
         self._blank_input_id = "c9a484aedbab4f518e5bab7ec402df65"  # input ID to use for the blank pages
         self._device_guid = device_guid
-        self._device_id = str(device_guid)
+        self._device_id = gremlin.util.normalize_guid(device_guid)
 
         self._lock = False
 
@@ -8435,13 +8523,14 @@ def getLayoutWidgetHeight(layout, max_height = None):
 
 
    
-def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, right_stretch = True, alignment = None, set_alignment = True, min_height = None):
+def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, right_stretch = True, alignment = None, set_alignment = True, min_height = None, use_vcontainers = False):
     ''' gets a qt H container widget 
     
     :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically, use "|" for separator, "||" to insert a stretch
     :param label: label to add to the container (appears first if provided)
     :param parent: parent widget if any
     :param left_stretch: adds the stretch at the start of the container to right align it on the row
+    :param use_vcontainers = individual items are wrapped in a vertical container to align top
     
     '''
     widget = QtWidgets.QWidget(parent=parent)
@@ -8471,13 +8560,20 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
                         continue
                     else:
                         item = QtWidgets.QLabel(item)
+                if use_vcontainers:
+                    item, _ = getVContainer(item)
+                    
                 if alignment:
                     layout.addWidget(item, alignment = alignment)
                 else:
                     layout.addWidget(item)
         else:
             if isinstance(widget_or_list, str):
-                item = QtWidgets.QLabel(widget_or_list)
+                widget_or_list = QtWidgets.QLabel(widget_or_list)
+
+            if use_vcontainers:
+                widget_or_list, _ = getVContainer(widget_or_list)
+
             if alignment:
                 layout.addWidget(widget_or_list, alignment= alignment)
             else:

@@ -2213,10 +2213,12 @@ def isNumeric(input_string):
 
 def normalize_guid(device_guid) -> str:
     ''' normalizes a device GUID to a string'''
+    if device_guid is None:
+        return None
     if not isinstance(device_guid, str):
         device_guid = device_guid.toId()
     else:
-        device_guid = device_guid.casefold().replace("-","")
+        device_guid = device_guid.casefold().replace("-","").replace("{","").replace("}","")
     return device_guid
 
 def compare_guid(id1, id2) -> bool:

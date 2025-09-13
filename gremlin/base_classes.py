@@ -472,6 +472,8 @@ class JoystickHook:
         self._device_guid = None
         self._input_type = None
         self._calibrate = True # calibrate the data by default, false = do not apply calibration
+        self._last_value = 0.0 # last value
+        self._astate = gremlin.event_handler.AxisState()
 
 
         config = gremlin.config.Configuration()
@@ -570,22 +572,31 @@ class JoystickHook:
             if self._input_id != event.identifier:
                 self._last_state_value = None # different axis moved
                 return
-            
-            astate = gremlin.event_handler.AxisState()
+        
+                
+            if not self._astate.shouldProcess(event):
+                # anti-spam filter
+                return
 
-            # values are [actual, raw, calibrated, curved]
-            values = astate.getAxisValues(self._device_guid, self._input_id, event.value)
-            self._hook_value = values # event.value
-            should_process = True
-            
-            if self._calibrate:
-                # get calibrated value
-                self._hook_calibrated_value = values[2] # calibration data 
+            if event.is_axis:
+                # axis input - get transforms
+                values = self._astate.getAxisValues(self._device_guid, self._input_id, event.value)
+                self._hook_value = values # event.value
+
+                if self._calibrate:
+                    # get calibrated value
+                    calibrated = values.calibrated
+                    self._hook_calibrated_value = calibrated if calibrated is not None else values.actual
+                else:
+                    self._hook_calibrated_value = values.actual
             else:
-                self._hook_calibrated_value = values[0]
+                # button
+                self._hook_value = event.is_pressed
 
-            if should_process:
-                self._hook_callback(self._hook_value)
+
+            self._last_value = event.value
+            
+            self._hook_callback(self._hook_value)
             
             if self._is_state:
                 # see if we should trigger a highlight change
@@ -601,7 +612,9 @@ class JoystickHook:
                         el = gremlin.event_handler.EventListener()
                         el.axis_state_change.emit(event)
 
-
+    def triggerUpdate(self):
+        ''' triggers a hook update by forcing a data read without an event '''
+        self._hook_update_value()
 
     def unhookDevice(self):
         ''' unhooks the device '''
@@ -654,6 +667,9 @@ class JoystickHook:
         # calibration data
         calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
         self._calibrate = calibration.hasData
+
+
+
 
     def setHookCallback(self, callback):
         ''' updates the callback on value change '''

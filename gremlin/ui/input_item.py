@@ -1766,6 +1766,8 @@ class InputItemWidget(QBoxFrame):
         el.mapping_changed.connect(self._mapping_changed_cb)
         el.curve_deleted.connect(self._curve_changed_cb)
         el.curve_added.connect(self._curve_changed_cb)
+        el.calibration_added.connect(self._calibration_changed_cb)
+        el.calibration_deleted.connect(self._calibration_changed_cb)
 
         # update mapping action icons
         self._update_repeater() # create the correct repeater widget
@@ -1967,6 +1969,8 @@ class InputItemWidget(QBoxFrame):
                         if self.button_widget:
                             remove_button = True
 
+                        self.axis_widget.triggerUpdate() # force an update
+
                     else: 
                         # button
                         if not current_button_widget:
@@ -1976,6 +1980,8 @@ class InputItemWidget(QBoxFrame):
                         # remove axis widget if we changed modes
                         if self.axis_widget:
                             remove_axis = True
+
+                
         else:
             # remove both axis and button
             remove_axis = True
@@ -2099,19 +2105,24 @@ class InputItemWidget(QBoxFrame):
     @QtCore.Slot(object, object, object)
     def _action_deleted_cb(self, item_dat, container, action):
         ''' occurs when an action is deleted '''
-        if self.findAction(action):
+        if self.findAction(action) and Shiboken.isValid(self):
             # find the widget corresponding to this action
-            self.clear_action_icon(self.data, action)
+            gremlin.util.InvokeUiMethod(self.clear_action_icon, self.data, action) # ensure on UI thread
 
     def _curve_changed_cb(self, input_item):
-        ''' fires when a curve is deleted '''
-        if input_item == self:
-            self._update_repeater()
+        ''' fires when a curve is added or deleted '''
+        if input_item == self._input_item and Shiboken.isValid(self):
+            gremlin.util.InvokeUiMethod(self._update_repeater) # ensure on UI thread
+
+    def _calibration_changed_cb(self, input_item):
+        ''' fires when a calibration is added or deleted '''
+        if input_item == self._input_item and Shiboken.isValid(self):
+            gremlin.util.InvokeUiMethod(self._update_repeater) # ensure on UI thread
 
     def _mapping_changed_cb(self, item_data):
         ''' called when a mapping changes - sends the item being changed '''
-        if item_data == self.data:
-            gremlin.util.InvokeUiMethod(self._mapping_changed_cb_ui, item_data)
+        if item_data == self.data and Shiboken.isValid(self):
+            gremlin.util.InvokeUiMethod(self._mapping_changed_cb_ui, item_data) # ensure on UI thread
 
     def _mapping_changed_cb_ui(self, item_data):
             ''' update the widget on mapping change '''
@@ -2642,10 +2653,10 @@ class InputItemWidget(QBoxFrame):
     @QtCore.Slot()
     def _calibration_button_cb(self):
         # open the calibration button for this input
-        dialog = gremlin.ui.axis_calibration.CalibrationDialogEx(self.data.device_guid, self.data.input_id)
+        dialog = gremlin.ui.axis_calibration.CalibrationDialogEx(self.data)
         dialog.exec()
         self._update_axis_icons()
-        self._update_repeater()
+        
 
     QtCore.Slot()
     def _clear_curve_cb(self):

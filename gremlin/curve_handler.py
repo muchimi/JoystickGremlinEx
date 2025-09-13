@@ -1576,7 +1576,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         super().__init__(parent=parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.action_data : AxisCurveData = curve_data
+        self.curve_data : AxisCurveData = curve_data
         self.is_inverted = False
         self.last_value = 0
         self.curve_model = None
@@ -1588,7 +1588,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
         clipboard.clipboard_changed.connect(self._update_clipboard)
 
 
-    def update_value(self, value):
+    def update_value(self, value : float):
+        ''' handler to update a visual input value on the curve'''
         gremlin.util.InvokeUiMethod(self._update_value_ui, value)
 
     def _update_value_ui(self, value):
@@ -1630,7 +1631,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
     def _cleanup_ui(self):
         ''' cleanup operations '''
-        self.action_data = None 
+        self.curve_data = None 
 
 
     def _create_ui(self):
@@ -1676,14 +1677,14 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # Curve symmetry
         self.curve_symmetry = QtWidgets.QCheckBox("Diagonal Symmetry")
-        self.curve_symmetry.setChecked(self.action_data.symmetry_mode == SymmetryMode.Diagonal)
+        self.curve_symmetry.setChecked(self.curve_data.symmetry_mode == SymmetryMode.Diagonal)
         self.curve_symmetry.clicked.connect(self._curve_symmetry_cb)
         self.container_options_layout.addWidget(self.curve_symmetry)
 
         # Handle symmetry
         self.handle_symmetry_widget = QtWidgets.QCheckBox("Force smooth curves")
         
-        if self.action_data.mapping_type == "cubic-bezier-spline":
+        if self.curve_data.mapping_type == "cubic-bezier-spline":
             self.handle_symmetry_widget.setChecked(self.curve_model.handle_symmetry_enabled)
             self.handle_symmetry_widget.stateChanged.connect(self._handle_symmetry_cb)
         else:
@@ -1764,16 +1765,16 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.input_curved_widget.setReadOnly(True)
 
         # Response curve model used
-        if self.action_data.mapping_type == CurveType.Cubic:
-            self.curve_model = CubicSplineModel(self.action_data)
-        elif self.action_data.mapping_type == CurveType.Bezier:
-            self.curve_model = CubicBezierSplineModel(self.action_data)
+        if self.curve_data.mapping_type == CurveType.Cubic:
+            self.curve_model = CubicSplineModel(self.curve_data)
+        elif self.curve_data.mapping_type == CurveType.Bezier:
+            self.curve_model = CubicBezierSplineModel(self.curve_data)
         else:
             raise gremlin.error.ProfileError("Invalid curve type")
         
         
         # mode
-        self.curve_model.set_symmetry_mode(self.action_data.symmetry_mode)
+        self.curve_model.set_symmetry_mode(self.curve_data.symmetry_mode)
 
         self.container_curve_widget = QtWidgets.QFrame()
 
@@ -1815,7 +1816,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.container_repeater_layout.addStretch()
 
         
-        self.deadzone_widget = DeadzoneWidget(self.action_data)
+        self.deadzone_widget = DeadzoneWidget(self.curve_data)
         self.deadzone_widget.changed.connect(self._deadzone_modified_cb)
 
         # Add all widgets to the layout
@@ -1833,7 +1834,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         """Populates the UI elements."""
 
         # Setup correct response curve object
-        index = self.curve_type_selection.findData(self.action_data.mapping_type)
+        index = self.curve_type_selection.findData(self.curve_data.mapping_type)
 
         with QtCore.QSignalBlocker(self.curve_type_selection):
             self.curve_type_selection.setCurrentIndex(index)
@@ -1841,15 +1842,15 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_scene.redraw_scene()
 
         with QtCore.QSignalBlocker(self.centered_widget):
-            self.centered_widget.setChecked(self.action_data.isCentered)
+            self.centered_widget.setChecked(self.curve_data.isCentered)
 
         # Set deadzone values
-        self.deadzone_widget.setValues(self.action_data.deadzone)
-        self.deadzone_widget.isCentered = self.action_data.isCentered
+        self.deadzone_widget.setValues(self.curve_data.deadzone)
+        self.deadzone_widget.isCentered = self.curve_data.isCentered
 
     @QtCore.Slot(bool)
     def _centered_changed_cb(self, checked):
-        self.action_data.isCentered = checked
+        self.curve_data.isCentered = checked
         self.deadzone_widget.isCentered = checked
 
     @QtCore.Slot()
@@ -1895,7 +1896,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
                     os.unlink(xml_source)
                 root = etree.Element("curve_preset")
                 #self.curve_model.save_to_profile() # sync the coords
-                node = self.action_data._generate_xml()
+                node = self.curve_data._generate_xml()
                 root.append(node)
                 tree = etree.ElementTree(root)
                 tree.write(xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
@@ -1929,9 +1930,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
                     gremlin.ui.ui_common.MessageBox(prompt = f"File {base_name} does not appear to be a valid preset file.")    
                     return
                 
-                self.action_data._parse_xml(node)
-                self._change_curve_type(self.action_data.mapping_type, self.action_data.control_points)
-                self.action_data.curve_update()
+                self.curve_data._parse_xml(node)
+                self._change_curve_type(self.curve_data.mapping_type, self.curve_data.control_points)
+                self.curve_data.curve_update()
                 self._update_ui()
                 self.update_value(self.last_value)
 
@@ -1949,7 +1950,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def _copy_curve_cb(self):
         ''' copies current curve data to the clipboard '''
-        node = self.action_data._generate_xml()
+        node = self.curve_data._generate_xml()
         xml = etree.tostring(node)
         clipboard = gremlin.clipboard.Clipboard()
         clipboard.data = xml
@@ -1964,9 +1965,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
             try:
                 xml = clipboard.data
                 node = etree.fromstring(xml)
-                self.action_data._parse_xml(node)
-                self._change_curve_type(self.action_data.mapping_type, self.action_data.control_points)
-                self.action_data.curve_update()
+                self.curve_data._parse_xml(node)
+                self._change_curve_type(self.curve_data.mapping_type, self.curve_data.control_points)
+                self.curve_data.curve_update()
                 self._update_ui()
                 self.update_value(self.last_value)
             except:
@@ -2000,23 +2001,23 @@ class AxisCurveWidget(QtWidgets.QWidget):
         # Create new model
         if control_points is None:
             if curve_type == CurveType.Cubic:
-                self.action_data.control_points = [(-1.0, -1.0), (1.0, 1.0)]
+                self.curve_data.control_points = [(-1.0, -1.0), (1.0, 1.0)]
             elif curve_type == CurveType.Bezier:
-                self.action_data.control_points = [(-1.0, -1.0), (-1.0, 0),
+                self.curve_data.control_points = [(-1.0, -1.0), (-1.0, 0),
                                 (-0.08, 0.0), (0.0, 0.0), (0.08, 0.0),
                                 (1.0, 0.0), (1.0, 1.0),
                                     ]
                 
         else:
-            self.action_data.control_points = control_points
+            self.curve_data.control_points = control_points
             
-        self.action_data.mapping_type = curve_type
-        self.curve_model = AxisCurveData.model_map[curve_type](self.action_data)
+        self.curve_data.mapping_type = curve_type
+        self.curve_model = AxisCurveData.model_map[curve_type](self.curve_data)
 
         # Update curve settings UI
-        if self.action_data.mapping_type == CurveType.Cubic:
+        if self.curve_data.mapping_type == CurveType.Cubic:
             self.handle_symmetry_widget.setVisible(False)
-        elif self.action_data.mapping_type == CurveType.Bezier:
+        elif self.curve_data.mapping_type == CurveType.Bezier:
             self.handle_symmetry_widget.setVisible(True)
             self.handle_symmetry_widget.stateChanged.connect(
                 self._handle_symmetry_cb
@@ -2028,7 +2029,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_scene = CurveView(
             self.curve_model,
             self.control_point_editor,
-            self.action_data.show_input_axis
+            self.curve_data.show_input_axis
         )
         self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
@@ -2040,10 +2041,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
     @QtCore.Slot(bool)
     def _curve_symmetry_cb(self, checked):
         if checked:
-            self.action_data.symmetry_mode = SymmetryMode.Diagonal
+            self.curve_data.symmetry_mode = SymmetryMode.Diagonal
             self.curve_model.set_symmetry_mode(SymmetryMode.Diagonal)
         else:
-            self.action_data.symmetry_mode = SymmetryMode.NoSymmetry
+            self.curve_data.symmetry_mode = SymmetryMode.NoSymmetry
             self.curve_model.set_symmetry_mode(SymmetryMode.NoSymmetry)
 
         self.curve_scene.redraw_scene()
@@ -2099,9 +2100,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 syslog.error(f"Curve preset: don't know how to handle {preset}")
                 return
 
-        self.action_data.symmetry_mode = SymmetryMode.NoSymmetry
-        self.action_data.mapping_type = curve_type
-        self.action_data.isCentered = is_centered
+        self.curve_data.symmetry_mode = SymmetryMode.NoSymmetry
+        self.curve_data.mapping_type = curve_type
+        self.curve_data.isCentered = is_centered
         self._change_curve_type(curve_type, control_points)
         self._update_ui()
         self.update_value(self.last_value)
@@ -2165,11 +2166,11 @@ class AxisCurveWidget(QtWidgets.QWidget):
     @QtCore.Slot() 
     def _deadzone_modified_cb(self):
         ''' called when deadzones are modified '''
-        self.action_data.curve_update()
+        self.curve_data.curve_update()
         values = self.deadzone_widget.values()
         #print (f"deadzone: {values}")
         for index, value in enumerate(values):
-            self.action_data.deadzone[index] = value
+            self.curve_data.deadzone[index] = value
 
         self._update_ui()
         self.update_value(self.last_value)
@@ -2214,6 +2215,7 @@ class AxisCurveData():
         }    
 
     def __init__(self):
+        self.id = gremlin.util.get_guid() # unique ID for this curve 
         self.deadzone = [-1, 0, 0, 1]
         self.sensitivity = 1.0
         self._mapping_type = CurveType.Cubic
@@ -2248,6 +2250,9 @@ class AxisCurveData():
 
         if not gremlin.base_profile._is_curve_tag(node.tag):
             return
+        
+        if "id" in node.attrib:
+            self.id = node.get("id") # re use existing ID
 
         if "mode" in node.attrib:
             mode = node.get("mode")
@@ -2286,8 +2291,8 @@ class AxisCurveData():
         """
         node = ElementTree.Element("curve-data")
         node.set("mode", SymmetryMode.to_string(self.symmetry_mode))
-
         node.set("centered", str(self.isCentered))
+        node.set("id", self.id)
 
         # Response curve mapping
         if len(self.control_points) > 0:
@@ -2357,6 +2362,9 @@ class AxisCurveData():
             value = self.response_fn(value)
         
         return value
+    
+    def __str__(self):
+        return f"Curve Data: [{self.id}] deadzone: {self.deadzone} mapping: {self.mapping_type.name}  cp: {self.control_points}"
 
 class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog box for curve configuration '''
@@ -2369,7 +2377,6 @@ class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
         """
         super().__init__(self.__class__.__name__, parent=parent)
 
-        self.action_data = curve_data
         self.setWindowTitle("Curve Editor")
 
         self.scroll_area = QtWidgets.QScrollArea()
@@ -2387,10 +2394,6 @@ class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        # self._size_dialog_widget = gremlin.ui.ui_common.Buttons.getResizeWidget(callback = self._handle_size_window)
-        # widget, _ = gremlin.ui.ui_common.getHContainer(self._size_dialog_widget)
-        # self.main_layout.addWidget(widget)    
-
         self.widget = AxisCurveWidget(curve_data, self)
         self.main_layout.addWidget(self.scroll_area)
         self.scroll_layout.addWidget(self.widget)
@@ -2398,18 +2401,13 @@ class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
         self.minimumWidth = 400
         self.minimumHeight = 400
 
-    # def _handle_size_window(self):
-    #     ''' size window '''
-    #     size = self.widget.sizeHint()
-    #     geom = self.geometry()
-    #     geom.setWidth(size.width()+20)
-    #     geom.setHeight(size.height()+20)
-    #     self.setGeometry(geom)
-
+    def getCurveData(self):
+        return self.widget.curve_data
 
 
     @property
     def curve_update_handler(self):
+        ''' call this to update the curve input dynamically '''
         return self.widget.update_value
     
 
