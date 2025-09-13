@@ -2874,9 +2874,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # update status nar
         self._update_mode_status_bar()
-        # startup setups
-        el.toggle_highlight.emit(self.is_highligthing_enabled, self.is_axis_highlighting, self.is_button_highlighting)
-
 
 
     def _select_last_input(self):
@@ -5153,6 +5150,8 @@ if __name__ == "__main__":
     sd.hook()
     sd.reset() # initial state
 
+    astate = gremlin.event_handler.AxisState()
+    astate.reset()
 
     
 
@@ -5181,6 +5180,8 @@ if __name__ == "__main__":
 
     syslog.info("Init completed...")
     el.ui_ready.emit()
+    el.toggle_highlight.emit(ui.is_highligthing_enabled, ui.is_axis_highlighting, ui.is_button_highlighting)
+
 
     # for some reason QT shows the window with a white background and ignores stylesheets/background color
     # workaround for now: show the window minimized so it doesnt' flash on the screen

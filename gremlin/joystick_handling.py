@@ -230,7 +230,11 @@ def get_axis_name(input_id):
         axis_name = "S2"
     else:
         axis_name = f"(unknown [{input_id}])"
-    return axis_name        
+    return axis_name     
+
+def get_axis_curve_data(guid, identifier):
+    ''' gets the curve data for an axis '''   
+
 
 def get_curved_axis(guid, identifier):
     ''' returns curved/calibrated data same as the event handler '''
@@ -476,6 +480,10 @@ def device_name_from_guid(device_guid) -> str:
 def known_devices() -> list:
     ''' gets the list of device GUID (strings) known to GremlinEx '''
     return [guid for guid in _joystick_device_guid_map.keys() if isinstance(guid, str)]
+
+def getDevice(device_guid):
+    ''' gets a device summary '''
+    return device_info_from_guid(device_guid)
 
 def device_info_from_guid(device_guid): # -> DeviceSummary:
     ''' gets physical device information '''

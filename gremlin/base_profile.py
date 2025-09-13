@@ -2182,8 +2182,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 if self._input_type == InputType.JoystickAxis:
                     self.is_axis = True # indicate we are an axis
                     self._is_button = False
-                    el = gremlin.event_handler.EventListener()
-                    el.registerInput(self)
+
+                    # update the registration in case the input type changed
+                    sdata = gremlin.event_handler.AxisState()
+                    sdata.registerAxisInputItem(self)
+                    
                     info = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
                     if info:
                         self._input_name = f"Axis {info.axis_names[input_id-1]}"
@@ -2194,7 +2197,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     mgr = gremlin.ui.axis_calibration.CalibrationManager()
                     self._calibration = mgr.getCalibration(self._device_guid, self._input_id)
 
-
+                    el = gremlin.event_handler.EventListener()
                     el.update_input_icons.emit()
                 elif self._input_type == InputType.JoystickButton:
                     self._input_name = f"Button {input_id}"

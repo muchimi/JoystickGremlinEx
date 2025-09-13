@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 import functools
 import traceback
 import inspect
@@ -328,7 +329,6 @@ class VjoyEvent:
 
 
 
-
 @gremlin.singleton_decorator.SingletonDecorator
 class EventListener:
 
@@ -565,6 +565,10 @@ class EventListener:
 
 	collapse_all_containers = Signal() # collapse all containers
 	expand_all_containers = Signal() # expand all containers
+	curve_added = Signal(object) # fires when a curve is added from an input item (InputItem)
+	curve_deleted = Signal(object) # fires when a curve is deleted from an input item (InputItem)
+	calibration_added = Signal(object) # fires when a calibration is added from an input item (InputItem)
+	calibration_deleted = Signal(object) # fires when a calibration is deleted from an input item (InputItem)
 	
 	
 	def __init__(self):
@@ -584,8 +588,7 @@ class EventListener:
 		# Calibration function for each axis of all devices
 		self._calibrations = {}
 
-		# map of axis input items that could be curved
-		self._joystick_input_item_map = {}
+		
 		
 		# Joystick device change update timeout timer
 		self._device_update_timer = None
@@ -803,16 +806,6 @@ class EventListener:
 		m2_list, f2_list = eh.execute_event(event_enter_pressed)
 		enter_release = Timer(delay, lambda : eh._execute_callbacks(event_enter_released, m2_list, f2_list))
 		enter_release.start()
-
-
-
-	def registerInput(self, item):
-		''' registers an input item '''
-		if item.input_type == InputType.JoystickAxis:
-			key = (item.device_guid, item.input_id)
-			self._joystick_input_item_map[key] = item
-
-	
 
 
 	def _device_changed_cb(self):
@@ -1392,20 +1385,21 @@ class EventListener:
 
 		return new_value
 
+
+	def getAxisValues(self, device_guid, input_id) -> AxisData:
+		''' gets axis data values for the given axis '''
+		return AxisState().getAxisValues(device_guid, input_id)
 		
 	def _apply_curve_ex(self, device_guid, input_id, value : float):
 		''' applies a curve to the input axis '''
-		key = (device_guid, input_id)
-		if key in self._joystick_input_item_map:
-			item = self._joystick_input_item_map[key]
-			if item.curve_data is not None:
-				
-				curved_value = item.curve_data.curve_value(value)
-				verbose = gremlin.config.Configuration().verbose_mode_curve
-				if verbose:
-					device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-					syslog.info(f"APPLY CURVE: device: [{device.name}] id: [{device_guid}] in: {value:0.4f} out: {curved_value:0.4f}")
-				return curved_value
+		curved_value = AxisState().applyCurve(device_guid, input_id, value)
+		if curved_value is not None:
+			verbose = gremlin.config.Configuration().verbose_mode_curve
+			if verbose:
+				device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+				syslog.info(f"APPLY CURVE: device: [{device.name}] id: [{device_guid}] in: {value:0.4f} out: {curved_value:0.4f}")
+			return curved_value
+		# no curve applied
 		return value
 	
 	def apply_transforms(self, device_guid, input_id, raw_value):
@@ -2707,4 +2701,245 @@ class JoystickState():
 
 
 
+class AxisData():
+	''' holds axis data '''
+	def __init__(self, device_guid, input_id):
+		if not isinstance(device_guid, str):
+			self.device_id = gremlin.util.normalize_guid(device_guid)
+			self.device_guid = device_guid
+		else:
+			self.device_id = gremlin.util.normalize_guid(device_guid)
+			self.device_guid = gremlin.util.parse_guid(device_guid)
+
+		self.input_id = input_id
+		self.actual_value = None # computed value from last query
+		self.raw_value = None
+		self.calibrated_value = None
+		self.curve_value = None
+
+	@property
+	def device(self) -> dinput.DeviceSummary:
+		import gremlin.joystick_handling
+		return gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+
+
+	@property
+	def hasCurve(self) -> bool:
+		return self.curve_value is not None
+	
+	@property
+	def hasCalibrated(self) -> bool:
+		return self.calibrated_value is not None
+	
+	@property
+	def hasValue(self) -> bool:
+		return self.raw_value is not None
+	
+	@property
+	def calibration(self):
+		''' returns the calibration data for this axis if it has any '''
+		import gremlin.ui.axis_calibration
+		calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
+		if calibration and calibration.hasData:
+			return calibration
+		return None
+
+	
+	def getAxisValues(self, value : float = None):
+		''' gets the axis value as [actual, raw, calibrated, curved]
+		 
+		actual value is the raw
+		   
+			 '''
+		import gremlin.ui.axis_calibration
+		device_guid = self.device_guid
+		input_id = self.input_id
+		if value is None:
+			# get the axis value
+			raw_value = gremlin.joystick_handling.get_axis(device_guid, input_id)
+		else:
+			raw_value = value
+		values = [raw_value]
+		actual_value = raw_value
+		self.raw_value = raw_value
+
+		calibrated_value = None
+		curve_value = None
+		has_calibration = False
+		has_curve = False
+
+		calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(device_guid, input_id)
+		if calibration and calibration.hasData:
+			calibrated_value = calibration.getValue(raw_value)
+			values.append(calibrated_value)
+			actual_value = calibrated_value
+			has_calibration = True
+
+		astate = AxisState()
+		curve_data = astate.getAxisCurve(device_guid, input_id)
+		if curve_data:
+			curve_value = curve_data.curve_value(actual_value)
+			actual_value = curve_value
+			has_curve = True
+
+		self.actual_value = actual_value
+		self.curve_value = curve_value
+		self.calibrated_value = calibrated_value
+		if not curve_data and not has_calibration:
+			self.raw_value = None # remove the raw value unless we also have a calibrated or curve value - the repeater only displays one value that way
+
+		if has_curve and has_calibration:
+			return [self.actual_value, self.raw_value, self.calibrated_value]
+		if has_calibration:
+			return [self.actual_value, self.raw_value]
+		if has_curve:
+			return [self.actual_value, self.raw_value]
+		# no curve, no calibration
+		return [self.actual_value]
+
+
+
+
+
+@gremlin.singleton_decorator.SingletonDecorator
+class AxisState():
+	def __init__(self):
+		self._data = {}
+
+		# map of axis input items that could be curved
+		self._joystick_input_item_map = {}
+
+		el = EventListener()
+		el.profile_unload.connect(self.reset)
+		el.profile_loaded.connect(self._update_inputs)
+
+
+	def reset(self):
+		''' resets the state data '''
+		verbose = gremlin.config.Configuration().verbose_mode_joystick
+		if verbose: 	
+			syslog.info("AXIS STATE: reset")
+		self._data.clear()
+		self._joystick_input_item_map.clear()
+		profile = gremlin.shared_state.current_profile
+		if profile:
+			self._update_inputs()
+
+	def _update_inputs(self):
+		''' reload all axes on profile load '''
+		profile = gremlin.shared_state.current_profile
+		for device_guid in profile.devices:
+			for mode_name in profile.devices[device_guid].modes:
+				mode_object = profile.devices[device_guid].modes[mode_name]
+				for input_type in mode_object.config:
+					for input_item in mode_object.config[input_type].values():
+						self.registerAxisInputItem(input_item)
+
+
+	
+	
+	def registerAxisInputItem(self, item):
+		''' registers an axis input item '''
+		if item.get_input_type() == InputType.JoystickAxis:
+			verbose = gremlin.config.Configuration().verbose_mode_joystick
+			device_guid = item.device_guid
+			if not isinstance(device_guid, str):
+				device_guid = gremlin.util.normalize_guid(device_guid)
+			input_id = item.input_id
+			key = self._get_key(device_guid, input_id)
+			if not key in self._joystick_input_item_map:
+				self._joystick_input_item_map[key] = item
+		
+			if not key in self._data:
+				self._data[key] = AxisData(device_guid, input_id)
+
+			if verbose: 	
+				device = gremlin.joystick_handling.getDevice(device_guid)
+				syslog.info(f"Register axis: {device.name} {device_guid} axis: {input_id}  {device.getAxisName(input_id)}")
+			
+
+	def _get_key(self, device_guid, input_id):
+		if not isinstance(device_guid, str):
+			device_guid = gremlin.util.normalize_guid(device_guid)
+		return (device_guid, input_id)
+	
+	def getAxis(self, device_guid, input_id):
+		''' gets the axis data block '''
+		if device_guid:
+			return self.register(device_guid, input_id)
+		return None
+	
+	def getItem(self, device_guid, input_id):
+		''' gets registered axis input item '''
+		if device_guid:
+			key = self._get_key(device_guid, input_id)
+			if key in self._joystick_input_item_map:
+				item = self._joystick_input_item_map[key]
+				return item
+		return None
+	
+	def getAxisData(self, device_guid, input_id):
+		if device_guid:
+			key = self._get_key(device_guid, input_id)
+			if key in self._data:
+				return self._data[key]
+		return None
+	
+
+	def getAxisValues(self, device_guid, input_id, value : float = None) -> list:
+		''' gets an axis input values, including actual, raw, calibrated and curved as a list of floating point values
+			a value of None indicates the item is not used.
+			the frist value is the computed value based on applied calibration
+
+			if the value is not provided, the axis is queried for the current value
+				
+		'''
+		if device_guid:
+			data= self.getAxisData(device_guid, input_id)
+			if data:
+				return data.getAxisValues(value)
+		return None
+	
+	def getAxisCurve(self, device_guid, input_id):
+		''' returns the curve data if the axis has a curve applied '''
+		if device_guid:
+			item = self.getItem(device_guid, input_id)
+			if item:
+				return item.curve_data 
+		return None
+	
+	def getAxisCalibration(self, device_guid, input_id):
+		''' gets the axis calibration data '''
+		if device_guid:
+			item = self.getItem(device_guid, input_id)
+			if item:
+				return item.calibration
+		return None
+
+	
+	def applyCalibration(self, device_guid, input_id, value : float, return_null : bool = True):
+		''' applies an axis calibration to an input value '''
+		if device_guid:
+			item = self.getItem(device_guid, input_id)
+			if item and item.calibration:
+				calibrated_value = item.calibration.getValue(value)
+				return calibrated_value
+			if return_null:
+				return None
+		return value
+	
+	def applyCurve(self, device_guid, input_id, value : float, return_null : bool = True):
+		if device_guid:
+			item = self.getItem(device_guid, input_id)
+			if item and item.curve_data:
+				curved_value = item.curve_data.curve_value(value)
+				return curved_value
+					
+			# no curve to apply
+			if return_null:
+				return None
+			return value
+		return None
+
+	
 

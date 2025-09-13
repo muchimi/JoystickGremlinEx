@@ -122,13 +122,16 @@ class Color():
         return "#8a761c" if gremlin.shared_state.is_dark_theme else "#bcaf8f"
     @staticmethod
     def selectGradientColor():
-        return "#448044" if gremlin.shared_state.is_dark_theme else "#568f56"
-    @staticmethod
-    def alternateSelectGradientColor():
-        return "#754e17" if gremlin.shared_state.is_dark_theme else "#568f56"
+        return "#448044"
     @staticmethod
     def selectEndGradientColor():
-        return "#8ac18a" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
+        return "#61BB61"
+    @staticmethod
+    def alternateSelectGradientColor():
+        return "#677517"
+    @staticmethod
+    def alternateSelectEndGradientColor():
+        return "#ACC425"
     @staticmethod
     def selectGradientAltColor():
         return "#448080" if gremlin.shared_state.is_dark_theme else "#568c8f"
@@ -4258,31 +4261,52 @@ class QPathLineItem(QtWidgets.QWidget):
 
 
 class QProgressBar(QtWidgets.QWidget):
-    ''' visualizes a vertical or horizontal progress bar '''
+    ''' visualizes a vertical or horizontal progress bar
+     
+    supports multiple values if the value is an iterating type like tuple or list.
+    colors are also multiple values and will round robin if the number of colors is less than the number of values.
+
+    values can be assigned as single float, or a list of values, displayed in sequence on the progress bar.
+    if the value is None, the progress bar adds a blank bar.  The number of bars always matches however may values are entered
+
+    Colors are assigned in roundrobin fashion for the next bar if the number of colors given is less than the numbers of bars to display
+      
+    '''
 
     valueChanged = QtCore.Signal() # fires when the value changes (and widget is not in readonly mode)
 
-    def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None):
+    def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None, parent = None):
         super().__init__()
-        self._value = value
-        self._orientation = orientation
-        self._step = step
-        self._readOnly = readonly
-        self._data = data
-        self.setRange(min, max)
+        self.parent = parent
         if orientation == Qt.Orientation.Vertical:
             self._desired_width = 10
             self._desired_height = 100
         else:
             self._desired_width = 100
             self._desired_height = 10
-        self.setMinimumSize(self.sizeHint())
-        self.setMaximumSize(self.sizeHint())
+        self._value = value
+        self._orientation = orientation
+        self._step = step
+        self._readOnly = readonly
+        self._data = data
+        self._percent = {} # percent valuess of the progress bar by value index
+        self._start_color = {} # color for each value band (start gradient)
+        self._end_color = {} # color for each value band (end gradient)
+        self.setRange(min, max)
+
+        # self.setMinimumSize(self.sizeHint())
+        # self.setMaximumSize(self.sizeHint())
 
         self._background_color = Color.actionBackgroundColor()
         self._border_color = Color.selectBorderColor()
-        self._gradient_start_color = Color.selectGradientColor()
-        self._gradient_end_color = Color.selectEndGradientColor()
+
+        # default gradients - two by default to alternate
+        self._start_color[0] = Color.selectGradientColor()
+        self._end_color[0] = Color.selectEndGradientColor()
+        self._start_color[1] = Color.alternateSelectGradientColor()
+        self._end_color[1] = Color.alternateSelectEndGradientColor()
+
+        
         
         self.installEventFilter(self)
         
@@ -4355,30 +4379,63 @@ class QProgressBar(QtWidgets.QWidget):
 
     @property
     def gradientStartColor(self):
-        return self._gradient_start_color
+        if len(self._start_color) > 1:
+            return [c for c in self._start_color.values()]
+        return self._start_color[0]
+        
     @gradientStartColor.setter
     def gradientStartColor(self, value):
-        self._gradient_start_color = value
-        try:
+        self._start_color.clear()
+        if hasattr(value,"__iter__"):
+            for index, color in enumerate(value):
+                self._start_color[index] = QtGui.QColor(color)
+        else:
+            self._start_color[0] = QtGui.QColor(value)
+
+        if Shiboken.isValid(self):
             self.update()
-        except:
-            pass        
+
+    @property
+    def isMulti(self) -> bool:
+        ''' true if the input has multiple values to display '''
+        return hasattr(self._value,"__iter__") 
 
         
     @property
     def gradientEndColor(self):
-        return self._gradient_end_color
+        if len(self._end_color) > 1:
+            return [c for c in self._end_color.values()]
+        return self._end_color[0]
+        
     @gradientEndColor.setter
     def gradientEndColor(self, value):
         self._gradient_end_color = value
-        try:
-            self.update()
-        except:
-            pass
+        self._end_color.clear()
+        if hasattr(value,"__iter__"):
+            for index, color in enumerate(value):
+                self._end_color[index] = QtGui.QColor(color)
+        else:
+            self._end_color[0] = QtGui.QColor(value)
+
+        if Shiboken.isValid(self):
+            self.update() # repaint
+        
 
 
     def sizeHint(self) -> QtCore.QSize:
-        return QtCore.QSize(self._desired_width, self._desired_height)
+        ''' desired widget size '''
+        count = len(self._percent)
+        size = super().sizeHint()
+        
+        if count:
+            if self._orientation == Qt.Orientation.Vertical:
+                w = self._desired_width * count
+                h = self._desired_height
+            else:
+                w = self._desired_width
+                h = self._desired_height * count 
+        size = QtCore.QSize(w, h)    
+        return size
 
 
     def setRange(self, min : float, max : float):
@@ -4388,12 +4445,29 @@ class QProgressBar(QtWidgets.QWidget):
         self._max_range = max
         self._update_value()
 
-    def setValue(self, value : float):
+    def setValue(self, value : float | list):
+        # if hasattr(value,"__iter__"):
+        #     assert len(value) == 4
         gremlin.util.InvokeUiMethod(self._set_value_ui, value)
 
-    def _set_value_ui(self, value : float):
-        self._value = value
-        self._update_value()
+    def _set_value_ui(self, value):
+        if hasattr(value,"__iter__"):
+            # count non null entries
+            if value[0] is not None:
+                count = sum(1 for item in value if item is not None)
+                if count == 1:
+                    self._value = value[0] # use the first value only
+                else:
+                    values = value
+                    # remove the last values if NULL
+                    while values and values[-1] is None:
+                        values.pop()
+                    self._value = values # use all values
+            else:
+                self._value = value # use the whole list
+        else:
+            self._value = value
+        self._update_value_ui()
 
     def Value(self) -> float:
         return self._value
@@ -4404,59 +4478,125 @@ class QProgressBar(QtWidgets.QWidget):
     def _update_value_ui(self):
         if not Shiboken.isValid(self):
             return
-        self._percent = gremlin.util.scale_to_range(self._value, 
-                                                    source_min= self._min_range, 
-                                                    source_max = self._max_range,
-                                                    target_min = 0.0,
-                                                    target_max = 1.0)
-        #syslog.info(f"value: {self._value:0.3f} percent: {self._percent:0.3f}")
-        # force a repaint
-        self.update()
-        #self.repaint()
+        if hasattr(self._value,"__iter__"):
+            # count how many are not None
+            values = self._value
+        else:
+            values = [self._value]
+        self._percent.clear()
+        for index, value in enumerate(values):
+            if value is None:
+                self._percent[index] = None
+            else:
+                self._percent[index] = gremlin.util.scale_to_range(value, 
+                                source_min= self._min_range, 
+                                source_max = self._max_range,
+                                target_min = 0.0,
+                                target_max = 1.0)
+        self.updateGeometry() # indicate desired size changed 
+        self.update() # repaint
+
     
     def paintEvent(self, event):
 
         # syslog.info("progress paint start")
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        
-        x = 0
-        y = 0
-        r = 0 # radius
-        w = int(self.size().width())
-        h = int(self.size().height())
 
-        backgroundBrush = QBrush(self._background_color)
-        borderPen = QtGui.QPen(QtGui.QColor(self._border_color))
-        borderPen.setWidth(1)
+        count = len(self._percent) # how many bars to display
+        if count:
+            # something to paint
+            x = 0
+            y = 0
+            r = 0 # radius
+            w = self._desired_width # width of one bar
+            h = self._desired_height # height of one bar
+            
 
-        # draw bar background
-        painter.setPen(borderPen)
-        
-        # draw progress bar foreground
-        painter.setBrush(backgroundBrush)
-        painter.drawRoundedRect(x, y, w, h, r, r)
+            is_vertical = self._orientation == Qt.Orientation.Vertical
+            
+            mw = w * count if is_vertical else w
+            mh = h if is_vertical else h * count
+            
 
-        if self._orientation == Qt.Orientation.Vertical:
-            gradient = QLinearGradient(QPoint(x, y), QPoint(w,h))
-            gradient.setColorAt(0, QtGui.QColor(self._gradient_end_color))
-            gradient.setColorAt(1, QtGui.QColor(self._gradient_start_color))
-            painter.setBrush(gradient)
-            v = int(h * (1.0 - self._percent)) # start from the bottom
-            painter.drawRoundedRect(x, y + v, w, h, r, r)
-        else:
-            # horizontal
-            gradient = QLinearGradient(QPoint(x, y), QPoint(w,h))
-            gradient.setColorAt(0, QtGui.QColor(self._gradient_start_color))
-            gradient.setColorAt(1, QtGui.QColor(self._gradient_end_color))   
-            painter.setBrush(gradient)
-            v = int(w * self._percent)
-            painter.drawRoundedRect(x, y, x + v, h, r, r)
+            backgroundBrush = QBrush(self._background_color)
+            borderPen = QtGui.QPen(QtGui.QColor(self._border_color))
+            borderPen.setWidth(1)
+
+            # draw bar background
+            painter.setPen(borderPen)
+            painter.setBrush(backgroundBrush)
+
+
+            painter.drawRoundedRect(x, y, mw, mh, r, r)
+            
+
+            start_index = 0
+            end_index = 0
+            index = 0
+            for percent in self._percent.values():
+                if is_vertical:
+                    gradient = QLinearGradient(QPoint(x, y), QPoint(w,h))
+                    
+                    gradient.setColorAt(0, self._start_color[start_index])
+                    gradient.setColorAt(1, self._end_color[end_index])
+                    painter.setBrush(gradient)
+                    if percent is None:
+                        v = 0
+                    else:
+                        v = int(h * (1.0 - percent)) # start from the bottom
+                    
+                    painter.drawRoundedRect(x, y + v, w, h, r, r)
+                    x += w # next band
+                else:
+                    # horizontal
+                    gradient = QLinearGradient(QPoint(x, y), QPoint(w,h))
+                    gradient.setColorAt(0, self._start_color[start_index])
+                    gradient.setColorAt(1, self._end_color[end_index]) 
+                    painter.setBrush(gradient)
+                    if percent is None:
+                        v = 0
+                    else:
+                        v = int(w * percent)
+                    painter.drawRoundedRect(x, y, x + v, h, r, r)
+                    y += h # next band
+
+                # round robin the colors
+                start_index += 1
+                if not start_index in self._start_color:
+                    start_index = 0
+                end_index += 1
+                if not end_index in self._end_color:
+                    end_index = 0
+                index += 1
+
         painter.end()
 
         #syslog.info("progress paint end")
 
         #syslog.info(f"X: {x} y: {y} w: {w} h: {h} v:{v} value: {self._percent:0.3f}")
+
+
+class QHookedProgressBar(QProgressBar, gremlin.base_classes.JoystickHook):
+    ''' hooked progress bar to a hardware input '''
+    def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float | list = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None, parent = None):
+        super().__init__(orientation, value, min, max, readonly, step, data, parent)
+        #super(gremlin.base_classes.JoystickHook, self).__init__()
+
+    def eventFilter(self, widget, event):
+        ''' grab mouse wheel events to avoid random scrolling '''
+        t = event.type()
+        if t == QtCore.QEvent.Type.Wheel:
+            return True
+        return False
+
+
+    def hookDevice(self, device_guid, input_type, input_id):    
+        ''' hooks the device '''    
+        if not Shiboken.isValid(self):
+            return
+        self._hookDevice(device_guid, input_type, input_id, self.setValue)
+        
 
 class ButtonStateWidget(QtWidgets.QWidget):
     ''' visualizes the state of a button '''
@@ -4713,9 +4853,9 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
     deleted = QtCore.Signal(object) # indicates the item is being deleted
 
-    def __init__(self, axis_id = None, show_calibrated = False, show_percentage = True, show_value = True,
-                  show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical,
-                  min_range : float = -1.0, max_range : float = 1.0, comment = None, device = None, decimals = 3, parent=None):
+    def __init__(self, axis_id = None, show_calibrated = False, show_percentage = False, show_value = False,
+                  show_label = False, show_curve = False, orientation = QtCore.Qt.Orientation.Horizontal,
+                  min_range : float = -1.0, max_range : float = 1.0, comment = None, device = None, decimals = 3, callback = None, parent=None):
         """Creates a new instance.
 
         :param axis_id: id of the axis, used in the label
@@ -4729,6 +4869,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         :param comment: comment label
         :param device : device to use
         :param decimals: decimals to use for value data (3)
+        :param callback: update callback when the widget changes values (optional)
         :param parent the parent of this widget
 
         """
@@ -4739,19 +4880,22 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         self.device = device
         self.setObjectName("state_repeater")
         self._is_state = True # indicate this is a state widget
+        self.show_raw = True # true if the raw value should be displayed
+        self._callback = callback
+
+       
         
 
         self.container_widget = QtWidgets.QWidget()
         if orientation == QtCore.Qt.Orientation.Vertical:
-            #self.container_layout = QtWidgets.QGridLayout()
             self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
-        else:
-            self.container_layout = QtWidgets.QHBoxLayout(self.container_widget)
             
-        self.setContentsMargins(0,0,0,0)
-        self.main_layout.setContentsMargins(0,0,0,0)
-        self.container_layout.setSpacing(0)
-        self.container_layout.setContentsMargins(0,0,0,0)
+        else:
+            # horizontal
+            self.container_layout = QtWidgets.QHBoxLayout(self.container_widget)
+
+        self.container_layout.setSpacing(4)
+            
 
         # container for the progress bars (regular + calibrated)
         self.progress_container_widget = None
@@ -4767,6 +4911,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
 
         # widget references 
         self._progress_widget = None
+        self._progress_raw_widget = None
         self._progress_calibrated_widget = None
         self._display_curve_widget = None
         self._display_label_widget = None
@@ -4814,12 +4959,23 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         el = gremlin.event_handler.EventListener()
         el.ui_ready.connect(self._ui_ready)
 
-        self._setValue(self._value)
+        self._set_value_ui(self._value)
 
 
         css = Color.cssRepeater()
         self.setStyleSheet(css)
         self.installEventFilter(self)
+
+    def sizeHint(self):
+        if self._orientation == QtCore.Qt.Orientation.Vertical:
+            w = 20
+            h = -1
+        else:
+            w = -1
+            h = 20
+
+        return QtCore.QSize(w, h)
+
 
     def eventFilter(self, widget, event):
         ''' grab mouse wheel events to avoid random scrolling '''
@@ -4833,7 +4989,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         ''' hooks the device '''    
         if not Shiboken.isValid(self):
             return
-        self._hookDevice(device_guid, input_type, input_id, self._setValue)
+        self._hookDevice(device_guid, input_type, input_id, self.setValue)
         
 
     @QtCore.Slot(object)
@@ -4882,147 +5038,81 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         Python being aware - we go through special handling to catch these situations and re-create garbage collected elements for this UI widget
         
         '''
+
+        gremlin.util.assert_ui_thread()
+
         if not Shiboken.isValid(self):
             return
 
         # gremlin.ui.ui_common.clear_layout(self.container_layout)
         alignment = QtCore.Qt.AlignmentFlag.AlignCenter if self._orientation == QtCore.Qt.Orientation.Vertical else QtCore.Qt.AlignmentFlag.AlignLeft
+        gremlin.ui.ui_common.clear_layout(self.container_layout)
         
         # progress bar label
         if self._show_label:
-            try:
-                if self._display_label_widget:
-                    self._display_label_widget.setText(self._label_text)
-            except:
-                # C++ exception
-                self._display_label_widget = None
-            if not self._display_label_widget:
-                self._display_label_widget = QtWidgets.QLabel(self._label_text)
-                self.container_layout.addWidget(self._display_label_widget, alignment = alignment)
-
-        # progress bar container 
-        try:
-            if self.progress_container_widget:
-                pass
-        except:
-            try:
-                self.container_layout.removeWidget(self.progress_container_widget)
-            except:
-                pass
-            self.progress_container_widget = None
-            self.progress_container_layout = None
-
-        if not self.progress_container_widget:
-            if self._orientation == QtCore.Qt.Orientation.Vertical:
-                # stack horizontal
-                self.progress_container_widget, self.progress_container_layout = getHContainer()
-            else:
-                # stack vertical
-                self.progress_container_widget, self.progress_container_layout = getVContainer()
-            self.progress_container_layout.setSpacing(0)
-            self.container_layout.addWidget(self.progress_container_widget, alignment = alignment)
-
-
+            self._display_label_widget = QtWidgets.QLabel(self._label_text)
+            self.container_layout.addWidget(self._display_label_widget, alignment = alignment)
+        
         # progress bar widget
-        try:
-            if self._progress_widget:
-                self._progress_widget.setValue(self._display_value)        
-        except:
-            # C++ exception
-            self._progress_widget = None
+        self._progress_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self._input_id)
+        #widget, layout = getVContainer(self._progress_widget)
+        self.container_layout.addWidget(self._progress_widget, alignment = alignment)
 
-        if not self._progress_widget:
-            self._progress_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self._input_id)
-            self._progress_widget.setFixedSize(self._progress_widget.sizeHint())
-            self.progress_container_layout.addWidget(self._progress_widget, alignment = alignment)
-            self._progress_widget.setValue(self._display_value)
-            if self._orientation == QtCore.Qt.Orientation.Vertical:
-                w = 2 + self._progress_widget.width()
-                self.progress_container_widget.setFixedWidth(w)
-            else:
-                h = 2 + self._progress_widget.height()
-                self.progress_container_widget.setFixedHeight(h)
+        if self.device and self.device.is_virtual:
+            self._progress_widget.setReadOnly(False)
+            self._progress_widget.valueChanged.connect(self._value_changed)
 
-            if self.device and self.device.is_virtual:
-                self._progress_widget.setReadOnly(False)
-                self._progress_widget.valueChanged.connect(self._value_changed)
-
-            
-                
+        if self._hooked:
+            # automatic value
+            astate = gremlin.event_handler.AxisState()
+            values = astate.getAxisValues(self._device_guid, self._input_id)
+            if values:
+                # progress bar widget
+                self._progress_widget.setValue(values)        
+        else:
+            # manual value
+            self._progress_widget.setValue(self._value)        
 
         if self._show_calibrated:
             config = gremlin.config.Configuration()
             if config.splitJoystickRepeater:
-                try:
-                    if self._progress_calibrated_widget:
-                        self._progress_calibrated_widget.setValue(self._calibrated_value)
-                except:
-                    # C++ exception
-                    self._progress_calibrated_widget = None
-                if not self._progress_calibrated_widget:
-                    self._progress_calibrated_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self.input_id)
-                    self._progress_calibrated_widget.gradientStartColor = Color.selectGradientAltColor()
-                    self._progress_calibrated_widget.gradientEndColor = Color.selectEndGradientAltColor()
-                    self._progress_calibrated_widget.setFixedSize(self._progress_calibrated_widget.sizeHint())
-                    self.progress_container_layout.addWidget(self._progress_calibrated_widget, alignment = alignment)
-                    if self._orientation == QtCore.Qt.Orientation.Vertical:
-                        w = 4 + self._progress_widget.width() + self._progress_calibrated_widget.width() 
-                        self.progress_container_widget.setFixedWidth(w)
-                    else:
-                        h = 4 + self._progress_widget.height() + self._progress_calibrated_widget.height()
-                        self.progress_container_widget.setFixedHeight(h)
-                    
-                    self._progress_calibrated_widget.setValue(self._calibrated_value)
-                    if self.device and self.device.is_virtual:
-                        self._progress_calibrated_widget.setReadOnly(False)
-                        self._progress_calibrated_widget.valueChanged.connect(self._value_changed)
+                self._progress_calibrated_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self.input_id)
+                self._progress_calibrated_widget.gradientStartColor = Color.selectGradientAltColor()
+                self._progress_calibrated_widget.gradientEndColor = Color.selectEndGradientAltColor()
+                self._progress_calibrated_widget.setFixedSize(self._progress_calibrated_widget.sizeHint())
+                self.container_layout.addWidget(self._progress_calibrated_widget, alignment = alignment)
+                if self._orientation == QtCore.Qt.Orientation.Vertical:
+                    w = 4 + self._progress_widget.width() + self._progress_calibrated_widget.width() 
+                    self.progress_container_widget.setFixedWidth(w)
+                else:
+                    h = 4 + self._progress_widget.height() + self._progress_calibrated_widget.height()
+                    self.progress_container_widget.setFixedHeight(h)
+                
+                self._progress_calibrated_widget.setValue(self._calibrated_value)
+                if self.device and self.device.is_virtual:
+                    self._progress_calibrated_widget.setReadOnly(False)
+                    self._progress_calibrated_widget.valueChanged.connect(self._value_changed)
 
 
         # progress bar value
         if self._show_value:
-
-            try:
-                if self._display_value_widget:
-                    self._display_value_widget.setText(self._label_value) 
-            except:
-                # C++ exception
-                self._display_value_widget = None
-            if not self._display_value_widget:
-                if self.device and self.device.is_virtual:
-                    self._display_value_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self._value)
-                    self._display_value_widget.valueChanged.connect(self._value_changed)
-                else:
-                    self._display_value_widget = QtWidgets.QLabel(self._label_value)
-                self.container_layout.addWidget(self._display_value_widget, alignment = alignment)
+            if self.device and self.device.is_virtual:
+                self._display_value_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self._value)
+                self._display_value_widget.valueChanged.connect(self._value_changed)
+            else:
+                self._display_value_widget = QtWidgets.QLabel(self._label_value)
+            self.container_layout.addWidget(self._display_value_widget, alignment = alignment)
 
 
         # progress bar percentage
         if self._show_percentage:
-            try:
-                if self._display_percent_widget:
-                    self._display_percent_widget.setText(self._label_percentage) 
-            except:
-                # C++ exception
-                self._display_percent_widget = None
-
-            if not self._display_percent_widget:
-                self._display_percent_widget = QtWidgets.QLabel(self._label_percentage)
-                self.container_layout.addWidget(self._display_percent_widget, alignment = alignment)
+            self._display_percent_widget = QtWidgets.QLabel(self._label_percentage)
+            self.container_layout.addWidget(self._display_percent_widget, alignment = alignment)
 
         # progress curve 
-        try:
-            if self._show_curve: 
-            
-                if self._display_curve_widget:
-                    self._display_curve_widget.setText(self._label_curve)
-                    
-                if not self._display_curve_widget:
-                    self._display_curve_widget = QtWidgets.QLabel(self._label_curve)
-                    self.container_layout.addWidget(self._display_curve_widget, alignment = alignment)
-        
-           
-        except:
-            pass
+        if self._show_curve: 
+            self._display_curve_widget = QtWidgets.QLabel(self._label_curve)
+            self.container_layout.addWidget(self._display_curve_widget, alignment = alignment)
 
         self.container_layout.addStretch()
 
@@ -5042,9 +5132,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
     @QtCore.Slot()
     def _ui_ready(self):
         ''' fires when the UI is ready '''
-        if not Shiboken.isValid(self):
-            return
-        self._setValue(self._value, self._curve_value)
+        self._value = self._hook_value
 
     def _cleanup_ui(self):
         ''' item is being deleted '''
@@ -5181,52 +5269,61 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         """Sets the value shown by the widget.
         :param value new value to show
         """
-        if Shiboken.isValid(self):
-            self._setValue(value, curve_value, percent_value, other_value)
+        gremlin.util.InvokeUiMethod(self._set_value_ui, value, curve_value, percent_value, other_value)
+    
 
-    def _setValue(self, value, calibrated_value = None, curve_value = None, percent_value = None, other_value = None):
+    def _set_value_ui(self, value, calibrated_value = None, curve_value = None, percent_value = None, other_value = None):
         ''' internal set value '''
 
         if not Shiboken.isValid(self):
             return
         
+        if self._callback:
+            self._callback(value)
+        
         if value is None:
             return
-        if isinstance(value, list) and value:
-            value = value[0]
-
         
-        if calibrated_value is None:
-            calibrated_value = value
-        
-        if value < self._min_range:
-            value = self._min_range
-        if value > self._max_range:
-            value = self._max_range
-        value += 0   # avoid negative 0 (WHY?)
-        self._value = value
-
-        if curve_value is not None:
-            self._curve_value = curve_value
-            display_value = curve_value
+        if hasattr(value,"__iter__"):
+            # value is [actual, raw, calibrated, curved]
+            display_value = value[0]
+            if calibrated_value is not None and curve_value is not None:
+                value = value[0] # use the first vlaue only if we have other data passed
+            
+            if calibrated_value is None:
+                calibrated_value = value[2]
+            if curve_value is None:
+                curve_value = value[3]
         else:
-            display_value = value
-            self._curve_value = value
+            # single value
+            if calibrated_value is None:
+                calibrated_value = value
+        
+            if value < self._min_range:
+                value = self._min_range
+            if value > self._max_range:
+                value = self._max_range
+            value += 0   # avoid negative 0 (WHY?)
 
+            if curve_value is not None:
+                self._curve_value = curve_value
+                display_value = curve_value
+            else:
+                display_value = value
+                self._curve_value = value
 
-        if self._reverse:
-            display_value = gremlin.util.scale_to_range(display_value, invert=True)
-            calibrated_value = gremlin.util.scale_to_range(calibrated_value, invert=True)
+            if self._reverse:
+                display_value = gremlin.util.scale_to_range(display_value, invert=True)
+                calibrated_value = gremlin.util.scale_to_range(calibrated_value, invert=True)
+                      
+            self._display_value = display_value
+            self._calibrated_value = calibrated_value
 
         if value is None:
             display_value = None
-        else:
-            scaled_value = display_value # self._scale_factor * display_value
-            
-        
-        self._display_value = scaled_value
-        self._calibrated_value = calibrated_value
-    
+       
+        self._value = value
+
         
         if display_value is not None:
             self._label_value = f"{display_value:+0.{self._decimals}f}"
@@ -5247,10 +5344,44 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
                 percent = percent_value
             self._label_percentage = f"{percent:0.1f} %"
 
-        self._update_widgets()
-
         
-        self.valueChanged.emit(self._value, self._curve_value)
+        try:
+            if self._progress_widget and Shiboken.isValid(self._progress_widget):
+                self._progress_widget.setValue(self._value)
+            else:
+                self._update_widgets()
+                return
+
+            if self._show_curve:
+                if self._display_curve_widget and Shiboken.isValid(self._display_curve_widget):
+                    self._display_curve_widget.setText(self._label_curve)
+                else:
+                    self._update_widgets()
+                    return
+
+            if self._show_label:
+                if self._display_label_widget and Shiboken.isValid(self._display_label_widget):
+                    self._display_label_widget.setText(self._label_text)
+                else:
+                    self._update_widgets()
+                    return
+
+            
+            if self._show_value:
+                if self._display_value_widget and Shiboken.isValid(self._display_value_widget):
+                    self._display_value_widget.setText(self._label_value)
+                else:
+                    self._update_widgets()
+                    return
+
+            if self._show_percentage:
+                if self._display_percent_widget and Shiboken.isValid(self._display_percent_widget):
+                    self._display_percent_widget.setText(self._label_percentage)
+                else:
+                    self._update_widgets()
+                    return
+        finally:
+            self.valueChanged.emit(self._value, self._curve_value)
 
            
 
@@ -5365,16 +5496,9 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         if not Shiboken.isValid(self):
             return
         if self._is_hardware_input:
-            #eh = gremlin.event_handler.EventListener()
-            # value = eh._apply_calibration_ex(self._device_guid, self._input_id, raw_value)
-            # curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
-            #print (f"raw: {raw_value:0.3f} calibrated: {value:0.3f} curved: {curve_value:0.3f}")
-            #self.setValue(value, curve_value)
             self._setValue(value)
         else:
             self._setValue(value)
-            #self.setValue(raw_value)
-
 
 
 
@@ -5396,6 +5520,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         else:
             self.setTitle(f"{device.name} - Axes")
 
+        self.show_raw = True # show raw value
         self.axes = {}
         self.value_labels = {}
         self.percent_labels = {}
@@ -5418,6 +5543,10 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 axis_label = QtWidgets.QLabel(f"Axis {index}")
                 axis_id = gremlin.joystick_handling.linear_axis_index(self.device.axismap_list,index)
                 self.index_map[axis_id] = index
+                if self.show_raw:
+                    self.index_map[axis_id + 10] = index
+
+
                 axis = AxisStateWidget(index, show_value = False, show_label=False, show_percentage=False, device = device)
                 calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(device_guid, input_id)
                 axis.setCalibrated(calibration.hasData) # enable calibrated mode dual repeater
@@ -5469,7 +5598,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         gremlin.joystick_handling.set_axis(device_guid, input_id, value)
         #self._set_value(index, value)
 
-    def _set_value(self, index : int, value : float):
+    def _set_value(self, index : int, value : float | list):
         self.axes[index].setValue(value)
         widget = self.value_labels[index]
         if hasattr(widget, "setValue"):
@@ -5493,7 +5622,11 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             )
             index = self.index_map[axis_id]
             value = event.value
-            self._set_value(index, value)
+            if self.show_raw:
+                raw_value = event.raw_value
+                self._set_value(index, [value, raw_value])    
+            else:
+                self._set_value(index, value)
 
 
 class HatWidget(QtWidgets.QWidget):
@@ -5979,7 +6112,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self.setLayout(layout)
         self.vis_type = vis_type
         self._hooked = False
-        #self._create_visuals()
+        self.show_raw = True # true if raw value is displayed
+        
 
     @property
     def device_id(self):
@@ -6161,6 +6295,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _current_axis_update_ui(self, event : gremlin.event_handler.Event):
         for widget in self.widgets:
+            widget.show_raw = self.show_raw
             widget.process_event(event)
 
     def _vjoy_current_axis_update(self, event : gremlin.event_handler.VjoyEvent):
@@ -8274,7 +8409,29 @@ class QHorizontalLine(QtWidgets.QFrame):
         super().__init__(parent)
         self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         self.setLineWidth(size)
+
+def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
+    ''' returns a list of layout widgets '''
+    widgets = []
+    if layout:
+        index = layout.count()
+        while index >= 0:
+            child = layout.itemAt(index)
+            if child is not None:
+                if child.layout():
+                    widgets.extend(get_layout_widgets(child.layout()))
+                elif child.widget():
+                    widgets.append(child.widget())
+            index -= 1
+
+    return widgets        
         
+def getLayoutWidgetHeight(layout, max_height = None):
+    ''' gets the maximum height of all the widgets in a layout - assume a horizontal layout up to maximum height if provided  '''
+    h = max(w.height() for w in get_layout_widgets(layout))
+    if max_height:
+        h = min(h, max_height)
+    return h 
 
 
    

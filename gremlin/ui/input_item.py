@@ -966,10 +966,16 @@ class InputItemListView(ui_common.AbstractView):
         self.item_edit.emit(self, index, self.model.data(index).input_id) # widget, index, data
 
     def _edit_curve_item_cb(self, index : int):
-        self.item_edit_curve.emit(self, index, self.model.data(index))
+        input_item = self.model.data(index)
+        self.item_edit_curve.emit(self, index, input_item)
+        el = gremlin.event_handler.EventListener()
+        el.curve_added.emit(input_item)
 
     def _delete_curve_item_cb(self, index : int):
+        input_item = self.model.data(index)
         self.item_delete_curve.emit(self, index, self.model.data(index))
+        el = gremlin.event_handler.EventListener()
+        el.curve_deleted.emit(input_item)
 
     def _update_value_changed(self, index : int, value : float):
         self.item_input_value_changed.emit(self, index, self.model.data(index), value)
@@ -1525,7 +1531,7 @@ class InputItemWidget(QBoxFrame):
         self._selected = False
         self.setContentsMargins(0,0,0,0)
         
-        debug_layout = False
+        self._debug_layout = False
 
         self.identifier = identifier
         self._input_id = identifier.input_id
@@ -1695,7 +1701,7 @@ class InputItemWidget(QBoxFrame):
         # container icons
         self._action_container_widget, self._action_container_layout = gremlin.ui.ui_common.getVContainer()
         self._action_container_widget.setObjectName("action_container")
-        if debug_layout: self._action_container_widget.setStyleSheet("#action_container { background: yellow; }")
+        if self._debug_layout: self._action_container_widget.setStyleSheet("#action_container { background: yellow; }")
         self._action_icons_container_widget, self._action_icons_container_layout = gremlin.ui.ui_common.getGridContainer()
         self._action_container_layout.addWidget(self._action_icons_container_widget)
         self._setWidgetHeight(self._action_container_widget, 0)
@@ -1705,7 +1711,7 @@ class InputItemWidget(QBoxFrame):
         # description row
         self._description_container_widget, self._description_container_layout = gremlin.ui.ui_common.getHContainer()
         self._setWidgetHeight(self._description_container_widget, 0)
-        if debug_layout:self._description_container_widget.setStyleSheet("background: blue;")
+        if self._debug_layout:self._description_container_widget.setStyleSheet("background: blue;")
         self._container_layout.addWidget(self._description_container_widget)
         
         self._input_description_widget = None
@@ -1714,27 +1720,27 @@ class InputItemWidget(QBoxFrame):
         # repeater
         self._repeater_container_widget, self._repeater_container_layout = gremlin.ui.ui_common.getVContainer()
         self._repeater_container_widget.setContentsMargins(0,0,0,2)
-        self._setWidgetHeight(self._repeater_container_widget, 0)
-        if debug_layout:self._repeater_container_widget.setStyleSheet("background: red;")
+        #self._setWidgetHeight(self._repeater_container_widget, 0)
+        if self._debug_layout:self._repeater_container_widget.setStyleSheet("background: red;")
         self._container_layout.addWidget(self._repeater_container_widget)
         # self._container_layout.addWidget(QtWidgets.QLabel("A"))
 
         # comment row
         self._comment_container_widget, self._comment_container_layout = gremlin.ui.ui_common.getHContainer()
         self._setWidgetHeight(self._comment_container_widget, 0)
-        if debug_layout:self._comment_container_widget.setStyleSheet("background: orange;")
+        if self._debug_layout:self._comment_container_widget.setStyleSheet("background: orange;")
         self._container_layout.addWidget(self._comment_container_widget)
 
         # custom content row
         self._custom_container_widget, self._custom_container_layout = gremlin.ui.ui_common.getVContainer()
         self._setWidgetHeight(self._custom_container_widget, 0)
         self._custom_container_widget.setContentsMargins(0,0,0,4)
-        if debug_layout:self._custom_container_widget.setStyleSheet("background: cyan;")
+        if self._debug_layout:self._custom_container_widget.setStyleSheet("background: cyan;")
         self._container_layout.addWidget(self._custom_container_widget)
 
         # status row
         self._status_container_widget, self._status_container_layout = gremlin.ui.ui_common.getVContainer()
-        if debug_layout:self._status_container_widget.setStyleSheet("background: gray;")
+        if self._debug_layout:self._status_container_widget.setStyleSheet("background: gray;")
         self._setWidgetHeight(self._status_container_widget, 0)
 
         self._status_widget = None
@@ -1742,7 +1748,7 @@ class InputItemWidget(QBoxFrame):
         
         # container ID row
         self._container_id_widget, self._container_id_layout = gremlin.ui.ui_common.getVContainer()
-        if debug_layout:self._container_id_widget.setStyleSheet("background: magenta;")
+        if self._debug_layout:self._container_id_widget.setStyleSheet("background: magenta;")
         self._setWidgetHeight(self._container_id_widget, 0)
         
         self._container_layout.addWidget(self._container_id_widget)
@@ -1758,6 +1764,8 @@ class InputItemWidget(QBoxFrame):
         # hook mapping changed event
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.connect(self._mapping_changed_cb)
+        el.curve_deleted.connect(self._curve_changed_cb)
+        el.curve_added.connect(self._curve_changed_cb)
 
         # update mapping action icons
         self._update_repeater() # create the correct repeater widget
@@ -1781,7 +1789,8 @@ class InputItemWidget(QBoxFrame):
     def addWidget(self, widget):
         ''' adds a widget to the container '''
         self._custom_container_layout.addWidget(widget)
-        self._custom_container_widget.setMaximumHeight(200)
+        h = sum(w.height() for w in gremlin.util.get_layout_widgets(self._custom_container_layout))
+        self._custom_container_widget.setMaximumHeight(h + 5)
 
     def clearWidgets(self):
         ''' clears the custom container layout and hides it '''
@@ -1906,7 +1915,7 @@ class InputItemWidget(QBoxFrame):
         return 28
     
     def _setWidgetHeight(self, widget : QtWidgets.QWidget, h):
-        ''' sets min/max height'''
+        ''' sets fixed min/max height'''
         if Shiboken.isValid(widget):
             widget.setMinimumHeight(h)
         widget.setMaximumHeight(h)
@@ -1919,7 +1928,7 @@ class InputItemWidget(QBoxFrame):
 
         if self._input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.ModeControl, InputType.State):
             gremlin.util.clear_layout(self._repeater_container_layout)
-            self._setWidgetHeight(self._repeater_container_widget, 0)
+            self._setWidgetHeight(self._repeater_container_widget, 0) # turn off repeater for non axis widgets
             self.axis_widget = None
             self.button_widget = None
             return
@@ -1948,9 +1957,9 @@ class InputItemWidget(QBoxFrame):
                     if self.identifier.is_axis:
                         # axis
                         if not current_axis_widget:
-                            widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False, show_value = False)
-                            calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
-                            widget.show_calibrated = calibration.hasData # enable calibrated mode dual repeater
+                            widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
+                            # calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
+                            # widget.show_calibrated = calibration.hasData # enable calibrated mode dual repeater
 
                             widget.data = self
                             self.axis_widget = widget
@@ -1990,10 +1999,15 @@ class InputItemWidget(QBoxFrame):
         if widget:
             # widget created
             widget.setMaximumWidth(200)
+            if self._debug_layout:
+                widget.setStyleSheet("background: purple;")
             widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
             self._repeater_container_layout.addWidget(widget)                
             self._repeater_container_layout.addStretch()
-            self._setWidgetHeight(self._repeater_container_widget, 16)
+            height = 50 # self._repeater_container_widget.sizeHint().height()
+            self._setWidgetHeight(self._repeater_container_widget, height)
+
+           
 
 
 
@@ -2088,6 +2102,11 @@ class InputItemWidget(QBoxFrame):
         if self.findAction(action):
             # find the widget corresponding to this action
             self.clear_action_icon(self.data, action)
+
+    def _curve_changed_cb(self, input_item):
+        ''' fires when a curve is deleted '''
+        if input_item == self:
+            self._update_repeater()
 
     def _mapping_changed_cb(self, item_data):
         ''' called when a mapping changes - sends the item being changed '''
@@ -2626,6 +2645,7 @@ class InputItemWidget(QBoxFrame):
         dialog = gremlin.ui.axis_calibration.CalibrationDialogEx(self.data.device_guid, self.data.input_id)
         dialog.exec()
         self._update_axis_icons()
+        self._update_repeater()
 
     QtCore.Slot()
     def _clear_curve_cb(self):

@@ -695,6 +695,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.chained_input = self.action_data.input_item.is_action
 
             # create UI components
+            self._repeater_value_widget = None
+            self._repeater_axis_widget = None
+            self._relative_pulse_widget = None
 
             self._create_override_input_type()
             self._create_selector()
@@ -839,18 +842,32 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_repeater(self):
         ''' creates an input repeater '''
-
-        self._repeater_axis_widget = gremlin.ui.ui_common.AxisStateWidget(orientation = QtCore.Qt.Orientation.Horizontal,  show_percentage=False, show_label=False, show_value = True, decimals = 3)
+        self._repeater_axis_widget = gremlin.ui.ui_common.QProgressBar(orientation = QtCore.Qt.Orientation.Horizontal)
+        # get the current value
+        value = self.action_data.get_filtered_axis_value()
+        self._repeater_axis_widget.setValue(value)
+        self._repeater_value_widget = QtWidgets.QLabel(f"{value:0.4f}")
         #self._repeater_button_widget = gremlin.ui.ui_common.ButtonStateWidget()
         widgets = [
             "Output:",
             self._repeater_axis_widget,
-            #self._repeater_button_widget,
+            self._repeater_value_widget
         ]
-        self.container_repeater_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height)
-        self.main_layout.addWidget(self.container_repeater_widget)
         
-
+        self.container_repeater_widget, self.container_repeater_layout = gremlin.ui.ui_common.getHContainer(widgets)
+        self.main_layout.addWidget(self.container_repeater_widget)
+        #self.container_repeater_widget.setStyleSheet("background: orange;")
+        h = gremlin.ui.ui_common.getLayoutWidgetHeight(self.container_repeater_layout, 32)
+        self.container_repeater_widget.setMaximumHeight(h + 8)
+        
+    def _update_repeater_value(self, value):
+        ''' callback for the output repeater when it changes values '''
+        if self._repeater_value_widget and Shiboken.isValid(self._repeater_value_widget):
+            if hasattr(value, "__iter__"):
+                # compound value
+                value = value[0]
+            
+            self._repeater_value_widget.setText(f"{value:0.4f}")
 
     def _update_repeater(self, value = None):
         ''' updates the input repeater '''
@@ -887,6 +904,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                         return
                     axis_widget_visible = True
                     self._repeater_axis_widget.setValue(value)
+                    self._repeater_value_widget.setText(f"{value:+0.4f}")
                 case VjoyAction.VJoyMergeAxis:
                     # axis merging
                     if not Shiboken.isValid(self._repeater_axis_widget):
@@ -4968,7 +4986,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     if verbose: curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
                     value = curve_value
 
-                if verbose: syslog.info(f"Filter: applied curve: {curve_msg}")
+                if verbose: syslog.info(f"AXIS Filter: applied curve: {curve_msg}")
 
                 
 
@@ -4980,9 +4998,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                         target_min=self.output_range_min,
                         target_max=self.output_range_max,
                         invert = is_reverse)
-                if verbose: syslog.info(f"Filter: using source: [{source}] applied filter: [{axis_value:0.3f}]  scaled: {is_scaled} reversed: {is_reverse} -> Filtered: [{value:0.3f}]")    
+                if verbose: syslog.info(f"AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}]  scaled: {is_scaled} reversed: {is_reverse} -> Filtered: [{value:0.3f}]")    
             else:
-                if verbose: syslog.info(f"Filter: using source: [{source}] applied filter: [{axis_value:0.3f}] -> Filtered: [{value:0.3f}]")
+                if verbose: syslog.info(f"AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}] -> Filtered: [{value:0.3f}]")
                 
 
 

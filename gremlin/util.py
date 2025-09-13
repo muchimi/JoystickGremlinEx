@@ -1981,7 +1981,6 @@ def to_byte_string(source) -> tuple:
     if isinstance(source, bytes):
         return (source.decode(), source)
     return (source, source.encode('utf-8'))
-    
 
 def _singleshot(callback):
     ''' runs on Ui thread - waits for items to be processed '''
@@ -1993,7 +1992,7 @@ def _get_singleshot_callback(callback):
 
 def singleShot(callback):
     ''' fires callback in a thread - returns immediately to caller '''
-    timer = threading.Timer(0, lambda: InvokeUiMethod(_get_singleshot_callback(callback)))
+    timer = threading.Timer(0.02, lambda: InvokeUiMethod(_get_singleshot_callback(callback)))
     timer.start()
     
 def cubic_progression(num_points, start, end):

@@ -288,9 +288,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         print ("update curve data")
         data.curve_data.curve_update()
 
-        # update the registered curve state
-        eh = gremlin.event_handler.EventListener()
-        eh.registerInput(data)
+        # # update the registered curve state
+        # eh = gremlin.event_handler.EventListener()
+        # eh.registerInput(data)
 
         # renable highlighting
         gremlin.shared_state.pop_suspend_highlighting()
@@ -313,6 +313,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if verbose: syslog.info("delete curve data")
             data.curve_data = None
             self._update_curve_icon(index, data)
+            
+            
         
 
 

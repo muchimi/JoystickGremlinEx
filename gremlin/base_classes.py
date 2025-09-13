@@ -529,8 +529,6 @@ class JoystickHook:
     @QtCore.Slot()
     def _hook_ui_ready(self):
         ''' called when UI is ready '''
-        el = gremlin.event_handler.EventListener()
-        el.ui_ready.disconnect(self._hook_ui_ready)
         self._hook_profile_stop() # enable hook  
 
     @QtCore.Slot()
@@ -561,7 +559,7 @@ class JoystickHook:
     def _hook_joystick_event(self, event):
         if gremlin.shared_state.is_repeater_suspended():
             return
-        if self._callback:
+        if self._hook_callback:
             if not event.is_axis:
                 return 
             if self._input_type != event.event_type:
@@ -573,21 +571,21 @@ class JoystickHook:
                 self._last_state_value = None # different axis moved
                 return
             
-            
+            astate = gremlin.event_handler.AxisState()
 
-            self._hook_value = event.value
+            # values are [actual, raw, calibrated, curved]
+            values = astate.getAxisValues(self._device_guid, self._input_id, event.value)
+            self._hook_value = values # event.value
             should_process = True
             
             if self._calibrate:
                 # get calibrated value
-                calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
-                value, should_process = calibration.getValue(event.value, normalize = False, filter = True) # input is already normalized
-                self._hook_calibrated_value = value
+                self._hook_calibrated_value = values[2] # calibration data 
             else:
-                self._hook_calibrated_value = self._hook_value
+                self._hook_calibrated_value = values[0]
 
             if should_process:
-                self._callback(self._hook_value, self._hook_calibrated_value)
+                self._hook_callback(self._hook_value)
             
             if self._is_state:
                 # see if we should trigger a highlight change
@@ -637,7 +635,7 @@ class JoystickHook:
         
         assert device_guid is not None,"Device GUID must be specified"
 
-        self._callback = callback
+        self._hook_callback = callback
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
@@ -659,14 +657,14 @@ class JoystickHook:
 
     def setHookCallback(self, callback):
         ''' updates the callback on value change '''
-        self._callback = callback
+        self._hook_callback = callback
         if callback:
             # update the current value
             callback(self._hook_value) 
 
     def getHookCallback(self):
         ''' gets the callback used for value change'''
-        return self._callback
+        return self._hook_callback
         
 
     def _hook_update_value(self):
@@ -676,16 +674,14 @@ class JoystickHook:
                 raw_value = self.input_id.axis_value
                 self._hook_value = raw_value
             elif self._is_hardware_input:
-                raw_value = gremlin.joystick_handling.get_axis(self.device_guid, self.input_id)
-                self._hook_value = raw_value
-            
-            if self._calibrate:
-                # apply calibration
-                calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
-                self._hook_value = calibration.getValue(raw_value)
+                sdata = gremlin.event_handler.AxisState()
 
-            if self._callback:
-                self._callback(self._hook_value, self._hook_calibrated_value)
+                # get the values as [actual, raw, calibrated, curved]
+                values = sdata.getAxisValues(self.device_guid, self.input_id)
+                self._hook_value = values
+
+            if self._hook_callback:
+                self._hook_callback(self._hook_value)
 
 class BaseCallbacks(QtCore.QObject):
     ''' base class implementing callback functionality'''

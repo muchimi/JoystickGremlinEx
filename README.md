@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T62)
+- New: Input Viewer: shows "raw" value and "curved" value for an input.
+
 ### (m76T61A)
 - Added: curve verbose mode to provide information on curve processing in the log file.
 - Updated: refactored input and output devices to filter out unwanted directinput data.
