@@ -258,7 +258,7 @@ class OscInputWidget(QtWidgets.QWidget):
         self._axis_max_widget.setMinimum(0)
         self._axis_max_widget.setValue(max_value)
         self._axis_max_widget.valueChanged.connect(self._range_changed)
-        self._axis_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=False,orientation=QtCore.Qt.Orientation.Horizontal, show_curve=False)
+        self._axis_repeater_widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
         self._axis_repeater_widget.setRange(min_value, max_value)
         
         self._axis_container_widget, self._axis_container_layout = gremlin.ui.ui_common.getHContainer()

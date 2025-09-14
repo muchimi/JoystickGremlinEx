@@ -430,10 +430,11 @@ class DeviceSummary:
         data : _DeviceSummary
             The data received from DILL and to be held by this instance
         """
+        import gremlin.util
         self._connected = False # true if device is connected
         if data is not None:    
             self.device_guid = GUID(data.device_guid)
-            self.device_id = str(self.device_guid)
+            self.device_id = gremlin.util.normalize_guid(self.device_guid)
             self._device_type = gremlin.types.DeviceType.Joystick
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id

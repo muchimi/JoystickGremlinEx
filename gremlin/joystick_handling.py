@@ -440,12 +440,8 @@ def registerSpecialDevice(dev):
     ''' adds a special device to the tracking list '''
     assert (_joystick_initialized)
     device_guid = dev.device_guid
-    device_id = dev.device_id
-    if dev.device_type ==  DeviceType.VJoy:
-        pass
-    if not device_id in _joystick_device_guid_map:
+    if not device_guid in _joystick_device_guid_map:
         _joystick_device_guid_map[device_guid] = dev
-        _joystick_device_guid_map[device_id] = dev
         syslog.info(f"SPECIAL DEVICE: {dev.device_id} / {dev.device_type.name} -> {dev.name}")
 
 
@@ -453,14 +449,12 @@ def removeDevice(dev):
     ''' removes a device from the tracking list'''
     global _all_joystick_devices, _vjoy_devices, _joystick_devices
     device_guid = dev.device_guid
-    device_id = dev.device_id
-    if device_id in _joystick_device_guid_map:
+    if device_guid in _joystick_device_guid_map:
         del _joystick_device_guid_map[device_guid]
-        del _joystick_device_guid_map[device_id]
         
         _all_joystick_devices = [d for d in _all_joystick_devices if d.device_guid != device_guid]
         if dev.device_type == DeviceType.VJoy:
-            _vjoy_devices = [d for d in _vjoy_devices if d.device_id != device_id]
+            _vjoy_devices = [d for d in _vjoy_devices if d.device_guid != device_guid]
             
         _joystick_devices = [d for d in _joystick_devices if d.device_guid != device_guid]
 
@@ -473,6 +467,7 @@ def device_name_from_guid(device_guid) -> str:
         device_guid = gremlin.util.parse_guid(device_guid) # GUID expected
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
+    # not found - check for any updated devices
     joystick_devices_update()
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
@@ -481,7 +476,7 @@ def device_name_from_guid(device_guid) -> str:
     
 def known_devices() -> list:
     ''' gets the list of device GUID (strings) known to GremlinEx '''
-    return [guid for guid in _joystick_device_guid_map.keys() if isinstance(guid, str)]
+    return [guid for guid in _joystick_device_guid_map.keys()]
 
 def getDevice(device_guid):
     ''' gets a device summary '''
@@ -674,7 +669,7 @@ def _scan_dinput():
             syslog.info(f"\tindex: [{device_index}] {str(dev)}")
             _joystick_devices.append(dev)
             _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
-            _joystick_device_guid_map[dev.device_id] = dev # key by string ID
+            
 
 
 

@@ -2195,6 +2195,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_device
+            verbose = True
             verbose_detailed = verbose and config.verbose_mode_extra
 
             if verbose_detailed: syslog.info("CREATE TAB: start")
@@ -2285,8 +2286,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 #tab_label = device.name.strip()
                 
                 
-                device_guid = str(device.device_guid)
+                device_guid = device.device_id
                 device_name =self._get_device_name(device_guid)
+                if "Throttle" in device_name:
+                    pass
                 if device_name:
                     widget = self.getRegisteredWidget(device_guid)
                     if not widget:
@@ -2357,7 +2360,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         device_name
                     )
 
-                    device_guid = str(device.device_guid)
+                    device_guid = gremlin.util.normalize_guid(device.device_guid)
                     widget = self.getRegisteredWidget(device_guid)
                     if not widget:
                         widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
@@ -2386,7 +2389,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 DeviceType.to_string(DeviceType.Keyboard)
             )
 
-            device_guid = str(gremlin.shared_state.keyboard_tab_guid)
+            device_guid = gremlin.util.normalize_guid(gremlin.shared_state.keyboard_tab_guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
           
             widget = self.getRegisteredWidget(device_guid)
@@ -2409,7 +2412,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             
             # =======================================================
             # Create MIDI tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
-            device_guid = str(gremlin.shared_state.midi_tab_guid)
+            device_guid = gremlin.util.normalize_guid(gremlin.shared_state.midi_tab_guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
           
             midi_device_guid = device_guid
@@ -2442,7 +2445,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # =======================================================
             # Create OSC tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
-            device_guid = str(gremlin.shared_state.osc_tab_guid)
+            device_guid = gremlin.util.normalize_guid(gremlin.shared_state.osc_tab_guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
            
             osc_device_guid = device_guid
@@ -2478,7 +2481,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             oo = gremlin.ui.octavi_device.OctaviInterface()
             if oo.deviceFound():
                 guid = gremlin.shared_state.octavi_tab_guid
-                device_guid = str(guid)
+                device_guid = gremlin.util.normalize_guid(guid)
                 device_type = DeviceType.OctaviIFR1
                 device_profile = self.profile.get_device_modes(
                     gremlin.ui.octavi_device.OctaviDeviceTabWidget.device_guid,
@@ -2504,7 +2507,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # =======================================================
             # create mode control tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
             guid = gremlin.shared_state.mode_tab_guid
-            device_guid = str(guid)
+            device_guid = gremlin.util.normalize_guid(guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
 
             device_profile = self.profile.get_device_modes(
@@ -2532,7 +2535,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # =======================================================
             # create state tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
             guid = gremlin.shared_state.state_tab_guid
-            device_guid = str(guid)
+            device_guid = gremlin.util.normalize_guid(guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
             widget = self.getRegisteredWidget(device_guid)
             if not widget:
@@ -2554,7 +2557,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # =======================================================
             # Add profile configuration tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
 
-            device_guid = str(gremlin.shared_state.settings_tab_guid)
+            device_guid = gremlin.util.normalize_guid(gremlin.shared_state.settings_tab_guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
             widget = self.getRegisteredWidget(device_guid)
             if not widget:
@@ -2572,7 +2575,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             
             # =======================================================
             # Add a plugin custom modules tab
-            device_guid = str(gremlin.shared_state.plugins_tab_guid)
+            device_guid = gremlin.util.normalize_guid(gremlin.shared_state.plugins_tab_guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
             widget = self.getRegisteredWidget(device_guid)
             if not widget:
@@ -2768,7 +2771,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _find_tab_data_guid(self, search_guid):
         ''' gets tab data based on the device guid '''
         if not isinstance(search_guid,str):
-            search_guid = str(search_guid) # tab map stores the GUID as a string
+            search_guid = gremlin.util.normalize_guid(search_guid) # tab map stores the GUID as a string
         tab_map = self._get_tab_map()
         data = [(device_guid, device_name, device_type, tab_index) for device_guid, device_name, device_type, tab_index in tab_map.values() if device_guid == search_guid]
         if data:

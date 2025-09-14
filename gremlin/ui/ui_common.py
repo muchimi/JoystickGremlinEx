@@ -136,14 +136,24 @@ class Color():
     @staticmethod
     def ChannelColors():
         ''' pairs of channel colors'''
-        return [
-            ("#448044","#61BB61"),
-            ("#677517","#ACC425"),
-            ("#177533","#25C4B7"),
-            ("#5F1775","#B725C4"),
-            ("#174875","#504EC0"),
-            ("#A7A7A7","#E4E4E4"),
-        ]
+        if gremlin.shared_state.is_dark_theme:
+            return [
+                ("#448044","#61BB61"),
+                ("#677517","#ACC425"),
+                ("#177533","#25C4B7"),
+                ("#5F1775","#B725C4"),
+                ("#174875","#504EC0"),
+                ("#A7A7A7","#E4E4E4"),
+            ]
+        else:
+            return [
+                ("#448044","#61BB61"),
+                ("#7A8B14","#8DA311"),
+                ("#177533","#25C4B7"),
+                ("#5F1775","#B725C4"),
+                ("#174875","#504EC0"),
+                ("#494949","#858585"),
+            ]
     
     @staticmethod
     def extraChannelC1Color():
@@ -5616,31 +5626,29 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         axes_layout = QtWidgets.QGridLayout()
         axes_layout.setSpacing(0)
         axis_list = device.axis_index_list() 
-
+        name_index = 0
         for i in range(8): 
             index = i + 1
             
             widget,layout = getVContainer()
             # widget.setStyleSheet("border: 1px solid;")
             widget.setFixedWidth(80)
+            sd = gremlin.event_handler.AxisState()
 
-            device_guid = device.device_guid
             if index in axis_list:
                 
                 input_id = index
-                axis_label = QtWidgets.QLabel(f"Axis {index}")
                 axis_id = gremlin.joystick_handling.linear_axis_index(self.device.axismap_list,index)
+                axis_name = device.axis_names[name_index]
+                name_index +=1
+                axis_label = QtWidgets.QLabel(f"Axis {axis_name}")
                 self.index_map[axis_id] = index
-                if self.show_raw:
-                    self.index_map[axis_id + 10] = index
-
-
-                axis = AxisStateWidget(index, show_value = False, show_label=False, show_percentage=False, device = device)
-                calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(device_guid, input_id)
-                axis.setCalibrated(calibration.hasData) # enable calibrated mode dual repeater
-
-                value = gremlin.joystick_handling.get_axis(device.device_guid, index)
-                #print (f"Axis {axis_id} value: {value:0.3f}")
+ 
+                axis_widget = QHookedProgressBar()
+                values = sd.getAxisValues(device.device_guid, input_id)    
+                value = values[0]
+                #value = gremlin.joystick_handling.get_axis(device.device_guid, index)
+                
                 if self.device.is_virtual:
                     value_widget = QFloatLineEdit(data = index)
                     value_widget.valueChanged.connect(self._value_changed)
@@ -5648,14 +5656,16 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                     value_widget = QtWidgets.QLabel(f"{value:+0.3f}")
 
                 #axis.setValue(value)
-                self.axes[index] = axis
+                self.axes[index] = axis_widget
                 self.value_labels[index] = value_widget
                 percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
                 
                 percent_label = QtWidgets.QLabel(f"{percent:0.1f} %")
                 self.percent_labels[index] = percent_label
-                axis.setValue(value)
-                layout.addWidget(axis)
+                axis_widget.setValue(values)
+
+                bar_container, _ = getHContainer(["||",axis_widget,"||"]) # centered horizontally
+                layout.addWidget(bar_container)
 
                 row = 0
                 axes_layout.addWidget(axis_label, row, i, alignment=QtCore.Qt.AlignCenter)    
@@ -5689,6 +5699,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
     def _set_value(self, index : int, value : float | list):
         self.axes[index].setValue(value)
         widget = self.value_labels[index]
+        if hasattr(value,"__iter__"):
+            value = value[0]
         if hasattr(widget, "setValue"):
             widget.setValue(value)
         else:
@@ -5708,13 +5720,14 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 self.device.axismap_list,
                 event.identifier
             )
-            index = self.index_map[axis_id]
+            axis_index = self.index_map[axis_id]
             value = event.value
             if self.show_raw:
-                raw_value = event.raw_value
-                self._set_value(index, [value, raw_value])    
+                sd = gremlin.event_handler.AxisState()
+                values = sd.getAxisValues(self.device.device_guid, axis_index)
+                self._set_value(axis_index, values)    
             else:
-                self._set_value(index, value)
+                self._set_value(axis_index, value)
 
 
 class HatWidget(QtWidgets.QWidget):
@@ -5977,19 +5990,33 @@ class AxesTimeline(QtWidgets.QGroupBox):
         else:
             self.setTitle(f"{device.name} - Axes")
 
+        
+
         self.setLayout(QtWidgets.QVBoxLayout())
+        layout = self.layout()
+        font = QtGui.QFont("Arial", 8)
+        self.scale_widget, _ = getVContainer(['+1',"||","0","||","-1"], font = font)
+        self.scale_widget.setMaximumWidth(20)
         self.plot_widget = TimeLinePlotWidget()
         self.legend_layout = QtWidgets.QHBoxLayout()
-        self.legend_layout.addStretch()
+        
         colors = Color.PenColors()
         for i in range(device.axis_count):
             index = device.axismap_list[i].axis_index
-            label = QtWidgets.QLabel(f"Axis {index:d}")
+            axis_name = device.axis_names[i]
+            label = QtWidgets.QLabel(f"Axis {axis_name}")
             css = f"QLabel {{ color: {colors.get(index,"#000000")}; font-weight: bold }}"
             label.setStyleSheet(css)
             self.legend_layout.addWidget(label)
-        self.layout().addWidget(self.plot_widget)
-        self.layout().addLayout(self.legend_layout)
+
+        self.legend_layout.addStretch()
+
+
+        self.timeline_container, _ = getHContainer([self.scale_widget, self.plot_widget])
+        self.scale_widget.setMinimumHeight(150)
+        layout.addWidget(self.timeline_container)
+        layout.addLayout(self.legend_layout)
+
 
     def add_point(self, value, series_id):
         """Adds a new point to the timline.
@@ -5997,6 +6024,8 @@ class AxesTimeline(QtWidgets.QGroupBox):
         :param value the value to add
         :param series_id id of the axes to which to add the value
         """
+        # invert the point
+        value *= -1.0
         self.plot_widget.add_point(value, series_id)
 
 
@@ -6103,8 +6132,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         # p.begin(self)
         p.setRenderHint(self._render_flags)
 
-        self._pixmap.scroll(-self._step_size, 0, QtCore.QRect(0, 0, self._pixmap.width(), self._pixmap.height())
-        )
+        self._pixmap.scroll(-self._step_size, 0, QtCore.QRect(0, 0, self._pixmap.width(), self._pixmap.height()))
         p.eraseRect(self._pixmap.width() - self._step_size, 0, 1,self._pixmap.height())
 
         # Draw vertical line in one second intervals
@@ -6201,6 +6229,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self.vis_type = vis_type
         self._hooked = False
         self.show_raw = True # true if raw value is displayed
+        self._as = gremlin.event_handler.AxisState()
         
 
     @property
@@ -6223,7 +6252,10 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             self._temporal_axis_update(event)
             for widget in self.widgets:
                 for input_id in self._device.axis_index_list():
-                    value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
+                    values = self._as.getAxisValues(self.device_guid, input_id)
+                    value= values[0]
+                    # syslog.info(f"input: {input_id} value: {value:0.3f}")
+                    #value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
                     widget.add_point(value, input_id)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._button_hat_update(event)
@@ -8523,7 +8555,7 @@ def getLayoutWidgetHeight(layout, max_height = None):
 
 
    
-def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, right_stretch = True, alignment = None, set_alignment = True, min_height = None, use_vcontainers = False):
+def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, right_stretch = True, alignment = None, set_alignment = True, min_height = None, use_vcontainers = False, font = None):
     ''' gets a qt H container widget 
     
     :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically, use "|" for separator, "||" to insert a stretch
@@ -8560,6 +8592,8 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
                         continue
                     else:
                         item = QtWidgets.QLabel(item)
+                        if font:
+                            item.setFont(font)
                 if use_vcontainers:
                     item, _ = getVContainer(item)
                     
@@ -8588,7 +8622,7 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
     return (widget, layout)
     
 
-def getVContainer(widget_or_list = None, label = None, alignment = None, parent = None):
+def getVContainer(widget_or_list = None, label = None, alignment = None, font = None, parent = None):
     ''' gets a qt H container widget '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QVBoxLayout(widget)
@@ -8607,7 +8641,17 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, parent 
         if isinstance(widget_or_list, list)  or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
                 if isinstance(item, str):
-                    layout.addWidget(QtWidgets.QLabel(item))    
+                    if item == "|": 
+                        # separator
+                        item = QHorizontalSeparator()
+                    elif item == "||":
+                        layout.addStretch(1)
+                        continue
+                    else:
+                        item = QtWidgets.QLabel(item)
+                        if font:
+                            item.setFont(font)
+                    layout.addWidget(item)    
                 else:
                     layout.addWidget(item)
         else:

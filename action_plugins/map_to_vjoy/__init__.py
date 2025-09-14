@@ -1727,7 +1727,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             return
         
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
-            # allow any device part of the merge operation to update 
+            # allow event processing for any device part of the merge operation
             valid_guids = [data.device_id for data in self.action_data._merge_data]
             valid_guids.append(gremlin.util.normalize_guid(self.action_data.hardware_device_guid))
             device_guid = gremlin.util.normalize_guid(event.device_guid)
@@ -1749,7 +1749,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         value = event.value
         
         if self.curve_update_handler:
-            # update the dynamic curve widget 
+            # update the dynamic curve widget if active
             self.curve_update_handler(value)
         
         gremlin.util.InvokeUiMethod(self._update_repeater, value) # ensure on UI thread

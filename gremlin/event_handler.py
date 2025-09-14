@@ -1068,7 +1068,7 @@ class EventListener:
 		is_virtual = device.is_virtual if device is not None else False
 		if is_virtual and self.js.inputIgnored(data.device_guid):
 			# ignore if the deviced is set to input ignore
-			syslog.info(f"Ignore input: {device.name} input: {event.input_index} type: {event.input_type}")
+			if verbose: syslog.info(f"Ignore input: {device.name} input: {event.input_index} type: {event.input_type}")
 			return
 		
 		
@@ -2903,6 +2903,7 @@ class AxisState():
 	
 	def getAxisData(self, device_guid, input_id):
 		if device_guid:
+			device_guid = gremlin.util.normalize_guid(device_guid)
 			key = self._get_key(device_guid, input_id)
 			if key in self._data:
 				return self._data[key]
@@ -2980,7 +2981,7 @@ class AxisState():
 			key = event.callbackKey # unique key for this event, device, and input
 			if process_key is not None:
 				key = (key, process_key) # hook to that key only 
-				
+
 			current_value = event.value
 			now = time.time()
 			if key in self._last_axis_values:

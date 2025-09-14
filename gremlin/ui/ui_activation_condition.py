@@ -494,7 +494,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.device_selector_widget.currentIndexChanged.connect(self._device_selected)
         self.input_selector_widget = ui_common.QLimitedComboBox()
         self.input_selector_widget.currentIndexChanged.connect(self._input_selected)
-        self.axis_repeater_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+        self.axis_repeater_widget = ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
         self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
         self.use_calibrated_input_widget = QtWidgets.QCheckBox("Use calibrated input")

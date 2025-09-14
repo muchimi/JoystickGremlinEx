@@ -1801,7 +1801,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.container_repeater_widget.setContentsMargins(0,0,0,0)
         self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
         self.container_repeater_layout.setContentsMargins(0,0,0,0)
-        self.reapeater_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal)
+        self.reapeater_widget = ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
 
 
 

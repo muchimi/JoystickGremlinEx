@@ -203,7 +203,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
 
 
-            self.axis_widget = gremlin.ui.ui_common.AxisStateWidget(orientation = QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+            self.axis_widget = gremlin.ui.ui_common.QHookedProgressBar(orientation = QtCore.Qt.Orientation.Horizontal)
             
             self.output_mode_widget = gremlin.ui.ui_common.QComboBox()
             self.output_container_widget = QtWidgets.QWidget()
