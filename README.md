@@ -15,12 +15,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T62)
-- API: axis input and tracking of calibrated and curve data refactored and centralized to a common API.
-- New: axis repeaters will include multiple channels. The base channel is the output value. If the output value has transforms, they will be displayed as additional channels (bars). If the input is both calibrated and curved, the repeater will display three bars, output, calibrated and curved.  GremlinEx applies calibration first, followed by curves.  This was added to better visualize axis data and transforms at design time.
-- Changed: Input viewer time graph has +1 at the top, matching the usual orientation of the Cartesian coordinate system and the repeaters.
-- issue: duplicated tab names
-- issue: reorder of tabs
-- Improved: vjoy remap design time performance.
+- API: axis input and computation of calibrated and curve data was refactored and centralized.
+- New: design time axis repeaters include multiple channels. If the axis value has transforms, each will be displayed as an additional channels (bars). If the input is both calibrated and curved, the repeater will display three bars, output, calibrated and curved.  GremlinEx applies calibration first, followed by curves.  This was added to better visualize axis data and the impact of transforms at design time.
+- Changed: Input viewer Y up to match the usual orientation of the Cartesian coordinate system and the visualization of vertical repeaters.
+- Improved: vjoy remap design time performance
+- 
 
 
 ### (m76T61A)

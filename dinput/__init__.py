@@ -432,6 +432,7 @@ class DeviceSummary:
         """
         import gremlin.util
         self._connected = False # true if device is connected
+        self.disabled = False # true if the device is disabled in GremlinEx
         if data is not None:    
             self.device_guid = GUID(data.device_guid)
             self.device_id = gremlin.util.normalize_guid(self.device_guid)
@@ -439,6 +440,7 @@ class DeviceSummary:
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id
             self.joystick_id = data.joystick_id
+            
             # try various encodings of the byte string as it can be finicky
             encodings = ["utf-8","unicode_escape","latin-1"]
             self.name = ""

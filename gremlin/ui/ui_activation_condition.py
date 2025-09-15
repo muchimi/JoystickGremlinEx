@@ -110,7 +110,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         self.container_condition_view.setModel(self.container_condition_model)
         
         self.container_condition_frame_layout.addWidget(self.container_condition_view)
-        self.container_condition_frame_layout.addStretch()
+        #self.container_condition_frame_layout.addStretch()
 
         
         self.main_layout.addWidget(self.container_condition_frame_widget)

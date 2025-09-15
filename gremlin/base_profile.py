@@ -3585,15 +3585,48 @@ class Profile():
         ''' gets the graph mode node for the given name '''
         return anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
 
+    def find_input(self, device_guid, input_id):
+        ''' finds the input item for the give device_guid, input_id  '''
+        device_guid = gremlin.util.normalize_guid(device_guid)
+        for dev_guid in self.devices:
+            id = gremlin.util.normalize_guid(dev_guid)
+            if id != device_guid:
+                continue
+            dev = self.devices[dev_guid]
+            for mode_name in dev.modes:
+                mode = dev.modes[mode_name]
+                for input_type in mode.config.keys():
+                    for input_item in mode.config[input_type].values():
+                        if input_item.input_id == input_id:
+                            return input_item
+                        
+        return None
+        
+    def first_input(self, device_guid):
+        ''' finds the first input item for the give device_guid'''
+        device_guid = gremlin.util.normalize_guid(device_guid)
+        for dev_guid in self.devices:
+            id = gremlin.util.normalize_guid(dev_guid)
+            if id != device_guid:
+                continue
+            dev = self.devices[dev_guid]
+            for mode_name in dev.modes:
+                mode = dev.modes[mode_name]
+                for input_type in mode.config.keys():
+                    for input_item in mode.config[input_type].values():
+                        return input_item
+                        
+        return None
+    
 
 
     def list_actions(self):
         ''' lists all actions in the current profile '''
         # Create a list of all used remap actions
         remap_actions = []
-        for dev_guid in self.devices.keys():
+        for dev_guid in self.devices:
             dev = self.devices[dev_guid]
-            for mode_name in dev.modes.keys():
+            for mode_name in dev.modes:
                 mode = dev.modes[mode_name]
                 for input_type in mode.config.keys():
                     for item in mode.config[input_type].values():

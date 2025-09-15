@@ -571,6 +571,7 @@ class EventListener:
 	calibration_deleted = Signal(object) # fires when a calibration is deleted from an input item (InputItem)
 	calibration_changed = Signal(object) # param - CalibrationData object (InputItem)
 	calibration_options_changed = Signal(object) # fires when calibration options are changed for the UI to update (InputItem)
+	sync_input = Signal(object) # request to sync the input (InputItem)
 	
 	def __init__(self):
 		"""Creates a new instance."""

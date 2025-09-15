@@ -1984,15 +1984,23 @@ def to_byte_string(source) -> tuple:
 
 def _singleshot(callback):
     ''' runs on Ui thread - waits for items to be processed '''
+    InvokeUiMethod(_singleshot_ui, callback) # run on UI thread
+
+def _singleshot_ui(callback):
     QtWidgets.QApplication.processEvents()
     callback()
 
 def _get_singleshot_callback(callback):
     return lambda : _singleshot(callback)
 
+def _create_singleshot_callback(callback):
+    return lambda: _get_singleshot_callback(callback)
+
+
 def singleShot(callback):
     ''' fires callback in a thread - returns immediately to caller '''
-    timer = threading.Timer(0.02, lambda: InvokeUiMethod(_get_singleshot_callback(callback)))
+    
+    timer = threading.Timer(0.02, _create_singleshot_callback(callback))
     timer.start()
     
 def cubic_progression(num_points, start, end):
@@ -2216,7 +2224,10 @@ def normalize_guid(device_guid) -> str:
     if device_guid is None:
         return None
     if not isinstance(device_guid, str):
-        device_guid = device_guid.toId()
+        if hasattr(device_guid, "toId"):
+            device_guid = device_guid.toId()
+        else:
+            device_guid = str(device_guid).casefold().replace("-","").replace("{","").replace("}","")
     else:
         device_guid = device_guid.casefold().replace("-","").replace("{","").replace("}","")
     return device_guid

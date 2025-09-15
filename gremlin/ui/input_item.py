@@ -337,7 +337,15 @@ class InputItemListModel(ui_common.AbstractModel):
             return self._item_map[input_id]
         return -1
     
-       
+    def hasInputItem(self, input_item):
+        ''' true if the model contains the input item '''
+        return input_item in self._index_map.values()
+    
+    def indexOfInputItem(self, input_item):
+        for index, item in self._index_map.items():
+            if item == input_item:
+                return index
+        return -1 # not found
     
     
 
@@ -640,9 +648,21 @@ class InputItemListView(ui_common.AbstractView):
 
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.connect(self._mapping_changed)
+        el.sync_input.connect(self._sync_input)
+
+        # self._resized = False
+        # self._scroll_requested = None
 
 
+    def _sync_input(self, input_item):
+        gremlin.util.InvokeUiMethod(self._sync_input_ui, input_item)
 
+    def _sync_input_ui(self, input_item):
+        if self.model.hasInputItem(input_item):
+            index = self.model.indexOfInputItem(input_item)
+            self.scrollToIndex(index)
+            
+        
 
     @property
     def current_index(self):
@@ -665,7 +685,6 @@ class InputItemListView(ui_common.AbstractView):
             self.redraw_index(index)
 
     
-
 
 
     def limit_input_types(self, types):
@@ -1070,6 +1089,12 @@ class InputItemListView(ui_common.AbstractView):
         # return the currently selected widget
         return widget
     
+    def _create_scroll_callback(self, widget):
+        return lambda : self._scroll_to_item(widget)
+    
+    def ensureVisible(self, widget):
+        gremlin.util.singleShot(self._create_scroll_callback(widget))
+
     def _scroll_to_item(self, widget):
         gremlin.util.InvokeUiMethod(self._scroll_to_item_ui, widget)
 
@@ -4238,7 +4263,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             if self.item_data.device_type == DeviceType.VJoy:
                 self._create_vjoy_dropdowns()
             else:
-                self._create_dropdowns()
+                self._create_mapping_toolbar()
 
             self.action_model = ActionContainerModel(self.item_data.containers, self.item_data, self._input_type)
             self.container_view = ActionContainerView(self)
@@ -4656,7 +4681,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.main_layout.addLayout(self.description_layout)
 
 
-    def _create_dropdowns(self):
+    def _create_mapping_toolbar(self):
         """Creates a drop down selection with actions that can be
         added to the current input item.
         """
@@ -4670,6 +4695,8 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         # check for an override for the inputs that can change types (such as OSC)
         
         input_type = self.item_data.getInputType()
+
+        self.sync_widget = gremlin.ui.ui_common.Buttons.getListSyncWidget(callback = self._sync_list)
 
         self.action_selector = ui_common.ActionSelector(input_type, self.item_data)
         self.action_selector.inputItem = self.item_data
@@ -4693,7 +4720,9 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.collapse_all_widget = gremlin.ui.ui_common.Buttons.getCollapseAllWidget(callback = self._handle_collapse_all)
         self.expand_all_widget = gremlin.ui.ui_common.Buttons.getExpandAllWidget(callback = self._handle_expand_all)
 
-        widgets = [self.action_selector,
+        widgets = [
+                   self.sync_widget, 
+                   self.action_selector,
                    self.container_selector,
                    self.collapse_all_widget,
                    self.expand_all_widget,
@@ -4705,6 +4734,11 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.main_layout.addWidget(self.dropdown_widget)
         desired_width = self.dropdown_widget.sizeHint().width()
         self.dropdown_widget.setMinimumWidth(desired_width)
+        
+    def _sync_list(self):
+        input_item = self.item_data
+        el = gremlin.event_handler.EventListener()
+        el.sync_input.emit(input_item)
         
 
     def _handle_collapse_all(self):

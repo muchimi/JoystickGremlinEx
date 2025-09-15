@@ -1393,7 +1393,7 @@ class ProfileGraph():
     def joystick_devices(self) -> list[DeviceSummary]:
         ''' gets a list of joystick devices defined in the profile '''
         device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
-        device_list = [node.device for node in device_nodes if node.device_type in (DeviceType.Joystick, DeviceType.VJoy)]
+        device_list = [node.device for node in device_nodes if node.device_type in (DeviceType.Joystick, DeviceType.VJoy) and not node.device.disabled]
         return device_list
         
             

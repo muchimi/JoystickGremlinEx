@@ -1607,13 +1607,8 @@ class Configuration(QtCore.QObject):
         if el.input_selection_suspended:
             # ignore selection requests if selection is suspended
             return
-
         
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-
-        
-
+        device_guid = gremlin.util.normalize_guid(device_guid)
         data : dict = self._profile_data.get("last_input", {})
         
         verbose = self.verbose_mode_inputs
@@ -1658,18 +1653,6 @@ class Configuration(QtCore.QObject):
             self.save_profile()
             self.save()
 
-          
-
-        
-
-
-
-    def get_last_device_guid(self):
-        ''' gets the last selected device in the profile '''
-        device_guid = self._profile_data.get("last_device_guid",None)
-        if device_guid is None:
-            device_guid = self._get_data("last_device_guid",None)
-        return device_guid
         
 
     def _get_input_id(self, dinput_device_guid, input_id) -> tuple: 
@@ -1855,6 +1838,21 @@ class Configuration(QtCore.QObject):
         return (None, None, None)
         
 
+    def get_last_device_guid(self):
+        ''' gets the last selected device in the profile '''
+        device_guid = self._profile_data.get("last_device_guid",None)
+        if device_guid is None:
+            device_guid = self._get_data("last_device_guid",None)
+        return device_guid
+    
+    def get_last_input_for_device(self, device_guid) -> tuple: # (input_type, input_id)
+        ''' gets the last input for the device as a tuple (input_type, input_id) '''
+        data = self.get_last_input(device_guid)
+        if data:
+            return (data[1],data[2])
+        
+        return None
+        
 
         
 

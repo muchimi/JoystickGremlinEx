@@ -853,6 +853,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._repeater_axis_widget = gremlin.ui.ui_common.QProgressBar(orientation = QtCore.Qt.Orientation.Horizontal)
         # get the current value
         value = self.action_data.get_filtered_axis_value()
+        if value is None:
+            value = self.action_data.get_filtered_axis_value()
         self._repeater_axis_widget.setValue(value)
         self._repeater_value_widget = QtWidgets.QLabel(f"{value:0.4f}")
         #self._repeater_button_widget = gremlin.ui.ui_common.ButtonStateWidget()

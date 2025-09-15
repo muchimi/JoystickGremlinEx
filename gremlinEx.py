@@ -2195,7 +2195,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_device
-            verbose = True
+            # verbose = True
             verbose_detailed = verbose and config.verbose_mode_extra
 
             if verbose_detailed: syslog.info("CREATE TAB: start")
@@ -2270,10 +2270,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # index of the current tab being addded 
             index = 0
 
-           
+            sorted_devices = sorted(all_phys_devices, key=lambda x: x.name)
+            
             # =======================================================
             # Create physical joystick device tabs
-            for device in sorted(all_phys_devices, key=lambda x: x.name):
+            for device in sorted_devices:
+                if verbose: syslog.info(f"TAB: [{index}] processing device [{device.name}]  [{device.device_id}]")
+                if device.disabled:
+                    if verbose: syslog.info("\tdisabled - skipping tab")
+                    continue
                 device_profile = self.profile.get_device_modes(
                     device.device_guid,
                     DeviceType.Joystick,
@@ -2287,12 +2292,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 
                 
                 device_guid = device.device_id
-                device_name =self._get_device_name(device_guid)
-                if "Throttle" in device_name:
-                    pass
+                device_name = device.name
                 if device_name:
                     widget = self.getRegisteredWidget(device_guid)
-                    if not widget:
+                    
+                    if not widget or not Shiboken.isValid(widget):
+                        if verbose: syslog.info("\tcreating widget...")
                         widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
                             device,
                             device_profile,
@@ -2301,14 +2306,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         )
                         
                         self.registerWidget(device_guid, widget)
+                    else:
+                        if verbose: syslog.info("\tusing existing widget...")
 
                     self._add_tab(device_guid, TabDeviceType.Joystick)
 
                   
                     widget.data = (TabDeviceType.Joystick, device_guid, index)
-
-                    if verbose:
-                        syslog.info(f"Added joystick tab: {device_name} index {index}")
 
                     #gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
                     widget.inputChanged.connect(self._device_input_changed_cb)
@@ -2594,6 +2598,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # reorder the tabs based on user preferences if a tab order was previously saved
 
             config_tab_map = self.config.tab_list
+            id_list = []
+            ctm = {}
+            for key, (id, name, a, b) in config_tab_map.items():
+                if id in id_list:
+                    continue
+                device = gremlin.joystick_handling.device_info_from_guid(id)
+                if device.disabled:
+                    continue
+                id_list.append(id)
+                ctm[key] = [id, name, a, b]
+
+            config_tab_map = ctm
+
             if config_tab_map:
                 current_tab_map = self._get_tab_map()
 
@@ -2681,32 +2698,32 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
         finally:
+            # select last items 
             try:
                 gremlin.shared_state.pop_input_selection(reset = True) # allow selections
-                if current_tab_guid:
-                    device_guid = current_tab_guid
-                    if verbose: 
-                        device = gremlin.joystick_handling.device_info_from_guid(current_tab_guid)
-                        syslog.info(f"DEVICE TABS: Select last device [{device.name}] [{current_tab_guid}] tab")
-                else:
-                    device_guid = self.config.last_device_guid
-                    if verbose: 
-                        device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-                        syslog.info(f"DEVICE TABS: Select stored device [{device.name}] [{device_guid}] tab")
+                last_device_guid, last_input_type, last_input_id = config.get_last_input()
 
+                device = gremlin.joystick_handling.device_info_from_guid(last_device_guid)
+                if not device:
+                    # does not exist anymore
+                    last_input_id = None
+                    last_input_type = None
+                    last_device_guid = self.ui.devices.tabData(0).device_guid # pick first
 
+                input_item = None
+                if last_input_id:
+                    # ensure the input still exists
+                    input_item = self.profile.find_input(last_device_guid, last_input_id)
+
+                if not input_item:
+                    # not found
+                    input_item = self.profile.first_input(last_device_guid)
+                    if input_item:
+                        last_input_id = input_item.input_id
+                        last_input_type = input_item.input_type
                 
-                # if not selected, select a default
-                if not device_guid or not device_guid in self._tab_device_map:
-                    # the last selected device is no longer in the device list
-                    if verbose: 
-                        device = gremlin.joystick_handling.device_info_from_guid(current_tab_guid)
-                        syslog.info(f"DEVICE TABS: Select default device [{device.name}] [{device_guid}] tab")
-                    device_guid = self.ui.devices.tabData(0).device_guid
                 
-                if device_guid:
-                    # select the item
-                    self._select_input(device_guid, force_switch=True)
+                self._select_input(last_device_guid, last_input_type, last_input_id, force_switch=True)
                 
                 
             except Exception as err:
@@ -3205,6 +3222,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                         #widget.select_item(index)
                         widget.setContentWidget(input_type, input_id)
+
+                        el.sync_input.emit(item)
 
           
                     if verbose: syslog.info(f"Select input: selected widget {input_type} {input_id}")

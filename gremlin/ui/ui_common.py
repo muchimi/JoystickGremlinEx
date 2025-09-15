@@ -720,6 +720,9 @@ class Icons():
     @staticmethod
     def expandAllIcon():
         return Icons._icon("mdi6.arrow-expand-vertical")
+    @staticmethod
+    def syncIcon():
+        return Icons._icon("mdi6.format-horizontal-align-left")
     
 
     def _icon(value : str, qta_color = None):
@@ -858,7 +861,10 @@ class Buttons():
         icon = Icons.resizeIcon()
         return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
                 
-
+    @staticmethod
+    def getListSyncWidget(label = None, tooltip = "Find In List", callback = None, no_keyboard = True, data = None):
+        icon = Icons.syncIcon()
+        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
 
     @staticmethod
     def getPasteWidget(tooltip = "Paste", callback = None):

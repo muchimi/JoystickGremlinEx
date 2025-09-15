@@ -260,6 +260,8 @@ def get_curved_axis(guid, identifier):
             osc = gremlin.ui.osc_device.InputOscClient()
             osc.start()
             data = osc.getData(identifier.message) # gets data arguments or None if no data
+            if data is None:
+                data = 0 # default is centered
             return data
         
     return None
@@ -739,6 +741,10 @@ def joystick_devices_initialization():
         # these are all connected devices
         dev = dinput.DILL.get_device_information_by_index(device_index)
 
+        if dev.vendor_id == 0x4d8 and dev.product_id == 0xe6d6 and dev.button_count == 35:
+            # IFR1 device, disable
+            syslog.warning("INIT: Octavi IFR1 is disabled in GremlinEx as a regular joystick as it's handled at the HID level.")
+            dev.disabled = True
 
 
         devices.append(dev)
@@ -802,7 +808,7 @@ def joystick_devices_initialization():
         config_map[vjoy_index] = (False, 8, count, 4) # fake configuration, varies by button count only
     
 
-    for vjoy_index in range(1,17):  # all possible vjoy devices index 1 up to 16
+    for vjoy_index in range(1,17):  # list all possible vjoy devices index 1 up to 16
             
         is_connected, axis_count, button_count, hat_count = config_map[vjoy_index]
             
