@@ -4520,9 +4520,8 @@ class QProgressBar(QtWidgets.QWidget):
         self._update_value()
 
     def setValue(self, value : float | list):
-        # if hasattr(value,"__iter__"):
-        #     assert len(value) == 4
-        gremlin.util.InvokeUiMethod(self._set_value_ui, value)
+        if value is not None:
+            gremlin.util.InvokeUiMethod(self._set_value_ui, value)
 
     def _set_value_ui(self, value):
         if hasattr(value,"toList"):

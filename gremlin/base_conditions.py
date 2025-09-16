@@ -468,6 +468,7 @@ class AbstractFunctor(QtCore.QObject):
 
         
     def hook(self):
+        ''' called by the execution context before profile_start, profile_started gets called '''
         if not self._hooked:
             self._hooked = True
             el = gremlin.event_handler.EventListener()

@@ -204,9 +204,9 @@ class Event:
 	def fake_button(self, is_pressed = True, clone = False):
 		''' converts the event to a fake button '''
 		e = self.clone() if clone else self
-		if e.event_type == InputType.JoystickAxis:
+		if e.event_type in (InputType.JoystickAxis, InputType.JoystickHat):
+			# convert axis/hat events to fake button events
 			e.event_type = InputType.JoystickButton 
-			#e.value = gremlin.actions.Value()
 		e.identifier = 1
 		e.is_axis = False # range exit is a button type event
 		e.is_pressed = is_pressed
@@ -409,6 +409,7 @@ class EventListener:
 	refresh_devices = Signal() # used to refresh the device list going into GremlinEx
 
 	profile_reset = Signal() # profile reset signal (when runtime for a profile needs to reset)
+	profile_hook = Signal() # hook functors - before profile start is emitted
 	profile_start = Signal() # profile start signal (when a profile starts)
 	profile_started = Signal() # profile started signal (after a profile starts and all process start functions are completed)
 	profile_stop = Signal() # profile stop signal (when a profile stops)
@@ -1149,7 +1150,7 @@ class EventListener:
 					identifier = event.input_index,
 					is_pressed = False,
 					is_virtual = is_virtual,
-					value = current,
+					value = value,
 					raw_value= current
 				)
 

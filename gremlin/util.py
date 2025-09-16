@@ -908,14 +908,47 @@ def get_icon_path(path):
     
         return None
 
-def load_pixmap(path, size = 24):
+def load_pixmap(path, size = 24, qta_color = None):
     ''' gets a pixmap from the path '''
     import gremlin.ui.ui_common
+
+    
+    if not path:
+        return None
+    
 
     desired_size = QtCore.QSize(size, size)
     
     if isinstance(path, QtGui.QIcon):
         return  path.pixmap(desired_size)
+    elif isinstance(path, str):
+        path = path.casefold()
+    
+    # see if a built-in icon
+    exts = (".png",".svg",".jpg",".ico",".bmp")
+    is_image = False
+    for ext in exts:
+        if ext in path:
+            is_image = True
+            break
+        
+    if not is_image:
+        if not qta_color:
+            qta_color = gremlin.ui.ui_common.Color.normalColor()
+        if isinstance(qta_color, str):
+            assert qta_color.startswith("#") and len(qta_color) == 7
+        icon = None
+        try:
+            icon = QtGui.QIcon(qta.icon(path, color = qta_color))
+        except:
+            pass
+
+        if icon:
+            return icon.pixmap(desired_size)
+            # actual_size = icon.actualSize( QtCore.QSize(64, 64))
+            # pixmap = icon.pixmap(actual_size) # original size
+            # scaled_pixmap = pixmap.scaled(size, size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+            # return scaled_pixmap
     
     the_path = get_icon_path(path)
     if the_path:

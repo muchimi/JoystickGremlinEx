@@ -1209,6 +1209,8 @@ class ActionSetView(ui_common.AbstractView):
             profile_data,
             label,
             view_type=ui_common.ContainerViewTypes.Action,
+            icon = None,
+            icon_size = 24,
             parent=None
     ):
 
@@ -1232,7 +1234,10 @@ class ActionSetView(ui_common.AbstractView):
         # Create a group box widget in which everything else will be placed
         #self.group_widget = QtWidgets.QGroupBox(self.label)
 
-        title = QtWidgets.QLabel(f"{self.label} action:")
+        if icon:
+            title = gremlin.ui.ui_common.QIconLabel(icon, icon_size = icon_size, text = f"{self.label} action:")
+        else:
+            title = QtWidgets.QLabel(f"{self.label} action:")
         self.main_layout.addWidget(title)
         # hline = gremlin.ui.ui_common.QHorizontalLine()
         # self.main_layout.addWidget(hline)
@@ -3491,7 +3496,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                 index = i
         return index
 
-    def _create_action_set_widget(self, action_set_data, label, view_type):
+    def _create_action_set_widget(self, action_set_data, label, view_type, icon = None, icon_size = 24):
         """Adds an action widget to the container.
 
         :param action_set_data data of the actions which form the action set
@@ -3504,6 +3509,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self.profile_data,
             label,
             view_type,
+            icon,     
+            icon_size,      
             parent = self
         )
         action_set_view.setModel(action_set_model)

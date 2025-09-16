@@ -411,6 +411,7 @@ class ExecutionContext():
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed) # reload data on mode changes
         #el.runtime_mode_changed.connect(self._runtime_mode_changed)
+        el.profile_hook.connect(self._profile_hook) # reload data on profile start
         el.profile_start.connect(self._profile_start) # reload data on profile start
         el.profile_started.connect(self._profile_started) # called when profile has started and all is initialized
         el.profile_stopped.connect(self._profile_stopped) # called when profile has stopped
@@ -553,17 +554,25 @@ class ExecutionContext():
         # self._rebuild()
         
         # update debug vars on start
+        pass
+
+
+    def _profile_hook(self):
+        ''' hook phase - before profile start occurs '''
         config = gremlin.config.Configuration() 
         self._verbose_exec = config.verbose_mode_execution
         self._verbose_condition = config.verbose_mode_condition
         self.reset()
-
-    def _profile_started(self):
-        ''' hook registered functors '''
         for functor in self._functors:
             functor.hook()
-        config = gremlin.config.Configuration() 
-        if config.verbose: syslog.info(f"CONTEXT: profile started with {len(self._functors):,} functors")
+        if config.verbose: syslog.info(f"CONTEXT: profile start with {len(self._functors):,} functors")    
+
+    def _profile_started(self):
+        ''' after profile start occurs '''
+        pass
+    #     ''' hook registered functors '''
+    #     config = gremlin.config.Configuration() 
+    #     if config.verbose: syslog.info(f"CONTEXT: profile started with {len(self._functors):,} functors")
 
     def _profile_stopped(self):
         ''' unhook registered functors '''

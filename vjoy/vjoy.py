@@ -407,6 +407,26 @@ class Hat:
         31500: (-1, 1), 
     }
 
+    @staticmethod
+    def getName(position):
+        ''' gets the name '''
+        if position in Hat.direction_to_name:
+            return Hat.direction_to_name[position]
+        return None
+    
+    @staticmethod
+    def getDirection(position):
+        if position in Hat.name_to_direction:
+            return Hat.name_to_direction[position]
+        return None
+    
+    @staticmethod
+    def getIcon(position):
+        if isinstance(position, str):
+            position = Hat.getDirection(position)
+        if position in Hat.direction_to_icon:
+            return Hat.direction_to_icon[position]
+        return None
 
     # Mapping from event directions to names
     direction_to_name = {
@@ -426,13 +446,34 @@ class Hat:
         "Center": (0, 0),
         "North": (0, 1),
         "North-east": (1, 1),
+        "North East": (1, 1),
         "East": (1, 0),
         "South-east": (1, -1),
+        "South East": (1, -1),
         "South": (0, -1),
         "South-west": (-1, -1),
+        "South West": (-1, -1),
         "West": (-1, 0),
-        "North-west": (-1, 1)
+        "North-west": (-1, 1),
+        "North West": (-1, 1)
+
     }
+
+    @staticmethod
+    def getFourDirections():
+        ''' gets the list of positions for a 4 position hat'''
+        return [
+            ( 0,  0),
+            ( 0,  1),
+            ( 1,  0),
+            ( 0, -1),
+            (-1,  0),
+        ]
+    
+    @staticmethod
+    def getEightDirections():
+        ''' gets the positions for all hat positions '''
+        return [p for p in Hat.direction_to_name]
 
     direction_to_icon = {
         ( 0,  0): "mdi.image-filter-center-focus-strong", #"Center",

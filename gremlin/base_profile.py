@@ -403,6 +403,7 @@ class AbstractContainer(ProfileData):
         self.comment = None # user comment
         self._callbacks_enabled = True # callbacks are enabled by default for this container
         self._collapsed = False # true if the container is collapsed
+        self.actionsetParseCallback = None # callback to use when parsing action set if it has additional data (node), returns an action set
 
         el = gremlin.event_handler.EventListener()
         el.virtual_button_changed.connect(self._virtual_button_changed)
@@ -434,6 +435,8 @@ class AbstractContainer(ProfileData):
         #     self.device_input_id = None
         #     self.device_input_type = None
         #     self.device = None
+
+
 
     def dumpActionSets(self, action_sets : list, label = None):
         ''' dumps the container's action sets to the output '''
@@ -774,15 +777,24 @@ class AbstractContainer(ProfileData):
 
         :param node the XML node to process
         """
-        self.action_sets = []
+        if not self.actionsetParseCallback:
+            # some containers manage their own action sets and this is not writeable
+            self.action_sets = []
+            
         for child in node:
             if child.tag == "virtual-button":
                 continue
             elif child.tag == "action-set":
-                action_set = ActionSet()
+                action_set = None
+                if self.actionsetParseCallback:
+                    # container needs special handling of action set nodes
+                    action_set = self.actionsetParseCallback(child)
+                if action_set is None:
+                    action_set = ActionSet()
                 self._parse_action_xml(child, action_set, data, extra_data)
                 if action_set:
                     self.action_sets.append(action_set)
+
  
     def _parse_action_xml(self, node, action_set, input_item = None, extra_data = None, data = None):
         """Parses the XML content related to actions in an action-set.
@@ -1039,7 +1051,6 @@ class Device:
 
 
 
-
 class AbstractAction(ProfileData):
 
     """Base class for all actions that can be encoded via the XML and
@@ -1184,8 +1195,23 @@ class AbstractAction(ProfileData):
         ''' true if the input is a button '''
         is_button = False
         input_item = self.input_item
+        # check hat first
+        hardware_input_type = self.hardware_raw_input_type
+        
+        input_type = None
+        if hasattr(self.parent_container,"get_input_type"):
+            input_type = self.parent_container.get_input_type() # container override input type
+
+        if input_type:
+            return input_type == InputType.JoystickButton
+        
+        if hardware_input_type == InputType.JoystickHat:
+            return False
+                
         if hasattr(input_item, "is_button"):
-            return input_item.is_button
+            is_button = input_item.is_button
+            return is_button
+        
         if hasattr(self, "hardware_input_type"):
             input_type : InputType = self.hardware_input_type
             return input_type == InputType.JoystickButton
@@ -1196,7 +1222,6 @@ class AbstractAction(ProfileData):
         if hasattr(self.hardware_input_id, "is_axis"):
             is_button = not self.hardware_input_id.is_axis
 
-        
         
         return is_button
 

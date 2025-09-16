@@ -850,14 +850,18 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_repeater(self):
         ''' creates an input repeater '''
+        input_type = self.action_data.get_input_type()
         self._repeater_axis_widget = gremlin.ui.ui_common.QProgressBar(orientation = QtCore.Qt.Orientation.Horizontal)
         # get the current value
-        value = self.action_data.get_filtered_axis_value()
-        if value is None:
+        if input_type == InputType.JoystickAxis:
             value = self.action_data.get_filtered_axis_value()
-        self._repeater_axis_widget.setValue(value)
-        self._repeater_value_widget = QtWidgets.QLabel(f"{value:0.4f}")
-        #self._repeater_button_widget = gremlin.ui.ui_common.ButtonStateWidget()
+        else:
+            value = 0.0
+        
+        if value is not None:
+            self._repeater_axis_widget.setValue(value)
+            self._repeater_value_widget = QtWidgets.QLabel(f"{value:0.4f}")
+        
         widgets = [
             "Output:",
             self._repeater_axis_widget,
@@ -2842,7 +2846,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
                 )
 
-            elif self.action_data.input_type == InputType.JoystickHat:
+            elif self.action_data.hardware_input_type == InputType.JoystickHat:
                 # hat actions
                 actions = [VjoyAction.VJoyHat, VjoyAction.VJoyHatToButton]
 

@@ -218,6 +218,13 @@ def empty_copy(obj):
     newcopy.__class__ = obj.__class__
     return newcopy      
 
+class DataList(list):
+    ''' a list if a data member to track information about the list '''
+    def __init__(self, data = None):
+        super().__init__()
+        self.data = data
+
+
 class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
     pass
 

@@ -681,6 +681,9 @@ class CodeRunner:
                     vs.setStartState(vjoy_device_id, vjoy_input_id, state)
                                 
 
+            # hook profiles
+            el.profile_hook.emit()
+
             # tell GremlinEx the profile started
             # this will also apply default start data and override prior data
             el.profile_start.emit()

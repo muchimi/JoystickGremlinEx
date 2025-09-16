@@ -15,16 +15,20 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T62)
-- API: axis input and computation of calibrated and curve data was refactored and centralized.
+- API: axis input and computation of calibrated and curve data was refactored and centralized.  This indirectly impacts processing of other items and removed some dragons along the way.
 - New: axis repeaters support multiple data channels. If the axis value has transforms, each will be displayed as an additional channels (bars). If the input is both calibrated and curved, the repeater will display three bars, output, calibrated and curved.  GremlinEx applies calibration first, followed by curves.  This was added to better visualize axis data and the impact of transforms at design time.
 - Changed: Input viewer Y up to match the usual orientation of the Cartesian coordinate system and the visualization of vertical repeaters.
-- Improved: Input viewer graph shows axis names / usage as reported by DirectInput 
+- Improved: Input viewer graph shows axis names / usage as reported by DirectInput instead of numbers that don't always mean much because axis numbers are not always sequential depending on how axes report back to DINPUT.  Some controllers "skip" axes (looking at you throttles). 
 - Improved: vjoy remap design time event handling performance
-- Improved: highlighting hotkeys shift (button) and ctrl (axis) keys will now disable the other mode while held. When you have an axis that also triggers buttons when it moves, holding the ctrl key will only highlight the axis, while holding the shft key will only highlight the button.  The prior version would highlight the axis, then a button immediately, effectively preventing the auto-selection of an axis if it outputs both signals at the same time.
-- Improved: design time event handling uses a throttle to prevent spamming of UI updates on event volumes.
+- Improved: highlighting of concurrent inputs. Hotkeys shift (button) and ctrl (axis) keys will now disable the other mode while held.  This is helpful when you have an axis that also triggers buttons as it moves, thus triggering two (or more) highlights in quick succession (one for the axis, the others for the buttons).   Holding the ctrl key will only highlight the axis, while holding the shft key will only highlight the button.  Use this when you have an input that does this.
+- Improved: Sync button to synchronize the right panel with the left when the input gets out of sync. There's a bug with QT right now where it will not reliably make visible a selected input in the list while the UI is loading. For devices with a large number of inputs, the list can easily be scrolled so the sync button will bring the selected input being mapped back into view in the left panel.
+- Improved: design time event handling now uses an event throttle to prevent spamming of UI updates - some inputs can fire tens if not hundreds of updates a second.
 - Fix: highlight hotkeys not functional unless the corresponding button or axis mode is also enabled.
-- Fix: Mode switch action overwrite selected mode in some situations causing the incorrect mode (or no mode) switch to occur at runtime.
-- Fix: hat to button container refactored for GremlinEx.
+- Fix: Mode switch action could select the incorrect mode (or no mode) at runtime due to an internal mode tracking bug.
+- Fix: hat to button container refactored for Gremlinex. Note: if you were using this broken container before, old data is unlikely to load so it will need to be reconfigured.  Note 2: this is not the hat to button feature in vjoy remap.
+- Fix: profile start sequence could bypass functor startup sequence which could lead to unexpected runtime behaviors across the board by not initializing or re-initializing container and action state data when a profile starts or stops.  What is a functor?  A functor is what processes actions and containers when a profile is running.  Each action and container has one.  This code is responsible for the runtime logic of any mapping.
+
+
 
 ### (m76T61A)
 - Added: curve verbose mode to provide information on curve processing in the log file.
