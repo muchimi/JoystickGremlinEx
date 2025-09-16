@@ -752,7 +752,7 @@ For more advanced axis splitting capability, look at the Gated Axis action.
         
         # make actions think we're attached to a button
         self.override_input_id = 1
-        self.override_input_type = InputType.JoystickButton
+        self.override_input_type = InputType.JoystickButton 
 
 
 

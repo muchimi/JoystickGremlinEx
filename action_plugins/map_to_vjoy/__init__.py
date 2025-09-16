@@ -883,6 +883,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' updates the input repeater '''
         if not self._ui_loaded:
             return
+        if not Shiboken.isValid(self):
+            return
         
         range_widget_visible = False
         axis_widget_visible = False
@@ -4958,6 +4960,10 @@ Supports axis merging, curved output, command, hat and button mappings.
     def get_input_type(self, override = True):
         if override and self.override_input_type is not None:
             return self.override_input_type
+        elif hasattr(self.parent,"get_input_type"):
+            input_type = self.parent.get_input_type()
+            if input_type is not None:
+                return input_type
         return super().get_input_type()
     
     def refresh_vjoy(self):

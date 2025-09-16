@@ -2484,6 +2484,7 @@ class ActionSelector(QtWidgets.QWidget):
         assert isinstance(input_item, gremlin.base_profile.InputItem), "expected an input item, wrong type passed"
         self._input_item = input_item
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
+        self._input_type = input_type
         
 
         self.action_dropdown = QComboBox()
@@ -2529,7 +2530,7 @@ class ActionSelector(QtWidgets.QWidget):
         
     def refresh(self, input_type):
         ''' reloads the selector based on the input '''
-        self.input_type = input_type
+        self.input_type = input_type if self._input_type is None else self._input_type
         with QtCore.QSignalBlocker(self.action_dropdown):
             self.action_dropdown.clear()
             for name in self._valid_action_list(input_type):
@@ -6134,8 +6135,6 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         p = QtGui.QPainter(self._pixmap)
         p.setBackground(QtGui.QBrush(QtGui.QColor(self._background_color)))
         
-
-        # p.begin(self)
         p.setRenderHint(self._render_flags)
 
         self._pixmap.scroll(-self._step_size, 0, QtCore.QRect(0, 0, self._pixmap.width(), self._pixmap.height()))
@@ -6706,7 +6705,6 @@ class QToggle(QCheckBox):
         # syslog.info("toggle paint start")
 
         p = QPainter(self)
-        # p.begin(self)
         p.setRenderHint(QPainter.Antialiasing)
 
         p.setPen(self._transparent_pen)
@@ -6826,7 +6824,6 @@ class QAnimatedToggle(QToggle):
         handleRadius = round(0.24 * contRect.height())
 
         p = QPainter(self)
-        # p.begin(self)
         p.setRenderHint(QPainter.Antialiasing)
 
         p.setPen(self._transparent_pen)
@@ -7706,7 +7703,6 @@ class QBubble(QtWidgets.QLabel):
 
         # syslog.info("bubble paint start")
         p = QtGui.QPainter(self)
-        # p.begin(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing, True)
         p.drawRoundedRect(
             0, 0, self.width() - 1, self.height() - 1, 5, 5)

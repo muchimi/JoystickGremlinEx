@@ -64,6 +64,10 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Creates the required UI elements."""
         if not Shiboken.isValid(self):
             return
+        
+        msg = "Consider using <i><b>Vjoy Remap</b></i> to curve axis output to further reduce response latency.<br>Curve Ex should only be used in special situations that require chained or nested processing."
+        warning_widget = gremlin.ui.ui_common.QWarningWidget(msg)
+        self.main_layout.addWidget(warning_widget)
         self.curve_widget = gremlin.curve_handler.AxisCurveWidget(self.action_data.curve_data, self)
         self.main_layout.addWidget(self.curve_widget)
 
@@ -73,7 +77,12 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
         el.profile_stop.connect(self._profile_stop)
 
     def _populate_ui(self):
-        pass
+
+        # get the current value and update the curve on start
+        astate = gremlin.event_handler.AxisState()
+        values = astate.getAxisValues(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+        self.curve_widget.update_value(values[0])
+
 
     @QtCore.Slot()
     def _profile_start(self):
@@ -169,7 +178,8 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
         super().__init__(parent)
         self.parent = parent
         self.curve_data = gremlin.curve_handler.AxisCurveData()
-        self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
+        # uptate m76T62 - ignore any calibration data 
+        #self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
         self.curve_data.curve_update()
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
 

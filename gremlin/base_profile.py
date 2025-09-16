@@ -623,6 +623,9 @@ class AbstractContainer(ProfileData):
         if index == -1:
             self.action_sets.append([])
             index = len(self.action_sets) - 1
+        if index > len(self.action_sets):
+            while len(self.action_sets) <= index:
+                self.action_sets.append([])
         self.action_sets[index].append(action)
 
         # Create activation condition data if needed
@@ -1066,6 +1069,7 @@ class AbstractAction(ProfileData):
         self.comment = None # user comments/notes
         self._priority = 0 # default priority
         self.data = None # additional data for runtime purposes, context dependent used to tag actions at runtime for some purpose like action grouping
+        self.data_ex = None # additional data for 
 
         el = gremlin.event_handler.EventListener()
         el.action_created.emit(self)
@@ -2665,6 +2669,7 @@ class ModeNode(anytree.NodeMixin):
     def __init__(self, name : str = None, mode_object = None):
         self.name = name
         self.mode_object = mode_object
+        
 
     @property
     def parent_mode(self) -> str:
@@ -2672,6 +2677,15 @@ class ModeNode(anytree.NodeMixin):
         if self.parent and self.parent.name:
             return self.parent.name
         return None
+    
+class ActionTreeNode(anytree.NodeMixin):
+    ''' holds an action tree node for the getActionTree() member function in Profile '''
+    def __init__(self, name : str = None, data= None, tagdata = None):
+        self.name = name
+        self.data = data
+        self.tagdata = None
+
+
 
 class Profile():
 
@@ -3618,6 +3632,38 @@ class Profile():
                         
         return None
     
+
+    def getActionTree(self, lookup_action) -> ActionTreeNode:
+        ''' finds the action in the current profile '''
+        for dev_guid in self.devices:
+            dev = self.devices[dev_guid]
+            for mode_name in dev.modes:
+                mode_object = dev.modes[mode_name]
+                for input_type in mode_object.config.keys():
+                    for item in mode_object.config[input_type].values():
+                        for container in item.containers:
+                            for actions in [a for a in container.action_sets if a is not None]:
+                                for action in actions:
+                                    if lookup_action == action:
+                                        # build the hierarchy
+                                        root = ActionTreeNode()
+                                        dev_node = ActionTreeNode(name = "device", data = dev_guid)
+                                        dev_node.parent = root
+                                        mode_node = ActionTreeNode(name = "mode", data = mode_object)
+                                        mode_node.parent = dev_node
+                                        input_item_node = ActionTreeNode(name = "input_item", data = item)
+                                        input_item_node.parent = mode_node
+                                        container_node = ActionTreeNode(name = "container", data = container)
+                                        container_node.parent = input_item_node
+                                        action_node = ActionTreeNode(name = "action", data = action, tagdata = actions)
+                                        action_node.parent = container_node
+                                        root.data = action_node
+                                        return root
+                                    
+            return None # not found
+
+
+        
 
 
     def list_actions(self):

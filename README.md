@@ -16,11 +16,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T62)
 - API: axis input and computation of calibrated and curve data was refactored and centralized.
-- New: design time axis repeaters include multiple channels. If the axis value has transforms, each will be displayed as an additional channels (bars). If the input is both calibrated and curved, the repeater will display three bars, output, calibrated and curved.  GremlinEx applies calibration first, followed by curves.  This was added to better visualize axis data and the impact of transforms at design time.
+- New: axis repeaters support multiple data channels. If the axis value has transforms, each will be displayed as an additional channels (bars). If the input is both calibrated and curved, the repeater will display three bars, output, calibrated and curved.  GremlinEx applies calibration first, followed by curves.  This was added to better visualize axis data and the impact of transforms at design time.
 - Changed: Input viewer Y up to match the usual orientation of the Cartesian coordinate system and the visualization of vertical repeaters.
-- Improved: vjoy remap design time performance
-- 
-
+- Improved: Input viewer graph shows axis names / usage as reported by DirectInput 
+- Improved: vjoy remap design time event handling performance
+- Improved: highlighting hotkeys shift (button) and ctrl (axis) keys will now disable the other mode while held. When you have an axis that also triggers buttons when it moves, holding the ctrl key will only highlight the axis, while holding the shft key will only highlight the button.  The prior version would highlight the axis, then a button immediately, effectively preventing the auto-selection of an axis if it outputs both signals at the same time.
+- Improved: design time event handling uses a throttle to prevent spamming of UI updates on event volumes.
+- Fix: highlight hotkeys not functional unless the corresponding button or axis mode is also enabled.
+- Fix: Mode switch action overwrite selected mode in some situations causing the incorrect mode (or no mode) switch to occur at runtime.
+- Fix: hat to button container refactored for GremlinEx.
 
 ### (m76T61A)
 - Added: curve verbose mode to provide information on curve processing in the log file.

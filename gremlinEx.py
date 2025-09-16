@@ -217,6 +217,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._last_toast_message = None
         self._change_input_lock = threading.Lock() # true when changing inputs
 
+        self._last_selected_device_guid = None
+        self._last_selected_input_type = None
+        self._last_selected_input_id = None
+
         self._resize_count = 0
 
         # list of detected devices
@@ -345,6 +349,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.profile_stop.connect(self._profile_stop)
         
         el.profile_changed.connect(self._profile_changed_cb)
+        # el.button_state_change.connect(psygnal.throttled(self._button_state_change, timeout = 100))
+        # el.axis_state_change.connect(psygnal.throttled(self._axis_state_change, timeout = 100))
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
         el.input_selection_changed.connect(self._input_changed_handler)
@@ -612,7 +618,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
     def _button_state_change(self, event):
-        ''' button changed - triggered only at design time - look for highlighting triggers '''
+        ''' button changed - triggered only at design time - look for highlighting triggers - HIGHLIGHT SYSTEM '''
+
+        if gremlin.shared_state.is_highlighting_suspended():
+            # highlighting disabled
+            return
+
+        el = gremlin.event_handler.EventListener()
+        is_shifted = el.get_shifted_state()
 
         is_tabswitch_enabled = self.config.highlight_autoswitch
         device_guid = event.device_guid
@@ -623,10 +636,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if not is_pressed:
             # trigger only on presses
             return
-        if gremlin.shared_state.is_highlighting_suspended():
-            # highlighting disabled
-            return
-        is_button = self.is_button_highlighting
+      
+        is_button = self.is_button_highlighting or is_shifted
         if not is_button:
             # highlight disabled
             return
@@ -638,20 +649,31 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # not setup to auto change tabs (override via shift/control keys)
             return
         
-        # see if input needs to change
-        input_switch_needed = tab_switch_needed or self._inputswitch_needed(device_guid, input_id)
-        if not input_switch_needed:
-            return
+       
+        # # see if input needs to change
+        # input_switch_needed = tab_switch_needed or self._inputswitch_needed(device_guid, input_id)
+        # if not input_switch_needed:
+        #     return
         
         # trigger switch
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose: syslog.info(f"Button input switch to {device_guid} button {input_id}")
         self._select_input_handler(device_guid, input_type, input_id)
 
 
 
     def _axis_state_change(self, event):
-        ''' axis changed - triggered only at design time '''
+        ''' axis changed - triggered only at design time - HIGHLIGHT SYSTEM'''
 
-        if not self.is_axis_highlighting:
+        if gremlin.shared_state.is_highlighting_suspended():
+            # highlighting disabled
+            return
+        
+        
+
+        el = gremlin.event_handler.EventListener()
+        is_control = el.get_control_state()
+        if not self.is_axis_highlighting and not is_control:
             # highlight disabled - reset tracking 
             self._last_state_device_guid = None
             self._last_state_input_id = None
@@ -664,8 +686,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         input_id = event.identifier
         value = event.value
 
-
-        
         if self._last_state_input_id == device_guid and self._last_state_input_id == input_id:
             # same device as last selected, ignore
             return 
@@ -676,9 +696,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._last_state_data[device_guid] = {}
         if not input_id in self._last_state_data[device_guid]:
             self._last_state_data[device_guid][input_id] = None
-
-        self._last_state_device = device_guid
-        self._last_state_input_id = input_id
 
         if self._last_state_data[device_guid][input_id] is not None:
             last_value = self._last_state_data[device_guid][input_id]
@@ -703,6 +720,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._last_state_data[device_guid][input_id] = value
 
         # trigger highlight switch
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose: syslog.info(f"Axis input switch to {device_guid} axis {input_id}")
         self._select_input_handler(device_guid, input_type, input_id, force_switch=True)
 
     @QtCore.Slot(int)
@@ -1643,12 +1662,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.status_bar_highlight_axis_widget = QtWidgets.QPushButton()
         self.status_bar_highlight_axis_widget.setStyleSheet("border: none")
         self.status_bar_highlight_axis_widget.clicked.connect(self._toggle_axis_highlight)
-        self.status_bar_highlight_axis_widget.setToolTip("Enable axis input highlighting")
+        self.status_bar_highlight_axis_widget.setToolTip("Enable axis input highlighting.\nThis mode can also be temporarily enabled while holding a ctrl key.")
 
         self.status_bar_highlight_button_widget = QtWidgets.QPushButton()
         self.status_bar_highlight_button_widget.setStyleSheet("border: none")
         self.status_bar_highlight_button_widget.clicked.connect(self._toggle_button_highlight)
-        self.status_bar_highlight_button_widget.setToolTip("Enable button input highlighting")
+        self.status_bar_highlight_button_widget.setToolTip("Enable button input highlighting.\nThis mode can also be temporarily enabled while holding a shift key.")
 
 
         self.status_bar_highlight_enable_widget = QtWidgets.QPushButton()
@@ -3026,8 +3045,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         try:
         
             self._change_input_lock.acquire_lock()
+            gremlin.util.pushCursor()
 
-            
             
             if gremlin.shared_state.is_input_selection_suspended:
                 return # skip if disabled
@@ -3039,9 +3058,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # no device selected - ignore
                 return
 
-            if self._selection_locked:
-                return
-            
+ 
             # avoid spamming
             if not force_update and self._last_input_change_timestamp + self._input_delay > time.time():
                     # delay not occured yet
@@ -3062,10 +3079,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 return
 
 
-
-            gremlin.util.pushCursor()
-
-            self._selection_locked = True
+            #self._selection_locked = True
 
             if not isinstance(device_guid, str):
                 device_guid = gremlin.util.normalize_guid(device_guid)
@@ -3223,6 +3237,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         #widget.select_item(index)
                         widget.setContentWidget(input_type, input_id)
 
+                        # syslog.info("sync input requested")
                         el.sync_input.emit(item)
 
           
@@ -3245,6 +3260,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # save settings as the last input
             el.input_selection_changed.emit(device_guid, input_type, input_id)
             el.update_input_state.emit(device_guid)
+
+            self._last_selected_device_guid = device_guid
+            self._last_selected_input_type = input_type
+            self._last_selected_input_id = input_id
+
         except Exception as err:
             # something went south with the selection
             syslog.error("TabIndex generic unhandled error occured in _select_input_handler_ui():")
@@ -3278,18 +3298,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     assert item is not None, f"SELECT: sync issue: no selection"
                     assert item.input_id == restore_input_id, f"SELECT: sync issue: input id mismatch: expected {restore_input_id} got {item.input_id}"
                 
-                    # current input mapping
-                    # if item.containers:
-                    #     input_item_config = widget.getContentWidget()
-                    #     if input_item_config:
-                    #         assert input_item_config.item_data == item, f"SELECT: sync issue: input id content mismatch: expected {restore_input_id} got {input_item_config.item_data.input_id}"
-                    
+       
                     
 
-            self._selection_locked = False
+            
             gremlin.util.popCursor()
             self._change_input_lock.release_lock()
-            # QtWidgets.QApplication.processEvents()
 
             
     @QtCore.Slot(object, object, object)
@@ -4784,7 +4798,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     @property
     def is_button_highlighting(self) -> bool:
-        ''' true if button highlighting is currently enabled '''
+        ''' true if button highlighting is currently enabled - this is either highlight or one of the shift keys held '''
         if not self.config.highlight_enabled or not self.config.highlight_input_buttons:
             # disabled
             return False
@@ -4794,6 +4808,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         el = gremlin.event_handler.EventListener()
         is_hotkey_autoswitch = self.config.highlight_hotkey_autoswitch
+        is_control = el.get_control_state()
+        if is_control:
+            return False # listen to axis only
         is_shifted = el.get_shifted_state() if is_hotkey_autoswitch else False
         return self.config.highlight_input_buttons or is_shifted or self._button_highlighting_enabled
     
@@ -4810,7 +4827,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         el = gremlin.event_handler.EventListener()
         is_hotkey_autoswitch = self.config.highlight_hotkey_autoswitch
-        is_control = el.get_shifted_state() if is_hotkey_autoswitch else False
+        is_shifted = el.get_shifted_state()
+        if is_shifted:
+            return False # listen to buttons only
+        is_control = el.get_control_state() if is_hotkey_autoswitch else False
         return self.config.highlight_input_axis or is_control or self._axis_highlighting_enabled
     
     @property

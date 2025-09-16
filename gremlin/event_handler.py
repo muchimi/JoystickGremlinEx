@@ -1100,7 +1100,8 @@ class EventListener:
 
 			# notify axis change for tab switches
 			if not gremlin.shared_state.is_running:
-				self.axis_state_change.emit(event)
+				if AxisState().shouldProcess(event,"state_change"):
+					self.axis_state_change.emit(event)
 
 			
 
@@ -2753,9 +2754,15 @@ class AxisData():
 		return None
 
 	
-	def getAxisValues(self, value : float = None) -> AxisValues:
-		''' gets the axis value as an AxisValues named tuple '''
+	def getAxisValues(self, value : float = None, action = None) -> AxisValues:
+		''' gets the axis value as an AxisValues named tuple
+		 
+		:param value: optional - input value if known
+		:param action: optiona - action requesting the value in case multiple curves are to be applied 
+		  
+		    '''
 		import gremlin.ui.axis_calibration
+		
 		device_guid = self.device_guid
 		input_id = self.input_id
 
@@ -2774,6 +2781,28 @@ class AxisData():
 			calibrated_value = calibration.getValue(raw_value, False) # do not normalize, input is already -1 to +1
 			actual_value = calibrated_value
 			has_calibration = True
+
+		# if action:
+		# 	# get all the curves that apply to this action
+		# 	if not isinstance(action.data, gremlin.base_profile.ActionTreeNode):
+		# 		profile = gremlin.shared_state.current_profile
+		# 		data = profile.getActionTree(action)
+		# 		action.data = data
+
+		# 	if action.data:
+		# 		curves = []
+		# 		root = action.data
+		# 		action_node = root.data
+		# 		# see if the action has any sibblings to apply to the curve
+		#		if action_node.tag_data:
+		#	 		curve_actions = [a for a in action_node.tagdata if a.tag in ("response-curve-ex","response-curve") and a.curve_data]
+		# 		if curve_actions:
+		# 			curves = [a.curve_data for a in curve_actions]
+		# 		if hasattr(action, "curve_data"):
+		# 			curves.append(action.curve_data)
+
+			
+
 
 		astate = AxisState()
 		curve_data = astate.getAxisCurve(device_guid, input_id)

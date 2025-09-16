@@ -52,9 +52,13 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
+        
+
         self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
         self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
-        self.main_layout.addWidget(self.mode_selector_widget)
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget,"Switch to mode:")
+        self.main_layout.addWidget(widget)
         self.ec = gremlin.execution_graph.ExecutionContext()
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._update_modes)
@@ -72,30 +76,27 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.mode_selector_widget):
             current_mode = self.action_data.mode # current mode
             self.mode_selector_widget.clear()
+            edit_mode = gremlin.shared_state.edit_mode
             
 
             # remove the current mode so we cannot switch to ourselves
             
-            modes = self.ec.getModeNames(as_tuple=True, include_current = False) # (display, mode)
+            modes = self.ec.getModeNames(as_tuple=True, include_current = False) # (display, mode) = exclude current mode
             if not modes:
                 # allow to select self if that's the only option (display, mode)
                 modes = self.ec.getModeNames(as_tuple=True)
-                
-            index = 0
-            select_index = None
-            for display, mode in modes:
-                #print (f"Mode: {display} -> {mode}")
-                self.mode_selector_widget.addItem(display, mode)
-                if select_index is None and mode == current_mode and current_mode is not None:
-                    select_index = index
-                index += 1
-            if select_index is not None:
-                with QtCore.QSignalBlocker(self.mode_selector_widget):
-                    self.mode_selector_widget.setCurrentIndex(select_index)
 
-            # ensure the displayed mode is saved
-            mode = self.mode_selector_widget.currentData()
-            self.action_data.mode = mode
+            for display, mode in modes:
+                self.mode_selector_widget.addItem(display, mode)
+
+            if modes:
+                if current_mode:
+                    index = self.mode_selector_widget.findData(current_mode)
+                    if index != -1:
+                        self.mode_selector_widget.setCurrentIndex(index)
+                else:
+                    # pick the default
+                    self.action_data.mode = self.mode_selector_widget.currentData()
         
 
     def _mode_selected_changed(self):
@@ -128,15 +129,15 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value, extra_data = None):
         import gremlin.control_action
         import gremlin.config        
-        import logging
         
         if event.is_pressed or value.current:
             verbose =  gremlin.config.Configuration().verbose
-            mode = self.action_data.mode
+            new_mode = self.action_data.mode
             current_mode =  gremlin.shared_state.runtime_mode
-            if mode and current_mode and mode != current_mode:
-                if verbose: syslog.info(f"ACTION SWITCH: mode switch from [{current_mode}] to [{mode}] requested")
-                gremlin.control_action.switch_mode(mode)
+            if verbose: syslog.info(f"ACTION SWITCH: mode switch from [{current_mode}] to [{new_mode}] requested")
+            if new_mode and current_mode and new_mode != current_mode:
+                if verbose: syslog.info(f"\switch to [{new_mode}]")
+                gremlin.control_action.switch_mode(new_mode)
         return True
 
 

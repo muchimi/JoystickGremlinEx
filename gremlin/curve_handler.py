@@ -1020,9 +1020,9 @@ class CurveView(QtWidgets.QGraphicsScene):
             self._select_item(self.item_list[0])
 
     def _model_changed(self):
-        eh = CurveEventHandler()
+        ch = CurveEventHandler()
         self.redraw_scene()
-        eh.value_changed.emit(self.value)
+        ch.value_changed.emit(self.value)
 
 
 
@@ -1581,8 +1581,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.last_value = 0
         self.curve_model = None
         self._create_ui()
-        eh = CurveEventHandler()
-        eh.value_changed.connect(self.update_value)
+        ch = CurveEventHandler()
+        ch.value_changed.connect(self.update_value)
 
         clipboard = gremlin.clipboard.Clipboard()
         clipboard.clipboard_changed.connect(self._update_clipboard)
@@ -1622,7 +1622,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
             curved = gremlin.util.clamp(curve_fn(value),-1.0, +1.0)
             self.input_curved_widget.setText(f"{curved:0.3f}")
 
-            self.reapeater_widget.setValue(curved)
+            # show the curve output and the input 
+            self.reapeater_widget.setValue([curved, value])
 
         self.last_value = value
         self.curve_scene.value = value
@@ -1805,9 +1806,6 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
 
 
-        
-
-
         self.container_repeater_layout.addWidget(QtWidgets.QLabel("Input:"))
         self.container_repeater_layout.addWidget(self.input_raw_widget)
         self.container_repeater_layout.addWidget(QtWidgets.QLabel("Curved:"))
@@ -1847,6 +1845,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
         # Set deadzone values
         self.deadzone_widget.setValues(self.curve_data.deadzone)
         self.deadzone_widget.isCentered = self.curve_data.isCentered
+
+        # update repeater
+        self._update_value_ui(0) # assume centered as a default
+
 
     @QtCore.Slot(bool)
     def _centered_changed_cb(self, checked):
@@ -2105,6 +2107,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_data.isCentered = is_centered
         self._change_curve_type(curve_type, control_points)
         self._update_ui()
+        self.curve_data.curve_update()
         self.update_value(self.last_value)
 
     @QtCore.Slot() 

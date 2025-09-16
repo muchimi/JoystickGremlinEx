@@ -1282,9 +1282,16 @@ class ActionSetView(ui_common.AbstractView):
         # not associated with a vJoy device
         if self.view_type == ui_common.ContainerViewTypes.Action and \
                 self.profile_data.get_device_type() != DeviceType.VJoy:
+            if hasattr(profile_data,"override_input_type"):
+                # override specified
+                input_type = profile_data.override_input_type
+            else:
+                input_type = profile_data.parent.getInputType()
+                
+
             
             self.action_selector = gremlin.ui.ui_common.ActionSelector(
-                profile_data.parent.getInputType(),
+                input_type,
                 profile_data.input_item
             )
             self.action_selector.inputItem = profile_data.input_item
@@ -3500,9 +3507,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             parent = self
         )
         action_set_view.setModel(action_set_model)
-        action_set_view.interacted.connect(
-            lambda x: self._handle_interaction(action_set_view, x)
-        )
+        action_set_view.interacted.connect(lambda x: self._handle_interaction(action_set_view, x))
 
         # Store the view widget so we can use it for interactions later on
         self.action_widgets.append(action_set_view)
@@ -3753,7 +3758,6 @@ class TitleBarButton(QtWidgets.QAbstractButton):
 
         # syslog.info("title paint start")
         p = QtGui.QPainter(self)
-        # p.begin(self)
 
         options = QtWidgets.QStyleOptionToolButton()
         options.initFrom(self)

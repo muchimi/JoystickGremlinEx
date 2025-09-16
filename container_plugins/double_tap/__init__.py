@@ -397,7 +397,7 @@ and another action on input double-click (tap)'''
 
         :param node the XML node with which to populate the container
         """
-        super()._parse_xml(node, data)
+        super()._parse_xml(node, data, extra_data)
         self.delay = gremlin.profile.safe_read(node, "delay", float, 0.5)
         self.activate_on = \
             gremlin.profile.safe_read(node, "activate-on", str, "combined")

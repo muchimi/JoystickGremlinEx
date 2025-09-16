@@ -664,7 +664,7 @@ class ExecutionContext():
     def getModes(self) -> list:
         ''' returns the list of defined modes in the execution tree '''
         return [node.mode for node in anytree.PreOrderIter(self.graph) if node.nodeType == ExecutionGraphNodeType.Mode and node.mode]
-        
+    
     
     def getCallbacks(self, callbacks, key, mode):
         callback_list = []

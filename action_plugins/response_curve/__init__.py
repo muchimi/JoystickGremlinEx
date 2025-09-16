@@ -1180,8 +1180,9 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Response Curve Ex</i> for additional functionality", use_wrap=False)
+        
+        msg = "Deprecated legacy action - please use <i><b>Vjoy Remap</b></i> or <i><b>Response Curve Ex</b></i> instead. This action is not aware of all GremlinEx features."
+        warning_widget = gremlin.ui.ui_common.QWarningWidget(msg)
         self.main_layout.addWidget(warning_widget)
 
 

@@ -412,7 +412,7 @@ class KeyboardHook:
 
     def stop(self):
         """Stops the hook from running."""
-        syslog.info("KBD: stop")
+        # syslog.info("KBD: stop")
         if self._running:
             self._running = False
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
@@ -522,7 +522,7 @@ class MouseHook:
     def stop(self):
         """Stops the hook from running."""
         
-        syslog.info("MOUSE: stop")
+        #syslog.info("MOUSE: stop")
         if self._running:
             self._running = False
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)

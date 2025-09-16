@@ -32,6 +32,7 @@ from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
 import gremlin.config
+from gremlin.util import safe_format, safe_read
 import logging
 from shiboken6 import Shiboken
 
@@ -71,18 +72,19 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
     """Basic container which holds a single action."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, action_data, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        super().__init__(action_data, parent)
 
     def _create_action_ui(self):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
+        
         gremlin.ui.ui_common.clear_layout(self.action_layout)
 
         self.options_layout = QtWidgets.QHBoxLayout()
@@ -104,35 +106,56 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         self.action_layout.addLayout(self.options_layout)
 
         # Create hat direction action sets
+        self._ensureActionSet(self.profile_data.button_count)
         if self.profile_data.button_count == 4:
             for i, direction in enumerate(_four_names):
-                if self.profile_data.action_sets[i] is None:
-                    self._add_action_selector(
-                        lambda x: self._add_action(i, x),
-                        direction
-                    )
-                else:
-                    self._create_action_widget(
-                        i,
-                        direction,
-                        self.action_layout,
-                        gremlin.ui.ui_common.ContainerViewTypes.Action
-                    )
+                self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+                self._create_action_widget(
+                    i,
+                    direction,
+                    self.action_layout,
+                    gremlin.ui.ui_common.ContainerViewTypes.Action
+                )
+            self._add_action_selector(lambda x: self._add_action(i, x),direction, lambda x: self._paste_action(i, x)
+                                          )
         elif self.profile_data.button_count == 8:
             for i, direction in enumerate(_eight_names):
-                if self.profile_data.action_sets[i] is None:
-                    self._add_action_selector(lambda x: self._add_action(i, x), direction)
-                else:
-                    self._create_action_widget(
-                        i,
-                        direction,
-                        self.action_layout,
-                        gremlin.ui.ui_common.ContainerViewTypes.Action
-                    )
+                self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+                self._create_action_widget(
+                    i,
+                    direction,
+                    self.action_layout,
+                    gremlin.ui.ui_common.ContainerViewTypes.Action
+                )
+            self._add_action_selector(lambda x: self._add_action(i, x), direction, lambda x: self._paste_action(i, x))
         else:
             pass
 
         self.action_layout.addStretch()
+
+    def _ensureActionSet(self, index):
+        while index > len(self.profile_data.action_sets):
+            self.profile_data.action_sets.append([])
+
+    def _add_action_selector(self, add_action_cb, label, paste_action_cb = None):
+        """Adds an action selection UI widget.
+
+        :param add_action_cb function to call when an action is added
+        :param label the description of the action selector
+        """
+        input_item = self.profile_data.input_item
+        action_selector = gremlin.ui.ui_common.ActionSelector(InputType.JoystickButton, input_item)
+        action_selector.action_added.connect(add_action_cb)
+        if paste_action_cb:
+            action_selector.action_paste.connect(paste_action_cb)
+
+        group_layout = QtWidgets.QVBoxLayout()
+        group_layout.addWidget(action_selector)
+        group_layout.addStretch(1)
+        group_box = QtWidgets.QGroupBox(label)
+        group_box.setLayout(group_layout)
+
+        self.action_layout.addWidget(group_box)        
 
     def _create_condition_ui(self):
         if not self.profile_data.action_sets:
@@ -158,6 +181,8 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
+    
+
     def _create_action_widget(self, index, label, layout, view_type):
         """Creates a new action widget.
 
@@ -166,29 +191,62 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         :param layout the layout widget to populate
         :param view_type the visualization type being used
         """
+        self._ensureActionSet(index)
         widget = self._create_action_set_widget(
             self.profile_data.action_sets[index],
             label,
-            view_type
+            view_type,
+
         )
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
 
-    def _add_action(self, index, action_name):
-        """Adds a new action to the container.
-
-        :param action_name the name of the action to add
+    def _add_action(self, index, action):
+        """Adds a new action to the container action set.
+        :param index: the action set to add the action to
+        :param action - action or action
         """
+        from gremlin.clipboard import Clipboard
+        if action is None:
+            return
+        
         gremlin.util.pushCursor()
+
         try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            action_item.data = index
-            self.profile_data.add_action(action_item)
+
+            if isinstance(action, str):
+                action_name = action
+                plugin_manager = gremlin.plugin_manager.ActionPlugins()
+                action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            elif isinstance(action, Clipboard):
+                # paste operation
+                if action.is_action:
+                    # verify the action in the clipboard is appropriate for this input
+
+                    action_item = plugin_manager.duplicate(action.data, self.profile_data)
+
+            self.profile_data.add_action(action_item, index)
             self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
+
+
+    def _paste_action(self, index, action):
+        ''' paste action'''
+
+        gremlin.util.pushCursor()
+        try:
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.duplicate(action, self.profile_data)
+            if self.profile_data.action_sets[index] is None:
+                self.profile_data.action_sets[index] = []
+            self.profile_data.action_sets[index].append(action_item)
+            self.profile_data.create_or_delete_virtual_button()
+        finally:
+            gremlin.util.popCursor()
+
+
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -344,8 +402,19 @@ class HatButtonsContainer(AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.button_count = 4
-        self.action_sets = [[], [], [], []]
+        self.button_count = 8
+        self.action_sets = []
+        for _ in range(self.button_count):
+            self.action_sets.append([])
+
+        # make actions think we're attached to a button
+        self.override_input_id = 1
+        self.override_input_type = InputType.JoystickButton
+
+
+    def get_input_type(self):
+        ''' override input type for action selectors '''
+        return self.override_input_type
 
 
     def _parse_xml(self, node, data = None, extra_data = None):
@@ -353,9 +422,8 @@ class HatButtonsContainer(AbstractContainer):
 
         :param node the XML node with which to populate the container
         """
-        self.button_count = gremlin.profile.safe_read(
-            node, "button-count", int, 4
-        )
+        self.button_count = gremlin.profile.safe_read(node, "button-count", int, 8)
+       
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -365,6 +433,7 @@ class HatButtonsContainer(AbstractContainer):
         node = ElementTree.Element("container")
         node.set("type", HatButtonsContainer.tag)
         node.set("button-count", str(self.button_count))
+
         for action_set in self.action_sets:
             as_node = ElementTree.Element("action-set")
             for action in action_set:
