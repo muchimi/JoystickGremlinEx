@@ -724,7 +724,7 @@ def find_files(root_folder, source_pattern = "*") -> list:
     
     wd = os.getcwd()
     os.chdir(root_folder)
-    process = subprocess.Popen(["cmd", "/c", "dir", source_pattern, "/b","/s"],stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(["cmd", "/c", "dir", source_pattern, "/b","/s"],creationflags=subprocess.CREATE_NO_WINDOW, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = process.communicate()
     os.chdir(wd)
     encoding = 'utf-8'

@@ -5639,6 +5639,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             widget,layout = getVContainer()
             # widget.setStyleSheet("border: 1px solid;")
             widget.setFixedWidth(80)
+            widget.setFixedHeight(150)
             sd = gremlin.event_handler.AxisState()
 
             if index in axis_list:
@@ -5649,9 +5650,14 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 name_index +=1
                 axis_label = QtWidgets.QLabel(f"Axis {axis_name}")
                 self.index_map[axis_id] = index
+                values = sd.getAxisValues(device.device_guid, input_id)    
+                if values is None:
+                    syslog.error(f"AxisCurrentState: unregistered axis [{device.name}] id: [{device.device_guid}] axis: [{input_id}]") 
+                    continue
  
                 axis_widget = QHookedProgressBar()
-                values = sd.getAxisValues(device.device_guid, input_id)    
+                
+               
                 value = values[0]
                 #value = gremlin.joystick_handling.get_axis(device.device_guid, index)
                 
@@ -5695,11 +5701,12 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
     @QtCore.Slot()
     def _value_changed(self):
-        widget = self.sender()
-        input_id = widget.data
-        value = widget.value()
-        device_guid = self.device.device_guid
-        gremlin.joystick_handling.set_axis(device_guid, input_id, value)
+        pass
+        # widget = self.sender()
+        # input_id = widget.data
+        # value = widget.value()
+        # device_guid = self.device.device_guid
+        #gremlin.joystick_handling.set_axis(device_guid, input_id, value)
         #self._set_value(index, value)
 
     def _set_value(self, index : int, value : float | list):
@@ -5728,7 +5735,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             )
             axis_index = self.index_map[axis_id]
             value = event.value
-            if self.show_raw:
+            if self.show_raw and not event.is_virtual:
                 sd = gremlin.event_handler.AxisState()
                 values = sd.getAxisValues(self.device.device_guid, axis_index)
                 self._set_value(axis_index, values)    
@@ -6234,6 +6241,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self._hooked = False
         self.show_raw = True # true if raw value is displayed
         self._as = gremlin.event_handler.AxisState()
+
         
 
     @property
@@ -6325,15 +6333,18 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             el.joystick_event.disconnect(self._current_axis_update)
+            el.vjoy_event.disconnect(self._vjoy_current_axis_update) # hook vjoy separately
             # if self._device.is_virtual:
             #     el.unregisterVjoyCallback(self._vjoy_current_axis_update)
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             el.joystick_event.disconnect(self._temporal_axis_update)
+            el.vjoy_event.disconnect(self._vjoy_temporal_axis_update) # hook vjoy separately
             # if self._device.is_virtual:
             #     el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._unhook_buttons()
             el.joystick_event.disconnect(self._button_hat_update)
+            el.vjoy_event.connect(self._vjoy_button_hat_update)
             # if self._device.is_virtual:
             #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
@@ -6403,6 +6414,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             event = gremlin.event_handler.Event(event_type = event.input_type,
                                                 identifier = event.input_id,
                                                 is_pressed = event.value,
+                                                is_virtual= True,
                                                 device_guid= self.device_guid,
                                                 value = event.value)
             gremlin.util.InvokeUiMethod(self._vjoy_button_hat_update_ui, event) # on ui thread
@@ -6426,7 +6438,12 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if self._device.vjoy_id != event.vjoy_id:
             return
         if event.input_type == InputType.JoystickAxis:
-            event = gremlin.event_handler.Event(event_type = event.input_type, identifier = event.input_id, device_guid= self.device_guid, value=event.value)
+            syslog.info(f"vjoy event: device: [{event.vjoy_id}] input:[{event.input_id}] value: {event.value:0.3f}")
+            event = gremlin.event_handler.Event(event_type = event.input_type,
+                                                is_virtual=True,
+                                                identifier = event.input_id,
+                                                device_guid = self.device_guid,
+                                                value=event.value)
             gremlin.util.InvokeUiMethod(self._vjoy_current_axis_update_ui, event) # on ui thread
 
 

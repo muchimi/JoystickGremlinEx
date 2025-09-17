@@ -14,6 +14,14 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T62A) hotfix
+- Fix: State not changing to the commanded state in map to state depending on how the state change was triggered.
+- Fix: Height of the bar axis repeater in Input Viewer could drop to zero making the bar visuals invisible in some situations.  
+- Fix: Virtual devices like VIGEM, OSC and VJOY did not register their axis states if not used as input, causing a data read fail when queried in the new API.  
+- Fix: blank window sometimes visible while saving a profile.
+- Fix: vjoy remap no longer shows momentary button options when mapped to a linear input.
+
+
 ### (m76T62)
 - API: axis input and computation of calibrated and curve data was refactored and centralized.  This indirectly impacts processing of other items and removed some dragons along the way.
 - New: axis repeaters support multiple data channels. If the axis value has transforms, each will be displayed as an additional channels (bars). If the input is both calibrated and curved, the repeater will display three bars, output, calibrated and curved.  GremlinEx applies calibration first, followed by curves.  This was added to better visualize axis data and the impact of transforms at design time.

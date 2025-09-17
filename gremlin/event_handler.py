@@ -2881,14 +2881,38 @@ class AxisState():
 
 	def _update_inputs(self):
 		''' reload all axes on profile load '''
-		profile = gremlin.shared_state.current_profile
-		for device_guid in profile.devices:
-			for mode_name in profile.devices[device_guid].modes:
-				mode_object = profile.devices[device_guid].modes[mode_name]
-				for input_type in mode_object.config:
-					for input_item in mode_object.config[input_type].values():
-						self.registerAxisInputItem(input_item)
+		# profile = gremlin.shared_state.current_profile
+		# for device_guid in profile.devices:
+		# 	for mode_name in profile.devices[device_guid].modes:
+		# 		mode_object = profile.devices[device_guid].modes[mode_name]
+		# 		for input_type in mode_object.config:
+		# 			for input_item in mode_object.config[input_type].values():
+		# 				self.registerAxisInputItem(input_item)
+		import gremlin.joystick_handling
+		for device in gremlin.joystick_handling.getDevices():
+			if device.connected:
+				self.registerDevice(device)
+		config = gremlin.config.Configuration()
+		verbose = config.verbose_mode_inputs or config.verbose_mode_joystick
+		if verbose:
+			syslog.info("Axis input list:")
+			for (device_guid, input_id) in self._data:
+				name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+				syslog.info(f"\t{name} axis [{input_id}]")
 
+
+
+	def registerDevice(self, device : dinput.DeviceSummary):
+		''' registers axes for a given device '''
+		if device.axis_count:
+			device_guid = device.device_guid
+			for index in range(device.axis_count):
+				input_id = device.getAxisInputId(index)
+				if input_id is None:
+					continue # not valid
+				key = self._get_key(device_guid, input_id)
+				if not key in self._data:
+					self._data[key] = AxisData(device_guid, input_id)
 
 	
 	

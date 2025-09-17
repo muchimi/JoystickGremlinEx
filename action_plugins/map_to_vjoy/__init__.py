@@ -2985,6 +2985,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         button_range_visible = False
         output_mode_visible = False # output mode for button output
         output_curve_visible = False
+        options_visible = False
 
 
         override_visible = False
@@ -3047,6 +3048,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 start_visible = True
             paired_visible = action == VjoyAction.VJoyButtonPress
             exec_on_release_visible =  action_data.input_type in VJoyRemapWidget.input_type_buttons
+            options_visible = True
             
         elif input_type == InputType.JoystickHat:
             if action == VjoyAction.VJoyHatToButton:
@@ -3055,7 +3057,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 show_grid_visible = False
             start_visible = True
             input_selector_visible = not hat_visible
-            
+            options_visible = True
 
 
 
@@ -3155,7 +3157,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_pulse_widget.setVisible(pulse_visible)
         self.button_pulse_repeat_widget.setVisible(repeat_visible)
         
-
+        self.container_options_widget.setVisible(options_visible)
         self.container_target_widget.setVisible(relative_target_visible)
         self.container_relative_widget.setVisible(default_target_visible)
         self.container_repeater_widget.setVisible(repeater_visible)

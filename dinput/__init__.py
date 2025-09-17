@@ -632,14 +632,11 @@ class DeviceSummary:
     
     def getAxisInputId(self, linear_index : int):
         ''' Gets the input for the linear index
-        :param index: index 
-        :param is_linear: true if the index is the linear axis index (range 0 to axis_count), false if the axis identifier
+        :param index: index 0 to axis_count -1 
         '''
-        am : AxisMap
-        for am in self.axismap_list:
-            if am.linear_index == linear_index:
-                return am.axis_index
-        return None
+        linear_index += 1 # linear index is 1 based
+        return next((am.axis_index for am in self.axismap_list if am.linear_index == linear_index), None)
+        
     
     def update(self):
         ''' updates device connectivity '''

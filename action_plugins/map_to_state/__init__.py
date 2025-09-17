@@ -740,7 +740,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
         verbose = gremlin.config.Configuration().verbose_mode_state
 
-        if event.event_type == InputType.JoystickButton:
+        if event.event_type != InputType.JoystickHat:
             key = self.action_data.key
             mode = self.action_data.mode
             is_pressed = event.is_pressed
@@ -751,18 +751,19 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
     
                 match mode:
                     case "actual":
-                        if verbose: syslog.info(f"STATE: set [{key}] ACTUAL {is_pressed}")
+                        if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] ACTUAL {is_pressed}")
                         self.sd.setValue(key, is_pressed)
                     case "press":
-                        if verbose: syslog.info(f"STATE: set [{key}] ON")
+                        if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] ON")
                         self.sd.setValue(key, True)
                         
                     case "release":
-                        if verbose: syslog.info(f"STATE: set [{key}] OFF")
+                        
+                        if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] OFF")
                         self.sd.setValue(key, False)
                     case "toggle":
                         is_pressed = not self.sd.value(key)
-                        if verbose: syslog.info(f"STATE: set [{key}] TOGGLE -> {'ON' if value else 'OFF'}")
+                        if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] TOGGLE -> {'ON' if value else 'OFF'}")
                         self.sd.setValue(key, is_pressed)
                     case "pulse":
                         if is_pressed:
@@ -798,6 +799,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                     case ButtonOutputMode.Hold:
                         if is_pressed:
                             # release the prior buttons
+                            if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] hold")
                             for pressed_position in pressed_positions:
                                 if position == pressed_position:
                                     continue
@@ -807,10 +809,12 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                                 del self.pressed_hat_buttons[pressed_position]
 
                     case ButtonOutputMode.Press:
+                        if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] press/on")
                         is_pressed = True
                         if position in self.pressed_hat_buttons:
                             del self.pressed_hat_buttons[position]
                     case ButtonOutputMode.Release:
+                        if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] release/off")
                         is_pressed = False # force a release on trigger
                         if position in self.pressed_hat_buttons:
                             del self.pressed_hat_buttons[position]

@@ -480,6 +480,14 @@ def known_devices() -> list:
     ''' gets the list of device GUID (strings) known to GremlinEx '''
     return [guid for guid in _joystick_device_guid_map.keys()]
 
+def getKnownDevicesGuids() -> list:
+    ''' gets a list of known device GUIDs '''
+    return [gremlin.util.parse_guid(id) for id in known_devices()]
+
+def getDevices() -> list[dinput.DeviceSummary]:
+    ''' gets a list of known devices, physical and virtual '''
+    return [dev for dev in _joystick_device_guid_map.values()]
+
 def getDevice(device_guid):
     ''' gets a device summary '''
     return device_info_from_guid(device_guid)
