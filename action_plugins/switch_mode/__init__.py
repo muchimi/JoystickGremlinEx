@@ -61,14 +61,34 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(widget)
         self.ec = gremlin.execution_graph.ExecutionContext()
         el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.connect(self._update_modes)
-        el.execution_context_changed.connect(self._update_modes)
+        el.profile_modes_changed.connect(self._update_modes)
+        el.execution_context_changed.connect(self._update_context_modes)
         self._update_modes()
 
-            
 
     @QtCore.Slot()
     def _update_modes(self):
+        ''' called when mode list needs to be updated '''
+        # update the list of available modes 
+        if not Shiboken.isValid(self.mode_selector_widget):
+            return
+        profile = gremlin.shared_state.current_profile
+        mode_list = gremlin.ui.ui_common.get_mode_list(profile)
+        
+        with QtCore.QSignalBlocker(self.mode_selector_widget):
+            current_mode = self.mode_selector_widget.currentData()
+            self.mode_selector_widget.clear()
+            for display, mode in mode_list:
+                self.mode_selector_widget.addItem(display, mode)
+
+            if current_mode:
+                index = self.mode_selector_widget.findData(current_mode)
+                if index != -1:
+                    self.mode_selector_widget.setCurrentIndex(index)
+   
+
+    @QtCore.Slot()
+    def _update_context_modes(self):
         ''' called when mode list needs to be updated '''
         # update the list of available modes 
         if not Shiboken.isValid(self.mode_selector_widget):

@@ -704,18 +704,7 @@ def idString(value):
     return value
     
 
-def compare_guid(first, other):
-    ''' compares GUIDs DINPUT or str - True if equal'''
-    if first is None and other is None:
-        return True
-    if first is None:
-        return False
-    if other is None:
-        return False
-    first = str(first).casefold()
-    other = str(other).casefold()
-    return first == other
-    
+   
 def find_files(root_folder, source_pattern = "*") -> list:
     ''' runs native file search to find files without blowing up on borked sym links in windows unlike rglob - returns full paths to the found file pattern '''
     import subprocess
@@ -1113,7 +1102,7 @@ def write_guid(guid):
     :param guid the GUID object to turn into a string
     :return string representation of the guid object
     """
-    return str(guid)
+    return normalize_guid(guid)
 
 
 def safe_read(node, key, type_cast, default_value):
@@ -2262,6 +2251,7 @@ def normalize_guid(device_guid) -> str:
         else:
             device_guid = str(device_guid).casefold().replace("-","").replace("{","").replace("}","")
     else:
+        # string
         device_guid = device_guid.casefold().replace("-","").replace("{","").replace("}","")
     return device_guid
 
@@ -2269,16 +2259,19 @@ def compare_guid(id1, id2) -> bool:
     ''' compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against '''
     if id1 is None and id2 is None: return True
     if id1 is None or id2 is None: return False
-    id1 = normalize_guid(id1)
+    nid1 = normalize_guid(id1)
+    assert not "-" in nid1 or "{" in nid1,f"Bad normalization [{id1}] -> [{nid1}]"
     if hasattr(id2, '__iter__'):
         for id in id2:
             a = normalize_guid(id)
-            if id1 == a:
+            assert not "-" in a or "{" in id,f"Bad normalization [{id}] -> [{a}]"
+            if nid1 == a:
                 return True
         return False
     else:
-        id2 = normalize_guid(id2)
-        return id1 == id2
+        nid2 = normalize_guid(id2)
+        assert not "-" in nid2 or "{" in nid2,f"Bad normalization [{id2}] -> [{nid2}]"
+        return nid1 == nid2
 
 def getTemporaryFile(ext = None):
     ''' gets a temporary file '''

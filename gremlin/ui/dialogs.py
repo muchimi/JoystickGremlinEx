@@ -871,6 +871,16 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         col2_layout.addWidget(box)
 
+
+        box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Options", transparent = True)
+        hide_default_mode_widget = QtWidgets.QCheckBox("Hide default mode")
+        hide_default_mode_widget.setToolTip("When set, the default mode won't be displayed if another root mode exists and no assignments to the default mode exist.")
+        hide_default_mode_widget.setChecked(self.config.hide_default_mode)
+        hide_default_mode_widget.clicked.connect(self._hide_default_mode_changed)
+        box.addWidget(hide_default_mode_widget)
+
+        col1_layout.addWidget(box)
+
         widget, layout = gremlin.ui.ui_common.getVContainer()
         layout.addWidget(page_widget)
         layout.addStretch()
@@ -1255,6 +1265,10 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
     @QtCore.Slot(bool)
     def _show_id_changed(self, checked):
         self.config.show_container_id = checked
+
+    @QtCore.Slot(bool)
+    def _hide_default_mode_changed(self, checked):
+        self.config.hide_default_mode = checked
 
     def _create_osc_page(self):
         page_widget = QtWidgets.QWidget()
@@ -2785,8 +2799,8 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         el = gremlin.event_handler.EventListener()
         if self.selected_mode:
             el.edit_mode_changed.emit(self.selected_mode)
-        el.keyboard_hook.start()
 
+        el.keyboard_hook.start()
         el.profile_modes_changed.emit() # tell the UI the profile mode options have changed
 
         super().closeEvent(event)

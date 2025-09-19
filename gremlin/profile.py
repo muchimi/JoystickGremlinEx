@@ -65,7 +65,7 @@ class ProfileConverter:
     """Handle converting and checking profiles."""
 
     # Current profile version number
-    current_version = 12
+    current_version = 13
 
     def __init__(self):
         pass
@@ -126,7 +126,8 @@ class ProfileConverter:
             9: None,
             10: self._convert_from_v10,
             11: self._convert_from_v11,
-            12: None,
+            12: self._convert_from_v12,
+            13: None,
         }
 
         # Create a backup of the outdated profile
@@ -927,8 +928,30 @@ class ProfileConverter:
 
         
 
-            
+    def _convert_from_v12(self, root, fname = None):
+        ''' convert from V12 to V13 - convert master mode GUID to new format  '''
+        import gremlin.util
+        root.attrib["version"] = "13" # change version
 
+        # calatog map to state nodes
+        nodes = root.xpath("//mode")
+        master_mode = gremlin.shared_state.master_mode
+        for node in nodes:
+            if "name" in node.attrib:
+                name = node.get("name")
+                if name == "{B3B159A0-4D06-4BD6-93F9-7583EC08B877}":
+                    node.set("name", master_mode)
+
+        # convert device GUIDs
+        nodes = root.xpath("//devices/device")
+        for node in nodes:
+            if "device-guid" in node.attrib:
+                id = node.get("device-guid")
+                node.set("device_guid", gremlin.util.normalize_guid(id))
+
+
+
+        return root
             
 
 

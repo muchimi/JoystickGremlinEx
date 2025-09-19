@@ -4698,8 +4698,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' called when mode list has changed '''
 
         # update the mode selector to the correct edit mode
-        self.mode_selector.select_mode(mode)
-        gremlin.event_handler.EventHandler().set_edit_mode(mode)
+        if mode:
+            self.mode_selector.select_mode(mode)
+            gremlin.event_handler.EventHandler().set_edit_mode(mode)
         self._update_mode_status_bar()
 
     def _runtime_mode_changed(self, mode : str):

@@ -52,7 +52,7 @@ class _GUID(ctypes.Structure):
 
       
     def toId(self):
-        ''' converts to short string lowercase format '''
+        ''' converts to short string lowercase format - no dashes or brackets '''
         s = f"{self.Data1:08x}{self.Data2:04x}{self.Data3:04x}"
         for b in self.Data4:
             s += f"{b:02x}"
@@ -190,17 +190,12 @@ class GUID:
         return self._ctypes_guid
     
     def toId(self):
-        return f"{self.guid[0]:08x}{self.guid[1]:04x}{self.guid[2]:04x}{self.guid[3]:04X}{self.guid[4]:012x}"
+        return str(self)
+        #return f"{self.guid[0]:08x}{self.guid[1]:04x}{self.guid[2]:04x}{self.guid[3]:04x}{self.guid[4]:012x}"
 
     def __str__(self):
-        """Returns a string representation of the GUID.
-
-        Returns
-        =======
-        str
-            GUID string representation in hexadecimal
-        """
-        return f"{{{self.guid[0]:08X}-{self.guid[1]:04X}-{self.guid[2]:04X}-{self.guid[3]:04X}-{self.guid[4]:012X}}}"
+        """Returns a string representation of the GUID. No dashes or brackets, lowercase """
+        return f"{self.guid[0]:08x}{self.guid[1]:04x}{self.guid[2]:04x}{self.guid[3]:04x}{self.guid[4]:012x}"
 
     def __eq__(self, other):
         """Returns whether or not two GUID instances are identical.

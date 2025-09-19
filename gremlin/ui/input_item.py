@@ -1285,15 +1285,18 @@ class ActionSetView(ui_common.AbstractView):
         
         # Only permit adding actions from the basic tab and if the tab is
         # not associated with a vJoy device
+        
         if self.view_type == ui_common.ContainerViewTypes.Action and \
                 self.profile_data.get_device_type() != DeviceType.VJoy:
+            input_type = None
             if hasattr(profile_data,"override_input_type"):
                 # override specified
                 input_type = profile_data.override_input_type
             else:
                 input_type = profile_data.parent.getInputType()
                 
-
+            if input_type is None:
+                input_type = profile_data.input_item.get_input_type()
             
             self.action_selector = gremlin.ui.ui_common.ActionSelector(
                 input_type,

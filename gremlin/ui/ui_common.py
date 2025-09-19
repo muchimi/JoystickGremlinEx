@@ -2533,7 +2533,10 @@ class ActionSelector(QtWidgets.QWidget):
         self.input_type = input_type if self._input_type is None else self._input_type
         with QtCore.QSignalBlocker(self.action_dropdown):
             self.action_dropdown.clear()
-            for name in self._valid_action_list(input_type):
+            action_list = self._valid_action_list(input_type)
+            if not action_list:
+                pass
+            for name in action_list:
                 self.action_dropdown.addItem(name)
             config = gremlin.config.Configuration()
             self.action_dropdown.setCurrentText(config.last_action)
@@ -2693,11 +2696,13 @@ def _inheritance_tree_to_labels(labels, tree, level):
     # skip the root node
     for child in tree.children:
         for pre, _, node in anytree.RenderTree(child, style=ModeStyle()):
+            if node.parent.is_root:
+                pre = ''
             labels.append((node.name,f"{pre}{node.name}"))
+    pass
 
-def get_mode_list(profile_data):
+def get_mode_list(profile):
     ''' gets a pairs (display_name, mode) '''
-    profile = profile_data
     mode_list = []
     
     # Create mode name labels visualizing the tree structure
@@ -2711,9 +2716,12 @@ def get_mode_list(profile_data):
     # their correct parent
     mode_names = [n[0] for n in labels]
     display_names = [n[1] for n in labels]
+    master_mode = gremlin.shared_state.master_mode
 
     # Add properly arranged mode names to the drop down list
     for display_name, mode_name in zip(display_names, mode_names):
+        if mode_name == master_mode:
+            continue
         mode_list.append((display_name, mode_name))
 
 
@@ -2884,6 +2892,7 @@ class ModeWidget(QtWidgets.QWidget):
         # disconnected and then at the end reconnected again.
         with QtCore.QSignalBlocker(self.edit_mode_selector):
             self.profile = profile
+            hide_default_mode = gremlin.config.Configuration().hide_default_mode
 
             modes = gremlin.shared_state.current_profile.get_modes()
             while self.edit_mode_selector.count() > 0:
@@ -2899,12 +2908,33 @@ class ModeWidget(QtWidgets.QWidget):
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
 
             if not last_edit_mode in modes:
-                last_edit_mode = gremlin.shared_state.current_profile.get_default_mode()
+                last_edit_mode = profile.get_default_mode()
+                #hide_default_mode = False # show default mode
+
+            if hide_default_mode:
+                # see if another root level mode exists
+                root_modes = profile.get_root_modes()
+                master_mode = gremlin.shared_state.master_mode
+                if "Default" in root_modes:
+                    root_modes.remove("Default")
+                if master_mode in root_modes:
+                    root_modes.remove(master_mode)
+                if not root_modes:
+                    # no root mode available - don't hide default mode
+                    hide_default_mode = False
+                else:
+                    # more than one root available - see if we have any mappings in the default mode
+                    if profile.get_mode_used("Default"):
+                        hide_default_mode = False # default mode has mappings, don't hide default mode
+
+                
 
 
             master_mode = gremlin.shared_state.master_mode
             for display_name, mode_name in mode_list_pairs:
                 if mode_name == master_mode:
+                    continue
+                if mode_name == "Default" and hide_default_mode:
                     continue
                 self.edit_mode_selector.addItem(display_name, mode_name)
                 # self.mode_list.append(mode_name)

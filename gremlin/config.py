@@ -2429,3 +2429,10 @@ class Configuration(QtCore.QObject):
         self._set_data("last_control_action", value)
 
         
+    @property
+    def hide_default_mode(self):
+        return self._get_data("hide_default_mode", True)
+    @hide_default_mode.setter
+    def hide_default_mode(self, value : bool):
+        self._set_data("hide_default_mode", value)
+        

@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T62B) hotfix
+- Fix: V13 profile version, converts old style GUIDs to new style GUIDs for consistency across the board.  This will bump profile versions to version 13.
+- New: Hide default mode option. This will make the "Default" profile disappear from the mode drop down boxes provided that (1) Another root level mode exists (2) the default mode has no mappings in it.  If neither are true, the mode will show even if the option to hide it is enabled for obvious reasons.
+
 ### (m76T62A) hotfix
 - Fix: State not changing to the commanded state in map to state depending on how the state change was triggered.
 - Fix: Height of the bar axis repeater in Input Viewer could drop to zero making the bar visuals invisible in some situations.  

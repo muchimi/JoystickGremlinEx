@@ -3052,6 +3052,8 @@ class Profile():
         # skip the root node
         for child in tree.children:
             for pre, _, node in anytree.RenderTree(child, style=gremlin.ui.ui_common.ModeStyle()):
+                if node.parent.is_root:
+                    pre = ''
                 labels.append((node.name,f"{pre}{node.name}"))
 
     def get_mode_display_list(self) -> list:
@@ -3084,7 +3086,8 @@ class Profile():
     def _ensure_mode_tree(self):
         
         if not self._mode_tree:
-            self._mode_tree = ModeNode()
+            self._mode_tree = ModeNode() # root node
+            self._mode_tree.isModeRoot = True
         
             # add default mode
             default_mode = ModeNode("Default")
@@ -3293,13 +3296,16 @@ class Profile():
     def set_mode_parent(self, name, inherited_name, emit = True) -> bool:
         ''' sets the parent of a current mode'''
 
-        node = anytree.find(self._mode_tree, lambda node: node.name == name)
+        root = self._mode_tree
+        
+        node = anytree.find(root, lambda node: node.name == name)
         if node is None:
             return
-        
+
+       
         node_parent = anytree.find(self._mode_tree, lambda node: node.name == inherited_name)
         if node_parent is None:
-            return
+            node_parent = root
         
         node.parent = node_parent
 
@@ -3482,6 +3488,18 @@ class Profile():
             break
 
         return modes
+    
+    def get_mode_used(self, mode_name) -> bool:
+        ''' true if the mode contains mapping information somewhere '''
+        for device in self.devices.values():
+            for mode_object in device.modes.values():
+                if mode_object.name != mode_name:
+                    continue
+                for input_type in mode_object.config.keys():
+                    for input_item in mode_object.config[input_type].values():
+                        if input_item.containers:
+                            return True
+        return False
 
     
     def get_mode_map(self, casefold = False) -> dict:
