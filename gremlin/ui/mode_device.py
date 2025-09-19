@@ -217,13 +217,20 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.setUpdatesEnabled(True)
 
 
-    @QtCore.Slot(str)
+
     def _edit_mode_changed_cb(self, mode : str):
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_cb_ui, mode)
+    
+    def _edit_mode_changed_cb_ui(self, mode : str):
         ''' occurs when a new mode is selected '''
+        assert mode is not None and mode, "Invalid mode detected"
         self.set_mode(mode)
 
-    @QtCore.Slot(str)
+
     def _mode_name_changed(self, name):
+        gremlin.util.InvokeUiMethod(self._mode_name_changed_ui) # ensure on UI thread
+    
+    def _mode_name_changed_ui(self, name):
         ''' occurs when there's a mode name change '''
         self.input_item_list_view.redraw()
 

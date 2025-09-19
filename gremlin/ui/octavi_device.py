@@ -749,8 +749,11 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' occurs when a new mode is selected '''
         self.set_mode(mode)
 
-    @QtCore.Slot(str)
+    
     def _mode_name_changed(self, name):
+        gremlin.util.InvokeUiMethod(self._mode_name_changed_ui) # ensure on UI thread
+    
+    def _mode_name_changed_ui(self, name):
         ''' occurs when there's a mode name change '''
         self.input_item_list_view.redraw()
 

@@ -3980,9 +3980,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._update_ui_mode(new_mode)
         self._update_mode_status_bar()
     
-
-    @QtCore.Slot()
     def _update_mode_status_bar(self):
+        gremlin.util.InvokeUiMethod(self._update_mode_status_bar_ui) # ensure on UI thread
+    
+    def _update_mode_status_bar_ui(self):
         ''' updates the mode status bar with current runtime and edit modes '''
         try:
 
@@ -4690,7 +4691,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._do_load_profile(fname)
         self._create_recent_profiles()
 
-    @QtCore.Slot(str, str)
+    
     def _mode_name_changed(self, old_mode:str, new_mode:str):
         self._update_mode_status_bar()
 

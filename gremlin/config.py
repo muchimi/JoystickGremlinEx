@@ -2431,7 +2431,7 @@ class Configuration(QtCore.QObject):
         
     @property
     def hide_default_mode(self):
-        return self._get_data("hide_default_mode", True)
+        return self._get_data("hide_default_mode", False)
     @hide_default_mode.setter
     def hide_default_mode(self, value : bool):
         self._set_data("hide_default_mode", value)

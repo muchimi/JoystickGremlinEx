@@ -497,7 +497,6 @@ class ExecutionContext():
         # ensure data is reset on a new profile
         self._reset() 
 
-        
     def reset(self, force_rebuild = False, no_rebuild = False):
         ''' reloads the execution context to capture changes '''
         # syslog = logging.getLogger("system")

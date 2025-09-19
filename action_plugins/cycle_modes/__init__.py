@@ -31,7 +31,7 @@ import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
 from shiboken6 import Shiboken
-
+import gremlin.util
 
 class CycleModeModel(QtCore.QAbstractItemModel):
     def __init__(self):
@@ -184,14 +184,17 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         with QtCore.QSignalBlocker(self.mode_list_widget):
             self.mode_list_widget.clear()
-            mode_list = gremlin.shared_state.current_profile.get_modes()
+            profile = gremlin.shared_state.current_profile
+            mode_list = gremlin.ui.ui_common.get_mode_list(profile)
             self.model.clear()
-            for mode in mode_list:
-                self.mode_list_widget.addItem(mode, mode)
+            for display, mode in mode_list:
+                self.mode_list_widget.addItem(display, mode)
 
+
+        modes = [mode for _, mode in mode_list]
         # verify the modes in the cycle are valid
         mode_list = self.action_data.mode_list
-        modes = gremlin.shared_state.current_profile.get_modes()
+        
         for mode in mode_list:
             if not mode in modes:
                 mode_list.remove(mode)
@@ -200,14 +203,11 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.model.addItem(mode, mode)
         
         
-      
-        
-
-            
-            
-
-    @QtCore.Slot()
     def _edit_mode_changed(self):
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui) # ensure on UI thread
+
+    
+    def _edit_mode_changed_ui(self):
         ''' occurs when the modes are edited or changed '''
         self._update_mode_list()
 

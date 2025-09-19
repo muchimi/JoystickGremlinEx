@@ -3051,15 +3051,34 @@ class Profile():
         """
         # skip the root node
         for child in tree.children:
-            for pre, _, node in anytree.RenderTree(child, style=gremlin.ui.ui_common.ModeStyle()):
-                if node.parent.is_root:
-                    pre = ''
-                labels.append((node.name,f"{pre}{node.name}"))
+            for _, _, node in anytree.RenderTree(child, style=gremlin.ui.ui_common.ModeStyle()):
+                #'└''─'
+                pre = '' if node.parent.is_root else '└'
+                fill = '─' * (node.depth-1)
+                labels.append((node.name,f"{pre}{fill} {node.name}"))
 
     def get_mode_display_list(self) -> list:
         ''' gets a pairs (display_name, mode) '''
         
         mode_list = []
+
+        hide_default_mode = gremlin.config.Configuration().hide_default_mode
+        if hide_default_mode:
+            mode_objects = self.get_mode_objects("Default")
+            root_modes = self.get_root_modes()
+            master_mode = gremlin.shared_state.master_mode
+            if master_mode in root_modes:
+                root_modes.remove(master_mode)
+            if len(root_modes) == 1:
+                # only one root mode
+                hide_default_mode = False
+            else:
+                # more than one root mode exists
+                for mode_object in mode_objects:
+                    if mode_object.is_root and mode_object.hasMappings:
+                        hide_default_mode = False # don't hide because it has mappings
+                        break
+
         
         # Create mode name labels visualizing the tree structure
         inheritance_tree = self.build_inheritance_tree()
@@ -3076,6 +3095,8 @@ class Profile():
         # Add properly arranged mode names to the drop down list
         master_mode = gremlin.shared_state.master_mode
         for display_name, mode_name in zip(display_names, mode_names):
+            if hide_default_mode and mode_name == "Default":
+                continue
             if mode_name == master_mode:
                 continue # special mode
             mode_list.append((display_name, mode_name))
@@ -3269,7 +3290,7 @@ class Profile():
             if parent_name is not None:
                 new_mode.inherit = parent_name
             else:
-                new_mode.inherit = self.get_default_mode()
+                new_mode.inherit = None # self.get_default_mode() # make this a root mode 
             new_mode.parent = device
             device.modes[name] = new_mode
 
@@ -3302,15 +3323,18 @@ class Profile():
         if node is None:
             return
 
+        if inherited_name == 'None':
+            inherited_name = None
        
         node_parent = anytree.find(self._mode_tree, lambda node: node.name == inherited_name)
+        
         if node_parent is None:
             node_parent = root
         
         node.parent = node_parent
 
         mode_list = self.mode_list()
-        if name in mode_list and inherited_name in mode_list:
+        if name in mode_list and (inherited_name is None or inherited_name in mode_list):
             for device in self.devices.values():
                  if name in device.modes.keys():
                     device.modes[name].inherit = inherited_name
@@ -3479,12 +3503,14 @@ class Profile():
 
         return modes  # unduplicated
     
-    def get_mode_objects(self) -> list[Mode]:
+
+    def get_mode_objects(self, mode_name = None) -> list[Mode]:
         ''' gets the mode objects in the device list '''
         modes = []
         for device in self.devices.values():
             for mode in device.modes.values():
-                modes.append(mode)
+                if mode_name is None or mode_name == mode.name:
+                    modes.append(mode)
             break
 
         return modes
@@ -4539,8 +4565,24 @@ class Mode:
     def name(self, value: str):
         self._name = value.strip() if value else ""
 
+    @property
+    def is_root(self) -> bool:
+        ''' true if the mode is a root level mode '''
+        return self.inherit is None
+
     def setName(self, value : str):
         self._name = value.strip() if value else ""
+
+    @property
+    def hasMappings(self) -> bool:
+        ''' True if the mode contains inputs that are mapped to a container '''
+        for input_type in self.config:
+            for input_item in self.config[input_type].values():
+                if input_item.containers:
+                    return True
+                
+        return False
+
 
     def from_xml(self, node, data = None, extra_data = None):
         """Parses the XML mode data.

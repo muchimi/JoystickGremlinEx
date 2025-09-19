@@ -2686,48 +2686,28 @@ class ModeStyle(anytree.AbstractStyle):
         super().__init__("\u2502 ", "\u251c\u2500 ", "\u2514\u2500 ")
 
 
-def _inheritance_tree_to_labels(labels, tree, level):
-    """Generates labels to use in the dropdown menu indicating inheritance.
+# def _inheritance_tree_to_labels(labels, tree, level):
+#     """Generates labels to use in the dropdown menu indicating inheritance.
 
-    :param labels the list containing all the labels
-    :param tree the part of the tree to be processed
-    :param level the indentation level of this tree
-    """
-    # skip the root node
-    for child in tree.children:
-        for pre, _, node in anytree.RenderTree(child, style=ModeStyle()):
-            if node.parent.is_root:
-                pre = ''
-            labels.append((node.name,f"{pre}{node.name}"))
-    pass
+#     :param labels the list containing all the labels
+#     :param tree the part of the tree to be processed
+#     :param level the indentation level of this tree
+#     """
+#     # skip the root node
+#     for child in tree.children:
+#         for pre, _, node in anytree.RenderTree(child, style=ModeStyle()):
+#             if node.parent.is_root:
+#                 pre = ''
+#             labels.append((node.name,f"{pre}{node.name}"))
+#     pass
 
 def get_mode_list(profile):
     ''' gets a pairs (display_name, mode) '''
-    mode_list = []
     
-    # Create mode name labels visualizing the tree structure
-    inheritance_tree = profile.build_inheritance_tree()
-    labels = []
+    profile = gremlin.shared_state.current_profile
+    return profile.get_mode_display_list()
 
-
-    _inheritance_tree_to_labels(labels, inheritance_tree, 0)
-
-    # Filter the mode names such that they only occur once below
-    # their correct parent
-    mode_names = [n[0] for n in labels]
-    display_names = [n[1] for n in labels]
-    master_mode = gremlin.shared_state.master_mode
-
-    # Add properly arranged mode names to the drop down list
-    for display_name, mode_name in zip(display_names, mode_names):
-        if mode_name == master_mode:
-            continue
-        mode_list.append((display_name, mode_name))
-
-
-    return mode_list
-
-
+    
 class ModeSelectorWidget(QtWidgets.QWidget):
     ''' displays a mode selector drop down for the current profile modes '''
 
@@ -2833,6 +2813,7 @@ class ModeWidget(QtWidgets.QWidget):
 
         el = gremlin.event_handler.EventListener()
         el.mode_list_update.connect(self._mode_list_update)
+        el.profile_modes_changed.connect(self._mode_list_update)
 
 
     def setRuntimeDisabled(self, value):
@@ -2858,8 +2839,11 @@ class ModeWidget(QtWidgets.QWidget):
     def _profile_stop_cb(self):
         self.setEnabled(True)
 
-    @QtCore.Slot()
+
     def _mode_list_update(self):
+        gremlin.util.InvokeUiMethod(self._mode_list_update_ui) # ensure on UI thread
+    
+    def _mode_list_update_ui(self):
         ''' occurs when mode list may have changed '''
         profile = gremlin.shared_state.current_profile
         mode = gremlin.shared_state.current_mode

@@ -15,8 +15,14 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T62B) hotfix
-- Fix: V13 profile version, converts old style GUIDs to new style GUIDs for consistency across the board.  This will bump profile versions to version 13.
-- New: Hide default mode option. This will make the "Default" profile disappear from the mode drop down boxes provided that (1) Another root level mode exists (2) the default mode has no mappings in it.  If neither are true, the mode will show even if the option to hide it is enabled for obvious reasons.
+- New: Hide default mode option in "UI" options.  
+  Behavior: This option will make the "Default" profile disappear from the mode selection boxes provided that (1) Another root level mode exists (2) the Default mode has no mappings in it.  If neither are true, the mode will show even if the option to hide it is enabled for obvious reasons.  The mode is still visible in the profile mode configuration list for obvious reasons.  This really has no functionality outside of hiding the "Default" mode if it is an annoyance. This option is off by default.
+
+- Fix: GUID format errors or missing devices. New V13 profile version, converts old style GUIDs (various formats) to new style GUIDs for consistency across the board.  This will bump profile versions to version 13. GUIDs in M76T62 are unified.  The string representation will be lowercase hexadecimal without brackets or hyphens when a string is needed.  
+- 
+- Fix: cycle mode action selector updated to use new display method.
+
+- UI: more code hardening for additional thread safety
 
 ### (m76T62A) hotfix
 - Fix: State not changing to the commanded state in map to state depending on how the state change was triggered.

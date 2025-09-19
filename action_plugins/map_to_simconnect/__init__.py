@@ -1733,7 +1733,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         
 
         # display name to mode pair list
-        self.mode_pair_list = gremlin.ui.ui_common.get_mode_list(self.profile)
+        self.mode_pair_list =  self.profile.get_mode_display_list()
 
         is_dark = gremlin.shared_state.is_dark_theme   
         
@@ -2045,7 +2045,11 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         if index != -1:
             self._mode_selector_widget.setCurrentIndex(index)
 
+
     def _handle_profile_modes_modified(self):
+        gremlin.util.InvokeUiMethod(self._handle_profile_modes_modified_ui) # ensure on UI thread
+
+    def _handle_profile_modes_modified_ui(self):
         ''' called when profile modes changed '''
         name = self.current_aircraft_widget.text()
         with QtCore.QSignalBlocker(self._mode_selector_widget):
