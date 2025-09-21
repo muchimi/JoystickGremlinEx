@@ -1618,6 +1618,7 @@ class GateData():
             device_name = self._device_name
             device = gremlin.joystick_handling.get_device(event.device_id)
             if device_name == device.name and not gremlin.util.compare_guid(self._device_id, event.device_id):
+                test = gremlin.util.compare_guid(self._device_id, event.device_id)
                 syslog.error(f"Device ID mismatch: {device_name} - expected {device.device_id} got {self._device_id}")
                 pass
 

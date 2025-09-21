@@ -620,6 +620,7 @@ class EventListener:
 		self.profile_start.connect(self._profile_start)
 		self.profile_stopping.connect(self._profile_stopping_cb)
 		self.profile_started.connect(self._profile_started_cb)
+		self.options_changed.connect(self._options_changed)
 		
 		
 
@@ -720,6 +721,12 @@ class EventListener:
 		#gremlin.util.singleShot(lambda: self._fire_event_list(event_list))
 
 
+	def _options_changed(self):
+		''' options were changed '''
+		config = gremlin.config.Configuration()
+		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
+
+		
 	def _profile_start(self):
 		''' occurs on profile start '''
 

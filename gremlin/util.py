@@ -2259,6 +2259,8 @@ def compare_guid(id1, id2) -> bool:
     ''' compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against '''
     if id1 is None and id2 is None: return True
     if id1 is None or id2 is None: return False
+    if id1 == id2:
+        return True
     nid1 = normalize_guid(id1)
     assert not "-" in nid1 or "{" in nid1,f"Bad normalization [{id1}] -> [{nid1}]"
     if hasattr(id2, '__iter__'):

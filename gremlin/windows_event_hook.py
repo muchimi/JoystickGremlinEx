@@ -253,6 +253,8 @@ def process_keyboard_event(n_code, w_param, l_param):
 _mouse_wheel_timer = {} # timer for wheel releases = keyed by button ID for each possible button, keyed by wheel button ID
 _mouse_wheel_state = {} # holds the current state (pressed) of the wheel button
 _mouse_wheel_delay = 0.5 # mouse wheel delay in ms
+_mouse_x = None 
+_mouxe_y = None
 
 _is_runtime = False # true if in runtime
 
@@ -270,9 +272,9 @@ def process_mouse_event(n_code, w_param, l_param):
     :param l_param message content
     """
     import gremlin.types
-    global g_mouse_callbacks, _is_runtime
+    global g_mouse_callbacks, _is_runtime, _mouse_x, _mouse_y
     verbose = False
-    if n_code == HC_ACTION and w_param != WM_MOUSEMOVE:
+    if n_code == HC_ACTION: # and w_param != WM_MOUSEMOVE:
         msg = ctypes.cast(l_param, LPMSLLHOOKSTRUCT)[0]
 
         # Only handle events we're supposed to, see
@@ -321,6 +323,10 @@ def process_mouse_event(n_code, w_param, l_param):
                 button_id = gremlin.types.MouseButton.WheelLeft
                 release_button_id = gremlin.types.MouseButton.WheelRight
             is_wheel = True
+        elif w_param == WM_MOUSEMOVE:
+            # mouse movement
+            _mouse_x = msg.pt.x
+            _mouse_y = msg.pt.y
 
         if is_wheel and button_id:
             # mouse wheel event processing

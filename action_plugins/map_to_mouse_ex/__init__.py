@@ -21,6 +21,9 @@ import gremlin.sendinput
 from gremlin import input_devices
 import psygnal
 from psygnal import Signal
+import gremlin.config
+import gremlin.repeater
+import gremlin.event_handler
 
 
 import enum, threading,time, random
@@ -64,18 +67,27 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.mode_widget = gremlin.ui.ui_common.NoWheelComboBox()
 
-        input_type = self._get_input_type()
-        if input_type == InputType.JoystickButton:
-            actions = (a for a in MouseAction)
+        input_type = self.action_data.get_input_type()
+        if input_type == InputType.JoystickAxis:
+            actions = [MouseAction.MouseMotion]
+            self.action_data.action_mode = MouseAction.MouseMotion # force motion for linear input
         else:
-            actions = (MouseAction.MouseButton, MouseAction.MouseMotion)
+         actions = [MouseAction.MouseButton, MouseAction.MouseMotion]
         
         for mode in actions:
             self.mode_widget.addItem(MouseAction.to_name(mode), mode)
 
-        self.mode_label = QtWidgets.QLabel("Description")
+        index = self.mode_widget.findData(self.action_data.action_mode)
+        if index != -1:
+            self.mode_widget.setCurrentIndex(index) # sync correct mode
+        else:
+            self.action_data.action_mode = self.mode_widget.currentData() # force correct mode
 
         self.mode_widget.currentIndexChanged.connect(self._action_mode_changed)
+        
+        self.mode_label = QtWidgets.QLabel("Description")
+
+        
 
         self.chkb_force_remote_output = QtWidgets.QCheckBox("Force Remote output")
         self.chkb_force_remote_output_only = QtWidgets.QCheckBox("Remote Only")
@@ -116,27 +128,11 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.options_layout.addWidget(self.chkb_force_remote_output)
         self.options_layout.addWidget(self.chkb_force_remote_output_only)
         
-        
         self.options_layout.addStretch()
-
-        # self.button_group = QtWidgets.QButtonGroup()
-        # self.button_radio = QtWidgets.QRadioButton("Button")
-        # self.motion_radio = QtWidgets.QRadioButton("Motion")
-        # self.wiggle_start_radio = QtWidgets.QRadioButton("Wiggle Start")
-        # self.wiggle_stop_radio = QtWidgets.QRadioButton("Wiggle Stop")
-        # self.button_group.addButton(self.button_radio)
-        # self.button_group.addButton(self.motion_radio)
 
         self.mode_layout.addWidget(self.mode_widget)
         self.mode_layout.addWidget(self.mode_label)
         self.mode_layout.addStretch()
-
-        # self.mode_layout.addWidget(self.wiggle_start_radio)
-        # self.mode_layout.addWidget(self.wiggle_stop_radio)
-
-        # self.button_radio.clicked.connect(self._change_mode)
-        # self.motion_radio.clicked.connect(self._change_mode)
-        
 
         self.button_widget.hide()
         self.motion_widget.hide()
@@ -190,13 +186,9 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.min_speed.setRange(0, 1e5)
         self.max_speed = QtWidgets.QSpinBox()
         self.max_speed.setRange(0, 1e5)
-        self.motion_layout.addWidget(
-            QtWidgets.QLabel("Minimum speed"), 1, 0, QtCore.Qt.AlignLeft
-        )
+        self.motion_layout.addWidget(QtWidgets.QLabel("Minimum speed"), 1, 0, QtCore.Qt.AlignLeft)
         self.motion_layout.addWidget(self.min_speed, 1, 1, QtCore.Qt.AlignLeft)
-        self.motion_layout.addWidget(
-            QtWidgets.QLabel("Maximum speed"), 1, 2, QtCore.Qt.AlignLeft
-        )
+        self.motion_layout.addWidget(QtWidgets.QLabel("Maximum speed"), 1, 2, QtCore.Qt.AlignLeft)
         self.motion_layout.addWidget(self.max_speed, 1, 3, QtCore.Qt.AlignLeft)
         self.motion_layout.addWidget(QtWidgets.QLabel(" "), 0, 4)
         self.motion_layout.setColumnStretch(4,2)
@@ -547,61 +539,79 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action, parent)
 
         self.action : MapToMouseEx = action
-        if not MapToMouseExFunctor._mouse_controller:
-            MapToMouseExFunctor._mouse_controller = gremlin.sendinput.MouseController()
-        
-        self.input_type = action.input_type
+        self.input_type = action.get_input_type()
         self.exec_on_release = action.exec_on_release
         self.action_mode = action.action_mode
         self.click_mode = action.click_mode
+        self.dx = 0 # current mouse motion = x axis
+        self.dy = 0 # current mouse motion = y axis
+        self.pulse_worker_map = {} # tracks pulse requests
+        config = gremlin.config.Configuration()
+        self.verbose = config.verbose_mode_mouse
+        self.verbose_extra = self.verbose and config.verbose_mode_extra
+
+    def profile_start(self):
+        ''' occurs on profile start '''
+        pass
+
+    def profile_stop(self):
+        ''' occurs on profile stop '''
+        pass
+    
+
+
     
 
     def process_event(self, event, value, extra_data = None):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
 
-        #syslog.debug(f"Process mouse functor event: {self.action_mode.name}  {self.action.action_id} exec on release: {self.action.exec_on_release}")
-        if self.input_type == InputType.JoystickButton:
-            if self.action_mode == MouseAction.MouseWiggleOnLocal:
-                # start the local wiggle thread
-                if self.exec_on_release and not event.is_pressed:
-                        self._wiggle_start(is_local=True)
-                elif not self.exec_on_release and event.is_pressed:
-                    self._wiggle_start(is_local=True)
-                    
-            elif self.action_mode == MouseAction.MouseWiggleOffLocal:
-                if self.exec_on_release and not event.is_pressed:
-                        self._wiggle_stop(is_local = True)
-                elif not self.exec_on_release and event.is_pressed:
-                    self._wiggle_stop(is_local=True)
-
-            elif self.action_mode == MouseAction.MouseWiggleOnRemote:
-                # start the local wiggle thread
-                if self.exec_on_release and not event.is_pressed:
-                    self._wiggle_start(is_remote=True)
-                elif not self.exec_on_release and event.is_pressed:
-                    self._wiggle_start(is_remote=True)
-                    
-            elif self.action_mode == MouseAction.MouseWiggleOffRemote:
-                if self.exec_on_release and not event.is_pressed:
-                    self._wiggle_stop(is_remote = True)
-                elif not self.exec_on_release and event.is_pressed:
-                    self._wiggle_stop(is_remote=True)
-            
-            elif self.action_mode == MouseAction.MouseMotion:
-                if event.event_type == InputType.JoystickAxis:
-                    self._perform_axis_motion(event, value)
-                elif event.event_type == InputType.JoystickHat:
-                    self._perform_hat_motion(event, value)
-                else:
+        if self.action_mode == MouseAction.MouseMotion:
+            # handle motion requests
+            match event.event_type:
+                case InputType.JoystickAxis: 
+                    sa = gremlin.event_handler.AxisState()
+                    should_process = sa.shouldProcess(event, self.id)
+                    if should_process:
+                        self._perform_axis_motion(event, value)
+                case InputType.JoystickHat: 
+                    self._perform_hat_motion(event, value) 
+                case InputType.JoystickButton:
                     self._perform_button_motion(event, value)
-            elif self.action_mode == MouseAction.MouseButton:
-                if self.exec_on_release:
-                    if not event.is_pressed:
-                        self._perform_mouse_button(event, value)
-                    elif  event.is_pressed:
-                        self._perform_mouse_button(event, value)
-                else:
+        
+        # elif self.action_mode == MouseAction.MouseWiggleOnLocal:
+        #     # start the local wiggle thread
+        #     if self.exec_on_release and not event.is_pressed:
+        #             self._wiggle_start(is_local=True)
+        #     elif not self.exec_on_release and event.is_pressed:
+        #         self._wiggle_start(is_local=True)
+                
+        # elif self.action_mode == MouseAction.MouseWiggleOffLocal:
+        #     if self.exec_on_release and not event.is_pressed:
+        #             self._wiggle_stop(is_local = True)
+        #     elif not self.exec_on_release and event.is_pressed:
+        #         self._wiggle_stop(is_local=True)
+
+        # elif self.action_mode == MouseAction.MouseWiggleOnRemote:
+        #     # start the local wiggle thread
+        #     if self.exec_on_release and not event.is_pressed:
+        #         self._wiggle_start(is_remote=True)
+        #     elif not self.exec_on_release and event.is_pressed:
+        #         self._wiggle_start(is_remote=True)
+                
+        # elif self.action_mode == MouseAction.MouseWiggleOffRemote:
+        #     if self.exec_on_release and not event.is_pressed:
+        #         self._wiggle_stop(is_remote = True)
+        #     elif not self.exec_on_release and event.is_pressed:
+        #         self._wiggle_stop(is_remote=True)
+            
+        elif self.action_mode == MouseAction.MouseButton:
+            if self.exec_on_release:
+                if not event.is_pressed:
                     self._perform_mouse_button(event, value)
+                elif  event.is_pressed:
+                    self._perform_mouse_button(event, value)
+            else:
+                self._perform_mouse_button(event, value)
 
         return True
     
@@ -671,7 +681,46 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
 
 
-        
+    # def _pulse_on(self, data = None):
+    #     ''' called when pulse is on '''
+    #     (is_local, is_remote) = self.get_state()
+    #     if is_local:
+    #         mc = gremlin.sendinput.MouseController()
+    #         mc.set_absolute_motion(self.dx, self.dy)
+            
+    #     if is_remote:
+    #         input_devices.remote_client.send_mouse_motion(self.dx, self.dy)
+
+    # def _pulse_off(self, data = None):
+    #     pass
+
+    # def pulse_start(self, duration : float, interval : float):
+    #     ''' pulse setup '''
+    #     key = self.id
+    #     worker : gremlin.repeater.PulseWorker 
+    #     if key in self.pulse_worker_map:
+    #         worker = self.pulse_worker_map[key]
+    #         if worker.is_running:
+    #             # worker already running - ignore pulse request
+    #             #if self.verbose: syslog.info(f"\talready pulsing - ignored")
+    #             return
+    #     else:
+    #         if self.verbose: syslog.info(f"Pulse START mouse motion [{self.id}] duration: {duration:0.3f} interval: {interval:0.3f}")
+    #         worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off)
+    #         self.pulse_worker_map[key] = worker
+
+    #     if self.verbose: syslog.info(f"\activate")
+    #     worker.start()
+
+    # def pulse_stop(self):
+    #     ''' request a pulse abort '''
+    #     if self.verbose: syslog.info(f"Pulse STOP mouse motion [{self.id}]")
+    #     key = self.id
+    #     if key in self.pulse_worker_map:
+    #         worker : gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
+    #         worker.stop()
+    #         del self.pulse_worker_map[key]
+     
 
     def _perform_axis_motion(self, event, value):
         """Processes events destined for an axis.
@@ -680,41 +729,68 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         :param value the current value of the event chain
         """
 
+        raw_value = event.value
+        value = abs(raw_value)
+        is_x = self.action_data.direction == 90
+
+        mc = gremlin.sendinput.MouseController()
+        deadzone = self.action_data.deadzone
+
+        if value <= deadzone:
+            # this only sets the value that isn't none
+            if is_x:
+                mc.set_absolute_motion(0,None)
+            else:
+                mc.set_absolute_motion(None, 0)
+            #if self.verbose: syslog.info(f"MOUSE MOTION: stop - centered")
+            
+            return
 
         if self.action.invert:
             # invert the input
-            inverted_value = gremlin.util.scale_to_range(value.current, invert=True)
-            value.current = inverted_value
+            inverted_value = gremlin.util.scale_to_range(value, invert=True)
+            value = inverted_value
+        
+        # determine the mouse motion
+        motion_value = abs(value) # 0..1
+        delta_motion = gremlin.util.scale_to_range(motion_value,
+                                                   source_min= deadzone,
+                                                   source_max = 1,
+                                                   target_min=self.action.min_speed,
+                                                   target_max=self.action.max_speed)
 
-        delta_motion = self.action.min_speed + abs(value.current) * \
-                (self.action.max_speed - self.action.min_speed)
-        delta_motion = math.copysign(delta_motion, value.current)
-        delta_motion = 0.0 if abs(value.current) < 0.05 else delta_motion
+        delta_motion = math.copysign(delta_motion, raw_value)
 
-        dx = delta_motion if self.action.direction == 90 else None
-        dy = delta_motion if self.action.direction != 90 else None
-        (is_local, is_remote) = self.get_state()
-        if is_local:
-            MapToMouseExFunctor._mouse_controller.set_absolute_motion(dx, dy)
-        if is_remote:
-            input_devices.remote_client.send_mouse_motion(dx, dy)
+
+        # if self.verbose:
+        #     motion = "X" if is_x else "Y"
+        #     syslog.info(f"MOUSE MOTION: in: {raw_value:0.3f} base: {motion_value:0.3f} delta: {delta_motion:0.3f} min: {self.action.min_speed} max: {self.action.max_speed} motion: {motion}")
+
+        if is_x:
+            mc.set_absolute_motion(delta_motion, None)
+        else:
+            mc.set_absolute_motion(None, delta_motion)
+
+
 
     def _perform_button_motion(self, event, value):
         (is_local, is_remote) = self.get_state()
+        mc = gremlin.sendinput.MouseController()    
         if event.is_pressed:
             if is_local:
-                MapToMouseExFunctor._mouse_controller.set_accelerated_motion(
+                mc.set_accelerated_motion(
                     self.action.direction,
                     self.action.min_speed,
                     self.action.max_speed,
                     self.action.time_to_max_speed
                 )
+                
             if is_remote:
                 input_devices.remote_client.send_mouse_acceleration(self.action.direction, self.action.min_speed, self.action.max_speed, self.action.time_to_max_speed)
      
         else:
             if is_local:
-                MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
+                mc.set_absolute_motion(0, 0)
             if is_remote:
                 input_devices.remote_client.send_mouse_motion(0, 0)
 
@@ -725,16 +801,17 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         :param value the current value of the event chain
         """
         (is_local, is_remote) = self.get_state()
+        mc = gremlin.sendinput.MouseController()    
         if value.current == (0, 0):
             if is_local:
-                MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
+                mc.set_absolute_motion(0, 0)
             if is_remote:
                 input_devices.remote_client.send_mouse_motion(0, 0)
 
         else:
             a = rad2deg(math.atan2(-value.current[1], value.current[0])) + 90.0
             if is_local:
-                MapToMouseExFunctor._mouse_controller.set_accelerated_motion(
+                mc.set_accelerated_motion(
                     a,
                     self.action.min_speed,
                     self.action.max_speed,
@@ -744,86 +821,86 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 input_devices.remote_client.send_mouse_acceleration(a, self.action.min_speed, self.action.max_speed, self.action.time_to_max_speed)
 
 
-    def _wiggle_start(self, is_local = False, is_remote = False):
-        ''' starts the wiggle thread, local or remote '''
+    # def _wiggle_start(self, is_local = False, is_remote = False):
+    #     ''' starts the wiggle thread, local or remote '''
 
-        if is_local and not MapToMouseExFunctor._wiggle_local_thread:
-            syslog.debug("Wiggle start local requested...")
-            MapToMouseExFunctor._wiggle_local_stop_requested = False
-            MapToMouseExFunctor._wiggle_local_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_local, daemon=False)
-            MapToMouseExFunctor._wiggle_remote_thread.name = "wiggle local"
-            MapToMouseExFunctor._wiggle_local_thread.start()
+    #     if is_local and not MapToMouseExFunctor._wiggle_local_thread:
+    #         syslog.debug("Wiggle start local requested...")
+    #         MapToMouseExFunctor._wiggle_local_stop_requested = False
+    #         MapToMouseExFunctor._wiggle_local_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_local, daemon=False)
+    #         MapToMouseExFunctor._wiggle_remote_thread.name = "wiggle local"
+    #         MapToMouseExFunctor._wiggle_local_thread.start()
 
-        if is_remote and not MapToMouseExFunctor._wiggle_remote_thread:
-            syslog.debug("Wiggle start remote requested...")
-            MapToMouseExFunctor._wiggle_remote_stop_requested = False
-            MapToMouseExFunctor._wiggle_remote_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_remote, daemon=False)
-            MapToMouseExFunctor._wiggle_remote_thread.name = "wiggle remote"
-            MapToMouseExFunctor._wiggle_remote_thread.start()
+    #     if is_remote and not MapToMouseExFunctor._wiggle_remote_thread:
+    #         syslog.debug("Wiggle start remote requested...")
+    #         MapToMouseExFunctor._wiggle_remote_stop_requested = False
+    #         MapToMouseExFunctor._wiggle_remote_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_remote, daemon=False)
+    #         MapToMouseExFunctor._wiggle_remote_thread.name = "wiggle remote"
+    #         MapToMouseExFunctor._wiggle_remote_thread.start()
 
-    def _wiggle_stop(self, is_local = False, is_remote = False):
-        ''' stops the wiggle thread, local or remote '''
+    # def _wiggle_stop(self, is_local = False, is_remote = False):
+    #     ''' stops the wiggle thread, local or remote '''
 
-        if is_local and MapToMouseExFunctor._wiggle_local_thread:
-            syslog.debug("Wiggle stop local requested...")
-            MapToMouseExFunctor._wiggle_local_stop_requested = True
-            MapToMouseExFunctor._wiggle_local_thread.join()
-            syslog.debug("Wiggle thread local exited...")
-            MapToMouseExFunctor._wiggle_local_thread = None
+    #     if is_local and MapToMouseExFunctor._wiggle_local_thread:
+    #         syslog.debug("Wiggle stop local requested...")
+    #         MapToMouseExFunctor._wiggle_local_stop_requested = True
+    #         MapToMouseExFunctor._wiggle_local_thread.join()
+    #         syslog.debug("Wiggle thread local exited...")
+    #         MapToMouseExFunctor._wiggle_local_thread = None
 
-        if is_remote and MapToMouseExFunctor._wiggle_remote_thread:
-            syslog.debug("Wiggle stop local requested...")
-            MapToMouseExFunctor._wiggle_remote_stop_requested = True
-            MapToMouseExFunctor._wiggle_remote_thread.join()
-            syslog.debug("Wiggle thread remote exited...")
-            MapToMouseExFunctor._wiggle_remote_thread = None
+    #     if is_remote and MapToMouseExFunctor._wiggle_remote_thread:
+    #         syslog.debug("Wiggle stop local requested...")
+    #         MapToMouseExFunctor._wiggle_remote_stop_requested = True
+    #         MapToMouseExFunctor._wiggle_remote_thread.join()
+    #         syslog.debug("Wiggle thread remote exited...")
+    #         MapToMouseExFunctor._wiggle_remote_thread = None
 
-    @staticmethod
-    def _wiggle_local():
-        ''' wiggles the mouse '''
-        syslog.debug("Wiggle local start...")
-        msg = "local wiggle mode on"
-        input_devices.remote_state.say(msg)
+    # @staticmethod
+    # def _wiggle_local():
+    #     ''' wiggles the mouse '''
+    #     syslog.debug("Wiggle local start...")
+    #     msg = "local wiggle mode on"
+    #     input_devices.remote_state.say(msg)
 
-        t_wait = time.time()
-        while not MapToMouseExFunctor._wiggle_local_stop_requested:
-            if time.time() >= t_wait:
-                syslog.debug("wiggling local...")
-                MapToMouseExFunctor._mouse_controller.set_absolute_motion(1, 1)
-                time.sleep(1)
-                MapToMouseExFunctor._mouse_controller.set_absolute_motion(-1, -1)
-                time.sleep(0.5)
-                MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
-                t_wait = time.time() + random.uniform(10,40)
-            time.sleep(0.5)
+    #     t_wait = time.time()
+    #     while not MapToMouseExFunctor._wiggle_local_stop_requested:
+    #         if time.time() >= t_wait:
+    #             syslog.debug("wiggling local...")
+    #             MapToMouseExFunctor._mouse_controller.set_absolute_motion(1, 1)
+    #             time.sleep(1)
+    #             MapToMouseExFunctor._mouse_controller.set_absolute_motion(-1, -1)
+    #             time.sleep(0.5)
+    #             MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
+    #             t_wait = time.time() + random.uniform(10,40)
+    #         time.sleep(0.5)
             
-        syslog.debug("Wiggle local stop...")
-        input_devices.remote_state.say("local wiggle mode off")
+    #     syslog.debug("Wiggle local stop...")
+    #     input_devices.remote_state.say("local wiggle mode off")
 
 
 
-    @staticmethod
-    def _wiggle_remote():
-        ''' wiggles the mouse - remote clients'''
-        syslog.debug("Wiggle remote start...")
+    # @staticmethod
+    # def _wiggle_remote():
+    #     ''' wiggles the mouse - remote clients'''
+    #     syslog.debug("Wiggle remote start...")
 
-        msg = "remote wiggle mode on"
-        input_devices.remote_state.say(msg)
+    #     msg = "remote wiggle mode on"
+    #     input_devices.remote_state.say(msg)
 
-        t_wait = time.time()
-        while not MapToMouseExFunctor._wiggle_remote_stop_requested:
-            if time.time() >= t_wait:
-                syslog.debug("wiggling remote...")
-                input_devices.remote_client.send_mouse_motion(1, 1)
-                time.sleep(1)
-                input_devices.remote_client.send_mouse_motion(-1, -1)
-                time.sleep(0.5)
-                input_devices.remote_client.send_mouse_motion(0,0)
-                t_wait = time.time() + random.uniform(10,40)
-            time.sleep(0.5)
+    #     t_wait = time.time()
+    #     while not MapToMouseExFunctor._wiggle_remote_stop_requested:
+    #         if time.time() >= t_wait:
+    #             syslog.debug("wiggling remote...")
+    #             input_devices.remote_client.send_mouse_motion(1, 1)
+    #             time.sleep(1)
+    #             input_devices.remote_client.send_mouse_motion(-1, -1)
+    #             time.sleep(0.5)
+    #             input_devices.remote_client.send_mouse_motion(0,0)
+    #             t_wait = time.time() + random.uniform(10,40)
+    #         time.sleep(0.5)
             
-        syslog.debug("Wiggle remote stop...")
-        input_devices.remote_state.say("remote wiggle mode off")
+    #     syslog.debug("Wiggle remote stop...")
+    #     input_devices.remote_state.say("remote wiggle mode off")
         
 
 class MapToMouseEx(gremlin.base_profile.AbstractAction):
@@ -848,10 +925,11 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
     #     InputType.Keyboard
     # ]
 
-    input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
-    ]
+    # input_types = [
+    #      InputType.JoystickButton,
+    #      InputType.JoystickHat,
+    #      InputType.JoystickAxis
+    # ]
 
     functor = MapToMouseExFunctor
     widget = MapToMouseExWidget
@@ -877,16 +955,25 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         self.time_to_max_speed = 1.0
         # invert motion
         self.invert = False
+        # repeat interval for pulses when moving the mouse
+        self.repeat_interval = -1 # disabled
+        # pulse delay
+        self.delay = 0.250
+        # deadzone in percent
+        self.deadzone = 0.01
+        
 
-        self.action_mode = MouseAction.MouseButton
+
+        if self.get_input_type() == InputType.JoystickAxis:
+            self.action_mode = MouseAction.MouseMotion
+        else:
+            self.action_mode = MouseAction.MouseButton
         self.exec_on_release = False
         self.force_remote_output = False
         self.force_remote_output_only = False
 
-        self.input_type = InputType.JoystickButton
 
         self.click_mode = MouseClickMode.Normal
-
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -938,6 +1025,7 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         self.min_speed = safe_read(node, "min-speed", int, 5)
         self.max_speed = safe_read(node, "max-speed", int, 5)
         self.time_to_max_speed = safe_read(node, "time-to-max-speed", float, 0.0)
+        
 
         # get the type of mapping this is
         

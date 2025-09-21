@@ -800,10 +800,10 @@ class MouseClickMode(Enum):
 class MouseAction(Enum):
     MouseButton = 0 # output a mouse button
     MouseMotion = 1 # output a mouse motion
-    MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
-    MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
-    MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
-    MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
+    # MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
+    # MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
+    # MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
+    # MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
 
     @staticmethod
     def to_string(mode):

@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T62C) hotfix
+- Fix: Map to mouse Ex has axes enabled again.  Logic for axes also changed.
+- Fix: Device GUID comparison failing in gated axis breaking it.
+
 ### (m76T62B) hotfix
 - New: Hide default mode option in "UI" options.  
   Behavior: This option will make the "Default" profile disappear from the mode selection boxes provided that (1) Another root level mode exists (2) the Default mode has no mappings in it.  If neither are true, the mode will show even if the option to hide it is enabled for obvious reasons.  The mode is still visible in the profile mode configuration list for obvious reasons.  This really has no functionality outside of hiding the "Default" mode if it is an annoyance. This option is off by default.
