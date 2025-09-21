@@ -3842,6 +3842,8 @@ class TitleBar(QtWidgets.QFrame):
         css = f"# frame {{border: 1px solid {border_color};}}')"
         self.setStyleSheet(css) 
         
+        config = gremlin.config.Configuration()
+
 
         self.hint = hint
         self.label = QtWidgets.QLabel(label)
@@ -3896,11 +3898,14 @@ class TitleBar(QtWidgets.QFrame):
             self.copy_button.clicked.connect(clipboard_cb)
             self.copy_button.setToolTip("Copy")
 
-        self.id_widget = gremlin.ui.ui_common.QDataLineEdit()
-        self.id_widget.setReadOnly(True)
-        self.id_widget.data = data
-        if data is not None and hasattr(data,"id"):
-            self.id_widget.setText(data.id)
+        if config.show_container_id:
+            self.id_widget = gremlin.ui.ui_common.QDataLineEdit()
+            self.id_widget.setReadOnly(True)
+            self.id_widget.data = data
+            if data is not None and hasattr(data,"id"):
+                self.id_widget.setText(data.id)
+        else:
+            self.id_widget = None
 
 
         self.comment_widget = gremlin.ui.ui_common.QDataLineEdit()
@@ -3910,14 +3915,24 @@ class TitleBar(QtWidgets.QFrame):
         self.comment_widget.textChanged.connect(self._comment_changed)
 
 
-
+        if hasattr(data,"priority"):
+            self.priority_widget = gremlin.ui.ui_common.QIntLineEdit(data,min_range=0, max_range=1000,value = data.priority)
+            self.priority_widget.setToolTip("Execution priority.  Lower priority runs first.")
+            self.priority_widget.valueChanged.connect(self._priority_changed)
+            self.priority_container, _ = gremlin.ui.ui_common.getHContainer(self.priority_widget,"Priority")
+        else:
+            self.priority_widget = None
+            self.priority_container = None
 
         self.layout = QtWidgets.QHBoxLayout(self)
         #self.layout.setSpacing(0)
         self.layout.setContentsMargins(5, 0, 5, 0)
 
         self.layout.addWidget(self.label)
-        self.layout.addWidget(self.id_widget)
+        if self.id_widget:
+            self.layout.addWidget(self.id_widget)
+        if self.priority_container:
+            self.layout.addWidget(self.priority_container)
         self.layout.addWidget(QtWidgets.QLabel("Notes:"))
         self.layout.addWidget(self.comment_widget)
         self.layout.addStretch()
@@ -3954,6 +3969,11 @@ class TitleBar(QtWidgets.QFrame):
         widget = self.sender()
         data = widget.data
         data.comment = widget.text()
+
+    def _priority_changed(self, value):
+        widget = self.sender()
+        data = widget.data
+        data.setPriority(value)
 
 
     def _show_hint(self):

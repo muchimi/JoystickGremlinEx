@@ -1078,7 +1078,7 @@ class AbstractAction(ProfileData):
         self._is_axis = False
         self._is_hardware = None
         self.comment = None # user comments/notes
-        self._priority = 0 # default priority
+        self._priority = 5 # default priority
         self.data = None # additional data for runtime purposes, context dependent used to tag actions at runtime for some purpose like action grouping
         self.data_ex = None # additional data for 
 
@@ -1113,6 +1113,7 @@ class AbstractAction(ProfileData):
 
     def setPriority(self, value : int):
         ''' sets the priority of the action, numeric'''
+        value = gremlin.util.clamp(value,0, 1000)
         self._priority = value   
 
     @property
@@ -1283,6 +1284,12 @@ class AbstractAction(ProfileData):
         if comment:
             self.comment = comment
 
+        priority = 5 # default priority for actions
+        if "priority" in node.attrib:
+            priority = safe_read(node, "priority",int, 5)
+            priority = gremlin.util.clamp(priority,0, 1000)
+            self._priority = priority
+
 
         super().from_xml(node, data, extra_data)
 
@@ -1314,6 +1321,8 @@ class AbstractAction(ProfileData):
         # output any notes
         if self.comment:
             node.set("comment", self.comment)
+
+        node.set("priority", safe_format(self._priority, int))
 
         return node
 

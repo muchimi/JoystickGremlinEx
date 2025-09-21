@@ -36,6 +36,7 @@ import logging
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+from gremlin.profile import safe_format, safe_read
 
 
 syslog = logging.getLogger("system")
@@ -89,6 +90,7 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
                 index = self.mode_selector_widget.findData(current_mode)
                 if index != -1:
                     self.mode_selector_widget.setCurrentIndex(index)
+        self.action_data.mode = self.mode_selector_widget.currentData()
    
     def _update_context_modes(self):
         gremlin.util.InvokeUiMethod(self._update_context_modes_ui) # ensure on UI thread
@@ -128,10 +130,11 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self.mode_selector_widget):
             return
         mode = self.mode_selector_widget.currentData()
+        assert bool(mode), "Invalid mode data"
         self.action_data.mode = mode
 
     def _populate_ui(self):
-        assert self.mode_selector_widget.count() > 0
+        
         mode = self.action_data.mode
         if mode is None:
             index = 0
@@ -191,16 +194,16 @@ To change the mode temporarily, use the temporary mode switch action.'''
         super().__init__(parent)
         self.parent = parent
         self.setPriority(999)
-        profile = gremlin.shared_state.current_profile
         current_mode = gremlin.shared_state.edit_mode
-        root = profile.modeTree()
-        node = anytree.find(root, lambda node: node.name == current_mode)
         mode = current_mode
-        if node:
-            if node.children:
-                mode = node.children[0].name
-            elif node.parent:
-                mode = node.parent.name
+        # profile = gremlin.shared_state.current_profile
+        # root = profile.modeTree()
+        # node = anytree.find(root, lambda node: node.name == current_mode)
+        # if node:
+        #     if node.children:
+        #         mode = node.children[0].name
+        #     elif node.parent:
+        #         mode = node.parent.name
         self._mode = mode
 
     @property
@@ -209,7 +212,7 @@ To change the mode temporarily, use the temporary mode switch action.'''
     
     @mode.setter
     def mode(self, value: str):
-        if value != self._mode:
+        if value != self._mode and value is not None:
             self._mode = value
             syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose
@@ -233,7 +236,10 @@ To change the mode temporarily, use the temporary mode switch action.'''
         ]
 
     def _parse_xml(self, node, data = None, extra_data = None):
-        self._mode = node.get("name")
+        mode = safe_read(node, "mode",str,"Default")
+        if not mode:
+            mode = "Default"
+        self.mode = mode
         verbose = gremlin.config.Configuration().verbose_mode_outputs
         if verbose: syslog.info(f"Read mode: {self._mode} from XML - edit mode: {gremlin.shared_state.edit_mode}")
 

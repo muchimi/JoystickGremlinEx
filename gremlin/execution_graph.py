@@ -1266,6 +1266,10 @@ class ExecutionContext():
                 if not action_list:
                     # empty set
                     continue
+                if verbose and len(action_list) > 1:
+                    syslog.info(f"BUILD: priorities for {len(action_list)} actions:")
+                    for (priority, index), action in action_list:
+                        syslog.info(f"\t[{index} priority: {priority} action: [{action}]]")
                 action_list.sort(key = lambda x : x[0]) # sort by priority, order of appearance
                 for index, action in action_list:
 

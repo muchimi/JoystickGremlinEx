@@ -182,6 +182,7 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
         #self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
         self.curve_data.curve_update()
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
+        self.setPriority(1) # execute before other nodes (default priority is 5)
 
     def getCurveData(self):
         ''' returns the curve data '''

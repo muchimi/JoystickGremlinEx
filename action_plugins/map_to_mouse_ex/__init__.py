@@ -729,7 +729,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         :param value the current value of the event chain
         """
 
-        raw_value = event.value
+        raw_value = event.curve_value
         value = abs(raw_value)
         is_x = self.action_data.direction == 90
 
