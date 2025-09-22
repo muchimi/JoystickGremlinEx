@@ -826,12 +826,19 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.split_joystick_repeater_widget.setToolTip("When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
         self.split_joystick_repeater_widget.setChecked(self.config.splitJoystickRepeater)
         self.split_joystick_repeater_widget.clicked.connect(self._split_joystick_repeater_cb)
+
+        # show parent mode in mode name drop downs
+        self.show_parent_mode_widget = QtWidgets.QCheckBox("Show parent mode in mode selector")
+        self.show_parent_mode_widget.setToolTip("When enabled, shows the parent mode name in the mode drop downs")
+        self.show_parent_mode_widget.setChecked(self.config.show_parent_mode)
+        self.show_parent_mode_widget.clicked.connect(self._show_parent_mode_widget_cb)
         
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Repeaters", transparent = True)
         box.addWidget(self.show_joystick_input_widget)
         box.addWidget(self.disable_joystick_input_widget)
         box.addWidget(self.show_button_grid_widget)
         box.addWidget(self.split_joystick_repeater_widget)
+        box.addWidget(self.show_parent_mode_widget)
         col2_layout.addWidget(box)
 
 
@@ -1832,6 +1839,12 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         # tell UI options changed
         el = gremlin.event_handler.EventListener()
         el.calibration_options_changed.emit()
+
+    @QtCore.Slot(bool)
+    def _show_parent_mode_widget_cb(self, checked):
+        self.config.show_parent_mode = checked
+        el = gremlin.event_handler.EventListener()
+        el.mode_list_update.emit() # request mode list update
 
     @QtCore.Slot(bool)
     def _partial_plugin_save(self, checked):

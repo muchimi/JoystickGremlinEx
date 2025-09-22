@@ -2686,21 +2686,6 @@ class ModeStyle(anytree.AbstractStyle):
         super().__init__("\u2502 ", "\u251c\u2500 ", "\u2514\u2500 ")
 
 
-# def _inheritance_tree_to_labels(labels, tree, level):
-#     """Generates labels to use in the dropdown menu indicating inheritance.
-
-#     :param labels the list containing all the labels
-#     :param tree the part of the tree to be processed
-#     :param level the indentation level of this tree
-#     """
-#     # skip the root node
-#     for child in tree.children:
-#         for pre, _, node in anytree.RenderTree(child, style=ModeStyle()):
-#             if node.parent.is_root:
-#                 pre = ''
-#             labels.append((node.name,f"{pre}{node.name}"))
-#     pass
-
 def get_mode_list(profile):
     ''' gets a pairs (display_name, mode) '''
     
@@ -2814,6 +2799,7 @@ class ModeWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         el.mode_list_update.connect(self._mode_list_update)
         el.profile_modes_changed.connect(self._mode_list_update)
+        
 
 
     def setRuntimeDisabled(self, value):

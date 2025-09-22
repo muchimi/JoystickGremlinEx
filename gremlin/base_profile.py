@@ -3059,12 +3059,16 @@ class Profile():
         :param level the indentation level of this tree
         """
         # skip the root node
+        show_parent = gremlin.config.Configuration().show_parent_mode
         for child in tree.children:
-            for _, _, node in anytree.RenderTree(child, style=gremlin.ui.ui_common.ModeStyle()):
+            for pre, fill, node in anytree.RenderTree(child, style = anytree.ContStyle()): # style=gremlin.ui.ui_common.ModeStyle()):
                 #'└''─'
-                pre = '' if node.parent.is_root else '└'
-                fill = '─' * (node.depth-1)
-                labels.append((node.name,f"{pre}{fill} {node.name}"))
+                # pre = '' if node.parent.is_root else '└'
+                # fill = '─' * (node.depth-1)
+                if node.parent.name and show_parent:
+                    labels.append((node.name,f"{pre} {node.name} (↑{node.parent.name})"))
+                else:
+                    labels.append((node.name,f"{pre} {node.name}"))
 
     def get_mode_display_list(self) -> list:
         ''' gets a pairs (display_name, mode) '''

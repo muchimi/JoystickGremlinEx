@@ -269,12 +269,16 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :returns: True if changes were made 
 
         '''
+
+        # mode actions are tied to the individual mode
         current_mode = gremlin.shared_state.edit_mode
         mode_object = self.device_profile.ensure_mode_exists(current_mode)
         config = self.device_profile.modes[current_mode].config
+
+        # mode changes are tied to the master mode - so apply
         master_mode = ModeDeviceTabWidget.master_mode
         master_mode_object = self.device_profile.ensure_mode_exists(master_mode, is_system = True)
-        master_config = self.device_profile.modes[master_mode].config
+        master_config = self.device_profile.modes[master_mode].config 
 
         changed = False
 

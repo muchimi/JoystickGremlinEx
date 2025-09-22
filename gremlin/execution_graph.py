@@ -569,9 +569,6 @@ class ExecutionContext():
     def _profile_started(self):
         ''' after profile start occurs '''
         pass
-    #     ''' hook registered functors '''
-    #     config = gremlin.config.Configuration() 
-    #     if config.verbose: syslog.info(f"CONTEXT: profile started with {len(self._functors):,} functors")
 
     def _profile_stopped(self):
         ''' unhook registered functors '''

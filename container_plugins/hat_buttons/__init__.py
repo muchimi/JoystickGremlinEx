@@ -132,25 +132,25 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
     def _ensureActionSet(self, position):
         return self.profile_data.getActionSet(position)
 
-    def _add_action_selector(self, add_action_cb, label, paste_action_cb = None):
-        """Adds an action selection UI widget.
+    # def _add_action_selector(self, add_action_cb, label, paste_action_cb = None):
+    #     """Adds an action selection UI widget.
 
-        :param add_action_cb function to call when an action is added
-        :param label the description of the action selector
-        """
-        input_item = self.profile_data.input_item
-        action_selector = gremlin.ui.ui_common.ActionSelector(InputType.JoystickButton, input_item)
-        action_selector.action_added.connect(add_action_cb)
-        if paste_action_cb:
-            action_selector.action_paste.connect(paste_action_cb)
+    #     :param add_action_cb function to call when an action is added
+    #     :param label the description of the action selector
+    #     """
+    #     input_item = self.profile_data.input_item
+    #     action_selector = gremlin.ui.ui_common.ActionSelector(InputType.JoystickButton, input_item)
+    #     action_selector.action_added.connect(add_action_cb)
+    #     if paste_action_cb:
+    #         action_selector.action_paste.connect(paste_action_cb)
 
-        group_layout = QtWidgets.QVBoxLayout()
-        group_layout.addWidget(action_selector)
-        group_layout.addStretch(1)
-        group_box = QtWidgets.QGroupBox(label)
-        group_box.setLayout(group_layout)
+    #     group_layout = QtWidgets.QVBoxLayout()
+    #     group_layout.addWidget(action_selector)
+    #     group_layout.addStretch(1)
+    #     group_box = QtWidgets.QGroupBox(label)
+    #     group_box.setLayout(group_layout)
 
-        self.action_layout.addWidget(group_box)        
+    #     self.action_layout.addWidget(group_box)        
 
     def _create_condition_ui(self):
         action_sets = self.profile_data.getActionSets()
@@ -217,7 +217,8 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
                     action_item = plugin_manager.duplicate(action.data, self.profile_data)
 
             self.profile_data.add_action(action_item, index)
-            self.container_modified.emit()
+            
+            #self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 

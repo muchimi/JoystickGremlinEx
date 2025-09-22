@@ -15,10 +15,14 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T63A) hotfix
-- Modified: filter for state input viewer dissociated from filter for state device.
-- Fix: QT garbage collection shenanigans in cycle mode action.
-- Fix: Changing a tab using the mouse wheel does not "select" the tab causing a UI desync.
+- New feature: filter for state input viewer dissociated from filter for state device.d
+- New feature: Switch mode and Map to State actions both gain an execute on press / release option.  Both can be active at the same time for special use-cases.  Default is execute on press.  
+- New Feature: Option to display parent mode in mode drop downs.
 
+- Fix: QT garbage collection shenanigans in cycle mode action.
+- Fix: Tab device scrolling using the mouse wheel did not "select" the tab causing a UI desync.
+- Fix: Mode enter actions not triggered on profile start if the mode has actions on start and the mode is already active on start.
+- Fix: Switch mode changed to default mode on profile load disabling mode changes unless the action was edited again.  Added additional asserts to switch mode if problems persist.
 
 
 ### (m76T63)

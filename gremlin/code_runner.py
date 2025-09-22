@@ -647,10 +647,7 @@ class CodeRunner:
 
             if not mode in mode_list:
                 syslog.error(f"Unable to select startup mode: '{mode}' no longer exists")
-            else:
-                if verbose:
-                    syslog.info(f"Using profile start mode: '{mode}'")
-                self.event_handler.change_mode(mode)
+                mode = profile.get_default_mode() # start the default mode instead
 
 
             # tell listener profiles are starting
@@ -691,6 +688,10 @@ class CodeRunner:
             if load_state:
                 # profile state ok = profile started correctly
                 el.profile_started.emit()
+
+            # change to the start mode
+            if verbose:syslog.info(f"Using profile start mode: '{mode}'")
+            self.event_handler.change_mode(mode, force_update=True) # force change to execute any startup triggers
 
             return load_state
 

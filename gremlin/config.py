@@ -2468,3 +2468,12 @@ class Configuration(QtCore.QObject):
     def hide_default_mode(self, value : bool):
         self._set_data("hide_default_mode", value)
         
+
+    @property
+    def show_parent_mode(self):
+        return self._get_data("show_parent_mode", False)
+    @show_parent_mode.setter
+    def show_parent_mode(self, value : bool):
+        self._set_data("show_parent_mode", value)
+        
+

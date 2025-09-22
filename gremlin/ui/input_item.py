@@ -1140,25 +1140,30 @@ class ActionSetModel(ui_common.AbstractModel):
 
     def remove_action(self, action):
         ''' runs when an action should be deleted '''
-        if action in self._action_set:
-            input_item = action.get_input_item()
-            container : gremlin.base_profile.AbstractContainer = action.get_container()
-            del self._action_set[self._action_set.index(action)]
-            el = gremlin.event_handler.EventListener()
-            el.action_delete.emit(input_item, container, action) # tell the UI the action is being deleted
-            if hasattr(action,"_cleanup"):
-                action._cleanup()
+        import gremlin.util
+        try:
+            gremlin.util.pushCursor()
+            if action in self._action_set:
+                input_item = action.get_input_item()
+                container : gremlin.base_profile.AbstractContainer = action.get_container()
+                del self._action_set[self._action_set.index(action)]
+                el = gremlin.event_handler.EventListener()
+                el.action_delete.emit(input_item, container, action) # tell the UI the action is being deleted
+                if hasattr(action,"_cleanup"):
+                    action._cleanup()
 
-            event = gremlin.event_handler.DeviceChangeEvent()
-            event.source = input_item
-            event.device_input_id = input_item
-            el.icon_changed.emit(event)
+                event = gremlin.event_handler.DeviceChangeEvent()
+                event.source = input_item
+                event.device_input_id = input_item
+                el.icon_changed.emit(event)
 
-            container.mapping_changed() # tell the UI about the change
-            
-            
-            
-        self.data_changed.emit()
+                container.mapping_changed() # tell the UI about the change
+                
+                
+                
+            self.data_changed.emit()
+        finally:
+            gremlin.util.popCursor()
         
 
 
@@ -3831,6 +3836,7 @@ class TitleBar(QtWidgets.QFrame):
         import gremlin.shared_state
         import gremlin.config
         import gremlin.event_handler
+        import gremlin.util
         super().__init__(parent)
 
         is_dark = gremlin.shared_state.is_dark_theme
@@ -3898,14 +3904,12 @@ class TitleBar(QtWidgets.QFrame):
             self.copy_button.clicked.connect(clipboard_cb)
             self.copy_button.setToolTip("Copy")
 
-        if config.show_container_id:
-            self.id_widget = gremlin.ui.ui_common.QDataLineEdit()
-            self.id_widget.setReadOnly(True)
-            self.id_widget.data = data
-            if data is not None and hasattr(data,"id"):
-                self.id_widget.setText(data.id)
-        else:
-            self.id_widget = None
+        self.id_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self.id_widget.setReadOnly(True)
+        self.id_widget.data = data
+        if data is not None and hasattr(data,"id"):
+            self.id_widget.setText(data.id)
+    
 
 
         self.comment_widget = gremlin.ui.ui_common.QDataLineEdit()
@@ -3929,8 +3933,7 @@ class TitleBar(QtWidgets.QFrame):
         self.layout.setContentsMargins(5, 0, 5, 0)
 
         self.layout.addWidget(self.label)
-        if self.id_widget:
-            self.layout.addWidget(self.id_widget)
+        self.layout.addWidget(self.id_widget)
         if self.priority_container:
             self.layout.addWidget(self.priority_container)
         self.layout.addWidget(QtWidgets.QLabel("Notes:"))
@@ -3947,6 +3950,8 @@ class TitleBar(QtWidgets.QFrame):
 
         self.setFrameShape(QtWidgets.QFrame.Box)
         self.setObjectName("frame")
+
+        gremlin.util.singleShot(lambda: self._show_container_id_changed())
 
     def setIdVisible(self, value : bool):
         self.id_widget.setVisible(value)
@@ -3984,6 +3989,7 @@ class TitleBar(QtWidgets.QFrame):
         )
 
     def _delete_cb(self):
+        ''' called on delete button '''
         if self._close_callback:
             self._close_callback()
 
@@ -4202,6 +4208,8 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
         from gremlin.ui.joystick_device import JoystickDeviceTabWidget
         assert gremlin.util.is_ui_thread()
+        if not Shiboken.isValid(self):
+            return
 
         if item_data is None:
             assert self.item_data, "Device data must be provided"

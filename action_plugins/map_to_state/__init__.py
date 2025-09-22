@@ -219,11 +219,11 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.container_pulse_widget)
 
-        self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
-        self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
-        self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
+        self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self.main_layout.addWidget(self.chkb_exec_on_release)
+        self.main_layout.addWidget(self._execute_widget)
 
         self.populate_selector()
 
@@ -231,6 +231,15 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._create_hat_mapping()
 
         gremlin.util.singleShot(self._update_ui)
+
+    @QtCore.Slot(bool)
+    def _execute_on_press_changed(self, checked : bool):
+        self.action_data.exec_on_press = checked
+
+    @QtCore.Slot(bool)
+    def _execute_on_release_changed(self, checked : bool):
+        self.action_data.exec_on_release = checked        
+
 
     @QtCore.Slot(bool)
     def _pulse_repeat_mode_changed(self, checked : bool):
@@ -337,11 +346,6 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.button_pulse_repeat_widget.setVisible(repeat_visible)
 
-
-    @QtCore.Slot(bool)
-    def _exec_on_release_changed(self, checked):
-        self.action_data.exec_on_release = checked
-        
 
     @QtCore.Slot()
     def _value_changed(self, value):
@@ -744,7 +748,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             key = self.action_data.key
             mode = self.action_data.mode
             is_pressed = event.is_pressed
-            trigger = (is_pressed and not self.action_data.exec_on_release) or \
+            trigger = (is_pressed and self.action_data.exec_on_press) or \
                     (not is_pressed and self.action_data.exec_on_release) or \
                     mode in ("actual","pulse")
             if trigger:
@@ -888,7 +892,9 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.pulse_delay = 250 # delay for pulse mode in milliseconds
         self.pulse_repeat = False # true if the pulse repeats while down
         self.pulse_repeat_delay  = 250 # repeat delay for pulse mode in milliseconds
+        self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
+
         self.hat_map = {} # map of button id keyed by hat position tuple
         self.hat_positions = list(vjoy.vjoy.Hat.to_continuous_direction.keys())
         self.hat_mode_map = {} # bool table keyed by hat position
@@ -965,6 +971,8 @@ class MapToState(gremlin.base_profile.AbstractAction):
             self.mode = node.get("mode")
         if "delay" in node.attrib:
             self.pulse_delay = safe_read(node,"delay",int, 250)
+        if "exec_on_press" in node.attrib:
+            self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
         if "exec_on_release" in node.attrib:
             self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
         if "repeat" in node.attrib:
@@ -1016,6 +1024,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
                 node.set("description", self.description)
             node.set("mode", self.mode)
             node.set("delay", safe_format(self.pulse_delay, int))
+            node.set("exec_on_press", safe_format(self.exec_on_press, bool))
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))
             if self.pulse_repeat:
                 node.set("repeat", safe_format(self.pulse_repeat, bool))
