@@ -2279,6 +2279,8 @@ class Configuration(QtCore.QObject):
         self.save()
         self.changed.emit("input_viewer_button_size", value)
 
+    # state device filter options
+
     @property
     def state_category_filter(self) -> str:
         ''' category filter for the state device '''
@@ -2305,6 +2307,36 @@ class Configuration(QtCore.QObject):
     def state_filter(self, value : str):
         self._data["state_filter"] = value
         self.save()
+
+    # input viewer filter options for state
+
+    @property
+    def iv_state_category_filter(self) -> str:
+        ''' category filter for the state device '''
+        return self._get_data("iv_state_category_filter",None)
+    @iv_state_category_filter.setter
+    def iv_state_category_filter(self, value : str):
+        self._data["iv_state_category_filter"] = value
+        self.save()
+
+    @property
+    def iv_state_filter_enabled(self) -> bool:
+        ''' enables state filtering in the state device '''
+        return self._get_data("iv_state_filter_enabled",False)
+    @iv_state_filter_enabled.setter
+    def iv_state_filter_enabled(self, value : bool):
+        self._data["iv_state_filter_enabled"] = value
+        self.save()
+
+    @property
+    def iv_state_filter(self) -> str:
+        ''' state  filter for the input viewer state device '''
+        return self._get_data("iv_state_filter",None)
+    @iv_state_filter.setter
+    def iv_state_filter(self, value : str):
+        self._data["iv_state_filter"] = value
+        self.save()
+
 
 
     @property

@@ -181,7 +181,8 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_mode_list(self):
 
-        
+        if not Shiboken.isValid(self.mode_list_widget):
+            return
         with QtCore.QSignalBlocker(self.mode_list_widget):
             self.mode_list_widget.clear()
             profile = gremlin.shared_state.current_profile

@@ -231,6 +231,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.devices.tabChanged.connect(self._tab_selected)
         self.ui.devices.tabMoveCompleted.connect(self._tab_moved_cb)
         self.ui.devices.tabContextMenu.connect(self._tab_context_menu_cb)
+        self.ui.devices.currentChanged.connect(self._tab_changed)
 
         self._last_input_item = None # last selected input item
         self._last_state_device_guid = None
@@ -725,6 +726,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._select_input_handler(device_guid, input_type, input_id, force_switch=True)
 
     @QtCore.Slot(int)
+    def _tab_changed(self, index):
+        #syslog.info(f"tab changed : {index}")
+        self._tab_selected(index)
+
+    @QtCore.Slot(int)
     def _tab_selected(self, index):
         ''' called when the device tab selection is changed
         :param: index = the index of the tab that was selected
@@ -734,6 +740,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self.ui.devices.moveInProgress:
             # ignore if the tab is being dragged
             return 
+        
+        #syslog.info(f"tab selected : {index}")
 
         device_guid = self.getDeviceGuidForTabIndex(index)
 
@@ -2228,10 +2236,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.push_highlighting()
             el = gremlin.event_handler.EventListener()
             gremlin.shared_state.push_input_selection() # prevent selections
-
-            # save current tab
-            current_tab_guid = self._active_tab_guid()
-
             
             self._reset_tab_data()
             self.clearWidgets()

@@ -36,6 +36,7 @@ class Ui_Gremlin(object):
         self.devices.setObjectName("devices")
         
         
+        
         self.tab_bar_layout.addWidget(self.devices)
         self.tab_bar_layout.addStretch(2)
 

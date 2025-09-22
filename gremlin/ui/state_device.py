@@ -2137,23 +2137,27 @@ class  StateFilterWidget(QtWidgets.QWidget):
     changed = Signal(str) # fires when the filter is changed
     categoryChanged = Signal(StateCategory)  # fires when the category is changed
     select = Signal(object) # request to select an item 
+    apply = Signal() # called when the widget's apply button is called
+    enabledChanged = Signal() # fires when the filter enable/disable is changed
         
-    def __init__(self, model = None, parent = None):
+    def __init__(self, model = None, parent = None, is_iv = False):
         super().__init__(parent)
 
         self._config = gremlin.config.Configuration()
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self._model = model
+        self._is_iv = is_iv # true if input viewer filter
 
          # filter widget
         cm = StateCategories()
-        category_id = self._config.state_category_filter
+        category_id = self._config.iv_state_category_filter if is_iv else self._config.state_category_filter
         category = cm.findById(category_id)
         self._category_filter = category
 
         self.filter_enabled_widget = QtWidgets.QCheckBox("Enable Filtering")
         self.filter_enabled_widget.setToolTip("Enables filtering on the state list by category")
-        is_filter = self._config.state_filter_enabled
+        is_filter = self._config.iv_state_filter_enabled if is_iv else self._config.state_filter_enabled
+
         self.filter_enabled_widget.setChecked(is_filter)
         self.filter_enabled_widget.clicked.connect(self._filter_enabled_changed)
 
@@ -2162,7 +2166,7 @@ class  StateFilterWidget(QtWidgets.QWidget):
         self._category_filter_widget.setEditable(False) # don't allow editing of categories for the main filter
 
 
-        current_filter = self._config.state_filter
+        current_filter = self._config.iv_state_filter if is_iv else self._config.state_filter
         self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text = current_filter)
 
         
@@ -2198,20 +2202,22 @@ class  StateFilterWidget(QtWidgets.QWidget):
         self._count_widget = QtWidgets.QLabel()
         widget, _ = gremlin.ui.ui_common.getHContainer(self._count_widget)
         self.main_layout.addWidget(widget)
-
-        
         self.main_layout.setSpacing(2)
-        
-        
         self._update_count()        
 
     @QtCore.Slot(bool)
     def _filter_enabled_changed(self, is_filter):
-        self._config.state_filter_enabled = is_filter
+        if self._is_iv:
+            self._config.iv_state_filter_enabled = is_filter
+        else:
+            self._config.state_filter_enabled = is_filter
+            
         self._category_filter_widget.setEnabled(is_filter) 
         has_categories = self._category_filter_widget.count()
         category = self._category_filter_widget.currentData() if is_filter and has_categories else None
         self.categoryChanged.emit(category)
+        self.enabledChanged.emit()
+
 
     @QtCore.Slot()
     def _category_filter_changed(self):
@@ -2258,8 +2264,12 @@ class  StateFilterWidget(QtWidgets.QWidget):
     def _apply_filter(self):
         ''' applies the filter '''
         value = self._filter_widget.text()
-        self._config.state_filter = value
+        if self._is_iv:
+            self._config.iv_state_filter = value
+        else:
+            self._config.state_filter = value
         self.changed.emit(value)
+        self.apply.emit()
 
 
     def clearFilter(self):
@@ -2522,6 +2532,8 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return True
         
         key = item.key.casefold().strip()
+        if self._filter in key:
+            return True
         return fnmatch.fnmatch(key, self._filter)
         
 
@@ -2529,6 +2541,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _filter_changed(self, filter):
         ''' called when the filter changes '''
         self._filter = gremlin.util.decorate_filter(filter)
+        self.input_item_list_model.refresh(emit = False)
         self.input_item_list_model.applyFilter()
         self.input_item_list_view.redraw()
         self._filter_widget.updateCounts()

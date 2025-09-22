@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T63A) hotfix
+- Modified: filter for state input viewer dissociated from filter for state device.
+- Fix: QT garbage collection shenanigans in cycle mode action.
+- Fix: Changing a tab using the mouse wheel does not "select" the tab causing a UI desync.
+
+
 
 ### (m76T63)
 - New: Action priority is exposed and can be changed.  Actions in a container with a higher priority will executed first at runtime.  Priorities are 0 to 1000. This was previously an internal priority however there are some use-cases where the priority should be manually set, if actions change the input value that goes into another action.   Mode switch actions should always execute last, as any action after the mode switch will be discarded.  

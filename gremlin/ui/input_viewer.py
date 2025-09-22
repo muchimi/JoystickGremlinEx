@@ -689,25 +689,59 @@ States can be toggled by clicking on the state button.  Expression states will u
         if self._state_visualizer_widget:
             gremlin.util.clear_layout(layout)
             self._state_buttons.clear()
-            font_size = gremlin.config.Configuration().input_viewer_button_size
-            sd = gremlin.ui.state_device.StateData()
-            css = gremlin.ui.ui_common.Color.cssStateButton(font_size)
-            cssAlternate = gremlin.ui.ui_common.Color.cssStateExpressionButton(font_size)
 
+        self._state_container_widget, self._state_container_layout = gremlin.ui.ui_common.getGridContainer() # holds state data
+        layout.addWidget(self._state_container_widget)
+    
+        self._reload_states()
+
+
+       
+
+        layout.setColumnStretch(10,1)
+
+    def _filter_data(self, state) -> bool:
+        ''' custom filter handler - true if the data is included in the filter, false otherwise '''
+        import fnmatch
+        filter = self._state_filter_widget.filter
+        if not filter:
+            return True # no filter = match
+        key = state.key
+        if not key:
+            # no key = match
+            return True
+        
+        key = state.key.casefold().strip()
+        if filter in key:
+            return True
+        return fnmatch.fnmatch(key, filter)        
+    
+    def _reload_states(self):
+        gremlin.util.InvokeUiMethod(self._reload_states_ui) # ensure on UI thread
+
+    def _reload_states_ui(self):
+        ''' loads or reloads states '''
         config = gremlin.config.Configuration()
-        is_filter = config.state_filter_enabled
-        verbose = config.verbose_mode_state
-
+        verbose = config.verbose_mode_state        
+        i = 0
+        sd = gremlin.ui.state_device.StateData()
+        items = sd.getStates().items()
+        layout = self._state_container_layout
+        gremlin.util.clear_layout(layout)
         cm = gremlin.ui.state_device.StateCategories()
         default_category = cm.default()
         category = None
+        
+        font_size = config.input_viewer_button_size
+        sd = gremlin.ui.state_device.StateData()
+        css = gremlin.ui.ui_common.Color.cssStateButton(font_size)
+        cssAlternate = gremlin.ui.ui_common.Color.cssStateExpressionButton(font_size)
+
+        is_filter = config.iv_state_filter_enabled
         if is_filter:
-            category = self._state_category_filter 
+            category = self._state_filter_widget.category 
             if not category:
                 category = default_category
-
-        i = 0
-        items = sd.getStates().items()
         if items:
             for key, state in items:
                 if state.value is None:
@@ -718,7 +752,8 @@ States can be toggled by clicking on the state button.  Expression states will u
                     item_category = state.category if state.category else default_category
                     if item_category != category:
                         continue # filter out
-                
+                if is_filter and not self._filter_data(state):
+                    continue
 
                 btn = gremlin.ui.ui_common.QDataPushButton(key)
                 btn.data = state # store the state with the button
@@ -744,7 +779,11 @@ States can be toggled by clicking on the state button.  Expression states will u
         else:
             layout.addWidget(QtWidgets.QLabel("No states found."),0,0,1,-1)
 
-        layout.setColumnStretch(10,1)
+    # @QtCore.Slot(bool)
+    # def state_filter_input_viewer_changed(self, checked):
+    #     config = gremlin.config.Configuration()
+    #     config.state_filter_input_viewer = checked
+    #     self.reload_states() # reload the states with or without filters
 
     def showState(self):
         ''' state device '''
@@ -753,11 +792,12 @@ States can be toggled by clicking on the state button.  Expression states will u
 
             layout = QtWidgets.QVBoxLayout(self._state_visualizer_widget)
             self._state_visualizer_widget.setLayout(layout)
-
-            self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget()
-            self._state_category_filter = self._state_filter_widget.category # current category
+            self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv = True)
+            self._state_filter_widget.apply.connect(self._reload_states)
             self._state_filter_widget.changed.connect(self._category_filter_changed)
+            self._state_filter_widget.enabledChanged.connect(self._reload_states)
             layout.addWidget(self._state_filter_widget)
+            layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
             config = gremlin.config.Configuration()
             config.changed.connect(self._config_changed)
@@ -789,8 +829,7 @@ States can be toggled by clicking on the state button.  Expression states will u
     @QtCore.Slot(object)
     def _category_filter_changed(self, category):
         ''' called when the state category filter is changed '''
-        self._state_category_filter = category
-        self.populateState(self._state_button_layout)
+        self._reload_states()
 
 
 

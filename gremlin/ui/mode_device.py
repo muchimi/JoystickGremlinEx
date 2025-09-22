@@ -304,20 +304,6 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         else:
             modeExit = config[InputType.ModeControl][ModeInputModeType.ModeExit]
 
-
-        # if not ModeInputModeType.ModeProfileLoad in master_config[InputType.ModeControl]:
-        #     modeProfileLoad = gremlin.base_profile.InputItem(self._custom_name_handler, parent = master_mode_object)
-        #     modeProfileLoad.input_type = InputType.ModeControl
-        #     modeProfileLoad.setOverrideInputType(InputType.JoystickButton)
-        #     modeProfileLoad.input_id = ModeInputModeType.ModeProfileLoad
-        #     modeProfileLoad.description = "Profile Load"
-        #     modeProfileLoad.descriptionReadOnly = True
-        
-        #     master_config[InputType.ModeControl][ModeInputModeType.ModeProfileLoad] = modeProfileLoad
-        #     changed = True
-        # else:
-        #     modeProfileLoad = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileLoad]            
-
         if not ModeInputModeType.ModeProfileStart in master_config[InputType.ModeControl]:
             modeProfileStart = gremlin.base_profile.InputItem(self._custom_name_handler, parent = master_mode_object)
             modeProfileStart.input_type = InputType.ModeControl
