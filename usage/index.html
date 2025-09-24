@@ -852,9 +852,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#mode-cycle" class="md-nav__link">
+  <a href="#cycle-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Mode Cycle
+      Cycle Modes
     </span>
   </a>
   
@@ -909,6 +909,24 @@
   <a href="#text-to-speech" class="md-nav__link">
     <span class="md-ellipsis">
       Text to Speech
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to State
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-octavi-ifr1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Octavi IFR1
     </span>
   </a>
   
@@ -2192,7 +2210,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#map-to-state" class="md-nav__link">
+  <a href="#map-to-state_1" class="md-nav__link">
     <span class="md-ellipsis">
       Map to State
     </span>
@@ -2985,9 +3003,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#mode-cycle" class="md-nav__link">
+  <a href="#cycle-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Mode Cycle
+      Cycle Modes
     </span>
   </a>
   
@@ -3042,6 +3060,24 @@
   <a href="#text-to-speech" class="md-nav__link">
     <span class="md-ellipsis">
       Text to Speech
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to State
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-octavi-ifr1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Octavi IFR1
     </span>
   </a>
   
@@ -4325,7 +4361,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#map-to-state" class="md-nav__link">
+  <a href="#map-to-state_1" class="md-nav__link">
     <span class="md-ellipsis">
       Map to State
     </span>
@@ -4624,7 +4660,7 @@
 <h3 id="device-list">Device list<a class="headerlink" href="#device-list" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/device_tabs.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="device tabs" src="../assets/device_tabs.png" /></a></p>
 <p>The top of the user interface below the toolbar is the device list, shown as a list of tabs.  The list shows all detected devices, as well as special devices (like OSC), keyboard, modes, and some general options to setup user plugins and profile options.</p>
-<p>Click on a tab to select the device as the active device.</p>
+<p>Click on a tab to select the device as the active device.  You can also use the mouse wheel to scroll the tabs left or right which will also select a new device tab.</p>
 <h4 id="special-devices">Special devices<a class="headerlink" href="#special-devices" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
@@ -4644,11 +4680,15 @@
 </tr>
 <tr>
 <td>OSC</td>
-<td>This device allows you to map inbound OSC messages</td>
+<td>This device allows you to map inbound OSC messages (two way communication supported via map to OSC action)</td>
 </tr>
 <tr>
 <td>MIDI</td>
 <td>This device allows you to map inbound MIDI messages</td>
+</tr>
+<tr>
+<td>Octavi IFR1</td>
+<td>This device allows you to map inputs from the Octavi IFR1 (two way supported via map to IFR1 action)</td>
 </tr>
 <tr>
 <td>Settings</td>
@@ -4664,6 +4704,9 @@
 <p><a class="glightbox" href="../assets/disconnected_device_tabs.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="disconnected device tabs" src="../assets/disconnected_device_tabs.png" /></a></p>
 <p>If a device was saved to a profile, the profile is loaded, and the device is no longer detected, GremlinEx will indicate the device is not currently available with a disconnected flag as shown above.  The device can be reconnected by plugging it back in, or deleted via the context (right click) menu.  Disconnected devices are normal when opening a profile created on a different machine as device hardware IDs will be different.</p>
 <p>It is possible for the disconnected device to have the same name of a current device if the device has a different hardware ID from what is currently detected.</p>
+<h4 id="tip-copy-mapping-from-one-device-to-the-other">Tip: copy mapping from one device to the other<a class="headerlink" href="#tip-copy-mapping-from-one-device-to-the-other" title="Permanent link">&para;</a></h4>
+<p>You can copy all mappings from a disconnected device to another connected device using the right-click context menu.  This is helpful if you changed devices but wish to copy the mappings from one to enother.  GremlinEx will copy one to one inputs that are in the disconnected device, and also found in the target device.</p>
+<p>You can also save mappings to a template, and load that template back into another device, which is similar although this lets you create templates persisted to a disk file for later use in other profiles.</p>
 <h3 id="input-area">Input area<a class="headerlink" href="#input-area" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/input_panel.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="input panel" src="../assets/input_panel.png" /></a></p>
 <p>The left of the user interface (UI) is the input area.  It shows a list of available inputs on the currently selected device.</p>
@@ -4673,6 +4716,9 @@
 <h3 id="linear-inputs">Linear inputs<a class="headerlink" href="#linear-inputs" title="Permanent link">&para;</a></h3>
 <p>Linear inputs indicate an axis type input is detected.   The input can change values.  Examples of linear inputs are a joystick axis, a slider, a fader, or rotary knob.</p>
 <p>Linear inputs that have multiple axes, such as an XY pad, will show as one input per axis.</p>
+<h4 id="linear-input-repeaters">Linear input repeaters<a class="headerlink" href="#linear-input-repeaters" title="Permanent link">&para;</a></h4>
+<p>GremlinEx can display a repeater bar graph that shows the current state of the input, and in some cases, transformations applied to that input.  This lets you visualize in real-time the inputs.</p>
+<p><a class="glightbox" href="../assets/axis_repeaters.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="input locksl" src="../assets/axis_repeaters.png" /></a></p>
 <h3 id="momentary-inputs">Momentary inputs<a class="headerlink" href="#momentary-inputs" title="Permanent link">&para;</a></h3>
 <p>A momentary input is an input that typically has two states - pressed or released such as a key or a button.   A momentary input can also be held in which case it will keep its pressed state until it is released. </p>
 <p>Encoders are also typically momentary but they have multiple positions.  In GremlinEx, an encoder will typically show as two inputs, one to increase, one to decrease.</p>
@@ -4801,7 +4847,20 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <h3 id="vjoy-remap">Vjoy Remap<a class="headerlink" href="#vjoy-remap" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_vjoy_remap.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="vjoy remap action" src="../assets/action_vjoy_remap.png" /></a></p>
 <p>This is the most common action in GremlinEx and lets you map an input (linear or momentary) to a VJOY device.</p>
-<p>This action replaces the legacy remap option.</p>
+<p>This action replaces the legacy remap option.  In GremlinEx, this action is the main way to send output to a VJOY device. </p>
+<p>Some of the features of vjoy remap:
+- map an input axis to a vjoy axis
+- apply an output curve to the vjoy axis based on input
+- scale or apply a range to the vjoy axis based on input
+- merge the output axis value with one or more input axes using add, substract, multiply, average.
+- map an input button to a vjoy button
+- map an input hat to a button or a hat
+- synchonize the input value to the output on profile start or pick a default value.
+- force a button pressed
+- force a button release
+- toggle a button
+- convert an axis value to a button
+- view which buttons are in-use profile wise</p>
 <h3 id="gated-axis">Gated Axis<a class="headerlink" href="#gated-axis" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_gated_axis.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gated axis" src="../assets/action_gated_axis.png" /></a></p>
 <p>This action lets you split an input axis and define what should happen when</p>
@@ -4817,7 +4876,7 @@ This container was specifically created for output needs that have "gates", such
 <h3 id="temporary-mode-switch">Temporary Mode Switch<a class="headerlink" href="#temporary-mode-switch" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_map_to_temporary_mode_switch.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="temporary mode switch" src="../assets/action_map_to_temporary_mode_switch.png" /></a></p>
 <p>This action lets you change the profile mode temporarily while the input is pressed.</p>
-<h3 id="mode-cycle">Mode Cycle<a class="headerlink" href="#mode-cycle" title="Permanent link">&para;</a></h3>
+<h3 id="cycle-modes">Cycle Modes<a class="headerlink" href="#cycle-modes" title="Permanent link">&para;</a></h3>
 <p>This action lets you cycle modes with each press.</p>
 <p><a class="glightbox" href="../assets/action_cycle_mode.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="cycle modes" src="../assets/action_cycle_mode.png" /></a></p>
 <h3 id="map-to-keyboard-ex">Map to Keyboard Ex<a class="headerlink" href="#map-to-keyboard-ex" title="Permanent link">&para;</a></h3>
@@ -4847,6 +4906,11 @@ This container was specifically created for output needs that have "gates", such
 <h3 id="text-to-speech">Text to Speech<a class="headerlink" href="#text-to-speech" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_tts.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="tts action" src="../assets/action_tts.png" /></a></p>
 <p>This action lets you send an audio prompt via TTS (text to speech).</p>
+<h3 id="map-to-state">Map to State<a class="headerlink" href="#map-to-state" title="Permanent link">&para;</a></h3>
+<p>This action lets you set or clear a state defined in the profile.  States are defined in the state device tab.</p>
+<p>If a state's value is changed and that state is used in an expression in another state, that state is also updated.</p>
+<h3 id="map-to-octavi-ifr1">Map to Octavi IFR1<a class="headerlink" href="#map-to-octavi-ifr1" title="Permanent link">&para;</a></h3>
+<p>This action sends output to the Octavie IFR 1 to control LEDs and modes.</p>
 <h3 id="macro">Macro<a class="headerlink" href="#macro" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_macro.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="macro action" src="../assets/action_macro.png" /></a></p>
 <p>This action lets you send complex sequences of outputs (joystick, keyboard, mouse) complete with timing and delay controls and separate make/break actions for buttons.</p>
@@ -6267,7 +6331,7 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 <p>This experimental container executes all contained actions in sequence, similar to a macro.  The difference between this container and others is the order of execution is guaranteed and each action runs in sequence rather than in parallel.</p>
 <p>Actions execute in the order they are listed and they can be re-ordered if needed.</p>
 <p>The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.</p>
-<h2 id="map-to-state">Map to State<a class="headerlink" href="#map-to-state" title="Permanent link">&para;</a></h2>
+<h2 id="map-to-state_1">Map to State<a class="headerlink" href="#map-to-state_1" title="Permanent link">&para;</a></h2>
 <p>This feature is only available in 1.0ex m74 and above.  For more information on states, consult the <a href="#states">state device section</a> of the documentation.</p>
 <p>The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:</p>
 <p><a class="glightbox" href="../assets/action_state.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="action state" src="../assets/action_state.png" /></a></p>
