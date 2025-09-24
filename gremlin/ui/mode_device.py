@@ -373,7 +373,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
          
     def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
-        return (self._device_guid, input_type, input_id)
+        mode = gremlin.shared_state.edit_mode
+        return (self._device_guid, input_type, input_id, mode)
 
 
     def _select_item_cb(self, index):
@@ -432,10 +433,11 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             self.input_item_list_view.select_item(index,False)
 
+        
 
         self._last_selected_index = index
         el = gremlin.event_handler.EventListener()
-        el.input_selection_changed.emit(device_guid, input_type, input_id)
+        el.input_selection_changed.emit(device_guid, input_type, input_id, gremlin.shared_state.edit_mode )
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
         ''' creates a widget for the input 
@@ -518,9 +520,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.current_mode = mode
         self.ensureInputItems()
         self.input_item_list_model.mode = mode
-        
         #self.input_item_list_view.select_item(-1)
-        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
+        if gremlin.shared_state.isDeviceTabActive(self._device_id):
             self.input_item_list_model.refresh()
             self.input_item_list_view.redraw()        
             self._select_item_cb(self._last_selected_index)

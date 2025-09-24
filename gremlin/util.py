@@ -1786,8 +1786,8 @@ def is_close(a, b, tolerance = 0.0001):
 
 class InvokeUiMethod(QtCore.QObject):
     ''' invokes a call on the UI thread as QT is not thread safe '''
-    _called = QtCore.Signal(object, object, object, object, object, object)
-    def __init__(self, method: Callable, p0 = None, p1 = None, p2 = None, p3 = None, p4 = None, p5 = None):
+    _called = QtCore.Signal(object, object, object, object, object, object, object, object)
+    def __init__(self, method: Callable, p0 = None, p1 = None, p2 = None, p3 = None, p4 = None, p5 = None, p6 = None, p7 = None):
         ''' Invokes a method on the main ui thread. 
         
         :params: method: lambda expression
@@ -1807,12 +1807,12 @@ class InvokeUiMethod(QtCore.QObject):
             self.setParent(QtWidgets.QApplication.instance())
             self._called.connect(self._execute)
             self.method = method           
-            self._called.emit(p0, p1, p2, p3, p4, p5)     
+            self._called.emit(p0, p1, p2, p3, p4, p5, p6, p7)     
         else:   
-            self._exec(method, p0, p1, p2, p3, p4, p5)
+            self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
 
 
-    def _exec(self, method, p0, p1, p2, p3, p4, p5):
+    def _exec(self, method, p0, p1, p2, p3, p4, p5, p6, p7):
         sig = inspect.signature(method)
         pcount = len(sig.parameters)
 
@@ -1846,20 +1846,27 @@ class InvokeUiMethod(QtCore.QObject):
                 method(p0,p1,p2,p3,p4)
             case 6:
                 method(p0,p1,p2,p3,p4,p5)
+            case 7:
+                method(p0,p1,p2,p3,p4,p5,p6)
+            case 8:
+                method(p0,p1,p2,p3,p4,p5,p6,p7)
 
 
 
 
     @QtCore.Slot(object)
-    def _execute(self, p0 = None, 
+    def _execute(self,
+                 p0 = None, 
                  p1 = None,
                  p2 = None,
                  p3 = None,
                  p4 = None,
-                 p5 = None
+                 p5 = None,
+                 p6 = None,
+                 p7 = None
                  ):
        
-        self._exec(self.method, p0, p1, p2, p3, p4, p5)
+        self._exec(self.method, p0, p1, p2, p3, p4, p5, p6, p7)
         
         # trigger garbage collector
         self.setParent(None)
@@ -2263,7 +2270,7 @@ def compare_guid(id1, id2) -> bool:
         return True
     nid1 = normalize_guid(id1)
     assert not "-" in nid1 or "{" in nid1,f"Bad normalization [{id1}] -> [{nid1}]"
-    if hasattr(id2, '__iter__'):
+    if not isinstance(id2, str) and hasattr(id2, '__iter__'):
         for id in id2:
             a = normalize_guid(id)
             assert not "-" in a or "{" in id,f"Bad normalization [{id}] -> [{a}]"

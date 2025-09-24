@@ -160,7 +160,13 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self.mode_selector_widget):
             return
         mode = self.mode_selector_widget.currentData()
-        assert bool(mode), "Invalid mode data"
+        if mode == gremlin.shared_state.edit_mode:
+            syslog.error(f"Invalid mode selected: {mode} selected mode cannot be the current mode")
+            return
+        if not mode:
+            syslog.error(f"Invalid mode selected: selected mode cannot be NULL")
+            return
+        
         self.action_data.mode = mode
 
     def _populate_ui(self):
@@ -238,8 +244,16 @@ To change the mode temporarily, use the temporary mode switch action.'''
         super().__init__(parent)
         self.parent = parent
         self.setPriority(999)
+
+        # default is the first mode in the profile list that is NOT the current mode
         current_mode = gremlin.shared_state.edit_mode
-        mode = current_mode
+        profile = gremlin.shared_state.current_profile
+        mode_list = profile.get_modes()
+        if current_mode in mode_list:
+            mode_list.remove(current_mode)
+        mode = mode_list[0] if mode_list else None
+        if mode and mode == current_mode:
+            mode = None
         self.exec_on_press = True # true if the mode should execute on input press
         self.exec_on_release = False # true if the mode should execute on input release
         self._mode = mode

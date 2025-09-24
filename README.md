@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T65)
+- Fix: UI sync for mode/profile device on mode change. When the mode was changed while in the Mode/Profile device, the UI could display stale data.
+- Fix: More hardening against QT Python dragons.
+- Fix: Mode switch: no longer select the current mode as the default action mode.
+
 ### (m76T64)
 - Changed: Startup sync for state and vjoy remap actions: A sync mode is now an option to decide how profile start syncing occurs. 
 The choices are: 

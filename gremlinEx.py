@@ -2724,7 +2724,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # select last items 
             try:
                 gremlin.shared_state.pop_input_selection(reset = True) # allow selections
-                last_device_guid, last_input_type, last_input_id = config.get_last_input()
+                last_device_guid, last_input_type, last_input_id, last_mode = config.get_last_input()
 
                 device = gremlin.joystick_handling.device_info_from_guid(last_device_guid)
                 if not device:
@@ -2877,7 +2877,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' UI loop is about to start '''
 
         # update the UI widgets that listen to inputs to disable the ones not visible 
-        device_guid, input_type, input_id = self.restore_input
+        device_guid, input_type, input_id, mode = self.restore_input
         # syslog = logging.getLogger("system")
         verbose = self.config.verbose_mode_details
         
@@ -2987,12 +2987,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         return None
         
 
-    def _select_input(self, device_guid, input_type : InputType = None, input_id = None, force_update = False, force_switch = False, tab_changed = False):
+    def _select_input(self, device_guid, input_type : InputType = None, input_id = None, mode = None, force_update = False, force_switch = False, tab_changed = False):
         if gremlin.shared_state.is_input_selection_suspended:
             return # skip if disabled
         gremlin.util.pushCursor()
         el = gremlin.event_handler.EventListener()
-        el.select_input.emit(device_guid, input_type, input_id, force_update, force_switch, tab_changed)
+        el.select_input.emit(device_guid, input_type, input_id, mode, force_update, force_switch, tab_changed)
         gremlin.util.popCursor()
 
 
@@ -3013,16 +3013,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._update_highlight_toolbar_enabled()
 
 
-    def _select_input_handler(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
+    def _select_input_handler(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, restore_mode = None, force_update : bool = False, force_switch = False, tab_changed = False):
         gremlin.util.InvokeUiMethod(self._select_input_handler_ui,
                                     device_guid,
                                     restore_input_type,
                                     restore_input_id,
+                                    restore_mode,
                                     force_update,
                                     force_switch,
                                     tab_changed)
 
-    def _select_input_handler_ui(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
+    def _select_input_handler_ui(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, restore_mode = None,  force_update : bool = False, force_switch = False, tab_changed = False):
         ''' Selects a specific input on the given tab
         The tab is changed if different from the current tab.
 
@@ -4355,8 +4356,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.info("Profile: load completed.")
 
             # mode to restore post-load if possible
-            last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
-            self._select_input(last_device_guid, last_input_type, last_input_id)
+            last_device_guid, last_input_type, last_input_id, last_mode = self.config.get_last_input()
+            self._select_input(last_device_guid, last_input_type, last_input_id, last_mode)
 
 
         finally:

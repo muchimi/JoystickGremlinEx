@@ -1595,7 +1595,7 @@ class Configuration(QtCore.QObject):
         self.save()
         self.save_profile()
 
-    def set_last_input(self, device_guid, input_type : gremlin.input_types.InputType, input_id ):
+    def set_last_input(self, device_guid, input_type : gremlin.input_types.InputType, input_id, mode = None ):
         ''' stores the last input '''
 
         import gremlin.joystick_handling
@@ -1610,6 +1610,8 @@ class Configuration(QtCore.QObject):
         
         device_guid = gremlin.util.normalize_guid(device_guid)
         data : dict = self._profile_data.get("last_input", {})
+        if mode is None:
+            mode = gremlin.shared_state.current_mode
         
         verbose = self.verbose_mode_inputs
         
@@ -1645,6 +1647,7 @@ class Configuration(QtCore.QObject):
             self._data["last_device_guid"] = device_guid
             self._data["last_input_type"] = gremlin.input_types.InputType.to_string(input_type)
             self._data["last_input_id"] = input_id
+            self._data["last_input_mode"] = mode
 
             if verbose: 
                 device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
@@ -1752,7 +1755,7 @@ class Configuration(QtCore.QObject):
         return (input_type, save_input_id, input_id)
 
 
-    def get_last_input(self, device_guid = None) -> tuple: # (device_guid, input_type, input_id)
+    def get_last_input(self, device_guid = None) -> tuple: # (device_guid, input_type, input_id, mode)
         ''' gets the last input for a given device
          
         :param device_guid: (optional) the device to look for - if None - uses the last known device
@@ -1772,8 +1775,10 @@ class Configuration(QtCore.QObject):
                 input_type = gremlin.input_types.InputType.to_enum(input_type)
             input_id = self._get_data("last_input_id", None)
 
-            if device_guid is not None and input_type is not None and input_id is not None:
-                return (device_guid, input_type, input_id)
+            mode = self._get_data("last_input_mode", None)
+
+            if device_guid is not None and input_type is not None and input_id is not None and mode is not None:
+                return (device_guid, input_type, input_id, mode)
 
             if device_guid is None:
                 if not self._profile_config_fname:
@@ -1781,9 +1786,10 @@ class Configuration(QtCore.QObject):
                 device_guid = self._profile_data.get("last_device_guid", None)
 
         if device_guid is None:
-            return (None, None, None)
+            return (None, None, None, None)
 
         verbose = self.verbose_mode_details
+        mode = gremlin.shared_state.edit_mode # current mode
         # verbose = True
         if verbose:
             device_name = gremlin.shared_state.get_device_name(device_guid)
@@ -1795,6 +1801,7 @@ class Configuration(QtCore.QObject):
         data : dict = self._profile_data.get("last_input", {})
         if device_guid in data:
             input_type, input_id = data[device_guid]
+
             try:
                 input_type = gremlin.input_types.InputType.to_enum(input_type)
             except:
@@ -1818,7 +1825,8 @@ class Configuration(QtCore.QObject):
                 except:
                     syslog.error(f"GetLastInput(): unable to convert input type {input_type} to a known type")
                     input_type = gremlin.input_types.InputType.NotSet
-                return (device_guid, input_type, input_id)
+                return (device_guid, input_type, input_id, mode)
+            
         # provide a suitable default for the input
         input_id = None
         if dinput_device_guid in gremlin.shared_state.device_type_map:
@@ -1830,7 +1838,7 @@ class Configuration(QtCore.QObject):
                 self.save_profile()
                 if verbose:
                     syslog.info(f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}")
-                return (device_guid, input_type, input_id)
+                return (device_guid, input_type, input_id, mode)
             
 
         if verbose:

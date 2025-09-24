@@ -658,6 +658,8 @@ class InputItemListView(ui_common.AbstractView):
         gremlin.util.InvokeUiMethod(self._sync_input_ui, input_item)
 
     def _sync_input_ui(self, input_item):
+        if not Shiboken.isValid(self):
+            return
         if self.model.hasInputItem(input_item):
             index = self.model.indexOfInputItem(input_item)
             self.scrollToIndex(index)
@@ -713,11 +715,15 @@ class InputItemListView(ui_common.AbstractView):
 
     def getWidgets(self):
         ''' gets the list of widgets in the list view '''
+        if not Shiboken.isValid(self.scroll_layout):
+            return
         widgets = gremlin.util.get_layout_widgets(self.scroll_layout)
         return widgets
 
     def getWidgetAt(self, index):
         ''' gets a specific widgets at the given index '''
+        if not Shiboken.isValid(self.scroll_layout):
+            return
         widgets = self.getWidgets()
         widget = [w for w in widgets if w.index == index]
         if widget:
@@ -727,6 +733,8 @@ class InputItemListView(ui_common.AbstractView):
         return None
     
     def scrollToIndex(self, index):
+        if not Shiboken.isValid(self.scroll_layout):
+            return
         widget = self.getWidgetAt(index)
         if index != -1:
             self._scroll_to_item(widget)
@@ -3908,8 +3916,7 @@ class TitleBar(QtWidgets.QFrame):
         self.id_widget.setReadOnly(True)
         self.id_widget.data = data
         if data is not None and hasattr(data,"id"):
-            self.id_widget.setText(data.id)
-    
+            self.setIdValue(data.id)
 
 
         self.comment_widget = gremlin.ui.ui_common.QDataLineEdit()
