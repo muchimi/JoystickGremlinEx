@@ -1203,3 +1203,25 @@ class ButtonOutputMode (IntEnum):
     Press = 2
     Release = 3
     NoOp = 4 # do nothing
+
+
+class SyncMode(IntEnum):
+    Ignore = 0 # no sync mode
+    Default = 1 # use default value
+    Input = 2 # sync to input
+    LastOrDefault = 3 # sync to last value if there is one, else to the default state
+    LastOrInput = 4 # sync to last value if there is one, else to the input state
+    
+    @staticmethod
+    def to_description(value):
+        if value in _syncmode_to_description:
+            return _syncmode_to_description[value]
+        return f"Unknown mode: {value}"
+    
+_syncmode_to_description = {
+    SyncMode.Ignore : "Do nothing",
+    SyncMode.Default : "Use the default value on profile start.",
+    SyncMode.Input : "Sync with the current input value",
+    SyncMode.LastOrDefault : "Use the last value at profile stop or the default value",
+    SyncMode.LastOrInput : "Use the Last value at profile stop or the current input value "
+}

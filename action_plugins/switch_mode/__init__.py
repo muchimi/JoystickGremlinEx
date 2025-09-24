@@ -60,7 +60,7 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self._warning_widget = gremlin.ui.ui_common.QWarningWidget("A valid mode cannot be found.")
+        self._warning_widget = gremlin.ui.ui_common.QWarningWidget("Mode must not be empty and cannot be the current mode.")
 
         widget, _ = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget,"Switch to mode:")
 
@@ -117,7 +117,8 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not self.mode_selector_widget.count():
             is_warning = True
 
-        assert self.action_data.mode != edit_mode,"logic error: switch mode cannot be the same as the current edit mode" # cannot be the same as edit mode
+        if self.action_data.mode == edit_mode:
+            is_warning = True
 
         self._warning_widget.setVisible(is_warning)
    

@@ -26,7 +26,7 @@ To the right of the toolbar, a drop down with the current edit mode for the acti
 
 The top of the user interface below the toolbar is the device list, shown as a list of tabs.  The list shows all detected devices, as well as special devices (like OSC), keyboard, modes, and some general options to setup user plugins and profile options.
 
-Click on a tab to select the device as the active device.
+Click on a tab to select the device as the active device.  You can also use the mouse wheel to scroll the tabs left or right which will also select a new device tab.
 
 #### Special devices
 
@@ -35,8 +35,9 @@ Click on a tab to select the device as the active device.
 | ----------- | ----------- |
 | Keyboard   | This device is for keyboard and mouse mappings |
 | MODE   | This device allows you to map actions on mode change (entering a mode or exiting a mode) |
-| OSC   | This device allows you to map inbound OSC messages |
+| OSC   | This device allows you to map inbound OSC messages (two way communication supported via map to OSC action) |
 | MIDI   | This device allows you to map inbound MIDI messages |
+| Octavi IFR1  | This device allows you to map inputs from the Octavi IFR1 (two way supported via map to IFR1 action) |
 | Settings   | This device opens profile options specific to input settings |
 | Plugins   | This device allows you to add user plugins to the profile - plugins are loaded whenever the profile start and are written in Python - see the plugin documentation for details |
 
@@ -48,6 +49,12 @@ Click on a tab to select the device as the active device.
 If a device was saved to a profile, the profile is loaded, and the device is no longer detected, GremlinEx will indicate the device is not currently available with a disconnected flag as shown above.  The device can be reconnected by plugging it back in, or deleted via the context (right click) menu.  Disconnected devices are normal when opening a profile created on a different machine as device hardware IDs will be different.
 
 It is possible for the disconnected device to have the same name of a current device if the device has a different hardware ID from what is currently detected.
+
+#### Tip: copy mapping from one device to the other
+
+You can copy all mappings from a disconnected device to another connected device using the right-click context menu.  This is helpful if you changed devices but wish to copy the mappings from one to enother.  GremlinEx will copy one to one inputs that are in the disconnected device, and also found in the target device.
+
+You can also save mappings to a template, and load that template back into another device, which is similar although this lets you create templates persisted to a disk file for later use in other profiles.
 
 ### Input area
 
@@ -66,6 +73,12 @@ Each input can be locked, which prevents inadvertent editing of its mappings.
 Linear inputs indicate an axis type input is detected.   The input can change values.  Examples of linear inputs are a joystick axis, a slider, a fader, or rotary knob.
 
 Linear inputs that have multiple axes, such as an XY pad, will show as one input per axis.
+
+#### Linear input repeaters
+
+GremlinEx can display a repeater bar graph that shows the current state of the input, and in some cases, transformations applied to that input.  This lets you visualize in real-time the inputs.
+
+![input locksl](assets/axis_repeaters.png)
 
 ### Momentary inputs
 
@@ -313,7 +326,22 @@ Certain actions execute last (such as a mode change).  Actions have an internal 
 
 This is the most common action in GremlinEx and lets you map an input (linear or momentary) to a VJOY device.
 
-This action replaces the legacy remap option.
+This action replaces the legacy remap option.  In GremlinEx, this action is the main way to send output to a VJOY device. 
+
+Some of the features of vjoy remap:
+- map an input axis to a vjoy axis
+- apply an output curve to the vjoy axis based on input
+- scale or apply a range to the vjoy axis based on input
+- merge the output axis value with one or more input axes using add, substract, multiply, average.
+- map an input button to a vjoy button
+- map an input hat to a button or a hat
+- synchonize the input value to the output on profile start or pick a default value.
+- force a button pressed
+- force a button release
+- toggle a button
+- convert an axis value to a button
+- view which buttons are in-use profile wise
+
 
 ### Gated Axis
 
@@ -339,7 +367,7 @@ This action lets you change a profile mode at runtime based on an input trigger.
 
 This action lets you change the profile mode temporarily while the input is pressed.
 
-### Mode Cycle
+### Cycle Modes
 
 This action lets you cycle modes with each press.
 
@@ -401,6 +429,16 @@ This action lets you send an OSC message to the network.
 ![tts action](assets/action_tts.png)
 
 This action lets you send an audio prompt via TTS (text to speech).
+
+### Map to State
+
+This action lets you set or clear a state defined in the profile.  States are defined in the state device tab.
+
+If a state's value is changed and that state is used in an expression in another state, that state is also updated.
+
+### Map to Octavi IFR1
+
+This action sends output to the Octavie IFR 1 to control LEDs and modes.
 
 ### Macro
 

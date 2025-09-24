@@ -465,6 +465,8 @@ class AbstractFunctor(QtCore.QObject):
         self.manual_callback = False # functor uses automatic mode
         self._hooked = False
         el = gremlin.event_handler.EventListener()
+        el.profile_hook.connect(self.hook)
+        el.profile_unhook.connect(self.unhook)
 
         
     def hook(self):

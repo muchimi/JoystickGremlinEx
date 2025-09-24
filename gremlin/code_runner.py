@@ -678,7 +678,7 @@ class CodeRunner:
                     vs.setStartState(vjoy_device_id, vjoy_input_id, state)
                                 
 
-            # hook profiles
+            # hook profiles - this tells all functors to hook runtime events
             el.profile_hook.emit()
 
             # tell GremlinEx the profile started
@@ -789,9 +789,13 @@ class CodeRunner:
             eh.change_profile(self._startup_profile)
         # change back to edit mode
         eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update = False)
-        
+
+        # hook profiles - this tells all functors to unhook runtime events
+        el.profile_unhook.emit() 
 
         el.profile_stopped.emit() # stopped
+
+
       
         # re-enable tabs
         self.enableUI()

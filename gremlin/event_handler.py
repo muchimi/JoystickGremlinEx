@@ -410,6 +410,7 @@ class EventListener:
 
 	profile_reset = Signal() # profile reset signal (when runtime for a profile needs to reset)
 	profile_hook = Signal() # hook functors - before profile start is emitted
+	profile_unhook = Signal() # unhook functors - when profiles stop
 	profile_start = Signal() # profile start signal (when a profile starts)
 	profile_started = Signal() # profile started signal (after a profile starts and all process start functions are completed)
 	profile_stop = Signal() # profile stop signal (when a profile stops)
@@ -2789,28 +2790,6 @@ class AxisData():
 			calibrated_value = calibration.getValue(raw_value, False) # do not normalize, input is already -1 to +1
 			actual_value = calibrated_value
 			has_calibration = True
-
-		# if action:
-		# 	# get all the curves that apply to this action
-		# 	if not isinstance(action.data, gremlin.base_profile.ActionTreeNode):
-		# 		profile = gremlin.shared_state.current_profile
-		# 		data = profile.getActionTree(action)
-		# 		action.data = data
-
-		# 	if action.data:
-		# 		curves = []
-		# 		root = action.data
-		# 		action_node = root.data
-		# 		# see if the action has any sibblings to apply to the curve
-		#		if action_node.tag_data:
-		#	 		curve_actions = [a for a in action_node.tagdata if a.tag in ("response-curve-ex","response-curve") and a.curve_data]
-		# 		if curve_actions:
-		# 			curves = [a.curve_data for a in curve_actions]
-		# 		if hasattr(action, "curve_data"):
-		# 			curves.append(action.curve_data)
-
-			
-
 
 		astate = AxisState()
 		curve_data = astate.getAxisCurve(device_guid, input_id)

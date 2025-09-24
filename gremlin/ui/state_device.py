@@ -404,6 +404,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._key = key
         self._category = category # category (StateCategory)
         self._default_value = default_value
+        self._last_value = None
         self._value = default_value
         self._type_cast = type(default_value) if default_value is not None else None
         self.setDescription(description) # parent property
@@ -550,8 +551,13 @@ class StateInputItem(gremlin.base_profile.InputItem):
             return
         if not self._expression and self._value != data:
             # only set value on non expression states and only if the value has changed
+            self._last_value = self._value
             self._value = data
             self._fire_changed(data)
+
+    @property
+    def lastValue(self) -> bool | None:
+        return self._last_value 
 
     def toggle(self):
         ''' toggles the state '''

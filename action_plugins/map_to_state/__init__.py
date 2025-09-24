@@ -13,6 +13,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
+from gremlin.types import SyncMode
 from gremlin.profile import read_bool, safe_read, safe_format
 import gremlin.ui.state_device
 import gremlin.ui.ui_common
@@ -219,11 +220,18 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.container_pulse_widget)
 
+
+
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self.main_layout.addWidget(self._execute_widget)
+        self._sync_widget = gremlin.ui.ui_common.QSyncModeWidget(mode = self.action_data.sync_mode, label = "State on profile start:", callback = self._sync_changed)
+
+        widgets = [self._execute_widget, self._sync_widget]
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+
+        self.main_layout.addWidget(widget)
 
         self.populate_selector()
 
@@ -231,6 +239,9 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._create_hat_mapping()
 
         gremlin.util.singleShot(self._update_ui)
+
+    def _sync_changed(self, mode):
+        self.action_data.sync_mode = mode
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
@@ -681,16 +692,59 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def profile_start(self):
-        self.verbose = gremlin.config.Configuration().verbose_mode_outputs
+        self.verbose = gremlin.config.Configuration().verbose_mode_state
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
-        value = gremlin.joystick_handling.get_hat(device_guid, input_id)
-        if value in vjoy.vjoy.Hat.to_continuous_position:
-            self.hat_position = vjoy.vjoy.Hat.to_continuous_position[value]
-        else:
-            self.hat_position = (0,0)
+        input_type = self.action_data.get_input_type()
         self.pressed_hat_buttons = {}
+        is_pressed = False
+        match input_type:
+            case InputType.JoystickHat:
+                value = gremlin.joystick_handling.get_hat(device_guid, input_id)
+                if value in vjoy.vjoy.Hat.to_continuous_position:
+                    self.hat_position = vjoy.vjoy.Hat.to_continuous_position[value]
+                else:
+                    self.hat_position = (0,0)
+                is_pressed = self.hat_position != (0,0)
+                
+            case InputType.JoystickButton:
+                is_pressed = gremlin.joystick_handling.get_button(device_guid, input_id)
+
+            case InputType.JoystickAxis:
+                pass
+        
         self.pulse_worker_map = {}  # map of (state_name) to pulse worker object
+        if self.verbose: state_stub = f"State: [{self.action_data.state.key}] sync mode: [{self.action_data.sync_mode.name}] set start value:"
+
+        # determine the startup state 
+        match self.action_data.sync_mode:
+            case SyncMode.Default:
+                if self.verbose: syslog.info(f"{state_stub} default : {self.action_data.state.default_value}")
+                self.action_data.state.value = self.action_data.state.default_value
+            case SyncMode.Input:
+                if self.verbose: syslog.info(f"{state_stub} input : {is_pressed}")
+                self.action_data.state.value = is_pressed
+            case SyncMode.LastOrInput:
+                last = self.action_data.state.lastValue
+                if last is None:
+                    if self.verbose: syslog.info(f"{state_stub} last or input : use input value : {is_pressed}")
+                    self.action_data.state.value = is_pressed
+                else:
+                    if self.verbose: syslog.info(f"{state_stub} last or input : use last value : {last}")
+                    self.action_data.state.value = last
+            case SyncMode.LastOrDefault:
+                last = self.action_data.state.lastValue
+                if last is None:
+                    if self.verbose: syslog.info(f"{state_stub} last or input : use default value : {self.action_data.state.default_value}")
+                    self.action_data.state.value = self.action_data.state.default_value
+                else:
+                    if self.verbose: syslog.info(f"{state_stub} last or default: use last value : {last}")
+                    self.action_data.state.value = last
+            case SyncMode.Ignore:
+                pass # do nothing
+        
+
+
         
 
         
@@ -886,7 +940,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.parent = parent
         
         
-        self.state = None # mapped state
+        self.state : gremlin.ui.state_device.StateInputItem = None # mapped state
         self.description = None # state description (used to recreate the state if needed)
         self.mode = "toggle" # valid modes are "pressed", "released", "toggle", "pulse"
         self.pulse_delay = 250 # delay for pulse mode in milliseconds
@@ -894,6 +948,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.pulse_repeat_delay  = 250 # repeat delay for pulse mode in milliseconds
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
+        self.sync_mode = SyncMode.Ignore # ignore by default
 
         self.hat_map = {} # map of button id keyed by hat position tuple
         self.hat_positions = list(vjoy.vjoy.Hat.to_continuous_direction.keys())
@@ -979,7 +1034,8 @@ class MapToState(gremlin.base_profile.AbstractAction):
             self.pulse_repeat = safe_read(node,"repeat",bool, False)
         if "repeat-delay" in node.attrib:
             self.pulse_repeat_delay = safe_read(node, "repeat-delay", int, 250)
-
+        if "sync-mode" in node.attrib:
+            self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
 
 
         input_type = self.get_input_type()
@@ -1026,6 +1082,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
             node.set("delay", safe_format(self.pulse_delay, int))
             node.set("exec_on_press", safe_format(self.exec_on_press, bool))
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))
+            node.set("sync-mode", safe_format(self.sync_mode, int))
             if self.pulse_repeat:
                 node.set("repeat", safe_format(self.pulse_repeat, bool))
                 node.set("repeat-delay", safe_format(self.pulse_repeat_delay, int))

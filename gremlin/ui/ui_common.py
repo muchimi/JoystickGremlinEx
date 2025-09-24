@@ -38,6 +38,7 @@ import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
+from gremlin.types import SyncMode
 from lxml import etree
 from PySide6.QtCore import (
     Qt, QSize, QPoint, QPointF, QRectF,
@@ -4046,11 +4047,13 @@ class QDataIPLineEdit(QDataLineEdit):
 
 class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
-    def __init__(self, data = None, parent = None, wheel_enabled = True):
+    def __init__(self, data = None, parent = None, wheel_enabled = True, auto_adjust = False):
         super().__init__(parent)
         self._data = data
         self._wheel_enabled = wheel_enabled
         self.installEventFilter(self)
+        if auto_adjust:
+            self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
 
     
     def eventFilter(self, widget, event):
@@ -10912,3 +10915,139 @@ class QCollapsible(QFrame):
 
     def _on_animation_done(self) -> None:
         self._is_animating = False
+
+
+
+class QSyncModeWidget(QtWidgets.QWidget):
+    ''' control used to set the synchronize mode for some actions '''
+    changed = Signal(gremlin.types.SyncMode) # called when a mode changes
+    valueChanged = Signal(object) # called when the value is changed 
+    def __init__(self, mode = gremlin.types.SyncMode.Default, label = None, callback = None, input_type = None, default_value = None, parent = None):
+        super().__init__(parent = parent)
+        self._callback = callback # change callback
+        self._mode = mode
+        self._default_value = default_value
+        self._input_type = input_type
+        self._value = None
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+    
+        self._selector_widget = QDataComboBox(auto_adjust=True)
+        for data in gremlin.types.SyncMode:
+            self._selector_widget.addItem(data.name, data)
+
+        index = self._selector_widget.findData(mode)
+        assert index != -1, f"invalid mode passed: {mode}"
+        self._selector_widget.setCurrentIndex(index)
+
+        widgets = [self._selector_widget]
+        default_widgets = []
+
+
+        # default value
+        if input_type is not None:
+            
+            # show default values
+            if input_type == InputType.JoystickAxis:
+                if default_value is None:
+                    default_value = 0.0
+                self._default_widget = QFloatLineEdit()
+                if default_value is not None:
+                    self._default_widget.setValue(default_value)
+                self._value = default_value
+                self._default_widget.valueChanged.connect(self._axis_value_changed)
+
+
+                
+                default_widgets.append(self._default_widget)
+
+            else:
+                # button
+                self.rb_start_released = QtWidgets.QRadioButton("Released")
+                self.rb_start_pressed = QtWidgets.QRadioButton("Pressed")
+                default_widgets.append(self.rb_start_pressed)
+                default_widgets.append(self.rb_start_released)
+                if default_value == True:
+                    self._value = True
+                    self.rb_start_pressed.setChecked(True)
+                else:
+                    self._value = False
+                    self.rb_start_released.setChecked(True)
+                self.rb_start_pressed.clicked.connect(self._pressed_changed)
+                self.rb_start_released.clicked.connect(self._released_changed)
+               
+        if default_widgets:
+            self._default_container_widget, _ = getHContainer(default_widgets)
+            widgets.append(self._default_container_widget)
+        else: 
+            self._default_container_widget = None
+        self._description_widget = QtWidgets.QLabel()
+
+        widgets.append(self._description_widget)
+
+        widget, _ = getHContainer(widgets, label if label else "Start Sync Mode:")
+        
+        main_layout.addWidget(widget)
+
+        self._selector_widget.currentIndexChanged.connect(self._mode_changed)
+
+        self._mode_changed(emit = False)
+        main_layout.setContentsMargins(0,0,0,0)
+
+
+    def _pressed_changed(self):
+        self._value = True
+        self.valueChanged.emit(self._value)
+
+    def _released_changed(self):
+        self._value = False
+        self.valueChanged.emit(self._value)        
+
+    def _axis_value_changed(self):
+        ''' called when the value is changed (axis) '''
+        self._value = self._default_widget.value()
+        self.valueChanged.emit(self._value)
+
+    
+    @property
+    def value(self) -> float | bool:
+        ''' gets the selected start value '''
+        return self._value
+    
+
+
+
+    def _mode_changed(self, emit = True):
+        ''' called when mode changes'''
+        self._mode = self._selector_widget.currentData()
+        description = gremlin.types.SyncMode.to_description(self._mode)
+        self._description_widget.setText(f"({description})")
+        if self._default_container_widget:
+            visible = self._mode in (SyncMode.Default, SyncMode.LastOrDefault)
+            self._default_container_widget.setVisible(visible)
+        if emit:
+            if self._callback:
+                self._callback(self._mode)
+            self.changed.emit(self._mode)
+
+    @property
+    def mode(self) -> SyncMode:
+        return self._mode
+    
+    def setMode(self, value : SyncMode):
+        gremlin.util.InvokeUiMethod(self._set_mode_ui, value) # ensure on UI thread
+
+    def _set_mode_ui(self, value : SyncMode):
+        index = self._selector_widget.findData(value)
+        if index != -1:
+            with QtCore.QSignalBlocker(self._selector_widget):
+                self._selector_widget.setCurrentIndex(index)
+
+        
+
+    
+
+
+
+
+    

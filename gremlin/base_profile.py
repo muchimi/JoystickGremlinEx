@@ -1097,6 +1097,20 @@ class AbstractAction(ProfileData):
         ''' stop event - override in subclass as needed '''
         pass
 
+    def getCurves(self) -> list:
+        ''' gets action node siblings'''
+        container = self.parent_container
+        curve_list = []
+        for action_set in container.action_sets:
+            for action in action_set:
+                 if gremlin.base_profile._is_curve_tag(action.tag):
+                    curve_data = action.curve_data
+                    if curve_data:
+                        curve_data.curve_update()
+                        curve_list.append(curve_data)
+        return curve_list
+
+
 
     @property
     def id(self):

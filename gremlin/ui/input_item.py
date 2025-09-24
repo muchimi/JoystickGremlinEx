@@ -3849,7 +3849,7 @@ class TitleBar(QtWidgets.QFrame):
         self.setStyleSheet(css) 
         
         config = gremlin.config.Configuration()
-
+        self._id_value = None
 
         self.hint = hint
         self.label = QtWidgets.QLabel(label)
@@ -3951,22 +3951,28 @@ class TitleBar(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.Box)
         self.setObjectName("frame")
 
-        gremlin.util.singleShot(lambda: self._show_container_id_changed())
+        self._show_container_id_changed_ui()
 
-    def setIdVisible(self, value : bool):
-        self.id_widget.setVisible(value)
+    def setIdVisible(self, visible : bool):
+        if Shiboken.isValid(self.id_widget):
+            if visible:
+                self.id_widget.setText(self._id_value)
+            else:
+                self.id_widget.setText(None)
 
     def setIdValue(self, value : str):
-        self.id_widget.setText(value)
+        self._id_value = value
+        self._show_container_id_changed()
 
-
-    @QtCore.Slot()
     def _show_container_id_changed(self):
+        gremlin.util.InvokeUiMethod(self._show_container_id_changed_ui)
+    
+    def _show_container_id_changed_ui(self):
         ''' display/hide container Ids on config change'''
         config = gremlin.config.Configuration()
         visible = config.show_container_id
-        if Shiboken.isValid(self.id_widget):
-            self.id_widget.setVisible(visible)
+        self.setIdVisible(visible)
+        
 
     @QtCore.Slot()
     def _comment_changed(self):

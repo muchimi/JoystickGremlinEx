@@ -10,9 +10,59 @@ The integration piece comes from the ability to combine inputs together into a l
 
 This is a high level summary of some of the feature set in GremlinEx.
 
+### Mapping and transforms
+
+GrmelinEx takes input such as a physical USB joystick, keyboard, mouse, and other specialized input devices like a state, and lets you apply a mapping, also known as a transform, to each button, axis, hat, or more complex inputs such as latched keys (one or more keypress combination), and other input such as MIDI or OSC input (described below).
+
+The mapping process can have logic applied to it, such as conditions, so that the mapping can be conditional on a specific context being true.  This can be "is this button also pressed", "is this axis value in this range", "are these keys also pressed", "is this state off", all in various combinations.
+
+Axis (linear) input can be curved and calibrated.  In fact, multiple curves can be applied, and the curves can be conditional as well.  For example, you can invert an axis but only if a condition is true, and when the condition is false, the axis will not be inverted.
+
+GremlinEx can also combine axes together and derive an output value based on the simultaneous input - scenarios that are helpful in flight simulation for trim, space sims for throttles, and for combining toe-brakes on a rudder in a single axis if the game doesn't support separate mappings.
+
+GremlinEx can do multiple mappings concurrently - so the input can be routed to different outputs depending on the need, and this can be changed dynamically on the fly.
+
+### Benefits
+
+#### Agreggation of multiple devices
+
+GremlinEx is designed to simplify mapping for a game or application so that the application has much fewer devices to map.  The first major benefit is to reduce the number of input devices, as many titles only "see" a few joysticks, and if you have a simpit, you could have left, right, center controllers all connected at the same time, and you may use some of them, or all of them, to map to the same input.  This can be very difficult to do in some games.
+
+GremlinEx is vendor agnostic so any mapping software that is proprietary to a particular manufacturer does not need to be used in most cases.  GremlinEx will use the raw device capabilities as seen by Windows, so as long as the device shows in Windows without software as a game controller, GremlinEx can create mappings for it.
+
+#### Dynamic routing
+
+Because GremlinEx has conditions and modes and states, you can "route" the input to different outputs, as well as modify the output in a dynamic way. You can take a single input and map it to different outputs depending on what you need.  So a toe brake on a rudder can become an accelerator or brake pedal for a vehicle on the ground, or an up/down strafe if you are in a spaceship, or plain toe brakes if you are in an airplane with differential left and right brakes.   You can have a button that is normally your primary trigger button control different weapon groups depending on the mode GremlinEx is in.  An axis can inverted dynamically, or different response curves applied to control, for example sensitivity.
+
+#### In-game mapper augmentation
+
+GremlinEx can achieve very complex mappings that are not supported by a game.  It can take complicated inputs (such as from multiple controllers) and map it to something the game does support, and the game does not need to be aware of these inputs, as it will not see them.  The game will only see a supported command.
+
+For example, you can combine inputs such as a keyboard key in combination with a joystick button and map that to a unique function in the game, even if the buit-in game mapper does not support these kinds of cross-hardware combinations.
+
+#### Easy mapping to game defaults
+
+Certain titles have less than ideal mappings, for example, not supporting DirectInput joysticks but having support for a console game controller.   GremlinEx can bridge this gap by producing output the game expects, even if the game doesn't support specific inputs that GremlinEx supports.
+
+It is generally recommended to use GremlinEx to map to default settings in a game, which avoids having to change mappings in the game itself.  This can greatly simplify game mapping for simulators in particular.
+
+#### Using glass surfaces and input panels like Streamdeck
+
+GremlinEx can map input from glass surfaces (touch screens) and hardware panels like Streamdeck using the OSC protocol using open source software.
+
+#### Networked devices support
+
+GremlinEx has a built-in capabilityu to use controllers attached to one computer to control another and deliver the output to a game over the local network.
+
+#### Direct support for Microsoft Flight Simulator
+
+GremlinEx has built-in support to directly control Microsoft Flight Simulator without using the internal MSFS mapper.  It uses the SimConnect interface to do this, and a custom WASM module to access internal variables not supported via SimConnect (as of this writing).
+
+
+
 ### Profiles
 
-In GremlinEx, a set of device mappings is saved as a profile.  The profile contains all the configuration and mapping information.   Profiles are usually associated with a particular target application.  GremlinEx has a mapping feature that lets you attach a profile to one or more Windows processes.  GremlinEx can switch to the profile when the process becomes active automatically.
+In GremlinEx, a set of device mappings is saved as a profile.  The profile contains all the configuration and mapping information from an input to an output.  Profiles are usually associated with a particular target application.  GremlinEx has a mapping feature that lets you attach a profile to one or more Windows processes.  GremlinEx can switch to the associated profile when the process becomes active automatically.
 
 Profiles are saved as XML files.  Because they contain specific hardware information that is unique to the machine, profiles cannot usually be shared from one  machine to the other.  GremlinEx does include some simple mapping when you attempt to load data for a device it cannot find.  In this case the profile will load and show devices it cannot find as disconnected.  Their mappings can be copied to devices that do exist.
 

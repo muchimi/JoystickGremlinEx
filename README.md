@@ -14,6 +14,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T64)
+- Changed: Startup sync for state and vjoy remap actions: A sync mode is now an option to decide how profile start syncing occurs. 
+The choices are: 
+	+ ignore = do nothing (do not sync) - this is the default
+	+ default = use a fixed, set value you define to apply on profile start.
+	+ input = use the current input value. This is the recommended sync mode so ensure inputs are synchronized with the inputs on profile start.
+	+ last or default = use the last value set by the profile from the last run in the current GremlinEx session, or use the default value if the output was never triggered.  This is to have continuity between the "last" known value.  This is usually not a good idea.
+	+ last or input = use the last value set by the profile from the last run in the current GremlinEx session, or use the current input value. This is usually not a good idea.
+
+If you multi-map the same output (have multiple actions that update the same output), it is recommended that only one of these actions synchronize inputs.
+
 ### (m76T63A) hotfix
 - New feature: filter for state input viewer dissociated from filter for state device.d
 - New feature: Switch mode and Map to State actions both gain an execute on press / release option.  Both can be active at the same time for special use-cases.  Default is execute on press.  
