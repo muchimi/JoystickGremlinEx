@@ -458,8 +458,8 @@ class EventListener:
 
 
 	# selection event - tells the UI to show a different input
-	select_input = Signal(object, object, object, str, bool, bool, bool) # selects a particular input (device_guid, input_type, input_id, mode, force_update, force_switch, tab_changed)
-	select_input_completed = Signal(object, object, object, str) # indicates input selection is completed (device_guid, input_type, input_id, mode)
+	select_input = Signal(object, object, object, bool, bool, bool) # selects a particular input (device_guid, input_type, input_id,  force_update, force_switch, tab_changed)
+	select_input_completed = Signal(object, object, object) # indicates input selection is completed (device_guid, input_type, input_id)
 
 	input_selected = Signal(object) # widget item was selected, parameter = InputItemWidget
 	input_item_selected = Signal(object, int) # widget item was selected, parameter = InputItem, index of input item in the listview
@@ -2177,9 +2177,9 @@ class EventHandler(QtCore.QObject):
 			self.mode_status_update.emit()
 
 			# update the selection
-			device_guid, input_type, input_id, mode = gremlin.config.Configuration().get_last_input()
+			device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
 			if input_type and input_id:
-				el.select_input.emit(device_guid, input_type, input_id, mode, False, True, False)
+				el.select_input.emit(device_guid, input_type, input_id, False, True, False)
 
 			# fire the UI update on change mode      
 			el.update_input_state.emit(device_guid)  # force a UI widget status update	

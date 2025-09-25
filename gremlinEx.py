@@ -753,7 +753,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 device_name = self._get_device_name(device_guid)
                 syslog.info(f"Tab index change: new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {device_name}")
             self.last_tab_index = index
-            _, restore_input_type, restore_input_id, _ = self.config.get_last_input(device_guid)
+            _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
             self._select_input(device_guid = device_guid, input_type = restore_input_type, input_id = restore_input_id, force_update =True, force_switch=True, tab_changed = True)
 
         gremlin.util.popCursor()
@@ -2724,7 +2724,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # select last items 
             try:
                 gremlin.shared_state.pop_input_selection(reset = True) # allow selections
-                last_device_guid, last_input_type, last_input_id, _ = config.get_last_input()
+                last_device_guid, last_input_type, last_input_id = config.get_last_input()
 
                 device = gremlin.joystick_handling.device_info_from_guid(last_device_guid)
                 if not device:
@@ -2868,7 +2868,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _select_last_tab(self):
         ''' restore the last selected tab '''
         # print (f"select last tab: {self.config.last_tab_guid}")
-        device_guid, input_type, input_id, _ = self.config.get_last_input()
+        device_guid, input_type, input_id = self.config.get_last_input()
         eh = gremlin.event_handler.EventListener()
         eh.select_input.emit(device_guid, input_type, input_id, False, True, False)
 
@@ -2877,7 +2877,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' UI loop is about to start '''
 
         # update the UI widgets that listen to inputs to disable the ones not visible 
-        device_guid, input_type, input_id, mode = self.restore_input
+        device_guid, input_type, input_id = self.restore_input
         # syslog = logging.getLogger("system")
         verbose = self.config.verbose_mode_details
         
@@ -2924,7 +2924,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _select_last_input(self):
         # if there is a last input - select that input as well
-        device_guid, input_type, input_id, _ = self.config.get_last_input()
+        device_guid, input_type, input_id = self.config.get_last_input()
         if input_type and input_id:
             eh = gremlin.event_handler.EventListener()
             eh.select_input.emit(device_guid, input_type, input_id, False, True, False)
@@ -2941,7 +2941,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         '''
         
-        _, input_type, input_id, _= gremlin.config.Configuration().get_last_input(device_guid)
+        _, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid)
         if not input_type:
             # pick the first input for that tab
             widget = self._get_tab_widget_guid(device_guid)
@@ -2992,7 +2992,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             return # skip if disabled
         gremlin.util.pushCursor()
         el = gremlin.event_handler.EventListener()
-        el.select_input.emit(device_guid, input_type, input_id, mode, force_update, force_switch, tab_changed)
+        el.select_input.emit(device_guid, input_type, input_id, force_update, force_switch, tab_changed)
         gremlin.util.popCursor()
 
 
@@ -3013,17 +3013,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._update_highlight_toolbar_enabled()
 
 
-    def _select_input_handler(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, restore_mode = None, force_update : bool = False, force_switch = False, tab_changed = False):
+    def _select_input_handler(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None,  force_update : bool = False, force_switch = False, tab_changed = False):
         gremlin.util.InvokeUiMethod(self._select_input_handler_ui,
                                     device_guid,
                                     restore_input_type,
                                     restore_input_id,
-                                    restore_mode,
                                     force_update,
                                     force_switch,
                                     tab_changed)
 
-    def _select_input_handler_ui(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, restore_mode = None,  force_update : bool = False, force_switch = False, tab_changed = False):
+    def _select_input_handler_ui(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None,  force_update : bool = False, force_switch = False, tab_changed = False):
         ''' Selects a specific input on the given tab
         The tab is changed if different from the current tab.
 
@@ -3184,7 +3183,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
                 if verbose: syslog.info(f"Select input: last input ID {input_id} not found - selecting default input ID")
-                last_device_guid, last_input_type, input_id, _  = self.config.get_last_input(device_guid)
+                last_device_guid, last_input_type, input_id = self.config.get_last_input(device_guid)
                 if verbose: syslog.info(f"Select input: found {last_device_guid} {last_input_type} {input_id} ")
                 if input_id is None:
                     input_item = self._get_input_item(device_guid, 0)
@@ -3314,7 +3313,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     @QtCore.Slot(object, object, object)
     def _input_changed_handler(self, device_guid, input_type, input_id):
         ''' called when an input changes '''
-        current_device_guid, current_input_type, current_input_id, _ = gremlin.shared_state.get_last_input_id()
+        current_device_guid, current_input_type, current_input_id = gremlin.shared_state.get_last_input_id()
         if current_device_guid != device_guid or current_input_type != input_type or current_input_id != input_id:
             # syslog = logging.getLogger("system")
             verbose = self.config.verbose_mode_device
@@ -3665,7 +3664,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.config.tab_list = self._get_tab_map()
         index = self.ui.devices.currentIndex()
         device_guid = self.ui.devices.tabData(index).device_guid
-        _, restore_input_type, restore_input_id, _ = self.config.get_last_input(device_guid)
+        _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
         self._select_input(device_guid = device_guid, input_type = restore_input_type, input_id = restore_input_id, force_update =True, force_switch=True)
 
 
@@ -4356,8 +4355,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.info("Profile: load completed.")
 
             # mode to restore post-load if possible
-            last_device_guid, last_input_type, last_input_id, last_mode = self.config.get_last_input()
-            self._select_input(last_device_guid, last_input_type, last_input_id, last_mode)
+            last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
+            self._select_input(last_device_guid, last_input_type, last_input_id)
 
 
         finally:
@@ -4394,7 +4393,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
     #     # mode to restore post-load if possible
-    #     last_device_guid, last_input_type, last_input_id, _ = self.config.get_last_input()
+    #     last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
 
     #        # Attempt to load the new profile
     #     try:

@@ -1650,6 +1650,9 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param index the index of the selected item
         """
         import gremlin.ui.input_item
+        if not Shiboken.isValid(self.input_item_list_view):
+            return
+
         if index == -1:
             index = self._last_selected_index
 

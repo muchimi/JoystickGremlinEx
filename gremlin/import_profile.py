@@ -2716,7 +2716,7 @@ class Mapper():
                 tab_widget.refresh()
 
                 # update the selection
-                device_guid, input_type, input_id, _ = gremlin.config.Configuration().get_last_input()
+                device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
                 if input_type and input_id:
                     el.select_input.emit(device_guid, input_type, input_id, True, False, False)
             finally:

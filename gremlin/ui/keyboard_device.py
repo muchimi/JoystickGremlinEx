@@ -630,6 +630,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _select_item_cb(self, index, emit = True):
         ''' called when a key has been selected - refreshes the view panel '''
 
+        if not Shiboken.isValid(self.input_item_list_view):
+            return
+
         if index == -1:
             index = self._last_selected_index
 

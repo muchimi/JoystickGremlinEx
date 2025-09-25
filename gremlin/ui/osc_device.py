@@ -3875,6 +3875,9 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         import gremlin.ui.input_item
         import gremlin.shared_state
 
+        if not Shiboken.isValid(self.input_item_list_view):
+            return
+
         # self._last_selected_index = index
         item_data = None
 

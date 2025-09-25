@@ -422,6 +422,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """
         from gremlin.ui.input_item import InputItemMappingWidget
 
+        if not Shiboken.isValid(self.input_item_list_view):
+            return
+
         try:
 
             self.setUpdatesEnabled(False)

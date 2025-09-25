@@ -382,7 +382,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         :param index the index of the selected item
         """
-
+        if not Shiboken.isValid(self.input_item_list_view):
+            return
 
         self.ensureInputItems(True) # ensure the control inputs exist for this mode
 
@@ -437,7 +438,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._last_selected_index = index
         el = gremlin.event_handler.EventListener()
-        el.input_selection_changed.emit(device_guid, input_type, input_id, gremlin.shared_state.edit_mode )
+        el.input_selection_changed.emit(device_guid, input_type, input_id )
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
         ''' creates a widget for the input 
