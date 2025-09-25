@@ -206,7 +206,10 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         :return Mode instance this object belongs to
         """
         if self._input_item is not None:
-            return self._input_item.profile_mode
+            mode = self._input_item.profile_mode
+            if mode == gremlin.shared_state.master_mode:
+                return "Master"
+            return mode
         return None
 
     def get_device_type(self):

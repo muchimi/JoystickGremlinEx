@@ -4038,6 +4038,7 @@ class BasicActionWrapper(AbstractActionWrapper):
         else:
             hint = gremlin.hints.hint.get(action.tag, "")  
         
+   
 
         self._titlebar_widget = TitleBar(
             f"{action_widget.action_data.name} ({mode})",

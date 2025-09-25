@@ -281,12 +281,19 @@ def get_axis(guid, index, normalized = True):
             return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
     return 0.0
 
-def get_hat(guid, index):
+def get_hat(guid, index) -> int:
     ''' gets the current hat value '''
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
     device = get_device(guid)
     return device.get_hat(index)
+
+def get_hat_position(guid, index) -> tuple:
+    ''' gets the hat position as a position tuple '''
+    direction = get_hat(guid, index)
+    if direction in vjoy.Hat.to_continuous_position:
+        return vjoy.Hat.to_continuous_position[direction]
+    return (0,0)
 
 def get_button(guid, index) -> bool:
     ''' gets the button pressed state '''

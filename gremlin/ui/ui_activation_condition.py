@@ -411,11 +411,12 @@ class StateConditionWidget(AbstractConditionWidget):
 
     @QtCore.Slot()
     def _state_changed(self):
-        data = self.state_selector.currentData()
-        description = data.description
-        self.setDescription(description)
-        self.condition.key = data.key
-        self.condition.description = description
+        if Shiboken.isValid(self.state_selector):
+            data = self.state_selector.currentData()
+            description = data.description
+            self.setDescription(description)
+            self.condition.key = data.key
+            self.condition.description = description
 
     @QtCore.Slot(str)
     def _comparison_changed_cb(self, text):
@@ -897,7 +898,12 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self._update_range_state(value)
 
     def _update_range_state(self, value):
+        gremlin.util.InvokeUiMethod(self._update_range_state_ui, value) # ensure UI thread
+
+    def _update_range_state_ui(self, value):
         ''' updates the range flag based on the input value '''
+        if not Shiboken.isValid(self.range_status_widget):
+            return
         if self.range_status_widget:
             visible = False
             

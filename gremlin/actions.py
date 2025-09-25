@@ -453,7 +453,7 @@ class JoystickCondition(AbstractCondition):
             
         elif self.input_type == InputType.JoystickHat:
 
-            direction = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
+            direction = gremlin.joystick_handling.get_hat_position(self.device_guid, self.input_id) # tuple
             if not event.is_pressed and direction == (0,0) and self.ignore_release:
                 # succeed on release
                 if verbose: syslog.info(f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: PASS (ignore release mode enabled)")

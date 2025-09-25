@@ -13,6 +13,11 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T66)
+- Fix: joystick hat drop down condition QT exception in some situations
+- Fix: joystick hat condition always failing
+- Fix: condition UI QT exception in some situations.
+
 
 ### (m76T65/A)
 - Fix: UI sync for mode/profile device on mode change. When the mode was changed while in the Mode/Profile device, the UI could display stale data.
