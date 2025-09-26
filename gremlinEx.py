@@ -2621,18 +2621,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # reorder the tabs based on user preferences if a tab order was previously saved
 
             config_tab_map = self.config.tab_list
-            id_list = []
-            ctm = {}
-            for key, (id, name, a, b) in config_tab_map.items():
-                if id in id_list:
-                    continue
-                device = gremlin.joystick_handling.device_info_from_guid(id)
-                if device.disabled:
-                    continue
-                id_list.append(id)
-                ctm[key] = [id, name, a, b]
+            if config_tab_map:
+                id_list = []
+                ctm = {}
+                for key, (id, name, a, b) in config_tab_map.items():
+                    if id in id_list:
+                        continue
+                    device = gremlin.joystick_handling.device_info_from_guid(id)
+                    if device.disabled:
+                        continue
+                    id_list.append(id)
+                    ctm[key] = [id, name, a, b]
 
-            config_tab_map = ctm
+                config_tab_map = ctm
 
             if config_tab_map:
                 current_tab_map = self._get_tab_map()

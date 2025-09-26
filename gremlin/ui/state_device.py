@@ -1154,19 +1154,22 @@ class StateData(QtCore.QObject):
     def _reset(self):
         ''' reset states to default values '''
         to_evaluate = []
-        for data in self._data.values():
-            if data.expression:
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        for state in self._data.values():
+            if state.expression:
                 # initial evaluation
-                to_evaluate.append(data)
+                to_evaluate.append(state)
             else:
-                data.value = data.default_value
+                state.value = state.default_value
+                if verbose: syslog.info(f"STATE: profile start [{state.key}] reset: {state.value}")
+                
 
         # evaluate expressions based on initial data values
-        for data in to_evaluate:
-            data.evaluate(force=True)
+        if verbose: syslog.info("STATE: profile start expressions:")
+        for state in to_evaluate:
+            state.evaluate(force=True)
+            if verbose: syslog.info(f"\t[{state.key}] expression: {state.value}")
 
-        verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose: syslog.info("STATE: reset data")
 
     def _register(self, key : str, value = None, description = None) -> StateInputItem:
         ''' registers a new state '''

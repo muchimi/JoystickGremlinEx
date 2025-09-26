@@ -2679,7 +2679,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @property
     def debug_display(self):
         ''' debug string for this item'''
-        return f"InputItem: {gremlin.shared_state.get_device_name(self.device_guid)} Input: {InputType.to_display_name(self.input_type)} Type: {self.display_name} mode: {self.profile_mode}"
+        mode = self.profile_mode
+        if mode == gremlin.shared_state.master_mode:
+            mode = "Master"
+        return f"InputItem: [{gremlin.shared_state.get_device_name(self.device_guid)}] Input: [{InputType.to_display_name(self.input_type)}] Type: [{self.display_name}] mode: [{mode}]"
 
     def __eq__(self, other):
         ''' true if the input item are the same object '''

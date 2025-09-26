@@ -13,6 +13,10 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T66A)
+- Fix: exception when device tab ordering data is missing
+- Changed: additional instrumentation on state init/sync on profile start.  
+
 ### (m76T66)
 - Fix: joystick hat drop down condition QT exception in some situations
 - Fix: joystick hat condition always failing

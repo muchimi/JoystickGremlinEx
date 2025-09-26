@@ -714,34 +714,39 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                 pass
         
         self.pulse_worker_map = {}  # map of (state_name) to pulse worker object
-        if self.verbose: state_stub = f"State: [{self.action_data.state.key}] sync mode: [{self.action_data.sync_mode.name}] set start value:"
+        if self.verbose:
+            
+            input_item = self.action_data.input_item
+            syslog.info (f"STATE: (map to state) [{self.action_data.state.key}] : mapped to input: {input_item.debug_display}")
+            syslog.info (f"\tsync mode: [{self.action_data.sync_mode.name}]")
 
         # determine the startup state 
         match self.action_data.sync_mode:
             case SyncMode.Default:
-                if self.verbose: syslog.info(f"{state_stub} default : {self.action_data.state.default_value}")
+                if self.verbose: syslog.info(f"\tset default : {self.action_data.state.default_value}")
                 self.action_data.state.value = self.action_data.state.default_value
             case SyncMode.Input:
-                if self.verbose: syslog.info(f"{state_stub} input : {is_pressed}")
+                if self.verbose: syslog.info(f"\t sync to input : {is_pressed}")
                 self.action_data.state.value = is_pressed
             case SyncMode.LastOrInput:
                 last = self.action_data.state.lastValue
                 if last is None:
-                    if self.verbose: syslog.info(f"{state_stub} last or input : use input value : {is_pressed}")
+                    if self.verbose: syslog.info(f"\tset last: use input value : {is_pressed}")
                     self.action_data.state.value = is_pressed
                 else:
-                    if self.verbose: syslog.info(f"{state_stub} last or input : use last value : {last}")
+                    if self.verbose: syslog.info(f"\tset last: use last value : {last}")
                     self.action_data.state.value = last
             case SyncMode.LastOrDefault:
                 last = self.action_data.state.lastValue
                 if last is None:
-                    if self.verbose: syslog.info(f"{state_stub} last or input : use default value : {self.action_data.state.default_value}")
+                    if self.verbose: syslog.info(f"\tset last: use default value : {self.action_data.state.default_value}")
                     self.action_data.state.value = self.action_data.state.default_value
                 else:
-                    if self.verbose: syslog.info(f"{state_stub} last or default: use last value : {last}")
+                    if self.verbose: syslog.info(f"\tset last: use last value : {last}")
                     self.action_data.state.value = last
             case SyncMode.Ignore:
-                pass # do nothing
+                pass
+                
         
 
 
@@ -1015,7 +1020,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
             self.state = state
         else:
             # state not found - see if we can find the missing datas  
-            syslog.error(f"State: [{key}] does not exist - creating state")
+            syslog.error(f"STATE: (map to state): [{key}] does not exist - creating state")
             state = sd._register(key)
             self.state = state
 
