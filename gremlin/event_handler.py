@@ -394,8 +394,6 @@ class EventListener:
 
 	# profile unloaded - trigger when a profile is being unloaded
 	profile_unloaded = Signal()
-
-	
 	
 	# signal emitted when the selected hardware device changes
 	profile_device_changed = Signal(DeviceChangeEvent)
@@ -454,7 +452,9 @@ class EventListener:
 	virtual_button_changed = Signal(object, object, object) # runs when the action has modified its input mode (input_item, container, action) as parameters
 
 	# called when vjoy button usage has changed in the profile so displays can update themselves
-	button_usage_changed = Signal(int)  # (vjoy_device_id) the vjoy device that changed
+	button_usage_changed = Signal(int)  # (vjoy_id) fires when a vjoy device button has changed
+	vjoy_button_usage = Signal(int, int, bool) # called when an action uses a vjoy button (vjoy_id, button_id, state)
+	set_vjoy_button_usage = Signal(int, int, bool, str) # called when a button state should be set (vjoy_id, button_id, state, key)
 
 
 	# selection event - tells the UI to show a different input

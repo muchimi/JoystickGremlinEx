@@ -13,6 +13,16 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+
+### (m76T67)
+- Fix: vjoy remap button display sync was refactored for a bug fix and optimized with far fewer calls and uses the new event model that didn't exist a while back.  with profile wide usage based on mappings to buttons of VJoy Remap or legacy remap (note legacy remap only contributes to usage but cannot display the button grid).
+- Fix: vjoy remap: re-added missing quick set buttons for axis to button mode.
+- Fix: vjoy remap: range controls visible again in set axis range mode.
+- New: fail override for execution graph build at profile start in options.  If set this option will allow the execution graph to build even if a container returned a failed validation step.  This could be ok in some situations.
+- Fix: TempoEx container will always succeed when checked for validation even if it's missing some actions/entries.  These should be caught at runtime by the execution logic.  
+
+Known issues: there may be issues with TempoEx container with some settings and selected actions that don't work in a timed setting. Not all actions work with TempoEx, and there is no current guardrail in place against potentially problematic actions in TempoEx.
+
 ### (m76T66A)
 - Fix: exception when device tab ordering data is missing
 - Changed: additional instrumentation on state init/sync on profile start.  

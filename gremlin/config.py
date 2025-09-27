@@ -2503,3 +2503,9 @@ class Configuration(QtCore.QObject):
         self._set_data("show_parent_mode", value)
         
 
+    @property 
+    def allow_exec_tree_container_validation_fail(self):
+        return self._get_data("allow_exec_tree_container_validation_fail", True)
+    @allow_exec_tree_container_validation_fail.setter
+    def allow_exec_tree_container_validation_fail(self, value : bool):
+        self._set_data("allow_exec_tree_container_validation_fail", value)

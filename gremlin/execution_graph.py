@@ -182,7 +182,10 @@ class ExecutionGraphModeNode(ExecutionGraphNode):
         self.mode = mode
 
     def to_string(self):
-        stub = f"Mode: [{self.mode}]"
+        mode = self.mode
+        if mode == gremlin.shared_state.master_mode:
+            mode = "Master"
+        stub = f"Mode: [{mode}]"
         return f"{self.node_string()} {stub}"
 
 class ExecutionGraphGroupNode(ExecutionGraphNode):
@@ -1175,12 +1178,15 @@ class ExecutionContext():
 
         gremlin.shared_state.pushLog()
         try:
-
-            verbose = gremlin.config.Configuration().verbose_mode_exec
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_exec
 
             if not container.is_valid():
-                syslog.warning("Incomplete container ignored")
-                return None
+                syslog.warning(f"Incomplete container ignored: container id: [{container.id}] returned validation FAIL")
+                if config.allow_exec_tree_container_validation_fail:
+                    syslog.warning(f"\tOverride allowed - build continuing...")
+                else:
+                    return None
 
             # ensure container IDs are unique in the tree to avoid duplicate entries as containers are main entry points for execution keyed by ID
             # container IDs may be duplicated when a container was pasted or the xml was manually edited and the profile was not saved/reloaded since

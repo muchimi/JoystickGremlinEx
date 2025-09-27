@@ -91,7 +91,17 @@ class VjoyAction(enum.Enum):
     VJoySetAxisStepped = 22 # like VjoySetAxis but uses a list of values to bump the index
     VJoyButtonPress = 23 # action on button press
     
-
+    @staticmethod
+    def is_button_action(mode):
+        ''' true if the mode is a button output mode '''
+        return mode in (VjoyAction.VJoyButton,
+                        VjoyAction.VJoyAxisToButton,
+                        VjoyAction.VJoyButtonPress,
+                        VjoyAction.VJoyButtonRelease,
+                        VjoyAction.VJoyPulse,
+                        VjoyAction.VJoyToggle,
+        )
+                        
   
 
     @staticmethod

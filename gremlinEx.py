@@ -748,7 +748,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.util.pushCursor()
 
         if device_guid is not None:
-            verbose = gremlin.config.Configuration().verbose
+            verbose = gremlin.config.Configuration().verbose_mode_ui
             if verbose:
                 device_name = self._get_device_name(device_guid)
                 syslog.info(f"Tab index change: new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {device_name}")

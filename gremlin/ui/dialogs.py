@@ -556,6 +556,10 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.persist_clipboard.setChecked(self._persist_clipboard_enabled())
 
 
+        self.allow_invalid_container_build = QtWidgets.QCheckBox("Invalid container does not fail build")
+        self.allow_invalid_container_build.setToolTip("When enabled, an invalid container will not fail the execution build.")
+        self.allow_invalid_container_build.setChecked(self.config.allow_invalid_container_build)
+        self.allow_invalid_container_build.clicked.connect(self._allow_invalid_container_build)
 
         
         # allow partial plugin configurations
@@ -693,6 +697,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         col3_layout.addWidget(filter_widget)
         col3_layout.addWidget(self.import_prompt_widget)
         col3_layout.addWidget(self.show_mode_change_message)
+        col3_layout.addWidget(self.allow_invalid_container_build)
         
 
         # bottom layout
@@ -1845,6 +1850,10 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         self.config.show_parent_mode = checked
         el = gremlin.event_handler.EventListener()
         el.mode_list_update.emit() # request mode list update
+
+    @QtCore.Slot(bool)
+    def _allow_invalid_container_build(self, checked):
+        self.config.allow_invalid_container_build = checked
 
     @QtCore.Slot(bool)
     def _partial_plugin_save(self, checked):

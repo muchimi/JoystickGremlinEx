@@ -1173,7 +1173,9 @@ More than one action per short press or long press can be added.'''
 
         :return True if the container is configured properly, False otherwise
         """
-        valid =  len(self.short_action_sets) > 0 or len(self.long_action_sets) > 0
+        # count = len(self.short_action_sets) + len(self.long_action_sets) + len(self.double_action_sets)
+        # valid = count > 0
+        valid = True
         return valid
     
     def get_action_sets(self):

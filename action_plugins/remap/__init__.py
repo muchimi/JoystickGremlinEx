@@ -80,6 +80,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             return
 
         self._last_input_type = self.action_data.input_type
+        self._last_button_id = -1 # no last button selected
 
         input_types = {
             InputType.Keyboard: [
@@ -167,10 +168,10 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.vjoy_device_id = vjoy_data["device_id"]
             self.action_data.vjoy_input_id = vjoy_data["input_id"]
             self.action_data.input_type = input_type
-            el = gremlin.event_handler.EventListener()
-            container = self.action_data.parent
-            input_item = container.input_item
-            el.virtual_button_changed.emit(input_item, container, self.action_data)
+
+           # Signal changes
+            self._notify_button_changed()
+
         
 
     def _populate_ui(self):
@@ -263,26 +264,31 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.action_data.axis_scaling = self.relative_scaling.value()
 
             # Signal changes
-            #if input_type_changed:
-
-            if self.action_data.input_type == InputType.JoystickButton:
-
-                usage_data = gremlin.joystick_handling.VJoyUsageState()
-                if current_id is not None and current_id != -1:
-                    # undo prior selection
-                    usage_data.set_usage_state(vjoy_id, current_id, action = self.action_data, state = False, emit = False)
-
-                # new selection
-                usage_data.set_usage_state(vjoy_id, new_id, action = self.action_data, state = True, emit = False)
-                
-                el = gremlin.event_handler.EventListener()
-                el.button_usage_changed.emit(vjoy_id)
-
+            self._notify_button_changed()
+          
             #self.action_modified.emit()
             self.notify_device_changed(emit_profile_changed=False)
 
         except gremlin.error.GremlinError as e:
             log_sys_error(e)
+
+
+
+    def _notify_button_changed(self):
+          if self.action_data.input_type == InputType.JoystickButton:
+                verbose = gremlin.config.Configuration().verbose_mode_vjoy
+                button_id =self.action_data.vjoy_input_id
+                vjoy_id = self.action_data.vjoy_device_id
+                el = gremlin.event_handler.EventListener()
+            
+                if self._last_button_id != -1 and self._last_button_id != button_id:
+                    # clear the old button if it was previously selected
+                    if verbose: syslog.info(f"LEGACY MAP: send button clear {vjoy_id} {self._last_button_id} {self.action_data.id}")
+                    el.set_vjoy_button_usage.emit(vjoy_id, self._last_button_id, False, self.action_data.id)
+                # send select
+                self._last_button_id = button_id
+                if verbose: syslog.info(f"LEGACY MAP: send button select {vjoy_id} {button_id} {self.action_data.id}")
+                el.set_vjoy_button_usage.emit(vjoy_id, button_id, True, self.action_data.id)
 
 
     def notify_device_changed(self, emit_profile_changed = True, emit_icon = True):
@@ -526,8 +532,7 @@ Use Vjoy Remap instead.'''
             elif "button" in node.attrib:
                 self.input_type = InputType.JoystickButton
                 self.vjoy_input_id = safe_read(node, "button", int, 1)
-                usage_data = gremlin.joystick_handling.VJoyUsageState()
-                usage_data.set_usage_state(self.vjoy_device_id, self.vjoy_input_id, state = True, action = self, emit = False)
+                
             elif "hat" in node.attrib:
                 self.input_type = InputType.JoystickHat
                 self.vjoy_input_id = safe_read(node, "hat", int, 1)

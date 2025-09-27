@@ -3857,11 +3857,13 @@ class QDataRadioButton(QtWidgets.QRadioButton):
 
 class QDataPushButton(QtWidgets.QPushButton):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None, tooltip = None):
+    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None):
         super().__init__(text, parent)
         self._data = data
         if tooltip:
             self.setToolTip(tooltip)
+        if callback:
+            self.clicked.connect(callback)
 
     @property
     def data(self):
@@ -11046,6 +11048,52 @@ class QSyncModeWidget(QtWidgets.QWidget):
         
 
     
+# class QVjoyGridWidget(QtWidgets.QWidget):
+#     def __init__(self, vjoy_id : int, parent = None):
+#         super().__init(parent = parent)
+#         self.used_pixmap = gremlin.util.load_pixmap("used.png")
+#         self.unused_pixmap = gremlin.util.load_pixmap("unused.png")
+#         self._grid_widgets = {}
+#         self._vjoy_id = vjoy_id
+
+#         self.button_group = QtWidgets.QButtonGroup()
+#         self.button_group.buttonClicked.connect(self._select_changed)
+
+
+
+#     def _populate_grid(self, device_id, button_id):
+#         ''' updates the usage grid based on current VJOY mappings '''
+
+
+#         self._grid_widgets = {}
+
+#         for cb in self.button_group.buttons():
+#             id = self.button_group.id(cb)
+#             self._grid_widgets[id] = cb
+
+#             used = self.usage_state.get_usage_state(device_id,id)
+
+#             if id == button_id:
+#                 with QtCore.QSignalBlocker(cb):
+#                     cb.setChecked(True)
+
+#             lbl = self.icon_map[id]
+#             lbl.setPixmap(self.used_pixmap if used else self.unused_pixmap)
+
+#     def _set_grid_state(self, button_id : int, state : bool):
+#         # update the grid
+#         if button_id in self._grid_widgets:
+#             cb = self._grid_widgets[button_id]
+#             with QtCore.QSignalBlocker(cb):
+#                 cb.setChecked(state)
+
+
+
+#     def _select_changed(self, rb):
+#             # called when a button is toggled
+#             vjoy_id = self.action_data.vjoy_device_id
+#             button_id = self.button_group.checkedId()
+#             self.select_button(vjoy_id, button_id)
 
 
 

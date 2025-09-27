@@ -1008,8 +1008,9 @@ class VJoyUsageState():
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self.ensure_profile)
 
+
         ''' tracks assigned VJOY functions '''
-        self._free_inputs = None
+        
         self._device_list = None
         self._profile = None
         self._load_list = []
@@ -1045,7 +1046,12 @@ class VJoyUsageState():
         el.profile_device_changed.connect(self._profile_device_changed)
         el.action_delete.connect(self._action_deleted_cb)
         el.profile_unloaded.connect(self._profile_changed)
+        el.set_vjoy_button_usage.connect(self._handle_request_button_change)
         self.ensure_vjoy()
+
+    def _handle_request_button_change(self, vjoy_id, button_id, state, key):
+        ''' handles request for button changes '''
+        self.set_usage_state(vjoy_id, button_id, key, state)
 
 
     @QtCore.Slot(object, object, object)
@@ -1053,11 +1059,14 @@ class VJoyUsageState():
         ''' called when an action is deleted in the profile'''
         self.delete_action(action)
 
-        
-    @QtCore.Slot()
+
+    
     def _profile_changed(self):
         ''' new profile - clear data '''
         self.ensure_vjoy(force_update = True)
+
+        # initialize states based on usage
+        self.ensure_profile()
 
 
 
@@ -1077,18 +1086,11 @@ class VJoyUsageState():
         if not self._profile or gremlin.shared_state.current_profile != self._profile:
             self.set_profile(gremlin.shared_state.current_profile)
 
-            for device_id, input_type, input_id in self._load_list:
-                # self.set_state(device_id, input_type, input_id, True)
-                if input_type == InputType.JoystickButton:
-                    self.set_usage_state(device_id, input_id, True)
-
-            self._load_list.clear()
 
 
     def ensure_valid(self, vjoy_id : int, input_id : int):
         ''' checks vjoy button mapping exists '''
-        if not vjoy_id in  self._button_usage:
-            # create it
+        if not vjoy_id in self._button_usage:
             self._button_usage[vjoy_id] = {}
             self._button_usage_map[vjoy_id] = {}
         if not input_id in self._button_usage[vjoy_id]:
@@ -1169,11 +1171,11 @@ class VJoyUsageState():
     
     def toggle_inverted(self, device_id, input_id):
         ''' toggles inversion state of specified device/axis is inverted '''
-        sylog = syslog
         if device_id in self._axis_invert_map:
             if input_id in self._axis_invert_map[device_id]:
                 self._axis_invert_map[device_id][input_id] = not self._axis_invert_map[device_id][input_id]
-                sylog.info(f"Vjoy Axis {device_id} {input_id} inverted state: {self._axis_invert_map[device_id][input_id]}")
+                verbose = gremlin.config.Configuration().verbose_mode_vjoy
+                if verbose: syslog.info(f"Vjoy Axis {device_id} {input_id} inverted state: {self._axis_invert_map[device_id][input_id]}")
                 return
             
         self._ensure_maps(device_id, input_id)
@@ -1207,12 +1209,9 @@ class VJoyUsageState():
         ''' loads profile data and free input lists'''
         if profile != self._profile:
             self._profile = profile
-            self._load_inputs()
-            # self._free_inputs = self._profile.list_unused_vjoy_inputs()
-
-            # for device_id in self._free_inputs.keys():
-            #     used = []
-
+            self._button_usage.clear()
+            self._button_usage_map.clear() # blits state data on profile change
+            self._load_inputs() # load mappings from the profile
 
 
 
@@ -1260,67 +1259,57 @@ class VJoyUsageState():
                     if current_state != new_state:
                         self._button_usage[vjoy_id][button_id] = new_state
                         emit_list.add(vjoy_id)
-        if emit_list and emit:
+        if emit_list and emit and not gremlin.shared_state.is_running:
             el = gremlin.event_handler.EventListener()
             for vjoy_id in emit_list:
                 el.button_usage_changed.emit(vjoy_id)
         
 
 
-    def set_usage_state(self, vjoy_id : int, button_id : int, action, state : bool, emit = True):
+    def set_usage_state(self, vjoy_id : int, button_id : int, key : str, state : bool, emit = True):
         ''' sets the usage state for a vjoy button '''
         self.ensure_vjoy()
         self.ensure_valid(vjoy_id, button_id) # create entry if needed
+
+        
+        current_state = len(self._button_usage_map[vjoy_id][button_id]) > 0
+        verbose = gremlin.config.Configuration().verbose_mode_vjoy
+        if verbose: syslog.info(f"Set usage state: [{vjoy_id}] [{button_id}] [{state}]  current state [{current_state}] from {key}")
         if state:
-            if not action in self._button_usage_map[vjoy_id][button_id]:
-                self._button_usage_map[vjoy_id][button_id].append(action)
+            if not key in self._button_usage_map[vjoy_id][button_id]:
+                self._button_usage_map[vjoy_id][button_id].append(key)
         else:
             # remove the data
-            action_list = self._button_usage_map[vjoy_id][button_id]
-            if action in action_list:
-                action_list.remove(action)
-
-        current_state = self._button_usage[vjoy_id][button_id]
-        new_state = len(self._button_usage_map[vjoy_id][button_id]) > 0
+            if key in self._button_usage_map[vjoy_id][button_id]:
+                self._button_usage_map[vjoy_id][button_id].remove(key)
         
+        new_state = len(self._button_usage_map[vjoy_id][button_id]) > 0
 
         if current_state != new_state:
             self._button_usage[vjoy_id][button_id] = new_state
-            if emit:
+            if emit and not gremlin.shared_state.is_running:
                 el = gremlin.event_handler.EventListener()
                 el.button_usage_changed.emit(vjoy_id)
+                el.vjoy_button_usage.emit(vjoy_id, button_id, new_state)
 
 
     def get_usage_state(self, vjoy_id : int, button_id : int) -> bool:
         ''' gets the usage state for a vjoy button '''
         self.ensure_vjoy()
         self.ensure_valid(vjoy_id, button_id) # create entry if needed - this can happen if the input vjoy device doesn't exist
-        if vjoy_id in self._button_usage.keys() and button_id in self._button_usage[vjoy_id].keys():
-            return self._button_usage[vjoy_id][button_id]
-        return False
+        return self._button_usage[vjoy_id][button_id]
+        
     
 
-    def used_list(self, device_id, input_type):
-        ''' returns a list of used joystick IDs for the specified vjoy'''
-        self.ensure_profile()
-        name = self.map_input_type(input_type)
-        unused_list = self._free_inputs[device_id][name]
-        count = self.get_count(device_id, input_type)
-        if count > 0:
-            return [id for id in range(1, count+1) if not id in unused_list]
-        return []
-    
-    def unused_list(self, device_id, input_type):
-        ''' returns a list of unused input IDs for the specified vjoy'''
-        self.ensure_profile()
-        name = self.map_input_type(input_type)
-        unused_list = self._free_inputs[device_id][name]
-        return unused_list
+    def used_button_list(self, vjoy_id) -> list[int]:
+        ''' gets the list of used buttons'''
+        used_list = []
+        if vjoy_id in self._button_usage_map:
+            used_list = [button_id for button_id in self._button_usage_map[vjoy_id] if self._button_usage[vjoy_id][button_id]]
 
-    @property
-    def free_inputs(self):
-        return self._free_inputs
-    
+        return used_list
+
+   
     @property
     def device_list(self):
         return self._device_list
@@ -1345,104 +1334,46 @@ class VJoyUsageState():
 
         :return dictionary of unused inputs for each input type
         """
+        import action_plugins
+        import gremlin.input_devices
         verbose = gremlin.config.Configuration().verbose
+        profile = gremlin.shared_state.current_profile
+        if not profile:
+            return # nothing to load yet
 
-        vjoy_devices = gremlin.joystick_handling.vjoy_devices()
-        devices = self._profile.devices
-        # action_plugins = gremlin.plugin_manager.ActionPlugins()
-
-        def extract_remap_actions(action_sets):
-            """Returns a list of remap actions from a list of actions.
-
-            :param action_sets set of actions from which to extract Remap actions
-            :return list of Remap actions contained in the provided list of actions
-            """
-            import action_plugins
-            remap_actions = []
-            for actions in [a for a in action_sets if a is not None]:
-                for action in actions:
-                    if isinstance(action, action_plugins.remap.Remap) or isinstance(action, action_plugins.map_to_vjoy.VjoyRemap):
-                        remap_actions.append(action)
-            return remap_actions
-
-        # List all input types
-        all_input_types = [input_type for input_type in InputType.to_list() if input_type != InputType.State]
-        
-
-        # Create list of all inputs provided by the vjoy devices
-        vjoy = {}
-        for entry in vjoy_devices:
-            vjoy[entry.vjoy_id] = {}
-            for input_type in all_input_types:
-                vjoy[entry.vjoy_id][InputType.to_string(input_type)] = []
-            for i in range(entry.axis_count):
-                vjoy[entry.vjoy_id]["axis"].append(
-                    entry.axismap_list[i].axis_index
-                )
-            for i in range(entry.button_count):
-                vjoy[entry.vjoy_id]["button"].append(i+1)
-            for i in range(entry.hat_count):
-                vjoy[entry.vjoy_id]["hat"].append(i+1)
-
-
+        devices = profile.devices
+        self.ensure_vjoy() # ensure the vjoy devices data objects are populated
 
         # Create a list of all used remap actions
-        remap_actions = []
-        for dev in devices.values():
-            for mode in dev.modes.values():
-                for input_type in all_input_types:
-                    if input_type in mode.config:
-                        for item in mode.config[input_type].values():
-                            for container in item.containers:
-                                action_list = extract_remap_actions(container.action_sets)
-                                remap_actions.append([dev, input_type, item.input_id, action_list])
-        
-        action_map = {}
-        # Remove all remap actions from the list of available inputs
-        for dev, input_type, input_id, actions in remap_actions:
-            # Skip remap actions that have invalid configuration
-            if not actions:
-                # no actions found
-                continue
+        for device_guid in devices:
+            for mode_name in devices[device_guid].modes:
+                mode_object = devices[device_guid].modes[mode_name]
+                for input_type in mode_object.config:
+                    for input_item in mode_object.config[input_type].values():
+                        if not input_item.containers:
+                            continue
+                        for container in input_item.containers:
+                            for action_set in container.action_sets:
+                                if action_set:
+                                    for action in action_set:
+                                        if isinstance(action, action_plugins.remap.Remap) or isinstance(action, action_plugins.map_to_vjoy.VjoyRemap):
+                                            if hasattr(action,"action_mode"):
+                                                action_mode = action.action_mode # vjoy remap
+                                                trigger = gremlin.input_devices.VjoyAction.is_button_action(action_mode)
+                                                button_id = action.vjoy_button_id
+                                            else:
+                                                # legacy remap 
+                                                trigger = action.input_type == InputType.JoystickButton
+                                                button_id = action.vjoy_input_id
+                                                
+                                            
+                                            if trigger:
+                                                vjoy_id = action.vjoy_device_id
+                                                
+                                                self._button_usage[vjoy_id][button_id] = True
+                                                self._button_usage_map[vjoy_id][button_id].append(action.id)
 
 
-            
-            for action in actions:
-                type_name = InputType.to_string(action.input_type)
-        
-                    
-                if action.vjoy_input_id in [0, None] \
-                        or action.vjoy_device_id in [0, None] \
-                        or action.vjoy_device_id not in vjoy \
-                        or type_name not in vjoy[action.vjoy_device_id] \
-                        or action.vjoy_input_id not in vjoy[action.vjoy_device_id][type_name]:
-                    if verbose:
-                        syslog = logging.getLogger("system")
-                        if action.vjoy_device_id not in vjoy:
-                            syslog.warning(f"Skipping vjoy device ID: vjoy id {action.vjoy_device_id} not found")
-                        elif type_name not in vjoy[action.vjoy_device_id]:
-                            syslog.warning(f"Skipping vjoy device ID: vjoy id {action.vjoy_device_id} type {type_name} not found")
-                    
-                    continue
-
-                vjoy_device_id = action.vjoy_device_id
-                vjoy_input_id = action.vjoy_input_id
-
-                if not vjoy_device_id in action_map.keys():
-                    action_map[vjoy_device_id] = {}
-                if not input_type in action_map[vjoy_device_id].keys():
-                    action_map[vjoy_device_id][input_type] = {}
-
-                if not vjoy_input_id in action_map[vjoy_device_id][input_type].keys():
-                    action_map[vjoy_device_id][input_type][vjoy_input_id] = []
-
-                action_map[vjoy_device_id][input_type][vjoy_input_id].append([dev.device_guid, dev.name, input_type, input_id])
-
-                idx = vjoy[action.vjoy_device_id][type_name].index(action.vjoy_input_id)
-                del vjoy[action.vjoy_device_id][type_name][idx]
-
-        self._free_inputs = vjoy
-        self._action_map = action_map
 
     def get_action_map(self, vjoy_device_id, input_type, input_id):
         ''' gets what's mapped to a vjoy device by input type and input id '''
