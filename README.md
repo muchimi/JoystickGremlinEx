@@ -15,7 +15,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T67)
-- Fix: vjoy remap button display sync was refactored for a bug fix and optimized with far fewer calls and uses the new event model that didn't exist a while back.  with profile wide usage based on mappings to buttons of VJoy Remap or legacy remap (note legacy remap only contributes to usage but cannot display the button grid).
+- Fix: vjoy remap button display sync was refactored for a bug fix and optimized with far fewer calls and uses the new event model that didn't exist a while back. This works with profile wide usage based on mappings to buttons of VJoy Remap or legacy remap (note legacy remap only contributes to usage but cannot display the button grid).
 - Fix: vjoy remap: re-added missing quick set buttons for axis to button mode.
 - Fix: vjoy remap: range controls visible again in set axis range mode.
 - New: fail override for execution graph build at profile start in options.  If set this option will allow the execution graph to build even if a container returned a failed validation step.  This could be ok in some situations.

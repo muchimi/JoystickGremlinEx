@@ -558,7 +558,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.allow_invalid_container_build = QtWidgets.QCheckBox("Invalid container does not fail build")
         self.allow_invalid_container_build.setToolTip("When enabled, an invalid container will not fail the execution build.")
-        self.allow_invalid_container_build.setChecked(self.config.allow_invalid_container_build)
+        self.allow_invalid_container_build.setChecked(self.config.allow_exec_tree_container_validation_fail)
         self.allow_invalid_container_build.clicked.connect(self._allow_invalid_container_build)
 
         
