@@ -21,7 +21,7 @@ import time
 import os
 import re
 import sys
-
+import traceback
 from PySide6 import QtCore
 
 import gremlin.config
@@ -117,8 +117,10 @@ class Configuration(QtCore.QObject):
 
             try:
                 os.makedirs(folder)
-            except Exception as e:
-                syslog.error(f"Unable to create data folder: {str(e)}")
+            except Exception as err:
+                syslog.error(f"Unable to create data folder:")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
+
         elif not os.path.isdir(folder):
             syslog.error(f"Unable to find data folder: {folder}")
             sys.exit(-1)
@@ -166,7 +168,7 @@ class Configuration(QtCore.QObject):
                 if not os.path.isdir(app_path):
                     try:
                         os.makedirs(app_path)
-                    except:
+                    except Exception as err:
                         print (f"Error: unable to create application data folder: {app_path}", file = sys.stderr)
                         sys.exit(-1)
             else:

@@ -20,7 +20,7 @@ import logging
 import threading
 import time
 from lxml import etree as ElementTree
-
+import traceback
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.actions
 import gremlin.base_conditions
@@ -3513,13 +3513,16 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._update_ui()
 
-        except gremlin.error.GremlinError as e:
+        except gremlin.error.GremlinError as err:
             util.display_error(
-                f"A needed vJoy device is not accessible: {e}\n\n" +
+                f"A needed vJoy device is not accessible:\n" +
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
-            syslog.error(str(e))
+            syslog.error(f"{err}\n{traceback.format_exc()}")
+
+        except Exception as err:
+            syslog.error(f"{err}\n{traceback.format_exc()}")
 
     @QtCore.Slot(bool)
     def _axis_reverse_changed(self, checked):
@@ -3959,7 +3962,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                                         device_guid = device_guid,
                                                         identifier=input_id,
                                                         is_axis=True,
-                                                        value = action_value)
+                                                        value = value,
+                                                        raw_value= value,
+                                                        curved_value = value)
                     self.action_data.axis_last_value = value
                     self.process_event(event, action_value)
 
@@ -4258,7 +4263,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if ranged_value is None:
                     ranged_value = filtered_value
 
-                if verbose: syslog.info(f"VjoyRemap: using input value source {source}: [{value:0.3f}] -> filtered [{filtered_value:0.3f}] -> range [{ranged_value: 0.3f}] applied curves: {curve_count}")
+                if verbose: syslog.info(f"VjoyRemap: using input value source {source}: [{value:0.3f}] -> filtered [{filtered_value:0.3f}] -> range [{ranged_value:0.3f}] applied curves: {curve_count}")
 
             action_value = gremlin.actions.Value(value = ranged_value, raw = event.raw_value, is_pressed = event.is_pressed)
             event.curve_value = ranged_value
@@ -4286,7 +4291,6 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
         self.action_data : VjoyRemap
         
-
         input_type = event.getInputType()
         result = True # assume functor executes
 
@@ -5695,8 +5699,10 @@ Supports axis merging, curved output, command, hat and button mappings.
                         mode = node.get("merge_mode")
                         try:
                             merge_mode = MergeOperationType.to_enum(mode)
-                        except:
-                            pass
+                        except Exception as err:
+                            syslog.error(f"Invalid MergeOperation {mode}:")
+                            syslog.error(f"{err}\n{traceback.format_exc()}")
+                            
                     invert = safe_read(node,"merge_invert", bool, False)
                     data = MergeData(device_id, input_id, operation = merge_mode, invert = invert)
                     self._merge_data.append(data)

@@ -2696,7 +2696,6 @@ def get_mode_list(profile):
     
 class ModeSelectorWidget(QtWidgets.QWidget):
     ''' displays a mode selector drop down for the current profile modes '''
-
     modeChanged = Signal(str) # occurs whena mode is selected
     
     def __init__(self, 
@@ -2704,7 +2703,7 @@ class ModeSelectorWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
 
-        self._selector_widget = QtWidgets.QComboBox()
+        self._selector_widget = QComboBox()
         self._selector_widget.currentIndexChanged.connect(self._handle_mode_changed)
 
         widgets = [self._selector_widget]
@@ -3453,7 +3452,7 @@ def get_layout_widgets(layout) -> list:
 
 class QComboBox (QtWidgets.QComboBox):
     ''' a max limited combo box '''
-    def __init__(self, parent = None, width = 200, maxItems = 20):
+    def __init__(self, parent = None, width = None, maxItems = 20):
         ''' combo box with max count 
         
         :param parent: the parent widget of the combo box
@@ -3471,7 +3470,9 @@ class QComboBox (QtWidgets.QComboBox):
         if width is not None:
             self.setMinimumWidth(width)
         else:
-             self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+            # AUTOSIZE
+            self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+            self.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
 
         self.setMaxVisibleItems(maxItems)
 
@@ -10504,23 +10505,29 @@ class QButtonGrid(QtWidgets.QWidget):
         
 
 
-class QModeSelector(QtWidgets.QGroupBox):
+class QModeSelector(QtWidgets.QWidget):
 
     """Allows selecting the mode in which Gremlin starts."""
-    modeSelected = Signal(str) # profile selected
+    modeChanged = Signal(str) # profile selected (mode:str)
 
-    def __init__(self, profile, parent=None):
+
+    def __init__(self, profile = None, title = None, parent=None):
+        import gremlin.shared_state
         super().__init__(parent)
         self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.dropdown = QComboBox()
+        if not profile:
+            profile = gremlin.shared_state.current_profile
 
-        self.setTitle("Mode Select:")
-
-        self.dropdown = gremlin.ui.ui_common.QComboBox()
         for mode in profile.mode_list():
-            self.dropdown.addItem(mode)
+            self.dropdown.addItem(mode, mode)
         self.dropdown.currentIndexChanged.connect(self._update_cb)
 
-        self.main_layout.addWidget(self.dropdown)
+        if title:
+            widget,_ = getHContainer(self.dropdown, title)
+            self.main_layout.addWidget(widget)
+        else:
+            self.main_layout.addWidget(self.dropdown)
         self.main_layout.addStretch()
 
     def _update_cb(self, index):
@@ -10528,8 +10535,8 @@ class QModeSelector(QtWidgets.QGroupBox):
 
         :param index the index of the entry selected
         """
-        mode = self.dropdown.currentText()
-        self.modeSelected.emit(mode)
+        mode = self.dropdown.currentData()
+        self.modeChanged.emit(mode)
         
 
 

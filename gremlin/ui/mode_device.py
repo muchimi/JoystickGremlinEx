@@ -180,7 +180,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         el = gremlin.event_handler.EventListener()
         el.mode_name_changed.connect(self._mode_name_changed)
-        el.edit_mode_changed.connect(self._edit_mode_changed_cb) # edit mode changed or mode added/removed
+        el.edit_mode_changed.connect(self._handle_edit_mode_changed) # edit mode changed or mode added/removed
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
@@ -218,10 +218,10 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
 
-    def _edit_mode_changed_cb(self, mode : str):
-        gremlin.util.InvokeUiMethod(self._edit_mode_changed_cb_ui, mode)
+    def _handle_edit_mode_changed(self, mode : str):
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)
     
-    def _edit_mode_changed_cb_ui(self, mode : str):
+    def _edit_mode_changed_ui(self, mode : str):
         ''' occurs when a new mode is selected '''
         assert mode is not None and mode, "Invalid mode detected"
         self.set_mode(mode)

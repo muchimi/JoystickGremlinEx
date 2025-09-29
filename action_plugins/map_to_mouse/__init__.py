@@ -549,9 +549,7 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
                 safe_read(node, "button-id", int, 1)
             )
         except ValueError as e:
-            syslog.warning(
-                f"Invalid mouse identifier in profile: {e:}"
-            )
+            syslog.warning(f"Invalid mouse identifier in profile: {e:}")
             self.button_id = gremlin.types.MouseButton.Left
         self.direction = safe_read(node, "direction", int, 0)
         self.min_speed = safe_read(node, "min-speed", int, 5)

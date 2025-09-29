@@ -1016,9 +1016,7 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
                 safe_read(node, "button-id", int, 1)
             )
         except ValueError as e:
-            syslog.warning(
-                f"Invalid mouse identifier in profile: {e:}"
-            )
+            syslog.warning(f"Invalid mouse identifier in profile: {e:}")
             self.button_id = gremlin.types.MouseButton.Left
 
         self.direction = safe_read(node, "direction", int, 0)

@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui #QtWebEngineWidgets
-
+import traceback
 import gremlin.base_profile
 import gremlin.config
 import gremlin.config
@@ -1906,6 +1906,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 gremlin.ui.ui_common.MessageBox(prompt = f"Preset saved to {base_name}", is_warning=False)
             except Exception as err:
                 gremlin.ui.ui_common.MessageBox(prompt = f"Error saving preset: {err}")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
 
 
     @QtCore.Slot()
@@ -1940,6 +1941,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
             except Exception as err:
                 gremlin.ui.ui_common.MessageBox(prompt = f"Error loading preset: {err}")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
 
     def _clipboard_valid(self, clipboard) -> bool:
         ''' true if the clipboard data is valid '''

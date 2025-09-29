@@ -1334,7 +1334,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if self.ui.tray_icon is not None:
                         self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
                 except:
-                    pass
+                     syslog.error(f"Load Icon: error: {err}\n{traceback.format_exc()}")
         except Exception as err:
             syslog.error(f"Activate: error: {err}\n{traceback.format_exc()}")
 
@@ -3273,7 +3273,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         except Exception as err:
             # something went south with the selection
             syslog.error("TabIndex generic unhandled error occured in _select_input_handler_ui():")
-            syslog.error(err)
+            syslog.error(f"{err}\n{traceback.format_exc()}")
+
 
             
 
@@ -3976,9 +3977,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
             self._update_mode_status_bar()
 
-        except e:
+        except Exception as err:
             log_sys_error(f"Unable to update status bar event: {event}")
-            log_sys_error(e)
+            syslog.error(f"{err}\n{traceback.format_exc()}")
+
 
     @QtCore.Slot()
     def _update_mode_change(self, new_mode):
@@ -4026,7 +4028,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     self.ui.tray_icon.showMessage(toast_msg,"",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
                     self._last_toast_message = toast_msg
         except Exception as err:
-            syslog.error(f"Unable to update status bar mode:\n{err}")
+            syslog.error(f"Unable to update status bar mode:")
+            syslog.error(f"{err}\n{traceback.format_exc()}")
+
 
 
     def _update_ui_mode(self, new_mode):
@@ -4281,26 +4285,29 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     syslog.info("Profile: parse completed.")
 
 
-                except (KeyError, TypeError) as error:
+                except (KeyError, TypeError) as err:
                     # An error occurred while parsing an existing profile,
                     # creating an empty profile instead
-                    syslog.exception(f"Invalid profile content:\n{error}")
+                    syslog.exception(f"Invalid profile content:")
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
                     self.new_profile()
                     self._profile_load_stack.clear()
 
-                except gremlin.error.ProfileError as error:
+                except gremlin.error.ProfileError as err:
                     # Parsing the profile went wrong, stop loading and start with an
                     # empty profile
                     cfg = gremlin.config.Configuration()
                     cfg.last_profile = None
                     self.new_profile()
-                    gremlin.util.display_error(f"Failed to load the profile {source_xml} due to:\n\n{error}")
+                    gremlin.util.display_error(f"Failed to load the profile {source_xml} due to:\n\n{err}")
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
                     self._profile_load_stack.clear()
 
                 except Exception as err:
                     syslog.error("Profile load error (generic):")
                     syslog.error(traceback.format_exc())
                     gremlin.util.display_error(f"Failed to load the profile {source_xml} (see log for details)")
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
                     self._profile_load_stack.clear()
 
 
@@ -4701,6 +4708,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._update_mode_status_bar()
 
     def _edit_mode_changed(self, mode : str):
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)    # ensure on UI thread
+
+    def _edit_mode_changed_ui(self, mode : str):
         ''' called when mode list has changed '''
 
         # update the mode selector to the correct edit mode
@@ -4974,7 +4984,9 @@ def configure_logger(config):
         if os.path.isfile(log_file):
             os.unlink(log_file)
     except:
-        pass
+        syslog.error(f"Unable to remove old log file [{log_file}]")
+        syslog.error(f"{err}\n{traceback.format_exc()}")
+        
     logger = logging.getLogger(config["name"])
     logger.setLevel(config["level"])
     #handler = logging.FileHandler(config["logfile"])
@@ -5073,7 +5085,7 @@ if __name__ == "__main__":
     # Show unhandled exceptions to the user when running a compiled version
     # of Joystick Gremlin
     executable_name = os.path.split(sys.executable)[-1]
-    if executable_name == "joystick_gremlin.exe":
+    if executable_name.casefold() == "gremlinex.exe":
         sys.excepthook = exception_hook
 
     # Initialize HidGuardian before we let SDL grab joystick data
@@ -5082,7 +5094,7 @@ if __name__ == "__main__":
     hg.add_process(os.getpid())
 
     # Create user interface
-    app_id = u"joystick.gremlinex"
+    app_id = u"gremlinex"
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
 
 
@@ -5257,7 +5269,7 @@ if __name__ == "__main__":
     try:
         app.exec()
     except Exception as err:
-        syslog.error(traceback.format_exc())
+        syslog.error(f"{err}\n{traceback.format_exc()}")
 
     syslog.info("GremlinEx UI terminated")
 

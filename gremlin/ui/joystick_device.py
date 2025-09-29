@@ -218,7 +218,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         el = gremlin.event_handler.EventListener()
         # update on an edit mode change so we update the display
-        el.edit_mode_changed.connect(self._edit_mode_changed_cb)
+        el.edit_mode_changed.connect(self._handle_edit_mode_changed)
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
         # lock all inputs
@@ -251,7 +251,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             el = gremlin.event_handler.EventListener()
             
-            el.edit_mode_changed.disconnect(self._edit_mode_changed_cb)
+            el.edit_mode_changed.disconnect(self._handle_edit_mode_changed)
             el.config_changed.disconnect(self._config_changed_cb)
 
             
@@ -322,8 +322,11 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if index in self.curve_update_handler and self.curve_update_handler[index] is not None:
             self.curve_update_handler[index](value)
 
-    @QtCore.Slot(str)
-    def _edit_mode_changed_cb(self, mode : str):
+
+    def _handle_edit_mode_changed(self, mode : str):
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode) # ensure on UI thread
+    
+    def _edit_mode_changed_ui(self, mode : str):
         ''' called on edit mode change '''
         if not Shiboken.isValid(self):
             return
@@ -551,11 +554,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             
         self.device_profile.ensure_mode_exists(mode, self.device)
 
-        # index = self.last_item_index
-        # self.input_item_list_model.mode = mode
-        # self.input_item_list_view.redraw()
-        # self.input_item_list_view.select_item(index, emit=False)
-        # self.input_item_selected_cb(index)
+  
 
         self.input_item_list_model.mode = mode
 

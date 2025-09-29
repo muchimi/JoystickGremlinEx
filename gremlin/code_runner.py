@@ -458,7 +458,7 @@ class CodeRunner:
                     #     )
             except Exception as err:
                 syslog.error("Error occured in CodeRunner MergeAxis - legacy merge axis disabled")
-                syslog.error(err)
+                syslog.error(f"{err}\n{traceback.format_exc()}")
 
             # setup callbacks for state data changes
             sd = gremlin.ui.state_device.StateData()
@@ -697,12 +697,12 @@ class CodeRunner:
 
 
 
-        except Exception as e:
+        except Exception as err:
             tb_msg = traceback.format_exc()
             # re-enable tabs
             self.enableUI()
             syslog.error("Unable to launch profile:")
-            syslog.error(f"Error: {e}")
+            
             syslog.error(f"Traceback: {tb_msg}")
 
             gremlin.util.display_error(f"Unable to launch profile due to an error: {tb_msg}")

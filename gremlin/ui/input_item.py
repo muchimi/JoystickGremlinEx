@@ -3305,16 +3305,17 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     @QtCore.Slot(object)
     def _update_ui(self, container):
+        ''' update the condition icon in the RIGHT PANEL tab '''
         if not Shiboken.isValid(self.dock_tabs):
             return
         dock_tabs = self.dock_tabs
         if dock_tabs.data == container:
-            tracker = gremlin.base_conditions.ConditionTracker()
-            input_item = container.input_item
-            count = tracker.getInputItemConditionCount(input_item)
-            enabled = tracker.getContainerConditionCount(container) > 0
+            # tracker = gremlin.base_conditions.ConditionTracker()
+            #input_item = container.input_item
+            # count = tracker.getInputItemConditionCount(input_item)
+            enabled = container.hasConditions() # tracker.getContainerConditionCount(container) > 0
             # count = self.container.condition_count
-            enabled = count > 0 or enabled
+            # enabled = count > 0 or enabled
             virtual_enabled = self.profile_data.virtual_button_user_enabled
             try:
                 

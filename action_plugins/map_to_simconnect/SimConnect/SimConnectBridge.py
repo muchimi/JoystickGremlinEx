@@ -24,7 +24,7 @@ import struct
 from time import sleep
 from ctypes import *
 from ctypes.wintypes import FLOAT
-
+import traceback
 import gremlin.event_handler
 import gremlin.shared_state
 from .Enum import *
@@ -142,7 +142,7 @@ class SimConnectBridge(QtCore.QObject):
 
         except Exception as err:
             syslog.error(f"SIMCONNECT BRIDGE: start error: {err}")
-            pass
+            syslog.error(f"{err}\n{traceback.format_exc()}")
 
     @property
     def is_alive(self)->bool:

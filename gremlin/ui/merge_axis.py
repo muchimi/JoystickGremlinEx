@@ -180,7 +180,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
     palette = QtGui.QPalette()
     palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.LightGray)
 
-    def __init__(self, change_cb, profile_data, parent=None):
+    def __init__(self, callback, profile_data, parent=None):
         """Creates a new instance.
 
         :param change_cb function to execute when changes occur
@@ -202,16 +202,16 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         # Selectors for both physical and virtual joystick axis for the
         # mapping selection
         self.vjoy_selector = ui_common.VJoySelector(
-            lambda x: change_cb(),
+            lambda x: callback(),
             [InputType.JoystickAxis],
             profile_data.settings.vjoy_as_input
         )
         self.joy1_selector = ui_common.JoystickSelector(
-            lambda x: change_cb(),
+            lambda x: callback(),
             [InputType.JoystickAxis]
         )
         self.joy2_selector = ui_common.JoystickSelector(
-            lambda x: change_cb(),
+            lambda x: callback(),
             [InputType.JoystickAxis]
         )
 
@@ -222,7 +222,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         self.operation_selector.addItem("Maximum")
         self.operation_selector.addItem("Sum")
         self.operation_selector.currentIndexChanged.connect(
-            lambda x: change_cb()
+            lambda x: callback()
         )
 
         # Mode selection
@@ -231,7 +231,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
 
         self.mode_selector = gremlin.ui.ui_common.ModeWidget()
         self.mode_selector.populate_selector(profile_data)
-        self.mode_selector.edit_mode_changed.connect(change_cb)
+        self.mode_selector.edit_mode_changed.connect(callback)
         self.mode_selector.setShowModeEdit(False)
         self.mode_selector.setShowProfileOptions(False)
         self.mode_selector.setLabelText("Profile Mode:")

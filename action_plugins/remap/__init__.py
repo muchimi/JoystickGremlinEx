@@ -20,7 +20,7 @@ import logging
 import threading
 import time
 from lxml import etree as ElementTree
-
+import traceback
 import gremlin.joystick_handling
 from gremlin.util import load_icon
 from PySide6 import QtWidgets
@@ -232,13 +232,13 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Save changes so the UI updates properly
             self.save_changes()
-        except gremlin.error.GremlinError as e:
+        except Exception as err:
             util.display_error(
-                f"A needed vJoy device is not accessible: {e}\n\n" +
+                f"A needed vJoy device is not accessible:\n\n" +
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
-            log_sys_error(e)
+            syslog.error(f"{err}\n{traceback.format_exc()}")
 
     def save_changes(self):
         """Saves UI contents to the profile data storage."""

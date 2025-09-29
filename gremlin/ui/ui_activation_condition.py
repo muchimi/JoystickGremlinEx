@@ -348,6 +348,87 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         # grab a new data index as this is a new entry
         self._key_pressed_cb(self._keyboard_dialog.latched_key)
 
+
+class ModeConditionWidget(AbstractConditionWidget):
+    ''' mode condition UI '''
+    def __init__(self, condition, parent=None):
+        super().__init__(condition, parent)
+        self.setTitle("Mode Condition")
+
+    def _create_ui(self):
+        if not Shiboken.isValid(self):
+            return        
+        
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
+        widget, _ = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True)
+        self.main_layout.addWidget(widget)
+
+        self.mode_selector = gremlin.ui.ui_common.QModeSelector()
+        self.mode_selector.modeChanged.connect(self._handle_mode_changed)
+
+        self.comparison_dropdown = gremlin.ui.ui_common.QComboBox()
+        self.comparison_dropdown.addItem("Equal", "equal")
+        self.comparison_dropdown.addItem("Not Equal", "not_equal")
+        
+        if self.condition.comparison: self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
+        self.comparison_dropdown.currentIndexChanged.connect(self._comparison_changed_cb)
+
+        self.key_label = QtWidgets.QLabel("")
+
+        
+        # self.grid_widget =  QtWidgets.QWidget()
+        # self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
+        # self.grid_layout.addWidget(QtWidgets.QLabel("Activate if mode"), 0, 0)
+        # self.grid_layout.addWidget(self.key_label, 0, 1)
+        # self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        # self.grid_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+        # self.grid_layout.addWidget(QtWidgets.QLabel("to"), 0, 2)
+        # self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+
+        self.ignore_release_widget = QtWidgets.QCheckBox("Apply condition on press only")
+        self.ignore_release_widget.setToolTip("When enabled, the condition will only apply to a press (on) event and always succeed on a release (off) event.\nThis option only has meaning on press events.")
+        self.ignore_release_widget.setChecked(self.condition.ignore_release)
+        self.ignore_release_widget.clicked.connect(self._ignore_release_cb)
+
+
+        widgets = [
+            "Activate if current mode is",
+            self.comparison_dropdown,
+            "to",
+            self.mode_selector,
+            self.ignore_release_widget
+        ]
+
+        widget,_ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.main_layout.addWidget(widget)
+
+        self.description_widget = QtWidgets.QLabel()
+        widget,_ = gremlin.ui.ui_common.getHContainer(["Description:", self.description_widget])
+        self.main_layout.addWidget(widget)
+
+
+        # self.grid_layout.addWidget(self.ignore_release_widget, 0, 5)        
+        # self.grid_layout.setColumnStretch(5,2)
+        #self.main_layout.addWidget(self.grid_widget)
+
+          
+    def _handle_mode_changed(self, mode):          
+        self.condition.mode = mode
+
+    @QtCore.Slot(bool)
+    def _ignore_release_cb(self, checked):
+        self.condition.ignore_release = checked
+        
+    def setDescription(self, value):
+        self.description_widget.setText(value if value else "n/a")
+
+
+    @QtCore.Slot(str)
+    def _comparison_changed_cb(self, text):
+        ''' update comparison '''
+        self.condition.comparison = self.comparison_dropdown.currentData()
+
+
 class StateConditionWidget(AbstractConditionWidget):
     ''' state condition UI '''
     def __init__(self, condition, parent=None):
@@ -358,19 +439,19 @@ class StateConditionWidget(AbstractConditionWidget):
         if not Shiboken.isValid(self):
             return
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
-        widget, layout = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True)
+        widget, _ = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True)
         self.main_layout.addWidget(widget)
 
         self.state_selector = gremlin.ui.ui_common.QComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
-        widget,layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector])
+        widget,_ = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector])
         self.main_layout.addWidget(widget)
 
         
 
 
-        widget,layout = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
+        widget,_ = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
         self.main_layout.addWidget(widget)
 
         self.comparison_dropdown = ui_common.QComboBox()
@@ -1412,6 +1493,8 @@ class ConditionView(ui_common.AbstractView):
             [InputActionCondition, InputActionConditionWidget],
         "State":
             [StateCondition, StateConditionWidget],
+        "Mode":
+            [ModeCondition, ModeConditionWidget]
     }
 
     # Mapping between application rule label and enumeration
@@ -1457,11 +1540,12 @@ class ConditionView(ui_common.AbstractView):
 
         # Condition selector
         self.condition_selector = ui_common.QComboBox()
-        self.condition_selector.addItem("Keyboard Condition")
+        self.condition_selector.addItem("Keyboard Condition", )
         self.condition_selector.addItem("Joystick Condition")
         self.condition_selector.addItem("vJoy Condition")
         self.condition_selector.addItem("Action Condition")
         self.condition_selector.addItem("State Condition")
+        self.condition_selector.addItem("Mode Condition")
         
         config = gremlin.config.Configuration()
         last_selector = config.condition_selector
@@ -1533,6 +1617,7 @@ class ConditionView(ui_common.AbstractView):
 
     def _add_condition(self):
         """Adds a condition to the view's model."""
+        
         data_type = ConditionView.condition_map[self.condition_selector.currentText().split()[0]][0]
         self.model.add_condition(data_type())
         

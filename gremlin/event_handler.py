@@ -281,6 +281,34 @@ class Event:
 		
 		raise ValueError(f"Unable to handle parameter - not a valid key: {key}")
 	
+	@staticmethod
+	def from_vjoyEvent(ve : VjoyEvent):
+		import gremlin.joystick_handling
+		device_guid = gremlin.joystick_handling.vjoy_guid_from_id(ve.vjoy_id)
+		input_type = ve.input_type
+		is_pressed = False
+		is_axis = False
+		value = ve.value
+		match input_type:
+			case InputType.JoystickButton:
+				is_pressed = value
+			case InputType.JoystickAxis:
+				is_axis = True
+			case InputType.JoystickHat:
+				is_pressed = value != (0,0)
+
+				
+		return Event(
+			event_type = ve.input_type,
+			identifier = ve.input_id,
+			device_guid = device_guid,
+			is_pressed = is_pressed,
+			is_axis = is_axis,
+			value = value,
+			curved_value= value,
+			raw_value = value
+		)
+	
 	def __str__(self):
 		if self.event_type == InputType.Mouse:
 			return f"Event: {self._id} Mouse - button {self.identifier} pressed: {self.is_pressed}"
@@ -617,6 +645,9 @@ class EventListener:
 		# calibration data access
 		self._calibrationManager = None
 		self._verbose_dinput = False
+		self._verbose_dinput_extra = False
+
+		self._profile_started = False
 
 		self.profile_start.connect(self._profile_start)
 		self.profile_stopping.connect(self._profile_stopping_cb)
@@ -642,6 +673,9 @@ class EventListener:
 		self.js = JoystickState()
 
 		self.shutdown.connect(self._shutdown_handler)
+
+		# TEST / POSSIBLE FUTURE WORK internal vjoy event handling for vjoy loopback cases
+		# self.vjoy_event.connect(self._handle_vjoy_event)
 
 	def registerVjoyCallback(self, callback):
 		if not callback in self._vjoy_callbacks:
@@ -726,19 +760,23 @@ class EventListener:
 		''' options were changed '''
 		config = gremlin.config.Configuration()
 		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
+		self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
 
 		
 	def _profile_start(self):
 		''' occurs on profile start '''
 
+		self._profile_started = False
 		config = gremlin.config.Configuration()
 		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
+		self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
 
 		# enable mouse hooks 
 		self.enableMouse(True)
 
 	def _profile_stopping_cb(self):
 		# mode events
+		self._profile_started = False
 		device_guid = gremlin.shared_state.mode_tab_guid
 		delay = 0.250 # delay in seconds between press/release events for mode control change
 		master_mode = gremlin.shared_state.master_mode
@@ -761,6 +799,7 @@ class EventListener:
 		m2_list, f2_list = eh.execute_event(event_stop_pressed)
 		start_release = Timer(delay, lambda : eh._execute_callbacks(event_stop_released, m2_list, f2_list))
 		start_release.start()
+		
 
 		if not self.enable_mouse_hook:
 			self.disableMouse()
@@ -804,7 +843,7 @@ class EventListener:
 		# read the starting hat states
 		self._load_hat_states()
 
-		
+		self._profile_started = True 
 		
 		# fire mode change for mode enter (press + release)
 		eh = EventHandler()
@@ -818,6 +857,7 @@ class EventListener:
 		enter_release = Timer(delay, lambda : eh._execute_callbacks(event_enter_released, m2_list, f2_list))
 		enter_release.start()
 
+		
 
 	def _device_changed_cb(self):
 		self._init_joysticks()
@@ -1042,6 +1082,15 @@ class EventListener:
 				notify_time = time.time() + 60*2 # 2 minutes
 			time.sleep(1)
 
+	# def _handle_vjoy_event(self, vjoyevent):	
+	# 	pass	
+	# 	# import gremlin.joystick_handling
+	# 	# if self._profile_started:
+	# 	# 	vjoy_id = vjoyevent.vjoy_id
+	# 	# 	if self.js.vjoyAsInput(vjoy_id):
+	# 	# 		event = Event.from_vjoyEvent(vjoyevent)
+	# 	# 		self.joystick_event.emit(event)
+
 	def _dinput_event_handler(self, data):
 		"""Callback for joystick events.
 
@@ -1062,6 +1111,7 @@ class EventListener:
 
 		from gremlin.util import dill_hat_lookup
 		verbose = self._verbose_dinput
+		verbose_extra = self._verbose_dinput_extra
 		
 		event = dinput.InputEvent(data)
 
@@ -1081,10 +1131,9 @@ class EventListener:
 			if verbose: syslog.info(f"Ignore input: {device.name} input: {event.input_index} type: {event.input_type}")
 			return
 		
-		
 		if event.input_type == dinput.InputType.Axis:
-			if verbose:
-				syslog.info(event)
+			if verbose and verbose_extra:
+				syslog.info(f"DINPUT AXIS: {event}")
 
 			# get the curved input if the input is curved
 			raw_value = event.value
@@ -1115,6 +1164,8 @@ class EventListener:
 			
 
 		elif event.input_type == dinput.InputType.Button:
+			if verbose:
+				syslog.info(f"DINPUT BUTTON: {event}")
 			event = Event(
 				event_type= InputType.JoystickButton,
 				device_guid=event.device_guid,
@@ -1485,9 +1536,13 @@ class EventHandler(QtCore.QObject):
 		el.profile_stop.connect(self._profile_stop)
 		el.profile_started.connect(self._profile_started)
 		el.runtime_mode_changed.connect(self._update_mode_change)
+		
 		self._started = False
 		self.reset()
 	
+	
+		
+
 	def _profile_start(self):
 		if not self._started:
 			self._started = True
@@ -2598,6 +2653,7 @@ class JoystickState():
 		self._input_ignored_device_list = {} # list of ignored devices (device_guid)
 		self._output_ignored_device_list = {} # list of ignored devices (device_guid)
 		self._vjoy_output_ignored_list = {} # list of ignored vjoy IDs for output (int)
+		self._vjoy_as_input = {} # map of VJOY devices used as input by GremlinEx
 
 	def hook(self):
 		el = EventListener()
@@ -2627,10 +2683,22 @@ class JoystickState():
 				is_output = not is_input
 				self.setInputIgnored(device_guid, is_output)
 				self.setOutputIgnored(device_guid, is_input)
+				self.setVjoyAsInput(dev.vjoy_id, is_input)
+
 				if verbose: syslog.info(f"VJOY: {dev.name} [{dev.vjoy_id}] used as {'input' if is_input else 'output'}")
 			else:
 				self.setInputIgnored(device_guid, False)
 				self.setOutputIgnored(device_guid, True)
+
+	def setVjoyAsInput(self, vid : int, enabled : bool):
+		self._vjoy_as_input[vid] = enabled
+
+	def vjoyAsInput(self, vid: int) -> bool:
+		''' true if vjoy device is also used as input '''
+		if vid in self._vjoy_as_input:
+			return self._vjoy_as_input[vid]
+		return False
+		
 
 
 	def inputEnabled(self, device_guid) -> bool:
@@ -2649,6 +2717,8 @@ class JoystickState():
 		if vid in self._vjoy_output_ignored_list:
 			return self._vjoy_output_ignored_list[vid]
 		return False
+	
+
 
 
 	def outputIgnored(self, device_guid) -> bool:
@@ -2693,6 +2763,7 @@ class JoystickState():
 			device_guid = gremlin.util.normalize_guid(dev.device_guid)
 			self.setOutputIgnored(device_guid, enabled) # vjoy used as input cannot be used as output
 			self.setInputIgnored(device_guid, not enabled)
+			self.setVjoyAsInput(vjoy_id, enabled)
 
 class AxisValues(NamedTuple):
 	#("AxisValue", "actual raw calibrated curved")

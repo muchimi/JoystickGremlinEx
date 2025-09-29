@@ -31,7 +31,7 @@ from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
 import gremlin.process_monitor
 import gremlin.shared_state
-
+import traceback
 import gremlin.shared_state
 import gremlin.shared_state
 import gremlin.singleton_decorator
@@ -720,7 +720,8 @@ class SimconnectOptions():
 
 
         except Exception as err:
-            syslog.error(f"Simconnect Config: XML read error: {xml_source}: {err}")
+            syslog.error(f"Simconnect Config: XML read error: {xml_source}")
+            syslog.error(f"{err}\n{traceback.format_exc()}")
             return False
 
     def to_xml(self):
@@ -794,7 +795,8 @@ class SimconnectOptions():
             tree = etree.ElementTree(root)
             tree.write(self._xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
         except Exception as err:
-            syslog.error(f"SimconnectData: unable to create XML simvars: {self._xml_source}: {err}")
+            syslog.error(f"SimconnectData: unable to create XML simvars: {self._xml_source}:")
+            syslog.error(f"{err}\n{traceback.format_exc()}")
 
     def get_community_folder(self):
         ''' looks for the community folder '''
@@ -3422,11 +3424,13 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         el.profile_start.connect(self._profile_start)
         el.profile_stop.connect(self._profile_stop)
         # refresh the UI on profile mode changes
-        el.edit_mode_changed.connect(self._populate_ui) 
+        el.edit_mode_changed.connect(self._handle_edit_mode_changed) 
 
         # update from ui
         self._update_ui()
 
+    def _handle_edit_mode_changed(self):
+        gremlin.util.InvokeUiMethod(self._populate_ui) # ensure on UI thread
 
     @QtCore.Slot()
     def _set_command_range(self):

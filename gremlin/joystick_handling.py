@@ -18,7 +18,7 @@
 
 import logging
 import threading
-
+import traceback
 
 import dinput
 import time
@@ -92,10 +92,10 @@ class VJoyProxy:
                 device = vjoy.VJoy(vid)
                 VJoyProxy.vjoy_devices[vid] = device
                 return device
-            except error.VJoyError as e:
-                msg = f"Failed accessing vJoy id={vid}, error is: {e}"
+            except error.VJoyError as err:
+                msg = f"Failed accessing vJoy id={vid}\n{err}"
                 syslog.error(msg)
-                raise e
+                raise err
 
     @classmethod
     def reset(self):
@@ -443,6 +443,13 @@ def vjoy_id_from_guid(guid, not_found_id = 1):
 
     syslog.error(f"Could not find vJoy matching guid {str(guid)}")
     return not_found_id
+
+def vjoy_guid_from_id(vid: int):
+    ''' gets the vjoy GUID from a vjoy integer id '''
+    for dev in vjoy_devices():
+        if dev.vjoy_id == vid:
+            return dev.device_guid
+    return None
 
 
 def registerSpecialDevice(dev):

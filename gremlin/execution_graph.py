@@ -494,6 +494,9 @@ class ExecutionContext():
         elif isinstance(condition, gremlin.base_conditions.StateCondition):
             return gremlin.actions.StateCondition(condition)
         
+        elif isinstance(condition, gremlin.base_conditions.ModeCondition):
+            return gremlin.actions.ModeCondition(condition)
+        
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
 
     def _handle_profile_load(self):
@@ -885,20 +888,19 @@ class ExecutionContext():
                         condition.is_extended,
                         condition.comparison
                     )
-                
         elif isinstance(condition, gremlin.base_conditions.JoystickCondition):
             return gremlin.actions.JoystickCondition(condition)
-            
         elif isinstance(condition, gremlin.base_conditions.VJoyCondition):
             return gremlin.actions.VJoyCondition(condition)
-            
         elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
-        
         elif isinstance(condition, gremlin.actions.VirtualButtonCondition):
             return condition
         elif isinstance(condition, gremlin.base_conditions.StateCondition):
             return gremlin.actions.StateCondition(condition)
+        elif isinstance(condition, gremlin.base_conditions.ModeCondition):
+            return gremlin.actions.ModeCondition(condition)
+        
    
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
 
@@ -1681,6 +1683,7 @@ class ExecutionContext():
         verbose_exec = self._verbose_exec
         verbose_detailed = self._verbose_detailed
         verbose_condition = self._verbose_condition
+        result = False # assume fails
         try:
             gremlin.shared_state.pushLog()
             logTabs = gremlin.shared_state.logTabs()
@@ -2052,6 +2055,9 @@ class AbstractExecutionGraph(QtCore.QObject):
             return gremlin.actions.InputActionCondition(condition.comparison)
         elif isinstance(condition, gremlin.base_conditions.StateCondition):
             return gremlin.actions.StateCondition(condition)
+        elif isinstance(condition, gremlin.base_conditions.ModeCondition):
+            return gremlin.actions.ModeCondition(condition)
+                
         
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
         

@@ -122,18 +122,14 @@ class PluginVariableType(enum.Enum):
         try:
             return _PluginVariableType_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PluginVariableType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
     @staticmethod
     def to_enum(value):
         try:
             return _PluginVariableType_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PluginVariableType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
 
 

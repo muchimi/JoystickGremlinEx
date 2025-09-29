@@ -24,7 +24,7 @@ import os
 import copy
 import logging
 import time
-
+import traceback
 #import gremlin.base_classes
 
 import gremlin.keyboard
@@ -433,11 +433,6 @@ class AbstractContainer(ProfileData):
         self.device_input_id = input_item.input_id
         self.device_input_type = input_item.input_type
         self.device = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
-        # else:
-        #     self.device_guid = None
-        #     self.device_input_id = None
-        #     self.device_input_type = None
-        #     self.device = None
 
 
 
@@ -559,16 +554,27 @@ class AbstractContainer(ProfileData):
     def has_conditions(self):
         ''' true if the container has conditions defined '''
         return self.activation_condition is not None and len(self.activation_condition.conditions) > 0
+    
+    def hasConditions(self):
+        ''' true if the container has a condition or contains actions with conditions '''
+        return self.has_conditions or self.has_action_conditions
 
     @property
     def has_action_conditions(self):
         ''' true if the container has action conditions defined '''
-        
-        if self.activation_condition is not None:
-            # if len(self.activation_condition.conditions) == 0:
-            #     self.refresh_conditions()
-            return len(self.activation_condition.conditions) > 0
+        for action_set in self.action_sets:
+            if action_set:
+                for action in action_set:
+                    if action.has_conditions:
+                        return True
+                    
         return False
+        
+        # if self.activation_condition is not None:
+        #     # if len(self.activation_condition.conditions) == 0:
+        #     #     self.refresh_conditions()
+        #     return len(self.activation_condition.conditions) > 0
+        # return False
     
 
     @property
@@ -2271,8 +2277,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 else:
                     try:
                         self._input_name =  key_from_code(input_id[0],input_id[1]).name
-                    except:
-                        self._input_name(f"Unable to parse type: {type(input_id).__name__}")
+                    except Exception as err:
+                        msg = f"Unable to parse type: {type(input_id).__name__}"
+                        self._input_name(msg)
+                        syslog.error(f"Unable to parse: {msg}")
+                        syslog.error(f"{err}\n{traceback.format_exc()}")
             elif self._input_type == InputType.ModeControl:
                 self._input_name = f"Mode [{gremlin.shared_state.edit_mode}] {'enter' if self._input_id == 0 else 'exit'} actions"
             elif self._input_type == InputType.OpenSoundControl:
@@ -2612,8 +2621,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     # blitz existing file
                     os.unlink(fname)
                 tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-            except:
-                syslog.error(f"Error writing template to: {fname}")
+            except Exception as err:
+                syslog.error(f"Error writing template to: [{fname}]")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
                 return False
             return True
         
@@ -2660,8 +2670,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     prompt = "".join((msg + "\n" for msg in msg_list))
                     gremlin.ui.ui_common.MessageBox(title="Load Template", prompt = prompt)
 
-            except:
-                pass
+            except Exception as err:
+                syslog.error(f"Error loading template: [{fname}]:")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
+                
             if container_list:
                 for new_container in container_list:
                     if hasattr(new_container, "action_model"):
@@ -2932,7 +2944,7 @@ class Profile():
         return None
 
 
-    @QtCore.Slot()        
+     
     def _edit_mode_changed_cb(self):
         ''' available mode list has changed - check data '''
 
@@ -4453,7 +4465,8 @@ class Profile():
                 try:
                     os.makedirs(backup_path)
                 except Exception as err:
-                    syslog.error(f"BACKUP: unable to create backup folder {backup_path}:  {err}")
+                    syslog.error(f"BACKUP: unable to create backup folder {backup_path}:")
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
                 
             if os.path.isdir(backup_path):
                 backup_files = gremlin.util.find_files(backup_path, pattern)
@@ -4478,7 +4491,8 @@ class Profile():
                     try:
                         os.unlink(oldest_file)
                     except Exception as err:
-                        syslog.error(f"BACKUP: save error: Unable to remove oldest backup profile: {oldest_file}:  {err}")    
+                        syslog.error(f"BACKUP: save error: Unable to remove oldest backup profile: {oldest_file}:")    
+                        syslog.error(f"{err}\n{traceback.format_exc()}")
 
                 # next file
                 backup_count=start_count + 1
@@ -4488,7 +4502,8 @@ class Profile():
                     verbose = gremlin.config.Configuration().verbose
                     if verbose: syslog.info(f"BACKUP: backup profile: {backup_file}")
                 except Exception as err:
-                    syslog.error(f"BACKUP: save error: Unable to backup profile: {err}")
+                    syslog.error(f"BACKUP: save error: Unable to backup profile: [{backup_file}]")
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
                     return
                 
         if use_name:
@@ -5125,8 +5140,9 @@ class ProfileMapItem():
                     pd.restore_last = restore_last
                     pd.force_numlock_off = force_numlock_off
 
-                except Exception as ex:
-                    syslog.error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
+                except Exception as err:
+                    syslog.error(f"PROC MAP: Unable to open profile mapping: {profile}:\n")
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
 
         return pd
     
@@ -5186,8 +5202,9 @@ class ProfileMapItem():
 
             # save the profile map
 
-            except Exception as ex:
-                syslog.error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
+            except Exception as err:
+                syslog.error(f"PROC MAP: Unable to open profile mapping: [{profile}]:")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
 
     def _update(self):
         pd = self._get_profile_data()
@@ -5253,8 +5270,9 @@ class ProfileMap():
                     self._items.append(item)
                     if verbose:
                         syslog.info(f"PROC MAP: Registered mapping: {process} -> {profile}")
-            except Exception as ex:
-                syslog.error(f"PROC MAP: Unable to open profile mapping: {fname}:\n{ex}")
+            except Exception as err:
+                syslog.error(f"PROC MAP: Unable to open profile mapping: [{fname}]")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
         self._update()
 
     def save_profile_map(self):
@@ -5283,7 +5301,8 @@ class ProfileMap():
             syslog.info(f"PROC MAP: saved preferences to {fname}")
 
         except Exception as err:
-            syslog.error(F"PROC MAP: failed to save preferences to {fname}: {err}")
+            syslog.error(F"PROC MAP: failed to save preferences to [{fname}]")
+            syslog.error(f"{err}\n{traceback.format_exc()}")
 
 
     @property

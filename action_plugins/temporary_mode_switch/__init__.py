@@ -35,6 +35,7 @@ import gremlin.execution_graph
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+import gremlin.util
 
 syslog = logging.getLogger("system")
 
@@ -57,11 +58,13 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._update_modes)
         el.execution_context_changed.connect(self._update_modes)
-        self._update_modes()
+        self._update_modes_ui()
 
 
-    @QtCore.Slot()
     def _update_modes(self):
+        gremlin.util.InvokeUiMethod(self._update_modes_ui) # ensure on UI method
+    
+    def _update_modes_ui(self):
         ''' called when mode list needs to be updated '''
         # update the list of available modes 
         if not Shiboken.isValid(self.mode_selector_widget):

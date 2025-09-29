@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T68)
+- Modified: drop down autosize behavior.
+- New: Mode condition.  This new condition tests the current execution mode for inputs that exist across all modes such as states.
+- Fix: Condition status icon on UI should update more reliably on condition load/add/remove.
+
 ### (m76T67)
 - Fix: vjoy remap button display sync was refactored for a bug fix and optimized with far fewer calls and uses the new event model that didn't exist a while back. This works with profile wide usage based on mappings to buttons of VJoy Remap or legacy remap (note legacy remap only contributes to usage but cannot display the button grid).
 - Fix: vjoy remap: re-added missing quick set buttons for axis to button mode.

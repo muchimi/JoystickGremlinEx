@@ -3691,7 +3691,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         el = gremlin.event_handler.EventListener()
         # update on an edit mode change so we update the display
-        el.edit_mode_changed.connect(self._edit_mode_changed_cb)
+        el.edit_mode_changed.connect(self._handle_edit_mode_changed)
         el.config_changed.connect(self._config_changed_cb)
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
@@ -3761,11 +3761,12 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             
         return None
     
-    
-
-    @QtCore.Slot(str)
-    def _edit_mode_changed_cb(self, mode : str):
+    def _handle_edit_mode_changed(self, mode : str):
         ''' occurs when a new mode is selected '''
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode) # ensure on UI thread
+
+    def _edit_mode_changed_ui(self, mode : str):
+        ''' occurs when a mode is selected (ui thread)'''
         self.set_mode(mode)
         
 

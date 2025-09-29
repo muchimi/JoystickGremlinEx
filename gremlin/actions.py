@@ -350,6 +350,64 @@ class StateCondition(AbstractCondition):
     
     def __str__(self):
         return self.condition_name()    
+    
+
+class ModeCondition(AbstractCondition):
+
+    """ Condition verifying a runtime mode """
+
+    def __init__(self, condition):
+        """Creates a new instance.
+
+        :param key: name of the state
+        :param is_extended whether or not the key code is extended
+        :param comparison the comparison operation to perform when evaluated
+        """
+        super().__init__(condition.comparison)
+        self.mode = condition.mode
+        self.ignore_release = condition.ignore_release
+       
+    def __call__(self, event, value, extra_data = None):
+        # default call
+        return self.process_event(event, value, extra_data)
+
+    def process_event(self, event, value, extra_data = None):
+        """Evaluates the condition using the condition and provided data.
+        :param event raw event that caused the condition to be evaluated
+        :param value the possibly modified value
+        :return True if the condition is satisfied, False otherwise
+        """
+        import gremlin.shared_state
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+
+        if verbose:
+            logtabs = gremlin.shared_state.logTabs(True)
+
+        current_mode = gremlin.shared_state.current_mode
+        
+        if current_mode is None:
+            # success if the mode is not found
+            if verbose: syslog.info(f"{logtabs}ModeCondition: key: [N/A] condition return state: PASS")
+            return True
+
+        state = False
+
+        if not event.is_pressed and not current_mode and self.ignore_release:
+            state = True
+        elif self.comparison == "equal":
+            state = self.mode == current_mode
+        elif self.comparison == "not_equal":
+            state = self.mode != current_mode
+
+        if verbose: syslog.info(f"{logtabs}ModeCondition: pressed {value} current mode [{current_mode}] test mode: [{self.mode}] - condition return state: {"PASS" if state else "FAIL"}")
+        return state
+        
+        
+    def condition_name(self)->str:
+        return f"ModeCondition: [{self.mode}] "
+    
+    def __str__(self):
+        return self.condition_name()        
 
 
 class JoystickCondition(AbstractCondition):
@@ -646,24 +704,24 @@ class VirtualButtonCondition(AbstractCondition):
     def __str__(self):
         return self.condition_name()
 
-class ModeCondition(AbstractCondition):
-    ''' condition verifying the runtime mode '''
-    def __init__(self, mode):
-        """Creates a new instance.
+# class ModeCondition(AbstractCondition):
+#     ''' condition verifying the runtime mode '''
+#     def __init__(self, mode):
+#         """Creates a new instance.
 
-        :param comparison the comparison operation to perform when evaluated
-        """
-        super().__init__(mode)
+#         :param comparison the comparison operation to perform when evaluated
+#         """
+#         super().__init__(mode)
 
-    def __call__(self, event, value, extra_data = None):
-        # default call
-        return self.process_event(event, value, extra_data)
+#     def __call__(self, event, value, extra_data = None):
+#         # default call
+#         return self.process_event(event, value, extra_data)
     
-    def process_event(self, event, value, extra_data = None):
-        return self.comparison == gremlin.shared_state.runtime_mode
+#     def process_event(self, event, value, extra_data = None):
+#         return self.comparison == gremlin.shared_state.runtime_mode
 
-    def condition_name(self)->str:
-        return f"ModeCondition: mode: [{self.comparison}]"
+#     def condition_name(self)->str:
+#         return f"ModeCondition: mode: [{self.comparison}]"
         
     
     

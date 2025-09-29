@@ -19,7 +19,7 @@ import lxml
 import gremlin.execution_graph
 from psygnal import Signal
 from shiboken6 import Shiboken
-
+import traceback
 syslog = logging.getLogger("system")
 
 
@@ -257,6 +257,7 @@ class JoystickCondition(AbstractCondition):
         return f"Joystick Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} device: {self.device_name} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[0]:0.3f}]  use calibrated: {self.use_calibrated_data}"
 
 
+
 class StateCondition(AbstractCondition):
     ''' state condition '''
     def __init__(self):
@@ -304,6 +305,55 @@ class StateCondition(AbstractCondition):
     
     def __str__(self):
         return f"State Condition: [{self.key}] comparison: {self.comparison}"
+    
+
+
+class ModeCondition(AbstractCondition):
+    ''' mode condition '''
+    def __init__(self):
+        super().__init__()
+
+        self.description = None
+        self.comparison = "equal"
+        self.mode = gremlin.shared_state.edit_mode
+        self.ignore_release = False
+
+    def from_xml(self, node, data = None):
+        import gremlin.ui.state_device
+        super().from_xml(node, data)
+
+        condition_type = node.get("condition-type")
+        if condition_type != "mode":
+            return
+        assert "mode" in node.attrib
+        self.mode = node.get("mode")
+        
+        if "description" in node.attrib:
+            self.description = node.get("description")
+
+        self.comparison = safe_read(node, "comparison", str, "")
+        self.ignore_release = safe_read(node,"ignore-release",bool,False)
+
+    def to_xml(self):
+        node = super().to_xml() 
+        node.set("comparison", str(self.comparison))
+        node.set("mode", self.mode if self.mode else "")
+        node.set("condition-type", "mode")
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
+        if self.description:
+            node.set("description", self.description)
+
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return super().is_valid() and bool(self.mode)
+    
+    def __str__(self):
+        return f"Mode Condition:  Mode: [{self.mode}] comparison: {self.comparison}"    
     
 class VJoyCondition(AbstractCondition):
 
@@ -701,9 +751,9 @@ class ConditionTracker():
         self._cache = {} # map of known conditions keyed by mode and condition ID
         self._owner_map = {} # map of condition ID to its input item owner so we know which input item has which condition
         self._data_map = {} # map of condition ID to tracker data
-        self._el = gremlin.event_handler.EventListener()
-        self._el.shutdown.connect(self.reset)
-        self._el.profile_unloaded.connect(self.reset)
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.reset)
+        el.profile_unloaded.connect(self.reset)
         
     @QtCore.Slot()
     def reset(self):
@@ -724,26 +774,14 @@ class ConditionTracker():
         self._cache[mode][condition.id] = data
         self._owner_map[condition.id] = input_item
         self._data_map[condition.id] = data
-        self._el.condition_added.emit(input_item, mode, condition)
-        self._el.condition_state_changed.emit(data.container)
+        el = gremlin.event_handler.EventListener()
+        el.condition_added.emit(input_item, mode, condition)
+        el.condition_state_changed.emit(data.container)
         verbose = gremlin.config.Configuration().verbose_mode_condition
         if verbose:
             syslog = logging.getLogger("system")
             syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name if hasattr(data.input_item,"display_name") else data.input_item} mode: {data.mode}")
         #data.condition.id_changed.connect(self._condition_id_changed)
-
-
-    # @QtCore.Slot(str, str)
-    # def _condition_id_changed(self, old_id, new_id):
-    #     ''' handle an ID swap for the condition in the tracking objects '''
-    #     if old_id in self._owner_map:
-    #         input_item = self._owner_map[old_id]
-    #         self._owner_map[new_id] = input_item
-    #         del self._owner_map[old_id]
-    #         data = self._data_map[old_id]
-    #         self._data_map[new_id] = data
-    #         del self._data_map[old_id]
-        
 
     def unregisterCondition(self, condition : AbstractCondition):
         ''' unregisters a condition '''
@@ -756,9 +794,10 @@ class ConditionTracker():
                 del self._cache[mode][id]
                 del self._owner_map[id]
                 # (input_item, mode, condition)
-                self._el.condition_removed.emit(data.input_item, data.mode, data.condition)
+                el = gremlin.event_handler.EventListener()
+                el.condition_removed.emit(data.input_item, data.mode, data.condition)
                 if Shiboken.isValid(data.container):
-                    self._el.condition_state_changed.emit(data.container)
+                    el.condition_state_changed.emit(data.container)
                 return
             
 
@@ -863,7 +902,8 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         "joystick": JoystickCondition,
         "vjoy": VJoyCondition,
         "action": InputActionCondition,
-        "state": StateCondition
+        "state": StateCondition,
+        "mode": ModeCondition
     }
 
     def __init__(self, conditions, rule):

@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 import shutil
 from lxml import etree
-
+import traceback
 from PySide6 import QtWidgets, QtCore, QtGui
 
 
@@ -579,8 +579,9 @@ class SimConnectManager(QtCore.QObject):
             if master_xml is not None and os.path.isfile(master_xml):
                 try:
                     shutil.copy(master_xml, self._simvars_xml)
-                except:
+                except Exception as err:
                     syslog.error("SIMMCONNECT: error placing master simvars to user profile")
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
 
 
     @QtCore.Slot()
@@ -693,8 +694,9 @@ class SimConnectManager(QtCore.QObject):
                 with open(self._lvars_xml,"w") as f:
                     f.write(xml)
                     f.flush()
-            except:
+            except Exception as err:
                 syslog.warning(f"Unable to write sample LVAR file to {self._lvars_xml}")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
         if os.path.isfile(self._lvars_xml):
             self._lvars.clear()
             parser = etree.XMLParser(remove_blank_text=True)
@@ -874,7 +876,8 @@ class SimConnectManager(QtCore.QObject):
         
 
         except Exception as err:
-            syslog.error(f"SimconnectData: XML simvars read error: {xml_source}: {err}")
+            syslog.error(f"SimconnectData: XML simvars read error: {xml_source}:")
+            syslog.error(f"{err}\n{traceback.format_exc()}")
             return False
 
         # indicate new data is available

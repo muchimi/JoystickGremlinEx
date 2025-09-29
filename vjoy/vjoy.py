@@ -61,11 +61,12 @@ class AxisName(enum.Enum):
 
 
 class HatType(enum.Enum):
-
     """Valid hat types."""
 
     Discrete = 0
     Continuous = 1
+
+
 
 
 def device_available(vjoy_id):
@@ -357,6 +358,7 @@ class Button:
 
         self.vjoy_dev.ensure_ownership()
         self._is_pressed = is_pressed
+        vjoy_id = self.vjoy_id
         if not VJoyInterface.SetBtn(
                 self._is_pressed,
                 self.vjoy_id,
@@ -364,7 +366,9 @@ class Button:
         ):
             syslog.error(f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}")
         self.vjoy_dev.used()
+        
 
+        
         
 
 
@@ -660,7 +664,7 @@ class VJoy:
     
     def ensure_ownership(self):
         # ensure runs on UI thread
-        gremlin.util.InvokeUiMethod(self._ensure_ownership_ui)
+        gremlin.util.InvokeUiMethod(self._ensure_ownership_ui) # ui thread
 
     def _ensure_ownership_ui(self):
         """Ensure this devices is still owned by the process.
@@ -687,9 +691,12 @@ class VJoy:
             syslog.error(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             #raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             return
-            
-            
+        
     def ensure_released(self):
+        gremlin.util.InvokeUiMethod(self._ensure_released_ui) # ui thread
+        
+            
+    def _ensure_released_ui(self):
         ''' ensures the VJOY device is not acquired '''
         vjoy_id = self.vjoy_id
         if vjoy_id == 1:
@@ -845,8 +852,11 @@ class VJoy:
         :return True if the hat is valid, False otherwise
         """
         return index in self._hat
-
+    
     def reset(self):
+        gremlin.util.InvokeUiMethod(self._reset_ui) # ui thread
+
+    def _reset_ui(self):
         """Resets the state of all inputs to their default state."""
         # Obtain the current state of all inputs
         axis_states = {}

@@ -59,6 +59,7 @@ class InputType(enum.IntEnum):
         except KeyError:
             raise ValueError("Invalid type in lookup")
         
+        
     @staticmethod
     def to_list(include_notset = False, include_mouse = False, include_virtualbutton = False) -> list:
         data = [it for it in InputType]

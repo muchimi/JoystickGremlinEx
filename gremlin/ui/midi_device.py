@@ -1569,7 +1569,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         
         el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.connect(self._edit_mode_changed_cb) # edit mode changed or mode added/removed
+        el.edit_mode_changed.connect(self._handle_edit_mode_changed) # edit mode changed or mode added/removed
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
@@ -1604,12 +1604,14 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
                     
 
-    @QtCore.Slot(str)
-    def _edit_mode_changed_cb(self, mode : str):
+    
+    def _handle_edit_mode_changed(self, mode : str):
         ''' occurs when a new mode is selected '''
-        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
-            self._select_item_cb(self._last_selected_index)
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode) # ensure on UI thread
 
+    def _edit_mode_changed_ui(self, mode : str):
+        ''' occurs when a new mode is selected (ui thread)'''
+        self.set_mode(mode)
 
     def display_name(self, input_id):
         ''' returns the name for the given input ID '''
@@ -1746,18 +1748,12 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.input_item_list_view.redraw()
             self._select_item_cb(self._last_selected_index)
 
-    def _edit_mode_changed_cb(self, mode):
-        """Handles mode change.
-
-        :param mode the new mode
-        """
-        self.set_mode(mode)
-
+    
 
     def refresh(self, emit = False):
         """Refreshes the current selection, ensuring proper synchronization."""
         self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
-        # self.input_item_selected_cb(self.input_item_list_view.current_index)
+        
 
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
