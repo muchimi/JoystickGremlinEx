@@ -419,7 +419,8 @@ class Hat:
         return None
     
     @staticmethod
-    def getDirection(position):
+    def getDirection(position) -> tuple:
+        ''' gets the hat position as a tuple '''
         if position in Hat.name_to_direction:
             return Hat.name_to_direction[position]
         return None
@@ -510,7 +511,7 @@ class Hat:
         self.hat_type = hat_type
 
     @property
-    def direction(self):
+    def direction(self) -> tuple:
         """Returns the current direction of the hat.
 
         :return current direction of the hat encoded as a tuple (x, y)

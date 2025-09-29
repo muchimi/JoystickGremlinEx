@@ -15,8 +15,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T68)
-- Modified: drop down autosize behavior.
+- Modified: drop down autosize behavior (this should prevent drop down boxes to be overly large for their input).
 - New: Mode condition.  This new condition tests the current execution mode for inputs that exist across all modes such as states.
+- New: vjoy loopback mode.  This is an internal routing feature that enables a vjoy device to be used more reliably as an output and input at the same time.  This enables GremlinEx to output to a vjoy device, and that same vjoy device can have mapped inputs as well.  Warning: this mechanism makes loops possible, so as with states, you can setup a loop, or a recursion, where the output triggers the input that triggers the same output. This will cause an endless loop. Detecting such loops are too expensive to do code wise to maintain performance goals, so are not implemented by design.
 - Fix: Condition status icon on UI should update more reliably on condition load/add/remove.
 
 ### (m76T67)
