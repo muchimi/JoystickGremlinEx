@@ -364,26 +364,26 @@ class ModeConditionWidget(AbstractConditionWidget):
         self.main_layout.addWidget(widget)
 
         self.mode_selector = gremlin.ui.ui_common.QModeSelector()
+        if not self.condition.mode:
+            self.condition.mode = gremlin.shared_state.edit_mode
+        self.mode_selector.setMode(self.condition.mode)
+             
         self.mode_selector.modeChanged.connect(self._handle_mode_changed)
 
         self.comparison_dropdown = gremlin.ui.ui_common.QComboBox()
         self.comparison_dropdown.addItem("Equal", "equal")
         self.comparison_dropdown.addItem("Not Equal", "not_equal")
+        if self.condition.comparison:
+            index = self.comparison_dropdown.findData(self.condition.comparison)
+            if index != -1:
+                self.comparison_dropdown.setCurrentIndex(index)
         
-        if self.condition.comparison: self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
+        #if self.condition.comparison: self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
         self.comparison_dropdown.currentIndexChanged.connect(self._comparison_changed_cb)
 
         self.key_label = QtWidgets.QLabel("")
 
-        
-        # self.grid_widget =  QtWidgets.QWidget()
-        # self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
-        # self.grid_layout.addWidget(QtWidgets.QLabel("Activate if mode"), 0, 0)
-        # self.grid_layout.addWidget(self.key_label, 0, 1)
-        # self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        # self.grid_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
-        # self.grid_layout.addWidget(QtWidgets.QLabel("to"), 0, 2)
-        # self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+
 
         self.ignore_release_widget = QtWidgets.QCheckBox("Apply condition on press only")
         self.ignore_release_widget.setToolTip("When enabled, the condition will only apply to a press (on) event and always succeed on a release (off) event.\nThis option only has meaning on press events.")

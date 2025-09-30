@@ -122,6 +122,8 @@ mode_tab_guid = gremlin.util.parse_guid('b3b159a0-4d06-4bd6-93f9-7583ec08b877')
 state_tab_guid = gremlin.util.parse_guid('72bbc0f4-31a8-4a41-b528-868dc7fcedfa')
 # UUID of the octavi device 
 octavi_tab_guid = gremlin.util.parse_guid('e04aaf53-4838-4763-bc60-d5c7f8e653a1')
+# fake GUID for fake inputs
+fake_tab_guid = gremlin.util.parse_guid('f7cbbba2-a490-4401-b2bb-1f7f541d9e45')
 
 master_mode = str(mode_tab_guid)
 

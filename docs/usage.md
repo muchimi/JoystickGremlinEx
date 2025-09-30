@@ -466,6 +466,20 @@ Conditions apply to containers or actions or both concurrently.
 
 Conditions are cummulative and apply in the order of evaluation, so conditions on containers are evaluated before conditions on actions.
 
+
+### List of currently supported conditions:
+
+| Condition      | Description |
+| ----------- | ----------- |
+| vJoy condition | This condition checks for a vJoy (virtual joystick) state, such as an axis in a given range, hat or button pressed or released.|
+| Joystick condition | This condition checks for a joystick or controller input state, such as an axis in a given range, hat or button pressed or released. |
+| Keyboard (mouse) condition | This condition checks for keyboard and mouse states. |
+| State condition | This condition checks for a state value. |
+| Mode condition | This condition checks for a particular profile mode being active (or inactive). |
+
+
+
+
 ### Virtual Button
 
 When mapping a momentary action to an axis, the virtual button tab usually becomes availble to define a range on the axis where the condition is active.

@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T68A)
+- hotfix for mode condition not loading the prior mode on UI load.
+- New: enabled wiggle feature in Sequence container.
+
 ### (m76T68)
 - Modified: drop down autosize behavior (this should prevent drop down boxes to be overly large for their input).
 - New: Mode condition.  This new condition tests the current execution mode for inputs that exist across all modes such as states.

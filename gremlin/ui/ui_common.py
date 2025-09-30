@@ -10538,6 +10538,21 @@ class QModeSelector(QtWidgets.QWidget):
         mode = self.dropdown.currentData()
         self.modeChanged.emit(mode)
         
+    def setMode(self, mode):
+        index = self.dropdown.findData(mode)
+        if index != -1:
+            with QtCore.QSignalBlocker(self.dropdown):
+                self.dropdown.setCurrentIndex(index)
+        else:
+            syslog.error(f"MODE SELECTOR: invalid mode: [{mode}]")
+
+    def setCurrentIndex(self, index):
+        try:
+            with QtCore.QSignalBlocker(self.dropdown):
+                self.dropdown.setCurrentIndex(index)
+        except:
+            syslog.error(f"MODE SELECTOR: invalid index: [{index}]")
+            pass # bad index
 
 
 

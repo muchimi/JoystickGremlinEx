@@ -22,6 +22,8 @@ GremlinEx can also combine axes together and derive an output value based on the
 
 GremlinEx can do multiple mappings concurrently - so the input can be routed to different outputs depending on the need, and this can be changed dynamically on the fly.
 
+As of M76T68, GremlinEx supports using vJoy as an input and output device simultaneously.  This enables scenarios where an input in GremlinEx triggers map to a vJoy device, and when that vJoy device changes, it triggers an input back into GremlinEx to trigger more actions.  This can create loops, so care should be excercised to not build a loop regardless of the sequence of events.  GremlinEx does not check for loops as they are too expensive performance wise to detect and guard against at runtime.
+
 ### Benefits
 
 #### Agreggation of multiple devices
@@ -57,8 +59,6 @@ GremlinEx has a built-in capabilityu to use controllers attached to one computer
 #### Direct support for Microsoft Flight Simulator
 
 GremlinEx has built-in support to directly control Microsoft Flight Simulator without using the internal MSFS mapper.  It uses the SimConnect interface to do this, and a custom WASM module to access internal variables not supported via SimConnect (as of this writing).
-
-
 
 ### Profiles
 

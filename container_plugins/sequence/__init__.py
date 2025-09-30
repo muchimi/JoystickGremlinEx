@@ -22,7 +22,8 @@ from PySide6 import QtWidgets
 import logging
 import time
 from lxml import etree as ElementTree
-
+import threading
+import random
 import gremlin
 import gremlin.actions
 import gremlin.base_conditions
@@ -57,6 +58,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
+        
+    
         self.widget_layout = QtWidgets.QHBoxLayout()
 
         self.profile_data.create_or_delete_virtual_button()
@@ -76,6 +79,52 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._trigger_on_release_widget.setChecked(self.profile_data.trigger_on_release)
         self._trigger_on_release_widget.clicked.connect(self._trigger_mode_changed)
 
+        self._wiggle_mode_widget = QtWidgets.QCheckBox("Enabled")
+        self._wiggle_mode_widget.setToolTip("When enabled, the sequence repeats while the input is triggered, optionally using random pauses between actions.")
+        self._wiggle_mode_widget.setChecked(self.profile_data.wiggle_mode)
+        self._wiggle_mode_widget.clicked.connect(self._handle_wiggle_mode_change)
+
+        self._wiggle_min_delay_widget = gremlin.ui.ui_common.QDelayWidget(5000, label = "Min Delay:")
+        self._wiggle_min_delay_widget.setToolTip("Time (ms) between steps")
+        self._wiggle_min_delay_widget.setValue(self.profile_data.wiggle_min_delay)
+        self._wiggle_min_delay_widget.valueChanged.connect(self._handle_min_delay_change)
+
+        self._wiggle_random_widget = QtWidgets.QCheckBox("Random Delay")
+        self._wiggle_random_widget.setToolTip("When enabled, the delay between steps will be randomized betweeen min and max delays")
+        self._wiggle_random_widget.setChecked(self.profile_data.wiggle_random)
+        self._wiggle_random_widget.clicked.connect(self._handle_wiggle_random_change)
+
+        self._wiggle_max_delay_widget = gremlin.ui.ui_common.QDelayWidget(5000, label = "Max Delay:")
+        self._wiggle_max_delay_widget.setToolTip("Time (ms) between steps, upper bound")
+        self._wiggle_max_delay_widget.setValue(self.profile_data.wiggle_max_delay)
+        self._wiggle_max_delay_widget.valueChanged.connect(self._handle_max_delay_change)
+
+
+        widgets = [
+            self._wiggle_mode_widget,
+            self._wiggle_random_widget,
+        ]
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Wiggle mode:")
+        self.action_layout.addWidget(widget)
+
+
+        self._wiggle_exec_delay_widget = gremlin.ui.ui_common.QDelayWidget(250, label = "Trigger time:")
+        self._wiggle_exec_delay_widget.setToolTip("Time (ms) between a press and release event sent to individual wiggle steps")
+        self._wiggle_exec_delay_widget.setValue(self.profile_data.wiggle_exec_delay)
+        self._wiggle_exec_delay_widget.valueChanged.connect(self._handle_exec_delay_change)
+
+        widgets = [
+            self._wiggle_exec_delay_widget,
+            self._wiggle_min_delay_widget,
+            self._wiggle_max_delay_widget,
+            
+        ]
+
+        self._wiggle_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+                   
+        self.action_layout.addWidget(self._wiggle_container_widget)
+
         self.widget_layout.addWidget(self._trigger_on_release_widget)
         self.widget_layout.addStretch()
 
@@ -91,6 +140,61 @@ class SequenceContainerWidget(AbstractContainerWidget):
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
+
+
+        self._update_widgets()
+
+    @QtCore.Slot(bool)
+    def _handle_wiggle_mode_change(self, checked):
+        self.profile_data.wiggle_mode = checked
+        self._update_widgets()
+
+    @QtCore.Slot(bool)
+    def _handle_wiggle_random_change(self, checked):
+        self.profile_data.wiggle_random = checked
+        self._update_widgets()
+
+    @QtCore.Slot(int)
+    def _handle_min_delay_change(self, value):
+        if value < 0:
+            with QtCore.QSignalBlocker(self._wiggle_min_delay_widget):
+                self._wiggle_min_delay_widget.setValue(self.profile_data.wiggle_min_delay)
+            return
+        if self.profile_data.wiggle_random and self.profile_data.wiggle_max_delay < value:
+            with QtCore.QSignalBlocker(self._wiggle_min_delay_widget):
+                self._wiggle_min_delay_widget.setValue(self.profile_data.wiggle_min_delay)
+            return
+        self.profile_data.wiggle_min_delay = value
+
+    @QtCore.Slot(int)
+    def _handle_max_delay_change(self, value):
+        if value < 0:
+            with QtCore.QSignalBlocker(self._wiggle_max_delay_widget):
+                self._wiggle_max_delay_widget.setValue(self.profile_data.wiggle_max_delay)
+            return
+        if self.profile_data.wiggle_random and self.profile_data.wiggle_max_delay < value:
+            with QtCore.QSignalBlocker(self._wiggle_max_delay_widget):
+                self._wiggle_max_delay_widget.setValue(self.profile_data.wiggle_max_delay)
+            return
+        self.profile_data.wiggle_max_delay = value
+
+    @QtCore.Slot(int)
+    def _handle_exec_delay_change(self, value):
+        self.profile_data.wiggle_exec_delay = value        
+
+        
+        
+
+
+    def _update_widgets(self):
+        enabled = self.profile_data.wiggle_mode
+        self._wiggle_min_delay_widget.setEnabled(enabled)
+
+        max_enabled = enabled and self.profile_data.wiggle_random
+        self._wiggle_max_delay_widget.setVisible(max_enabled)
+
+        self._wiggle_random_widget.setEnabled(enabled)
+        self._wiggle_exec_delay_widget.setEnabled(enabled)
 
     @QtCore.Slot(bool)
     def _trigger_mode_changed(self, checked: bool):
@@ -195,6 +299,35 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                     self.switch_on_press = True
 
         self._verbose = gremlin.config.Configuration().verbose_mode_container
+        self._is_running = False
+
+    def profile_start(self):
+        self._is_running = False
+
+
+    def profile_stop(self):
+        # stop wiggling
+        self.stop_wiggle()
+
+
+    def start_wiggle(self):
+        ''' starts the wiggle process '''
+        if not self._is_running:
+            syslog.info(f"SEQUENCE: start wiggle runner")
+            self._is_running = True
+            self._thread = threading.Thread(target = self._wiggle_runner)
+            self._thread.name = "wiggle runner"
+            self._thread.start()
+
+
+    def stop_wiggle(self):
+        ''' stops the wiggle process '''
+        if self._is_running:
+            syslog.info(f"SEQUENCE: stop wiggle runner")
+            self._is_running = False
+            self._thread.join()
+            self._thread = None
+
 
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data : dict = None) -> bool:
@@ -215,17 +348,91 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 if self._verbose: syslog.info(f"SEQUENCE: execute - ignore pressed event")
                 return False
             
+        if self.container.wiggle_mode:
+            if is_pressed and not self._is_running:
+                # run sequence in wiggle mode
+                self.start_wiggle()
+
+            elif not is_pressed and self._is_running:
+                # stop wiggle mode
+                self.stop_wiggle()
+
+
+
+
+        else:
+            # regular mode
             is_pressed = True # flip it for containers
             value.is_pressed = is_pressed
             value.current = is_pressed
             event.is_pressed = is_pressed
             event.raw_value = is_pressed
-
-
-        self._execute(event, value, extra_data, self._verbose)    
+            self._execute(event, value, extra_data, self._verbose)    
 
         return False # stop execution as the logic is internal to trigger the other nodes
     
+    def _wiggle_runner(self):
+        ''' wiggle mode runner thread '''
+        event_press = gremlin.event_handler.Event(InputType.JoystickButton,
+                                            1,
+                                            device_guid=gremlin.shared_state.fake_tab_guid,
+                                            is_pressed = True)
+        
+        event_release = event_press.fake_button(False,True)
+        
+        nodes = [node for node in self.action_set_nodes]
+        verbose = self._verbose
+        if not nodes:
+            # nothing to run
+            self._is_running = False
+            if verbose: syslog.info(f"SEQUENCE WIGGLE: Trigger Functor: nothing to wiggle")
+            return
+        index = 0
+        count = len(nodes)
+        min_delay = self.container.wiggle_min_delay 
+        max_delay = self.container.wiggle_max_delay 
+        wiggle_random = self.container.wiggle_random and min_delay != max_delay
+        exec_delay = self.container.wiggle_exec_delay / 1000
+
+        while self._is_running:
+            node = nodes[index]
+            if verbose: syslog.info(f"SEQUENCE WIGGLE: Trigger Functor: execute node ID: sequence [{index}] [{node.id}]")
+            self._ec.execute_node(node, event_press, True, None) # issue press
+            # time between executions
+            self._wait(exec_delay)
+            self._ec.execute_node(node, event_release, False, None) # issue release
+            # delay between steps
+            if not self._is_running:
+                if wiggle_random:
+                    # random delay
+                    delay = random.randrange(min_delay, max_delay) / 1000 # to seconds
+                else:
+                    # fixed delay
+                    delay = min_delay/1000 # to seconds
+                if delay:
+                    self._wait(delay)
+            # next node to run
+            index += 1
+            if index == count:
+                # loop
+                index = 0
+
+            
+    def _wait(self, delay : float):
+        ''' interruptible delay 
+        :param delay: time in seconds
+        
+        '''
+        expires = time.time() + delay
+        while self._is_running and expires > time.time():
+            time.sleep(0.01)
+
+
+        
+
+
+
+
 
 class SequenceContainer(AbstractContainer):
 
@@ -262,6 +469,12 @@ Unlike a macro, any action suitable for the input can be used.'''
         """
         super().__init__(parent, node)
         self.trigger_on_release = False # true if the sequence triggers on input release instead of input press
+        self.wiggle_mode = False # wiggle mode off by default
+        self.wiggle_min_delay = 250 # minimum delay for wiggle mode, or default delay if not randomized
+        self.wiggle_max_delay = 5000 # maximum delay for wiggle mode, if in random mode
+        self.wiggle_random = True # wiggle random mode
+        self.wiggle_exec_delay = 250 # delay between a press trigger and a release trigger for each action executing in wiggle mode
+
         
 
     def _parse_xml(self, node, data = None, extra_data = None):
@@ -271,7 +484,16 @@ Unlike a macro, any action suitable for the input can be used.'''
         """
         if "trigger_on_release" in node.attrib:
             self.trigger_on_release = safe_read(node,"trigger_on_release",bool,False)
-            # action sets are read by the parent
+            
+
+        self.wiggle_mode = safe_read(node,"wiggle-mode", bool, False)
+        self.wiggle_min_delay = safe_read(node,"wiggle-min", int, 250)
+        self.wiggle_max_delay = safe_read(node,"wiggle-max", int, 5000)
+        self.wiggle_exec_delay = safe_read(node,"wiggle-exec", int, 5000)
+        self.wiggle_random = safe_read(node,"wiggle-random", bool, True)
+
+
+        
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -281,6 +503,13 @@ Unlike a macro, any action suitable for the input can be used.'''
         node = ElementTree.Element("container")
         node.set("type", SequenceContainer.tag)
         node.set("trigger_on_release",safe_format(self.trigger_on_release,bool))
+        node.set("wiggle-mode", safe_format(self.wiggle_mode, bool))
+        node.set("wiggle-min", safe_format(self.wiggle_min_delay, int))
+        node.set("wiggle-max", safe_format(self.wiggle_max_delay, int))
+        node.set("wiggle-exec", safe_format(self.wiggle_exec_delay, int))
+        node.set("wiggle-random", safe_format(self.wiggle_random, bool))
+
+
         for actions in self.action_sets:
             as_node = ElementTree.Element("action-set")
             for action in actions:

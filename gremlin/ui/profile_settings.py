@@ -708,10 +708,11 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
 
         # Information label
         label = QtWidgets.QLabel(
-            "Declaring a vJoy device as an input device will allow it to be"
-            "used like a physical device , i.e. it can be forwarded to other"
-            "vJoy devices. However, this also means that it won't be available"
-            " as an output device."
+            "Declaring a vJoy device as an input device will allow it to be "
+            "used like a physical device, i.e. it can be forwarded to other "
+            "vJoy devices or triggering actions. When vJoy is used in this way, it is possible to create "
+            "endless loops if the input triggers the output that is also used as input. "
+            "Care should be used to prevent this situation. "
         )
 
         background_color = gremlin.ui.ui_common.Color.highlightBackgroundColor()
