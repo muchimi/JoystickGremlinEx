@@ -5274,6 +5274,9 @@ Supports axis merging, curved output, command, hat and button mappings.
 
                 v1 = value
 
+            if self.reverse:
+                value = scale_to_range(value, invert = True)
+
         if channels:
             data = gremlin.event_handler.AxisValues(actual = value, raw = raw_value, curved = curve_value, merged=merged_values)
             return data
@@ -5888,6 +5891,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                 node.set("merge_invert", safe_format(self.merge_invert, bool))
                 node.set("merge_min", safe_format(self.output_range_min, float))
                 node.set("merge_max", safe_format(self.output_range_max, float))
+                reverse = safe_format(self.reverse_configured, bool)
+                node.set("reverse", reverse)
+
                 #node.set("merge_input_type", gremlin.input_types.InputType.to_string(self.merge_input_type))
 
 

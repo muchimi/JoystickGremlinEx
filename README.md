@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T69)
+- Fix: vjoy remap inversion flag ignored/not persisted in merge axis mode
+
 ### (m76T68A)
 - hotfix for mode condition not loading the prior mode on UI load.
 - New: enabled wiggle feature in Sequence container.
