@@ -4633,7 +4633,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = (key, data))
             self.pulse_worker_map[key] = worker
 
-        if self.verbose: syslog.info(f"\activate")
+        if self.verbose: syslog.info(f"\tactivate")
         worker.start()
 
     def pulse_stop(self, key: str):

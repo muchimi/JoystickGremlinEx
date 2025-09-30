@@ -11069,55 +11069,105 @@ class QSyncModeWidget(QtWidgets.QWidget):
 
         
 
+class QCurveWidget(QtWidgets.QWidget):
+    ''' curve button / clear / set '''
+
+    curveChanged = Signal(object) # fires when the curve data changes (curve_data)
+
+    def __init__(self, parent = None):
+        super().__init__(parent = parent)
+        import gremlin.curve_handler
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
+
+        active_color = Color.activeColor()
+        normal_color = Color.normalColor()
+        self.curve_icon_inactive = load_icon("mdi.chart-bell-curve",qta_color=normal_color)
+        self.curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color=active_color)
+        self.curve_button_widget.setToolTip("Curve output")
+        self.curve_button_widget.clicked.connect(self._curve_button_cb)
+
+        self.curve_clear_widget = QtWidgets.QPushButton("Clear curve")
+        delete_icon = load_icon("mdi.delete")
+        self.curve_clear_widget.setIcon(delete_icon)
+        self.curve_clear_widget.setToolTip("Removes the curve output")
+        self.curve_clear_widget.clicked.connect(self._curve_delete_button_cb)
+
+        self.curve_data = gremlin.curve_handler.AxisCurveData()
+
+        widgets = [self.curve_button_widget, self.curve_clear_widget]
+
+        widget,_ = getHContainer(widgets)
+        main_layout.addWidget(widget)
+        self.curve_update_handler = None
+
+    def setValue(self, value : float):
+        ''' update the axis position in the dialog '''
+        if self.curve_update_handler:
+            self.curve_update_handler(value)
+
+    QtCore.Slot()
+    def _curve_button_cb(self):
+        import gremlin.curve_handler
+        if not self.curve_data:
+            curve_data = gremlin.curve_handler.AxisCurveData()
+            curve_data.curve_update()
+            self.curve_data = curve_data
+
+        syslog.info(f"Before curve update: {self.curve_data}")
+
+        dialog = gremlin.curve_handler.AxisCurveDialog(self.curve_data)
+        gremlin.util.centerDialog(dialog, dialog.width(), dialog.height())
+        # setup the update handler for value inputs into the curve
+        self.curve_update_handler = dialog.curve_update_handler
+        #self._update_axis_widget()
+
+        # disable highlighting
+        gremlin.shared_state.push_suspend_highlighting()
+        dialog.exec()
+        gremlin.shared_state.pop_suspend_highlighting()
+        self.curve_update_handler = None
+        self.curve_data = dialog.getCurveData()
+        self.curve_data.curve_update() # update any changes to the curve
+
+        syslog.info(f"After curve update: {self.curve_data}")
+
+        self._update_curve_icon()
+        self.curveChanged.emit(self.curve_data)
+
+    QtCore.Slot()
+    def _curve_delete_button_cb(self):
+        ''' removes the curve data '''
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Confirmation")
+        message_box.setInformativeText("Delete curve data for this output?")
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+        )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        is_cursor = gremlin.util.isCursorActive()
+        if is_cursor:
+            gremlin.util.popCursor()
+        response = message_box.exec()
+        if is_cursor:
+            gremlin.util.pushCursor()
+        if response == QtWidgets.QMessageBox.StandardButton.Ok:
+            self.curve_data = None
+            self._update_curve_icon()
+            self.curveChanged.emit(self.curve_data)
+
     
-# class QVjoyGridWidget(QtWidgets.QWidget):
-#     def __init__(self, vjoy_id : int, parent = None):
-#         super().__init(parent = parent)
-#         self.used_pixmap = gremlin.util.load_pixmap("used.png")
-#         self.unused_pixmap = gremlin.util.load_pixmap("unused.png")
-#         self._grid_widgets = {}
-#         self._vjoy_id = vjoy_id
-
-#         self.button_group = QtWidgets.QButtonGroup()
-#         self.button_group.buttonClicked.connect(self._select_changed)
-
-
-
-#     def _populate_grid(self, device_id, button_id):
-#         ''' updates the usage grid based on current VJOY mappings '''
-
-
-#         self._grid_widgets = {}
-
-#         for cb in self.button_group.buttons():
-#             id = self.button_group.id(cb)
-#             self._grid_widgets[id] = cb
-
-#             used = self.usage_state.get_usage_state(device_id,id)
-
-#             if id == button_id:
-#                 with QtCore.QSignalBlocker(cb):
-#                     cb.setChecked(True)
-
-#             lbl = self.icon_map[id]
-#             lbl.setPixmap(self.used_pixmap if used else self.unused_pixmap)
-
-#     def _set_grid_state(self, button_id : int, state : bool):
-#         # update the grid
-#         if button_id in self._grid_widgets:
-#             cb = self._grid_widgets[button_id]
-#             with QtCore.QSignalBlocker(cb):
-#                 cb.setChecked(state)
-
-
-
-#     def _select_changed(self, rb):
-#             # called when a button is toggled
-#             vjoy_id = self.action_data.vjoy_device_id
-#             button_id = self.button_group.checkedId()
-#             self.select_button(vjoy_id, button_id)
-
-
+    def _update_curve_icon(self):
+        if self.curve_data:
+            self.curve_button_widget.setIcon(self.curve_icon_active)
+            self.curve_clear_widget.setEnabled(True)
+        else:
+            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+            self.curve_clear_widget.setEnabled(False)
 
 
     

@@ -2288,6 +2288,39 @@ class AxisCurveData():
 
         self.curve_update()
 
+    def setPreset(self, preset : CurvePreset):
+        ''' applies a preset to this curve'''
+        match preset:
+            case CurvePreset.Bezier1:
+                # max 10% 
+                control_points =  [(-1.0, -1.0), (-1.0, 0),
+                                (-0.1, 0.0), (0.0, 0.0), (0.1, 0.0),
+                                (1.0, 0.0), (1.0, 1.0),
+                                    ]
+            case CurvePreset.Bezier2:
+                # max 20% 
+                control_points =  [(-1.0, -1.0), (-1.0, 0),
+                                (-0.2, 0.0), (0.0, 0.0), (0.2, 0.0),
+                                (1.0, 0.0), (1.0, 1.0),
+                                    ]
+            case CurvePreset.Bezier3:
+                # 5% start 50%
+                control_points =  [(-1.0, -1.0), (-0.5, 0),
+                                (-0.05, 0.0), (0.0, 0.0), (0.05, 0.0),
+                                (0.5, 0.0), (1.0, 1.0),
+                                    ]                
+            case CurvePreset.Bezier4:
+                # 10% start 50% 
+                control_points =  [(-1.0, -1.0), (-0.5, 0),
+                                    (-0.1, 0.0), (0.0, 0.0), (0.1, 0.0),
+                                    (0.5, 0.0), (1.0, 1.0),
+                    ]
+            case CurvePreset.Reset:
+                # reset to cubic linear
+                control_points =  [(-1.0, -1.0), (1.0, 1.0)]
+                
+        self.control_points = control_points
+
 
     def _generate_xml(self):
         """Generates a XML node corresponding to this object.

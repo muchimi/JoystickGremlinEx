@@ -2880,6 +2880,10 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         
         item_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        if not item_data:
+            # not in the model yet
+            return
+        
         input_type = InputType.State
         input_id = item_data.input_id
         key = self.getWidgetKey(input_type, input_id)

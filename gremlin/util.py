@@ -2262,6 +2262,7 @@ def normalize_guid(device_guid) -> str:
         device_guid = device_guid.casefold().replace("-","").replace("{","").replace("}","")
     return device_guid
 
+
 def compare_guid(id1, id2) -> bool:
     ''' compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against '''
     if id1 is None and id2 is None: return True

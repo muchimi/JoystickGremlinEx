@@ -709,7 +709,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     #         worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off)
     #         self.pulse_worker_map[key] = worker
 
-    #     if self.verbose: syslog.info(f"\activate")
+    #     if self.verbose: syslog.info(f"\tactivate")
     #     worker.start()
 
     # def pulse_stop(self):

@@ -1866,6 +1866,14 @@ class OscInterface(QtCore.QObject):
 
         self._host_ip = host_ip
         self._started = False
+        self._osc_client = None
+        self._osc_server = None
+        self._osc_internal_client = None
+        self._input_port = None
+        self._output_port = None
+        self._target_ip = None
+        self._target_port = None
+
        
         el = gremlin.event_handler.EventListener()
         el.request_osc.connect(self._request_osc_state)

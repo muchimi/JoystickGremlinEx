@@ -1129,6 +1129,7 @@ class EventListener:
 		import gremlin.util
 		# get current vjoy state
 		
+		verbose = self._verbose_vjoy
 		# setup the tracking data structure to look for changes
 		if not vjoy_id in self._vjoy_events:
 			self._vjoy_events[vjoy_id] = {}
@@ -1155,17 +1156,23 @@ class EventListener:
 		if input_id in self._vjoy_events[vjoy_id][input_type]:
 			if input_type == InputType.JoystickAxis:
 				# account for floating point accuracy issues
-				syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value:0.3f}] to [{current_value:0.3f}]")
+				if verbose: syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value:0.3f}] to [{current_value:0.3f}]")
 				if gremlin.util.is_close(value, current_value):
+					if verbose: syslog.info("\tFAIL")
 					return False
+				else:
+					if verbose: syslog.info("\tSUCCEED")
 			# button/hat
 			syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}] to [{current_value}]")
 			if value == current_value:
+				if verbose: syslog.info("\tFAIL")
 				return False # same state, nothing to do
+			else:
+				if verbose: syslog.info("\tSUCCEED")
 		
 		# record the vjoy state
 		self._vjoy_events[vjoy_id][input_type][input_id] = value
-		syslog.info(f"VJOY LOOPBACK: record vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
+		if verbose: syslog.info(f"VJOY LOOPBACK: record vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
 
 		return True # process
 		
@@ -1223,6 +1230,7 @@ class EventListener:
 					input_type = InputType.JoystickAxis
 				elif event.input_type == dinput.InputType.Button:
 					input_type = InputType.JoystickButton
+					value = value != 0 # true if pressed, false if not
 				elif event.input_type == dinput.InputType.Hat:
 					input_type = InputType.JoystickHat
 				else:
@@ -3101,6 +3109,14 @@ class AxisState():
 			if verbose: 	
 				device = gremlin.joystick_handling.getDevice(device_guid)
 				syslog.info(f"Register axis: {device.name} {device_guid} axis: {input_id}  {device.getAxisName(input_id)}")
+
+	def queueAxisEvent(self, device_guid, input_id):
+		''' queues a joystick update event to trigger UI updates for example '''
+		values = self.getAxisValues(device_guid, input_id)
+		device_guid = gremlin.util.parse_guid(device_guid)
+		event = Event(InputType.JoystickAxis, input_id, device_guid, is_axis = True, value = values.actual, extra_data={"queuedEvent" : True})
+		el = EventListener()
+		el.custom_joystick_event.emit(event)
 			
 
 	def _get_key(self, device_guid, input_id):

@@ -16,6 +16,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T69)
 - Fix: vjoy remap inversion flag ignored/not persisted in merge axis mode
+- New: vjoy remap Merge axis centered trim mode (this is the same as trim but expects the trimming axis to be centered)
+- New: vjoy remap Merge axis has individual curves for the merged axes.  This allows you to modify the response of each merged component in addition to the final merged result.
+- Fix: State definition default value change throws an exception.  
+- Fix: OSC: exception when handling UI events if OSC is not enabled/used.
+- Fix: vjoy loopback mode: fixed an issue where a button event from dinput was not converting to the correct data type for buttons.
 
 ### (m76T68A)
 - hotfix for mode condition not loading the prior mode on UI load.
