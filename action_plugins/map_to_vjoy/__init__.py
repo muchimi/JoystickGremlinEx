@@ -3189,7 +3189,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # self.hardware_input_container_widget.setVisible(hardware_widget_visible)
         self.axis_range_container_widget.setVisible(output_range_visible)
-        self.chkb_exec_on_release.setVisible(exec_on_release_visible)
+        #self.chkb_exec_on_release.setVisible(exec_on_release_visible)
+        #self._execute_widget.setVisible()
         self.chkb_paired.setVisible(paired_visible)
         self.target_value_container_widget.setVisible(button_to_axis_visible)
         self.step_value_container_widget.setVisible(axis_steps_visible)
@@ -3559,10 +3560,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.sb_button_range_high):
                     self.sb_button_range_high.setValue(self.action_data.button_range_max)
 
-                with QtCore.QSignalBlocker(self.chkb_exec_on_release):
-                    self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
+                # with QtCore.QSignalBlocker(self.chkb_exec_on_release):
+                #     self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
+                
 
-                with QtCore.QSignalBlocker(self.chkb_exec_on_release):
+                with QtCore.QSignalBlocker(self.chkb_ignore_release):
                     self.chkb_ignore_release.setChecked(self.action_data.ignore_release)                    
 
                 with QtCore.QSignalBlocker(self.chkb_paired):
@@ -4596,7 +4598,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             # determine if event should be fired based on release mode
             is_pressed = event.is_pressed
-            fire_event =  (self.exec_on_release and not is_pressed) or (self.exec_on_press and is_pressed)
+            fire_event =  (self.action_data.exec_on_release and not is_pressed) or (self.action_data.exec_on_press and is_pressed)
             
 
             if self.action_mode == VjoyAction.VJoyButton:
