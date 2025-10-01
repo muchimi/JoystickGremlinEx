@@ -354,7 +354,7 @@ class InputEvent:
             self.value = 0
 
     def __str__(self) -> str:
-        return f"InputEvent: GUID {self.device_guid} type: {self.input_type} index: {self.input_index} raw value: {self.value}"
+        return f"InputEvent: GUID [{self.device_guid}] type: [{self.input_type}] index: [{self.input_index}] value: [{self.value}]"
 
 
 

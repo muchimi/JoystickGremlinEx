@@ -1937,13 +1937,13 @@ class OscInterface(QtCore.QObject):
         self.osc_enabled = True # always able to listen to ports
         self._client_pool = {} # pool of clients keyed by (ip,port)
         self._client_map = {} # list of clients by client ID (str)
-        self._osc_internal_client = None
         self._osc_client = self.getClient("osc_interface", self._target_ip, self._target_port) # the default OSC client setup in the configuration file
         if verbose: syslog.info(f"OSC: output IP: {self._target_ip} port: {self._output_port}")
 
-
+        
         self.setHostIp(host_ip)
         self._osc_internal_client = self.getClient("osc_internal_client", self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
+        
 
         syslog.info(f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
         self._osc_server.stop() # stop server if started - this resets the message handler for the server and listen ip/port
@@ -1965,9 +1965,9 @@ class OscInterface(QtCore.QObject):
             self._host_ip = host_ip
             config = gremlin.config.Configuration()
             config.hostIp = host_ip
-            if self._osc_internal_client:
+            if hasattr(self, "_osc_internal_client") and self._osc_internal_client:
                 self._osc_internal_client.setHost(host_ip, self._output_port) # loopback internal device
-            if self._osc_server:
+            if hasattr(self, "_osc_server") and self._osc_server:
                 self._osc_server.setHostIp(host_ip, self._input_port) # server listening
 
     @property

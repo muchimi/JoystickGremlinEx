@@ -49,9 +49,11 @@ class TextToSpeech:
         el = gremlin.event_handler.EventListener()
         el.tts_change.connect(self._tts_changed)
         el.shutdown.connect(self.end)
+        el.profile_start.connect(self.profile_start)
         self._lock = threading.Lock()
 
         self._current_rate  = 100 # default rate (global)
+        self._last_hash = None
 
         config = gremlin.config.Configuration()
         verbose = config.verbose
@@ -82,6 +84,8 @@ class TextToSpeech:
             syslog.error(f"TTS: unable to initialize TTS: {err}")
                 
 
+    def profile_start(self):
+        self._last_hash = None # reset prior speech
         
     @QtCore.Slot(bool)
     def _tts_changed(self, enabled : bool):
@@ -120,25 +124,42 @@ class TextToSpeech:
         if not self.valid:
             return
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose
-        if verbose: syslog.info(f"TTS: SPEAK add to queue: {text}")
 
-        self._lock.acquire_lock()
-        if clear:
-            self._queue.clear()
-        self._queue.append(lambda : self._speak(text, rate))
-        self._lock.release_lock()
+        if text:
+
+            config = gremlin.config.Configuration()
+            verbose = config.verbose
+
+            
+            if config.tts_suppress_duplicate:
+                h = hash(text)
+                if h == self._last_hash:
+                    if verbose: syslog.info(f"TTS: SUPRESS duplicate: {text}")
+                    return
+                self._last_hash = h
+            
+            if verbose: syslog.info(f"TTS: SPEAK add to queue: {text}")
+
+            self._lock.acquire_lock()
+            if clear or not text:
+                # clear on no message.
+                self._queue.clear()
+            if text:
+                self._queue.append(lambda : self._speak(text, rate))
+            self._lock.release_lock()
 
     def _speak(self, text, rate = None):        
         ''' speaks the text'''
         
         try:
-            text = self.text_substitution(text)
-            if rate is None:
-                rate = self._current_rate
-            new_rate = self.rate_playback + int(util.clamp(rate, self.rate_offset_min, self.rate_offset_max))
-            self.engine.setProperty('rate', new_rate)
-            self.engine.say(text)
+            if text:
+                text = self.text_substitution(text)
+                if rate is None:
+                    rate = self._current_rate
+                new_rate = self.rate_playback + int(util.clamp(rate, self.rate_offset_min, self.rate_offset_max))
+                self.engine.setProperty('rate', new_rate)
+                self.engine.say(text)
+
 
 
         except Exception as err:

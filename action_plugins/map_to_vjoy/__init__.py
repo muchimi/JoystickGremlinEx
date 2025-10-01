@@ -219,7 +219,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         widgets = []
         for merge_type in MergeOperationType:
             if merge_type != MergeOperationType.NotSet:
-                rb = gremlin.ui.ui_common.QDataRadioButton(text = MergeOperationType.to_display_name(merge_type), data = merge_type)
+                rb = gremlin.ui.ui_common.QDataRadioButton(label = MergeOperationType.to_display_name(merge_type), data = merge_type)
                 widgets.append(rb)
                 self._merge_widgets_map[merge_type] = rb
                 if merge_type == self.data.operation:
@@ -2135,10 +2135,12 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         warning_color = gremlin.ui.ui_common.Color.warningColor()
         self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="", use_wrap=False)
         self.container_warning_widget,_ = gremlin.ui.ui_common.getHContainer(self.warning_widget, min_height = self.container_height)
+
+
  
-        self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
-        self.chkb_exec_on_release.setToolTip("If enabled, the trigger will execute on input release")
-        #self.chkb_exec_on_release.setStyleSheet(css)
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
+        self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
         
         self.chkb_ignore_release = QtWidgets.QCheckBox("Ignore release")
         self.chkb_ignore_release.setToolTip("If enabled, the action will ignore release triggers (this is input and container dependent) - normal is OFF")
@@ -2170,7 +2172,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             # self.rb_start_released,
             # self.rb_start_pressed,
             # gremlin.ui.ui_common.QHorizontalSeparator(),
-            self.chkb_exec_on_release,
+            self._execute_widget,
             self.chkb_ignore_release,
             self.chkb_paired,
             self.chkb_auto_release_widget,
@@ -2246,8 +2248,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # hook events
 
-
-        self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
         self.chkb_ignore_release.clicked.connect(self._ignore_release_changed)
         self.chkb_paired.clicked.connect(self._paired_changed)
         self.chkb_auto_release_widget.clicked.connect(self._autorelease_changed)
@@ -2265,6 +2265,14 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.b_range_hhalf.clicked.connect(self._b_range_hhalf_clicked)
         self.b_range_bottom.clicked.connect(self._b_range_bot_clicked)
         self.b_range_top.clicked.connect(self._b_range_top_clicked)
+
+    @QtCore.Slot(bool)
+    def _execute_on_press_changed(self, checked : bool):
+        self.action_data.exec_on_press = checked
+
+    @QtCore.Slot(bool)
+    def _execute_on_release_changed(self, checked : bool):
+        self.action_data.exec_on_release = checked    
 
 
     def setWarning(self, text):
@@ -3672,9 +3680,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _b_max_start_value_clicked(self):
         self.sb_start_value.setValue(1.0)
 
-    @QtCore.Slot(bool)
-    def _exec_on_release_changed(self, checked):
-        self.action_data.exec_on_release = checked
+    
 
     @QtCore.Slot(bool)
     def _ignore_release_changed(self, checked):
@@ -4589,19 +4595,20 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             force_remote = event.force_remote or is_paired
 
             # determine if event should be fired based on release mode
-            fire_event =  (self.exec_on_release and not event.is_pressed) or (not self.exec_on_release and event.is_pressed)
             is_pressed = event.is_pressed
+            fire_event =  (self.exec_on_release and not is_pressed) or (self.exec_on_press and is_pressed)
+            
 
             if self.action_mode == VjoyAction.VJoyButton:
                 # normal default behavior
                 if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_device_id}] button {self.vjoy_input_id} pressed: True")
-                if self.exec_on_release:
-                    if not is_pressed:
-                        if is_local:
-                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
-                        if is_remote or is_paired:
-                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True, force_remote = force_remote )
-                else:
+                if self.action_data.exec_on_release and not is_pressed:
+                    if is_local:
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
+                    if is_remote or is_paired:
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True, force_remote = force_remote )
+
+                if self.action_data.exec_on_press and is_pressed:
                     auto_release = False
                     if is_pressed and not self.action_data.ignore_release:
                         if extra_data and "autorelease" in extra_data:
@@ -4641,7 +4648,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # press button (no auto release)
                 if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_device_id}] button {self.vjoy_input_id} pressed: True")
 
-                if is_pressed:
+                if fire_event:
                     self.action_data.button_last_value = True
                     if is_local:
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
@@ -4652,7 +4659,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoyButtonRelease:
                 # release button (no auto release)
                 if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_device_id}] button {self.vjoy_input_id} pressed: False")
-                if is_pressed:
+                if fire_event:
                     self.action_data.button_last_value = False
                     if is_local:
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False
@@ -4682,7 +4689,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 device_id = self.vjoy_device_id
                 if verbose: syslog.info(f"VJOY: trigger start pulse vjoy {device_id} button {input_id}")
                 # pulse action
-                if is_pressed:
+                if fire_event:
                     auto_complete = False
                     repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
                     self.pulse_start(device_id, input_id, self.pulse_delay/1000, repeat_interval, is_local, is_remote, force_remote)
@@ -5035,7 +5042,9 @@ Supports axis merging, curved output, command, hat and button mappings.
         config = gremlin.config.Configuration()
         self._grid_visible = config.button_grid_visible # true if the button grid is visible
 
-        self._exec_on_release : bool = False
+        self.exec_on_press = True # true if trigger should execute on input press event
+        self.exec_on_release = False # true if trigger should execute on input release event
+
         self._paired : bool = False
 
         self.auto_release = False # true if we should do an auto-release (only means anything on momentary inputs)
@@ -5468,14 +5477,6 @@ Supports axis merging, curved output, command, hat and button mappings.
 
 
     @property
-    def exec_on_release(self):
-        return self._exec_on_release
-
-    @exec_on_release.setter
-    def exec_on_release(self, value):
-        self._exec_on_release = value
-
-    @property
     def paired(self):
         return self._paired
 
@@ -5789,11 +5790,8 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "axis_start_value" in node.attrib:
                 self.axis_start_value = safe_read(node,"axis_start_value", float, -1.0)
 
-            # if "axis_start_value_enabled" in node.attrib:
-            #     self.axis_start_value_enabled = safe_read(node,"axis_start_value_enabled", bool, False)
-
-            if "exec_on_release" in node.attrib:
-                self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+            self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
+            self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
 
             if "paired" in node.attrib:
                 self.paired = safe_read(node,"paired", bool, False)
@@ -5953,6 +5951,9 @@ Supports axis merging, curved output, command, hat and button mappings.
         )
 
         node.set("mode", safe_format(VjoyAction.to_string(self.action_mode), str))
+
+        node.set("exec_on_press", safe_format(self.exec_on_press, bool))
+        node.set("exec_on_release", safe_format(self.exec_on_release, bool))
 
         write_node_input = True
 

@@ -1186,6 +1186,8 @@ class EventListener:
 		:param data the joystick event
 		"""
 
+		import vjoy.vjoy
+
 		if not gremlin.joystick_handling._joystick_initialized:
 			# not initialized yet
 			return 
@@ -1202,10 +1204,11 @@ class EventListener:
 		
 		event = dinput.InputEvent(data)
 
+		if verbose: syslog.info(f"DINPUT EVENT: {event}")
+			
+
 		event_list = []
 
-		# syslog.info(f"joystick event: {str(event)}")
-		
 		#breakpoint()
 		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
 		if device is None:
@@ -1230,9 +1233,11 @@ class EventListener:
 					input_type = InputType.JoystickAxis
 				elif event.input_type == dinput.InputType.Button:
 					input_type = InputType.JoystickButton
-					value = value != 0 # true if pressed, false if not
+					value = value != 0 # convert to boolean - true if pressed, false if not
 				elif event.input_type == dinput.InputType.Hat:
 					input_type = InputType.JoystickHat
+					# convert value to tuple for hat value comparisons
+					value = vjoy.vjoy.Hat.getDirection(value)
 				else:
 					if verbose_vjoy: syslog.error(f"DINPUT LOOPBACK: don't know how to handle input type: {event.input_type}")
 					input_type = None

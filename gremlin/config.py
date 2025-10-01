@@ -2442,6 +2442,13 @@ class Configuration(QtCore.QObject):
     def tts_mode_switch_enabled(self, value : bool):
         self._set_data("tts_mode_switch_enabled", value)
 
+    @property
+    def tts_suppress_duplicate(self) -> bool:
+        return self._get_data("tts_suppress_duplicate", True)
+    @tts_suppress_duplicate.setter
+    def tts_suppress_duplicate(self, value: bool):
+        self._set_data("tts_suppress_duplicate", value)
+
             
 
     @property

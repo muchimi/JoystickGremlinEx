@@ -4711,13 +4711,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)    # ensure on UI thread
 
     def _edit_mode_changed_ui(self, mode : str):
-        ''' called when mode list has changed '''
-
+        ''' called when edit time mode has changed '''
         # update the mode selector to the correct edit mode
         if mode:
             self.mode_selector.select_mode(mode)
             gremlin.event_handler.EventHandler().set_edit_mode(mode)
         self._update_mode_status_bar()
+        self._create_tabs() # reload the UI with the new mode
+
 
     def _runtime_mode_changed(self, mode : str):
         ''' called when runtime mode changes '''

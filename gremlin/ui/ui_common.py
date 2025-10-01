@@ -3804,24 +3804,26 @@ class QDataLabel(QtWidgets.QLabel):
 
 class QDataCheckbox(QtWidgets.QCheckBox):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None):
-        super().__init__(text, parent)
+    def __init__(self, label : str = None, data = None, callback = None, value : bool = None, tooltip = None, parent = None):
+        '''
+        :param text: the label (optional, recommended)
+        :param data: the data tracked by this control (optional)
+        :param value: default value (optional)
+        :param tooltip: tooltip to display (optional)
+        :param parent: parent widget (optional)
+        '''
+
+        super().__init__(label, parent)
         self._data = data
         self._ignore_keyboard = False
         self.installEventFilter(self)
 
-    #     foreground_color = Color.normalColor()
-    #     self._icon_unchecked = load_icon("fa.circle-thin", qta_color=QtGui.QColor(foreground_color))
-    #     self._icon_checked = load_icon("fa5.check-circle", qta_color=QtGui.QColor(foreground_color))
-
-    #     self.stateChanged.connect(self._update_state)
-
-    #     self._update_state()
-
-    # @QtCore.Slot()
-    # def _update_state(self):
-    #     icon = self._icon_checked if self.isChecked() else self._icon_unchecked
-    #     self.setIcon(icon)
+        if value:
+            self.setChecked(value)
+        if callback:
+            self.clicked.connect(callback)
+        if tooltip:
+            self.setToolTip(tooltip)
             
 
     @property
@@ -3842,11 +3844,28 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     def setIgnoreKeyboard(self, value : bool):
         self._ignore_keyboard = value
 
+
+
 class QDataRadioButton(QtWidgets.QRadioButton):
     ''' a radio button that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None):
-        super().__init__(text, parent)
+    def __init__(self, label : str = None, data = None, callback = None, value : bool = None, tooltip = None, parent = None):
+        ''' data enabled checkbox 
+        :param text: the label (optional, recommended)
+        :param data: the data tracked by this control (optional)
+        :param value: default value (optional)
+        :param tooltip: tooltip to display (optional)
+        :param parent: parent widget (optional)
+        
+        '''
+        super().__init__(label, parent)
         self._data = data
+
+        if value:
+            self.setChecked(value)
+        if callback:
+            self.clicked.connect(callback)
+        if tooltip:
+            self.setToolTip(tooltip)
 
     @property
     def data(self):
@@ -7800,7 +7819,7 @@ class QContentWidget(QtWidgets.QWidget):
 
 
 class QSplitTabWidget(QDataWidget):
-    ''' tab content widgeth split '''
+    ''' tab content widget split '''
     def __init__(self, object_name, device_guid, parent = None):
         super().__init__(parent)
         self.setObjectName(object_name)
@@ -7863,7 +7882,7 @@ class QSplitTabWidget(QDataWidget):
 
         #_tabsplitter_tracker.registerWidget(self)
 
-        syslog.info(f"Created Device content: [{self._id}] {self.objectName()}")
+        # syslog.info(f"Created Device content: [{self._id}] {self.objectName()}")
 
         self._blank_input()
 

@@ -207,7 +207,7 @@ class SwitchWidget(QtWidgets.QWidget):
 
         for switch_type in SwitchModeType:
             if switch_type != SwitchModeType.NotSet:
-                rb = gremlin.ui.ui_common.QDataRadioButton(text = SwitchModeType.to_display_name(switch_type), data = switch_type)
+                rb = gremlin.ui.ui_common.QDataRadioButton(label = SwitchModeType.to_display_name(switch_type), data = switch_type)
                 rb.data = switch_type
                 device_layout.addWidget(rb)
                 if data.mode == switch_type:

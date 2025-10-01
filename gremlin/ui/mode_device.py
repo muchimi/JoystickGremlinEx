@@ -125,6 +125,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             show_master_mode = True
         )
 
+        self.current_mode = current_mode
+
         # create the two entries
         self.ensureInputItems()
 
@@ -136,7 +138,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Input type specific setups
         self.input_item_list_view.setModel(self.input_item_list_model)
-        self.input_item_list_view.redraw()
+        # self.input_item_list_view.redraw()
 
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
@@ -180,7 +182,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         el = gremlin.event_handler.EventListener()
         el.mode_name_changed.connect(self._mode_name_changed)
-        el.edit_mode_changed.connect(self._handle_edit_mode_changed) # edit mode changed or mode added/removed
+        
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
@@ -217,16 +219,6 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.setUpdatesEnabled(True)
 
 
-
-    def _handle_edit_mode_changed(self, mode : str):
-        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)
-    
-    def _edit_mode_changed_ui(self, mode : str):
-        ''' occurs when a new mode is selected '''
-        assert mode is not None and mode, "Invalid mode detected"
-        self.set_mode(mode)
-
-
     def _mode_name_changed(self, name):
         gremlin.util.InvokeUiMethod(self._mode_name_changed_ui) # ensure on UI thread
     
@@ -243,11 +235,13 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _custom_name_handler(self, input_item):
         ''' gets the custom name for the input item '''
         input_item : gremlin.base_profile.InputItem
+        current_mode = self.current_mode
+        # syslog.info(f"name handler: mode: {current_mode}")
         match input_item.input_id:
             case ModeInputModeType.ModeEnter:
-                return f"Mode [{gremlin.shared_state.edit_mode}] Activate"
+                return f"Mode [{current_mode}] Activate"
             case ModeInputModeType.ModeExit:
-                return f"Mode [{gremlin.shared_state.edit_mode}] Deactivate"
+                return f"Mode [{current_mode}] Deactivate"
             case ModeInputModeType.ModeGlobalEnter:
                 return f"Mode Activate (any)"
             case ModeInputModeType.ModeGlobalExit:
@@ -271,7 +265,9 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         '''
 
         # mode actions are tied to the individual mode
-        current_mode = gremlin.shared_state.edit_mode
+        
+        current_mode = self.current_mode
+        # syslog.info(f"ensure: mode: {current_mode}")
         mode_object = self.device_profile.ensure_mode_exists(current_mode)
         config = self.device_profile.modes[current_mode].config
 
@@ -334,20 +330,20 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         else:
             modeProfileStop = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStop]                        
 
-        #     modeProfileLoad.setProfileModeCallback(self._custom_profile_mode_handler)
-        # modeProfileStart.setProfileModeCallback(self._custom_profile_mode_handler)
-        # modeProfileStop.setProfileModeCallback(self._custom_profile_mode_handler)
-        # syslog.info(modeEnter.profile_mode)
-        # syslog.info(modeExit.profile_mode)
-
-        # #modeProfileLoad.profile_mode = master_mode
-        # syslog.info(modeProfileStart.profile_mode)
-        # syslog.info(modeProfileStop.profile_mode)
-        
         if changed or refresh:
-            self.input_item_list_model.refresh()    
+            self.refreshInputItems()
 
         return changed 
+    
+    def refreshInputItems(self):
+        ''' refreshes input list'''
+        import gremlin.ui.input_item as input_item
+        # syslog.info(f"refresh: mode {self.current_mode}")
+        self.input_item_list_model.refresh()
+
+
+
+
     
     # def _custom_profile_mode_handler(self, input_item):
     #     ''' gets the current input's profile mode (this can vary with some input types)'''
@@ -523,8 +519,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model.mode = mode
         #self.input_item_list_view.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self._device_id):
-            self.input_item_list_model.refresh()
-            self.input_item_list_view.redraw()        
+            # self.input_item_list_model.refresh()
+            # self.input_item_list_view.redraw()        
             self._select_item_cb(self._last_selected_index)
 
  

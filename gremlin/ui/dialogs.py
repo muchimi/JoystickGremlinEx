@@ -962,26 +962,44 @@ There should only be one GremlinEx master server on the subnet.
     def _create_tts_page(self):
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
 
-        self.enable_broadcast_speech_widget = QtWidgets.QCheckBox("Enable TTS mode change cue on remote clients")
-        self.enable_broadcast_speech_widget.setChecked(self.config.enable_broadcast_speech)
-        self.enable_broadcast_speech_widget.clicked.connect(self._enable_broadcast_speech)
-        self.enable_broadcast_speech_widget.setToolTip("When set, output an audio cue via TTS when the broadcast mode is changed, which can be changed by an action.")
+        self.enable_broadcast_speech_widget = gremlin.ui.ui_common.QDataCheckbox(
+                                                                "Enable TTS mode change cue on remote clients",
+                                                                value = self.config.enable_broadcast_speech,
+                                                                callback = self._enable_broadcast_speech,
+                                                                tooltip = "When set, output an audio cue via TTS when the broadcast mode is changed, which can be changed by an action."
+                                                                )
 
-        self.tts_enabled_widget = QtWidgets.QCheckBox("Enable Voice (TTS)")
-        self.tts_enabled_widget.setChecked(self.config.tts_enabled)
-        self.tts_enabled_widget.clicked.connect(self._tts_changed)
-        self.tts_enabled_widget.setToolTip("Enables or disables voice (text to speech)")
+        self.tts_enabled_widget = gremlin.ui.ui_common.QDataCheckbox(
+                                                                "Enable Voice (TTS)",
+                                                                value = self.config.tts_enabled,
+                                                                callback = self._tts_changed,
+                                                                tooltip = "Enables or disables voice (text to speech)"
+                                                                )
 
 
-        self.tts_mode_switch_enabled_widget = QtWidgets.QCheckBox("Enable voice on mode switch (TTS)")
-        self.tts_mode_switch_enabled_widget.setChecked(self.config.tts_mode_switch_enabled)
-        self.tts_mode_switch_enabled_widget.clicked.connect(self._tts_mode_switch_changed)
-        self.tts_mode_switch_enabled_widget.setToolTip("Enables or disables the audible mode cue when a profile mode is changed at runtime.")        
+        self.tts_mode_switch_enabled_widget = gremlin.ui.ui_common.QDataCheckbox(
+                                                                "Enable voice on mode switch (TTS)",
+                                                                value = self.config.tts_mode_switch_enabled,
+                                                                callback = self._tts_mode_switch_changed,
+                                                                tooltip = "Enables or disables the audible mode cue when a profile mode is changed at runtime."
+                                                                )        
 
-        self.initial_load_mode_tts_widget = QtWidgets.QCheckBox("Say active mode on auto-load mode changes activation via TTS")
-        self.initial_load_mode_tts_widget.setChecked(self.config.initial_load_mode_tts)
-        self.initial_load_mode_tts_widget.clicked.connect(self._initial_load_mode_tts)
-        self.initial_load_mode_tts_widget.setToolTip("""When set, GremlinEx will say that text-to-speech the profile mode whenever a profile is first loaded""")
+        self.initial_load_mode_tts_widget = gremlin.ui.ui_common.QDataCheckbox(
+                                                                "Say active mode on auto-load mode changes activation via TTS",
+                                                                value = self.config.initial_load_mode_tts,
+                                                                callback = self._tts_initial_load_mode_changed,
+                                                                tooltip = "When set, GremlinEx will say that text-to-speech the profile mode whenever a profile is first loaded"
+                                                                )
+        
+        
+
+        self.suppress_duplicate_widget = gremlin.ui.ui_common.QDataCheckbox(
+                                                                "Suppress duplicate TTS speech", 
+                                                                value = self.config.tts_suppress_duplicate,
+                                                                callback = self._tts_suppress_changed,
+                                                                tooltip = "When enabled, TTS will ignore duplicate sequential messages." 
+                                                                )
+
 
         
 
@@ -991,6 +1009,7 @@ There should only be one GremlinEx master server on the subnet.
         box.addWidget(self.tts_mode_switch_enabled_widget)
         box.addWidget(self.enable_broadcast_speech_widget)
         box.addWidget(self.initial_load_mode_tts_widget)
+        box.addWidget(self.suppress_duplicate_widget)
 
         tts = gremlin.tts.TextToSpeech()
         self.tts_rate_widget = gremlin.ui.ui_common.QIntLineEdit()
@@ -1002,7 +1021,7 @@ There should only be one GremlinEx master server on the subnet.
         widget, _ = ui_common.getHContainer(self.tts_rate_widget, "  TTS Playback Rate (WPM):")
         box.addWidget(widget)
 
-        info_box = ui_common.QInfoBox("Normal playback speed is 100 in words per minute.")
+        info_box = ui_common.QInfoBox("Normal playback speed is 100 words per minute (WPM).")
         box.addWidget(info_box)
 
         
@@ -1762,10 +1781,12 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _convert_response_curve(self, checked):
         self.config.convert_response_curve = checked
 
-
+    @QtCore.Slot(bool)
+    def _tts_suppress_changed(self, checked):
+        self.config.tts_suppress_duplicate = checked
 
     @QtCore.Slot(bool)
-    def _initial_load_mode_tts(self, checked):
+    def _tts_initial_load_mode_changed(self, checked):
         self.config.initial_load_mode_tts = checked
 
     @QtCore.Slot(bool)
