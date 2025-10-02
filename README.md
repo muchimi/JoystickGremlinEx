@@ -16,11 +16,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T70)
 - New: TTS gains a mode to abort current speech. When triggered, this will stop any active speech in the queue or in progress.
-- New: TTS gains execute on press, or execute on release modes (was previously on press only) when the input type is a button.
 - New: TTS gains a general option to suppress the speech to avoid repeating text.  This auto-clears on profile start.
-- New: Vjoy Remap gains execute on press/release options when the input type is a button.
-- Fix: TTS default volume and rate input widgets not always set to profile values.
-- Fix: UI sync on mode change (left hand panel could be stale) - ui and device list will not completely reload on mode change to ensure proper input state.  This may be revisited later.
+- New: Vjoy Remap, TTS, Description and Play actions gains execute on press/release options when the input type is a button.  Default is trigger on input press.
+- Fix: TTS default volume and rate input widgets not always set to profile values.  
+- Fix: TTS thread safety
+- Fix: UI sync on mode change (left hand panel could be stale) - ui and device list will not completely reload on mode change to ensure proper input state.  This may be revisited later for performance optimization as right now the entire device UI is updated when modes are changed to ensure UI is in sync with the new mode.
 - Fix: (another) OSC: exception when handling UI events if OSC is not enabled/used.
 
 ### (m76T69)

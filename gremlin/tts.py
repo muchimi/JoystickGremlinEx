@@ -32,7 +32,7 @@ from . import event_handler, util
 import pyttsx3
 import gremlin.singleton_decorator
 from PySide6 import QtCore
-
+import gremlin.util
 syslog = logging.getLogger("system")
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -91,9 +91,9 @@ class TextToSpeech:
     def _tts_changed(self, enabled : bool):
         self.valid = enabled
         if enabled:
-            self.start()
+            self._start_ui()
         else:
-            self.stop()
+            self._stop_ui()
         
 
 
@@ -121,6 +121,9 @@ class TextToSpeech:
 
 
     def speak(self, text, rate = 100, clear = False):     
+        gremlin.util.InvokeUiMethod(self._speak_ui, text, rate, clear) # ensure on UI thread
+
+    def _speak_ui(self, text, rate = 100, clear = False):     
         if not self.valid:
             return
         # syslog = logging.getLogger("system")
@@ -165,7 +168,11 @@ class TextToSpeech:
         except Exception as err:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
-    def speak_single(self, text, rate = None, clear = False, threaded = True):        
+
+    def speak_single(self, text, rate = None, clear = False, threaded = True):                
+        gremlin.util.InvokeUiMethod(self._speak_single_ui, text, rate, clear, threaded)
+
+    def _speak_single_ui(self, text, rate = None, clear = False, threaded = True):        
         if text and self.valid:
             # syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose
@@ -204,7 +211,10 @@ class TextToSpeech:
         except Exception as err:
             syslog.error(f"Error in TTS: {err}")
 
-    def abort(self):
+    def abort(self):            
+        gremlin.util.InvokeUiMethod(self._abort_ui) # ensure on UI thread
+
+    def _abort_ui(self):
         ''' aborts current speech and resets the queue '''
         self.engine.stop()
         self._lock.acquire_lock()
@@ -212,9 +222,13 @@ class TextToSpeech:
         self._lock.release_lock()
 
     def stop(self):
-        ''' stops any speech '''
         if not self._started:
             return
+        gremlin.util.InvokeUiMethod(self._stop_ui) # ensure on UI thread
+
+    def _stop_ui(self):
+        ''' stops any speech '''
+       
         try:
             syslog.info("TTS: stop")
             self._queue_thread.stop()
@@ -231,6 +245,9 @@ class TextToSpeech:
             syslog.error(f"Error in TTS: {err}")
 
     def start(self):
+        gremlin.util.InvokeUiMethod(self._start_ui) # ensure on UI thread
+
+    def _start_ui(self):
         ''' starts the loop '''
         if not self.valid:
             return
@@ -274,9 +291,10 @@ class TextToSpeech:
         # terminate any remaining queue items
         self._queue.clear()
 
-
-    @QtCore.Slot()
     def end(self):
+        gremlin.util.InvokeUiMethod(self._end_ui) # ensure on UI thread
+    
+    def _end_ui(self):
         ''' ends the loop '''
         
         if not self.valid:
@@ -298,9 +316,12 @@ class TextToSpeech:
             except:
                 pass
             self._started = False
-        
 
-    def set_volume(self, value):
+
+    def set_volume(self, value):    
+        gremlin.util.InvokeUiMethod(self._set_volume_ui, value) # ensure on UI thread
+
+    def _set_volume_ui(self, value):
         """Sets the volume anywhere between 0 and 100.
 
         :param value the new volume value
@@ -311,6 +332,9 @@ class TextToSpeech:
         self.engine.setProperty('volume', volume / 100) # value is 0 to 1 floating point
 
     def set_rate(self, value):
+        gremlin.util.InvokeUiMethod(self._set_rate_ui, value) # ensure on UI thread
+
+    def _set_rate_ui(self, value):
         """Sets the speaking speed between -10 and 10.
 
         Negative values slow speech down while positive values speed

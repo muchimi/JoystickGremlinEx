@@ -35,7 +35,6 @@ import collections
 import logging
 import re
 import time
-import logging
 from typing import Any, Iterator, List, Union
 import gremlin.ui.input_item
 import os
@@ -519,8 +518,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model.mode = mode
         #self.input_item_list_view.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self._device_id):
-            # self.input_item_list_model.refresh()
-            # self.input_item_list_view.redraw()        
+            self.input_item_list_model.refresh()
+            self.input_item_list_view.redraw()        
             self._select_item_cb(self._last_selected_index)
 
  

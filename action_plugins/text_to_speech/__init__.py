@@ -28,6 +28,8 @@ import gremlin.ui.ui_common
 import gremlin.util
 from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
+import logging
+syslog = logging.getLogger("system")
 
 class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -197,7 +199,7 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
         self.action_data = action
-
+    
     def _speak(self):
         if self.tts is not None:
             if self.action_data.abort:

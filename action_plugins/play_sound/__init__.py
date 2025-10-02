@@ -30,6 +30,13 @@ import gremlin.ui.input_item
 import gremlin.ui.ui_common
 import threading
 from shiboken6 import Shiboken
+from gremlin.util import safe_format, safe_read
+import logging
+import psygnal
+from psygnal import Signal
+
+syslog = logging.getLogger("system")
+
 
 class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -66,6 +73,10 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._play_cb)
 
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
+        self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
+
 
 
         content_layout.addWidget(self.icon_widget)
@@ -74,11 +85,20 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         content_layout.addWidget(QtWidgets.QLabel("Volume"))
         content_layout.addWidget(self.volume_widget)
         content_layout.addWidget(self.play_widget)
-        
+
         self.main_layout.addWidget(content_widget)
+        self.main_layout.addWidget(self._execute_widget)
 
         self.player.setAudioOutput(self.audio)
         
+    @QtCore.Slot(bool)
+    def _execute_on_press_changed(self, checked : bool):
+        self.action_data.exec_on_press = checked
+
+    @QtCore.Slot(bool)
+    def _execute_on_release_changed(self, checked : bool):
+        self.action_data.exec_on_release = checked       
+
 
     def eventFilter(self, object, event):
         t = event.type()
@@ -171,10 +191,23 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
         self.sound_file = action.sound_file
         self.volume = action.volume
         PlaySoundFunctor.player.setAudioOutput(PlaySoundFunctor.audio)
+        config = gremlin.config.Configuration()
+        self.verbose = config.verbose_mode_output or config.verbose_mode_exec
 
 
     def process_event(self, event, value, extra_data = None):
-        if os.path.isfile(self.sound_file):
+
+        
+        verbose = self.verbose
+
+        is_pressed = event.is_pressed
+        trigger = (is_pressed and self.action_data.exec_on_press) or \
+                    (not is_pressed and self.action_data.exec_on_release) 
+        
+        if verbose: syslog.info(f"PLAY: trigger [{trigger}] on input state: [{is_pressed}]")
+
+        if trigger and os.path.isfile(self.sound_file):
+            if verbose: syslog.info(f"\texecute play soundfile: {self.sound_file}")
             media = QtCore.QUrl(self.sound_file)
             PlaySoundFunctor.player.setSource(media)
             PlaySoundFunctor.audio.setVolume(self.volume/100) # 0 to 1
@@ -218,6 +251,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.parent = parent
         self.sound_file = None
         self.volume = 50
+        self.exec_on_press = True # true if trigger should execute on input press event
+        self.exec_on_release = False # true if trigger should execute on input release event
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -232,6 +267,9 @@ class PlaySound(gremlin.base_profile.AbstractAction):
     def _parse_xml(self, node, data = None, extra_data = None):
         self.sound_file = node.get("file")
         self.volume = int(node.get("volume", 50))
+        self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
+        self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+
 
     def _generate_xml(self):
         node = ElementTree.Element("play-sound")
@@ -239,6 +277,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             self.sound_file = ""
         node.set("file", self.sound_file)
         node.set("volume", str(self.volume))
+        node.set("exec_on_press", safe_format(self.exec_on_press, bool))
+        node.set("exec_on_release", safe_format(self.exec_on_release, bool))        
         return node
 
     def _is_valid(self):
