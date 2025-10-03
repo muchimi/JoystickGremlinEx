@@ -35,7 +35,7 @@ from gremlin.util import load_icon, load_pixmap, get_guid
 import gremlin.util
 from gremlin.input_types import InputType
 from gremlin.base_buttons import *
-from gremlin.types import DeviceType
+from gremlin.types import DeviceType, TabDeviceType
 import gremlin.plugin_manager
 import gremlin.ui.ui_common as ui_common
 from gremlin.ui.ui_common import QBoxFrame
@@ -47,6 +47,7 @@ from shiboken6 import Shiboken
 import psygnal
 from psygnal import Signal
 import copy
+import gremlin.tabstate
 
 
 
@@ -163,7 +164,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
     """Model storing a device's input item list."""
 
-    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None, show_master_mode = False):
+    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None, show_master_mode = False, show_used_only = False):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
@@ -175,6 +176,7 @@ class InputItemListModel(ui_common.AbstractModel):
         self._device_data = device_data
         self._mode = mode
         self._show_master_mode = show_master_mode
+        self._show_used_only = show_used_only
         self._index_map = {} # map of index to input item
         self._item_map = {} # map of input_id to index
         self._source_index_map = {} # map of source states
@@ -183,12 +185,25 @@ class InputItemListModel(ui_common.AbstractModel):
         else:
             # all types
             self._allowed_input_types = gremlin.base_classes.TraceableList(InputType.to_list(), self._filter_change_cb)
+
+        
         self._custom_update_handler = custom_update_handler
         self._custom_clear_handler = custom_clear_handler
         self._custom_remove_handler = custom_remove_handler
         self._custom_filter_handler = custom_filter_handler # handles entries, return true to include, false to exclude
         self._update_data()
 
+    @property
+    def show_used(self) -> bool:
+        return self._show_used_only
+    @show_used.setter
+    def show_used(self, value : bool):
+        if self._show_used_only != value:
+            self._show_used_only = value
+            if not value:
+                pass
+            self._update_data()
+    
 
     def _filter_change_cb(self):
         ''' occurs when the input filter changes '''
@@ -280,6 +295,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
     def _update_data(self, apply_filter = True, emit_change = True):
         ''' loads into the data model all the items for the current mode and device '''
+        import gremlin.base_profile
         # load the items for this mode
 
         if self._custom_update_handler:
@@ -298,8 +314,12 @@ class InputItemListModel(ui_common.AbstractModel):
             if input_type in mode_object.config.keys():
                 sorted_keys = sorted(mode_object.config[input_type].keys())
                 for data_key in sorted_keys:
-                    data = mode_object.config[input_type][data_key]
+                    data : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
                     # add hardware GUID reference to data block so we have an easier reference to it
+                    if self._show_used_only:
+                        if not data.hasContainers:
+                            # filter out empty items 
+                            continue
                     data.device_guid = self._device_data.device_guid
                     self._index_map[index] = data
                     self._item_map[data.input_id] = index
@@ -315,8 +335,13 @@ class InputItemListModel(ui_common.AbstractModel):
                     if input_type in mode_object.config.keys():
                         sorted_keys = sorted(mode_object.config[input_type].keys())
                         for data_key in sorted_keys:
-                            data = mode_object.config[input_type][data_key]
+                            data : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
                             # add hardware GUID reference to data block so we have an easier reference to it
+
+                            if self._show_used_only:
+                                if not data.hasContainers:
+                                    # filter out empty items 
+                                    continue
                             data.device_guid = self._device_data.device_guid
                             self._index_map[index] = data
                             
@@ -346,6 +371,12 @@ class InputItemListModel(ui_common.AbstractModel):
             if item == input_item:
                 return index
         return -1 # not found
+    
+    def inputItemAtIndex(self, index):
+        ''' gets the input item as the given index '''
+        if index in self._index_map:
+            return self._index_map[index]
+        return None
     
     
 
@@ -624,18 +655,8 @@ class InputItemListView(ui_common.AbstractView):
         self.scroll_area = QtWidgets.QScrollArea()
         
 
-        # self.scroll_container_widget, self.scroll_container_layout = gremlin.ui.ui_common.getVContainer()
-        # self.scroll_container_widget.setSizePolicy(
-        #     QtWidgets.QSizePolicy.Expanding,
-        #     QtWidgets.QSizePolicy.Expanding
-        # )
-
         self.scroll_widget, self.scroll_layout = gremlin.ui.ui_common.getVContainer()
         self.scroll_widget.setContentsMargins(2,2,2,2)
-        #self.scroll_container_layout.addWidget(self.scroll_widget)
-        #self.scroll_container_layout.addStretch(5)
-        
-        
 
         # Configure the scroll area
         self.scroll_area.setWidgetResizable(True)
@@ -650,9 +671,7 @@ class InputItemListView(ui_common.AbstractView):
         el.mapping_changed.connect(self._mapping_changed)
         el.sync_input.connect(self._sync_input)
 
-        # self._resized = False
-        # self._scroll_requested = None
-
+        
 
     def _sync_input(self, input_item):
         gremlin.util.InvokeUiMethod(self._sync_input_ui, input_item)
@@ -742,12 +761,15 @@ class InputItemListView(ui_common.AbstractView):
 
     def redraw(self):
         """Redraws the entire model.
-
-        This creates a fake listview where a vertical container just has InputItemButton widgets
-
         """
         if not Shiboken.isValid(self):
             return
+        
+        ts = gremlin.tabstate.TabState()
+        data = ts.getData(self._device_id)
+        if not data or not data.populateEnabled:
+            # do not populate the list
+            return 
         self.setUpdatesEnabled(False)
         try:
 
@@ -5105,3 +5127,4 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
         return lambda: self.model.remove_container(widget.profile_data)
     
+

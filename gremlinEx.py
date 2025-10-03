@@ -46,6 +46,7 @@ import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
 from gremlin.types import TabDeviceType
 from shiboken6 import Shiboken
+import gremlin.tabstate
 
 import gremlin.joystick_handling
 
@@ -55,6 +56,7 @@ import gremlin.joystick_handling
 import gremlin.util
 import gremlin.config
 import gremlin.input_types
+
 import gremlin.event_handler
 import gremlin.base_classes
 
@@ -153,30 +155,11 @@ ui = None
 
 
 
-class TabData:
-    def __init__(self, device_guid, tab_type : TabDeviceType, device : dinput.DeviceSummary):
-        device_guid = gremlin.util.normalize_guid(device_guid)
-        self._device_guid = device_guid
-        self._tab_type = tab_type
-        self._device = device
 
-    @property
-    def device_guid(self) -> str:
-        return self._device_guid
-    @property
-    def tab_type(self) -> TabDeviceType:
-        return self._tab_type
-    
-    @property
-    def device(self) -> dinput.DeviceSummary:
-        ''' device data'''
-        return self._device
 
 class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     """Main window of the Joystick Gremlin user interface."""
-
-
 
     ui = None
 
@@ -225,6 +208,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # list of detected devices
         self._active_devices = []
+        self._tab_dirty = True # True if tabs should be refreshed
+        self._tab_map = None # holds tabdata objects indexed by tab index
 
         # cache of widget references so they don't get garbage collected by QT
 
@@ -477,38 +462,53 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.error(f"Unknown device GUID found in tabs: {device_guid}")
             return
         device_name = device.name
+
+        ts = gremlin.tabstate.TabState()
+
         #has_mapping = self._has_mapping(device_guid)
+        widget = self.getRegisteredWidget(device_guid)
         if device_name == "Controller (XBOX 360 For Windows)":
-            widget = self.getRegisteredWidget(device_guid)
+            object_name = f"Game Controller [{device_name}]"
+        else:
+            object_name = device_name
+
+        if not widget:
             device_profile = self.profile.get_device_modes(
-                    device.device_guid,
-                    DeviceType.Joystick,
-                    device.name,
-                )
-            if not widget:
-                widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
-                device,
-                device_profile,
-                self.current_mode,
-                object_name= f"Game Controller [{device_name}]"
-                )
-                widget.data = (TabDeviceType.VjoyInput, device_guid, index)
-                self.registerWidget(device_guid, widget)
-                #gremlin.shared_state.device_widget_map[device.device_guid] = widget
+                device.device_guid,
+                DeviceType.Joystick,
+                device.name,
+            )
+        
+            widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
+                        device,
+                        device_profile,
+                        self.current_mode,
+                        object_name= object_name
+                        )
+            widget.data = (TabDeviceType.VjoyInput, device_guid, index)
+            
+            self.registerWidget(device_guid, widget)
+        
+
+                
+        
 
         tab_name = override_name if override_name else device_name
-        if index is None:
-            position = self.ui.devices.addTab(tab_name)
-        else:
-            position = self.ui.devices.insertTab(index, tab_name)
+        with QtCore.QSignalBlocker(self.ui.devices):
+            if index is None:
+                position = self.ui.devices.addTab(tab_name)
+            else:
+                position = self.ui.devices.insertTab(index, tab_name)
 
-        
+        #  tab data block
+        data = ts.addData(device_guid, tab_type, device)
+        self.ui.devices.setTabData(position, data)
 
         self._tab_device_map[device_guid] = position
         self._tab_index_map[position] = device_guid
         self._tab_name_map[device_guid] = tab_name
         
-        self.ui.devices.setTabData(position, TabData(device.device_id, tab_type, device))
+        
 
         if tab_type == TabDeviceType.Joystick:
             self._joystick_device_guids.append(device_guid)
@@ -567,11 +567,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tab_count = self.ui.devices.count()
         tab_map = {}
         for index in range(tab_count):
-            data : TabData =  self.ui.devices.tabData(index)
+            data  =  self.ui.devices.tabData(index)
             device_guid = data.device_guid
             device_name = self._tab_name_map[device_guid]
             
             tab_map[index] = (device_guid, device_name, data.tab_type, index)
+        return tab_map
+    
+    def _get_tab_data_map(self) -> dict:
+        ''' returns the map of tab data objects associated with their device GUID '''
+        tab_count = self.ui.devices.count()
+        tab_map = {}
+        for index in range(tab_count):
+            data  =  self.ui.devices.tabData(index)
+            tab_map[data.device_guid] = data
+
         return tab_map
     
     def _get_tab_type(self, index):
@@ -741,17 +751,18 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # ignore if the tab is being dragged
             return 
         
-        #syslog.info(f"tab selected : {index}")
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        
+        if verbose: syslog.info(f"TAB CHANGED: selected : {index}")
 
         device_guid = self.getDeviceGuidForTabIndex(index)
-
         gremlin.util.pushCursor()
 
         if device_guid is not None:
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            
             if verbose:
                 device_name = self._get_device_name(device_guid)
-                syslog.info(f"Tab index change: new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {device_name}")
+                syslog.info(f"TAB CHANGED:  new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {device_name}")
             self.last_tab_index = index
             _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
             self._select_input(device_guid = device_guid, input_type = restore_input_type, input_id = restore_input_id, force_update =True, force_switch=True, tab_changed = True)
@@ -790,7 +801,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _tab_context_menu_cb(self, tab_index):
         ''' tab context menu '''
         self._context_menu_tab_index = tab_index
-        data : TabData = self.ui.devices.tabData(tab_index)
+        data = self.ui.devices.tabData(tab_index)
         tab_type = data.tab_type
         #device_guid = data.device_guid
         # substitution is only available if the profile has been saved (a new profile matches the current devices by definition)
@@ -846,7 +857,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         for input_type in mode.config.keys():
             for entry in mode.config[input_type].values():
                 entry.containers.clear()
-        self._create_tabs()
+        self.setTabsDirty(True)
+       
 
     def _tab_remove_device_execute(self, device):
         ''' removes the specified device '''
@@ -869,7 +881,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             return
 
         # verify we have hardware to substitute with
-        data : TabData = self.ui.devices.tabData(self._context_menu_tab_index)
+        data  = self.ui.devices.tabData(self._context_menu_tab_index)
         device_guid = data.device_guid
 
         #device_name = self.ui.devices.tabText(self._context_menu_tab_index)
@@ -893,7 +905,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             return
 
         # verify we have hardware to substitute with
-        data : TabData = self.ui.devices.tabData(self._context_menu_tab_index)
+        data  = self.ui.devices.tabData(self._context_menu_tab_index)
         device_guid = data.device_guid
 
         dialog = gremlin.profile_graph.DeviceCopyDialogUI(device_guid)
@@ -920,7 +932,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _reload(self):
         ''' reloads the ui '''
-        self._create_tabs()
+        self.setTabsDirty(True)
 
 
     @QtCore.Slot(str, bool)
@@ -1493,8 +1505,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         
 
-        # Create device tabs
-        self._create_tabs()
+        self.setTabsDirty(True)
 
         # reset modes
         current_mode = gremlin.shared_state.current_mode
@@ -1962,14 +1973,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # widget is already in the list
             device_name = self._get_device_name(device_guid)
             syslog.error(f"TAB: widget already exists for tab: {device_guid} {device_name}")
-            return index
-        
-        #current_index = self.ui.device_widget.currentIndex()
-        
-        self.ui.device_widget.addWidget(widget)
+        else:
+            self.ui.device_widget.addWidget(widget)
+
         index = self.ui.device_widget.indexOf(widget)
         self._widget_device_index_map[device_guid] = index
         self._widget_index_device_map[index] = device_guid
+        device_name = self._get_device_name(device_guid)
+        syslog.info(f"REGISTER WIDGET: {device_guid} index {index}  name: {device_name}")
 
         if not hide:
             # make visible
@@ -2043,16 +2054,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def getRegisteredWidget(self, device_guid) -> QtWidgets.QWidget:
         ''' gets the widget for the given device id, None if not found'''
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
+        device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._widget_device_index_map:
             index = self._widget_device_index_map[device_guid]
             return self.ui.device_widget.widget(index)
         return None
     
     def getRegisteredWidgetIndex(self, device_guid) -> int:
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
+        device_guid = gremlin.util.normalize_guid(device_guid)
         if device_guid in self._widget_device_index_map:
             return self._widget_device_index_map[device_guid]
         return None
@@ -2175,7 +2184,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def getActiveTabType(self) -> TabDeviceType:
         index = self.ui.devices.currentIndex()
-        data : TabData = self.ui.devices.tabData(index)
+        data : gremlin.input_item.TabData = self.ui.devices.tabData(index)
         return  TabDeviceType(data.tab_type)
     
     def _mapping_changed(self, item_data : gremlin.base_profile.InputItem):
@@ -2209,6 +2218,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self.ui.devices.setTabTextColor(position, color)
         
 
+
+    def setTabsDirty(self, update = False):
+        ''' indicate tabs must be refreshed next time create tabs is called '''
+
+
+        if update:
+            self._create_tabs()
+
     def _create_tabs(self, activate_tab=None):
         gremlin.util.InvokeUiMethod(self._create_tabs_ui)
 
@@ -2217,15 +2234,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         the different connected devices.
         """
         try:
+            
 
-            sd = gremlin.event_handler.JoystickState()
+            #sd = gremlin.event_handler.JoystickState()
+            ts = gremlin.tabstate.TabState()
 
             config = gremlin.config.Configuration()
-            verbose = config.verbose_mode_device
+            verbose = config.verbose_mode_device or config.verbose_mode_ui
             # verbose = True
             verbose_detailed = verbose and config.verbose_mode_extra
+           
+            if verbose: syslog.info("CREATE TAB: start")
 
-            if verbose_detailed: syslog.info("CREATE TAB: start")
+            #if verbose_detailed: syslog.info("CREATE TAB: start")
 
             device : DeviceSummary
             device_guid = None
@@ -2333,6 +2354,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         if verbose: syslog.info("\tusing existing widget...")
 
                     self._add_tab(device_guid, TabDeviceType.Joystick)
+                    widget.tabData = ts.getData(device_guid)
 
                   
                     widget.data = (TabDeviceType.Joystick, device_guid, index)
@@ -2371,14 +2393,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 
                 device_guid = device.device_guid
                 device_name = device.name
-                input_enabled = sd.inputEnabled(device.device_guid) #  self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+                #input_enabled = sd.inputEnabled(device.device_guid) #  self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+                input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
                 if not input_enabled:
                     if verbose: syslog.info(f"VJOY TAB: {device_name} not created because input is disabled on this device.")
                     continue
                 if not device.connected:
                     if verbose: syslog.info(f"VJOY TAB: {device_name} not created because device is not connected.")
                     continue
-
                 
                 if device_name:
                     device_profile = self.profile.get_device_modes(
@@ -2635,6 +2657,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 config_tab_map = ctm
 
+           
             if config_tab_map:
                 current_tab_map = self._get_tab_map()
 
@@ -2706,6 +2729,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # style the tabs by connection
             #self._update_tab_stylesheet()
 
+            self._tab_map = self._get_tab_data_map()
+
+
 
             el = gremlin.event_handler.EventListener()
             el.tabs_loaded.emit()
@@ -2746,7 +2772,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         last_input_id = input_item.input_id
                         last_input_type = input_item.input_type
                 
-                
+                syslog.info(f"SELECT TAB INDEX: {index}")
+                index = self.getTabIndexForDevice(last_device_guid)
+                data = ts.getData(last_device_guid)
+                if not data.populateEnabled:
+                    data.populateEnabled = True
+                    widget = self.getRegisteredWidget(device_guid)
+                    widget.ensureLoaded()
+
+                self.ui.devices.setCurrentIndex(index)
                 self._select_input(last_device_guid, last_input_type, last_input_id, force_switch=True)
                 
                 
@@ -2771,6 +2805,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if verbose_detailed:
                 syslog.info("CREATE TABS: complete")
+
 
 
 
@@ -3080,7 +3115,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             switch_enabled = self.is_highligthing_enabled
             if not force_switch and gremlin.util.compare_guid(gremlin.shared_state.current_tab_device_guid,device_guid) and not switch_enabled:
                 if verbose:
-                    syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)")
+                    syslog.info(f"SELECT INPUT: event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)")
                 return
 
 
@@ -3099,6 +3134,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not tabdata:
                 # no current data
                 return
+            
+            if not tabdata.populateEnabled:
+                # enable widget population for this tab for on-demand UI loading
+                if verbose: syslog.info(f"SELECT INPUT: activate tab for device: {tabdata.device.name}")
+                widget = self.getRegisteredWidget(device_guid)
+                if not widget:
+                    pass
+                tabdata.populateEnabled = True
+                widget.ensureLoaded()
 
             current_device_guid = tabdata.device_guid
             current_input_type, current_input_id = self._get_last_input(current_device_guid)
@@ -3108,7 +3152,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             has_inputs = gremlin.util.compare_guid(device_guid, (gremlin.shared_state.settings_tab_guid, gremlin.shared_state.plugins_tab_guid)) # settings and plugins tabs don't have inputs
 
             if verbose:
-                syslog.info(f"Select input: current input: {current_device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(current_input_type)} input ID: {current_input_id} current mode: {gremlin.shared_state.current_mode}")
+                syslog.info(f"SELECT INPUT: current input: {current_device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(current_input_type)} input ID: {current_input_id} current mode: {gremlin.shared_state.current_mode}")
 
             # make the content visible
             self.selectTabWidget(device_guid)
@@ -3129,7 +3173,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
             if verbose:
-                syslog.info(f"Select input: new input: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}  current mode: {gremlin.shared_state.current_mode}")
+                syslog.info(f"SELECT INPUT: new input: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}  current mode: {gremlin.shared_state.current_mode}")
 
 
             # guid of current device tab
@@ -3175,7 +3219,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
             if switch_tabs and not force_switch and not config.highlight_autoswitch:
-                if verbose: syslog.info("Tab change ignored: auto tab switching is disabled")
+                if verbose: syslog.info("SELECT INPUT: Tab change ignored: auto tab switching is disabled")
                 return
 
 
@@ -3183,9 +3227,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # get the default item to select
 
 
-                if verbose: syslog.info(f"Select input: last input ID {input_id} not found - selecting default input ID")
+                if verbose: syslog.info(f"SELECT INPUT: last input ID {input_id} not found - selecting default input ID")
                 last_device_guid, last_input_type, input_id = self.config.get_last_input(device_guid)
-                if verbose: syslog.info(f"Select input: found {last_device_guid} {last_input_type} {input_id} ")
+                if verbose: syslog.info(f"SELECT INPUT: found {last_device_guid} {last_input_type} {input_id} ")
                 if input_id is None:
                     input_item = self._get_input_item(device_guid, 0)
                     if input_item and self._last_input_item != input_item:
@@ -3196,7 +3240,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         last_device_guid = device_guid
                         last_input_type = input_type
                         has_containers = len(input_item.containers) > 0
-                        if verbose: syslog.info(f"Select input: defaulting to first item on list {last_device_guid} {last_input_type} {input_id} ")
+                        if verbose: syslog.info(f"SELECT INPUT: defaulting to first item on list {last_device_guid} {last_input_type} {input_id} ")
 
                         self._last_input_item = input_item
                 switch_input = True # we are switching inputs
@@ -3218,7 +3262,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if widget:
                     if isinstance(widget, gremlin.ui.ui_common.QSplitTabWidget): # some tabs are not the standard widget - ignore those as they have no inputs
                         self.selectRegisteredWidget(device_guid)
-                        if verbose: syslog.info(f"Select input: select widget {input_type} {input_id}")
+                        if verbose: syslog.info(f"SELECT INPUT: select widget {input_type} {input_id}")
                         if tab_changed or not hasattr(widget, "input_item_list_view"):
                             widget.refresh(emit = False)
                         if not force_update:
@@ -3246,7 +3290,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         el.sync_input.emit(item)
 
           
-                    if verbose: syslog.info(f"Select input: selected widget {input_type} {input_id}")
+                    if verbose: syslog.info(f"SELECT INPUT: selected widget {input_type} {input_id}")
 
                 # remember the last input id
                 self._current_tab_input_id = input_id
@@ -3444,7 +3488,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tab_data = [self.ui.devices.tabData(index) for index in range(self.ui.devices.count())]
         self._reset_tab_data()
         for index, (device_guid, device_name, device_type, tab_index) in enumerate(guid_list):
-            data : TabData = tab_data[index]
+            data = tab_data[index]
             self._add_tab(device_guid, data.tab_type, index)
 
         tab_map = self._get_tab_map()
@@ -3619,7 +3663,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     #self._current_tab_widget = None
 
                     # recreate the tabs
-                    self._create_tabs()
+                    self.setTabsDirty()
 
                     # Stop Gremlin execution
 
@@ -3641,7 +3685,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     #     gremlin.util.popCursorLevel()
                     
 
-                    
+                    self._create_tabs()
 
                 # mark items processed
                 self._device_change_queue = 0
@@ -4341,7 +4385,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # update the hash value
             self._profile_hash = new_profile.getMappingHash()
 
-            self._create_tabs()
+            # self._create_tabs()
 
             
 
@@ -4717,7 +4761,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.mode_selector.select_mode(mode)
             gremlin.event_handler.EventHandler().set_edit_mode(mode)
         self._update_mode_status_bar()
-        self._create_tabs() # reload the UI with the new mode
+        self.setTabsDirty(True)
 
 
     def _runtime_mode_changed(self, mode : str):
@@ -5294,3 +5338,6 @@ if __name__ == "__main__":
     syslog.info("Terminating GremlinEx")
     #gc.collect()
     sys.exit(0)
+
+
+

@@ -108,22 +108,39 @@ _virtual_device_guid_to_name_map = {}
 
 # UUID of the plugins tab (plungins special device)
 plugins_tab_guid = gremlin.util.parse_guid('dbce0add-460c-480f-9912-31f905a84247')
+plugins_tab_id = gremlin.util.normalize_guid(plugins_tab_guid)
+
 # UUID of the settings tab (settings special device)
 settings_tab_guid = gremlin.util.parse_guid('5b70b5ba-bded-41a8-bd91-d8a209b8e981')
+settings_tab_id = gremlin.util.normalize_guid(settings_tab_guid)
+
 # UUID of the MIDI tab (midi device)
 midi_tab_guid = gremlin.util.parse_guid('1b56ecf7-0624-4049-b7b3-8d9b7d8ed7e0')
+midi_tab_id = gremlin.util.normalize_guid(midi_tab_guid)
+
 # UUID of the OSC tab (osc device)
 osc_tab_guid = gremlin.util.parse_guid('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
+osc_tab_id = gremlin.util.normalize_guid(osc_tab_guid)
+
 # UUID of the keyboard tab (keyboard device)
 keyboard_tab_guid = gremlin.util.parse_guid('6f1d2b61-d5a0-11cf-bfc7-444553540000')
+keyboard_tab_id = gremlin.util.normalize_guid(keyboard_tab_guid)
+
 # UUID of the mode tab (mode device)
 mode_tab_guid = gremlin.util.parse_guid('b3b159a0-4d06-4bd6-93f9-7583ec08b877')
+mode_tab_id = gremlin.util.normalize_guid(mode_tab_guid)
+
 # UUID of the state tab (state special device)
 state_tab_guid = gremlin.util.parse_guid('72bbc0f4-31a8-4a41-b528-868dc7fcedfa')
+state_tab_id = gremlin.util.normalize_guid(state_tab_guid)
+
 # UUID of the octavi device 
 octavi_tab_guid = gremlin.util.parse_guid('e04aaf53-4838-4763-bc60-d5c7f8e653a1')
+octavi_tab_id = gremlin.util.normalize_guid(octavi_tab_guid)
+
 # fake GUID for fake inputs
 fake_tab_guid = gremlin.util.parse_guid('f7cbbba2-a490-4401-b2bb-1f7f541d9e45')
+fake_tab_id = gremlin.util.normalize_guid(fake_tab_guid)
 
 master_mode = str(mode_tab_guid)
 

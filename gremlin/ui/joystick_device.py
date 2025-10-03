@@ -68,6 +68,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             device_profile,
             current_mode,
             object_name = "Joystick",
+            data = None,
             parent=None
     ):
         """Creates a new object instance.
@@ -82,10 +83,16 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         import gremlin.plugin_manager
         import gremlin.config
         import gremlin.ui.ui_common 
+        import gremlin
 
         config = gremlin.config.Configuration()
 
+        # if device.is_virtual and device.vjoy_id == 4:
+        #     pass
+
         # Store parameters
+
+        self.data : gremlin.ui.tab= data
         
         
         self.curve_update_handler = {} # map of curve handlers to the input by index
@@ -107,9 +114,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # List of inputs
         self.input_item_list_model = gremlin.ui.input_item.InputItemListModel(
             device_profile,
-            current_mode
+            current_mode,
         )
-        self.input_item_list_view = gremlin.ui.input_item.InputItemListView(name=device.name, custom_widget_handler = self._custom_widget_handler)
+
+        self.input_item_list_view = gremlin.ui.input_item.InputItemListView(name=device.name, custom_widget_handler = self._custom_widget_handler, device_id = device.device_id)
         
 
         # Handle vJoy as input and vJoy as output devices properly
@@ -152,6 +160,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
+        lock_widget.filterChanged.connect(self._handle_filter_changed)
 
 
         widget, _ = gremlin.ui.ui_common.getHContainer([label_axis,
@@ -199,12 +208,13 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 device.is_virtual and \
                 not vjoy_as_input.get(device.vjoy_id, False):
             
-            msg = '''
-                This tab allows assigning a response curve to virtual axis. 
-                The purpose of this is to enable split and merge axis to be
-                customized to a user's needs with regards to dead zone and
-                response curve.
-                '''
+            # msg = '''
+            #     This tab allows assigning a response curve to virtual axis. 
+            #     The purpose of this is to enable split and merge axis to be
+            #     customized to a user's needs with regards to dead zone and
+            #     response curve.
+            #     '''
+            msg = "Virtual Input Device"
             widget = gremlin.ui.ui_common.QInfoBox(msg)
             self.addLeftPanelWidget(widget)
 
@@ -221,9 +231,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.edit_mode_changed.connect(self._handle_edit_mode_changed)
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
-        # lock all inputs
-        el.lock_inputs.connect(self._handle_lock_inputs)
-        el.unlock_inputs.connect(self._handle_unlock_inputs)
+
+        # # lock all inputs
+        # el.lock_inputs.connect(self._handle_lock_inputs)
+        # el.unlock_inputs.connect(self._handle_unlock_inputs)
 
         self.updating = False
         self.last_event = None
@@ -238,6 +249,39 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # update all curve icons
         self.update_curve_icons()
 
+
+    def _handle_filter_changed(self, value : bool):
+        gremlin.util.InvokeUiMethod(self._handle_filter_changed_ui, value) # ensure on UI thread
+
+    def _handle_filter_changed_ui(self, value : bool):
+        ''' update filtered to used inputs only'''
+        # save current selection
+        selected_index = self.input_item_list_view.current_index
+        input_item = self.input_item_list_model.inputItemAtIndex(selected_index)
+        # filter setup
+        self.input_item_list_model.show_used = value
+        # find the index in the filtered list, -1 if not found
+        count = self.input_item_list_model.filteredRows()
+        if count:
+            index = self.input_item_list_model.indexOfInputItem(input_item)
+            if index == -1:
+                # no longer displayed, select the first item
+                index = 0
+        
+        self.input_item_list_view.select_item(index)
+        #self._select_item_cb(index)
+
+    def _handle_locked_changed(self, value : bool):
+        if value:
+            # lock
+            self._handle_lock_inputs(self.device_guid)
+        else:
+            # unlock
+            self._handle_unlock_inputs(self.device_guid)
+
+    def update_used_filter(self, value : bool):
+        ''' handles filter changes '''
+        self.input_item_list_model.show_used = value
 
 
     def _cleanup_ui(self):
@@ -565,6 +609,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.select_item(self._last_selected_index)
 
 
+    def ensureLoaded(self):
+        self.input_item_list_model.refresh()
+        self.input_item_list_view.redraw()        
 
 
 

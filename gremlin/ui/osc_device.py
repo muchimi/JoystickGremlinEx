@@ -3711,6 +3711,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if selected_index is not None:
             self._select_item_cb(selected_index)
 
+    def ensureLoaded(self):
+        self.input_item_list_model.refresh()
+        self.input_item_list_view.redraw()        
+
+
 
     def _handle_lock_inputs(self, data):
         ''' lock all inputs event'''

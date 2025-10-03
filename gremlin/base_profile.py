@@ -1946,13 +1946,18 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         return (self._device_guid, self._input_type, self._input_id)
     
     @property
-    def hasActions(self):
+    def hasActions(self) -> bool:
         ''' true if the input item has at least one action '''
         for container in self.containers:
             for action_set in container.action_sets:
                 if action_set:
                     return True
         return False
+    
+    @property
+    def hasContainers(self) -> bool:
+        ''' true if the input item has at least one container '''
+        return len(self._containers) > 0
         
 
     @property

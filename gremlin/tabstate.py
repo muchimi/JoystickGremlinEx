@@ -1,0 +1,147 @@
+# -*- coding: utf-8; -*-
+
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.	If not, see <http://www.gnu.org/licenses/>.
+
+
+from __future__ import annotations
+import functools
+import traceback
+import inspect
+import logging
+import time
+import queue
+import threading
+import anytree
+from typing import NamedTuple, Optional
+from threading import Thread, Timer
+from typing import Callable
+import math
+import gremlin.base_classes
+import gremlin.shared_state
+import gremlin.threading
+
+from PySide6 import QtCore, QtWidgets
+
+import dinput
+import gremlin.config
+from gremlin.input_types import InputType
+import gremlin.shared_state
+
+import gremlin.util
+
+import gremlin.keyboard
+import gremlin.ui
+import gremlin.singleton_decorator
+import json
+
+import psygnal
+from psygnal import Signal
+
+
+from gremlin.types import TabDeviceType
+
+
+class TabData:
+	filteredChanged = Signal(bool) # fires when the filtered property changes 
+	lockedChanged = Signal(bool) # fires when the lock property changes
+
+	def __init__(self, device_guid, tab_type : TabDeviceType, device : dinput.DeviceSummary, filtered = False, dirty = True, locked = False):
+		device_guid = gremlin.util.normalize_guid(device_guid)
+		self._device_guid = device_guid
+		self._tab_type = tab_type
+		self._device = device
+		self._filtered = filtered # true if inputs are filtered by used inputs only
+		self._dirty = dirty # true if the tab is dirty and needs to be reloaded
+		self._locked = False
+		self._populate_enabled = False # true if the UI can be populated for this tab
+
+	@property
+	def device_guid(self) -> str:
+		return self._device_guid
+	@property
+	def tab_type(self) -> TabDeviceType:
+		return self._tab_type
+
+	@property
+	def device(self) -> dinput.DeviceSummary:
+		''' device data'''
+		return self._device
+
+	@property
+	def filtered(self) -> bool:
+		return self._filtered
+
+	@filtered.setter
+	def filtered(self, value: bool):
+		if value != self._filtered:
+			self._filtered = value
+			self.filteredChanged.emit(value)
+
+	@property
+	def dirty(self) -> bool:
+		return self._dirty
+	@dirty.setter
+	def dirty(self, value : bool):
+		self._dirty = value
+
+	@property
+	def locked(self) -> bool:
+		return self._locked
+	@locked.setter
+	def locked(self, value : bool):
+		if value != self._locked:
+			self._locked = value
+			self.lockedChanged.emit(value)
+
+	@property
+	def populateEnabled(self) -> bool:
+		return self._populate_enabled
+	@populateEnabled.setter
+	def populateEnabled(self, value : bool):
+		self._populate_enabled = value
+
+
+@gremlin.singleton_decorator.SingletonDecorator
+class TabState():
+	''' holds tab state data for all tabs '''
+
+	def __init__(self):
+		self._tab_map = {}		
+		import gremlin.event_handler
+		el = gremlin.event_handler.EventListener()
+		el.profile_unload.connect(self.reset)
+
+
+	def reset(self):
+		''' resets the data '''
+		self._tab_map.clear()
+
+	def getData(self, device_guid) -> TabData:
+		if device_guid in self._tab_map:
+			return self._tab_map[device_guid]
+		
+		return None
+
+	def addData(self, device_guid, tab_type : TabDeviceType, device : dinput.DeviceSummary, filtered : bool = False, locked : bool = False):
+		if not device_guid in self._tab_map:
+			data = TabData(device_guid, tab_type=tab_type, device=device, filtered = filtered, locked = locked)
+			self._tab_map[device_guid] = data
+		
+		return self._tab_map[device_guid]
+
+    
+
+_tab_state = TabState() # instance

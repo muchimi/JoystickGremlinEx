@@ -716,6 +716,14 @@ class Icons():
     def unlockIcon(qta_color = "#2abd38"):
         return Icons._icon("fa5s.lock-open", qta_color = qta_color)
     @staticmethod
+    def filterIcon(qta_color = "#2aa7bd"):
+        return Icons._icon("mdi.filter", qta_color = qta_color)
+    @staticmethod
+    def noFilterIcon():
+        return Icons._icon("mdi.filter-off")
+    
+    
+    @staticmethod
     def collapseAllIcon():
         return Icons._icon("mdi6.arrow-collapse-vertical")
     @staticmethod
@@ -6463,7 +6471,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if self._device.vjoy_id != event.vjoy_id:
             return
         if event.input_type == InputType.JoystickAxis:
-            syslog.info(f"vjoy event: device: [{event.vjoy_id}] input:[{event.input_id}] value: {event.value:0.3f}")
+            verbose = gremlin.config.Configuration().verbose_mode_vjoy
+            if verbose: syslog.info(f"vjoy event: device: [{event.vjoy_id}] input:[{event.input_id}] value: {event.value:0.3f}")
             event = gremlin.event_handler.Event(event_type = event.input_type,
                                                 is_virtual=True,
                                                 identifier = event.input_id,
@@ -7828,8 +7837,10 @@ class QSplitTabWidget(QDataWidget):
         self._blank_input_id = "c9a484aedbab4f518e5bab7ec402df65"  # input ID to use for the blank pages
         self._device_guid = device_guid
         self._device_id = gremlin.util.normalize_guid(device_guid)
+        self._filtered = False # filter state for inputs
 
         self._lock = False
+        self._tab_data = None
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
@@ -7884,7 +7895,34 @@ class QSplitTabWidget(QDataWidget):
 
         # syslog.info(f"Created Device content: [{self._id}] {self.objectName()}")
 
+
         self._blank_input()
+
+    def _handle_used_filter_changed(self, device_id, value):
+        if self._device_id == device_id and self._filtered != value:
+            self._filtered = value
+            self.update_used_filter(value)
+
+
+    @property 
+    def tabData(self):
+        return self._tab_data
+    @tabData.setter
+    def tabData(self, value):
+        if value != self._tab_data:
+            if self._tab_data:
+                self._tab_data.filteredChanged.disconnect(self._handle_used_filter_changed)
+                self._tab_data.lockedChanged.disconnect(self._handle_locked_changed)
+            self._tab_data = value
+            self._tab_data.filteredChanged.connect(self._handle_used_filter_changed)
+            self._tab_data.lockedChanged.connect(self._handle_locked_changed)
+
+    def _handle_used_filter_changed(self, value : bool):
+        assert False, "Abstract member must be implemented in derived class"
+
+    def _handle_locked_changed(self, value : bool):
+        assert False, "Abstract member must be implemented in derived class"
+
 
     @QtCore.Slot(int, int)
     def _splitter_moved(self, pos, index):
@@ -10635,20 +10673,18 @@ class QWarningWidget(QtWidgets.QWidget):
     def hasText(self) -> bool:
         return bool(self._text)
 
-# class QWarning(QIconLabel):
-#     def __init__(self, text = None, parent = None):
-#         super().__init__()
-#         self.setIcon(Icons.warningIcon())
-#         if text:
-#             self.setText(text)
 
 class QInputLockWidget(QtWidgets.QWidget):
     ''' displays the global lock/unlock buttons '''
-    def __init__(self, data = None, parent = None):
+
+    filterChanged = Signal(bool) # fires when the filter is toggled
+
+    def __init__(self, data = None, filter : bool = False, parent = None):
         super().__init__(parent)
         
         self.data = data # holds anything
         main_layout = QtWidgets.QVBoxLayout(self)
+        self._filter = filter
 
         lock_widget = QtWidgets.QPushButton()
         lock_widget.setIcon(Icons.lockIcon())
@@ -10660,8 +10696,31 @@ class QInputLockWidget(QtWidgets.QWidget):
         lock_widget.setToolTip("Unlock all inputs")
         unlock_widget.clicked.connect(self._handle_unlock)
 
-        widget, _ = getHContainer([lock_widget, unlock_widget],left_stretch=True)
+
+        self._filter_widget = QtWidgets.QPushButton()
+        self._filter_widget.setIcon(Icons.filterIcon() if filter else Icons.noFilterIcon())
+        self._filter_widget.setToolTip("Unlock all inputs")
+        self._filter_widget.clicked.connect(self._handle_used)
+        
+
+        widget, _ = getHContainer([ self._filter_widget, lock_widget, unlock_widget],left_stretch=True)
         main_layout.addWidget(widget)
+
+    @property
+    def filter(self) -> bool:
+        return self._filter
+    @filter.setter
+    def filter(self, value: bool):
+        if value != self._filter:
+            self._filter = value
+            self._filter_widget.setIcon(Icons.filterIcon() if value else Icons.noFilterIcon())
+            self._filter_widget.setToolTip("Filter used inputs" if value else "View all inputs")
+            self.filterChanged.emit(value)
+            
+
+    def _handle_used(self):
+        # toggle filter
+        self.filter = not self.filter
 
     def _handle_lock(self):
         import gremlin.event_handler

@@ -29,9 +29,6 @@ from threading import Thread, Timer
 from typing import Callable
 import math
 import gremlin.base_classes
-import gremlin.event_handler
-
-import gremlin.shared_state
 import gremlin.shared_state
 import gremlin.threading
 
@@ -54,6 +51,7 @@ import psygnal
 from psygnal import Signal
 
 
+from gremlin.types import TabDeviceType
 
 
 
@@ -432,6 +430,7 @@ class EventListener:
 
 	# signal emitted when the UI tabs are loaded and profiles are loaded - some widgets use this for post-UI initialization update that needs to occur after the UI data is completely loaded
 	tabs_loaded = Signal()
+	tab_filtered_changed = Signal(object, bool) # fires when tab filtering changes
 
 	refresh_devices = Signal() # used to refresh the device list going into GremlinEx
 
@@ -3118,10 +3117,11 @@ class AxisState():
 	def queueAxisEvent(self, device_guid, input_id):
 		''' queues a joystick update event to trigger UI updates for example '''
 		values = self.getAxisValues(device_guid, input_id)
-		device_guid = gremlin.util.parse_guid(device_guid)
-		event = Event(InputType.JoystickAxis, input_id, device_guid, is_axis = True, value = values.actual, extra_data={"queuedEvent" : True})
-		el = EventListener()
-		el.custom_joystick_event.emit(event)
+		if values:
+			device_guid = gremlin.util.parse_guid(device_guid)
+			event = Event(InputType.JoystickAxis, input_id, device_guid, is_axis = True, value = values.actual, extra_data={"queuedEvent" : True})
+			el = EventListener()
+			el.custom_joystick_event.emit(event)
 			
 
 	def _get_key(self, device_guid, input_id):

@@ -27,6 +27,8 @@ import psygnal
 from psygnal import Signal
 from gremlin.ui.qdatawidget import QDataWidget
 from shiboken6 import Shiboken
+import gremlin.tabstate
+
 class ProfileSettingsWidget(QDataWidget):
 
     """Widget allowing changing profile specific settings."""
@@ -66,15 +68,20 @@ class ProfileSettingsWidget(QDataWidget):
 
         self._create_ui()
 
+    def ensureLoaded(self):
+        self.refresh_ui()
+
     def refresh_ui(self, emit=False):
         """Refreshes the entire UI."""
+
         gremlin.ui.ui_common.clear_layout(self.scroll_layout)
         self._create_ui()
         if emit:
             self.changed.emit()
 
     def refresh(self, emit = True):
-        self.refresh_ui(emit)
+        gremlin.util.InvokeUiMethod(self.refresh_ui, emit) # UI thread
+        
 
     @QtCore.Slot(int, bool)
     def vjoy_as_input_changed(self, vid : int, enabled : bool):
@@ -94,6 +101,12 @@ class ProfileSettingsWidget(QDataWidget):
         # Default start mode selection
         if not Shiboken.isValid(self):
             return
+        
+        ts = gremlin.tabstate.TabState()
+        data = ts.getData(gremlin.shared_state.settings_tab_id)
+        if not data or not data.populateEnabled:
+            # do not populate the list
+            return 
 
         from functools import partial
         self.scroll_layout.addWidget(DefaultModeSelector(self.profile_settings))

@@ -371,6 +371,11 @@ class ModuleManagementView(QtWidgets.QSplitter):
     def refresh_ui(self):
         pass
 
+    def ensureLoaded(self):
+        pass
+
+
+
     def _prompt_user_for_module(self):
         """Asks the user to select the path to the module to add."""
         import gremlin.config

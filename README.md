@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T71)
+- Improved: general UI optimization pass.
+- New: Filter used inputs on joystick inputs. This button filters out unused inputs to only displayed mapped inputs for a device.  This setting does not persist to the profile between sessions.  This is a convenience feature when you have controllers with 128 buttons.
+
 ### (m76T70)
 - New: TTS gains a mode to abort current speech. When triggered, this will stop any active speech in the queue or in progress.
 - New: TTS gains a general option to suppress the speech to avoid repeating text.  This auto-clears on profile start.
