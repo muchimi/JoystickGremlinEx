@@ -15,8 +15,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T71)
-- Improved: general UI optimization pass.
-- New: Filter used inputs on joystick inputs. This button filters out unused inputs to only displayed mapped inputs for a device.  This setting does not persist to the profile between sessions.  This is a convenience feature when you have controllers with 128 buttons.
+- Improved: general UI optimization pass (on demand load).
+- Improved: profile xml optimization pass (removal of empty nodes).
+- Improved: documentation updates.
+- New Feature: Joystick device inputs gain a filter button appearing next to the lock/unlock toolbar. This setting does not persist between sessions / profile loads and defaults to unfiltered. Click the filter button to toggle viewing all inputs or mapped inputs only. 
+- New feature: added scale (centered) and scale half (centered) to merge axis operations (old scale options will map to these automatically).  The existing scale/scale half options now output a full axis range -1 to +1.  This should cover all possible scaling scenarios.
+- Fix: Vjoy as input device tab could persist in some situations from one profile to even when not used as input.
+- profile version change: V13->V14 (conversion of merge data to new equivalent modes)
 
 ### (m76T70)
 - New: TTS gains a mode to abort current speech. When triggered, this will stop any active speech in the queue or in progress.

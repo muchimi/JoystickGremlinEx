@@ -216,22 +216,59 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
 
         self._merge_widgets_map = {}
         
-        widgets = []
-        for merge_type in MergeOperationType:
-            if merge_type != MergeOperationType.NotSet:
+        row_widgets = []
+        self.option_widget = QtWidgets.QButtonGroup()
+        
+        self.merge_description_widget = QtWidgets.QLabel()
+        merge_options = [
+            [
+            MergeOperationType.Add,
+            MergeOperationType.Average,
+            MergeOperationType.Center,
+            MergeOperationType.Min,
+            MergeOperationType.Max
+            ],
+            [
+                MergeOperationType.ScaleFull,
+                MergeOperationType.ScaleFullCentered,
+                MergeOperationType.ScaleHalf,
+                MergeOperationType.ScaleHalfCentered
+            ],
+            [
+                MergeOperationType.Trim,
+                MergeOperationType.TrimCentered
+            ]
+        ]
+        id = 0
+        for merge_group in merge_options:
+            widgets = []
+            for merge_type in merge_group:
                 rb = gremlin.ui.ui_common.QDataRadioButton(label = MergeOperationType.to_display_name(merge_type), data = merge_type)
                 widgets.append(rb)
                 self._merge_widgets_map[merge_type] = rb
                 if merge_type == self.data.operation:
                     rb.setChecked(True)
+                    description = _merge_operation_to_description_lookup[merge_type]
+                    self.merge_description_widget.setText(description)
                 rb.clicked.connect(self._merge_mode_changed_cb)
+                self.option_widget.addButton(rb, id = id)
+                id+=1
+
+            widget,_ = gremlin.ui.ui_common.getHContainer(widgets)
+            row_widgets.append(widget)
+
 
         self.merge_invert_widget = QtWidgets.QCheckBox("Invert")
         self.merge_invert_widget.setChecked(self.data.invert)
         self.merge_invert_widget.clicked.connect(self._merge_invert_changed_cb)
-        widgets.append(self.merge_invert_widget)
+        row_widgets.append(self.merge_invert_widget)
 
-        self.container_merge_options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Merge Operation:")
+
+        self.container_merge_options_widget, _ = gremlin.ui.ui_common.getVContainer(row_widgets)
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(self.merge_description_widget,"Merge Operation:")
+        
+        self.container_merge_layout.addWidget(widget)
         self.container_merge_layout.addWidget(self.container_merge_options_widget)
         
         self.merge_curve_widget = gremlin.ui.ui_common.QCurveWidget()
@@ -360,7 +397,10 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
     def _merge_mode_changed_cb(self, checked):
         ''' merge mode selection change '''
         widget = self.sender()
-        self.data.operation = widget.data 
+        op = widget.data 
+        self.data.operation = op
+        description = _merge_operation_to_description_lookup[op]
+        self.merge_description_widget.setText(description)
         self.changed.emit(self.data)
 
     def _remove_cb(self):
@@ -508,6 +548,8 @@ class MergeOperationType (enum.IntEnum):
     Multiply = 8, # multiplies one axis with the value of another
     Trim = 9, # trim
     TrimCentered = 10 # centered trim
+    ScaleFullCentered = 11 # scale centered
+    ScaleHalfCentered = 12
 
 
     @staticmethod
@@ -539,7 +581,8 @@ _merge_operation_to_enum_lookup = {
     "multiply": MergeOperationType.Multiply,
     "trim": MergeOperationType.Trim,
     "trimcentered": MergeOperationType.TrimCentered,
-
+    "scalefullc": MergeOperationType.ScaleFullCentered,
+    "scalehalfc": MergeOperationType.ScaleHalfCentered,
 }
 
 _merge_operation_to_string_lookup = {
@@ -554,6 +597,8 @@ _merge_operation_to_string_lookup = {
     MergeOperationType.Multiply : "multiply",
     MergeOperationType.Trim : "trim",
     MergeOperationType.TrimCentered : "trimcentered",
+    MergeOperationType.ScaleFullCentered : "scalefullc",
+    MergeOperationType.ScaleHalfCentered : "scalehalfc",
 }
 
 
@@ -565,10 +610,12 @@ _merge_operation_display_lookup = {
     MergeOperationType.Min : "Minimum",
     MergeOperationType.Max : "Maximum",
     MergeOperationType.ScaleFull : "Scale ",
-    MergeOperationType.ScaleHalf : "Scale half (0..1)",
+    MergeOperationType.ScaleHalf : "Scale half",
     MergeOperationType.Multiply : "Multiply",
     MergeOperationType.Trim : "Trim",
-    MergeOperationType.TrimCentered : "Trim Centered",
+    MergeOperationType.TrimCentered : "Trim (centered)",
+    MergeOperationType.ScaleFullCentered : "Scale (centered)",
+    MergeOperationType.ScaleHalfCentered : "Scale half (centered)",
 
 }
 
@@ -579,11 +626,13 @@ _merge_operation_to_description_lookup = {
     MergeOperationType.Center : "Centered (A-B)/2",
     MergeOperationType.Min : "Min(A, B)",
     MergeOperationType.Max : "Max(A, B)",
-    MergeOperationType.ScaleFull : "Scale 0..1 is derived from full deviation",
-    MergeOperationType.ScaleHalf : "Scale 0..1 is derived from half axis value - use for centered scale inputs",
+    MergeOperationType.ScaleFull : "Scale 0..1 is derived from full deviation, results in an output -1 to +1",
+    MergeOperationType.ScaleHalf : "Scale 0..1 is derived from half axis value - use for centered scale inputs, and results in an output -1 to +1",
     MergeOperationType.Multiply : "A * B",
     MergeOperationType.Trim: "Trim A with B - B is scaled 0 to 1 and applies a trim value to A",
-    MergeOperationType.TrimCentered: "Trim A with B - B is centered adpplies a trim value to A"
+    MergeOperationType.TrimCentered: "Trim A with B - B is centered adpplies a trim value to A",
+    MergeOperationType.ScaleFullCentered : "Scale 0..1 is derived from full deviation",
+    MergeOperationType.ScaleHalfCentered : "Scale 0..1 is derived from half axis value - use for centered scale inputs",
 
 }
 
@@ -5212,7 +5261,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             if channels is enabled, returns the data as an AxisValue object with channels
         '''
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_curve and gremlin.shared_state.is_running
+        verbose = (config.verbose_mode_curve and gremlin.shared_state.is_running) or config.verbose_mode_vjoy
         curve_value = None
         merged_values = None
 
@@ -5364,12 +5413,27 @@ Supports axis merging, curved output, command, hat and button mappings.
                                                 invert = self.merge_invert)
                         
                     case MergeOperationType.ScaleFull:
+                        scale = v2
+                        value = scale_to_range(v1*scale)
+                        
+                        
+                    case MergeOperationType.ScaleHalf:
+                        if v2 > 0:
+                            scale = v2
+                            value = scale_to_range(v1*scale)
+                        else:
+                            scale = abs(v2)
+                            value = scale_to_range(v1*-scale)
+                        
+
+                    case MergeOperationType.ScaleFullCentered:
                         scale = scale_to_range(v2, target_min=0, target_max = 1)
                         value = scale_to_range(v1*scale)
                         
-                    case MergeOperationType.ScaleHalf:
+                        
+                    case MergeOperationType.ScaleHalfCentered:
                         scale = abs(v2)
-                        value = scale_to_range(v1*scale)
+                        value = scale_to_range(v1*scale)                        
                         
                     case MergeOperationType.Multiply:
                         value = scale_to_range(v1 * v2)
@@ -5395,7 +5459,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                             value = v2 + ( (t + 1) * v1 )
 
                         
-
+                if verbose: syslog.info(f"Merge operation: {data.operation.name}: v1 {v1:0.03f} v2: {v2:0.03f} result: {value:0.03f}")
                 v1 = value
 
             if self.reverse:

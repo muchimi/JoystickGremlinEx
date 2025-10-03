@@ -1053,7 +1053,11 @@ class Device:
  
         node.set("type",device_type)
         for mode in sorted(self.modes.values(), key=lambda x: x.name):
-            node.append(mode.to_xml())
+            mode_node = mode.to_xml()
+            depth = gremlin.util.xmlNodeDepth(mode_node)
+            if depth > 2: 
+                # only write nodes that have mappings
+                node.append(mode.to_xml())
         return node
 
 
@@ -1533,6 +1537,12 @@ class Settings:
         self.startup_mode = None
         self.default_delay = 0.05
 
+    def reset(self):
+        ''' resets setting '''
+        self.vjoy_as_input.clear()
+        self.vjoy_initial_values.clear()
+        self.startup_mode = None
+        self.default_delay = 0.05
 
     def to_xml(self):
         """Returns an XML node containing the settings.
@@ -1604,6 +1614,9 @@ class Settings:
 
         # vJoy as input settings
         self.vjoy_as_input = {}
+
+
+
         for vjoy_node in node.findall("vjoy-input"):
             vid = safe_read(vjoy_node, "id", int, 0)
             device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vid)
@@ -1632,6 +1645,12 @@ class Settings:
 
         # update the data from the profile
         sd.reset()
+
+    def setVjoyAsInput(self, vid, enabled = True):
+        ''' enables a vjoy device as an input device '''
+        self.vjoy_as_input[vid] = enabled
+        sd = gremlin.event_handler.JoystickState()
+        sd.setVjoyAsInput(vid, enabled)
 
     def get_vjoy_axis_enabled(self, vid, aid) -> bool:
         ''' true if the value is enabled for this axis '''
@@ -2814,6 +2833,7 @@ class Profile():
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
         self.state.clear()
         self._loaded = False
+        self.settings.reset() # reset settings
         
     @property
     def loaded(self) -> bool:
@@ -3905,6 +3925,10 @@ class Profile():
         if "force_numlock_on" in root.attrib:
             self._force_numlock_on = safe_read(root, "force_numlock_on", bool, False)
 
+
+        # settings data
+        self.settings.from_xml(root.find("settings"), data, extra_data)            
+
         # state data - read first because states can be referenced by nodes
         nodes = root.xpath("//states")
         if not nodes:
@@ -3913,15 +3937,20 @@ class Profile():
         for node in nodes:
             self.state.from_xml(node)
 
-
-
-
         # Parse each device into separate DeviceConfiguration objects
         devices = root.xpath("//profile/devices/device")
         for child in devices:
             device = Device(self)
             device.from_xml(child, data, extra_data)
             self.devices[device.device_guid] = device
+
+            dd : dinput.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(device.device_guid)
+            if dd.is_virtual:
+                # vjoy as input
+                self.settings.setVjoyAsInput(dd.vjoy_id, True)
+                if verbose: syslog.info(f"PROFILE: enable vjoy as input device [{dd.vjoy_id}]")
+
+            
 
 
         # Parse each vjoy device into separate DeviceConfiguration objects
@@ -4015,8 +4044,6 @@ class Profile():
         for child in root.iter("merge-axis"):
             self.merge_axes.append(self._parse_merge_axis(child))
 
-        # Parse settings entries
-        self.settings.from_xml(root.find("settings"), data, extra_data)
 
         # Parse plugin entries
         for child in root.findall("plugins/plugin"):
@@ -4698,7 +4725,11 @@ class Mode:
                 item_list = sorted(item_list, key=lambda x: x.input_id)
             for item in item_list:
                 #if item.is_valid_for_save():
-                node.append(item.to_xml())
+                item_node = item.to_xml()
+                depth = gremlin.util.xmlNodeDepth(item_node)
+                if depth > 0 or item.device_type != DeviceType.Joystick:
+                    # skip empty joystick items with no mappings
+                    node.append(item_node)
         return node
 
     def delete_data(self, input_type, input_id):

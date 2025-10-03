@@ -158,8 +158,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         icon = gremlin.ui.ui_common.Icons.hatIcon()
         label_hat = gremlin.ui.ui_common.QIconLabel(icon, f"{device.hat_count}")
 
-        # lock widget
-        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
+        # lock widget (add filter for joystick devices)
+        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid, filter_enabled = True)
         lock_widget.filterChanged.connect(self._handle_filter_changed)
 
 
@@ -256,20 +256,25 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _handle_filter_changed_ui(self, value : bool):
         ''' update filtered to used inputs only'''
         # save current selection
-        selected_index = self.input_item_list_view.current_index
-        input_item = self.input_item_list_model.inputItemAtIndex(selected_index)
-        # filter setup
-        self.input_item_list_model.show_used = value
-        # find the index in the filtered list, -1 if not found
-        count = self.input_item_list_model.filteredRows()
-        if count:
-            index = self.input_item_list_model.indexOfInputItem(input_item)
-            if index == -1:
-                # no longer displayed, select the first item
-                index = 0
+
+        try:
+            gremlin.util.pushCursor()
+            selected_index = self.input_item_list_view.current_index
+            input_item = self.input_item_list_model.inputItemAtIndex(selected_index)
+            # filter setup
+            self.input_item_list_model.show_used = value
+            # find the index in the filtered list, -1 if not found
+            count = self.input_item_list_model.filteredRows()
+            if count:
+                index = self.input_item_list_model.indexOfInputItem(input_item)
+                if index == -1:
+                    # no longer displayed, select the first item
+                    index = 0
+            
+            self.input_item_list_view.select_item(index)
         
-        self.input_item_list_view.select_item(index)
-        #self._select_item_cb(index)
+        finally:
+            gremlin.util.popCursor()
 
     def _handle_locked_changed(self, value : bool):
         if value:

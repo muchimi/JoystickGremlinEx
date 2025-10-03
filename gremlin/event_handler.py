@@ -2815,6 +2815,7 @@ class JoystickState():
 	def setVjoyAsInput(self, vid : int, enabled : bool):
 		self._vjoy_as_input[vid] = enabled
 
+
 	def vjoyAsInput(self, vid: int) -> bool:
 		''' true if vjoy device is also used as input '''
 		if vid in self._vjoy_as_input:

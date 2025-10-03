@@ -3875,6 +3875,7 @@ class QDataRadioButton(QtWidgets.QRadioButton):
         if tooltip:
             self.setToolTip(tooltip)
 
+
     @property
     def data(self):
         return self._data
@@ -10679,7 +10680,7 @@ class QInputLockWidget(QtWidgets.QWidget):
 
     filterChanged = Signal(bool) # fires when the filter is toggled
 
-    def __init__(self, data = None, filter : bool = False, parent = None):
+    def __init__(self, data = None, filter : bool = False, filter_enabled = False, parent = None):
         super().__init__(parent)
         
         self.data = data # holds anything
@@ -10696,14 +10697,23 @@ class QInputLockWidget(QtWidgets.QWidget):
         lock_widget.setToolTip("Unlock all inputs")
         unlock_widget.clicked.connect(self._handle_unlock)
 
+        widgets = [
+            lock_widget,
+            unlock_widget
+        ]
 
-        self._filter_widget = QtWidgets.QPushButton()
-        self._filter_widget.setIcon(Icons.filterIcon() if filter else Icons.noFilterIcon())
-        self._filter_widget.setToolTip("Unlock all inputs")
-        self._filter_widget.clicked.connect(self._handle_used)
+        if filter_enabled:
+
+            self._filter_widget = QtWidgets.QPushButton()
+            self._filter_widget.setIcon(Icons.filterIcon() if filter else Icons.noFilterIcon())
+            self._filter_widget.setToolTip(self._get_filter_tooltip(filter))
+            self._filter_widget.clicked.connect(self._handle_used)
+            widgets.insert(0, self._filter_widget)
+        else:
+            self._filter_widget = None
         
 
-        widget, _ = getHContainer([ self._filter_widget, lock_widget, unlock_widget],left_stretch=True)
+        widget, _ = getHContainer(widgets, left_stretch=True)
         main_layout.addWidget(widget)
 
     @property
@@ -10711,11 +10721,15 @@ class QInputLockWidget(QtWidgets.QWidget):
         return self._filter
     @filter.setter
     def filter(self, value: bool):
-        if value != self._filter:
+        if value != self._filter and self._filter_widget:
             self._filter = value
             self._filter_widget.setIcon(Icons.filterIcon() if value else Icons.noFilterIcon())
-            self._filter_widget.setToolTip("Filter used inputs" if value else "View all inputs")
+            self._filter_widget.setToolTip(self._get_filter_tooltip(value))
             self.filterChanged.emit(value)
+
+    def _get_filter_tooltip(self, value : bool) -> str:
+        return "Filter used inputs: click to view all inputs." if value \
+            else "Filter used inputs: click to view mapped inputs only."
             
 
     def _handle_used(self):

@@ -1967,6 +1967,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         device_guid = gremlin.util.normalize_guid(device_guid)
 
+        # device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+
+
 
         index =  self.ui.device_widget.indexOf(widget)
         if index != -1:
@@ -2382,12 +2385,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # =======================================================
             # add the VJOY input devices to the device tabs
             self._vjoy_input_device_guids = []
-
-
             
             # Create vJoy as input device tabs
-
-            
             for device in sorted(all_vjoy_devices, key=lambda x: x.vjoy_id):
                 # Ignore vJoy as output devices
                 
@@ -2395,12 +2394,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 device_name = device.name
                 #input_enabled = sd.inputEnabled(device.device_guid) #  self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
                 input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+              
                 if not input_enabled:
                     if verbose: syslog.info(f"VJOY TAB: {device_name} not created because input is disabled on this device.")
                     continue
                 if not device.connected:
                     if verbose: syslog.info(f"VJOY TAB: {device_name} not created because device is not connected.")
                     continue
+                # vjoy as input enabled
                 
                 if device_name:
                     device_profile = self.profile.get_device_modes(
@@ -2652,6 +2653,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     device = gremlin.joystick_handling.device_info_from_guid(id)
                     if device.disabled:
                         continue
+                    if device.is_virtual:
+                        input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+                        if not input_enabled:
+                            continue
+
                     id_list.append(id)
                     ctm[key] = [id, name, a, b]
 

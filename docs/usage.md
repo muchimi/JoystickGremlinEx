@@ -28,18 +28,33 @@ The top of the user interface below the toolbar is the device list, shown as a l
 
 Click on a tab to select the device as the active device.  You can also use the mouse wheel to scroll the tabs left or right which will also select a new device tab.
 
+#### Physical Joystick devices
+
+Joystick devices and "console" game controllers will appear with ther DirectInput name, one per tab.  Clicking on each tab will bring up a list of device inputs (axis, button and hat) in the left panel.  Any mapped action will appear on the right panel.
+
+#### Virtual (VJOY) Joystick devices
+
+Virtual VJOY devices will also appear as a tab if they are set in input mode (enabled in the settings tab).  GremlinEx allows VJOY devices to be used both as input and output concurrently.
+GremlinEx names the VJOY devices using their axis/button/hat count and the VJOY device number (1 to 16).
+
+As each VJOY device must be different from the other when configured in the VJOY software, each name will be different because each device will have at least a different axis, button or hat count.
+
 #### Special devices
 
+Special devices in GremlinEx are non-joystick devices, or configuration devices.
 
 | Device     | Description |
 | ----------- | ----------- |
-| Keyboard   | This device is for keyboard and mouse mappings |
-| MODE   | This device allows you to map actions on mode change (entering a mode or exiting a mode) |
-| OSC   | This device allows you to map inbound OSC messages (two way communication supported via map to OSC action) |
-| MIDI   | This device allows you to map inbound MIDI messages |
-| Octavi IFR1  | This device allows you to map inputs from the Octavi IFR1 (two way supported via map to IFR1 action) |
-| Settings   | This device opens profile options specific to input settings |
+| Keyboard/Mouse   | This device is for keyboard and mouse mappings - ![see Keyboard/Mouse device](#keyboard-and-mouse)|
+| Mode/Profile   | This device allows you to map actions on mode and profile change (entering or exiting a profile mode, or on profile start/stop) - ![see MODE device](#modeprofile-device) |
+| OSC   | This device allows you to map inbound OSC messages (two way communication supported via map to OSC action) - ![see OSC device](#osc-device-open-sound-control) |
+| MIDI   | This device allows you to map inbound MIDI messages - ![see MIDI device](#midi-device)|
+| States   | This device allows you to define and map GremlinEx - ![see state device](#states) |
+| Octavi IFR1  | This device allows you to map inputs from the Octavi IFR1 (two way supported via map to IFR1 action) - ![see Octavi device](#octavi-ifr1-device) |
+| Settings   | This device opens profile options specific to input settings - ![see profile settings](#profile-settings)|
 | Plugins   | This device allows you to add user plugins to the profile - plugins are loaded whenever the profile start and are written in Python - see the plugin documentation for details |
+
+Note that the MIDI and OSC tabs only appear if MIDI and OSC are enabled in options (this is by default enabled).
 
 
 #### Disconnected devices
@@ -103,7 +118,7 @@ The keyboard is a momentary input with a key either pressed or released (known a
 
 ![mouse input](assets/mouse_input.png)
 
-In GremlinEx, mouse inputs are available through the keyboard device and GremlinEx supports five mouse buttons, and adds four more for wheel up/down and wheel left/right.  The left button is mouse 1, the right button is mouse 2, the middle button is mouse 3.  Buttons 4 and 5 are sometimes known as the forward and back buttons on the mouse.
+In GremlinEx, mouse inputs are available through the keyboard/mouse device.  GremlinEx supports all five mouse buttons, and adds four more for wheel up/down and wheel left/right respectively.  The left button is mouse 1, the right button is mouse 2, the middle button is mouse 3.  Buttons 4 and 5 are sometimes known as the forward and back buttons on the mouse.
 
 ### Available inputs
 
@@ -203,6 +218,13 @@ Currently states are either pressed (on/true) or released (off/false) and functi
 States are read by [conditions](#conditions) and specifically the [state condition](#state-condition).
 
 In GremlinEx, states can be mapped via the State Device, the "map to state" action is used to clear, set, toggle or pulse a state, and the state condition is used to determine, based on state, if a container or action should execute or not.
+
+### Octavi IFR1 device
+
+The Octavi IFR1 device is supported by GremlinEx directly at the HID layer.  The device offers a number of button actions and functions in GremlinEx like a joystick.  The companion ![map to Octavi IFR1](#map-to-octavi-ifr1) action lets GremlinEx set state and LEDs on the Octavi.
+
+![image](assets/octavi_ifr1.png)
+
 
 ### Reordering of devices
 
@@ -726,7 +748,6 @@ If the persist option is not checked, GremlinEx will use whatever data is in the
 ### HID devices
 
 GremlinEx will show all detected game controllers in tabs located at the top of the UI.  These are the raw input devices, either buttons, hats or axes.
-
 
 ### Device change detection
 
@@ -1417,8 +1438,20 @@ At profile runtime, VJOY device 1 button 1 will be triggered whenever either but
 
 would introduce a latching, which means state C (however triggered) would also need to be true for the mapping to trigger.
 
+### Profile Settings
 
-### Changing modes
+Profile settings is a tab that lets you configure various profile options.
+
+- select which VJOY device can be used as an input device
+- set default values for VJOY axes
+- select the default profile start mode
+- set the default macro execution delay between steps
+
+Note: Profile modes are defined in the ![mode dialog](#profile-modes).
+
+![image](assets/profile_settings.png)
+
+### Changing modes on existing mappings
 
 If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.
 
@@ -1666,6 +1699,43 @@ The commands are only available to button bindings at this time.
 
 In relative mode when the input is also an axis, the value of the offset depends on the deviation of the input.  An input of 0 (center) means no deviation.
 The offset applied is scaled based on the deviation, so maximum deviation of the input is the full offset value.
+
+### Merge operations
+
+When the input is an axis, Vjoy Remap has a merge axis mode that enables merging of two or more axes into an output value.
+
+A merge operation always has at least one merged axis.  It is possible to add more merge axes as needed for more complicated merge scenarios and a cumulative effect.  The merge is applied top to bottom, so the prior merge step output becomes the input to the next merge operation in sequence.
+
+Each merge axis can be selected by selecting the axis from the drop downs, or you can click the listen button to have GremlinEx select the axis that moved.
+
+The merged axis cannot be the same as the input axis.
+
+A merge operation should only be applied to one of the components of the merge.
+
+
+| Merge operation      | Description |
+| ----------- | ----------- |
+| Add | The axis is added to the prior value. |
+| Average | The value of the merged axis is averaged with the prior value. |
+| Center | The value of the merged axis represents half of the output value, and the prior value is the other half.  This is used to combined two axes into a single centered axis such as for toe-brakes. |
+| Minimum | The smallest value of the merged axis and the prior value is the output value |
+| Maximum | The largest value of the merged axis and the prior value is the output value |
+| Scale | The merged axis value acts is a scale multiplier on the other axis.  The scale applied is 0 to 100%.  Output range -1 to +1.  |
+| Scale Half | The merged axis value acts is a scale multiplier on the other axis however only uses half the range.  If the merged axis is centered, the scale is 0%.  Output range -1 to +1. |
+| Scale (centered)| The merged axis value acts is a scale multiplier on the other axis.  The scale applied is 0 to 100%. |
+| Scale Half (centered)| The merged axis value acts is a scale multiplier on the other axis however only uses half the range.  If the merged axis is centered, the scale is 0%.  Moving the merged axis up or down sales +- 100%. |
+| Trim | The merged axis adds a positive or negative trim, using a full axis range of the merge axis. |
+| Trim (centered) | The merged axis adds a positive or negative trim, using the half axis range of the merge axis. |
+
+Each merge step can be inverted.
+
+Each merge step can have its own curve applied to the merge axis.  The curve is applied to the merge axis first, then used in the computation of the merge.  This can be used for interesting effects such as reducing the range of the merged axis, which is helpful to control min and max scaling, and also to control sensitivity.
+
+
+
+### Axis to Buttons
+
+In this mode, the input axis can be split up into ranges each triggering a button when the range is entered.  For more complicated scenarios and sophisticated axis range slicing, use ![gated axis](#gated-axis).
 
 &nbsp;
 

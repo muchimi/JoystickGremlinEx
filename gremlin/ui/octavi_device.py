@@ -696,18 +696,12 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
 
-        
-
         el = gremlin.event_handler.EventListener()
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
-        
-
         # last index selected, -1 means none
         self._last_selected_index = -1 
-
-
         
         # Select default entry
         selected_index = self.input_item_list_view.current_index

@@ -41,6 +41,7 @@ import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
 import inspect
+import lxml
 
 
 from . import error
@@ -2315,4 +2316,18 @@ def decorate_filter(filter) -> str:
         if not "*" in filter and not "?" in filter:
             filter = f"*{filter}*" # add wild cards
     return filter
+
+
+def xmlNodeDepth(node):
+    ''' gets the depth of a given xml node '''
+    return _xml_depth(node, 0)
+    
+
+def _xml_depth(node, depth) -> int:
+    d = depth
+    for child in node:
+        d = max(d, _xml_depth(child, depth + 1))
+    return d
+    
+    
 

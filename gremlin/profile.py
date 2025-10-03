@@ -65,7 +65,7 @@ class ProfileConverter:
     """Handle converting and checking profiles."""
 
     # Current profile version number
-    current_version = 13
+    current_version = 14
 
     def __init__(self):
         pass
@@ -127,7 +127,8 @@ class ProfileConverter:
             10: self._convert_from_v10,
             11: self._convert_from_v11,
             12: self._convert_from_v12,
-            13: None,
+            13: self._convert_from_v13,
+            14: None,
         }
 
         # Create a backup of the outdated profile
@@ -953,6 +954,24 @@ class ProfileConverter:
 
         return root
             
+    def _convert_from_v13(self, root, fname = None):
+        ''' convert from V13 to V14 - convert merge operation scale name changes '''
+        import gremlin.util
+        root.attrib["version"] = "14" # change version
+
+        # calatog map to state nodes
+        nodes = root.xpath("//merge-data")
+        for node in nodes:
+            if "operation" in node.attrib:
+                operation = node.get("operation")
+                if operation == "scalehalf":
+                    node.set("operation","scalehalfc")
+                elif operation == "scalefull":
+                    node.set("operation","scalefullc")
+
+        return root
+            
+
 
 
     
