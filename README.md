@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T71A) hotfix
+- Fix: missing volume in TTS
+- Fix: missing master mode in profile
+
 ### (m76T71)
 - Improved: general UI optimization pass (on demand load).
 - Improved: profile xml optimization pass (removal of empty nodes).

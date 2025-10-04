@@ -3174,9 +3174,9 @@ class Profile():
 
         return mode_list
     
-    def _ensure_mode_tree(self):
+    def _ensure_mode_tree(self, reset : bool = False):
         
-        if not self._mode_tree:
+        if not self._mode_tree or reset:
             self._mode_tree = ModeNode() # root node
             self._mode_tree.isModeRoot = True
         
@@ -3220,6 +3220,7 @@ class Profile():
     
     def traverse_mode(self):
         ''' returns the current mode list as a list of (level, mode) '''
+        self.dumpModeTree()
         nodes = [(node.depth-1, node.name) for node in anytree.PreOrderIter(self._mode_tree) if node.name]
         return nodes
     
@@ -3646,7 +3647,8 @@ class Profile():
         :param update_devices: if set, updates the device to new modes to complete any missing mode sets (do this when loading from XML only)
         
         '''
-        self._mode_tree = Node("") # root node
+        #self._mode_tree = Node("") # root node
+        self._ensure_mode_tree(True)
         
         mode_list = []
         node_map = {}
@@ -3657,8 +3659,10 @@ class Profile():
         for node in mode_nodes:
             mode_name = node.name
             if not mode_name in mode_list:
-                m_node = Node(mode_name)
-                m_node.parent = self._mode_tree # default parent node
+                m_node = anytree.find_by_attr(self._mode_tree, mode_name)
+                if not m_node:
+                    m_node = Node(mode_name)
+                    m_node.parent = self._mode_tree # default parent node
                 node_map[mode_name] = m_node
                 mode_list.append(mode_name)
                 inherit_map[mode_name] = node.inherit
@@ -3672,6 +3676,7 @@ class Profile():
         
         verbose = gremlin.config.Configuration().verbose
         if verbose: self.dumpModeTree()
+        pass
             
     
     def rename_mode(self, old_mode:str, new_mode:str, emit = False) -> bool:

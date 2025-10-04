@@ -86,7 +86,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
             "Voice:",
             self.voice_widget,
             "Volume:",
-            self.voice_widget,
+            self.volume_widget,
             "Rate (wpm):",
             self.rate_widget,
             self.play_widget,
