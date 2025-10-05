@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T71B) hotfix
+- Fix: release from hold mode in vjoyremap does not trigger a release (broken by new exec on release mode in m70)
+
 ### (m76T71A) hotfix
 - Fix: missing volume in TTS
 - Fix: missing master mode in profile

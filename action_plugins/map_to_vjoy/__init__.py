@@ -4642,11 +4642,13 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             self.hat_position = position
 
         elif input_type in VJoyRemapWidget.input_type_buttons:
+            # process a button output 
             is_paired = remote_state.paired
             force_remote = event.force_remote or is_paired
 
             # determine if event should be fired based on release mode
             is_pressed = event.is_pressed
+            trigger = False
             fire_event =  (self.action_data.exec_on_release and not is_pressed) or (self.action_data.exec_on_press and is_pressed)
             
 
@@ -4683,16 +4685,23 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         # ignore release action on press/release modes
                         if verbose: syslog.info("\tignoring release")
                         trigger = False
+                elif not is_pressed:
+                    # send a release trigger
+                    trigger = True
   
-                    if trigger:
-                        if verbose: syslog.info(f"\tTrigger {self.vjoy_input_id} pressed: {is_pressed}")
-                        if is_local:
-                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = is_pressed
-                        if is_remote or is_paired:
-                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, is_pressed, force_remote = is_paired )
-                    else:
-                        # indicate no execution
-                        result = False 
+                if trigger:
+                    if verbose: syslog.info(f"\tTrigger {self.vjoy_input_id} pressed: {is_pressed}")
+                    if is_local:
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = is_pressed
+                    if is_remote or is_paired:
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, is_pressed, force_remote = is_paired )
+                else:
+                    # indicate no execution
+                    result = False 
+                
+
+
+            
 
 
             elif self.action_mode == VjoyAction.VJoyButtonPress:
