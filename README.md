@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T72)
+- Fix: description field not persisted / not displayed for some input types.
+- Improved: further optimization of profile xml data.
+- Fix: description action not adding data to log file unless in verbose mode.
+
 ### (m76T71B) hotfix
 - Fix: release from hold mode in vjoyremap does not trigger a release (broken by new exec on release mode in m70)
 

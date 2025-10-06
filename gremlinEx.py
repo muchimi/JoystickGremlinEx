@@ -2780,14 +2780,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 
                 syslog.info(f"SELECT TAB INDEX: {index}")
                 index = self.getTabIndexForDevice(last_device_guid)
-                data = ts.getData(last_device_guid)
-                if not data.populateEnabled:
-                    data.populateEnabled = True
-                    widget = self.getRegisteredWidget(device_guid)
-                    widget.ensureLoaded()
+                if index is not None:
+                    data = ts.getData(last_device_guid)
+                    if data and not data.populateEnabled:
+                        data.populateEnabled = True
+                        widget = self.getRegisteredWidget(device_guid)
+                        widget.ensureLoaded()
 
-                self.ui.devices.setCurrentIndex(index)
-                self._select_input(last_device_guid, last_input_type, last_input_id, force_switch=True)
+                    self.ui.devices.setCurrentIndex(index)
+                    self._select_input(last_device_guid, last_input_type, last_input_id, force_switch=True)
                 
                 
             except Exception as err:
@@ -3145,10 +3146,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # enable widget population for this tab for on-demand UI loading
                 if verbose: syslog.info(f"SELECT INPUT: activate tab for device: {tabdata.device.name}")
                 widget = self.getRegisteredWidget(device_guid)
-                if not widget:
-                    pass
-                tabdata.populateEnabled = True
-                widget.ensureLoaded()
+                # if not widget:
+                #     pass
+                if widget:
+                    tabdata.populateEnabled = True
+                    widget.ensureLoaded()
 
             current_device_guid = tabdata.device_guid
             current_input_type, current_input_id = self._get_last_input(current_device_guid)

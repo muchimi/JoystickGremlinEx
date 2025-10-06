@@ -805,6 +805,8 @@ class InputItemListView(ui_common.AbstractView):
                         is_button = data.is_button
                     )
 
+                    
+
                     if self.custom_widget_handler:
                         # custom widget creation handling
                         widget = self.custom_widget_handler(self, index, identifier, data, parent = self.scroll_layout)
@@ -819,7 +821,11 @@ class InputItemListView(ui_common.AbstractView):
                         elif data.input_type == InputType.JoystickHat:
                             widget.setIcon("ei.fullscreen")
                         widget.create_action_icons(data)
-                        widget.setDescription(data.description)
+                        
+
+                    # set the description based on the mapping description
+                    widget.setDescription(data.description)                        
+                    # id update
                     widget._update_container_id()
 
                     self.scroll_layout.addWidget(widget)
@@ -1771,6 +1777,19 @@ class InputItemWidget(QBoxFrame):
         # button repeater object
         self.button_widget = None
 
+        hide_widgets = []
+
+        
+        # description row
+        self._description_widget = gremlin.ui.ui_common.QIconLabel()
+        self._description_widget.setStyleSheet("font-style: italic;")
+        self._description_widget.setToolTip("Mapping Description")
+        self._description_container_widget, self._description_container_layout = gremlin.ui.ui_common.getHContainer(self._description_widget)
+        self._description_icon = None
+        hide_widgets.append(self._description_container_widget)
+        
+        if self._debug_layout: self._description_container_widget.setStyleSheet("background: blue;")
+        self._container_layout.addWidget(self._description_container_widget)
 
 
         # container icons
@@ -1779,44 +1798,58 @@ class InputItemWidget(QBoxFrame):
         if self._debug_layout: self._action_container_widget.setStyleSheet("#action_container { background: yellow; }")
         self._action_icons_container_widget, self._action_icons_container_layout = gremlin.ui.ui_common.getGridContainer()
         self._action_container_layout.addWidget(self._action_icons_container_widget)
-        self._setWidgetHeight(self._action_container_widget, 0)
+        hide_widgets.append(self._action_container_widget)
+
         
         self._container_layout.addWidget(self._action_container_widget)
 
-        # description row
-        self._description_container_widget, self._description_container_layout = gremlin.ui.ui_common.getHContainer()
-        self._setWidgetHeight(self._description_container_widget, 0)
-        if self._debug_layout:self._description_container_widget.setStyleSheet("background: blue;")
-        self._container_layout.addWidget(self._description_container_widget)
-        
-        self._input_description_widget = None
+        # input description row
+        self._input_description_widget = gremlin.ui.ui_common.QIconLabel()
+        self._input_description_container_widget, self._input_description_container_layout = gremlin.ui.ui_common.getHContainer(self._input_description_widget)
         self._input_description_icon = None
+        hide_widgets.append(self._input_description_container_widget)
+
+        if self._debug_layout: self._description_container_widget.setStyleSheet("background: brown;")
+        self._container_layout.addWidget(self._input_description_container_widget)
+
+        # custom widget row (used by some inputs to display custom UI elements like keyboard )
+        self._custom_container_widget, self._custom_container_layout = gremlin.ui.ui_common.getVContainer()
+        self._custom_container_layout.setContentsMargins(4,0,0,0)
+        hide_widgets.append(self._custom_container_widget)
+        
+        if self._debug_layout: self._custom_container_widget.setStyleSheet("background: cyan; ")
+        self._container_layout.addWidget(self._custom_container_widget)
+  
 
         # repeater
         self._repeater_container_widget, self._repeater_container_layout = gremlin.ui.ui_common.getVContainer()
         self._repeater_container_widget.setContentsMargins(0,0,0,2)
-        #self._setWidgetHeight(self._repeater_container_widget, 0)
-        if self._debug_layout:self._repeater_container_widget.setStyleSheet("background: red;")
+        
+        if self._debug_layout: self._repeater_container_widget.setStyleSheet("background: red;")
         self._container_layout.addWidget(self._repeater_container_widget)
-        # self._container_layout.addWidget(QtWidgets.QLabel("A"))
+        
 
         # comment row
         self._comment_container_widget, self._comment_container_layout = gremlin.ui.ui_common.getHContainer()
-        self._setWidgetHeight(self._comment_container_widget, 0)
-        if self._debug_layout:self._comment_container_widget.setStyleSheet("background: orange;")
+        hide_widgets.append(self._comment_container_widget)
+        
+        if self._debug_layout: self._comment_container_widget.setStyleSheet("background: orange;")
         self._container_layout.addWidget(self._comment_container_widget)
 
         # custom content row
         self._custom_container_widget, self._custom_container_layout = gremlin.ui.ui_common.getVContainer()
-        self._setWidgetHeight(self._custom_container_widget, 0)
-        self._custom_container_widget.setContentsMargins(0,0,0,4)
+        self._custom_container_widget.setContentsMargins(0,0,0,4) # give room below
+        hide_widgets.append(self._custom_container_widget)
+        
+   
         if self._debug_layout:self._custom_container_widget.setStyleSheet("background: cyan;")
         self._container_layout.addWidget(self._custom_container_widget)
 
         # status row
         self._status_container_widget, self._status_container_layout = gremlin.ui.ui_common.getVContainer()
+        hide_widgets.append(self._status_container_widget)
         if self._debug_layout:self._status_container_widget.setStyleSheet("background: gray;")
-        self._setWidgetHeight(self._status_container_widget, 0)
+        
 
         self._status_widget = None
         self._container_layout.addWidget(self._status_container_widget)
@@ -1824,14 +1857,20 @@ class InputItemWidget(QBoxFrame):
         # container ID row
         self._container_id_widget, self._container_id_layout = gremlin.ui.ui_common.getVContainer()
         if self._debug_layout:self._container_id_widget.setStyleSheet("background: magenta;")
-        self._setWidgetHeight(self._container_id_widget, 0)
+        hide_widgets.append(self._container_id_widget)
+        
         
         self._container_layout.addWidget(self._container_id_widget)
+        spacer = QtWidgets.QWidget()
+        spacer.setFixedHeight(4)
+        self._container_layout.addWidget(spacer)
         
-        self._container_layout.addStretch(2)
+        #self._container_layout.addStretch(2)
     
 
         self._ui_loaded = True
+
+        self._setWidgetHeight(hide_widgets, 0)
 
         # event filter
         self.installEventFilter(self)
@@ -1991,11 +2030,17 @@ class InputItemWidget(QBoxFrame):
     def _getRowHeight(self) -> int:
         return 28
     
-    def _setWidgetHeight(self, widget : QtWidgets.QWidget, h):
+    def _setWidgetHeight(self, widget : QtWidgets.QWidget | list [QtWidgets.QWidget] , h):
         ''' sets fixed min/max height'''
-        if Shiboken.isValid(widget):
-            widget.setMinimumHeight(h)
-        widget.setMaximumHeight(h)
+        if not hasattr(widget,"__iter__"):
+            w_list = [widget]
+        else:
+            w_list = widget
+        for widget in w_list:
+            if widget == self._description_container_widget and h != 0:
+                pass
+            if Shiboken.isValid(widget):
+                widget.setFixedHeight(h)
 
 
 
@@ -2035,6 +2080,7 @@ class InputItemWidget(QBoxFrame):
                         # axis
                         if not current_axis_widget:
                             widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
+                            widget.sizeChanged.connect(self._repeater_size_changed)
                             # calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
                             # widget.show_calibrated = calibration.hasData # enable calibrated mode dual repeater
 
@@ -2085,12 +2131,19 @@ class InputItemWidget(QBoxFrame):
             widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
             self._repeater_container_layout.addWidget(widget)                
             self._repeater_container_layout.addStretch()
-            height = 50 # self._repeater_container_widget.sizeHint().height()
+            #height = self._getRowHeight()
+            #height = 20 # single row height
+            #height = 50 # self._repeater_container_widget.sizeHint().height()
+            height = widget.sizeHint().height() + 4
             self._setWidgetHeight(self._repeater_container_widget, height)
 
            
 
 
+    def _repeater_size_changed(self):
+        widget = self.sender()
+        height = widget.sizeHint().height() + 4
+        self._setWidgetHeight(self._repeater_container_widget, height)
 
 
     def _message_key_changed(self, old_message_key, new_message_key):
@@ -2255,89 +2308,37 @@ class InputItemWidget(QBoxFrame):
         ''' sets the title of the input widget '''
         self._title_text_widget.setText(value)
 
-    def setInputDescription(self, value):
-        ''' sets the title of the input widget '''
-        
-        import gremlin.ui.virtual_keyboard
-        
-        gremlin.util.clear_layout(self._description_container_layout)
-        if value is not None:
-            
-            rh = self._getRowHeight()
-            if isinstance(value, str):
-                if value:
-                    self._input_description_widget = gremlin.ui.ui_common.QIconLabel(self._input_description_icon, value)
-                    self._description_container_layout.addWidget(self._input_description_widget)
-                    self._setWidgetHeight(self._description_container_widget, rh)
-                else:
-                    self._setWidgetHeight(self._description_container_widget, 0)
-
-            else:
-
-                if isinstance(value[0], gremlin.keyboard.Key):
-
-
-                    #css = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
-
-                    # list of individual keys
-                    container_widget, container_layout = gremlin.ui.ui_common.getHContainer()
-                    if len(value) < 8:
-                        # display as keys if there enough width
-                        max_width = 32
-                        
-                        h = gremlin.ui.ui_common.get_text_height()
-                        max_height = h + 4
-
-                        border_color = gremlin.ui.ui_common.Color.keyBorderColor()
-                        background_color = gremlin.ui.ui_common.Color.keyBackgroundColor()
-                        key_color = gremlin.ui.ui_common.Color.keyForegroundColor()
-
-                        key : gremlin.keyboard.Key
-                        for key in value:
-
-                            widget = gremlin.ui.virtual_keyboard.QKeyWidget()
-                            icon = gremlin.keyboard.KeyMap.icon(key)
-                            name = gremlin.keyboard.KeyMap.get_name(key)
-                            tooltip = gremlin.keyboard.KeyMap.get_description(key, True)
-                            if icon:
-                                widget.setIcon(icon)
-                            if name:
-                                widget.setText(name)
-                            if tooltip:
-                                widget.setToolTip(tooltip)
-                            widget.keySize = 2
-                            widget.autoSize = True
-                            
-                            widget.setReadOnly(True)
-                            
-   
-                            container_layout.addWidget(widget)
-
-                    else:
-                        # output as text that can wrap
-                        keys = "".join(key.name + " " for key in value)
-                        lbl = QtWidgets.QLabel(keys)
-                        lbl.setWordWrap(True)
-                        container_layout.addWidget(lbl)    
-                    container_layout.addStretch(4)
-                elif isinstance(value[0], str):
-                    # output as text that can wrap
-                    keys = "".join(name + " " for name in value)
-                    lbl = QtWidgets.QLabel(keys)
-                    lbl.setWordWrap(True)
-                    container_layout.addWidget(lbl)
-                else:
-                    container_layout.addWidget(QtWidgets.QLabel("[Don't know how to handle input data format]"))
-                container_layout.addStretch()
-                
-                self._description_container_layout.addWidget(container_widget)
-                self._setWidgetHeight(self._description_container_widget, rh)
-
+    def setCustomContent(self, items : QtWidgets.QWidget | list [QtWidgets.QWidget]):
+        ''' adds custom content to the input widget (vertical container)'''
+        gremlin.util.clear_layout(self._custom_container_layout)
+        if not items:
+            self._setWidgetHeight(self._custom_container_widget, 0)
+        if not hasattr(items, "__iter__"):
+            widgets = [items]
         else:
-            self._input_description_widget = None
-            self._setWidgetHeight(self._description_container_widget, 0)
+            widgets = items
+        rh = 0
+        widget : QtWidgets.QWidget
+        for widget in widgets:
+            self._custom_container_layout.addWidget(widget)
+            rh += widget.sizeHint().height()
 
-        
+        self._setWidgetHeight(self._custom_container_widget, rh + 4)
+
+
+    def setInputDescription(self, description : str | None):
+        ''' sets the input description for an input widget (optional) '''
+ 
+        if description:
+            rh = self._getRowHeight()
+            self._input_description_widget.setText(description) 
+            self._input_description_widget.setIcon(self._input_description_icon)
+            self._setWidgetHeight(self._input_description_container_widget, rh)
+        else:
+            self._input_description_widget.setText(None)
+            self._input_description_widget.setIcon(None)
+            self._setWidgetHeight(self._input_description_container_widget, 0)
+
             
 
         
@@ -2348,7 +2349,7 @@ class InputItemWidget(QBoxFrame):
             self._input_description_icon = icon_path
         else:
             self._input_description_icon = load_icon(icon_path, use_qta) if icon_path else None
-        if self._input_description_widget and Shiboken.isValid(self._input_description_widget):
+        if Shiboken.isValid(self._input_description_widget):
             self._input_description_widget.setIcon(self._input_description_icon)
 
     def setStatus(self, status: str, icon = None):
@@ -2363,11 +2364,17 @@ class InputItemWidget(QBoxFrame):
         
 
 
-    def setDescription(self, value):
-        ''' sets the description of the input widget
-        :param value: string or tuple/list of strings  
-        '''
-        self.setInputDescription(value)
+    def setDescription(self, description : str | None):
+        ''' sets the description of the input widget '''
+        if description:
+            rh = self._getRowHeight()
+            self._description_widget.setText(description) 
+            self._description_widget.setIcon(self._input_description_icon)
+            self._setWidgetHeight(self._description_container_widget, rh)
+        else:
+            self._description_widget.setText(None)
+            self._description_widget.setIcon(None)
+            self._setWidgetHeight(self._description_container_widget, 0)
 
        
     def setComment(self, value, icon = None):
@@ -2417,6 +2424,9 @@ class InputItemWidget(QBoxFrame):
                 if self._input_button_widget and Shiboken.isValid(self._input_button_widget):
                     self._title_icon_layout.removeWidget(self._input_button_widget)
                     self._input_button_widget = None
+
+            # description field
+            self.setDescription(self.data.description)
 
 
             if not self._config_external or self.populate_name is not None:
@@ -4745,7 +4755,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         """Creates the description input for the input item."""
         self.description_layout = QtWidgets.QHBoxLayout()
         self.description_layout.addWidget(
-            QtWidgets.QLabel("<b>Action Description</b>")
+            QtWidgets.QLabel("<b>Mapping Description:</b>")
         )
         self.description_field = QtWidgets.QLineEdit()
         self.description_field.setText(self.item_data.description)

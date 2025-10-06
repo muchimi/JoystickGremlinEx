@@ -83,8 +83,7 @@ class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
                     (not is_pressed and self.action_data.exec_on_release) 
         
         if trigger:
-            verbose = gremlin.config.Configuration().verbose
-            if verbose: syslog.info(f"DESCRIPTION: {self.action_data.description}  (input pressed: [{is_pressed}]")
+            syslog.info(f"DESCRIPTION: {self.action_data.description}  (input pressed: [{is_pressed}]")
         return True
 
 

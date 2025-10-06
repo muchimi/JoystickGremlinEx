@@ -227,7 +227,7 @@ class KeyboardInputItem(AbstractInputItem):
         child.set("description", root_key.lookup_name)
         node.append(child)
         for key in root_key.latched_keys:
-            comment = f"virtual: 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.extended}"
+            comment = f"virtual: 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
             latched_child = etree.Element("latched")
             latched_child.set("virtual-code", str(key.virtual_code))
             latched_child.set("scan-code", str(key.scan_code))
@@ -748,8 +748,6 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent=parent, data=data)
         widget.data = data
         widget.create_action_icons(data)
-        widget.setDescription(data.description)
-
         widget.setIcon("fa6s.keyboard")
         widget.enable_close()
         widget.enable_edit()
@@ -759,13 +757,54 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         return widget
     
+    def _set_custom_content(self, input_widget, values : list[gremlin.keyboard.Key]):
+        ''' sets custom content '''
+        if not values:
+            # clear content
+            input_widget.setCustomContent(None)
+            return 
+        
+        widgets = []
+        if len(values) < 8:
+            key : gremlin.keyboard.Key
+            for key in values:
+
+                widget = gremlin.ui.virtual_keyboard.QKeyWidget()
+                icon = gremlin.keyboard.KeyMap.icon(key)
+                name = gremlin.keyboard.KeyMap.get_name(key)
+                tooltip = gremlin.keyboard.KeyMap.get_description(key, True)
+                if icon:
+                    widget.setIcon(icon)
+                if name:
+                    widget.setText(name)
+                if tooltip:
+                    widget.setToolTip(tooltip)
+                widget.keySize = 2
+                widget.autoSize = True
+                widget.setFixedHeight(28)
+                
+                widget.setReadOnly(True)
+                widgets.append(widget)
+        else:
+            # output as text that can wrap
+            keys = "".join(key.name + " " for key in values)
+            lbl = QtWidgets.QLabel(keys)
+            lbl.setWordWrap(True)
+            widgets = [lbl]
+        
+
+        # update
+        container_widget, container_layout = gremlin.ui.ui_common.getHContainer(widgets)
+        input_widget.setCustomContent(container_widget)
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the keyboard input widget has to update itself on a data change '''
         data = input_widget.identifier.input_id
         input_widget.setTitle(data.title_name)
+        # input_widget.setInputDescription(data.description)
         values = data.getKeyList()
-        input_widget.setInputDescription(values)
+        self._set_custom_content(input_widget, values)
+        
         #input_widget.setInputDescription(data.display_name_scan)
         input_widget.display_name = data.display_name_scan
         

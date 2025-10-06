@@ -4342,6 +4342,7 @@ class QProgressBar(QtWidgets.QWidget):
     '''
 
     valueChanged = QtCore.Signal() # fires when the value changes (and widget is not in readonly mode)
+    sizeChanged = QtCore.Signal() # fires when the number of rows in the progress bar changes
 
     def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None, parent = None):
         super().__init__()
@@ -4360,6 +4361,7 @@ class QProgressBar(QtWidgets.QWidget):
         self._data = data
         self._percent = {} # percent valuess of the progress bar by value index
         self._colors = {} # color gradient assigned to a specific channel
+        self._row_count = 1 # display rows by default
 
         self._start_color = {} # color for each value band (start gradient)
         self._end_color = {} # color for each value band (end gradient)
@@ -4386,6 +4388,7 @@ class QProgressBar(QtWidgets.QWidget):
         self.setRange(min, max)
         self.installEventFilter(self)
         
+
     @property
     def data(self):
         return self._data
@@ -4532,7 +4535,7 @@ class QProgressBar(QtWidgets.QWidget):
 
     def sizeHint(self) -> QtCore.QSize:
         ''' desired widget size '''
-        count = len(self._percent)
+        count = self._row_count
         size = super().sizeHint()
         
         if count:
@@ -4638,9 +4641,14 @@ class QProgressBar(QtWidgets.QWidget):
 
                     # next channel
                     index += 1
-            
 
         self.updateGeometry() # indicate desired size changed 
+        
+        count = len(self._percent)
+        if count != self._row_count:
+            self._row_count = count
+            self.sizeChanged.emit()                    
+
         self.update() # repaint
 
     
@@ -4734,6 +4742,7 @@ class QHookedProgressBar(QProgressBar, gremlin.base_classes.JoystickHook):
         if not Shiboken.isValid(self):
             return
         self._hookDevice(device_guid, input_type, input_id, self.setValue)
+
         
 
 class ButtonStateWidget(QtWidgets.QWidget):
@@ -4784,6 +4793,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
+
+    def desiredHeight(self):
+        return self.sizeHint().height()
         
     def _config_changed(self, option, value):
         ''' called when a configuration option changes '''
@@ -8712,12 +8724,10 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, font = 
     layout.setContentsMargins(0,0,0,0)
     if alignment is None:
         alignment = QtCore.Qt.AlignmentFlag.AlignTop
-
     layout.setAlignment(widget, alignment)
     stretch = False
     if label:
         layout.addWidget(QtWidgets.QLabel(label))
-        
         stretch = True
     if widget_or_list:
         if isinstance(widget_or_list, list)  or isinstance(widget_or_list, tuple):

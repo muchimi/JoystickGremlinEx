@@ -2207,12 +2207,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.grid_visible_widget = QtWidgets.QCheckBox("Show button grid")
         self.grid_visible_widget.setToolTip("Sets the button grid visibility, use ctrl+ to enable/disable globally")
-        
-        global_visible = gremlin.config.Configuration().button_grid_visible
-        if global_visible:
-            self.action_data.grid_visible = global_visible
-        visible = self.action_data.grid_visible
-        self.grid_visible_widget.setChecked(visible)
+        self.grid_visible_widget.setChecked(self.action_data.grid_visible)
         self.grid_visible_widget.clicked.connect(self._grid_visible_cb)
 
 
@@ -5100,7 +5095,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.button_last_value : bool = None # last button sent
 
         config = gremlin.config.Configuration()
-        self._grid_visible = config.button_grid_visible # true if the button grid is visible
+        self._grid_visible = None
 
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
@@ -5630,6 +5625,9 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @property
     def grid_visible(self) -> bool:
+        config = gremlin.config.Configuration()
+        if self._grid_visible is None:
+            return config.button_grid_visible
         return self._grid_visible
     @grid_visible.setter
     def grid_visible(self, value : bool):
@@ -5783,6 +5781,8 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.action_mode = default_action_mode
 
 
+            if "grid-visible" in node.attrib:
+                self._grid_visible = safe_read(node,"grid-visible", bool, False)
 
                 
             # sync on start (axis input only)
@@ -6126,6 +6126,8 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         node.set("auto_release", safe_format(self.auto_release,bool))
         node.set("ignore-release",safe_format(self.ignore_release,bool)) 
+        if self._grid_visible is not None:
+            node.set("grid-visible", safe_format(self.grid_visible, bool))
 
         node.set("target_value", safe_format(self.target_value, float))
         node.set("target_relative", safe_format(self.target_is_relative, bool))

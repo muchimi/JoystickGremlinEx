@@ -1050,14 +1050,14 @@ class Device:
         node.set("label", safe_format(self.label, str))
         node.set("device-guid", write_guid(self.device_guid))
         device_type = DeviceType.to_string(self.type)
- 
         node.set("type",device_type)
         for mode in sorted(self.modes.values(), key=lambda x: x.name):
             mode_node = mode.to_xml()
-            depth = gremlin.util.xmlNodeDepth(mode_node)
-            if depth > 2: 
-                # only write nodes that have mappings
-                node.append(mode.to_xml())
+            if mode_node is not None:
+                node.append(mode_node)
+
+        # syslog.info(f"device: {self.name}")
+        # syslog.info(etree.tostring(node,pretty_print=True))
         return node
 
 
@@ -2562,8 +2562,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         if self._description:
             node.set("description", safe_format(self._description, str))
-        else:
-            node.set("description", "")
+
 
         # lock state
         node.set("locked", safe_format(self._locked, bool))
@@ -4176,20 +4175,17 @@ class Profile():
         # strip the unused nodes that don't contain any data where possible to reduce the size of the profile
         for device in device_list:
             node = device.to_xml()
-            if device.device_type == DeviceType.Joystick:
+            depth = gremlin.util.xmlNodeDepth(node)
+            if device.device_type in (
+                DeviceType.Joystick,
+                DeviceType.VJoy,
+                DeviceType.State,
+                DeviceType.ModeControl,
+
+                ):
+
                 # remove empty nodes
-                for axis_node in node.xpath("//axis"):
-                    if not list(axis_node):
-                         axis_node.getparent().remove(axis_node)
-                for button_node in node.xpath("//button"):
-                    if not list(button_node):
-                         button_node.getparent().remove(button_node)
-                has_container = node.xpath("//container")
-                if has_container:
-                    devices.append(node)
-            elif device.device_type == DeviceType.VJoy:
-                has_container = node.xpath("//container")
-                if has_container:
+                if depth > 0:
                     devices.append(node)
             else:
                 # check for inputs
@@ -4724,18 +4720,41 @@ class Mode:
         if self.inherit is not None:
             node.set("inherit", safe_format(self.inherit, str))
         input_types = Mode.SaveInputTypes
+        include = False
         for input_type in input_types:
             item_list = self.config[input_type].values()
             if item_list:            
                 item_list = sorted(item_list, key=lambda x: x.input_id)
+                # item_list = [item for item in item_list if item.description or item.containers]
             for item in item_list:
                 #if item.is_valid_for_save():
                 item_node = item.to_xml()
                 depth = gremlin.util.xmlNodeDepth(item_node)
-                if depth > 0 or item.device_type != DeviceType.Joystick:
-                    # skip empty joystick items with no mappings
+                do_include = False
+                match item.device_type:
+                    case DeviceType.Joystick:
+                        if item.description or depth > 1:
+                            do_include = True
+                    case DeviceType.OctaviIFR1:
+                        do_include = depth > 1
+                    case DeviceType.ModeControl:
+                        do_include = depth > 1
+                    case _:
+                        # other nodes = ok
+                        do_include = True
+                    
+
+                if do_include:
+                    # syslog.info(f"Mode: {self.name} include input: {item.input_name}")
                     node.append(item_node)
-        return node
+                    include = True
+                    
+        if include:
+            return node
+        # syslog.info(f"Mode: {self.name} exclude XML:")
+        # syslog.info(etree.tostring(node, pretty_print = True))
+        # syslog.info("----")
+        return None
 
     def delete_data(self, input_type, input_id):
         """Deletes the data associated with the provided

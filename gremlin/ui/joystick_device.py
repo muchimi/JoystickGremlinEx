@@ -572,6 +572,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             #gremlin.util.dumpWidgets(self._right_container_layout)
             self.update()
         
+       
 
     
     def _description_changed_cb(self, index, text):
@@ -581,8 +582,11 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         '''
         item = self.input_item_list_view.itemAt(index)
-        item.data.description = text
-        item.setDescription(text)
+        if item:
+            item.data.description = text
+            item.setDescription(text)
+        else:
+            syslog.error(f"set description (joystick input) failed: index: [{index}] does not exist.")
 
     def _description_clear_cb(self, index, widget):
         ''' delete description entry '''
