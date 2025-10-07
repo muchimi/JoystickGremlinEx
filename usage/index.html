@@ -2252,6 +2252,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Sequence Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#wiggle-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wiggle mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4448,6 +4463,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Sequence Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#wiggle-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wiggle mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -6538,7 +6568,19 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 <p>The chain delay is included although it will conflict with long press.  I may remove it later because the value may be limited in most use-cases that would benefit from this container.</p>
 <p>Within each action set, the chain group entries can be re-ordered, or can be removed.</p>
 <h2 id="sequence-container">Sequence Container<a class="headerlink" href="#sequence-container" title="Permanent link">&para;</a></h2>
-<p>This experimental container executes all contained actions in sequence, similar to a macro.  The difference between this container and others is the order of execution is guaranteed and each action runs in sequence rather than in parallel.</p>
+<p>This container executes all contained actions in sequence, similar to a macro.  The difference between this container and others is the order of execution is guaranteed in step order, and each action runs in sequence rather than in parallel.</p>
+<p>This container has several features not found in a macro:</p>
+<ul>
+<li>all action types suitable for momentary input can be used, such as OSC.</li>
+<li>steps can themselves contain macros if needed.</li>
+<li>wiggle mode can be used to randomize the execution of the container</li>
+<li>each step can contain more than one action.</li>
+</ul>
+<h3 id="wiggle-mode">Wiggle mode<a class="headerlink" href="#wiggle-mode" title="Permanent link">&para;</a></h3>
+<p>When Wiggle mode is enabled, this container can randomize the execution of actions it contains. </p>
+<p>In wiggle mode, the container will continue executing actions while the input is pressed, and stop when the input is released.  This makes it particularly suitable to usage by a state, or when mapped to a physical toggle switch on a hardware input.</p>
+<p>The pause between steps can be randomized between a minimum delay, and a maximum delay.</p>
+<p>If step randomization is enabled, the next step to execute will also be randomized.  If disabled, the step sequence is observed.</p>
 <p>Actions execute in the order they are listed and they can be re-ordered if needed.</p>
 <p>The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.</p>
 <h2 id="map-to-state_1">Map to State<a class="headerlink" href="#map-to-state_1" title="Permanent link">&para;</a></h2>
