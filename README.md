@@ -14,8 +14,20 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T73)
+- Improved: Sequence container delay validation (so if values are not accepted it will explain why).
+- New: Sequence container gains execute on press/release options.
+- New: Sequence container gains a randomize step option for wiggle mode. When active, the next executed step while wiggling will be picked at random instead of being sequential.
+- New: Exposed two parameters for VJOY loopback handling in a new exec page in global options. The first enables time to be used as a factor to filter vjoy loopback events, the other is the delay in milliseconds. Explanation: Loopback is a new mode designed to work with vjoy behavior when used concurrently as input and output.  Depending on timing, vjoy may fire a direct input event to the owning process, and (most of the time) it doesn't. Vjoy is not meant to be used as input/output by the same process concurrently (and also why this was disabled in the original Joystick Gremlin). GremlinEx allows this and uses a monitoring service to watch vjoy related events, and suppresses any duplicates it finds to avoid re-triggers (or no triggers). The catch is GremlinEx also allows for VJOY to be used by another process while it's used by GremlinEx as output, which means it needs to handle both situations - triggers due to GremlinEx output, and external triggers.  The service filters received VJOY events if it sent them, the ability to factor time into the filtering may help in some situations.  Recommended value: 250ms so duplicate inputs received in a quarter second will be ignored if they are the "same" event (so, setting a button twice, moving an axis to the same spot, etc...).  Filtering is only active when using vjoy both as input and output in the same profile.
+- Changed: validation logic in delay and int editor widgets and added a custom validator to avoid QT shenanigans with the built-in validator.  This could cause issues with manual data entry not being accepted.
+- Fix: bug in sequence delay validation and execution in some situations.
+- Fix: icon update logic on device mapping change disconnected
+- Fix: Options dialog - removed scrollbar as it is causing a hard crash in QT in some situations. This will get another pass later - the goal was to eliminate the QT hard crash for now. As a result, some visuals may clip if the options window is too small - this is a known issue.
+
+ 
+
 ### (m76T72)
-- Fix: description field not persisted / not displayed for some input types.
+- Fix: description field not persisted / not displayed for some input types and exception on edit.
 - Improved: further optimization of profile xml data.
 - Fix: description action not adding data to log file unless in verbose mode.
 

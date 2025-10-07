@@ -2518,3 +2518,17 @@ class Configuration(QtCore.QObject):
     @allow_exec_tree_container_validation_fail.setter
     def allow_exec_tree_container_validation_fail(self, value : bool):
         self._set_data("allow_exec_tree_container_validation_fail", value)
+
+    @property
+    def vjoy_loopback_use_time(self):
+        return self._get_data("vjoy_loopback_use_time", True)
+    @vjoy_loopback_use_time.setter
+    def vjoy_loopback_use_time(self, value : bool):
+        self._set_data("vjoy_loopback_use_time", value)
+
+    @property
+    def vjoy_loopback_delay(self):
+        return self._get_data("vjoy_loopback_delay", 250)
+    @vjoy_loopback_delay.setter
+    def vjoy_loopback_delay(self, value : int):
+        self._set_data("vjoy_loopback_delay", value)

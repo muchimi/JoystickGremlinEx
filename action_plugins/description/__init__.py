@@ -49,9 +49,12 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.inner_layout.addWidget(self.label)
         self.inner_layout.addWidget(self.description)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
-        self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
-        self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press,
+                                                                    self.action_data.exec_on_release,
+                                                                    press_callback = self._execute_on_press_changed, 
+                                                                    release_callback = self._execute_on_release_changed)
+        # self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
+        # self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
         self.main_layout.addLayout(self.inner_layout)
         self.main_layout.addWidget(self._execute_widget)
@@ -83,7 +86,7 @@ class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
                     (not is_pressed and self.action_data.exec_on_release) 
         
         if trigger:
-            syslog.info(f"DESCRIPTION: {self.action_data.description}  (input pressed: [{is_pressed}]")
+            syslog.info(f"DESCRIPTION: {self.action_data.description}  (input pressed: [{is_pressed}])")
         return True
 
 

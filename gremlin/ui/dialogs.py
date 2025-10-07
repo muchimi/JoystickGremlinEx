@@ -338,42 +338,18 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.setWindowTitle("Options")
 
-        self.dialog_layout = QtWidgets.QVBoxLayout(self)
-
-        #self.main_layout = QtWidgets.QGridLayout()
+        self.dialog_layout = QtWidgets.QVBoxLayout()
         self.main_layout = QtWidgets.QVBoxLayout(self)
-
-
+        self.main_layout.addLayout(self.dialog_layout)
         self.tab_container = QtWidgets.QTabWidget()
-        #self.tab_container.setMaximumWidth(self._max_content_width)
-
-        self.scroll_area = QtWidgets.QScrollArea()
-        self.scroll_widget = QtWidgets.QWidget()
-        self.scroll_layout = QtWidgets.QVBoxLayout()
-        self.scroll_widget.setLayout(self.scroll_layout)
-        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding,QtWidgets.QSizePolicy.Expanding)
-        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-
-        # Configure the scroll area
-        #self.scroll_area.setMinimumWidth(300)
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setWidget(self.scroll_widget)
-
-        self.dialog_layout.addWidget(self.scroll_area)
-
-
-        self.scroll_layout.addLayout(self.main_layout)
-
-        #self.main_layout.addWidget(self.tab_container,0,0)
         self.main_layout.addWidget(self.tab_container)
-        #self.main_layout.addWidget(QtWidgets.QWidget(),0,4)
-        #self.main_layout.setColumnStretch(4,2)
+        
 
 
         self.closed.connect(self._save_on_close_cb)
 
         self._create_general_page()
+        self._create_exec_page()
         self._create_ui_options_page()
         self._create_remote_control_page()
         self._create_tts_page()
@@ -400,8 +376,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         options_layout.addStretch()
         options_layout.addWidget(close_button)
 
-
-        self.dialog_layout.addWidget(options_container)
+        self.main_layout.addWidget(options_container)
 
         # select the last used tab
         index = self.config.last_options_tab
@@ -413,7 +388,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._update_highlight_options() # update highlight state for checkboxes
 
         self.tab_container.currentChanged.connect(self._tab_changed_cb)
-        self.setMinimumWidth(self._max_content_width)
+        #self.setMinimumWidth(self._max_content_width)
 
         
 
@@ -471,6 +446,59 @@ class OptionsUi(ui_common.BaseDialogUi):
     def _tab_changed_cb(self, new_index):
         ''' occurs on tab change, save the last used tab index so we can restore it later '''
         self.config.last_options_tab = new_index
+
+    def _create_exec_page(self):
+        """Creates the general execution page."""
+
+        page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
+        page_layout.setContentsMargins(4,4,4,4)
+
+        grid_widget, grid_layout = gremlin.ui.ui_common.getGridContainer()
+        col1_widget, col1_layout = gremlin.ui.ui_common.getVContainer()
+        col2_widget, col2_layout = gremlin.ui.ui_common.getVContainer()
+        col3_widget, col3_layout = gremlin.ui.ui_common.getVContainer()
+
+
+        bottom_widget, _ = gremlin.ui.ui_common.getVContainer()
+
+        grid_layout.addWidget(col1_widget, 0,0)
+        grid_layout.addWidget(col2_widget, 0,1)
+        grid_layout.addWidget(col3_widget, 0,3)
+
+        page_layout.addWidget(grid_widget)
+        page_layout.addWidget(bottom_widget)
+        page_layout.addStretch()
+
+        self.vjoy_use_time_widget = QtWidgets.QCheckBox("Use VJOY loopbadck timeout")
+        self.vjoy_use_time_widget.setChecked(self.config.vjoy_loopback_use_time)
+        self.vjoy_use_time_widget.clicked.connect(self._handle_vjoy_loopback_use_time)
+        self.vjoy_use_time_widget.setToolTip("When set, time will factor in suppressing VJOY Loopback events.\nLoopback events will be processed if different values are received.\nThis option will also factor time between events for any suppression.")
+
+        self.vjoy_loopback_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self.config.vjoy_loopback_delay,
+                                                                            show_shortcuts = False,
+                                                                            label = "Loopback delay (ms):"
+                                                                            )
+        self.vjoy_loopback_delay_widget.valueChanged.connect(self._handle_loopback_delay)
+        self.vjoy_loopback_delay_widget.setToolTip("Looback delay in milliseconds.\nProcessing of duplicate loopback events that occur before this delay will be ignored.")
+
+
+        box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Options", transparent = True)
+        
+        box.addWidget(self.vjoy_use_time_widget)
+        box.addWidget(self.vjoy_loopback_delay_widget)
+
+        col1_layout.addWidget(box)
+
+        widget, _ = gremlin.ui.ui_common.getVContainer(page_widget)
+        self.tab_container.addTab(widget, "Execution")
+
+    @QtCore.Slot(bool)
+    def _handle_vjoy_loopback_use_time(self, checked : bool):
+        self.config.vjoy_loopback_use_time = checked
+
+    @QtCore.Slot(int)
+    def _handle_loopback_delay(self, value : int):
+        self.config.vjoy_loopback_delay = value
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_general_page(self):
@@ -1125,9 +1153,6 @@ This setting is also available on a profile by profile basis on the profile tab,
         page_layout.addWidget(self.convert_vjoy_remap_widget)
         page_layout.addWidget(self.convert_response_curve_widget)
         
-
-
-
 
         # profile map widgets
         self.container_map_widget = QtWidgets.QWidget()

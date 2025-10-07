@@ -1926,6 +1926,47 @@ class QFloatLineEditEx(QtWidgets.QWidget):
     def maximum(self):
         return self._max_range    
 
+
+class IntValidator(QtGui.QValidator):
+    def __init__(self, min_range = None, max_range = None, parent=None):
+        super().__init__(parent)
+        self._min_range = min_range
+        self._max_range = max_range
+
+    def setBottom(self, value : int):
+        self._min_range = value
+
+    def setTop(self, value : int):
+        self._max_range = value
+
+    def validate(self, input_str, pos):
+        # Implement your custom validation logic here
+        # Return a tuple: (state, validated_string, cursor_position)
+        # States: QValidator.Invalid, QValidator.Intermediate, QValidator.Acceptable
+
+        if not input_str:
+            return (QtGui.QValidator.Intermediate, input_str, pos)
+        
+        # invalid characters?
+        if not gremlin.util.valid_integer_string(input_str):
+            return (QtGui.QValidator.Invalid, input_str, pos)
+        
+        # convert
+        try:
+            value = int(input_str)
+        except:
+            return (QtGui.QValidator.Invalid, input_str, pos)
+        
+        # range check
+        if self._min_range is not None and value < self._min_range:
+            return (QtGui.QValidator.Invalid, input_str, pos)
+        
+        if self._max_range is not None and value > self._max_range:
+            return (QtGui.QValidator.Invalid, input_str, pos)
+        
+        return (QtGui.QValidator.Acceptable, input_str, pos)
+
+        
 class QIntLineEdit(QtWidgets.QLineEdit):
     ''' integer input validator with optional range limits for input axis
 
@@ -1935,17 +1976,21 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
     doubleClick = QtCore.Signal() # fires when the input is double clicked
+    invalid = QtCore.Signal() # fires when there is an invalid value entered
 
-    def __init__(self, data = None, min_range = -16383, max_range = 16384, step = 1, value = 0, chars = 8, parent = None):
+    def __init__(self, data = None, min_range = None, max_range = None, step = 1, value = 0, chars = 8, parent = None):
         super().__init__(parent)
-        if min_range > max_range:
-            max_range, min_range = min_range, max_range
+        if min_range is not None and max_range is not None:
+            if min_range > max_range:
+                max_range, min_range = min_range, max_range
         self._min_range = min_range
         self._max_range = max_range
         self._step = step
 
+        self._supressed = False # true if events are suppressed
 
-        self._validator = QtGui.QIntValidator(min_range, max_range) 
+        # self._validator = QtGui.QIntValidator(min_range, max_range) 
+        self._validator = IntValidator(min_range, max_range) 
         self._validator.setLocale(self.locale()) # handle correct floating point separator
         self.textChanged.connect(self._validate)
         self.setValidator(self._validator)
@@ -1958,6 +2003,9 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         else:
             self.chars = 0
 
+    def setSuppressed(self, value : bool):
+        self._supressed = value
+    
 
     @property
     def chars(self) -> int:
@@ -2013,33 +2061,40 @@ class QIntLineEdit(QtWidgets.QLineEdit):
             # format the input to the correct decimals
             self.setValue(self.value())
         elif t == QtCore.QEvent.Type.MouseButtonDblClick:
-            self.doubleClick.emit()
+            if not self._supressed:
+                self.doubleClick.emit()
         return False
 
 
     def _update_value(self, value : int):
         other = self.value()
-
+        v1 = int(value)
         if value is None and other is None:
             return
-        s_value = str(int(value))
+        s_value = str(v1)
         if s_value != self.text():
-            self.setText(s_value)
-        if other is not None and other != value:
-            self.valueChanged.emit(int(value))
-
-
+            with QtCore.QSignalBlocker(self):
+                self.setText(s_value)
+        if not self._supressed and other is not None and other != value:
+            self.valueChanged.emit(v1)
 
     @QtCore.Slot()
     def _validate(self):
         ''' called whenever the text changes '''
         if self.hasAcceptableInput():
             value = self.value()
-            self.valueChanged.emit(value)
+            if not self._supressed:
+                self.valueChanged.emit(value)
+        else:
+            if not self._supressed:
+                self.invalid.emit()
 
     def setValue(self, value : int):
         ''' sets the value '''
-        self._update_value(int(value))
+        v1 = int(value)
+        self._update_value(v1)
+        if not self._supressed:
+            self.valueChanged.emit(v1)
 
     def value(self) -> int:
         ''' current value, None if not a valid input'''
@@ -2069,15 +2124,16 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self._step = step
 
     def setRange(self, bottom, top):
-        if top < bottom:
+        if bottom is not None and top is not None and top < bottom:
             bottom, top = top, bottom
         self._min_range = bottom
         self._max_range = top
         self._validator.setBottom(bottom)
         self._validator.setTop(top)
         value = int(self.text())
-        value = int(gremlin.util.clamp(value, bottom, top))
-        self._update_value(value)
+        v1 = int(gremlin.util.clamp(value, bottom, top))
+        if v1 != value:
+            self._update_value(value)
 
     def setMaximum(self, top):
         self._max_range = top
@@ -6973,87 +7029,133 @@ class QDelayWidget(QtWidgets.QWidget):
     ''' widget to collect a delay time in milliseconds '''
 
     valueChanged = QtCore.Signal(int) # fired when the value changes
+    invalid = QtCore.Signal() # fires when the input is invalid
 
-    def __init__(self, value = 250, is_seconds = False, callback = None, parent = None, label = None):
+    def __init__(self, value = 250, max_value_seconds = 60, is_seconds = False, callback = None, invalid_callback = None, validation_callback = None, show_shortcuts = True, parent = None, label = None):
         '''
 
         :params value: default delay in milliseconds '''
         super().__init__(parent)
+        self._value = value
+        self._supressed = False
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
         self._callback = callback # callback when value change 
+        self._invalid_callback = invalid_callback # callback on invalid input
+        self._validation_callback = validation_callback # callback that accepts a value and returns True if the value can be used
 
         self.delay_container_widget = QtWidgets.QWidget()
         self.delay_container_layout = QtWidgets.QHBoxLayout()
         self.delay_container_widget.setLayout(self.delay_container_layout)
 
         self._is_seconds = is_seconds
+        self._max_value = max_value_seconds * 1000 # max value possible
 
         width = gremlin.ui.ui_common.get_char_width(8)
         delay_label = QtWidgets.QLabel(label if label else "Delay (ms)")
         self._delay_widget = QIntLineEdit()
-        self._delay_widget.setRange(0, 20000) # up to 20 seconds
+        self._delay_widget.invalid.connect(self._handle_invalid_input)
+        # self._delay_widget.setRange(0, self._max_value) 
         self._delay_widget.setMaximumWidth(width)
         self._delay_widget.setValue(value) # default
         self._delay_widget.valueChanged.connect(self._value_changed)
 
-        quarter_sec_button = QtWidgets.QPushButton("1/4s")
-        half_sec_button = QtWidgets.QPushButton("1/2s")
-        sec_button = QtWidgets.QPushButton("1s")
-
-        quarter_sec_button.clicked.connect(self._quarter_sec_delay)
-        half_sec_button.clicked.connect(self._half_sec_delay)
-        sec_button.clicked.connect(self._sec_delay)
-
 
         self.delay_container_layout.addWidget(delay_label)
         self.delay_container_layout.addWidget(self._delay_widget)
-        self.delay_container_layout.addWidget(quarter_sec_button)
-        self.delay_container_layout.addWidget(half_sec_button)
-        self.delay_container_layout.addWidget(sec_button)
-        self.delay_container_layout.addStretch()
+
+        if show_shortcuts:
+
+            quarter_sec_button = QtWidgets.QPushButton("1/4s")
+            half_sec_button = QtWidgets.QPushButton("1/2s")
+            sec_button = QtWidgets.QPushButton("1s")
+
+            quarter_sec_button.clicked.connect(self._quarter_sec_delay)
+            half_sec_button.clicked.connect(self._half_sec_delay)
+            sec_button.clicked.connect(self._sec_delay)
+
+
+            
+            self.delay_container_layout.addWidget(quarter_sec_button)
+            self.delay_container_layout.addWidget(half_sec_button)
+            self.delay_container_layout.addWidget(sec_button)
+            self.delay_container_layout.addStretch()
 
         self.main_layout.addWidget(self.delay_container_widget)
+
+    def setSuppressed(self, value : bool):
+        ''' supresses events when on '''
+        self._supressed = value
+            
+
+    def isValid(self) -> bool:
+        ''' true if the delay value is valid '''
+        return self._delay_widget.isValid()
+
+    def _handle_invalid_input(self):
+        if not self._supressed:
+            if self._invalid_callback:
+                self._invalid_callback()
+
+            self.invalid.emit()
 
     def setSecondsMode(self, enabled : bool):
         self._is_seconds = enabled
 
     def value(self):
         ''' gets the delay in milliseconds '''
-        value = self._delay_widget.value()
+        value = self._value
         if self._is_seconds:
             value /= 1000 # to seconds
         return value
 
-    def setValue(self, value : float):
+    def setValue(self, value : float, emit = True):
         ''' sets the widget value 
         :param value: value in ms or in seconds if the widget mode is set to seconds
         '''
         milliseconds = milliseconds = value * 1000 if self._is_seconds else value
-        if milliseconds >= 0 and milliseconds != self._delay_widget.value():
+        if self._validation_callback:
+            if not self._validation_callback(milliseconds):
+                return
+        if milliseconds >= 0 and milliseconds != self._value:
+            self._value = milliseconds
+            self._delay_widget.setSuppressed(True)
             self._delay_widget.setValue(milliseconds)
-            if self._callback:
-                self._callback(milliseconds)
-            self.valueChanged.emit(milliseconds)
+            self._delay_widget.setSuppressed(False)
+            if emit and not self._supressed:
+                if self._callback:
+                    self._callback(milliseconds)
+                self.valueChanged.emit(milliseconds)
+
+    
 
     @QtCore.Slot()
     def _value_changed(self):
-        milliseconds = self._delay_widget.value()
-        if self._callback:
-            self._callback(milliseconds)
-        self.valueChanged.emit(milliseconds)
+        value = self._delay_widget.value()
+        if self._validation_callback:
+            if not self._validation_callback(value):
+                self._delay_widget.setSuppressed(True)
+                self._delay_widget.setValue(self._value)
+                self._delay_widget.setSuppressed(False)
+                return
+        self._value = value
+        if not self._supressed:
+            if self._callback:
+                self._callback(value)
+            self.valueChanged.emit(value)
 
     @QtCore.Slot()
     def _quarter_sec_delay(self):
-        self._delay_widget.setValue(250)
+        self.setValue(250)
 
     @QtCore.Slot()
     def _half_sec_delay(self):
-        self._delay_widget.setValue(500)
+        self.setValue(500)
 
+    
     @QtCore.Slot()
     def _sec_delay(self):
-        self._delay_widget.setValue(1000)
+        self.setValue(1000)
 
 
 import gremlin.singleton_decorator
@@ -10213,7 +10315,13 @@ class QExecuteWidget(QtWidgets.QWidget):
     valueChanged = QtCore.Signal(bool, bool) # fires when either press or release changed
 
     ''' widget presenting Execute on press, Execute on release options '''
-    def __init__(self, execute_on_press : bool = True, execute_on_release : bool = True, label = None, parent = None):
+    def __init__(self,
+                 execute_on_press : bool = True,
+                 execute_on_release : bool = True,
+                 press_callback = None,
+                 release_callback = None,
+                 label = None,
+                 parent = None):
         super().__init__(parent)
 
         self._execute_on_press = execute_on_press
@@ -10224,12 +10332,13 @@ class QExecuteWidget(QtWidgets.QWidget):
         self._press_widget.setToolTip("If checked, commands sends on a press event")
         self._press_widget.clicked.connect(self._press_changed)
 
-
         self._release_widget = QtWidgets.QCheckBox("Execute on release")
         self._release_widget.setChecked(execute_on_release)
         self._release_widget.setToolTip("If checked, commands sends on a release event")
         self._release_widget.clicked.connect(self._release_changed)
 
+        self._press_callback = press_callback
+        self._release_callback = release_callback
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         widget, _ = getHContainer([self._press_widget, self._release_widget], label = label)
@@ -10242,6 +10351,8 @@ class QExecuteWidget(QtWidgets.QWidget):
         self._execute_on_press = checked
         v1 = checked
         v2 = self.execute_on_release
+        if self._press_callback:
+            self._press_callback(v1)
         self.pressChanged.emit(v1)
         self.valueChanged.emit(v1,v2)
 
@@ -10251,6 +10362,8 @@ class QExecuteWidget(QtWidgets.QWidget):
         self._execute_on_release = checked
         v1 = self.execute_on_press
         v2 = checked
+        if self._release_callback:
+            self._release_callback(v2)
         self.releaseChanged.emit(v2)
         self.valueChanged.emit(v1,v2)
 

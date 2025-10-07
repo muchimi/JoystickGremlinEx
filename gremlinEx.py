@@ -1968,7 +1968,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         device_guid = gremlin.util.normalize_guid(device_guid)
 
         # device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-
+        verbose = gremlin.config.Configuration().verbose_mode_ui
 
 
         index =  self.ui.device_widget.indexOf(widget)
@@ -1983,7 +1983,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._widget_device_index_map[device_guid] = index
         self._widget_index_device_map[index] = device_guid
         device_name = self._get_device_name(device_guid)
-        syslog.info(f"REGISTER WIDGET: {device_guid} index {index}  name: {device_name}")
+        if verbose: syslog.info(f"REGISTER WIDGET: {device_guid} index {index}  name: {device_name}")
 
         if not hide:
             # make visible

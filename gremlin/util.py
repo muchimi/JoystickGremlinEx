@@ -331,21 +331,28 @@ def valid_python_identifier(name):
     """
     return re.match(r"^[^\d\W]\w*\Z", name) is not None
 
+def valid_integer_string(text):
+    return re.match(r"^-?\d+$", text) is not None
+
 
 def clamp(value, min_val = -1.0, max_val = 1.0):
     """Returns the value clamped to the provided range.
 
     :param value the input value
-    :param min_val minimum value
-    :param max_val maximum value
+    :param min_val minimum value (can be null)
+    :param max_val maximum value (can be null)
     :return the input value clamped to the provided range
     """
-    if min_val > max_val:
-        min_val, max_val = max_val, min_val
-    if value > max_val:
-        value = max_val
-    elif value < min_val:
-        value = min_val
+    if min_val is not None and max_val is not None:
+        if min_val > max_val:
+            min_val, max_val = max_val, min_val
+
+    if min_val is not None:
+        if value < min_val:
+            value = min_val
+    if max_val is not None:
+        if value > max_val:
+            value = max_val
     return value
 
 

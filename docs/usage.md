@@ -2075,9 +2075,30 @@ The chain delay is included although it will conflict with long press.  I may re
 
 Within each action set, the chain group entries can be re-ordered, or can be removed.
 
-## Sequence Container 
+## Sequence Container
 
-This experimental container executes all contained actions in sequence, similar to a macro.  The difference between this container and others is the order of execution is guaranteed and each action runs in sequence rather than in parallel.
+This container executes all contained actions in sequence, similar to a macro.  The difference between this container and others is the order of execution is guaranteed in step order, and each action runs in sequence rather than in parallel.
+
+This container has several features not found in a macro:
+
+- all action types suitable for momentary input can be used, such as OSC.
+- steps can themselves contain macros if needed.
+- wiggle mode can be used to randomize the execution of the container
+- each step can contain more than one action.
+
+### Wiggle mode
+
+When Wiggle mode is enabled, this container can randomize the execution of actions it contains. 
+
+In wiggle mode, the container will continue executing actions while the input is pressed, and stop when the input is released.  This makes it particularly suitable to usage by a state, or when mapped to a physical toggle switch on a hardware input.
+
+The pause between steps can be randomized between a minimum delay, and a maximum delay.
+
+If step randomization is enabled, the next step to execute will also be randomized.  If disabled, the step sequence is observed.
+
+
+
+
 
 Actions execute in the order they are listed and they can be re-ordered if needed.
 

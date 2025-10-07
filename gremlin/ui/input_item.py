@@ -1882,6 +1882,7 @@ class InputItemWidget(QBoxFrame):
         el.curve_added.connect(self._curve_changed_cb)
         el.calibration_added.connect(self._calibration_changed_cb)
         el.calibration_deleted.connect(self._calibration_changed_cb)
+        el.icon_changed.connect(self._icon_changed_cb)
 
         # update mapping action icons
         self._update_repeater() # create the correct repeater widget

@@ -355,6 +355,13 @@ class VjoyEvent:
 		self.input_id = input_id
 		self.value = value
 
+	def __str__(self):
+		if self.input_type == InputType.JoystickAxis:
+			value_stub = f"{self.value:0.3f}"
+		else:
+			value_stub = f"{self.value}"
+		return f"VjoyEvent: vjoy [{self.vjoy_id}] type: [{self.input_type.name}] input: [{self.input_id}] value: [{value_stub}]"
+
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -674,9 +681,13 @@ class EventListener:
 		self.js = JoystickState()
 
 		self.shutdown.connect(self._shutdown_handler)
+		
 
 		# TEST / POSSIBLE FUTURE WORK internal vjoy event handling for vjoy loopback cases
 		self._vjoy_events = {} # map of processed events
+		self._vjoy_events_times = {} # map of processed events times
+		self._vjoy_events_delay = 0.250 # quarter second delay for event loopback checking
+		self._vjoy_events_use_time = config.vjoy_loopback_use_time
 		self.vjoy_event.connect(self._handle_vjoy_event)
 
 	def registerVjoyCallback(self, callback):
@@ -766,13 +777,20 @@ class EventListener:
 
 		
 	def _profile_start(self):
-		''' occurs on profile start '''
+		''' occurs on profile start EVENT LISTENER '''
 
 		self._profile_started = False
 		config = gremlin.config.Configuration()
 		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
 		self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
 		self._verbose_vjoy = config.verbose_mode_vjoy
+		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
+
+		# loopback configuration for vjoy events
+		self._vjoy_events.clear() # map of processed events
+		self._vjoy_events_times.clear()# map of processed events times
+		self._vjoy_events_delay = config.vjoy_loopback_delay / 1000 # quarter second delay for event loopback checking
+		self._vjoy_events_use_time = config.vjoy_loopback_use_time
 
 		# enable mouse hooks 
 		self.enableMouse(True)
@@ -1105,18 +1123,21 @@ class EventListener:
 			input_type = vjoyevent.input_type
 			input_id = vjoyevent.input_id
 			value = vjoyevent.value
+			if self._verbose_vjoy : syslog.info(f"VJOY EVENT:  [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
 			if self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
 				# issue a loop back internal event
+				if self._verbose_vjoy : syslog.info(f"VJOY EVENT: loopback trigger (exec) {vjoyevent}")
 				event = Event.from_vjoyEvent(vjoyevent)
-				if self._verbose_vjoy : syslog.info(f"VJOY LOOPBACK: trigger [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
 				thread = threading.Thread(target = self._execute_loopback_callback, args = (event,))
 				thread.name = "vjoy loopback"
 				thread.start()
+			else:
+				if self._verbose_vjoy : syslog.info(f"VJOY EVENT: looback filtered (skip) {vjoyevent}")
 
 
 	def _execute_loopback_callback(self, event):
 		''' executes a vjoy loopback event '''
-		if self._verbose_vjoy : syslog.info(f"VJOY LOOPBACK: trigger execute {event}")
+		# if self._verbose_vjoy : syslog.info(f"VJOY LOOPBACK: trigger execute: {str(event)}")
 		eh = EventHandler()
 		eh.execute_event(event)
 
@@ -1128,16 +1149,20 @@ class EventListener:
 		import gremlin.util
 		# get current vjoy state
 		
-		verbose = self._verbose_vjoy
+		verbose = self._verbose_vjoy_extra
+		now = time.time()
 		# setup the tracking data structure to look for changes
 		if not vjoy_id in self._vjoy_events:
 			self._vjoy_events[vjoy_id] = {}
+			self._vjoy_events_times[vjoy_id] = {}
 		if not input_type in self._vjoy_events[vjoy_id]:
 			self._vjoy_events[vjoy_id][input_type] = {}
+			self._vjoy_events_times[vjoy_id][input_type] = {}
 
 		if record_only:
 			# record the vjoy state
 			self._vjoy_events[vjoy_id][input_type][input_id] = value
+			self._vjoy_events_times[vjoy_id][input_type][input_id] = now
 			return False
 		
 		# read current value 
@@ -1151,27 +1176,36 @@ class EventListener:
 			case _:
 				syslog.error(f"VJOY LOOPBACK: don't know how to handle input type: {input_type}")
 				return False 
+			
+
 
 		if input_id in self._vjoy_events[vjoy_id][input_type]:
+			t = self._vjoy_events_times[vjoy_id][input_type][input_id] + self._vjoy_events_delay
 			if input_type == InputType.JoystickAxis:
 				# account for floating point accuracy issues
 				if verbose: syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value:0.3f}] to [{current_value:0.3f}]")
-				if gremlin.util.is_close(value, current_value):
-					if verbose: syslog.info("\tFAIL")
+				is_close = gremlin.util.is_close(value, current_value)
+				trigger = is_close and t < now if self._vjoy_events_use_time else is_close
+				if trigger:
+					if verbose: syslog.info("\tFAIL (skip event)")
 					return False
 				else:
 					if verbose: syslog.info("\tSUCCEED")
-			# button/hat
-			syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}] to [{current_value}]")
-			if value == current_value:
-				if verbose: syslog.info("\tFAIL")
-				return False # same state, nothing to do
 			else:
-				if verbose: syslog.info("\tSUCCEED")
+				# button/hat
+				if verbose: syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}] to [{current_value}]")
+				
+				trigger = value == current_value and t < now if self._vjoy_events_use_time else value == current_value
+				if trigger:
+					if verbose: syslog.info("\tFAIL (skip event)")
+					return False # same state, nothing to do
+				else:
+					if verbose: syslog.info("\tSUCCEED")
 		
 		# record the vjoy state
 		self._vjoy_events[vjoy_id][input_type][input_id] = value
-		if verbose: syslog.info(f"VJOY LOOPBACK: record vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
+		self._vjoy_events_times[vjoy_id][input_type][input_id] = now
+		if verbose: syslog.info(f"VJOY LOOPBACK: record vjoy state: [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
 
 		return True # process
 		
@@ -1218,7 +1252,7 @@ class EventListener:
 		if is_virtual:
 			vjoy_id = device.vjoy_id
 			if self.js.inputIgnored(data.device_guid):
-				# ignore if the deviced is set to input ignore
+				# ignore if the device is set to input ignore
 				if verbose: syslog.info(f"Ignore input: {device.name} input: {event.input_index} type: {event.input_type}")
 				return
 		
@@ -1244,7 +1278,8 @@ class EventListener:
 				if input_type:
 					# track the input event
 					if verbose_vjoy: syslog.info(f"DINPUT LOOPBACK: register vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
-					self.shouldProcessVjoy(vjoy_id, input_type, input_id, value, record_only = True)
+					if not self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
+						return # skip DINPUT event
 
 		if event.input_type == dinput.InputType.Axis:
 			if verbose and verbose_extra:
@@ -1659,9 +1694,11 @@ class EventHandler(QtCore.QObject):
 		
 
 	def _profile_start(self):
+		'''' profile start event - EVENT HANDLER '''
 		if not self._started:
 			self._started = True
 			self._update_mode_change(gremlin.shared_state.runtime_mode)
+
 
 
 	def _profile_started(self):
@@ -2513,12 +2550,12 @@ class EventHandler(QtCore.QObject):
 			
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
-			if event.extra_data and "loopback" in event.extra_data:
-				pass
+			
+			
 			if not (m_list or f_list): 
-				syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+				if verbose_detailed: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 			else:
-				syslog.info(f"EVENT: [Joystick] found callbacks for {str(event.identifier)} mode: {self.runtime_mode}  m: {len(m_list)} f: {len(f_list)}")
+				if verbose: syslog.info(f"EVENT: [Joystick] found callbacks for {str(event.identifier)} mode: {self.runtime_mode}  m: {len(m_list)} f: {len(f_list)}")
 			# if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 		else:
 			# other inputs including control inputs
@@ -3042,6 +3079,7 @@ class AxisState():
 		self._last_axis_values = {} # last value
 		self._last_axis_time = {} # time when last modified
 		self._delay = 0 # delay in seconds for filter - 0 = disabled
+		self._registered_devices = [] # guid of registered devices
 
 		el = EventListener()
 		el.profile_unload.connect(self.reset)
@@ -3054,6 +3092,7 @@ class AxisState():
 		if verbose: 	
 			syslog.info("AXIS STATE: reset")
 		self._data.clear()
+		self._registered_devices.clear()
 		self._joystick_input_item_map.clear()
 		profile = gremlin.shared_state.current_profile
 		if profile:
@@ -3086,6 +3125,10 @@ class AxisState():
 		''' registers axes for a given device '''
 		if device.axis_count:
 			device_guid = device.device_guid
+			device_id = gremlin.util.normalize_guid(device_guid)
+			if not device_id in self._registered_devices:
+				self._registered_devices.append(device_id)
+
 			for index in range(device.axis_count):
 				input_id = device.getAxisInputId(index)
 				if input_id is None:
@@ -3094,7 +3137,24 @@ class AxisState():
 				if not key in self._data:
 					self._data[key] = AxisData(device_guid, input_id)
 
+	def registerDeviceGuid(self, device_guid):
+		import gremlin.joystick_handling
+		device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+		config = gremlin.config.Configuration()
+		verbose = config.verbose_mode_inputs or config.verbose_mode_joystick
+		if verbose:
+			syslog.info(f"AXIS STATE: register device: {device.name}")
+		if device:
+			self.registerDevice(device)
+		else:
+			syslog.warning(f"AXIS STATE: registerDeviceGUID: failed to find device for ID: [{device_guid}]")
+
+	def isRegistered(self, device_guid) -> bool:
+		''' true if the device is registered'''
+		device_id = gremlin.util.normalize_guid(device_guid)
+		return device_id in self._registered_devices
 	
+
 	
 	def registerAxisInputItem(self, item):
 		''' registers an axis input item '''

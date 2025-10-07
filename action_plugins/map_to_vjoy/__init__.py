@@ -3743,6 +3743,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_grid(self):
         ''' updates the usage grid based on current VJOY mappings '''
+        if not self.action_data.grid_visible:
+            # nothing to do
+            return
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose: syslog.info(f"populate grid {self.action_data.id}")
         used_pixmap = load_pixmap("used.png")
@@ -5360,12 +5363,36 @@ Supports axis merging, curved output, command, hat and button mappings.
 
                 if gremlin.joystick_handling.is_hardware_device(merge_device_guid):
                     values = sd.getAxisValues(merge_device_guid, merge_input_id)
-                    v2 = values.actual
-                    #v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+                    if values:
+                        v2 = values.actual
+                    else:
+                        sd.registerDeviceGuid(merge_device_guid)
+                        values = sd.getAxisValues(merge_device_guid, merge_input_id)
+                        if values:
+                            v2 = values.actual
+                        else:
+                            device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
+                            v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+                            syslog.warning(f"Unable to get value for hardware device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}")
+                        
+                        
                 elif gremlin.joystick_handling.is_vjoy_device(merge_device_guid):
                     values = sd.getAxisValues(merge_device_guid, merge_input_id)
-                    v2 = values.actual
-                    #v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+                    if values:
+                        v2 = values.actual
+                    else:
+                        
+                        sd.registerDeviceGuid(merge_device_guid)
+                        values = sd.getAxisValues(merge_device_guid, merge_input_id)
+                        if values:
+                            v2 = values.actual
+                        else:
+                            device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
+                            v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+                            syslog.warning(f"Unable to get value for vjoy device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}")
+                        
+                        
+                    
                 else:
                     # find the merged device
                     ec = gremlin.execution_graph.ExecutionContext()
