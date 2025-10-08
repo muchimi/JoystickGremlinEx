@@ -8818,7 +8818,7 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
     return (widget, layout)
     
 
-def getVContainer(widget_or_list = None, label = None, alignment = None, font = None, parent = None):
+def getVContainer(widget_or_list = None, label = None, alignment = None, font = None,  parent = None):
     ''' gets a qt H container widget '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QVBoxLayout(widget)
@@ -11386,3 +11386,58 @@ class QCurveWidget(QtWidgets.QWidget):
 
 
     
+class QScrollableWidget(QtWidgets.QWidget):
+    ''' implements a scrollable widget '''
+
+    def __init__(self, widget = None, stretch = True, vertical_scroll = True, horizontal_scroll = True, parent = None):
+        super().__init__(parent = parent)
+
+        self._scroll_area = QtWidgets.QScrollArea()
+        self._scroll_area.setWidgetResizable(True)
+        main_layout = QtWidgets.QVBoxLayout(self)
+        self._content_widget = QtWidgets.QWidget()
+        self._content_layout = QtWidgets.QVBoxLayout(self._content_widget)
+        self._scroll_area.setWidget(self._content_widget)
+        main_layout.addWidget(self._scroll_area)
+
+        if widget is not None:
+            # add content if provided either as a single widget or a list of widgets
+            if hasattr(widget, "__iter__"):
+                # list
+                for w in widget:
+                    self._content_layout.addWidget(w)
+            else:
+                self._content_layout.addWidget(widget)
+            if stretch:
+                self._content_layout.addStretch()
+
+        self.setVerticalScroll(vertical_scroll)
+        self.setHorizontalScroll(horizontal_scroll)
+            
+
+    def addWidget(self, widget):
+        ''' adds a widget '''
+        self._content_layout.addWidget(widget)
+
+    def clear(self):
+        ''' removes all widgets from the layout '''
+        gremlin.util.clear_layout(self._content_layout)
+
+    def getLayout(self):
+        ''' returns the scrollable layout'''
+        return self._content_layout
+    
+
+    def setVerticalScroll(self, enabled : bool):
+        ''' enable or disable vertical scroll bar '''
+        if enabled:
+            self._scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        else:
+            self._scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def setHorizontalScroll(self, enabled : bool):
+        ''' enable or disable horizontal scroll bar '''
+        if enabled:
+            self._scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        else:
+            self._scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)

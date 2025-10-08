@@ -244,8 +244,6 @@ class Event:
 				0
 			)
 
-
-
 	def __hash__(self):
 		"""Computes the hash value of this event.
 		new in m58: use the unique ID of this event to uniquely identify it
@@ -295,7 +293,6 @@ class Event:
 			case InputType.JoystickHat:
 				is_pressed = value != (0,0)
 
-				
 		return Event(
 			event_type = ve.input_type,
 			identifier = ve.input_id,
@@ -305,7 +302,8 @@ class Event:
 			value = value,
 			curved_value= value,
 			raw_value = value,
-			extra_data={"loopback":True}
+			extra_data={"loopback":True,
+			   "vjoy" : ve.key} # store vjoy info for quick comparison
 		)
 	
 	def __str__(self):
@@ -354,6 +352,12 @@ class VjoyEvent:
 		self.input_type = input_type
 		self.input_id = input_id
 		self.value = value
+
+	@property
+	def key(self) -> tuple:
+		''' unique key for this event '''
+		return (self.vjoy_id, self.input_type.value, self.input_id, self.value)
+
 
 	def __str__(self):
 		if self.input_type == InputType.JoystickAxis:
@@ -685,10 +689,10 @@ class EventListener:
 
 		# TEST / POSSIBLE FUTURE WORK internal vjoy event handling for vjoy loopback cases
 		self._vjoy_events = {} # map of processed events
-		self._vjoy_events_times = {} # map of processed events times
+		# self._vjoy_events_times = {} # map of processed events times
 		self._vjoy_events_delay = 0.250 # quarter second delay for event loopback checking
-		self._vjoy_events_use_time = config.vjoy_loopback_use_time
-		self.vjoy_event.connect(self._handle_vjoy_event)
+		self._vjoy_events_use_time = False # config.vjoy_loopback_use_time
+		self.vjoy_event.connect(self._handle_vjoy_event) # hook internal vjoy events generated whenever something is output to vjoy
 
 	def registerVjoyCallback(self, callback):
 		if not callback in self._vjoy_callbacks:
@@ -788,7 +792,7 @@ class EventListener:
 
 		# loopback configuration for vjoy events
 		self._vjoy_events.clear() # map of processed events
-		self._vjoy_events_times.clear()# map of processed events times
+		# self._vjoy_events_times.clear()# map of processed events times
 		self._vjoy_events_delay = config.vjoy_loopback_delay / 1000 # quarter second delay for event loopback checking
 		self._vjoy_events_use_time = config.vjoy_loopback_use_time
 
@@ -1118,94 +1122,117 @@ class EventListener:
 		'''
 		import gremlin.util
 		vjoy_id = vjoyevent.vjoy_id
+		verbose = self._verbose_vjoy
+		#verbose = True # debug mode - force output for diagnostics regardless of user settings
 		if self._profile_started and self.js.vjoyAsInput(vjoy_id):
 			# profile is running and started, and the vjoy device is a loopback device (used as input)
 			input_type = vjoyevent.input_type
 			input_id = vjoyevent.input_id
 			value = vjoyevent.value
-			if self._verbose_vjoy : syslog.info(f"VJOY EVENT:  [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
+			if verbose : syslog.info(f"VJOY EVENT:  [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
 			if self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
 				# issue a loop back internal event
-				if self._verbose_vjoy : syslog.info(f"VJOY EVENT: loopback trigger (exec) {vjoyevent}")
+				if verbose : syslog.info(f"VJOY EVENT: loopback trigger (exec) {vjoyevent}")
 				event = Event.from_vjoyEvent(vjoyevent)
 				thread = threading.Thread(target = self._execute_loopback_callback, args = (event,))
 				thread.name = "vjoy loopback"
 				thread.start()
 			else:
-				if self._verbose_vjoy : syslog.info(f"VJOY EVENT: looback filtered (skip) {vjoyevent}")
+				if verbose : syslog.info(f"VJOY EVENT: looback filtered (skip) {vjoyevent}")
 
 
 	def _execute_loopback_callback(self, event):
 		''' executes a vjoy loopback event '''
 		# if self._verbose_vjoy : syslog.info(f"VJOY LOOPBACK: trigger execute: {str(event)}")
 		eh = EventHandler()
+		verbose = self._verbose_vjoy
+		# verbose = True # debug mode - force output for diagnostics regardless of user settings
+		if verbose : syslog.info(f"VJOY EVENT THREAD: looback execute: {str(event)}")
 		eh.execute_event(event)
 
 
 
-	def shouldProcessVjoy(self, vjoy_id : int, input_type : InputType, input_id : int, value, record_only : bool = False) -> bool:
+	#def shouldProcessVjoy(self, vjoy_id : int, input_type : InputType, input_id : int, value, record_only : bool = False) -> bool:
+	def shouldProcessVjoy(self, vjoy_id : int, input_type : InputType, input_id : int, value) -> bool:
 		''' tracks vjoy events from directinput or internally triggered '''
 		import gremlin.joystick_handling
 		import gremlin.util
 		# get current vjoy state
 		
 		verbose = self._verbose_vjoy_extra
-		now = time.time()
+		#verbose = True
+
+		
+		if verbose: 
+			match input_type:
+				case InputType.JoystickAxis:
+					syslog.info(f"VJOY LOOPBACK: got axis event [{vjoy_id}] [{input_type.name}] axis [{input_id}]  value: [{value:0.3f}]")
+				case InputType.JoystickButton:
+					syslog.info(f"VJOY LOOPBACK: got button event [{vjoy_id}] [{input_type.name}] btn [{input_id}] value: [{value != 0}]")
+				case InputType.JoystickHat:
+					syslog.info(f"VJOY LOOPBACK: got hat event [{vjoy_id}] [{input_type.name}] hat [{input_id}]  value: [{value}]")
+
+		# now = time.time()
 		# setup the tracking data structure to look for changes
 		if not vjoy_id in self._vjoy_events:
 			self._vjoy_events[vjoy_id] = {}
-			self._vjoy_events_times[vjoy_id] = {}
+			# self._vjoy_events_times[vjoy_id] = {}
 		if not input_type in self._vjoy_events[vjoy_id]:
 			self._vjoy_events[vjoy_id][input_type] = {}
-			self._vjoy_events_times[vjoy_id][input_type] = {}
-
-		if record_only:
-			# record the vjoy state
-			self._vjoy_events[vjoy_id][input_type][input_id] = value
-			self._vjoy_events_times[vjoy_id][input_type][input_id] = now
-			return False
+			# self._vjoy_events_times[vjoy_id][input_type] = {}
 		
 		# read current value 
-		match input_type:
-			case InputType.JoystickAxis:
-				current_value = gremlin.joystick_handling.VJoyProxy()[vjoy_id].axis(input_id).value
-			case InputType.JoystickButton:
-				current_value = gremlin.joystick_handling.VJoyProxy()[vjoy_id].button(input_id).is_pressed
-			case InputType.JoystickHat:
-				current_value = gremlin.joystick_handling.VJoyProxy()[vjoy_id].hat(input_id).direction
-			case _:
-				syslog.error(f"VJOY LOOPBACK: don't know how to handle input type: {input_type}")
-				return False 
+		if value is None:
+			match input_type:
+				case InputType.JoystickAxis:
+					current_value = gremlin.joystick_handling.VJoyProxy()[vjoy_id].axis(input_id).value
+				case InputType.JoystickButton:
+					current_value = gremlin.joystick_handling.VJoyProxy()[vjoy_id].button(input_id).is_pressed
+				case InputType.JoystickHat:
+					current_value = gremlin.joystick_handling.VJoyProxy()[vjoy_id].hat(input_id).direction
+				case _:
+					syslog.error(f"VJOY LOOPBACK: don't know how to handle input type: {input_type}")
+					return False 
+		else:
+			current_value = value
 			
 
 
 		if input_id in self._vjoy_events[vjoy_id][input_type]:
-			t = self._vjoy_events_times[vjoy_id][input_type][input_id] + self._vjoy_events_delay
+			if verbose: syslog.info(f"\tprior event found")
+			# t = self._vjoy_events_times[vjoy_id][input_type][input_id] + self._vjoy_events_delay
+			last_value = self._vjoy_events[vjoy_id][input_type][input_id]
 			if input_type == InputType.JoystickAxis:
 				# account for floating point accuracy issues
-				if verbose: syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value:0.3f}] to [{current_value:0.3f}]")
-				is_close = gremlin.util.is_close(value, current_value)
-				trigger = is_close and t < now if self._vjoy_events_use_time else is_close
-				if trigger:
-					if verbose: syslog.info("\tFAIL (skip event)")
+				if verbose: syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  new value: [{current_value:0.3f}] old value [{last_value:0.3f}]")
+				is_close = gremlin.util.is_close(last_value, current_value)
+				# duplicated = is_close and t < now if self._vjoy_events_use_time else is_close
+				duplicated = is_close
+				if duplicated:
+					if verbose: syslog.info("\tFAIL (skip event) (axis)")
 					return False
 				else:
-					if verbose: syslog.info("\tSUCCEED")
+					if verbose: syslog.info("\tSUCCEED (axis)")
 			else:
 				# button/hat
-				if verbose: syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}] to [{current_value}]")
+				current_value = value != 0
+				if verbose: syslog.info(f"VJOY LOOPBACK: compare vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  new value: [{current_value}]  old value: [{last_value}]")
 				
-				trigger = value == current_value and t < now if self._vjoy_events_use_time else value == current_value
-				if trigger:
-					if verbose: syslog.info("\tFAIL (skip event)")
+				#duplicated = last_value == current_value and t < now if self._vjoy_events_use_time else last_value == current_value
+				duplicated = last_value == current_value
+				if duplicated:
+					if verbose: syslog.info("\tFAIL (skip event) (button)")
 					return False # same state, nothing to do
 				else:
-					if verbose: syslog.info("\tSUCCEED")
+					if verbose: syslog.info("\tSUCCEED (button)")
+		else:
+			if verbose: syslog.info(f"\tnew event registered")
+
 		
-		# record the vjoy state
+		# update the data
 		self._vjoy_events[vjoy_id][input_type][input_id] = value
-		self._vjoy_events_times[vjoy_id][input_type][input_id] = now
-		if verbose: syslog.info(f"VJOY LOOPBACK: record vjoy state: [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
+		# self._vjoy_events_times[vjoy_id][input_type][input_id] = now
+		#if verbose: syslog.info(f"VJOY LOOPBACK: record vjoy state: [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
 
 		return True # process
 		
@@ -1272,12 +1299,12 @@ class EventListener:
 					# convert value to tuple for hat value comparisons
 					value = vjoy.vjoy.Hat.getDirection(value)
 				else:
-					if verbose_vjoy: syslog.error(f"DINPUT LOOPBACK: don't know how to handle input type: {event.input_type}")
+					if verbose_vjoy: syslog.error(f"DINPUT VJOY LOOPBACK: don't know how to handle input type: {event.input_type}")
 					input_type = None
 
 				if input_type:
 					# track the input event
-					if verbose_vjoy: syslog.info(f"DINPUT LOOPBACK: register vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
+					if verbose_vjoy: syslog.info(f"DINPUT VJOY LOOPBACK: register vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
 					if not self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
 						return # skip DINPUT event
 
@@ -1316,12 +1343,14 @@ class EventListener:
 		elif event.input_type == dinput.InputType.Button:
 			if verbose:
 				syslog.info(f"DINPUT BUTTON: {event}")
+			is_pressed = event.value == 1
 			event = Event(
 				event_type= InputType.JoystickButton,
-				device_guid=event.device_guid,
-				identifier=event.input_index,
-				is_pressed=event.value == 1,
-				is_virtual = is_virtual
+				device_guid= event.device_guid,
+				identifier= event.input_index,
+				is_pressed= is_pressed,
+				is_virtual = is_virtual,
+				value = is_pressed
 			)
 			
 			if not gremlin.shared_state.is_running:
@@ -1686,18 +1715,61 @@ class EventHandler(QtCore.QObject):
 		el.profile_stop.connect(self._profile_stop)
 		el.profile_started.connect(self._profile_started)
 		el.runtime_mode_changed.connect(self._update_mode_change)
-		
+		self._lock = threading.Lock()
 		self._started = False
+		self._execute_queue = [] # list of items to execute
+		self._execute_thread = None
+		self._execute_running = False
 		self.reset()
 	
+	# def _queue_start(self):
+	# 	if not self._execute_running:
+	# 		syslog.info("EVENT QUEUE: start")
+	# 		self._execute_queue.clear()
+	# 		self._execute_running = True
+	# 		self._execute_thread = threading.Thread(target = self._execute_queue_runner)
+	# 		self._execute_thread.name = "Execution queue runner"
+	# 		self._execute_thread.start()
+
+
+	# def _queue_stop(self):
+	# 	if self._execute_running:
+	# 		syslog.info("EVENT QUEUE: stopping...")
+	# 		self._execute_running = False
+	# 		self._execute_thread.join()
+	# 		self._execute_thread = None
+	# 		syslog.info("EVENT QUEUE: stopped")
+
+	# def _queue_add(self, event, m_list, f_list):
+	# 	''' add execution items to the list '''
+	# 	if self._execute_running:
+	# 		syslog.info(f"EVENT QUEUE: add: {str(event)}")
+	# 		self._execute_queue.append((event, m_list, f_list)) # this is thread safe in Python
+		
 	
+	# def _execute_queue_runner(self):
+	# 	''' execution queue runner '''
+	# 	while self._execute_running:
+	# 		if self._execute_queue:
+	# 			event, m_list, f_list = self._execute_queue.pop(0)
+	# 			self._execute_callbacks(event, m_list, f_list)
+	# 			time.sleep(0.01)
+		
+	# 	# stop executing requested = clear the queue
+	# 	while self._execute_queue:
+	# 		event, m_list, f_list = self._execute_queue.pop(0)
+	# 		self._execute_callbacks(event, m_list, f_list)
+	# 		time.sleep(0.01)
 		
 
 	def _profile_start(self):
 		'''' profile start event - EVENT HANDLER '''
 		if not self._started:
 			self._started = True
+			self._last_vjoy_event = None # reset vjoy loopback
+			# self._queue_start()
 			self._update_mode_change(gremlin.shared_state.runtime_mode)
+			
 
 
 
@@ -1707,6 +1779,7 @@ class EventHandler(QtCore.QObject):
 	
 	def _profile_stop(self):
 		if self._started:
+			# self._queue_stop() # finish up and stop the current execution queue
 			self._started = False
 			self._last_tts_notify = None
 			self._last_tts_notify_time = None
@@ -1753,6 +1826,7 @@ class EventHandler(QtCore.QObject):
 		self._event_lookup = {}
 		self.latched_functors = {}
 		self.experimental = config.experimental
+		self._last_vjoy_event = None # tracks the last VJOY event for loopback detection
 		
 		
 
@@ -2425,160 +2499,179 @@ class EventHandler(QtCore.QObject):
 		
 
 	def execute_event(self, event : Event):
-		''' main execution (runtime) event handler - triggers callbacks on input '''
+		''' main execution (runtime) event handler - queues trigger callbacks on event input '''
 		
 		import gremlin.config
 		import gremlin.keyboard
 
-		# list of callbacks
-		m_list = []
-		f_list = []
-
-
-		# mode to act on
-		mode = event.mode if event.mode else self.runtime_mode  
-
+		
 		config =  gremlin.config.Configuration()
 		verbose = config.verbose_mode_inputs
 		verbose_detailed = verbose and config.verbose_mode_extra
+		
+		try:
+			
+			#if verbose: syslog.info("EVENT EXECUTE: enter critical phase")
 
-		if verbose and event.event_type != InputType.JoystickAxis:
-			syslog.info(f"process event - mode [{mode}] event: {str(event)}")
-
-
-
-		input_item = self._matching_input_item(mode, event)
-		if input_item is not None and not input_item.enabled:
-			# input item registered but not enabled - ignore inputs that aren't registered or could not be found (latched keys for example)
-			if verbose: syslog.info(f"Event: input disabled {str(event)}")
-			return
-
-		# filter latched keyboard or mouse events
-		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
-			verbose = gremlin.config.Configuration().verbose_mode_detailed
-			data = event.data # holds keyboard state info
-			if event.event_type == InputType.Mouse:
-				verbose = gremlin.config.Configuration().verbose_mode_mouse
-			if verbose:
-				syslog.info(f"process keyboard event: {event}")
-				syslog.info(f"\tKeyboard state data:")
-				keys = list(data.keys())
-				for key in keys:
-					syslog.info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
+			# self._lock.acquire()
+			
+			# mode to act on
+			mode = event.mode if event.mode else self.runtime_mode  
 
 
-			items = self._matching_event_keys(event)  # returns list of primary keys
-			if items:
+			if verbose and event.event_type != InputType.JoystickAxis:
+				syslog.info(f"EVENT EXECUTE: process event - mode [{mode}] event: {str(event)}")
+
+
+			# if event.extra_data and "vjoy" in event.extra_data:
+			# 	# event is a vjoy event
+			# 	syslog.info(f"EXEC EVENT: got vjoy event: {event.extra_data["vjoy"]}")
+			# 	if self._last_vjoy_event:
+			# 		k1 = event.extra_data["vjoy"]
+			# 		k2 = self._last_vjoy_event.extra_data["vjoy"]
+			# 		if k1 == k2:
+			# 			syslog.info(f"EXEC EVENT: skipping duplicate vjoy event: {k1}")
+			# 			return 
+			# 	self._last_vjoy_event = event # record last vjoy event
+			# 	syslog.info(f"EXEC EVENT: processing vjoy event: {event.extra_data["vjoy"]}")
+					
+			
+
+			# list of callbacks
+			m_list = []
+			f_list = []
+
+
+
+
+			input_item = self._matching_input_item(mode, event)
+			if input_item is not None and not input_item.enabled:
+				# input item registered but not enabled - ignore inputs that aren't registered or could not be found (latched keys for example)
+				if verbose: syslog.info(f"Event: input disabled {str(event)}")
+				return
+
+			# filter latched keyboard or mouse events
+			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+				verbose = gremlin.config.Configuration().verbose_mode_detailed
+				data = event.data # holds keyboard state info
+				if event.event_type == InputType.Mouse:
+					verbose = gremlin.config.Configuration().verbose_mode_mouse
 				if verbose:
-					syslog.info(f"Matched keys for mode: [{mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
-					for index, input_item in enumerate(items):
-						syslog.info(f"\t[{index}]: {input_item.name}")
-				
-				for input_item in items:
-					if verbose: syslog.info("-"*50)
-					is_latched = True
-					latch_key = None
-					# print (data)
-					latched_keys = [input_item.key]
-					latched_keys.extend(input_item.latched_keys)
-					if verbose: syslog.info(f"KEY: Checking latching: {len(latched_keys)} key(s)")
-					if len(latched_keys) > 1:
-						# key is latched - check the other keys are also pressed
-						for k in latched_keys:
-							index = k.index_tuple()
-							found = index in data.keys()
-							if not found:
-								# try the reverse translate
-								r_index = gremlin.keyboard.KeyMap.reverse_translate(index)
-								if r_index is not None:
-									found = r_index in data.keys()
-									if found:
-										index = r_index
+					syslog.info(f"process keyboard event: {event}")
+					syslog.info(f"\tKeyboard state data:")
+					keys = list(data.keys())
+					for key in keys:
+						syslog.info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
 
-							state = data[index] if found else False
-							if verbose:
-								syslog.info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
+
+				items = self._matching_event_keys(event)  # returns list of primary keys
+				if items:
+					if verbose:
+						syslog.info(f"Matched keys for mode: [{mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
+						for index, input_item in enumerate(items):
+							syslog.info(f"\t[{index}]: {input_item.name}")
+					
+					for input_item in items:
+						if verbose: syslog.info("-"*50)
+						is_latched = True
+						latch_key = None
+						# print (data)
+						latched_keys = [input_item.key]
+						latched_keys.extend(input_item.latched_keys)
+						if verbose: syslog.info(f"KEY: Checking latching: {len(latched_keys)} key(s)")
+						if len(latched_keys) > 1:
+							# key is latched - check the other keys are also pressed
+							for k in latched_keys:
+								index = k.index_tuple()
+								found = index in data.keys()
 								if not found:
-									syslog.info(f"\t\t* Key not found *")
-							is_latched = is_latched and state # make sure all latched keys are currently pressed (state = True)
+									# try the reverse translate
+									r_index = gremlin.keyboard.KeyMap.reverse_translate(index)
+									if r_index is not None:
+										found = r_index in data.keys()
+										if found:
+											index = r_index
 
-					if verbose:	syslog.info(f"\tLatched state: {is_latched}")
-					
-					if is_latched:
-						latch_key = input_item.key
+								state = data[index] if found else False
+								if verbose:
+									syslog.info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
+									if not found:
+										syslog.info(f"\t\t* Key not found *")
+								is_latched = is_latched and state # make sure all latched keys are currently pressed (state = True)
 
-				
-
-					if latch_key:
-
-						# override the event type to a keyboard so actions think we're using a keyboard when using a mouse click
-						event.override_input_type = InputType.Keyboard
-
-						#print (f"Found latched key: {latch_key}")
-						m_list = self._matching_latched_callbacks(event, latch_key)
-						if m_list:
-							if verbose:
-								trigger_line = "***** TRIGGER " + "*"*30
-								syslog.info(trigger_line)
-								syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
-								syslog.info(trigger_line)
-							self._trigger_callbacks(m_list, event)
-							return
-						# else:
-						# 	print (f"No callbacks found for: {latch_key}")
-				verbose = gremlin.config.Configuration().verbose_mode_inputs
-			else:
-				if verbose:
-					syslog.info("No matching events")
-			return
+						if verbose:	syslog.info(f"\tLatched state: {is_latched}")
 						
-		elif event.event_type ==InputType.Midi:
-			m_list = self._matching_midi_callbacks(event)
-			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [MIDI] no matching inputs for {str(event.identifier.message_key)} mode: {self.runtime_mode}")
+						if is_latched:
+							latch_key = input_item.key
+
 					
-		elif event.event_type == InputType.OpenSoundControl:
-			m_list = self._matching_osc_callbacks(event)
-			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
-		elif event.event_type == InputType.State:
-			m_list = self._matching_state_callbacks(event)
-			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [STATE] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
-		elif event.event_type == InputType.JoystickAxis:
-			m_list = self._matching_callbacks(event)
-			f_list = self._matching_functors(event)
-			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
-		elif event.event_type in (InputType.JoystickButton, InputType.JoystickHat, InputType.OctaviIfr1):
-			
-			m_list = self._matching_callbacks(event)
-			f_list = self._matching_functors(event)
-			
-			
-			if not (m_list or f_list): 
-				if verbose_detailed: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+
+						if latch_key:
+
+							# override the event type to a keyboard so actions think we're using a keyboard when using a mouse click
+							event.override_input_type = InputType.Keyboard
+
+							#print (f"Found latched key: {latch_key}")
+							m_list = self._matching_latched_callbacks(event, latch_key)
+							if m_list:
+								if verbose:
+									trigger_line = "***** TRIGGER " + "*"*30
+									syslog.info(trigger_line)
+									syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+									syslog.info(trigger_line)
+								self._trigger_callbacks(m_list, event)
+								return
+							# else:
+							# 	print (f"No callbacks found for: {latch_key}")
+					verbose = gremlin.config.Configuration().verbose_mode_inputs
+				else:
+					if verbose:
+						syslog.info("No matching events")
+				return None, None
+							
+			elif event.event_type ==InputType.Midi:
+				m_list = self._matching_midi_callbacks(event)
+				if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [MIDI] no matching inputs for {str(event.identifier.message_key)} mode: {self.runtime_mode}")
+						
+			elif event.event_type == InputType.OpenSoundControl:
+				m_list = self._matching_osc_callbacks(event)
+				if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
+			elif event.event_type == InputType.State:
+				m_list = self._matching_state_callbacks(event)
+				if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [STATE] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
+			elif event.event_type == InputType.JoystickAxis:
+				m_list = self._matching_callbacks(event)
+				f_list = self._matching_functors(event)
+				if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+			elif event.event_type in (InputType.JoystickButton, InputType.JoystickHat, InputType.OctaviIfr1):
+				
+				m_list = self._matching_callbacks(event)
+				f_list = self._matching_functors(event)
+				
+				
+				if not (m_list or f_list): 
+					if verbose_detailed: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+				else:
+					if verbose: syslog.info(f"EVENT: [Joystick] found callbacks for {str(event.identifier)} mode: {self.runtime_mode}  m: {len(m_list)} f: {len(f_list)}")
+				# if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 			else:
-				if verbose: syslog.info(f"EVENT: [Joystick] found callbacks for {str(event.identifier)} mode: {self.runtime_mode}  m: {len(m_list)} f: {len(f_list)}")
-			# if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
-		else:
-			# other inputs including control inputs
-			
-			m_list = self._matching_callbacks(event)
-			f_list = self._matching_functors(event)
-			if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+				# other inputs including control inputs
+				
+				m_list = self._matching_callbacks(event)
+				f_list = self._matching_functors(event)
+				if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
-		if m_list or f_list:
-			self._execute_callbacks(event, m_list, f_list)
+			if m_list or f_list:
+				# self._queue_add(event, m_list, f_list)
+				self._execute_callbacks(event, m_list, f_list)
 
-		# if m_list:
-		# 	if verbose:
-		# 		syslog.info(f"TRIGGER: mode: [{mode}] callbacks: {len(m_list)} event: {event}")
-		# 	self._trigger_callbacks(m_list, event)
-
-		# if f_list:
-		# 	if verbose:
-		# 		syslog.info(f"TRIGGER: mode: [{mode}] functors: {len(f_list)} event: {event}")
-		# 	self._trigger_functor_callbacks(f_list, event)
-
-		# returns what was executed if they need to be retriggered
-		return m_list, f_list
+			return m_list, f_list
+		except Exception as err:
+			syslog.error(f"EVENT EXECUTE: error: {err}\n{traceback.format_exc()}")
+		finally:
+			#if verbose: syslog.info("EVENT EXECUTE: exit critical phase")
+			# self._lock.release()
+			pass
 
 
 
@@ -2610,6 +2703,7 @@ class EventHandler(QtCore.QObject):
 				syslog.error(f"FUNCTOR CALLBACK: error {ex}")				
 				tb_msg = traceback.format_exc()
 				syslog.error(tb_msg)
+
 
 
 	def _execute_callbacks(self, event, m_list, f_list):

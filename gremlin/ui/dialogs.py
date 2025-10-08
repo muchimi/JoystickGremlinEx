@@ -349,7 +349,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.closed.connect(self._save_on_close_cb)
 
         self._create_general_page()
-        self._create_exec_page()
+        # self._create_exec_page() disable for now
         self._create_ui_options_page()
         self._create_remote_control_page()
         self._create_tts_page()
@@ -464,6 +464,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         grid_layout.addWidget(col1_widget, 0,0)
         grid_layout.addWidget(col2_widget, 0,1)
         grid_layout.addWidget(col3_widget, 0,3)
+        grid_layout.addWidget(QtWidgets.QWidget(), 0,4)
+        grid_layout.setColumnStretch(4,2)
 
         page_layout.addWidget(grid_widget)
         page_layout.addWidget(bottom_widget)
@@ -489,8 +491,9 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         col1_layout.addWidget(box)
 
-        widget, _ = gremlin.ui.ui_common.getVContainer(page_widget)
-        self.tab_container.addTab(widget, "Execution")
+
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Execution")
 
     @QtCore.Slot(bool)
     def _handle_vjoy_loopback_use_time(self, checked : bool):
@@ -504,6 +507,8 @@ class OptionsUi(ui_common.BaseDialogUi):
     def _create_general_page(self):
         """Creates the general options page."""
 
+        
+
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
 
         grid_widget, grid_layout = gremlin.ui.ui_common.getGridContainer()
@@ -512,11 +517,14 @@ class OptionsUi(ui_common.BaseDialogUi):
         col3_widget, col3_layout = gremlin.ui.ui_common.getVContainer()
 
 
+
         bottom_widget, bottom_layout = gremlin.ui.ui_common.getVContainer()
 
         grid_layout.addWidget(col1_widget, 0,0)
         grid_layout.addWidget(col2_widget, 0,1)
         grid_layout.addWidget(col3_widget, 0,3)
+        grid_layout.addWidget(QtWidgets.QWidget(), 0,4)
+        grid_layout.setColumnStretch(4,2)
 
         page_layout.addWidget(grid_widget)
         page_layout.addWidget(bottom_widget)
@@ -627,18 +635,14 @@ class OptionsUi(ui_common.BaseDialogUi):
 
 
         # Default action selection
-        self.default_action_widget = QtWidgets.QWidget()
-        self.default_action_widget.setContentsMargins(0,0,0,0)
-        self.default_action_layout = QtWidgets.QHBoxLayout(self.default_action_widget)
-        self.default_action_layout.setContentsMargins(0,0,0,0)
 
 
-        self.default_action_label = QtWidgets.QLabel("Default action")
-        self.default_action_dropdown = gremlin.ui.ui_common.QComboBox()
-        self.default_action_layout.addWidget(self.default_action_label)
-        self.default_action_layout.addWidget(self.default_action_dropdown)
+
+        
+        self.default_action_dropdown = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
+        self.default_action_widget, self.default_action_layout = gremlin.ui.ui_common.getHContainer(self.default_action_dropdown, "Default Action:")
         self._init_action_dropdown()
-        self.default_action_layout.addStretch()
+        
 
         # Macro axis polling rate
         self.macro_axis_polling_widget = QtWidgets.QWidget()
@@ -745,8 +749,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         col3_layout.addStretch(1)
         bottom_layout.addStretch(1)
 
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
 
-        self.tab_container.addTab(page_widget, "General")
+        self.tab_container.addTab(content_widget, "General")
         
     # --------------------------------------------------------------------------------------------------------------------
     def _create_ui_options_page(self):
@@ -928,7 +933,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         col1_layout.addStretch(1)
         col2_layout.addStretch(1)
 
-        self.tab_container.addTab(widget, "User Interface")
+
+
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+
+        self.tab_container.addTab(content_widget, "User Interface")
 
 
     # --------------------------------------------------------------------------------------------------------------------
@@ -984,7 +993,9 @@ There should only be one GremlinEx master server on the subnet.
 
 
         page_layout.addStretch()
-        self.tab_container.addTab(page_widget, "Remote Control")
+
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Remote Control")
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):
@@ -1057,7 +1068,9 @@ There should only be one GremlinEx master server on the subnet.
 
         page_layout.addWidget(box)
 
-        self.tab_container.addTab(page_widget, "Voice (TTS)")
+
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Voice (TTS)")
 
 
     # --------------------------------------------------------------------------------------------------------------------
@@ -1241,10 +1254,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         self._autoload_mapped_profile(self.autoload_profile_widget.isChecked())
 
 
-        #col1_layout.addStretch(1)
-        #col2_layout.addStretch(1)
+        
 
-        self.tab_container.addTab(page_widget, "Profile Options")
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Profile Options")
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_verbose_page(self):
@@ -1315,7 +1328,9 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
 
         page_layout.addStretch()
        
-        self.tab_container.addTab(page_widget, "Verbosity")
+       
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Verbosity")
 
 
     @QtCore.Slot(bool)
@@ -1337,7 +1352,9 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         column_layout.setContentsMargins(0,0,0,0)
 
         page_layout.addWidget(column_widget)
-        self.tab_container.addTab(page_widget, "OSC/MIDI")
+
+        
+        
 
 
         self.osc_enabled = QtWidgets.QCheckBox("Enable OSC")
@@ -1501,6 +1518,9 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         page_layout.addStretch()
 
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "OSC/MIDI")
+
 
     @QtCore.Slot()
     def _mouse_wheel_delay_change_value(self):
@@ -1536,7 +1556,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         page_layout = QtWidgets.QVBoxLayout(page_widget)
 
         page_layout.addWidget(QtWidgets.QLabel("MSFS SimConnect options:"))
-        self.tab_container.addTab(page_widget, "MSFS SimConnect")
+        
 
         enabled = gremlin.config.Configuration().simconnect_enabled
         widget = QtWidgets.QCheckBox("Enable SimConnect")
@@ -1574,6 +1594,9 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         
         page_layout.addStretch()
+
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "MSFS SimConnect")
 
 
 
@@ -1613,7 +1636,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
 
         page_layout.addWidget(QtWidgets.QLabel("VIGEM (Virtual Gamepad Emulator) options:"))
-        self.tab_container.addTab(page_widget, "VIGEM")
+
+        
 
 
 
@@ -1648,76 +1672,10 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         page_layout.addStretch()
 
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "VIGEM")
 
-    def _create_hidguardian_page(self):
-        self.hg_page = QtWidgets.QWidget()
-        self.hg_page_layout = QtWidgets.QVBoxLayout(self.hg_page)
-
-        # Display instructions for non admin users
-        if not gremlin.util.is_user_admin():
-            label = QtWidgets.QLabel(
-                "In order to use HidGuardian to both specify the devices to "
-                "hide via HidGuardian as well as have Gremlin see them, "
-                "Gremlin has to be run as Administrator."
-            )
-            label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
-            label.setWordWrap(True)
-            label.setFrameShape(QtWidgets.QFrame.Box)
-            label.setMargin(10)
-            self.hg_page_layout.addWidget(label)
-
-        else:
-            # Get list of devices affected by HidGuardian
-            hg = gremlin.hid_guardian.HidGuardian()
-            hg_device_list = hg.get_device_list()
-
-            self.hg_device_layout = QtWidgets.QGridLayout()
-            self.hg_device_layout.addWidget(
-                QtWidgets.QLabel("<b>Device Name</b>"), 0, 0
-            )
-            self.hg_device_layout.addWidget(
-                QtWidgets.QLabel("<b>Hidden</b>"), 0, 1
-            )
-
-            devices = gremlin.joystick_handling.joystick_devices()
-            devices_added = []
-            for i, dev in enumerate(devices):
-                # Don't add vJoy to this list
-                if dev.name == "vJoy Device":
-                    continue
-
-                # For identical VID / PID devices only add one instance
-                vid_pid_key = (dev.vendor_id, dev.product_id)
-                if vid_pid_key in devices_added:
-                    continue
-
-                # Set checkbox state based on whether or not HidGuardian tracks
-                # the device. Add a callback with pid/vid to add / remove said
-                # device from the list of devices handled by HidGuardian
-                self.hg_device_layout.addWidget(QtWidgets.QLabel(dev.name), i+1, 0)
-                checkbox = QtWidgets.QCheckBox("")
-                checkbox.setChecked(vid_pid_key in hg_device_list)
-                checkbox.stateChanged.connect(self._create_hg_cb(dev))
-                self.hg_device_layout.addWidget(checkbox, i+1, 1)
-                devices_added.append(vid_pid_key)
-
-            self.hg_page_layout.addLayout(self.hg_device_layout)
-
-            self.hg_page_layout.addStretch()
-            label = QtWidgets.QLabel(
-                "After making changes to the devices hidden by HidGuardian "
-                "the devices that should now be hidden or shown to other"
-                "applications need to be unplugged and plugged back in for "
-                "the changes to take effect."
-            )
-            label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
-            label.setWordWrap(True)
-            label.setFrameShape(QtWidgets.QFrame.Box)
-            label.setMargin(10)
-            self.hg_page_layout.addWidget(label)
-
-        self.tab_container.addTab(self.hg_page, "HidGuardian")
-
+  
     def closeEvent(self, event):
         """Closes the calibration window.
 

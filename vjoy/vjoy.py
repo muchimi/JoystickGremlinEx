@@ -352,7 +352,7 @@ class Button:
         el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
         el.vjoy_event.emit(event)
-        el.vjoy_callback(event)
+        # el.vjoy_callback(event) disable 10/8 in m76T23+ 
 
 
 
@@ -1028,7 +1028,7 @@ class VjoyDebug():
 
     def _event_handler(self, event):
         ''' event handler:  type of event: gremlin.event_handler.VjoyEvent '''
-        syslog.info(f"VJOY output: device: {event.vjoy_id} {event.input_type.name} {event.input_id} {event.value}")
+        syslog.info(f"VJOY DEBUG: vjoy event received: {str(event)}")
 
 
 

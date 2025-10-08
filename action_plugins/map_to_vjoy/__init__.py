@@ -4643,11 +4643,17 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             # process a button output 
             is_paired = remote_state.paired
             force_remote = event.force_remote or is_paired
+            
+                
 
+     
             # determine if event should be fired based on release mode
             is_pressed = event.is_pressed
             trigger = False
             fire_event =  (self.action_data.exec_on_release and not is_pressed) or (self.action_data.exec_on_press and is_pressed)
+
+            # if self.vjoy_input_id == 2:
+            #     syslog.info(f"=============================================================== button 2 set pressed {is_pressed}")
             
 
             if self.action_mode == VjoyAction.VJoyButton:

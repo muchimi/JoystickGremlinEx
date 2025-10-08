@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+import traceback
 from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -689,6 +690,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         if key and not self.sd.exists(key):
             description = self.action_data.description
             self.sd.register(key,False, description if description else "auto-created state")
+        #self.debug_count = 0
 
 
     def profile_start(self):
@@ -698,6 +700,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         input_type = self.action_data.get_input_type()
         self.pressed_hat_buttons = {}
         is_pressed = False
+        self.debug_count = 0
         match input_type:
             case InputType.JoystickHat:
                 value = gremlin.joystick_handling.get_hat(device_guid, input_id)
@@ -802,111 +805,129 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
 
         verbose = gremlin.config.Configuration().verbose_mode_state
+        input_type = self.action_data.get_input_type()
 
-        if event.event_type != InputType.JoystickHat:
-            key = self.action_data.key
-            mode = self.action_data.mode
-            is_pressed = event.is_pressed
-            trigger = (is_pressed and self.action_data.exec_on_press) or \
-                    (not is_pressed and self.action_data.exec_on_release) or \
-                    mode in ("actual","pulse")
-            if trigger:
-    
-                match mode:
-                    case "actual":
-                        if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] ACTUAL {is_pressed}")
-                        self.sd.setValue(key, is_pressed)
-                    case "press":
-                        if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] ON")
-                        self.sd.setValue(key, True)
-                        
-                    case "release":
-                        
-                        if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] OFF")
-                        self.sd.setValue(key, False)
-                    case "toggle":
-                        is_pressed = not self.sd.value(key)
-                        if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] TOGGLE -> {'ON' if value else 'OFF'}")
-                        self.sd.setValue(key, is_pressed)
-                    case "pulse":
-                        if is_pressed:
-                            if verbose: syslog.info(f"STATE: trigger start range pulse state {key}")
-                            repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
-                            self.pulse_start(key, self.action_data.pulse_delay/1000, repeat_interval)
-                        else:
-                            self.pulse_stop(key)
+        key = self.action_data.key
+        mode = self.action_data.mode
+        is_pressed = event.is_pressed
+        trigger = (is_pressed and self.action_data.exec_on_press) or \
+                (not is_pressed and self.action_data.exec_on_release) or \
+                mode in ("actual","pulse","toggle")        
+        
 
-        elif event.event_type == InputType.JoystickHat:
-            # hat button handling
-            position = event.raw_value
-            pressed_positions = list(self.pressed_hat_buttons.keys())
-            is_pressed = event.is_pressed
-            mode = self.action_data.hat_mode_map[position]
-
-            state_name = self.action_data.hat_map[position]
-            self.hat_position = position
-            
-            if state_name:
-                match mode:
-                    case ButtonOutputMode.Pulse:
-                        if is_pressed:
-                            if verbose: syslog.info(f"VJOY: trigger start pulse state {state_name} hat {position}")
-                            repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
-                            self.pulse_start(state_name, self.action_data.pulse_delay/1000, repeat_interval)
+        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}]")
+        # if not is_pressed:
+        #     self.debug_count += 1
+        #     if self.debug_count == 2:
+        #          self.debug_count = 0
+                
+            # syslog.info("STATE FUNCTOR traceback:")
+            # syslog.info(traceback.format_stack())
+        
+        if trigger:
+            # trigger mode (act as press)
+            match input_type:
+                case InputType.JoystickButton:
+                    # button
+                    match mode:
+                        case "actual":
+                            if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] ACTUAL {is_pressed}")
+                            self.sd.setValue(key, is_pressed)
                             
-                        else:
-                            if verbose: syslog.info(f"VJOY: trigger stop pulse state {state_name} hat {position}")
-                            self.pulse_stop(state_name)
+                        case "press":
+                            if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] ON")
+                            self.sd.setValue(key, True)
+                            
+                        case "release":
+                            if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] OFF")
+                            self.sd.setValue(key, False)
+                            
+                        case "toggle":
+                            # current state
+                            state = not self.sd.value(key)
+                            if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] TOGGLE -> {'ON' if state else 'OFF'}")
+                            self.sd.setValue(key, state)
+                            
+                        case "pulse":
+                            if is_pressed:
+                                if verbose: syslog.info(f"STATE: trigger start range pulse state {key}")
+                                repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
+                                self.pulse_start(key, self.action_data.pulse_delay/1000, repeat_interval)
+                            else:
+                                self.pulse_stop(key)
 
-                            # threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
-                    case ButtonOutputMode.Hold:
-                        if is_pressed:
-                            # release the prior buttons
-                            if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] hold")
-                            for pressed_position in pressed_positions:
-                                if position == pressed_position:
-                                    continue
-                                release_input_id = self.pressed_hat_buttons[pressed_position]
-                                if release_input_id > 0:
-                                        self.sd.setValue(state_name, False)
-                                del self.pressed_hat_buttons[pressed_position]
 
-                    case ButtonOutputMode.Press:
-                        if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] press/on")
-                        is_pressed = True
-                        if position in self.pressed_hat_buttons:
-                            del self.pressed_hat_buttons[position]
-                    case ButtonOutputMode.Release:
-                        if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] release/off")
-                        is_pressed = False # force a release on trigger
-                        if position in self.pressed_hat_buttons:
-                            del self.pressed_hat_buttons[position]
-                    case ButtonOutputMode.NoOp:
-                        # do nothing
-                        return True
+                case InputType.JoystickHat:
+                    # hat button handling
+                    position = event.raw_value
+                    pressed_positions = list(self.pressed_hat_buttons.keys())
+                    is_pressed = event.is_pressed
+                    mode = self.action_data.hat_mode_map[position]
+
+                    state_name = self.action_data.hat_map[position]
+                    self.hat_position = position
                     
-                # set the new button
-                self.pressed_hat_buttons[position] = state_name
-                self.sd.setValue(state_name, is_pressed)
-
-
-            else:
-                # release
-                match mode:
-                    case ButtonOutputMode.NoOp:
-                        # do nothing
-                        return True
-                    case ButtonOutputMode.Press:
-                        return True
-                    case ButtonOutputMode.Release:
-                        return True
-
-                for pressed_position in pressed_positions:
-                    state_name = self.pressed_hat_buttons[pressed_position]
                     if state_name:
-                        self.sd.setValue(state_name, False)
+                        match mode:
+                            case ButtonOutputMode.Pulse:
+                                if is_pressed:
+                                    if verbose: syslog.info(f"VJOY: trigger start pulse state {state_name} hat {position}")
+                                    repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
+                                    self.pulse_start(state_name, self.action_data.pulse_delay/1000, repeat_interval)
+                                    
+                                else:
+                                    if verbose: syslog.info(f"VJOY: trigger stop pulse state {state_name} hat {position}")
+                                    self.pulse_stop(state_name)
 
-                    del self.pressed_hat_buttons[pressed_position]
+                                    # threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
+                            case ButtonOutputMode.Hold:
+                                if is_pressed:
+                                    # release the prior buttons
+                                    if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] hold")
+                                    for pressed_position in pressed_positions:
+                                        if position == pressed_position:
+                                            continue
+                                        release_input_id = self.pressed_hat_buttons[pressed_position]
+                                        if release_input_id > 0:
+                                                self.sd.setValue(state_name, False)
+                                        del self.pressed_hat_buttons[pressed_position]
+
+                            case ButtonOutputMode.Press:
+                                if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] press/on")
+                                is_pressed = True
+                                if position in self.pressed_hat_buttons:
+                                    del self.pressed_hat_buttons[position]
+                            case ButtonOutputMode.Release:
+                                if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] release/off")
+                                is_pressed = False # force a release on trigger
+                                if position in self.pressed_hat_buttons:
+                                    del self.pressed_hat_buttons[position]
+                            case ButtonOutputMode.NoOp:
+                                # do nothing
+                                return True
+                            
+                        # set the new button
+                        self.pressed_hat_buttons[position] = state_name
+                        self.sd.setValue(state_name, is_pressed)
+
+
+                    else:
+                        # non trigger mode (release)
+                        match mode:
+                            case ButtonOutputMode.NoOp:
+                                # do nothing
+                                return True
+                            case ButtonOutputMode.Press:
+                                return True
+                            case ButtonOutputMode.Release:
+                                return True
+
+                        for pressed_position in pressed_positions:
+                            state_name = self.pressed_hat_buttons[pressed_position]
+                            if state_name:
+                                self.sd.setValue(state_name, False)
+
+                            del self.pressed_hat_buttons[pressed_position]
 
 
         return True

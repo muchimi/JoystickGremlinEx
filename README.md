@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T74)
+- Fix: state in toggle mode does not trigger a state change when input is released
+- Fix: duplicate event filtering when using VJOY as both input and output (could compare wrong datatypes depending on which API fired the event first resulting in double triggers)
+- Test: disabled time component from filtering (for now)
+- Improved: added scrolling pages to global options dialog.
+
 ### (m76T73)
 - Improved: Sequence container delay validation (so if values are not accepted it will explain why).
 - New: Sequence container gains execute on press/release options.
