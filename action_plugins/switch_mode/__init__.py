@@ -291,15 +291,16 @@ To change the mode temporarily, use the temporary mode switch action.'''
         mode = safe_read(node, "name",str,"")
         self.mode = mode
 
-        parent_mode = None
-        mode_node = node
-        while mode_node is not None and mode_node.tag != "mode":
-            mode_node = mode_node.getparent()
-        if mode_node is not None:
-            parent_mode = mode_node.get("name")
+        if not gremlin.util._xml_paste_mode(node, extra_data):
+            parent_mode = None
+            mode_node = node
+            while mode_node is not None and mode_node.tag != "mode":
+                mode_node = mode_node.getparent()
+            if mode_node is not None:
+                parent_mode = mode_node.get("name")
 
-        assert parent_mode is not None,"XML error: missing parent mode tag"
-        assert bool(mode) and self.mode != parent_mode,"logic error: switch mode cannot be the same as the current edit mode" # cannot be the same as edit mode
+            assert parent_mode is not None,"XML error: missing parent mode tag"
+            assert bool(mode) and self.mode != parent_mode,"logic error: switch mode cannot be the same as the current edit mode" # cannot be the same as edit mode
 
         self.exec_on_press = safe_read(node,"exec-on-press", bool, True)
         self.exec_on_release = safe_read(node,"exec-on-release", bool, False)

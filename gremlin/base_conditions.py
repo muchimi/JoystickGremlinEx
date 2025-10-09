@@ -68,7 +68,7 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
         self._comparison = value
 
     
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
@@ -120,13 +120,13 @@ class KeyboardCondition(AbstractCondition):
         self.is_extended = None
         self.comparison = "pressed"
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
         """
 
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
         self.comparison = safe_read(node, "comparison", str, "")
         self.scan_code = safe_read(node, "scan-code", int, 0)
         self.is_extended = parse_bool(safe_read(node, "extended", str, ""))
@@ -195,13 +195,13 @@ class JoystickCondition(AbstractCondition):
         self.use_calibrated_data = True # true if the input should use the calibrated data if any
         self.ignore_release = False # true if the condition always succeeds on input release
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
         """
 
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
 
         self.input_type = InputType.to_enum(safe_read(node, "input", str, ""))
         comparison = safe_read(node, "comparison", str, "")
@@ -268,9 +268,9 @@ class StateCondition(AbstractCondition):
         self.comparison = "pressed"
         self.ignore_release = False
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         import gremlin.ui.state_device
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
 
         condition_type = node.get("condition-type")
         if condition_type != "state":
@@ -318,9 +318,9 @@ class ModeCondition(AbstractCondition):
         self.mode = gremlin.shared_state.edit_mode
         self.ignore_release = False
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         import gremlin.ui.state_device
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
 
         condition_type = node.get("condition-type")
         if condition_type != "mode":
@@ -371,7 +371,7 @@ class VJoyCondition(AbstractCondition):
         self.range = [0.0, 0.0]
         self.ignore_release = False
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the object with data from an XML node.
 
         Parameters
@@ -380,7 +380,7 @@ class VJoyCondition(AbstractCondition):
             XML node to parse for data
         """
 
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
         self.comparison = safe_read(node, "comparison", str, "")
         if not "input" in node.attrib:
             syslog.error("VJOY XML: invalid input in XML - NULL ")
@@ -462,12 +462,12 @@ class InputActionCondition(AbstractCondition):
         super().__init__()
         self._comparison = "always" # default comparison is press or release
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
         """
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
         self.comparison = safe_read(node, "comparison", str, "")
         
 
@@ -944,7 +944,7 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         self._id = value
  
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Extracts activation condition data from an XML node.
 
         :param node: the XML node to parse

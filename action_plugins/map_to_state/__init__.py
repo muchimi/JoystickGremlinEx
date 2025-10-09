@@ -683,6 +683,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         """
         super().__init__(action, parent)
         self.lock = threading.Lock()
+        self._started = False
         
         # create the state if it doesn't exist
         self.sd = gremlin.ui.state_device.StateData()
@@ -720,8 +721,9 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         if self.verbose:
             
             input_item = self.action_data.input_item
-            syslog.info (f"STATE: (map to state) [{self.action_data.state.key}] : mapped to input: {input_item.debug_display}")
+            syslog.info (f"STATE FUNCTOR PROFILE START SYNC: (map to state) [{self.action_data.state.key}] : mapped to input: {input_item.debug_display}")
             syslog.info (f"\tsync mode: [{self.action_data.sync_mode.name}]")
+
 
         # determine the startup state 
         match self.action_data.sync_mode:
@@ -751,7 +753,13 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                 pass
                 
         
+    def profile_started(self):
+        # occurs on profile start once profile start sequence is completed
+        self._started = True
 
+    def profile_stop(self):
+        # occurs on profile stop
+        self._started = False
 
         
 
@@ -803,6 +811,10 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value, extra_data = None):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
+
+        if not self._started:
+            # trap events kicked off while profile start is going on
+            return
 
         verbose = gremlin.config.Configuration().verbose_mode_state
         input_type = self.action_data.get_input_type()

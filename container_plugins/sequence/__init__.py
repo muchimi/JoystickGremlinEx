@@ -171,11 +171,11 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
-        self.profile_data.trigger_on_press = checked
+        self.profile_data.exec_on_press = checked
 
     @QtCore.Slot(bool)
     def _execute_on_release_changed(self, checked : bool):
-        self.profile_data.trigger_on_release = checked
+        self.profile_data.exec_on_release = checked
 
     @QtCore.Slot(bool)
     def _handle_wiggle_mode_change(self, checked):
@@ -262,9 +262,9 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._warning_widget.setVisible(visible)
 
 
-    @QtCore.Slot(bool)
-    def _trigger_mode_changed(self, checked: bool):
-        self.profile_data.trigger_on_release = checked
+    # @QtCore.Slot(bool)
+    # def _trigger_mode_changed(self, checked: bool):
+    #     self.profile_data.exec_on_release = checked
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:

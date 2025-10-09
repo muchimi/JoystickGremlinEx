@@ -113,7 +113,7 @@ class ProfileBaseNode(ABC, NodeMixin):
         self._description = None # descriptive text for this node
 
     @abstractmethod
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         ''' '''
         pass
 
@@ -141,7 +141,7 @@ class ProfileRootNode(ProfileBaseNode):
 
 
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         self._start_mode = None
         if "start_mode" in node.attrib:
             self.start_mode = node.get("start_mode")
@@ -770,7 +770,7 @@ class ProfileDeviceNode(ProfileBaseNode):
 
 
 
-    def from_xml(self, node : Element, data = None):
+    def from_xml(self, node : Element, data = None, extra_data = None):
         """Populates this device based on the xml data.
 
         :param node the xml node to parse to populate this device
@@ -882,7 +882,7 @@ class ProfileModeNode(ProfileBaseNode):
         self.inherit = None # parent mode name
         self.parent = parent
 
-    def from_xml(self, node : Element, data = None):
+    def from_xml(self, node : Element, data = None, extra_data = None):
         """Parses the XML mode data.
 
         :param node XML node to parse
@@ -1205,7 +1205,7 @@ class ProfileContainerNode(ProfileBaseNode):
         
 
 
-    def from_xml(self, node : Element, data = None):
+    def from_xml(self, node : Element, data = None, extra_data = None):
         ''' reads container data from the profile xml'''
         container_type = node.get("type")
 
@@ -1238,7 +1238,7 @@ class ProfileMergedAxisNode(ProfileBaseNode):
         self.entry = None
         self.parent = parent
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         entry = {
             "mode": node.get("mode", None),
             "operation": gremlin.types.MergeAxisOperation.to_enum(safe_read(node, "operation", str, "average"))

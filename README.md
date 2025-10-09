@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T74) hotfix
+- Fix: Switch Mode action is now aware of when it is being pasted to avoid the runtime integrity checks.
+- Fix: Sequence container not properly recalling execution trigger mode.
+- Fix: vjoy as input profile load scanner not handling devices it cannot find.  Updated behavior is to output a warning if a device referenced in a saved profile is no longer found along with the offending line number in the profile.
+
 ### (m76T74)
 - Fix: state in toggle mode does not trigger a state change when input is released
 - Fix: duplicate event filtering when using VJOY as both input and output (could compare wrong datatypes depending on which API fired the event first resulting in double triggers)

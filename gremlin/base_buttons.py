@@ -17,7 +17,7 @@ class AbstractVirtualButton(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the virtual button based on the node's data.
 
         :param node the node containing data for this instance
@@ -72,14 +72,14 @@ class VirtualAxisButton(AbstractVirtualButton):
     def range(self):
         return [self.lower_limit, self.upper_limit]
     
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the virtual button based on the node's data.
 
         :param node the node containing data for this instance
         """
 
         # grab the device GUID this applies to
-        device_guid, input_type, input_id, mode = get_xml_input_data(node)
+        device_guid, input_type, input_id, mode = get_xml_input_data(node, extra_data)
         self.device_guid = device_guid
         self.input_type = input_type
         self.mode = mode
@@ -155,13 +155,13 @@ class VirtualHatButton(AbstractVirtualButton):
         self.input_type = container.get_input_type()
         self.container = container
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         """Populates the activation condition based on the node's data.
 
         :param node the node containing data for this instance
         """
 
-        device_guid, input_type, input_id, mode = get_xml_input_data(node)
+        device_guid, input_type, input_id, mode = get_xml_input_data(node, extra_data)
         self.device_guid = device_guid
         self.input_type = input_type
         self.mode = mode

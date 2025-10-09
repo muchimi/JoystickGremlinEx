@@ -251,7 +251,7 @@ class OscArg(QtCore.QObject):
 
 
 
-    def from_xml(self, node):
+    def from_xml(self, node, extra_data = None):
         ''' reads a data node '''
         if "id" in node.attrib:
             self._id = node.get("id")   

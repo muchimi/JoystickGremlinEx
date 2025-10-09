@@ -222,7 +222,7 @@ class StateCategories(QtCore.QObject):
         ''' adds the default category if missing '''
         self._categories[self._default_category.name] = self._default_category
 
-    def from_xml(self, root : ElementTree.Element):
+    def from_xml(self, root : ElementTree.Element, data = None, extra_data = None):
         ''' reads the category '''
         self._categories = {}
         if root.tag == "categories":
@@ -724,7 +724,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
         return node
     
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         ''' read XML state node '''
         self._key = node.get("key")
         if "id" in node.attrib:
@@ -1281,7 +1281,7 @@ class StateData(QtCore.QObject):
         ''' sets state value (and registers if needed) '''
         key = key.casefold().strip()
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose: syslog.info(f"STATE: [{key}] -> {value}")
+        if verbose: syslog.info(f"STATE SET: set state [{key}] -> {value}")
         self._data[key].value = value
 
     
@@ -1391,7 +1391,7 @@ class StateData(QtCore.QObject):
         root.append(node)
         return root
 
-    def from_xml(self, root):
+    def from_xml(self, root, data = None, extra_data = None):
         ''' reads saved data '''
 
         # read categories first

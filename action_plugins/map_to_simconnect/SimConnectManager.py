@@ -2443,7 +2443,7 @@ class SimConnectBlock():
 
         return node
 
-    def from_xml(self, node, data = None):
+    def from_xml(self, node, data = None, extra_data = None):
         ''' reads from an xml node block or command '''
 
         if node.tag == "command":

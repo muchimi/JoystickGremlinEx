@@ -4976,7 +4976,7 @@ class  MergeData():
             node.append(curve_node)
         return node
 
-    def from_xml(self, node):
+    def from_xml(self, node, extra_data = None):
         ''' read node data from xml '''
         if not node.tag == "merge-data":
             return

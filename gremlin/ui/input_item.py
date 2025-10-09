@@ -4643,7 +4643,9 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         import_data = gremlin.base_profile.ProfileImportData()
         verbose = gremlin.config.Configuration().verbose
 
-        
+        if not extra_data:
+            extra_data = {}
+        extra_data["paste"] = True # indicate paste mode for xml readers
 
         if isinstance(container, ObjectEncoder):
             oc = container

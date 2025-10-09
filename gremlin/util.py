@@ -1258,7 +1258,7 @@ def get_xml_mode(node):
     
     return None
 
-def get_xml_input_data(node):
+def get_xml_input_data(node, extra_data = None):
     ''' for a given XML node, find in the parent hierarchy of a profile the device_guid, mode, input_type and input_id 
     
     :param node: the child node
@@ -2338,3 +2338,6 @@ def _xml_depth(node, depth) -> int:
     
     
 
+def _xml_paste_mode(node, extra_data) -> bool:
+    ''' true if the xml should be read in paste mode '''
+    return extra_data and "paste" in extra_data

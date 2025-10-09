@@ -753,8 +753,8 @@ class AbstractContainer(ProfileData):
         self._collapsed = safe_read(node,"collapsed",bool, False)
 
         self._parse_action_set_xml(node, data, extra_data)
-        self._parse_virtual_button_xml(node, data)
-        self._parse_activation_condition_xml(node, data)
+        self._parse_virtual_button_xml(node, data, extra_data)
+        self._parse_activation_condition_xml(node, data, extra_data)
 
 
     def to_xml(self):
@@ -845,7 +845,7 @@ class AbstractContainer(ProfileData):
 
 
 
-    def _parse_virtual_button_xml(self, node, data = None):
+    def _parse_virtual_button_xml(self, node, data = None, extra_data = None):
         """Parses the virtual button part of the XML data.
 
         :param node the XML node to process
@@ -858,16 +858,16 @@ class AbstractContainer(ProfileData):
             item = AbstractContainer.virtual_button_lut[self.get_input_type()]
             if item is not None:
                 self.virtual_button = item(self)
-                self.virtual_button.from_xml(vb_node, data)
+                self.virtual_button.from_xml(vb_node, data, extra_data)
 
-    def _parse_activation_condition_xml(self, node, data):
+    def _parse_activation_condition_xml(self, node, data, extra_data = None):
         ''' load the container condition '''
         self.activation_condition = ActivationCondition([], ActivationRule.All)
         self.activation_condition.setContainer(self)
         input_item = data
         activation_node = gremlin.util.get_xml_child(node,"activation-condition")
         if activation_node is not None:
-            self.activation_condition.from_xml(activation_node, (input_item, self))
+            self.activation_condition.from_xml(activation_node, (input_item, self), extra_data)
 
 
     def _is_valid(self):
@@ -1326,7 +1326,7 @@ class AbstractAction(ProfileData):
         for _ in node.findall("activation-condition"):
             cond_node = node.find("activation-condition")
             if cond_node is not None:
-                self.activation_condition.from_xml(cond_node, data)
+                self.activation_condition.from_xml(cond_node, data, extra_data)
                 
 
         # record the type of this action
@@ -1425,7 +1425,7 @@ class AbstractContainerAction(AbstractAction):
         :param node the XML node to populate fields with
         """
 
-        super().from_xml(node, data)
+        super().from_xml(node, data, extra_data)
         registry = ProfileRegistry()
         container_nodes = gremlin.util.get_xml_child(node,"action_containers", multiple = True)
 
@@ -3947,14 +3947,14 @@ class Profile():
             device = Device(self)
             device.from_xml(child, data, extra_data)
             self.devices[device.device_guid] = device
-
+            
             dd : dinput.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(device.device_guid)
-            if dd.is_virtual:
+            if not dd:
+                syslog.warning(f"PROFILE: unable to find device [{device.device_guid}] - XML source line: {child.sourceline}")
+            elif dd.is_virtual:
                 # vjoy as input
                 self.settings.setVjoyAsInput(dd.vjoy_id, True)
                 if verbose: syslog.info(f"PROFILE: enable vjoy as input device [{dd.vjoy_id}]")
-
-            
 
 
         # Parse each vjoy device into separate DeviceConfiguration objects
