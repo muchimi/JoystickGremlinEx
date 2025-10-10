@@ -1364,10 +1364,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self.ui.actionInputRepeater.isChecked():
             el.keyboard_event.connect(self.repeater.process_event)
             el.joystick_event.connect(self.repeater.process_event)
+            el.vjoy_event.connect(self.repeater.process_event)
             self._update_statusbar_repeater("Waiting for input")
         else:
             el.keyboard_event.disconnect(self.repeater.process_event)
             el.joystick_event.disconnect(self.repeater.process_event)
+            el.vjoy_event.disconnect(self.repeater.process_event)
             self.repeater.stop()
             self.status_bar_repeater_widget.setText("")
 

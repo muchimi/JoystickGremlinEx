@@ -437,7 +437,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             event.raw_value = is_pressed
             self._execute(event, value, extra_data, self._verbose)    
 
-        return False # stop execution as the logic is internal to trigger the other nodes
+        return True 
     
     def _wiggle_runner(self):
         ''' wiggle mode runner thread '''
