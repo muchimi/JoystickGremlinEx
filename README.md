@@ -14,6 +14,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T74C)
+- Fix: fix issue with device tab reorder if a device is referenced in the profile but cannot be found because it is not currently detected by GremlinEx (multiple reasons).
 
 ### (m76T74B)
 - Change: Sequence container will always succeed to avoid a FAIL code when executing that could impact conditions.

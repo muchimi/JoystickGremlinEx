@@ -2653,9 +2653,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if id in id_list:
                         continue
                     device = gremlin.joystick_handling.device_info_from_guid(id)
-                    if device.disabled:
+                    if not device:
+                        if verbose: syslog.info(f"TAB REORDER: skipping a device - ID not found in detected devices: [{id}]")  
                         continue
+                    if device.disabled:
+                        if verbose: syslog.info(f"TAB REORDER: skipping a device - device disabled - [{device.name}] ID [{id}]")  
+                        continue
+
                     if device.is_virtual:
+                        # skip devices if the VJOY device is not setup as input
                         input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
                         if not input_enabled:
                             continue
