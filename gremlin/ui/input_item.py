@@ -2569,7 +2569,6 @@ class InputItemWidget(QBoxFrame):
             self._edit_button_widget = None
 
 
-
     def create_action_icons(self, profile_data):
         """Creates the label of this instance.
 
@@ -2579,6 +2578,9 @@ class InputItemWidget(QBoxFrame):
         :param profile_data the profile.InputItem object associated
             with this instance
         """
+
+        if not Shiboken.isValid(self._action_icons_container_layout):
+            return
 
         if profile_data is None or self.data.id != profile_data.id:
             return

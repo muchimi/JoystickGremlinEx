@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T74D)
+- Fix: more QT shenanigans with garbage collection.
+
 ### (m76T74C)
 - Fix: fix issue with device tab reorder if a device is referenced in the profile but cannot be found because it is not currently detected by GremlinEx (multiple reasons).
 
