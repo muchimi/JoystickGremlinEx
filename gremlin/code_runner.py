@@ -305,10 +305,19 @@ class CodeRunner:
             # Create input callbacks based on the profile's content
             
             verbose = gremlin.config.Configuration().verbose_mode_exec
+            verbose = True
+            device : gremlin.base_profile.Device
             for device in profile.devices.values():
+                device_info = gremlin.joystick_handling.device_info_from_guid(device.device_guid)
+                if not device_info:
+                    syslog.warning(f"CALLBACK: skipping a device: ID referenced in profile data is not currently found in the list of known devices:")  
+                    syslog.warning(f"\t{str(device)}")
+                    continue
+       
+                    
+                device_name = device_info.name
                 if verbose:
-                    device_name = gremlin.joystick_handling.device_name_from_guid(device.device_guid)
-                    syslog.info(f"CALLBACK: device: {device_name}")
+                    syslog.info(f"CALLBACK: device: {str(device)}")
                 
                 for mode in device.modes.values():
                     if not mode.name in mode_nodes:

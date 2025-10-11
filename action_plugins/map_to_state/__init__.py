@@ -824,7 +824,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         is_pressed = event.is_pressed
         trigger = (is_pressed and self.action_data.exec_on_press) or \
                 (not is_pressed and self.action_data.exec_on_release) or \
-                mode in ("actual","pulse","toggle")        
+                mode in ("actual","pulse")        
         
 
         if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}]")

@@ -66,6 +66,8 @@ _joystick_initialized = False
 
 syslog = logging.getLogger("system")
 
+
+
 class VJoyProxy:
 
     """Manages the usage of vJoy and allows shared access all callbacks."""
@@ -488,7 +490,7 @@ def device_name_from_guid(device_guid) -> str:
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
 
-    return None
+    return ""
     
 def known_devices() -> list:
     ''' gets the list of device GUID (strings) known to GremlinEx '''

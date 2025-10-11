@@ -1161,7 +1161,7 @@ class StateData(QtCore.QObject):
                 to_evaluate.append(state)
             else:
                 state.value = state.default_value
-                if verbose: syslog.info(f"STATE: profile start [{state.key}] reset: {state.value}")
+                if verbose: syslog.info(f"STATE: profile start [{state.key}] set initial value to: [{f"ON/PRESSED" if state.value else "OFF/RELEASED"}]")
                 
 
         # evaluate expressions based on initial data values

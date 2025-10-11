@@ -1061,7 +1061,8 @@ class Device:
         return node
 
 
-
+    def __str__(self):
+        return f"Profile Device: [{self.device_id}] name: [{self.name}] type: [{self.device_type}] virtual: [{self.virtual}]"
 
 
 class AbstractAction(ProfileData):

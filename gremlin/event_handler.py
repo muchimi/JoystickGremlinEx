@@ -1263,17 +1263,22 @@ class EventListener:
 		
 		
 		event = dinput.InputEvent(data)
+		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
 
-		if verbose: syslog.info(f"DINPUT EVENT: {event}")
+		if device is None:
+			if verbose: syslog.info(f"DINPUT EVENT: device not found: {event}")
+			return 
+
+		if verbose: 
+			if not device.is_virtual or verbose_extra:
+				syslog.info(f"DINPUT EVENT: device [{device.name}] data: {event}")
 			
 
 		event_list = []
 
 		#breakpoint()
-		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
-		if device is None:
-			# device not initialized/not found = ignore
-			return 
+		
+		
 		
 		is_virtual = device.is_virtual if device is not None else False
 		if is_virtual:

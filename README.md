@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T75)
+- Fix: profile start will ignore (and log) a device reference if the device is not a known device at the time the profile starts rather than throw a hard exception.
+- Fix: reverted toggle state changes
+- Fix: exception related to a verbose log item referencing a NULL value in some situations.
+
+
+
 ### (m76T74D)
 - Fix: more QT shenanigans with garbage collection.
 
