@@ -771,6 +771,8 @@ class DataPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
 
     def redraw(self):
         """Forces a position update of the ui element."""
+        if not Shiboken.isValid(self):
+            return
         self.setPos(self.x, self.y)
 
 class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
@@ -809,6 +811,8 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
 
     def redraw(self):
         """Forces a position update of the ui element."""
+        if not Shiboken.isValid(self):
+            return
         self.setPos(
             g_scene_size * self.control_point.center.x,
             -g_scene_size * self.control_point.center.y
@@ -906,6 +910,8 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
 
     def redraw(self):
         """Forces a position update of the ui element."""
+        if not Shiboken.isValid(self):
+            return
         center = self.parent.control_point.center
         point = self.parent.control_point.handles[self.index]
         delta = point - center

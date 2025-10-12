@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T76)
+- Fix: profile modes not showing up unless a mapping exists in that mode.  Reworked the mode load logic to use the profile mode section instead of the device mode list.
+- Fix: QT garbage collection desync in activation conditions UI.
+
 ### (m76T75)
 - Fix: profile start will ignore (and log) a device reference if the device is not a known device at the time the profile starts rather than throw a hard exception.
 - Fix: reverted toggle state changes

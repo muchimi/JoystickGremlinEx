@@ -2759,6 +2759,7 @@ class ModeNode(anytree.NodeMixin):
     def __init__(self, name : str = None, mode_object = None):
         self.name = name
         self.mode_object = mode_object
+        self.parent_name = None # name of parent mode
         
 
     @property
@@ -3655,17 +3656,17 @@ class Profile():
         node_map[""] = self._mode_tree
         inherit_map = {}
 
-        mode_nodes = [node for node in self._profile_graph.root.descendants if node.nodeType == gremlin.profile_graph.ProfileNodeType.Mode]
-        for node in mode_nodes:
-            mode_name = node.name
-            if not mode_name in mode_list:
-                m_node = anytree.find_by_attr(self._mode_tree, mode_name)
-                if not m_node:
-                    m_node = Node(mode_name)
-                    m_node.parent = self._mode_tree # default parent node
-                node_map[mode_name] = m_node
-                mode_list.append(mode_name)
-                inherit_map[mode_name] = node.inherit
+        mode_list = self._profile_graph.getModeList()
+
+        # mode_nodes = [node for node in self._profile_graph.root.descendants if node.nodeType == gremlin.profile_graph.ProfileNodeType.Mode]
+        for mode_name in mode_list:
+            m_node = anytree.find_by_attr(self._mode_tree, mode_name)
+            if not m_node:
+                m_node = Node(mode_name)
+                m_node.parent = self._mode_tree # default parent node
+            node_map[mode_name] = m_node
+            mode_node = self._profile_graph.getModeNode(mode_name)
+            inherit_map[mode_name] = mode_node.inherit
 
         for mode_name in mode_list:
             m_node = node_map[mode_name]
@@ -3673,7 +3674,7 @@ class Profile():
             if parent_mode_name:
                 m_parent_node = node_map[parent_mode_name]
                 m_node.parent = m_parent_node
-        
+            
         verbose = gremlin.config.Configuration().verbose
         if verbose: self.dumpModeTree()
         pass
@@ -3935,11 +3936,11 @@ class Profile():
         self.settings.from_xml(root.find("settings"), data, extra_data)            
 
         # state data - read first because states can be referenced by nodes
-        nodes = root.xpath("//states")
-        if not nodes:
+        mode_nodes = root.xpath("//states")
+        if not mode_nodes:
             # not found
             self.state.clear()
-        for node in nodes:
+        for node in mode_nodes:
             self.state.from_xml(node)
 
         # Parse each device into separate DeviceConfiguration objects
@@ -3969,52 +3970,58 @@ class Profile():
         for child in root.iter("simconnect"):
             key_cp = safe_read(child,"key_cp",str, "")
             key_ap = safe_read(child,"key_ap",str, "")
-            mode = safe_read(child,"mode", str, "")
+            mode_name = safe_read(child,"mode", str, "")
             key = (key_cp.casefold(), key_ap.casefold())
-            self._simconnect_modes[key] = mode
+            self._simconnect_modes[key] = mode_name
 
 
         # extract the mode list
-        mode_node_map = {}
-        nodes = {}
-        mode_root = ModeNode("")  # root mode
-        nodes[""] = mode_root
+        mode_node_map = {} # list of xml mode nodes keyed by mode name
+        mode_tree_nodes = {} # list of mode nodes for the mode tree
+        mode_tree_root = ModeNode("")  # root mode of the tree
+        mode_tree_nodes[""] = mode_tree_root
         master_mode_name = gremlin.shared_state.master_mode
-        mode_nodes = root.xpath("//device//mode")
-        for mode_node in mode_nodes:
-            mode = mode_node.get("name")
-            if mode in mode_node_map:
-                continue # already known
 
-            if "inherit" in mode_node.attrib:
-                parent_mode = mode_node.get("inherit")
-                if not parent_mode in mode_node_map:
-                    tree_parent_mode = ModeNode(parent_mode)
-                    nodes[parent_mode] = tree_parent_mode
-                    mode_node_map[parent_mode] = tree_parent_mode
-                    tree_parent_mode.parent = mode_root
+        node_list = root.xpath("//profile/modes")
+        if node_list:
+            mode_nodes = node_list[0]
+            for mode_node in mode_nodes:
+                mode_name = mode_node.get("name")
+                if verbose: syslog.info(f"PROFILE MODE: [{mode_name}] ")
+                if mode_name in mode_node_map:
+                    continue # already known
+
+                if not mode_name in mode_node_map:
+                    mode_tree_node = ModeNode(mode_name)
+                    mode_tree_nodes[mode_name] = mode_tree_node
+                mode_node_map[mode_name] = mode_node
+
+                if "inherit" in mode_node.attrib:
+                    parent_mode_name = mode_node.get("inherit")
+                    if not parent_mode_name in mode_node_map:
+                        tree_parent_mode = ModeNode(parent_mode_name)
+                        mode_tree_nodes[parent_mode_name] = tree_parent_mode
+                        
+                    mode_tree_node.parent_name = parent_mode_name
+
+        # link parent nodes in the tree
+        for mode_name in mode_tree_nodes:
+            if not mode_name:
+                continue # root
+            tree_node = mode_tree_nodes[mode_name]
+            parent_name = tree_node.parent_name
+            if parent_name:
+                parent_tree_node = mode_tree_nodes[parent_name]
+                tree_node.parent = parent_tree_node
             else:
-                parent_mode = None
-
-            if not mode in mode_node_map:
-                tree_node = ModeNode(mode)
-                mode_node_map[mode] = tree_node
-                nodes[mode] = tree_node
-                if parent_mode:
-                    parent_tree_node = nodes[parent_mode]
-                    tree_node.parent = parent_tree_node
-                    continue
-            
                 # no parent - parent to root
-                tree_node.parent = mode_root
+                tree_node.parent = mode_tree_root
 
         if not master_mode_name in mode_node_map:
             # add new master mode for old profiles for manual edits in case the converter didn't catch it
-            master_mode = ModeNode(master_mode_name)
-            master_mode.parent = mode_root
-            mode_node_map[master_mode_name] = mode_root
-            nodes[master_mode_name] = master_mode
-
+            master_tree_mode = ModeNode(master_mode_name)
+            master_tree_mode.parent = mode_tree_root
+            mode_tree_nodes[master_mode_name] = mode_tree_root
 
         mode_list = list(mode_node_map.keys())
 
@@ -4068,14 +4075,14 @@ class Profile():
         # update missing modes from devices
         for device in self.devices.values():
             device_modes = [mode.name for mode in device.modes.values()]
-            missing_modes = [mode for mode in mode_list if not mode in device_modes]
-            for mode_name in missing_modes:
-                mode = Mode(device)
-                mode.name = mode_name
-                node = nodes[mode_name]
-                if node.parent and node.parent.name:
-                    mode.inherit = node.parent.name
-                device.modes[mode_name] = mode
+            missing_mode_names = [name for name in mode_list if not name in device_modes]
+            for mode_name in missing_mode_names:
+                mode_object = Mode(device)
+                mode_object.name = mode_name
+                mode_tree_node = mode_tree_nodes[mode_name]
+                if mode_tree_node.parent_name:
+                    mode_object.inherit = mode_tree_node.parent_name
+                device.modes[mode_name] = mode_object
 
 
         # read button and axis startup data
@@ -4116,7 +4123,7 @@ class Profile():
 
         # load the profile graph
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
-        self._profile_graph.parse_xml(fname)
+        self._profile_graph.from_xml(fname)
 
 
 

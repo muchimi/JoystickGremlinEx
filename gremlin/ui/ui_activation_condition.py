@@ -1597,6 +1597,10 @@ class ConditionView(ui_common.AbstractView):
 
         # el = gremlin.event_handler.EventListener()
         # el.condition_redraw.emit(self.model.action_data)
+        if not Shiboken.isValid(self):
+            return
+        if not Shiboken.isValid(self.conditions_layout):
+            return
         
         ui_common.clear_layout(self.conditions_layout)
 

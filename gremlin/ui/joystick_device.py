@@ -630,6 +630,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
     def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
+        
         self._select_item_cb(self.input_item_list_view.current_index, force_update = True, emit = emit)
 
         # self.redraw()

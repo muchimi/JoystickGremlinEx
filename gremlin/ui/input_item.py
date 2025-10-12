@@ -1371,6 +1371,8 @@ class ActionSetView(ui_common.AbstractView):
 
     def redraw(self):
 
+        if not Shiboken.isValid(self):
+            return
 
         
         cache = ActionSetViewCache()

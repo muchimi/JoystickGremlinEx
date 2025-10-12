@@ -135,7 +135,7 @@ class ProfileRootNode(ProfileBaseNode):
         self.devices = {} # map of device to device node, keyed by device_guid
         self.simconnect_modes = {} # map of simconnect key to profile mode
         self.source_xml = source_xml # source file
-
+        self._graph_modes = {} # list of mode definitions in the graph
         self._load_default_devices()
         
 
@@ -158,6 +158,24 @@ class ProfileRootNode(ProfileBaseNode):
 
         if "force_numlock" in node.attrib:
             self.force_numlock_off = safe_read(node, "force_numlock", bool, True)
+
+        # parse modes
+        node_list = node.xpath("//profile/modes")
+        self._graph_modes.clear()
+        if node_list:
+            mode_nodes = node_list[0]
+            for mode_node in mode_nodes:
+                profile_mode_node = ProfileModeNode()
+                profile_mode_node.from_xml(mode_node)
+                self._graph_modes[profile_mode_node.name] = profile_mode_node
+
+        for mode_name in self._graph_modes:
+            profile_mode_node = self._graph_modes[mode_name]
+            parent_name = profile_mode_node.inherit
+            if parent_name:
+                parent_mode_node = self._graph_modes[parent_name]
+                profile_mode_node.parent = parent_mode_node
+
 
         # Parse each device 
         self.devices = {} 
@@ -876,10 +894,10 @@ class ProfileDeviceNode(ProfileBaseNode):
 
 class ProfileModeNode(ProfileBaseNode):
     ''' mode node '''
-    def __init__(self, parent : ProfileDeviceNode):
+    def __init__(self, mode_name = None, parent_mode_name = None, parent : ProfileDeviceNode = None):
         super().__init__(ProfileNodeType.Mode)
-        self.name = None # mode name
-        self.inherit = None # parent mode name
+        self.name = mode_name # mode name
+        self.inherit = parent_mode_name # parent mode name
         self.parent = parent
 
     def from_xml(self, node : Element, data = None, extra_data = None):
@@ -893,12 +911,11 @@ class ProfileModeNode(ProfileBaseNode):
         self.name = name
         self.inherit = safe_read(node, "inherit", str, "")
         
-
-
-        child : Element
-        for child in node:
-            input_node = ProfileInputNode(device_node = self.parent, parent = self)
-            input_node.from_xml(child, data)
+        if self.parent:
+            child : Element
+            for child in node:
+                input_node = ProfileInputNode(device_node = self.parent, parent = self)
+                input_node.from_xml(child, data)
 
     def to_xml(self) -> Element:
         """Generates XML code for this DeviceConfiguration.
@@ -927,6 +944,7 @@ class ProfileInputNode(ProfileBaseNode):
     ''' input node - represents an input for a device '''
     def __init__(self, device_node : ProfileDeviceNode, parent : ProfileModeNode):
         super().__init__(ProfileNodeType.Input)
+        assert device_node is not None,"device node must be provided"
         self.device_node  = device_node # link to the device node this input belongs to
         
         self.input_type : InputType = InputType.NotSet # input type
@@ -1294,8 +1312,18 @@ class ProfileGraph():
         self._root = ProfileRootNode()
         self._source_xml = None # source XML loaded 
         self._remap_prompt_issued = False
+        
 
         
+    def getModeList(self) -> list[str]:
+        ''' gets the list of defined modes in the profile '''
+        return list(self._root._graph_modes.keys())
+    
+    def getModeNode(self, mode_name) -> ProfileModeNode:
+        ''' gets the profile graph mode for the specific mode ='''
+        if mode_name in self._root._graph_modes:
+            return self._root._graph_modes[mode_name]
+        return None # not found
 
     def get_device_node(self, device_guid) -> ProfileDeviceNode:
         ''' gets the profile device node for the given device_guid, None if not found '''
@@ -1312,7 +1340,7 @@ class ProfileGraph():
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
                 syslog.info(f"{pre}{str(node)}")
 
-    def parse_xml(self, source_xml : str, data = None):
+    def from_xml(self, source_xml : str, data = None):
         ''' reads a profile from XML '''
         parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
         tree = etree.parse(source_xml, parser)
