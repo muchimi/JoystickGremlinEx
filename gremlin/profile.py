@@ -65,7 +65,7 @@ class ProfileConverter:
     """Handle converting and checking profiles."""
 
     # Current profile version number
-    current_version = 14
+    current_version = 15
 
     def __init__(self):
         pass
@@ -128,7 +128,8 @@ class ProfileConverter:
             11: self._convert_from_v11,
             12: self._convert_from_v12,
             13: self._convert_from_v13,
-            14: None,
+            14: self._convert_from_v14,
+            15: None,
         }
 
         # Create a backup of the outdated profile
@@ -971,7 +972,72 @@ class ProfileConverter:
 
         return root
             
+            
+    def _convert_from_v14(self, root, fname = None):
+        ''' convert from V14 to V15 - ensure modes are in the Mode section due to change in how modes are read for a profile  '''
+        import gremlin.util
+        import gremlin.base_profile
+        root.attrib["version"] = "15" # change version
 
+        # calatog all modes in the profile 
+        mode_map = {}
+        nodes = root.xpath("//profile/modes")
+
+
+        if nodes:
+            # exists already
+            # verify the master mode exists
+            mode_root = nodes[0]
+            nodes = root.xpath("//profile/modes/mode")
+            for node_mode in nodes:
+                mode_name = node_mode.get("name")
+                mode_object = gremlin.base_profile.ModeNode()
+                mode_object.name = mode_name
+                if not mode_name in mode_map:
+                    if "inherit" in node_mode.attrib:
+                        parent_mode_name = node_mode.get("inherit")
+                        mode_object.parent_name = parent_mode_name
+
+            # remove the node
+            root.remove(mode_root)
+
+    
+        # recreate
+        mode_root = etree.Element("modes")
+        root.append(mode_root)
+
+        # add any mode in the devices
+        mode_nodes = root.xpath("//device/mode")
+  
+        for node_mode in mode_nodes:
+            mode_name = node_mode.get("name")
+            mode_object = gremlin.base_profile.ModeNode()
+            mode_object.name = mode_name
+            if not mode_name in mode_map:
+                if "inherit" in node_mode.attrib:
+                    parent_mode_name = node_mode.get("inherit")
+                    mode_object.parent_name = parent_mode_name
+                mode_map[mode_name] = mode_object
+
+        # ensure the master mode exists
+        master_mode = gremlin.shared_state.master_mode                
+        if not master_mode in mode_map:
+            mode_object = gremlin.base_profile.ModeNode()
+            mode_object.name = master_mode
+            mode_map[master_mode] = mode_object
+
+        # write the update data out
+
+        for mode_object in mode_map.values():
+            mode_node = etree.Element("mode")
+            mode_node.set("name", mode_object.name)
+            if mode_object.parent_name:
+                mode_node.set("inherit", mode_object.parent_name)
+            # add the new node
+            mode_root.append(mode_node)
+
+
+        return root
 
 
     

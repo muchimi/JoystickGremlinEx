@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T77)
+- Performance: avoid internal handled exception when applying a used input filter if no inputs are in use. 
+- Fix: condition logic on container nodes reworked to directly handle any and all conditions rather than rely on node nesting, as the shortcut evaluation could cause some conditions to not get evaluated in some circumstances. 
+- Fix: Config file save thread safety.  Runtime actions that write to the configuration file at runtime could cause an I/O concurrency error which would cause a file reset.  In general no actions should write to the configuration file at runtime, this was a legacy feature predating the new event model that makes this feature a moot point.
+- Fix: profile data v15, handles legacy profiles that do not have a mode data block compatible with the optimized profile data format. The conversion ensures a mode block exists to avoid missing profiles in T72+. Mode blocks have existed for a while but they are not present in old profiles before mode blocks were added.
+
 ### (m76T76)
 - Fix: profile modes not showing up unless a mapping exists in that mode.  Reworked the mode load logic to use the profile mode section instead of the device mode list.
 - Fix: QT garbage collection desync in activation conditions UI.

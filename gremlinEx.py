@@ -3719,7 +3719,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _tab_moved_cb(self, tab_from, tab_to):
         ''' occurs when a tab is moved '''
         # persist tab order
-        print (f"tab move detected {tab_from} {tab_to}")
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose: syslog.info(f"UI: tab move detected {tab_from} {tab_to}")
         # rebuild the tab order
         self._reindex_tabs()
         # update new order

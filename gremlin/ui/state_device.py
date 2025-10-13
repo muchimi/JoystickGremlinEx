@@ -546,6 +546,8 @@ class StateInputItem(gremlin.base_profile.InputItem):
     
     @value.setter
     def value(self, data : bool):
+        if self.key == "b" and data:
+            pass
         if data is None or not isinstance(data, bool):
             syslog.warning(f"State setter: state: [{self.key}] id: [{self.id}] attempt to set invalid value [{data}]")
             return

@@ -23,7 +23,7 @@ import re
 import sys
 import traceback
 from PySide6 import QtCore
-
+import threading
 import gremlin.config
 import gremlin.event_handler
 import gremlin.input_types
@@ -62,6 +62,7 @@ class Configuration(QtCore.QObject):
         import gremlin.util
         super().__init__()
 
+        self._lock = False
         self._data = {} # gremlin items - version specific
         self._profile_data = {}  # profile specific options 
         self._profile_loaded = False
@@ -80,12 +81,16 @@ class Configuration(QtCore.QObject):
         fname = self.get_config()
         basedir = os.path.dirname(fname)
         if not os.path.isdir(basedir):
+            
             if not gremlin.util.create_folder(basedir):
-                gremlin.util.display_error(f"Unable to create data folder: {basedir}.\nCheck that you have the permissions to create this folder or create it manually.")
+                msg = f"CONFIG: Unable to create data folder: {basedir}.\nCheck that you have the permissions to create this folder or create it manually."
+                gremlin.util.display_error(msg)
+                syslog.error(msg)
                 
 
         if not os.path.isfile(fname):
             # create a stub - first time run
+            syslog.info("CONFIG: no configuration found - creating default")
             self.save()
 
             
@@ -282,15 +287,27 @@ class Configuration(QtCore.QObject):
 
 
     def save(self):
+        import gremlin.util
+        gremlin.util.InvokeUiMethod(self._save_ui) # ensure on UI thread
+
+    def _save_ui(self):
         """Writes the version specific configuration file to disk."""
+        if self._lock:
+            # ignore concurrent save requests (technically not necessary due to UI thread placement)
+            return
         try:
+            self._lock = True
             fname = self.get_config() 
             with open(fname, "w") as hdl:
                 encoder = json.JSONEncoder(sort_keys=True,indent=4)
                 hdl.write(encoder.encode(self._data))
+                hdl.flush()
+                hdl.close()
         except Exception as ex:
             syslog.error("CONFIG: unable to save file:")
             syslog.error(ex)
+        finally:
+            self._lock = False
 
 
     def save_profile(self):
@@ -324,7 +341,9 @@ class Configuration(QtCore.QObject):
             self._data["last_mode"] = {}
         self._data["last_mode"][profile_path] = mode_name
         # syslog = logging.getLogger("system")
-        syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
+        verbose = gremlin.config.Configuration().verbose_mode
+        if verbose:
+            syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
         self.save()
 
     def get_last_runtime_mode(self, profile_path):

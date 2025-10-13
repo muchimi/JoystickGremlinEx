@@ -258,6 +258,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # save current selection
 
         try:
+            index = -1
             gremlin.util.pushCursor()
             selected_index = self.input_item_list_view.current_index
             input_item = self.input_item_list_model.inputItemAtIndex(selected_index)
@@ -271,7 +272,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     # no longer displayed, select the first item
                     index = 0
             
-            self.input_item_list_view.select_item(index)
+            if index != -1:
+                self.input_item_list_view.select_item(index)
         
         finally:
             gremlin.util.popCursor()

@@ -196,16 +196,35 @@ class ExecutionGraphGroupNode(ExecutionGraphNode):
     def to_string(self):
         stub = "Group"
         return f"{self.node_string()} {stub}"      
+    
+class BaseExecutionConditionNode(ExecutionGraphNode):
+    ''' base node for conditions '''
+    def __init__(self, node_type = ExecutionGraphNodeType.Condition, condition = None):
+        assert isinstance(node_type, ExecutionGraphNodeType)
+        super().__init__(node_type)
+        self.conditions = []
+        self.rule = gremlin.actions.ActivationRule.All # rule set that applies to the condition node
+        self.container = None # owning container for the condition
+        if condition:
+            self.addCondition(condition)
+        #self.condition : gremlin.actions.ActivationCondition = condition # holds the condition 
 
-class ExecutionGraphActivationConditionNexusNode(ExecutionGraphNode):
-    ''' holds an input item in the execution graph '''
-    def __init__(self, condition = None):
-        super().__init__(ExecutionGraphNodeType.ActivationConditionNexus)
-        self.condition : gremlin.actions.ActivationCondition = condition # holds the condition 
+    def addCondition(self, condition):
+        self.conditions.append(condition)
 
     def to_string(self):
-        stub = "Activation Condition"
-        return f"{self.node_string()} {stub}"  
+        if self.conditions:
+            stub = ""
+            for index, condition in enumerate(self.conditions):
+                stub += f" [{index+1}] {str(condition)}"
+        else:
+            stub = "No Conditions"
+        return f"{self.node_string()} {stub}"
+    
+class ExecutionGraphActivationConditionNexusNode(BaseExecutionConditionNode):
+    ''' holds an input item in the execution graph '''
+    def __init__(self):
+        super().__init__(ExecutionGraphNodeType.ActivationConditionNexus)
 
 class ExecutionGraphInputNode(ExecutionGraphNode):
     ''' holds an input item in the execution graph '''
@@ -217,27 +236,15 @@ class ExecutionGraphInputNode(ExecutionGraphNode):
         stub = f"{self.input_item.display_name}"
         return f"{self.node_string()} {stub}"
     
-class ExecutionGraphConditionNode(ExecutionGraphNode):
+class ExecutionGraphConditionNode(BaseExecutionConditionNode):
     ''' holds an input item in the execution graph '''
-    def __init__(self, condition = None):
+    def __init__(self):
         super().__init__(ExecutionGraphNodeType.Condition)
-        self.condition : gremlin.actions.ActivationCondition = condition # holds the condition 
-        
-
-    def to_string(self):
-        stub = self.condition.condition_name()
-        return f"{self.node_string()} {stub}"
     
-class ExecutionGraphActivationConditionNode(ExecutionGraphNode):
+class ExecutionGraphActivationConditionNode(BaseExecutionConditionNode):
     ''' holds an input item in the execution graph '''
-    def __init__(self, condition = None):
+    def __init__(self):
         super().__init__(ExecutionGraphNodeType.ActivationCondition)
-        self.condition : gremlin.actions.ActivationCondition = condition # holds the condition 
-
-    def to_string(self):
-        stub = str(self.condition)
-        return f"{self.node_string()} {stub}"
-    
 
 
 class ExecutionGraphFunctorNode(ExecutionGraphNode):
@@ -935,40 +942,52 @@ class ExecutionContext():
         root_node = condition_node
         if isinstance(owner, gremlin.base_profile.AbstractContainer):
             conditions = owner.activation_condition.conditions
-            condition_node.condition =  owner.activation_condition
+            condition_node.addCondition(owner.activation_condition)
             
         elif isinstance(owner, gremlin.base_profile.AbstractAction):
             if owner.activation_condition:
                 conditions = owner.activation_condition.conditions
-            condition_node.condition = owner.activation_condition
+            condition_node.addCondition(owner.activation_condition)
         else:
             assert False,f"don't know how to handle: {owner.__class__.__name__}"
 
         rule = owner.activation_condition.rule
-        condition_nexus = None # for all conditions, don't use a nexus node
+       
         match rule:
             case gremlin.actions.ActivationRule.Any:
                 # create a condition nexus node for the ANY rule (any condition that passes means the action is good to go)
                 condition_nexus = ExecutionGraphActivationConditionNexusNode()
                 condition_nexus.parent = condition_node
                 condition_nexus.description = f"ActivationConditionNexus: {str(owner)}"
+                condition_nexus.container = owner
+                condition_nexus.rule = rule
                 node = condition_nexus
+                for index, condition in enumerate(conditions):
+                    functor = self._convert_condition(condition)
+                    condition_nexus.functors.append(functor)
+                    condition_nexus.addCondition(condition)
+                    condition_nexus.description += f"[{index + 1}] {str(condition)} "
+
+
             case gremlin.actions.ActivationRule.All:
                 # no nexus created for the all condition - conditions in ALL mode are nested so they are all evaluated
                 node = root_node #
         
-        if conditions:
-            for condition in conditions:
-                sub_node = ExecutionGraphActivationConditionNode()
-                sub_node.condition = condition
-                sub_node.description =  f"(sub) ActivationCondition node: {str(condition)}"
-                sub_node.container = owner
-                sub_node.parent = node
-                functor = self._convert_condition(condition)
-                sub_node.functors.append(functor)
-                if not condition_nexus:
-                    # all rule = nest conditions so they are all evaluated
-                    node = sub_node
+                if conditions:
+                    sub_node = ExecutionGraphActivationConditionNode()
+                    sub_node.description =  f"(sub) ActivationCondition {len(conditions)} condition(s)"
+                    sub_node.container = owner
+                    sub_node.parent = node
+                    sub_node.rule = rule
+                    for index, condition in enumerate(conditions):
+                        functor = self._convert_condition(condition)
+                        sub_node.functors.append(functor)
+                        if not sub_node:
+                            sub_node.addCondition(condition)
+                            sub_node.description += f"[{index + 1}] {str(condition)} "
+                        
+                        node = sub_node # first node
+                
         
         return node
     
@@ -1032,34 +1051,33 @@ class ExecutionContext():
                     return
                 
                 case ExecutionGraphNodeType.ActivationCondition:
-                    if node.condition:
-                        condition  = node.condition
+                    if node.conditions:
                         container = node.container
                         node_functors = []
-                        
-                        if condition and container:
-                            if isinstance(condition, gremlin.base_conditions.ActivationCondition):
-                                if self._verbose_detailed: syslog.info(f"{logTabs}\tprocessing ALL rule")
-                                for child in node.children:
-                                    self._traverse_node_functors(child, node_functors)
-                                functors.extend(node_functors)
-                                node.functors = node_functors
-                                # done processing that branch
-                                return
-                            elif isinstance(condition, gremlin.base_conditions.AbstractCondition):
-                                if self._verbose_detailed: syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
-                                functor = self._convert_condition(condition)
-                                node_functors.append(functor)
-                                functors.append([functors])
-                                node.functors = node_functors
-                            elif isinstance(condition, gremlin.actions.VirtualButtonCondition):
-                                functor = condition
-                                node_functors.append(functor)
-                                functors.append([functors])
-                                node.functors = node_functors
+                        for condition in node.conditions:
+                            if condition and container:
+                                if isinstance(condition, gremlin.base_conditions.ActivationCondition):
+                                    if self._verbose_detailed: syslog.info(f"{logTabs}\tprocessing ALL rule")
+                                    for child in node.children:
+                                        self._traverse_node_functors(child, node_functors)
+                                    functors.extend(node_functors)
+                                    node.functors = node_functors
+                                    # done processing that branch
+                                    return
+                                elif isinstance(condition, gremlin.base_conditions.AbstractCondition):
+                                    if self._verbose_detailed: syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
+                                    functor = self._convert_condition(condition)
+                                    node_functors.append(functor)
+                                    functors.append([functors])
+                                    node.functors = node_functors
+                                elif isinstance(condition, gremlin.actions.VirtualButtonCondition):
+                                    functor = condition
+                                    node_functors.append(functor)
+                                    functors.append([functors])
+                                    node.functors = node_functors
 
-                            else:
-                                assert False, f"invalid condition type: [{condition.__class__.__name__}]"
+                                else:
+                                    assert False, f"invalid condition type: [{condition.__class__.__name__}]"
 
                 case ExecutionGraphNodeType.Condition:
                     # condition node
@@ -1096,17 +1114,17 @@ class ExecutionContext():
         while n:
             if n.nodeType in (ExecutionGraphNodeType.ActivationCondition, ExecutionGraphNodeType.Condition):
                 # execution condition 
-                if n.condition:
-                    condition  = n.condition
-                    container = n.container
-                    if condition and container:
-                        if isinstance(condition, gremlin.base_conditions.ActivationCondition):
-                            functor = self._create_activation_condition(condition, container, True)
-                        else:
-                            functor = self._convert_condition(condition)
-                        logtabs = gremlin.shared_state.logTabs()
-                        if self._verbose_exec: syslog.info(f"{logtabs}\tAdding activation container condition: {str(condition)}")                            
-                        functors.append(functor)
+                if n.conditions:
+                    for condition in n.conditions:
+                        container = n.container
+                        if condition and container:
+                            if isinstance(condition, gremlin.base_conditions.ActivationCondition):
+                                functor = self._create_activation_condition(condition, container, True)
+                            else:
+                                functor = self._convert_condition(condition)
+                            logtabs = gremlin.shared_state.logTabs()
+                            if self._verbose_exec: syslog.info(f"{logtabs}\tAdding activation container condition: {str(condition)}")                            
+                            functors.append(functor)
 
             if n.nodeType == ExecutionGraphNodeType.InputItem:
                 break # stop at input type
@@ -1705,10 +1723,16 @@ class ExecutionContext():
                                 syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                             elif isinstance(functor, gremlin.actions.AbstractCondition):
                                 syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                        if not result:
-                            # condition failed
-                            return result
-                
+                        match node.rule:
+                            case gremlin.actions.ActivationRule.Any:
+                                if result:
+                                    # one condition succeeded
+                                    break
+                            case gremlin.actions.ActivationRule.All:
+                                if not result:
+                                    # any one condition failed failes the whole stack
+                                    return result
+                        
 
 
             result = True
@@ -1729,7 +1753,34 @@ class ExecutionContext():
 
             elif node.nodeType == ExecutionGraphNodeType.ActivationConditionNexus:
                 # activation condition group - pass on the first ok
+                result = True
+                condition_functors = node.getConditionFunctors()
+                for functor in condition_functors:
+                    result =  self.process_functor(functor, event, value, extra_data, manual)
+                    if verbose_condition:
+                        condition_name = functor.condition_name()
+                        if isinstance(functor, gremlin.actions.ActivationCondition):
+                            syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                        elif isinstance(functor, gremlin.actions.AbstractCondition):
+                            syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                    match node.rule:
+                        case gremlin.actions.ActivationRule.Any:
+                            if result:
+                                # one condition succeeded
+                                break
+                            
+                        case gremlin.actions.ActivationRule.All:
+                            if not result:
+                                # any one condition failed failes the whole stack
+                                return result
+                                
+                if not result:
+                    # any one condition failed failes the whole stack
+                    return result
+                                        
+
                 for child in node.children:
+                    
                     result = self.execute_node(child, event, value, extra_data, manual)
                     if result:
                         # pass the whole group on first group that doesn't fail
@@ -1751,10 +1802,15 @@ class ExecutionContext():
                             syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                         elif isinstance(functor, gremlin.actions.AbstractCondition):
                             syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                if not result:
-                    # condition failed
-                    return result
-                
+                    match node.rule:
+                        case gremlin.actions.ActivationRule.Any:
+                            if result:
+                                # one condition succeeded
+                                break
+                        case gremlin.actions.ActivationRule.All:
+                            if not result:
+                                # any one condition failed failes the whole stack
+                                return result
                 
                 # if container - execute the container functor if any
                 container_functors = node.getActionFunctors()
@@ -1799,11 +1855,35 @@ class ExecutionContext():
     
 
             return result
-        
+
         finally:
             if verbose_condition: syslog.info(f"{logTabs}>Overall Result: {'PASS' if result else 'FAIL'}")
             gremlin.shared_state.popLog()
 
+
+    def execute_condition_functors(self, node, event, value, extra_data, manual) -> bool:
+        ''' executes conditions'''
+        config = gremlin.config.Configuration()
+        verbose_condition = config.verbose_mode_condition
+        condition_functors = node.getConditionFunctors()
+        logTabs = gremlin.shared_state.logTabs(True)
+        for functor in condition_functors:
+            result =  self.process_functor(functor, event, value, extra_data, manual)
+            if verbose_condition:
+                condition_name = functor.condition_name()
+                if isinstance(functor, gremlin.actions.ActivationCondition):
+                    syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                elif isinstance(functor, gremlin.actions.AbstractCondition):
+                    syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+            match node.rule:
+                case gremlin.actions.ActivationRule.Any:
+                    if result:
+                        # one condition succeeded
+                        break
+                case gremlin.actions.ActivationRule.All:
+                    if not result:
+                        # any one condition failed failes the whole stack
+                        return result
 
     def execute_functor_id(self, id, event, value, extra_data : dict = None, manual = False) -> bool:
         ''' executes a functor chain 
@@ -1911,7 +1991,20 @@ class ContainerCallback:
             node = self.container_node.ExecutionPoint()
             if node:
                 if verbose:
-                    syslog.info(f"EXEC: Callback for container [{self.container_node.id}] executing node: [{node.id}]")
+                    device_name = gremlin.joystick_handling.device_name_from_guid(event.device_guid)
+                    match event.event_type:
+                        case InputType.JoystickAxis:
+                            if isinstance(value, gremlin.actions.Value):
+                                value_stub = f"current: {value.current:0.3f} raw: {value.raw:0.3f}"
+                            elif isinstance(value, float) or isinstance(value, int):
+                                value_stub = f"{value:0.3f}"
+
+                        case InputType.JoystickButton:
+                            value_stub = "button: " + "[Pressed]" if event.is_pressed else "[Released]"
+                        case _:
+                            value_stub = f"Pressed: {event.is_pressed} Value: {event.value}"
+
+                    syslog.info(f"EXEC: Callback for container [{self.container_node.id}] executing node: [{node.id}] device: [{device_name}] input type: [{event.event_type.name}] input id: [{event.identifier}] {value_stub}")
                 if not extra_data:
                     extra_data = event.extra_data
                 else:
@@ -2161,6 +2254,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
 
         # If container based conditions exist add them before any actions
         if container.has_conditions: 
+            
             functor = self._create_activation_condition(container.activation_condition, container, is_container_condition = True)
             self.functors.append(functor)
             node.functors.append(functor)

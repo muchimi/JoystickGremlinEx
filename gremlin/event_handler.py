@@ -1788,6 +1788,11 @@ class EventHandler(QtCore.QObject):
 			self._started = False
 			self._last_tts_notify = None
 			self._last_tts_notify_time = None
+
+			# save the last profile mode
+			current_profile = gremlin.shared_state.current_profile
+			last_mode = gremlin.shared_state.runtime_mode
+			current_profile.set_last_runtime_mode(last_mode)
 	
 	def registerModeValidator(self, callback):
 		assert callable(callback)
@@ -1894,25 +1899,25 @@ class EventHandler(QtCore.QObject):
 		for callbacks in self.callbacks[device_guid][mode][event.callbackKey]:
 			for callback in callbacks:
 				if not hasattr(callback,"execution_graph"):
-					syslog.debug(f"\tDevice ID: {device_name}  mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
+					syslog.info(f"\tDevice ID: {device_name}  mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
 					continue
 				
 				for callback_functor in callback.execution_graph.functors:
 					if hasattr(callback_functor,"action_set"):
 						for functor in callback_functor.action_set.functors:
 							action_data = functor.action_data if hasattr(functor, "action_data") else None
-							syslog.debug(f"\tDevice ID: {device_name} mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
+							syslog.info(f"\tDevice ID: {device_name} mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
 							if action_data:
 								# dump member variables only
-								syslog.debug("\t\tData block:")
+								syslog.info("\t\tData block:")
 								for attr in dir(action_data):
 									if not attr.startswith("_"):
 										item = getattr(action_data,attr)
 										
 										if not (isinstance(item, FunctionType) or isinstance(item, MethodType) or inspect.isabstract(item) or inspect.isclass(item)):
-											syslog.debug(f"\t\t\t{attr}: {item}")
+											syslog.info(f"\t\t\t{attr}: {item}")
 					else:
-						syslog.debug(f"\tFunctor '{type(callback_functor).__name__} does not define an action set")
+						syslog.info(f"\tFunctor '{type(callback_functor).__name__} does not define an action set")
 					
 								
 
@@ -1927,7 +1932,7 @@ class EventHandler(QtCore.QObject):
 		
 		get_device_name = gremlin.shared_state.get_device_name
 		
-		syslog.debug("------------ Latched Events ----------------")
+		syslog.info("------------ Latched Events ----------------")
 		for device_guid in self.latched_events.keys():
 			device_name = gremlin.shared_state.get_device_name(device_guid)
 			for mode in self.latched_events[device_guid].keys():
@@ -1939,9 +1944,9 @@ class EventHandler(QtCore.QObject):
 							key_data = f"scan code: 0x{scan_code:X}  extended: {is_extended}"
 						else:
 							key_data = str(key_pair)
-						syslog.debug(f"\tDevice ID: {device_name} mode: {mode} pair: {key_data} data: {identifier.to_string()}")
+						syslog.info(f"\tDevice ID: {device_name} mode: {mode} pair: {key_data} data: {identifier.to_string()}")
 
-		syslog.debug("------------ Execution callbacks ----------------")
+		syslog.info("------------ Execution callbacks ----------------")
 		for device_guid in self.callbacks.keys():
 			for mode in self.callbacks[device_guid].keys():
 				for key in self.callbacks[device_guid][mode]:
@@ -2334,9 +2339,9 @@ class EventHandler(QtCore.QObject):
 
 			if verbose:
 				if is_running:
-					syslog.debug(f"CHANGE MODE: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
+					syslog.info(f"CHANGE MODE: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
 				else:
-					syslog.debug(f"CHANGE MODE: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+					syslog.info(f"CHANGE MODE: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 			
 
 
@@ -2381,7 +2386,7 @@ class EventHandler(QtCore.QObject):
 			if is_running:
 				# runtime event (prevents UI from reloading)
 				# if verbose:
-				# 	syslog.debug(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+				# 	syslog.info(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 
 
 				if self.runtime_mode != new_mode or force_update:
@@ -2434,7 +2439,6 @@ class EventHandler(QtCore.QObject):
 					gremlin.shared_state.runtime_mode = new_mode
 					# remember the last mode for this profile
 					
-					current_profile.set_last_runtime_mode(self.runtime_mode)
 					self.previous_runtime_mode = self.runtime_mode
 					self.runtime_mode = new_mode
 					if verbose: syslog.info(f"CHANGE MODE: [{current_profile.name}] - Runtime Mode switch to: {new_mode}")
@@ -2453,7 +2457,7 @@ class EventHandler(QtCore.QObject):
 					gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
 					gremlin.shared_state.edit_mode = new_mode
 					self.edit_mode = new_mode
-					syslog.debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
+					syslog.info(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
 					if emit:
 						el.edit_mode_changed.emit(self.edit_mode)
 						
@@ -2845,7 +2849,7 @@ class EventHandler(QtCore.QObject):
 						self.dump_exectree(device_guid, mode, event)
 
 		if verbose:
-			syslog.debug(f"CALLBACK: device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
+			syslog.info(f"CALLBACK: device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
 
 
 		# Filter events when the system is paused

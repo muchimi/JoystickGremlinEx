@@ -1364,7 +1364,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
                                                              ])
 
         self.grid_layout.addWidget(QtWidgets.QLabel("Activate when"), 0, 0)
-        self.grid_layout.addWidget(QtWidgets.QLabel("<b>this (virtual) button</b>"),0,1)
+        self.grid_layout.addWidget(QtWidgets.QLabel("<b>this input</b>"),0,1)
         self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
         self.grid_layout.addWidget(self.state_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
 

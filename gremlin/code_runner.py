@@ -640,7 +640,7 @@ class CodeRunner:
             if config.restore_profile_mode_on_start or profile.get_restore_mode():
                 # restore the profile mode
                 mode = profile.get_last_runtime_mode()
-                syslog.error(f"Start: Restoring the last active profile mode for this profile: '{mode}' - overriding profile start mode '{start_mode}' at user request")
+                syslog.info(f"PROFILE START: Restoring the last active profile mode for this profile: '{mode}' - overriding profile start mode '{start_mode}' at user request")
                 
 
                 if mode:
@@ -648,7 +648,7 @@ class CodeRunner:
                         syslog.error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
                         mode = start_mode
             else:
-                syslog.error(f"Start: Using default Restoring the last active profile mode for this profile: '{mode}'")
+                syslog.info(f"PROFILE START: Using default Restoring the last active profile mode for this profile: '{mode}'")
 
 
             sendinput.MouseController().start()
