@@ -22,7 +22,7 @@ import os
 import re
 import sys
 import traceback
-from PySide6 import QtCore
+from PySide6 import QtCore, QtWidgets
 import threading
 import gremlin.config
 import gremlin.event_handler
@@ -288,7 +288,10 @@ class Configuration(QtCore.QObject):
 
     def save(self):
         import gremlin.util
-        gremlin.util.InvokeUiMethod(self._save_ui) # ensure on UI thread
+        if QtWidgets.QApplication.instance():
+            gremlin.util.InvokeUiMethod(self._save_ui) # ensure on UI thread
+        else:
+            self._save_ui()
 
     def _save_ui(self):
         """Writes the version specific configuration file to disk."""
@@ -2312,7 +2315,7 @@ class Configuration(QtCore.QObject):
     @filter_axis_threshold.setter
     def filter_axis_threshold(self, value : float):
         if self.filter_axis_threshold != value and value >= 0 and value <= 1.0:
-            self.filter_axis_threshold = value
+            self._data["filter_axis_threshold"] = value
             self.save()
             self.changed.emit("filter_axis_threshold", value)
 

@@ -1809,6 +1809,7 @@ class InvokeUiMethod(QtCore.QObject):
         assert method is not None,"Method not provided"
         current_thread = QtCore.QThread.currentThread()
         ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
+        
         if current_thread != ui_thread:
             # non on UI thread, move it to the UI thread
             self.moveToThread(ui_thread)
