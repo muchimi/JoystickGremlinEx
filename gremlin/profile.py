@@ -986,23 +986,25 @@ class ProfileConverter:
 
         if nodes:
             # exists already
-            # verify the master mode exists
-            mode_root = nodes[0]
-            nodes = root.xpath("//profile/modes/mode")
-            for node_mode in nodes:
-                mode_name = node_mode.get("name")
-                mode_object = gremlin.base_profile.ModeNode()
-                mode_object.name = mode_name
-                if not mode_name in mode_map:
-                    if "inherit" in node_mode.attrib:
-                        parent_mode_name = node_mode.get("inherit")
-                        mode_object.parent_name = parent_mode_name
+            return root # no changes 
+        
+            # # verify the master mode exists
+            # mode_root = nodes[0]
+            # nodes = root.xpath("//profile/modes/mode")
+            # for node_mode in nodes:
+            #     mode_name = node_mode.get("name")
+            #     mode_object = gremlin.base_profile.ModeNode()
+            #     mode_object.name = mode_name
+            #     if not mode_name in mode_map:
+            #         if "inherit" in node_mode.attrib:
+            #             parent_mode_name = node_mode.get("inherit")
+            #             mode_object.parent_name = parent_mode_name
 
-            # remove the node
-            root.remove(mode_root)
+            # # remove the node
+            # root.remove(mode_root)
 
     
-        # recreate
+        # create
         mode_root = etree.Element("modes")
         root.append(mode_root)
 
