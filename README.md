@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T78)
+- Change: behavior of numeric input widgets used in several places was not allowing, while editing, values out of range.  The change is any edit is allowed and if the value is out of bounds on focus loss, the widget will clamp the value to whichever value is appropriate (min or max).
+- Fix: VJOY API reset while a profile is loaded or on device change can have a NULL VJOY device number causing an exception.
+
 ### (m76T77)
 - Performance: avoid internal handled exception when applying a used input filter if no inputs are in use. 
 - Fix: condition logic on container nodes reworked to directly handle any and all conditions rather than rely on node nesting, as the shortcut evaluation could cause some conditions to not get evaluated in some circumstances. 

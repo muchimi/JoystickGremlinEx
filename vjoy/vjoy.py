@@ -700,8 +700,10 @@ class VJoy:
     def _ensure_released_ui(self):
         ''' ensures the VJOY device is not acquired '''
         vjoy_id = self.vjoy_id
-        if vjoy_id == 1:
-            pass
+        if self.vjoy_id is None:
+            return
+        
+
         if self._keep_alive_timer:
             self._keep_alive_timer.cancel()
             self._keep_alive_timer.join()

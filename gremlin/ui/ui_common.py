@@ -1958,11 +1958,11 @@ class IntValidator(QtGui.QValidator):
             return (QtGui.QValidator.Invalid, input_str, pos)
         
         # range check
-        if self._min_range is not None and value < self._min_range:
-            return (QtGui.QValidator.Invalid, input_str, pos)
+        # if self._min_range is not None and value < self._min_range:
+        #     return (QtGui.QValidator.Invalid, input_str, pos)
         
-        if self._max_range is not None and value > self._max_range:
-            return (QtGui.QValidator.Invalid, input_str, pos)
+        # if self._max_range is not None and value > self._max_range:
+        #     return (QtGui.QValidator.Invalid, input_str, pos)
         
         return (QtGui.QValidator.Acceptable, input_str, pos)
 
@@ -1992,7 +1992,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         # self._validator = QtGui.QIntValidator(min_range, max_range) 
         self._validator = IntValidator(min_range, max_range) 
         self._validator.setLocale(self.locale()) # handle correct floating point separator
-        self.textChanged.connect(self._validate)
+        #self.textChanged.connect(self._validate)
         self.setValidator(self._validator)
         self.installEventFilter(self)
         self.setValue(value)
@@ -2053,8 +2053,12 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
             return True # filter the wheel event
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
-            if not self.hasAcceptableInput():
-                return True # skip the event
+            # check the range
+            value = self.value()
+            if self._min_range is not None and value < self._min_range:
+                self.setValue(self._min_range)
+            if self._max_range is not None and value > self._max_range:
+                self.setValue(self._max_range)
         elif t == QtCore.QEvent.Type.FocusOut:
             if not self.hasAcceptableInput():
                 return True # skip the event
