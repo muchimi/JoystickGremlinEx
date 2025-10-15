@@ -346,7 +346,7 @@ class ExecutionGraphActionNode(ExecutionGraphNode):
         return f"{self.node_string()} {stub}"
 
 
-class ExecutionGraphGateConditionNode(ExecutionGraphNode):
+class ExecutionGraphGateConditionNode(BaseExecutionConditionNode):
     ''' holds a gated axis gate condition in the execution graph '''
     def __init__(self, functor = None):
         super().__init__(ExecutionGraphNodeType.GatedAxisGateCondition)
@@ -359,7 +359,7 @@ class ExecutionGraphGateConditionNode(ExecutionGraphNode):
         stub = f"Gated Axis GATE Condition type: {exec_functor.condition_type.name if exec_functor else 'n/a'}"
         return f"{self.node_string()} {stub}"
     
-class ExecutionGraphRangeConditionNode(ExecutionGraphNode):
+class ExecutionGraphRangeConditionNode(BaseExecutionConditionNode):
     ''' holds a gated axis gate condition in the execution graph '''
     def __init__(self, functor = None):
         super().__init__(ExecutionGraphNodeType.GatedAxisRangeCondition)

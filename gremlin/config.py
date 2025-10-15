@@ -435,13 +435,46 @@ class Configuration(QtCore.QObject):
 
     @property
     def initial_load_rate_tts(self):
-        ''' if set, JGEX outputs a verbal readout of the current playback rate on profile load '''
+        ''' default TTS playback rate '''
         return self._get_data("initial_load_rate_tts", 100)
     
     @initial_load_rate_tts.setter
     def initial_load_rate_tts(self, value):
         self._data["initial_load_rate_tts"] = value
         self.save()        
+
+    @property
+    def initial_volume_tts(self):
+        ''' default TTS volume '''
+        return self._get_data("initial_volume_tts", 80)
+    
+    @initial_volume_tts.setter
+    def initial_volume_tts(self, value):
+        self._data["initial_volume_tts"] = value
+        self.save()        
+
+
+    @property
+    def tts_enabled(self) -> bool:
+        return self._get_data("tts_enabled", True)
+    @tts_enabled.setter
+    def tts_enabled(self, value : bool):
+        self._set_data("tts_enabled", value)
+
+
+    @property
+    def tts_mode_switch_enabled(self) -> bool:
+        return self._get_data("tts_mode_switch_enabled", True)
+    @tts_mode_switch_enabled.setter
+    def tts_mode_switch_enabled(self, value : bool):
+        self._set_data("tts_mode_switch_enabled", value)
+
+    @property
+    def tts_suppress_duplicate(self) -> bool:
+        return self._get_data("tts_suppress_duplicate", True)
+    @tts_suppress_duplicate.setter
+    def tts_suppress_duplicate(self, value: bool):
+        self._set_data("tts_suppress_duplicate", value)        
 
     @property
     def runtime_ui_update(self):
@@ -2449,27 +2482,7 @@ class Configuration(QtCore.QObject):
 
     
 
-    @property
-    def tts_enabled(self) -> bool:
-        return self._get_data("tts_enabled", True)
-    @tts_enabled.setter
-    def tts_enabled(self, value : bool):
-        self._set_data("tts_enabled", value)
 
-
-    @property
-    def tts_mode_switch_enabled(self) -> bool:
-        return self._get_data("tts_mode_switch_enabled", True)
-    @tts_mode_switch_enabled.setter
-    def tts_mode_switch_enabled(self, value : bool):
-        self._set_data("tts_mode_switch_enabled", value)
-
-    @property
-    def tts_suppress_duplicate(self) -> bool:
-        return self._get_data("tts_suppress_duplicate", True)
-    @tts_suppress_duplicate.setter
-    def tts_suppress_duplicate(self, value: bool):
-        self._set_data("tts_suppress_duplicate", value)
 
             
 

@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T79)
+- Fix: new TTS actions will use the configured volume and rate setup in TTS options
+- New: default volume option for new tts entries.
+- Fix: condition ruleset missing for gated axis execution graph nodes causing an internal exception introduced in T77.
+
 ### (m76T78A)
 - Fix: mouse button listen in macro now uses the updated API.
 

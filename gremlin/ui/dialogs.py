@@ -1056,8 +1056,21 @@ There should only be one GremlinEx master server on the subnet.
         self.tts_rate_widget.setValue(self.config.initial_load_rate_tts)
         self.tts_rate_widget.valueChanged.connect(self._rate_changed_cb)
         self.tts_rate_widget.doubleClick.connect(self._rate_reset_cb)        
+        self.tts_rate_widget.setToolTip(f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}")
+
+        self.tts_volume_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self.tts_volume_widget.setRange(0, 100)
+        self.tts_volume_widget.setValue(self.config.initial_volume_tts)
+        self.tts_volume_widget.valueChanged.connect(self._volume_changed_cb)
+        self.tts_volume_widget.doubleClick.connect(self._volume_reset_cb)        
+        self.tts_volume_widget.setToolTip("Default volume percent (0..100)")
+
+        
 
         widget, _ = ui_common.getHContainer(self.tts_rate_widget, "  TTS Playback Rate (WPM):")
+        box.addWidget(widget)
+
+        widget, _ = ui_common.getHContainer(self.tts_volume_widget, "  TTS Playback Volume:")
         box.addWidget(widget)
 
         info_box = ui_common.QInfoBox("Normal playback speed is 100 words per minute (WPM).")
@@ -1715,6 +1728,16 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     @QtCore.Slot()
     def _rate_reset_cb(self):
         self.tts_rate_widget.setValue(100)
+
+    @QtCore.Slot()
+    def _volume_changed_cb(self, value):
+        self.config.initial_volume_tts = value
+
+    @QtCore.Slot()
+    def _volume_reset_cb(self):
+        self.tts_rate_widget.setValue(80)
+
+        
 
 
     @QtCore.Slot(bool)

@@ -26,6 +26,7 @@ import gremlin.ui.input_item
 import gremlin.tts
 import gremlin.ui.ui_common
 import gremlin.util
+import gremlin.config
 from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
 import logging
@@ -65,12 +66,14 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.volume_widget.setRange(0, 100)
         self.volume_widget.setValue(self.action_data.volume)
         self.volume_widget.valueChanged.connect(self._volume_changed_cb)
+        self.volume_widget.setToolTip("Default volume percent (0..100)")
                                                 
         self.rate_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.rate_widget.setRange(tts.rate_offset_min, tts.rate_offset_max)
         self.rate_widget.setValue(self.action_data.rate)
         self.rate_widget.valueChanged.connect(self._rate_changed_cb)
         self.rate_widget.doubleClick.connect(self._rate_reset_cb)
+        self.rate_widget.setToolTip(f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}")
 
         self.play_widget = QtWidgets.QPushButton("Play")
         self.play_widget.setIcon(gremlin.util.load_icon("ei.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
@@ -262,11 +265,13 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     widget = TextToSpeechWidget
 
     def __init__(self, parent):
+
         super().__init__(parent)
+        config = gremlin.config.Configuration()
         self.parent = parent
         self._text = ""
-        self.volume = 50
-        self.rate = 100
+        self.volume = config.initial_volume_tts # default volume set in options
+        self.rate = config.initial_load_rate_tts # default wpm set in options
         self.voice_index = 0
         self._voice_name = ''
         self._abort = False # true if the action aborts any current TTS
