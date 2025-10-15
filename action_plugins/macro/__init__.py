@@ -419,7 +419,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         config = gremlin.config.Configuration()
         action = self.model.get_entry(self.index.row())
-        if action is None:
+        if action is None or action.key is None:
             return
         self.ui_elements["key_label"] = QtWidgets.QLabel("Key")
         self.ui_elements["key_input"] = \
@@ -972,7 +972,7 @@ class MacroActionEditor(QtWidgets.QWidget):
                 return_kb_event=True
             )
 
-            dialog.item_selected.connect(callback)
+            dialog.keyInput.connect(callback)
             self.button_press_dialog = dialog
 
             # Display the dialog centered in the middle of the UI
@@ -1064,26 +1064,28 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements = {}
         self._joystick_ui()
 
-    def _modify_key(self, event):
-        gremlin.util.InvokeUiMethod(self._modify_key_ui, event)
+    def _modify_key(self, key):
+        gremlin.util.InvokeUiMethod(self._modify_key_ui, key)
 
-    def _modify_key_ui(self, event):
+    def _modify_key_ui(self, key):
         """Changes which key is mapped.
 
         :param event the event containing information about the key to use
         """
 
-        self.model.get_entry(self.index.row()).key = gremlin.keyboard.KeyMap.from_event(event)
+        self.model.get_entry(self.index.row()).key = key # gremlin.keyboard.KeyMap.from_event(event)
         self._update_model()
         gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}
         self._keyboard_ui()
 
-    def _modify_mouse(self, event):
-        gremlin.util.InvokeUiMethod(self._modify_mouse_ui, event)
+    def _modify_mouse(self, key):
+        gremlin.util.InvokeUiMethod(self._modify_mouse_ui, key)
 
-    def _modify_mouse_ui(self, event):
-        self.model.get_entry(self.index.row()).button = event.identifier
+    def _modify_mouse_ui(self, key):
+        entry = self.model.get_entry(self.index.row())
+        mouse_button = gremlin.types.MouseButton(key.mouse_button)
+        entry.button = mouse_button # event.identifier
         self._update_model()
         gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}

@@ -3396,6 +3396,7 @@ class InputListenerWidget(QBoxFrame):
                 self._echo_key(key)
             else:
                 # not listening to multiple keys
+                self.keyInput.emit(key) # notify a key was pressed
                 self.item_selected.emit([key])
                 self._accepted = True
                 self.close()                    
