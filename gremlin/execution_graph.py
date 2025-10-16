@@ -1724,6 +1724,9 @@ class ExecutionContext():
                                 syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                             elif isinstance(functor, gremlin.actions.AbstractCondition):
                                 syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                        if not hasattr(node,"rule"):
+                            node.rule = gremlin.actions.ActivationRule.All
+
                         match node.rule:
                             case gremlin.actions.ActivationRule.Any:
                                 if result:

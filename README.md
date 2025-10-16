@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T80)
+- Fix: Gated axis not handling gate count over 12 (20 is the max)
+- Fix: Gated axis rebased ranged output modes ignored due to updated curve API.
+- Fix: Hardened more custom widgets against QT for Python garbage collection issues.
+- Fix: Missing rule member on condition evaluation in execution graph - create suitable default as needed/encountered.
+
 ### (m76T79A)
 - Fix: adding multiple gates via the context menu can eventually cause a range error.
 - Fix: execution graph condition constructor exception on virtual inputs

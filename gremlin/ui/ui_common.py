@@ -1534,6 +1534,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
 
     def setReadOnly(self, value : bool):
         ''' sets or clears readonly state '''
+        if not Shiboken.isValid(self):
+            return
         self._widget.setReadOnly(value)
 
     @property
@@ -1613,6 +1615,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
 
     def _update_value(self, value, format = True):
         gremlin.util.assert_ui_thread()
+        if not Shiboken.isValid(self):
+            return
         if value is None:
             return
         current_value = self._value
@@ -1834,6 +1838,8 @@ class QFloatLineEditEx(QtWidgets.QWidget):
 
 
     def _update_value(self, value):
+        if not Shiboken.isValid(self):
+            return
         if value is None:
             return
         other = self._value
@@ -2071,6 +2077,8 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
 
     def _update_value(self, value : int):
+        if not Shiboken.isValid(self):
+            return
         other = self.value()
         v1 = int(value)
         if value is None and other is None:
@@ -4985,6 +4993,8 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def _update_value(self, is_pressed):
         ''' updates a button position '''
+        if not Shiboken.isValid(self):
+            return
         if self._last_state_value is None or self._last_state_value != is_pressed:
             gremlin.util.InvokeUiMethod(self._update_pixmap_ui, is_pressed)
             self._last_state_value = is_pressed
@@ -5977,7 +5987,8 @@ class HatWidget(QtWidgets.QWidget):
 
         :param state the direction of the hat
         """
-
+        if not Shiboken.isValid(self):
+            return
         self.angle = self._angle_map.get(state,-1)
         # syslog.info(f"SetAngle: {state} {self.angle}")
         self.update()

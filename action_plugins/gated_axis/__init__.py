@@ -395,7 +395,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         ''' delete requested '''
         self._remove_gate(self._range_info)
 
-    def _remove_gate(self, data):
+    def _prompt_delete(self) -> bool:
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText("This will delete this entry.\nAre you sure?")
@@ -410,8 +410,12 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
-            self._delete_confirmed_cb(data)
+        return result == QtWidgets.QMessageBox.StandardButton.Ok
+
+    def _remove_gate(self, data, prompt = True):
+        if prompt and not self._prompt_delete():
+            return
+        self._delete_confirmed_cb(data)
 
     def _delete_confirmed_cb(self, data):
         self.delete_requested.emit(self._range_info)
@@ -1390,6 +1394,22 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             self._set_slider_gate_value(gate.slider_index, value)
         
 
+    def _prompt_delete(self) -> bool:
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Delete confirmation")
+        message_box.setInformativeText("This will delete one or more gates.\nAre you sure?")
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        #pixmap = gremlin.util.load_pixmap("warning.svg")
+        #pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        message_box.setIconPixmap(pixmap)
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+            )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+        return result == QtWidgets.QMessageBox.StandardButton.Ok
 
 
     QtCore.Slot(object, GateInfo)
@@ -1399,10 +1419,10 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         gate = widget.data
         self._remove_gate(gate)
 
-    def _remove_gate(self, gate):
-        gremlin.util.InvokeUiMethod(self._remove_gate_ui, gate)
+    def _remove_gate(self, gate, prompt = True):
+        gremlin.util.InvokeUiMethod(self._remove_gate_ui, gate, prompt)
 
-    def _remove_gate_ui(self, gate):
+    def _remove_gate_ui(self, gate, prompt : bool):
 
         # ensure there are at least two gates left
         count = len(self._gate_data._gate_used_gates())
@@ -1411,22 +1431,10 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             gremlin.ui.ui_common.MessageBox(prompt="Unable to remove this gate.  At least two gates must be defined.")
             return # do not allow fewer than 2 gates
 
-        message_box = gremlin.ui.ui_common.QMessageBox()
-        message_box.setText("Delete confirmation")
-        message_box.setInformativeText("This will delete this gate.\nAre you sure?")
-        # pixmap = gremlin.util.load_pixmap("warning.svg")
-        # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
-        message_box.setIconPixmap(pixmap)
-        message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok |
-            QtWidgets.QMessageBox.StandardButton.Cancel
-            )
-        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        if prompt and not self._prompt_delete():
+            return
         
-        result = message_box.exec()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
-            self._delete_confirmed_cb(gate)
+        self.deleteGate(gate)
 
     def _delete_confirmed_cb(self, gate):
          self.deleteGate(gate)
@@ -1767,26 +1775,28 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.container_steps_layout.addWidget(QtWidgets.QLabel("Right-click range to add new gate, right click gate for configuration"))
         self.container_steps_layout.addStretch()
 
-    def _add_gate(self, value):
+    def _add_gate(self, value, check_exists = True):
         ''' adds gate '''
-        gate = self._gate_data.findGate(value)
-        if gate:
-            # display a warning a gate is already there
-            message_box = QtWidgets.QMessageBox()
-            message_box.setText("A gate already exists at this location")
-            # pixmap = gremlin.util.load_pixmap("warning.svg")
-            # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
-            message_box.setIconPixmap(pixmap)
-            message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
-            message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-            gremlin.util.centerDialog(message_box)
-            message_box.exec()
-            return
+        gate = self._gate_data.findGate(value) if check_exists else None
+        if gate and gate.used:
+            return gate
+            # # display a warning a gate is already there
+            # message_box = QtWidgets.QMessageBox()
+            # message_box.setText("A gate already exists at this location")
+            # # pixmap = gremlin.util.load_pixmap("warning.svg")
+            # # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            # pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+            # message_box.setIconPixmap(pixmap)
+            # message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            # message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+            # gremlin.util.centerDialog(message_box)
+            # message_box.exec()
+            # return
         
+        if not gate:
+            # get one of the available gates
+            gate : GateInfo = self.gate_data.getUnusedGate()
 
-        # get one of the available gates
-        gate : GateInfo = self.gate_data.getUnusedGate()
         if not gate:
             # ran too many gates
             message_box = QtWidgets.QMessageBox()
@@ -1845,7 +1855,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
                 for pair in pairs:
                     v1,v2 = pair
                     value = (v1 + v2) / 2
-                    self._add_gate(value)
+                    self._add_gate(value, False)
                     steps -=1
                     if steps == 0:
                         break
@@ -1854,7 +1864,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
                 interval = 2.0 / steps
                 value = -1 + interval
                 while steps > 0:
-                    self._add_gate(value)
+                    self._add_gate(value, False)
                     value += interval
                     steps -=1
 
@@ -1867,9 +1877,11 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             if verbose:
                 syslog.info(f"Set gate count: reduce {steps} gates")
 
+            # user was already prompted to confirm removal
             for index in range(gate_count, current_steps):
                 gate = gates[index]
-                self._remove_gate(gate)
+                self._remove_gate(gate, False)
+
 
 
     
