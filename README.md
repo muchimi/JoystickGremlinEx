@@ -16,6 +16,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T79A)
 - Fix: adding multiple gates via the context menu can eventually cause a range error.
+- Fix: execution graph condition constructor exception on virtual inputs
 
 ### (m76T79)
 - Fix: new TTS actions will use the configured volume and rate setup in TTS options

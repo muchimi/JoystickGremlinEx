@@ -359,7 +359,7 @@ class ExecutionGraphGateConditionNode(BaseExecutionConditionNode):
         stub = f"Gated Axis GATE Condition type: {exec_functor.condition_type.name if exec_functor else 'n/a'}"
         return f"{self.node_string()} {stub}"
     
-class ExecutionGraphRangeConditionNode(BaseExecutionConditionNode):
+1248class ExecutionGraphRangeConditionNode(BaseExecutionConditionNode):
     ''' holds a gated axis gate condition in the execution graph '''
     def __init__(self, functor = None):
         super().__init__(ExecutionGraphNodeType.GatedAxisRangeCondition)
@@ -1245,7 +1245,8 @@ class ExecutionContext():
 
             if container.has_virtual_button:
                 condition = gremlin.actions.VirtualButtonCondition(container.virtual_button)
-                virtual_condition_node = ExecutionGraphActivationConditionNode(condition)
+                virtual_condition_node = ExecutionGraphActivationConditionNode()
+                virtual_condition_node.addCondition(condition)
                 virtual_condition_node.container = container
                 virtual_condition_node.functors = condition
                 virtual_condition_node.parent = container_node.parent
