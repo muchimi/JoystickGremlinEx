@@ -1466,7 +1466,6 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         ''' right click on range = show context menu '''
         menu = QtWidgets.QMenu(self)
         rng = self._gate_data.findRangeByValue(value)
-
         msg = f"<b>Range {rng.to_display()}</b>"
         line = gremlin.ui.ui_common.QHLine()
         color = gremlin.ui.ui_common.Color.menuSeparatorColor()
@@ -1807,6 +1806,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         gate.setUsed(True)
         gate.setValue(value, False)
         self._reload_widgets()
+
+        # update ranges
+        self.gate_data._update_ranges()
 
        
         return gate
