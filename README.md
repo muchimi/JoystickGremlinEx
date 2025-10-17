@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T80A)
+- Revised: Force match of VJOY device to DINPUT device and disable VJOY device if not found.  This will be reflected in the log file on startup.
+- Changed: rather than checking if the VJOY device is defined, GremlinEx will instead verify it can connect via the API to the VJOY device in case it is disabled at the API level.
+- Hardened code to check for missing VJOY device references on profile load.  There may be more work to do here.
+
 ### (m76T80)
 - Fix: Gated axis not handling gate count over 12 (20 is the max)
 - Fix: Gated axis rebased ranged output modes ignored due to updated curve API.

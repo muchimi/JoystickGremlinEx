@@ -847,7 +847,7 @@ class VJoyCurves:
                     axis_id = vjoy_module.vjoy.VJoy.axis_equivalence.get(aid, aid)
                     vjoy_id = gremlin.joystick_handling.vjoy_id_from_guid(guid)
 
-                    if len(data.containers) > 0 and vjoy[vjoy_id].is_axis_valid(axis_id):
+                    if len(data.containers) > 0 and vjoy_id in vjoy and vjoy[vjoy_id].is_axis_valid(axis_id):
                         action = data.containers[0].action_sets[0][0]
                         if hasattr(action,"deadzone"):
                             vjoy[vjoy_id].axis(aid).set_deadzone(*action.deadzone)
