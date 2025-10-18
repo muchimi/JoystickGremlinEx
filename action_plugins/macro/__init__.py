@@ -258,13 +258,22 @@ class MacroActionEditor(QtWidgets.QWidget):
             ),
         }
 
-        #self.setMinimumWidth(260)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
-        self.group_box = gremlin.ui.ui_common.QGroupBox("Action Settings")
-        self.group_layout = QtWidgets.QVBoxLayout(self.group_box)
-        self.group_layout.setContentsMargins(0,0,0,0)
+
+        
+        self.main_layout.addWidget(QtWidgets.QLabel("Action Settings"))
+        self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+
+        # self.group_box = gremlin.ui.ui_common.QGroupBox("Action Settings")
+        # self.group_layout = QtWidgets.QVBoxLayout(self.group_box)
+
+        #widget, _ = gremlin.ui.ui_common.getHContainer(self.group_box)
+
+        self.group_box, self.group_layout = gremlin.ui.ui_common.getVContainer()
+
+        
         self.main_layout.addWidget(self.group_box)
 
         self.blank_label = QtWidgets.QLabel("Please add an action.")
@@ -274,6 +283,13 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements = {}
         self._create_ui()
         self._populate_ui()
+
+    def hook(self, widget):
+        widget.rightPanelResize.connect(self._handle_panel_resize)
+
+    def _handle_panel_resize(self, width):
+        if Shiboken.isValid(self):
+            self.setFixedWidth(width)
 
     def _create_ui(self):
         """Creates the editor UI."""
@@ -286,22 +302,25 @@ class MacroActionEditor(QtWidgets.QWidget):
         try:
             MacroActionEditor.locked = True
 
-            self.action_selector = gremlin.ui.ui_common.QComboBox(width=None)
+            self.action_selector = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
             for action_name in sorted(self.action_types):
                 self.action_selector.addItem(action_name)
             self.action_selector.currentTextChanged.connect(self._change_action)
 
-            self.group_layout.addWidget(self.action_selector)
+            widget, _ = gremlin.ui.ui_common.getHContainer(self.action_selector, "Step Action:")
+            self.group_layout.addWidget(widget)
+            self.group_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
             self.action_layout = QtWidgets.QVBoxLayout()
             self.group_layout.addLayout(self.action_layout)
-            #self.group_layout.addStretch(1)
+            
         finally:
             MacroActionEditor.locked = False
 
     def _populate_ui(self):
         """Populate the UI elements with data from the model."""
-
+        if not Shiboken.isValid(self):
+            return
         
         # ensure there's a selected item in the model
         if self.model.rowCount() == 0:
@@ -397,10 +416,10 @@ class MacroActionEditor(QtWidgets.QWidget):
         action = self.model.get_entry(self.index.row())
         if action is None:
             return
-
+        
         self.ui_elements["input_label"] = QtWidgets.QLabel("Input")
-        self.ui_elements["input_button"] = \
-            gremlin.ui.ui_common.NoKeyboardPushButton("Press Me")
+        self.ui_elements["input_button"] = gremlin.ui.ui_common.NoKeyboardPushButton("Select...")
+        self.ui_elements["input_button"].setToolTip("Select the output device")
         self.ui_elements["input_button"].clicked.connect(
             lambda: self._request_user_input([
                 InputType.JoystickAxis,
@@ -412,7 +431,8 @@ class MacroActionEditor(QtWidgets.QWidget):
         self._create_joystick_inputs_ui(action)
 
         self.action_layout.addWidget(self.ui_elements["input_label"])
-        self.action_layout.addWidget(self.ui_elements["input_button"])
+        widget, _ = gremlin.ui.ui_common.getHContainer(self.ui_elements["input_button"])
+        self.action_layout.addWidget(widget)
 
     def _keyboard_ui(self):
         """Creates and populates the KeyAction editor UI."""
@@ -652,109 +672,153 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
 
 
-            
-
             self.ui_elements["vjoy_selector"].set_selection(
                 action.input_type,
                 action.vjoy_id,
                 action.input_id
             )
 
+            self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
+            self._create_joystick_inputs_ui(action)
 
+            self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
-            # Axis mode configuration
-            if action.input_type == InputType.JoystickAxis:
-                if not "axis_type_layout" in self.ui_elements.keys():
-                    self.ui_elements["axis_type_layout"] = QtWidgets.QHBoxLayout()
-                    self.ui_elements["axis_value_layout"] = QtWidgets.QHBoxLayout()
-                    self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
-                    self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
-                    self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
-                    self.ui_elements["axis_value"] = gremlin.ui.ui_common.QFloatLineEdit()
+            # listen button
+            listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._handle_listen_request)
+
+            self.action_layout.addWidget(listen_widget)
                     
-
-                    if action.axis_type == "absolute":
-                        self.ui_elements["axis_absolute"].setChecked(True)
-                        self.ui_elements["axis_relative"].setChecked(False)
-                    elif action.axis_type == "relative":
-                        self.ui_elements["axis_absolute"].setChecked(False)
-                        self.ui_elements["axis_relative"].setChecked(True)
-                    
-                    self.ui_elements["axis_absolute"].clicked.connect(
-                        self._modify_vjoy_axis
-                    )
-                    self.ui_elements["axis_relative"].clicked.connect(
-                        self._modify_vjoy_axis
-                    )
-
-
-                    
-
-                    self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_reverse"])
-                    self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_absolute"])
-                    self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_relative"])
-                    self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_value"])
-                    self.ui_elements["axis_type_layout"].addStretch()
-                    
-                    self.action_layout.addLayout(self.ui_elements["axis_type_layout"])
                     
                 
 
-            self._create_joystick_inputs_ui(action)
+
         finally:
             MacroActionEditor.locked = False
+
+    def _handle_listen_request(self):
+        ''' calls up a listen box to select the input '''
+        dialog = gremlin.ui.ui_common.InputListenerWidget(
+                return_kb_event = True,
+                callback = self._handle_listen_selection,
+                virtual_only = True
+            )
+        
+        root = self
+        while root.parent():
+            root = root.parent()
+        geom = root.geometry()
+    
+        dialog.setGeometry(
+                int(geom.x() + geom.width() / 2 - 150),
+                int(geom.y() + geom.height() / 2 - 75),
+                300,
+                150
+            )
+        
+        dialog.show()
+
+    def _handle_listen_selection(self, event):
+        gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
+
+    def _handle_listen_selection_ui(self, event):
+        dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+        if not dev.is_virtual:
+            return
+        self._modify_joystick(event)
+          
 
 
     def _create_joystick_inputs_ui(self, action):
         # Handle display of value based on the actual input type
-        if action.input_type == InputType.JoystickAxis:
-            if "axis_value" in self.ui_elements.keys():
-                # self.ui_elements["axis_value"].setRange(-1.0, 1.0)
-                # self.ui_elements["axis_value"].setSingleStep(0.1)
-                # self.ui_elements["axis_value"].setDecimals(3)
-                self.ui_elements["axis_value"].setValue(action.value)
+        import gremlin.joystick_handling
+        device = gremlin.joystick_handling.device_info_from_guid(action.device_guid)
+        if device:
+                
+            if action.input_type == InputType.JoystickAxis:
+
+                self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
+                self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
+                self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
+
+                if action.axis_type == "absolute":
+                    self.ui_elements["axis_absolute"].setChecked(True)
+                    self.ui_elements["axis_relative"].setChecked(False)
+                elif action.axis_type == "relative":
+                    self.ui_elements["axis_absolute"].setChecked(False)
+                    self.ui_elements["axis_relative"].setChecked(True)
+                
+                self.ui_elements["axis_absolute"].clicked.connect(
+                    self._modify_vjoy_axis
+                )
+                self.ui_elements["axis_relative"].clicked.connect(
+                    self._modify_vjoy_axis
+                )                
+
+                self.ui_elements["axis_value"] = gremlin.ui.ui_common.QFloatLineEdit()
                 self.ui_elements["axis_value"].valueChanged.connect(self._modify_axis_state)
+                self.ui_elements["axis_value"].setValue(action.value)
 
-                self.action_layout.addWidget(self.ui_elements["axis_value"])
+                axis_name = gremlin.joystick_handling.get_axis_name(action.input_id)
+                widget = QtWidgets.QLabel(f"{device.name} Axis {action.input_id} {axis_name}")
+                self.action_layout.addWidget(widget)
 
-        elif action.input_type == InputType.JoystickButton:
-            if not "button_press" in self.ui_elements.keys():
-                self.ui_elements["button_press"] = QtWidgets.QRadioButton("Press")
-                self.ui_elements["button_release"] = QtWidgets.QRadioButton("Release")
-                if action.value:
-                    self.ui_elements["button_press"].setChecked(True)
-                else:
-                    self.ui_elements["button_release"].setChecked(True)
+                self.action_layout.addWidget(self.ui_elements["axis_reverse"])
 
-                self.ui_elements["button_press"].toggled.connect(
-                    self._modify_button_state
-                )
-                self.ui_elements["button_release"].toggled.connect(
-                    self._modify_button_state
-                )
-                self.action_layout.addWidget(self.ui_elements["button_press"])
-                self.action_layout.addWidget(self.ui_elements["button_release"])
+                widget, _= gremlin.ui.ui_common.getHContainer([
+                            self.ui_elements["axis_absolute"],
+                            self.ui_elements["axis_relative"]
+                            ],"Type:")
 
-        elif action.input_type == InputType.JoystickHat:
-            if not "hat_direction" in self.ui_elements.keys():
-                self.ui_elements["hat_direction"] = gremlin.ui.ui_common.QComboBox()
-                directions = [
-                    "Center", "North", "North East", "East", "South East",
-                    "South", "South West", "West", "North West"
-                ]
-                for val in directions:
-                    self.ui_elements["hat_direction"].addItem(val)
-                self.ui_elements["hat_direction"].currentTextChanged.connect(
-                    self._modify_hat_state
-                )
-                hat_direction = (0, 0)
-                if isinstance(action.value, tuple):
-                    hat_direction = action.value
-                self.ui_elements["hat_direction"].setCurrentText(
-                    gremlin.common.direction_tuple_lookup[hat_direction]
-                )
-                self.action_layout.addWidget(self.ui_elements["hat_direction"])
+                self.action_layout.addWidget(widget)
+
+
+                widget, _ = gremlin.ui.ui_common.getHContainer(self.ui_elements["axis_value"],"Set Value:")
+                self.action_layout.addWidget(widget)
+                
+
+            elif action.input_type == InputType.JoystickButton:
+                if not "button_press" in self.ui_elements.keys():
+                    self.ui_elements["button_press"] = QtWidgets.QRadioButton("Press")
+                    self.ui_elements["button_release"] = QtWidgets.QRadioButton("Release")
+                    if action.value:
+                        self.ui_elements["button_press"].setChecked(True)
+                    else:
+                        self.ui_elements["button_release"].setChecked(True)
+
+                    self.ui_elements["button_press"].toggled.connect(
+                        self._modify_button_state
+                    )
+                    self.ui_elements["button_release"].toggled.connect(
+                        self._modify_button_state
+                    )
+
+                    widget = QtWidgets.QLabel(f"{device.name} Button [{action.input_id}]")
+                    self.action_layout.addWidget(widget)
+                    self.action_layout.addWidget(self.ui_elements["button_press"])
+                    self.action_layout.addWidget(self.ui_elements["button_release"])
+
+            elif action.input_type == InputType.JoystickHat:
+                if not "hat_direction" in self.ui_elements.keys():
+                    self.ui_elements["hat_direction"] = gremlin.ui.ui_common.QComboBox()
+                    directions = [
+                        "Center", "North", "North East", "East", "South East",
+                        "South", "South West", "West", "North West"
+                    ]
+                    for val in directions:
+                        self.ui_elements["hat_direction"].addItem(val)
+                    self.ui_elements["hat_direction"].currentTextChanged.connect(
+                        self._modify_hat_state
+                    )
+                    hat_direction = (0, 0)
+                    if isinstance(action.value, tuple):
+                        hat_direction = action.value
+                    self.ui_elements["hat_direction"].setCurrentText(
+                        gremlin.common.direction_tuple_lookup[hat_direction]
+                    )
+                    widget = QtWidgets.QLabel(f"{device.name} Hat [{action.input_id}]")
+                    self.action_layout.addWidget(widget)
+                    self.action_layout.addWidget(self.ui_elements["hat_direction"])
 
 
     def _remote_control_ui(self):
@@ -952,12 +1016,15 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _request_user_input(self, input_types):
         """Prompts the user for the input to bind to this item."""
         from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+        import gremlin.joystick_handling
+        import gremlin.ui.ui_common
 
         if InputType.Keyboard in input_types:
             callback = self._modify_key
         elif InputType.Mouse in input_types:
             callback = self._modify_mouse
         else:
+            # joystick input
             callback = self._modify_joystick
 
         if InputType.Keyboard in input_types:
@@ -967,27 +1034,75 @@ class MacroActionEditor(QtWidgets.QWidget):
             dialog.showNormal()
         else:
 
-            dialog = gremlin.ui.ui_common.InputListenerWidget(
-                event_types = input_types,
-                return_kb_event=True
-            )
+            
+            config = gremlin.config.Configuration()
+            device_id = config.macro_last_device_id
+            dev = gremlin.joystick_handling.device_info_from_guid(device_id) if device_id else None
+            input_type = config.macro_last_input_type if dev else None
+            input_id = config.macro_last_input_id if dev else None
+                
 
-            dialog.keyInput.connect(callback)
+            dialog = gremlin.ui.ui_common.QJoystickSelectorDialog(
+                default_device = dev,
+                default_input_type = input_type,
+                default_input_id = input_id,
+                virtual_only = True
+                )
+            
+            dialog.dialog_closed.connect(self._handle_input_selected)
+
+            # dialog = gremlin.ui.ui_common.InputListenerWidget(
+            #     event_types = input_types,
+            #     return_kb_event=True
+            # )
+
+            # dialog.keyInput.connect(callback)
+
             self.button_press_dialog = dialog
+            dialog.exec()
 
-            # Display the dialog centered in the middle of the UI
-            root = self
-            while root.parent():
-                root = root.parent()
-            geom = root.geometry()
+            # # Display the dialog centered in the middle of the UI
+            # root = self
+            # while root.parent():
+            #     root = root.parent()
+            # geom = root.geometry()
 
-            self.button_press_dialog.setGeometry(
-                int(geom.x() + geom.width() / 2 - 150),
-                int(geom.y() + geom.height() / 2 - 75),
-                300,
-                150
-            )
-            self.button_press_dialog.show()
+            # self.button_press_dialog.setGeometry(
+            #     int(geom.x() + geom.width() / 2 - 150),
+            #     int(geom.y() + geom.height() / 2 - 75),
+            #     300,
+            #     150
+            # )
+            # self.button_press_dialog.show()
+
+    def _handle_input_selected(self, dialog):
+        ''' occurs when macro input selection is made '''
+        if dialog.selectedData:
+            dev, input_type, input_id = dialog.selectedData
+            if dev is not None and input_type is not None and input_id is not None:
+                self.model.set_entry(
+                        gremlin.macro.JoystickAction(
+                            dev.device_guid,
+                            input_type,
+                            input_id,
+                            0.0
+                        ),
+                        self.index.row()
+                    )
+                
+                self._update_model()
+                gremlin.ui.ui_common.clear_layout(self.action_layout)
+                self.ui_elements = {}
+                self._joystick_ui()
+
+                config = gremlin.config.Configuration()
+                config.macro_last_device_id = dev.device_id
+                config.macro_last_input_type = input_type
+                config.macro_last_input_id = input_id
+
+
+
+
 
     def _keyboard_dialog_cb(self):
         ''' callled when the dialog completes '''
@@ -1151,7 +1266,7 @@ class HoldRepeatMacroWidget(AbstractRepeatMacroWidget):
         self.data.delay = self.delay.value()
 
 
-class MacroSettingsWidget(QtWidgets.QWidget):
+class MacroSettingsWidget(gremlin.ui.ui_common.QContentWidget):
 
     """Widget presenting macro settings."""
 
@@ -1198,7 +1313,7 @@ class MacroSettingsWidget(QtWidgets.QWidget):
         # Create UI elements
         self.exclusive_checkbox = QtWidgets.QCheckBox("Exclusive")
         self.force_remote_checkbox = QtWidgets.QCheckBox("Remote Only")
-        self.repeat_dropdown = gremlin.ui.ui_common.QComboBox()
+        self.repeat_dropdown = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
         self.repeat_dropdown.addItems(["None", "Count", "Toggle", "Hold"])
         self.repeat_widget = None
         if type(self.data.repeat) in MacroSettingsWidget.storage_to_name:
@@ -1227,13 +1342,11 @@ class MacroSettingsWidget(QtWidgets.QWidget):
         self.repeat_dropdown.currentTextChanged.connect(self._update_settings)
 
         # Place UI elements
-        widget = QtWidgets.QWidget()
-        box = QtWidgets.QHBoxLayout(widget)
-        box.addWidget(self.exclusive_checkbox)
-        box.addWidget(self.force_remote_checkbox) 
+        widget, _ = gremlin.ui.ui_common.getHContainer([self.exclusive_checkbox, self.force_remote_checkbox])
         self.group_layout.addWidget(widget)
-        self.group_layout.addWidget(self.repeat_dropdown)
+
         if self.repeat_widget is not None:
+            widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_dropdown)
             self.group_layout.addWidget(self.repeat_widget)
 
     def _update_settings(self, value):
@@ -1278,6 +1391,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
     
 
     from gremlin.util import get_icon_path
+
+    rightPanelResize = QtCore.Signal(int) # occurs when right panel content should resize
 
     locked = False
 
@@ -1333,13 +1448,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             QtWidgets.QWidget().setLayout(self.layout())
             self.main_layout = QtWidgets.QVBoxLayout(self)
 
-            # macro list + toolbar + editor widget
-            self.macro_widget, self.macro_layout = gremlin.ui.ui_common.getHContainer()
-            self.main_layout.addWidget(self.macro_widget)
             
-            self.editor_settings_layout = QtWidgets.QVBoxLayout()
-            self.buttons_layout = QtWidgets.QVBoxLayout()
-
+            # header
 
             execute_label = QtWidgets.QLabel("Execute macro on:")
             self.execute_on_press_widget = QtWidgets.QCheckBox("Press")
@@ -1369,7 +1479,6 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
                        ]
             self.execute_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
             
-            self.macro_layout.addLayout(self.buttons_layout)
             self.main_layout.addWidget(self.execute_container_widget)
 
             #self.delegate = MacroItemDelegate(self)
@@ -1384,14 +1493,18 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.list_view.clicked.connect(self._edit_action)
             #self.list_view.setItemDelegate(self.delegate)
 
+            
 
-            # Create editor as well as settings place holder widgets
+    
+            
             self.editor_widget = QtWidgets.QWidget()
+            self.editor_container_widget, self.editor_container_layout = gremlin.ui.ui_common.getHContainer(self.editor_widget)
+
+            
             self.settings_widget = MacroSettingsWidget(self.action_data)
-            self.editor_settings_layout.addWidget(self.editor_widget)
-            self.editor_settings_layout.addWidget(self.settings_widget)
-            self.editor_settings_layout.addStretch()
-      
+            self.settings_widget.resized.connect(self._handle_settings_resized)
+            
+     
 
             prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
@@ -1530,18 +1643,72 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             height = self.toolbar.sizeHint().height()
             self.toolbar.setMinimumHeight(height) # 260)
 
-            # Assemble the entire widget
+            self._last_sizes = None
 
-
+            # Assemble left panel
+            self.macro_widget, self.macro_layout = gremlin.ui.ui_common.getHContainer()
             self.macro_layout.addWidget(self.list_view)
             self.macro_layout.addWidget(self.toolbar)
-            self.macro_layout.addLayout(self.editor_settings_layout)
-
+            self.macro_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+            self.list_view.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
             
 
-            self.main_layout.setContentsMargins(0, 0, 0, 0)
+            # Create editor as well as settings place holder widgets
+            self.left_panel_widget, self._left_panel_layout = gremlin.ui.ui_common.getVContainer(self.macro_widget)
+
+            # ,alignment=QtCore.Qt.AlignmentFlag.AlignTop |QtCore.Qt.AlignmentFlag.AlignLeft
+            # assemble right panel
+            self.right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer([self.editor_container_widget,self.settings_widget])
+
+            grid_layout = QtWidgets.QGridLayout()
+            grid_layout.addWidget(self.left_panel_widget, 0, 0)
+            grid_layout.addWidget(self.right_panel_widget, 0, 1)
+            #grid_layout.addWidget(QtWidgets.QWidget(), 0, 2)
+            grid_layout.setColumnStretch(0,1)
+            grid_layout.setColumnStretch(1,1)
+            #grid_layout.setColumnStretch(1,2)
+
+            # assemble left and right panels
+            #self.panel_widget, self.panel_layout = gremlin.ui.ui_common.getHContainer([self.left_panel_widget, self.right_panel_widget], right_stretch=False) # main panel left and right
+            #self.main_layout.addWidget(self.panel_widget) 
+            self.main_layout.addLayout(grid_layout)
+
+            
         finally:
             MacroWidget.locked = False
+
+    @QtCore.Slot(QtCore.QSize)
+    def _handle_settings_resized(self, size):
+        # resize the splitter to the container's size as it doesn't happen by itself for some reason
+        width = self.settings_widget.frameGeometry().width()
+        #height = self.settings_widget.frameGeometry().height()
+        self.rightPanelResize.emit(width)
+        
+
+
+    @QtCore.Slot(QtCore.QSize)
+    def _content_resized(self, size : QtCore.QSize):
+        ''' called when the container object is resized '''
+
+        # resize the splitter to the container's size as it doesn't happen by itself for some reason
+        width = self._content_widget.frameGeometry().width()
+        height = self._content_widget.frameGeometry().height()
+        if width > 400:
+            self._splitter.setFixedWidth(width)
+        self._splitter.setFixedHeight(height)          
+
+    @QtCore.Slot(int, int)
+    def _splitter_moved(self, pos, index):
+        sizes = self._splitter.sizes()
+        if pos < 0:
+            # QT bug - position should never be negative
+            if self._last_sizes:
+                sizes = self._last_sizes
+            else:
+                width = self._content_widget.frameGeometry().width()
+                sizes = [200, width - 200]
+            self._splitter.setSizes(sizes)        
+        self._last_sizes = sizes          
 
     def _create_toolbutton(self, icon_path, tooltip, is_checkable, default_on=True):
         """Creates a new toolbutton with the provided options.
@@ -1600,11 +1767,12 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.editor_widget = QtWidgets.QLabel("Please select a single action")
         else:
             self.editor_widget = MacroActionEditor(self.model, model_index)
-        old_item = self.editor_settings_layout.takeAt(0)
-        old_item.widget().hide()
-        old_item.widget().deleteLater()
-        self.editor_settings_layout.insertWidget(0, self.editor_widget)
-        self.editor_widget.setMaximumWidth(200)
+            self.editor_widget.hook(self)
+ 
+        gremlin.util.clear_layout(self.editor_container_layout)
+        self.editor_container_layout.addWidget(self.editor_widget)
+        
+
 
     def _update_record_settings(self):
         """Store user preferences of inputs to record."""
@@ -2005,12 +2173,15 @@ To send complex sequences, please look at the sequence container.'''
         # Read macro actions
         for child in node.find("actions"):
             if child.tag == "joystick":
-                joy_action = gremlin.macro.JoystickAction(
-                    parse_guid(child.get("device-guid")),
-                    InputType.to_enum(safe_read(child, "input-type", str, "")),
-                    safe_read(child, "input-id", int, 1),
-                    safe_read(child, "value", str, ""),
-                )
+                device_id = child.get("device-guid")
+                parse_guid(device_id)
+                if device_id:
+                    joy_action = gremlin.macro.JoystickAction(
+                        parse_guid(device_id),
+                        InputType.to_enum(safe_read(child, "input-type", str, "")),
+                        safe_read(child, "input-id", int, 1),
+                        safe_read(child, "value", str, ""),
+                    )
                 self._str_to_joy_value(joy_action)
                 self.sequence.append(joy_action)
             elif child.tag == "key":
@@ -2123,6 +2294,8 @@ To send complex sequences, please look at the sequence container.'''
 
         action_list = ElementTree.Element("actions")
         for entry in self.sequence:
+            if not entry.device_guid:
+                continue
             if isinstance(entry, gremlin.macro.JoystickAction):
                 joy_node = ElementTree.Element("joystick")
                 joy_node.set("device-guid", write_guid(entry.device_guid))

@@ -123,15 +123,37 @@ def all_joystick_devices(): # -> list[DeviceSummary]:
 
 
 def axis_input_devices(): # -> list[DeviceSummary]:
-    ''' returns the list of input devices '''
+    ''' returns the list of devices that has axes '''
     devices = [dev for dev in _joystick_devices if dev.axis_count]
     return devices
     
 def button_input_devices(): # -> list[DeviceSummary]:
+    ''' returns the list of devices that have buttons'''
     devices = [dev for dev in _joystick_devices if dev.button_count]
     return devices
 
+def hat_input_devices(): # -> list[DeviceSummary]:
+    ''' returns the list of devices that define hats '''
+    devices = [dev for dev in _joystick_devices if dev.hat_count]
+    return devices
 
+def filtered_input_devices(input_type_list = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat], virtual_only = False):
+    ''' gets a list of devices filtered by axis, button or hat '''
+    def filter_func(dev : dinput.DeviceSummary):
+        if virtual_only and not dev.is_virtual:
+            return False
+        for input_type in input_type_list:
+            match input_type:
+                case InputType.JoystickAxis:
+                    return dev.axis_count > 0
+                case InputType.JoystickButton:
+                    return dev.button_count > 0
+                case InputType.JoystickHat:
+                    return dev.hat_count > 0
+            return False
+        
+    devices = [dev for dev in _joystick_devices if filter_func(dev)]
+    return devices
 
 def  is_hardware_device(device_guid) -> bool:
     ''' true if the device is a hardware device '''

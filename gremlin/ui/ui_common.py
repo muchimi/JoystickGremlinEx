@@ -3201,11 +3201,12 @@ class InputListenerWidget(QBoxFrame):
 
     def __init__(
             self,
-            event_types,
+            event_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
             return_kb_event=False,
             multi_keys=False,
             filter_func=None,
             callback = None, 
+            virtual_only = False,
             parent=None
     ):
         """Creates a new instance.
@@ -3234,6 +3235,7 @@ class InputListenerWidget(QBoxFrame):
         self._multi_key_storage = []
         self._callback = callback
         self._accepted = False # true if the input is accepted
+        self._virtual_only = virtual_only # only listen to virtual devices if set
         
         
         self._listen_mouse = InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
@@ -3323,6 +3325,11 @@ class InputListenerWidget(QBoxFrame):
 
     def _selected_ui(self, event):
         ''' input selected - runs on UI thread'''
+        if self._virtual_only:
+            dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+            if not dev.is_virtual:
+                return
+        
         if self._callback:
             self._callback(event)
         self.item_selected.emit(event)
@@ -4894,12 +4901,13 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self.updateState()
         self._tab_selected(device_guid)
         el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self.process_event)
-
-
+        el.button_state_change.connect(self.process_event)
 
 
     def process_event(self, event):
+        config = gremlin.config.Configuration()
+        if not (config.highlight_enabled and config.highlight_input_buttons):
+            return
         if not Shiboken.isValid(self):
             return
         if self._suspended:
@@ -4908,21 +4916,15 @@ class ButtonStateWidget(QtWidgets.QWidget):
             return
         if not gremlin.util.compare_guid(event.device_guid, self._device_guid):
             return
+        if event.event_type != self._input_type:
+            return
         if event.identifier != self._input_id:
             return
         state = event.is_pressed
 
-        if self._last_state_value is None or self._last_state_value != state:
-            # changed
-            gremlin.util.InvokeUiMethod(self._update_value, state)
-
-            # only issue a state change on press and if highlighing is enabled
-            if state:
-                config = gremlin.config.Configuration()
-                if config.highlight_enabled and config.highlight_input_buttons:
-                    el = gremlin.event_handler.EventListener()
-                    el.button_state_change.emit(event)
-
+        # if self._last_state_value is None or self._last_state_value != state:
+        #     # changed
+        gremlin.util.InvokeUiMethod(self._update_value, state)
 
     
         
@@ -4996,6 +4998,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         if not Shiboken.isValid(self):
             return
         if self._last_state_value is None or self._last_state_value != is_pressed:
+            syslog.info(f"update button state: {is_pressed}")
             gremlin.util.InvokeUiMethod(self._update_pixmap_ui, is_pressed)
             self._last_state_value = is_pressed
               
@@ -8014,18 +8017,7 @@ class QSplitTabWidget(QDataWidget):
         self._splitter.setStretchFactor(0,1)
         self._splitter.setStretchFactor(1,4)
 
-        # width = self.frameGeometry().width()
-        # w1 = width // 5
-        # self._splitter.setSizes((w1, w1*4))
-
-        # self._splitter.setCollapsible(0, False)
-        # self._splitter.setCollapsible(1, False)
         self.main_layout.addWidget(self._content_widget)
-
-        #_tabsplitter_tracker.registerWidget(self)
-
-        # syslog.info(f"Created Device content: [{self._id}] {self.objectName()}")
-
 
         self._blank_input()
 
@@ -8443,6 +8435,8 @@ class QShowAtCursorDialog(QtWidgets.QDialog):
     def closeEvent(self, arg__1):
         self.dialog_closed.emit(self)
         return super().closeEvent(arg__1)
+    
+    
 
 
 class QRememberDialog(QtWidgets.QDialog):
@@ -11457,3 +11451,298 @@ class QScrollableWidget(QtWidgets.QWidget):
             self._scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         else:
             self._scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+
+class QJoystickSelectorWidget(QtWidgets.QWidget):
+    ''' selector widget for a joystick axis, button or hat '''
+    selectionChanged = QtCore.Signal(tuple) # when data is selected, returns (dev : DeviceSummary, inputType, inputId)
+    def __init__(self,
+                    input_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
+                    default_device = None,
+                    default_input_type = None,
+                    default_input_id = None,
+                    virtual_only = False,
+                    parent = None):
+        ''' 
+        :param input_types: list of selectable inputs 
+        
+        '''
+        import gremlin.joystick_handling
+        super().__init__(parent)
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        self._input_types = input_types
+        self._selected_device = default_device
+        self._selected_input_type = default_input_type
+        self._selected_input_id = default_input_id
+        self._last_key = None # last event data 
+        self._key_map = {} # map of input keys to input index
+        self._virtual_only = virtual_only
+
+        self._devices = sorted(gremlin.joystick_handling.filtered_input_devices(self._input_types, virtual_only),key=lambda x: x.name)
+
+        container_selector_widget = QtWidgets.QWidget()
+        main_layout.addWidget(container_selector_widget)
+        grid = QtWidgets.QGridLayout(container_selector_widget)
+        grid.setColumnStretch(3,1)
+
+
+        row = 0
+
+        self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
+        grid.addWidget(self.lbl_vjoy_device_selector,row,0)
+        self.device_selector_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        grid.addWidget(self.device_selector_widget,row,1)
+
+
+
+        row += 1
+        self.input_selector_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.lbl_vjoy_input_selector = QtWidgets.QLabel("Input:")
+        grid.addWidget(self.lbl_vjoy_input_selector,row,0)
+        grid.addWidget(self.input_selector_widget,row,1)
+
+    
+        self._update_devices()
+        self._update_inputs(self.device_selector_widget.currentData())
+
+        
+
+        self.device_selector_widget.currentIndexChanged.connect(self._handle_device_changed)
+        self.input_selector_widget.currentIndexChanged.connect(self._handle_input_changed)
+
+    def select(self, device, input_type, input_id):
+        ''' selects the specified entries if they exist  '''
+        with QtCore.QSignalBlocker(self.device_selector_widget):
+            index = self.device_selector_widget.findData(self._selected_device)
+            if index != -1:
+                self.device_selector_widget.setCurrentIndex(index)
+                self._selected_device = device
+                self._update_inputs(device)
+                with QtCore.QSignalBlocker(self.input_selector_widget):
+                    key = (input_type, input_id)
+                    if key in self._key_map:
+                        index = self._key_map[key]
+                    else: 
+                        index = -1
+                    if index != -1:
+                        self.input_selector_widget.setCurrentIndex(index)
+                        self._selected_input_type = input_type
+                        self._selected_input_id = input_id
+                    else:
+                        self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
+                
+            else:
+                self._selected_device = self.device_selector_widget.currentData()
+                self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
+        
+
+
+    def _update_devices(self):
+        ''' updates the device list '''
+        with QtCore.QSignalBlocker(self.device_selector_widget):
+            self.device_selector_widget.clear()
+            for dev in self._devices:
+                self.device_selector_widget.addItem(dev.name, dev)
+
+            # select the current entry
+            if self._selected_device:
+                index = self.device_selector_widget.findData(self._selected_device)
+                if index != -1:
+                    self.device_selector_widget.setCurrentIndex(index)
+                else:
+                    self._selected_device = None 
+
+            if not self._selected_device:
+                self._selected_device = self.device_selector_widget.currentData() # new default
+
+            self._emit() # send update if needed
+
+    def _update_inputs(self, dev):
+        ''' updates the input list for a given device '''
+        with QtCore.QSignalBlocker(self.input_selector_widget):
+            self.input_selector_widget.clear()
+            self._key_map.clear()
+            index = 0
+            for input_type in self._input_types:
+                
+                match input_type:
+                    case InputType.JoystickAxis:
+                        # add axes
+                        if dev.axis_count:
+                            for input_id in range(1, dev.axis_count+1):
+                                key = (input_type, input_id)
+                                axis_name = gremlin.joystick_handling.get_axis_name(input_id)
+                                self.input_selector_widget.addItem(f"Axis {input_id} ({axis_name})", key)
+                                self._key_map[key] = index
+                                index += 1
+                    case InputType.JoystickButton:
+                        # add buttons
+                        if dev.button_count:
+                            for input_id in range(1, dev.button_count+1):
+                                key = (input_type, input_id)
+                                self.input_selector_widget.addItem(f"Button {input_id}",  key)
+                                self._key_map[key] = index
+                                index += 1
+                    case InputType.JoystickHat:
+                        # add hats
+                        if dev.hat_count:
+                            for input_id in range(1, dev.hat_count+1):
+                                key = (input_type, input_id)
+                                self.input_selector_widget.addItem(f"Hat {input_id}",  key)
+                                self._key_map[key] = index
+                                index += 1
+
+            # default selection
+            key = (self._selected_input_type, self._selected_input_id)
+            if key in self._key_map:
+                index = self._key_map[key]
+                self.input_selector_widget.setCurrentIndex(index)
+            else:
+                # not found, new default
+                self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
+
+            self._emit() # send update if needed
+
+
+    @QtCore.Slot()
+    def _handle_device_changed(self):
+        import dinput
+        dev : dinput.DeviceSummary = self.device_selector_widget.currentData()
+        if dev:
+            
+            if self._selected_device != dev:
+                self._update_inputs(dev)
+                self._selected_device = dev
+                if self.input_selector_widget.count:
+                    self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
+                    return
+                else:                
+                    self._selected_input_type = self._selected_input_id = None
+                self._selected_device = dev
+        else:
+            self._selected_device = None
+
+        self._emit()
+
+    @QtCore.Slot()
+    def _handle_input_changed(self):
+        if self.input_selector_widget.count:
+            self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
+            self._emit()
+
+    def _emit(self):
+        ''' fire the change event if the data is valid '''
+        new_key = (self._selected_device, self._selected_input_type, self._selected_input_id)
+        if new_key != self._last_key and None not in new_key:
+            self.selectionChanged.emit(new_key)
+            self._last_key = new_key
+
+
+class QJoystickSelectorDialog(QShowAtCursorDialog):
+    def __init__(self,
+                input_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
+                default_device = None,
+                default_input_type = None,
+                default_input_id = None,
+                virtual_only : bool = False,
+                parent = None):
+        
+        super().__init__(self.__class__.__name__,parent = parent)
+
+
+        self._selected_data = (default_device, default_input_type, default_input_id)
+        self._input_types = input_types
+        self._selected_device = default_device
+        self._selected_input_type = default_input_type
+        self._selected_input_id = default_input_id
+        self._virtual_only = virtual_only
+
+        # self._sequence = InputKeyboardModel(sequence=sequence)
+        self.setWindowTitle("Select Joystick Input")
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+
+        main_layout = QtWidgets.QVBoxLayout()
+        self.setLayout(main_layout)
+
+        self.selector_widget = QJoystickSelectorWidget(input_types, default_device, default_input_type, default_input_id, virtual_only = virtual_only)
+        self.selector_widget.selectionChanged.connect(self._handle_selection_changed)
+        main_layout.addWidget(self.selector_widget)
+
+        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._handle_listen_request)
+
+        ok_button_widget =  QtWidgets.QPushButton("Ok")
+        ok_button_widget.clicked.connect(self._execute_cb)
+        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget.clicked.connect(self._close_cb)
+        button_container_widget, _ = getHContainer(
+            [listen_widget, 
+             "||",
+             ok_button_widget,
+             cancel_button_widget])
+        
+        main_layout.addWidget(button_container_widget)
+
+        
+    @QtCore.Slot(tuple)
+    def _handle_selection_changed(self, data):
+        self._selected_data = data
+
+    def _handle_listen_request(self):
+        ''' calls up a listen box to select the input '''
+        dialog = gremlin.ui.ui_common.InputListenerWidget(
+                event_types = self._input_types,
+                return_kb_event=True,
+                callback = self._handle_listen_selection,
+                virtual_only = self._virtual_only
+            )
+        
+        root = self
+        while root.parent():
+            root = root.parent()
+        geom = root.geometry()
+    
+        dialog.setGeometry(
+                int(geom.x() + geom.width() / 2 - 150),
+                int(geom.y() + geom.height() / 2 - 75),
+                300,
+                150
+            )
+        
+        dialog.show()
+
+    def _handle_listen_selection(self, event):
+        gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
+
+    def _handle_listen_selection_ui(self, event):
+        dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+        if self._virtual_only and not dev.is_virtual:
+            return
+        self._selected_device =  dev
+        self._selected_input_type = event.event_type
+        self._selected_input_id = event.identifier
+        self.selector_widget.select(self._selected_device, self._selected_input_type, self._selected_input_id)
+
+
+
+    @QtCore.Slot()
+    def _close_cb(self):
+        ''' cancel button pressed '''
+        self._selected_data = None
+        self.close()
+
+    @QtCore.Slot()
+    def _execute_cb(self):
+        ''' ok button pressed'''
+        import gremlin.input_types
+        self._selected_data = (self._selected_device, gremlin.input_types.InputType(self._selected_input_type), self._selected_input_id)
+        self.close()
+
+
+    @property
+    def selectedData(self) -> tuple:
+        ''' dialog selection'''
+        return self._selected_data
+
+
+ 

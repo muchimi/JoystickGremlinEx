@@ -1865,7 +1865,6 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         gremlin.shared_state.push_suspend_highlighting() # prevent device highlight changes while editing a state 
 
         # self._sequence = InputKeyboardModel(sequence=sequence)
-        main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("State Editor")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent # list view

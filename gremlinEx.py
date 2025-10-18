@@ -335,8 +335,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.profile_stop.connect(self._profile_stop)
         
         el.profile_changed.connect(self._profile_changed_cb)
-        # el.button_state_change.connect(psygnal.throttled(self._button_state_change, timeout = 100))
-        # el.axis_state_change.connect(psygnal.throttled(self._axis_state_change, timeout = 100))
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
         el.input_selection_changed.connect(self._input_changed_handler)

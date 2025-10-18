@@ -1336,6 +1336,8 @@ def parse_guid(value):
     import dinput
     if value is None or value == "None" or not value:
         return None
+    if isinstance(value, str) and len(value) < 32:
+        return None
     if isinstance(value, dinput.GUID):
         return value
     try:
@@ -1348,10 +1350,9 @@ def parse_guid(value):
             raw_guid.Data4[i] = tmp.bytes[8 + i]
 
         return dinput.GUID(raw_guid)
-    except (ValueError, AttributeError) as e:
-        raise error.ProfileError(
-            f"Failed parsing GUID from value {value}"
-        )
+    except:
+        syslog.error(f"Failed parsing GUID from value [{value}]")
+        return None
 
 
 def parse_bool(value, default_value=False):
@@ -1368,8 +1369,8 @@ def parse_bool(value, default_value=False):
 
     # Attempt to parse the value
     try:
-        if value.isnumeric():
-            int_value = int(value)
+        if isNumeric(value):
+            int_value = int(float(value))
             if int_value in [0, 1]:
                 return int_value == 1
             else:

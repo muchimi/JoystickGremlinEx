@@ -325,6 +325,46 @@ class Event:
 			return f"Event: {self._id} OSC : {self.identifier} value: {self.value}"
 		
 		return f"Event: {self._id} {self.event_type} identifier {self.identifier}"
+	
+	# serialize
+	def __getstate__(self):
+		state = {}
+		state["id"] = self._id
+		state["event_type"] = self.event_type
+		state["identifier"] = self.identifier
+		state["device_guid"] = self.device_guid
+		state["value"] = self.value
+		state["virtual_code"] = self.virtual_code
+		state["curved_value"] = self.curve_value
+		state["raw_value"] = self.raw_value
+		state["mode"] = self.mode
+		state["is_axis"] = self.is_axis
+		state["is_virtual"] = self.is_virtual
+		state["is_pressed"] = self.is_pressed
+		state["action_id"] = self.action_id
+		state["force_remote"] = self.force_remote
+		return state
+
+	# deserialize
+	def __setstate__(self, state):
+		self._id = state["id"]  
+		self.event_type = state["event_type"]  
+		self.identifier = state["identifier"]
+		self.device_guid = state["device_guid"] 
+		self.value = state["value"] 
+		self.virtual_code = state["virtual_code"]
+		self.curve_value = state["curved_value"]
+		self.raw_value = state["raw_value"]
+		self.mode = state["mode"]
+		self.is_axis = state["is_axis"] 
+		self.is_virtual = state["is_virtual"]
+		self.is_pressed = state["is_pressed"]  
+		self.action_id = state["action_id"]
+		self.force_remote = state["force_remote"]
+
+
+		
+
 
 class DeviceChangeEvent:
 	''' sent when a new device is selected '''

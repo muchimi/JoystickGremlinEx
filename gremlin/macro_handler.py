@@ -53,8 +53,15 @@ class MacroListModel(QtCore.QAbstractListModel):
         InputType.JoystickButton:
             lambda entry: "pressed" if entry.value else "released",
         InputType.JoystickHat:
-            lambda entry: gremlin.common.direction_tuple_lookup[entry.value]
+            lambda entry: MacroListModel._get_hat_value(entry.value)
     }
+
+    @staticmethod
+    def _get_hat_value(value):
+        import vjoy.vjoy
+        if not value in vjoy.vjoy.Hat.direction_to_name:
+            value = (0,0)
+        return vjoy.vjoy.Hat.direction_to_name[value]
 
     def __init__(self, data_storage, parent=None):
         """Creates a new instance.

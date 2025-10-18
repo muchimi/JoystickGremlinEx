@@ -2567,3 +2567,29 @@ class Configuration(QtCore.QObject):
     @vjoy_loopback_delay.setter
     def vjoy_loopback_delay(self, value : int):
         self._set_data("vjoy_loopback_delay", value)
+
+
+
+    @property
+    def macro_last_device_id(self):
+        ''' id of the last device selected as an input for macros '''
+        return self._get_data("macro_last_device_id", "")
+    @macro_last_device_id.setter
+    def macro_last_device_id(self, id : str):
+        self._set_data("macro_last_device_id",id)
+    
+    @property
+    def macro_last_input_type(self):
+        ''' id of the last device input type as an input for macros '''
+        return self._get_data("macro_last_input_type", "")
+    @macro_last_input_type.setter
+    def macro_last_input_type(self, input_type):
+        self._set_data("macro_last_input_type", input_type)
+
+    @property
+    def macro_last_input_id(self):
+        ''' id of the last device input type as an input for macros '''
+        return self._get_data("macro_last_input_id", "")
+    @macro_last_input_id.setter
+    def macro_last_input_id(self, id):
+        self._set_data("macro_last_input_id", id)

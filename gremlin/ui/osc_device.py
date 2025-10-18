@@ -4380,8 +4380,6 @@ class InputOscClient(QtCore.QObject):
                     is_pressed = False
                     is_axis = True
                     # update the current axis value for the input
-
-                    
                     
                     event = gremlin.event_handler.Event(
                         event_type = InputType.OpenSoundControl,
@@ -4411,48 +4409,56 @@ class InputOscClient(QtCore.QObject):
                 elif input_item.mode == OscInputItem.InputMode.Button:
                     # trigger a button press event
                     autorelease = input_item._autorelease
-                    if autorelease:
-                        # parameter don't care
-                       is_pressed = True
+                    if len(args) == 0:
+                        syslog.warning(f"Autorelease not set on OSC no param button.  Thay may cause no trigger.  Check mode for [{input_item.message}]")
+                        autorelease = True
+                        is_pressed = True
                     else:
-                        if len(args) == 0:
-                            syslog.warning(f"Autorelease not set on OSC no param button.  Thay may cause no trigger.  Check mode for [{input_item.message}]")
-
-
                         is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
 
                     value = 1 if is_pressed else 0
                     
                     input_item.setButtonValue(is_pressed)
-                    extra_data = {"autorelease": False} # set autorelease mode
+                    #extra_data = {"autorelease": autorelease} # set autorelease mode
                     
-                    event = gremlin.event_handler.Event(
-                            event_type = input_type,
-                            device_guid = OscDeviceTabWidget.device_guid,
-                            identifier = input_item,
-                            is_pressed = is_pressed,
-                            value = is_pressed,
-                            raw_value = is_pressed,
-                            data = index, # source index
-                            is_virtual = True, # indicate we are not a hardware input
-                            is_axis = False,
-                            override_input_type=InputType.JoystickButton,
-                            extra_data = extra_data
-                            )
+          
                     
-                    self._event_listener.joystick_event.emit(event)
+
+                    # if not is_running:
+                    #     #event.event_type = InputType.OpenSoundControl
+                    #     event = gremlin.event_handler.Event(
+                    #         event_type = input_type,
+                    #         device_guid = OscDeviceTabWidget.device_guid,
+                    #         identifier = input_item,
+                    #         is_pressed = is_pressed,
+                    #         value = is_pressed,
+                    #         raw_value = is_pressed,
+                    #         data = index, # source index
+                    #         is_virtual = True, # indicate we are not a hardware input
+                    #         is_axis = False,
+                    #         override_input_type=InputType.JoystickButton,
+                    #         extra_data = extra_data
+                    #         )
+                    #     self._event_listener.button_state_change.emit(event)
+                    #     if autorelease:
+                    #         delay = input_item.autorelease_delay/1000 # ms to s
+                    #         release_event = event.clone()
+                    #         release_event.is_pressed = False
+                    #         release_event.value = 0
+                    #         timer = threading.Timer(delay, self._create_callback(input_item, release_event))
+                    #         input_item.autorelease_timer = timer # auto cancels the prior timer when the new value is set
+                    #         timer.start()
+
+
+                    #     continue
+
                     self._state_data[input_item.message_key] = is_pressed
 
-                    if not is_running:
-                        #event.event_type = InputType.OpenSoundControl
-                        self._event_listener.button_state_change.emit(event)
-                        continue
+                 
+                    if self._verbose:
+                        syslog.info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
-                if self._verbose:
-                    syslog.info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
-
-                if not is_axis:
-                    
+                    # button mode
                     event = gremlin.event_handler.Event(
                         event_type = input_type,
                         device_guid = OscDeviceTabWidget.device_guid,
@@ -4465,7 +4471,8 @@ class InputOscClient(QtCore.QObject):
                         is_axis = is_axis)
 
                     self._event_listener.osc_event.emit(event)
-
+                    if not gremlin.shared_state.is_running:
+                        self._event_listener.button_state_change.emit(event)
 
                     if autorelease:
                         # schedule an autorelease event
@@ -4509,6 +4516,8 @@ class InputOscClient(QtCore.QObject):
     def _autorelease_callback(self, input_item, event):
         ''' execute autorelease for an input '''
         self._event_listener.osc_event.emit(event)
+        if not gremlin.shared_state.is_running:
+            self._event_listener.button_state_change.emit(event)
 
 
         

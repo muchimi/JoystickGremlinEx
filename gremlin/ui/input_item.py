@@ -2069,6 +2069,7 @@ class InputItemWidget(QBoxFrame):
         # if self.identifier.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
         #     pass
         input_type = self.identifier.input_type
+        
         if config.show_input_axis:
             
             if (self.identifier.is_axis or self.identifier.is_button or self.identifier.is_hat) or \
@@ -2084,8 +2085,7 @@ class InputItemWidget(QBoxFrame):
                         if not current_axis_widget:
                             widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
                             widget.sizeChanged.connect(self._repeater_size_changed)
-                            # calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
-                            # widget.show_calibrated = calibration.hasData # enable calibrated mode dual repeater
+       
 
                             widget.data = self
                             self.axis_widget = widget
@@ -2097,10 +2097,10 @@ class InputItemWidget(QBoxFrame):
 
                     else: 
                         # button
-                        if not current_button_widget:
+                        if not self.button_widget:
                             widget = gremlin.ui.ui_common.ButtonStateWidget()
                             self.button_widget = widget
-
+                            widget.hookDevice(self._device_guid, input_type, self._input_id )
                         # remove axis widget if we changed modes
                         if self.axis_widget:
                             remove_axis = True
@@ -2454,7 +2454,8 @@ class InputItemWidget(QBoxFrame):
             if not self.identifier.is_status:
                 self._setWidgetHeight(self._status_container_widget, 0)
            
-
+            # update repeater for this widget
+            self._update_repeater()
 
     @property
     def selected(self) -> bool:

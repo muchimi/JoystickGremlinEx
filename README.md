@@ -14,6 +14,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T81)
+- Fix: OSC - repeater incorrect on new OSC entry
+
+
 ### (m76T80A)
 - Revised: Force match of VJOY device to DINPUT device and disable VJOY device if not found.  This will be reflected in the log file on startup.
 - Changed: rather than checking if the VJOY device is defined, GremlinEx will instead verify it can connect via the API to the VJOY device in case it is disabled at the API level.
