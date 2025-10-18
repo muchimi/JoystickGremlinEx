@@ -11686,6 +11686,7 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
         
     @QtCore.Slot(tuple)
     def _handle_selection_changed(self, data):
+        self._selected_device, self._selected_input_type, self._selected_input_id = data 
         self._selected_data = data
 
     def _handle_listen_request(self):

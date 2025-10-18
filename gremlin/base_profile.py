@@ -3859,7 +3859,8 @@ class Profile():
             
 
             type_name = InputType.to_string(act.input_type)
-            if act.vjoy_input_id in [0, None] \
+            if not act.vjoy_device_id in vjoy \
+                    or act.vjoy_input_id in [0, None] \
                     or act.vjoy_device_id in [0, None] \
                     or act.vjoy_input_id not in vjoy[act.vjoy_device_id][type_name]:
                 continue

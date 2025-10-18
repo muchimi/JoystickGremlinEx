@@ -15,8 +15,24 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T81)
-- Fix: OSC - repeater incorrect on new OSC entry
-- Fix: OSC - repeater not updating reliably for OSC axis or button input
+- New: OSC - new global option to set default autorelease delay for OSC triggers
+- New: OSC - new global option to set autorelease mode on OSC messages with no parameters. This treats messages with no parameters/arguments as a button trigger.
+- New: OSC - improved warning messages in the log file when input data is incompatible with the configuration of the OSC input.  Review the log file if nothing happens when you get an OSC message.  Remember to enable OSC verbose mode to see what messages are being received to identify any OSC configuration issues on the network.
+- New: MACRO - toggle option added to joystick buttons.  This action will flip the button state.
+- New: MACRO - new joystick selection dialog and listen button.
+- Improved: MACRO - Macro UI layout.
+- Improved: Documentation updates for OSC usage.
+- Improved: VJOY reworked tracking of VJOY devices including unavailable/disconnected devices to prevent exceptions if a profile reference a non existing vjoy device or if there are issues with the VJOY configuration.
+- Improved: VJOY REMAP: will display disconnected or unavailable VJOY devices referenced in the profile even if the VJOY device is not available. 
+- Improved: performance improvement on vjoy device lookup.
+- Fix: OSC - QT garbage collection error handling in OSC UI elements.
+- Fix: OSC - Invalid key exception on OSC client close (profile stop/exit).
+- Fix: OSC - button repeater state incorrect on new OSC entry
+- Fix: OSC - button repeater not updating reliably on message receipt.
+- Fix: EVENT - serialization of events could fail as Python can't handle some data types.
+- Fix: MACRO - action entry does not have a device GUID.
+- Fix: VJOY REMAP / legacy REMAP: check for vjoy connected before reading or sending data to runtime exceptions if VJOY config has changed.
+- Profile version change 15 -> 16 to account for new button options in macro actions.
 
 
 

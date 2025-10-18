@@ -1266,6 +1266,38 @@ A typical OSC command will thus be /my_command_1, number  where number is:
 | zero    | Button release |
 | non-zero    | Button press |
 
+### OSC Message Requirements
+
+GremlinEx can accept any OSC message, with or without parameters.
+
+| Example OSC Message  | Parameter | GremlinEx OSC Input Mode | Description |
+| ----------- | ----------- | ----------- | ----------- |
+| /set_speed  | 0.0 to 1.0   | Axis |  Axis mapping -1 to +1 |
+| /toggle_lights  | 0 or 1   | Button | Trigger a momentary input with 1 being the press event, and 0 being the release event.  Any non zero value will be considered to be a "press". |
+| /toggle_gear  | none   | Button | Requires autorelease enabled. Trigger a "press" when the message is received.  GremlinEx automatically generates a "release" event after the delay has lapsed. |
+| /flight/trim_set  | 0.0 to 1.0   | Axis |  Axis mapping -1 to +1 |
+
+
+Messages must start with a forward slash.
+
+A message can be interpreted as an axis if the first parameter provided is a floating point value, usually 0.0 (min) to 1.0 (max) which matches most OSC control surface defaults for faders and sliders.
+
+Messages for button control should also have a numeric parameter.  A value of 0.0 (or 0 for integer data) means released.  A non-zero value means pressed.
+
+If a message has no parameters, and the OSC input in GremlinEx can be setup to auto-release on message receipt.  In this situation, GremlinEx treats the receipt of the message as a "press" trigger for the button, and it will automatically generate a "release" trigger after a delay has lapsed.  This enables GremlinEx to use OSC input with no parameters.
+
+If the message has no parameters, a global option can be set in OSC options to automatically consider all messages with no parameters as trigger buttons, without the need to enable the autorelease mode on the button.
+
+Warnings will be placed in the log file if an OSC message arrives that is not suitable for the current GremlinEx input configuration and options selected.  For example, an input set to Axis mode when the message has no parameters.  In these situations, GremlinEx will just issue a warning in the log file and ignore the input.
+
+### OSC Mode Considerations
+
+| GremlinEx OSC input mode    | Description |
+| ----------- | ----------- |
+| Axis    | The input will look like an axis to actions and containers with an input range of -1.0 to +1.0.  The first argument in the received OSC message be in a range 0.0 to 1.0. |
+| Button | The input will look like a button to actions and containers.  The first argument (integer or floating point) should be 0 for "released", and non zero for "pressed". |
+| Button (autorelease) | The input will look like a button to actions and containers. GremlinEx will issue a "press" even on message receipt, and generate an automatic "release" when the delay has lapsed. |
+
 
 ## States
 

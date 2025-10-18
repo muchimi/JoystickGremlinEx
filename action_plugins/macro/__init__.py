@@ -417,6 +417,8 @@ class MacroActionEditor(QtWidgets.QWidget):
         if action is None:
             return
         
+        virtual_only = isinstance(action, gremlin.macro.VJoyMacroAction)
+
         self.ui_elements["input_label"] = QtWidgets.QLabel("Input")
         self.ui_elements["input_button"] = gremlin.ui.ui_common.NoKeyboardPushButton("Select...")
         self.ui_elements["input_button"].setToolTip("Select the output device")
@@ -425,7 +427,7 @@ class MacroActionEditor(QtWidgets.QWidget):
                 InputType.JoystickAxis,
                 InputType.JoystickButton,
                 InputType.JoystickHat
-            ])
+            ], virtual_only)
         )
 
         self._create_joystick_inputs_ui(action)
@@ -449,6 +451,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         )
         self.ui_elements["key_press"] = QtWidgets.QRadioButton("Press")
         self.ui_elements["key_release"] = QtWidgets.QRadioButton("Release")
+        
         if action.is_pressed:
             self.ui_elements["key_press"].setChecked(True)
         else:
@@ -779,24 +782,30 @@ class MacroActionEditor(QtWidgets.QWidget):
 
             elif action.input_type == InputType.JoystickButton:
                 if not "button_press" in self.ui_elements.keys():
-                    self.ui_elements["button_press"] = QtWidgets.QRadioButton("Press")
-                    self.ui_elements["button_release"] = QtWidgets.QRadioButton("Release")
-                    if action.value:
-                        self.ui_elements["button_press"].setChecked(True)
-                    else:
-                        self.ui_elements["button_release"].setChecked(True)
-
-                    self.ui_elements["button_press"].toggled.connect(
-                        self._modify_button_state
-                    )
-                    self.ui_elements["button_release"].toggled.connect(
-                        self._modify_button_state
-                    )
+                    self.ui_elements["button_press"] = gremlin.ui.ui_common.QDataRadioButton("Press", data = "press", callback = self._modify_button_state)
+                    self.ui_elements["button_release"] = gremlin.ui.ui_common.QDataRadioButton("Release", data = "release", callback = self._modify_button_state)
+                    self.ui_elements["button_toggle"] = gremlin.ui.ui_common.QDataRadioButton("Toggle", data = "toggle", callback = self._modify_button_state)
+                    if isinstance(action.value, bool):
+                        action.value = "press" if action.value else "release"
+                    
+                    match action.value:
+                        case "press":
+                            self.ui_elements["button_press"].setChecked(True)
+                        case "release":
+                            self.ui_elements["button_release"].setChecked(True)
+                        case "toggle":
+                            self.ui_elements["button_toggle"].setChecked(True)
+                        case _:
+                            # default if changing from a different value type
+                            action.value = "press"
+                            self.ui_elements["button_press"].setChecked(True)
 
                     widget = QtWidgets.QLabel(f"{device.name} Button [{action.input_id}]")
                     self.action_layout.addWidget(widget)
                     self.action_layout.addWidget(self.ui_elements["button_press"])
                     self.action_layout.addWidget(self.ui_elements["button_release"])
+                    self.action_layout.addWidget(self.ui_elements["button_toggle"])
+
 
             elif action.input_type == InputType.JoystickHat:
                 if not "hat_direction" in self.ui_elements.keys():
@@ -935,8 +944,9 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     @QtCore.Slot(bool)
     def _modify_button_state(self, state):
+        widget = self.sender()
         action = self.model.get_entry(self.index.row())
-        action.value = self.ui_elements["button_press"].isChecked()
+        action.value = widget.data
         self._update_model()
 
     @QtCore.Slot(bool)
@@ -1013,19 +1023,19 @@ class MacroActionEditor(QtWidgets.QWidget):
         """Forces an update of the model at the current index."""
         self.model.update(self.index)
 
-    def _request_user_input(self, input_types):
+    def _request_user_input(self, input_types, virtual_only = False):
         """Prompts the user for the input to bind to this item."""
         from gremlin.ui.virtual_keyboard import InputKeyboardDialog
         import gremlin.joystick_handling
         import gremlin.ui.ui_common
 
-        if InputType.Keyboard in input_types:
-            callback = self._modify_key
-        elif InputType.Mouse in input_types:
-            callback = self._modify_mouse
-        else:
-            # joystick input
-            callback = self._modify_joystick
+        # if InputType.Keyboard in input_types:
+        #     callback = self._modify_key
+        # elif InputType.Mouse in input_types:
+        #     callback = self._modify_mouse
+        # else:
+        #     # joystick input
+        #     callback = self._modify_joystick
 
         if InputType.Keyboard in input_types:
             dialog = InputKeyboardDialog(parent = self, select_single=True, index = -1)
@@ -1040,40 +1050,23 @@ class MacroActionEditor(QtWidgets.QWidget):
             dev = gremlin.joystick_handling.device_info_from_guid(device_id) if device_id else None
             input_type = config.macro_last_input_type if dev else None
             input_id = config.macro_last_input_id if dev else None
-                
+            
+
 
             dialog = gremlin.ui.ui_common.QJoystickSelectorDialog(
                 default_device = dev,
                 default_input_type = input_type,
                 default_input_id = input_id,
-                virtual_only = True
+                virtual_only = virtual_only
                 )
             
             dialog.dialog_closed.connect(self._handle_input_selected)
 
-            # dialog = gremlin.ui.ui_common.InputListenerWidget(
-            #     event_types = input_types,
-            #     return_kb_event=True
-            # )
-
-            # dialog.keyInput.connect(callback)
 
             self.button_press_dialog = dialog
             dialog.exec()
 
-            # # Display the dialog centered in the middle of the UI
-            # root = self
-            # while root.parent():
-            #     root = root.parent()
-            # geom = root.geometry()
-
-            # self.button_press_dialog.setGeometry(
-            #     int(geom.x() + geom.width() / 2 - 150),
-            #     int(geom.y() + geom.height() / 2 - 75),
-            #     300,
-            #     150
-            # )
-            # self.button_press_dialog.show()
+        
 
     def _handle_input_selected(self, dialog):
         ''' occurs when macro input selection is made '''
@@ -2294,9 +2287,10 @@ To send complex sequences, please look at the sequence container.'''
 
         action_list = ElementTree.Element("actions")
         for entry in self.sequence:
-            if not entry.device_guid:
-                continue
+
             if isinstance(entry, gremlin.macro.JoystickAction):
+                if not entry.device_guid:
+                    continue
                 joy_node = ElementTree.Element("joystick")
                 joy_node.set("device-guid", write_guid(entry.device_guid))
                 joy_node.set(
@@ -2374,7 +2368,7 @@ To send complex sequences, please look at the sequence container.'''
         if action.input_type == InputType.JoystickAxis:
             action.value = float(action.value)
         elif action.input_type == InputType.JoystickButton:
-            action.value = gremlin.profile.parse_bool(action.value)
+            pass # use as-is
         elif action.input_type == InputType.JoystickHat:
             action.value = gremlin.util.hat_direction_to_tuple(action.value)
 

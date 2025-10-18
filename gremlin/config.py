@@ -1463,6 +1463,25 @@ class Configuration(QtCore.QObject):
         self.save()
 
     @property
+    def osc_no_arg_autorelease(self) -> bool:
+        ''' if set, OSC input is set to autorelease if no args are present in the packet '''
+        return self._get_data("osc_no_arg_autorelease", True)
+    @osc_no_arg_autorelease.setter
+    def osc_no_arg_autorelease(self, value : bool):
+        self._set_data["osc_no_arg_autorelease", value]
+
+    @property
+    def osc_default_autorelease_delay(self) -> float:
+        ''' autorelease delay in seconds'''        
+        return self._get_data("osc_default_autorelease_delay", 0.25)
+    @osc_default_autorelease_delay.setter
+    def osc_default_autorelease_delay(self, value : float):
+        if value >= 0:
+            self._set_data("osc_default_autorelease_delay", value)
+    
+
+
+    @property
     def show_scancodes(self):
         ''' hide/show scan codes for keyboard related inputs '''
         return self._get_data("show_scancodes", False)

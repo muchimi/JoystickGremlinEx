@@ -197,7 +197,7 @@ class Axis:
 
         # If this is not the case our value setter needs to change
         if self._min_value != 0:
-            raise VJoyError(
+            syslog.error(
                 f"vJoy axis minimum value is not 0  - {_error_string(self.vjoy_id, self.axis_id, self._min_value)}")
 
     def set_response_curve(self, spline_type, control_points):
@@ -277,8 +277,7 @@ class Axis:
                 self.vjoy_id,
                 self.axis_id
         ):
-            from gremlin.util import log_sys_warn
-            log_sys_warn(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
+            syslog.error(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
 
 
         self.vjoy_dev.used()
@@ -308,7 +307,7 @@ class Axis:
                 self.vjoy_id,
                 self.axis_id
         ):
-            raise VJoyError(
+            syslog.error(
                 f"Failed setting axis value - { _error_string(self.vjoy_id, self.axis_id, self._value)}"
             )
         self.vjoy_dev.used()
@@ -358,7 +357,6 @@ class Button:
 
         self.vjoy_dev.ensure_ownership()
         self._is_pressed = is_pressed
-        vjoy_id = self.vjoy_id
         if not VJoyInterface.SetBtn(
                 self._is_pressed,
                 self.vjoy_id,
@@ -542,7 +540,7 @@ class Hat:
         elif self.hat_type == HatType.Continuous:
             self._set_continuous_direction(direction)
         else:
-            raise VJoyError(
+            syslog.error(
                 f"Invalid hat type specified - {_error_string(self.vjoy_id, self.hat_id, self.direction)}")
         self.vjoy_dev.used()
 
@@ -689,7 +687,7 @@ class VJoy:
                 retry_count -= 1
                 time.sleep(0.01)
                     
-            syslog.error(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
+            syslog.error(f"VJOY API: Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             #raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             return
         
@@ -753,18 +751,18 @@ class VJoy:
         if axis_id is not None:
             axis_id = VJoy.axis_equivalence.get(axis_id, axis_id)
             if not self.is_axis_valid(axis_id=axis_id):
-                raise VJoyError(
-                    f"Invalid axis index requested - {_error_string(self.vjoy_id, axis_id, "")}"
+                syslog.error(
+                    f"VJOY API: Invalid axis index requested - {_error_string(self.vjoy_id, axis_id, "")}"
                 )
             return self._axis_names[axis_id]
         elif linear_index is not None:
             if not self.is_axis_valid(linear_index=linear_index):
-                raise VJoyError(
-                    f"Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, "")}"
+                syslog.error(
+                    f"VJOY API:Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, "")}"
                 )
             return self._axis_names[self._axis_lookup[linear_index]]
         else:
-            raise VJoyError("No vjoy_id or linear_index provided")
+            syslog.error("VJOY API:No vjoy_id or linear_index provided")
 
     def axis_id(self, linear_index):
         """Returns the absolute axis id corresponding to the relative one.
@@ -773,8 +771,8 @@ class VJoy:
         :return absolute id of the axis
         """
         if not self.is_axis_valid(linear_index=linear_index):
-            raise VJoyError(
-                f"Invalid linear index for axis lookup provided - ensure VJOY settings are correct and reflected in the profile mapping:  {_error_string(self.vjoy_id, linear_index, "")}"
+            syslog.error(
+                f"VJOY API:Invalid linear index for axis lookup provided - ensure VJOY settings are correct and reflected in the profile mapping:  {_error_string(self.vjoy_id, linear_index, "")}"
             )
 
         return self._axis_lookup[linear_index]
@@ -789,18 +787,21 @@ class VJoy:
         if axis_id is not None:
             axis_id = VJoy.axis_equivalence.get(axis_id, axis_id)
             if not self.is_axis_valid(axis_id=axis_id):
-                raise VJoyError(
-                    f"Invalid axis index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, axis_id, "")}"
+                syslog.error(
+                    f"VJOY API:Invalid axis index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, axis_id, "")}"
                 )
+                return None
             return self._axis[axis_id]
         elif linear_index is not None:
             if not self.is_axis_valid(linear_index=linear_index):
-                raise VJoyError(
-                    f"Invalid linear index for axis lookup provided - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, linear_index, "")}"
+                syslog.error(
+                    f"VJOY API:Invalid linear index for axis lookup provided - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, linear_index, "")}"
                 )
+                return None
             return self._axis[self._axis_lookup[linear_index]]
         else:
-            raise VJoyError("No vjoy_id or linear_index provided")
+            syslog.error("VJOY API:No vjoy_id or linear_index provided")
+            return None
 
     def button(self, index):
         """Returns the axis object associated with the provided index.
@@ -809,9 +810,10 @@ class VJoy:
         :return Button object corresponding to the provided index
         """
         if index not in self._button:
-            raise VJoyError(
-                f"Invalid button index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, index, "")}"
+            syslog.error(
+                f"VJOY API:Invalid button index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, index, "")}"
             )
+            return None
         return self._button[index]
 
     def hat(self, index):
@@ -821,9 +823,10 @@ class VJoy:
         :return Hat object corresponding to the provided index
         """
         if index not in self._hat:
-            raise VJoyError(
-                f"Invalid hat index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, index, "")}"
+            syslog.error (
+                f"VJOY API:Invalid hat index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, index, "")}"
             )
+            return None
         return self._hat[index]
 
     def is_axis_valid(self, axis_id=None, linear_index=None):

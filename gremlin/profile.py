@@ -129,7 +129,8 @@ class ProfileConverter:
             12: self._convert_from_v12,
             13: self._convert_from_v13,
             14: self._convert_from_v14,
-            15: None,
+            15: self._convert_from_v15,
+            16: None,
         }
 
         # Create a backup of the outdated profile
@@ -987,22 +988,6 @@ class ProfileConverter:
         if nodes:
             # exists already
             return root # no changes 
-        
-            # # verify the master mode exists
-            # mode_root = nodes[0]
-            # nodes = root.xpath("//profile/modes/mode")
-            # for node_mode in nodes:
-            #     mode_name = node_mode.get("name")
-            #     mode_object = gremlin.base_profile.ModeNode()
-            #     mode_object.name = mode_name
-            #     if not mode_name in mode_map:
-            #         if "inherit" in node_mode.attrib:
-            #             parent_mode_name = node_mode.get("inherit")
-            #             mode_object.parent_name = parent_mode_name
-
-            # # remove the node
-            # root.remove(mode_root)
-
     
         # create
         mode_root = etree.Element("modes")
@@ -1041,7 +1026,26 @@ class ProfileConverter:
 
         return root
 
+    def _convert_from_v15(self, root, fname = None):
+        ''' convert from V15 to V16 - convert macro button values from boolean to the new set to support toggle '''
+        import gremlin.util
+        root.attrib["version"] = "16" # change version
 
+        # change value for button macro actions from boolean to actual action names
+        nodes = root.xpath("//macro/actions/vjoy[@input-type='button']")
+        for node in nodes:
+            value = safe_read(node, "value", "")
+            new_value = None
+            match value.casefold():
+                case "true":
+                    new_value = "press"
+                case "false":
+                    new_value = "release"
+            if new_value:
+                node.set("value", new_value)
+
+        return root
+            
     
     def _p3_extract_map_to_keyboard(self, input_item):
         """Converts an old macro setup to a map to keyboard action.

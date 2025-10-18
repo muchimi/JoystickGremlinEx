@@ -559,21 +559,23 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         result = msgbox.show()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             positions = self.action_data.hat_positions
-            dev = self.action_data.vjoy_map[self.action_data.vjoy_device_id]
-            button_count = dev.button_count
-            for index, position in enumerate(positions):
-                if index == 0:
-                    button_id = self.action_data.hat_map[position]
-                    if button_id == 0:
-                        # default if first button is not set
+            vjoy_id = self.action_data.vjoy_device_id
+            if vjoy_id in self.action_data:
+                dev = self.action_data.vjoy_map[vjoy_id]
+                button_count = dev.button_count
+                for index, position in enumerate(positions):
+                    if index == 0:
+                        button_id = self.action_data.hat_map[position]
+                        if button_id == 0:
+                            # default if first button is not set
+                            button_id = 1
+
+                    self.action_data.hat_map[position] = button_id
+
+                    button_id += 1
+                    if button_id > button_count:
+                        # wrap around
                         button_id = 1
-
-                self.action_data.hat_map[position] = button_id
-
-                button_id += 1
-                if button_id > button_count:
-                    # wrap around
-                    button_id = 1
 
             self._update_hat_mapping()
 

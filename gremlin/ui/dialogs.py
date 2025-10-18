@@ -1367,9 +1367,6 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         page_layout.addWidget(column_widget)
 
         
-        
-
-
         self.osc_enabled = QtWidgets.QCheckBox("Enable OSC")
         self.osc_enabled.clicked.connect(self._osc_enabled)
         self.osc_enabled.setChecked(self.config.osc_enabled)
@@ -1405,8 +1402,16 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         remote_host_ip_widget.setMinimumWidth(w)
         remote_host_ip_widget.setMaximumWidth(w)
 
+        self.osc_no_args_autorelease_widget = QtWidgets.QCheckBox("Autorelease on no arg messages")
+        self.osc_no_args_autorelease_widget.setChecked(self.config.osc_no_arg_autorelease)
+        self.osc_no_args_autorelease_widget.setToolTip("If set, inbound OSC messages with no parameter will be considered as an input trigger that auto-releases")
+        self.osc_no_args_autorelease_widget.clicked.connect(self._handle_osc_no_arg_autorelease_changed)
 
-
+        self.osc_autorelease_delay_widget = ui_common.QDelayWidget(self.config.osc_default_autorelease_delay * 1000,
+                                                                   callback = self._handle_osc_autorelease_delay_changed,
+                                                                   label="Default Autorelease Delay:"
+                                                                   )
+        self.osc_autorelease_delay_widget.setToolTip("Default OSC autorelease")
 
 
         # midi enabled
@@ -1491,6 +1496,12 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         row +=1 
         col = 0
         layout.addWidget(self.osc_pad_arg_widget, row, col, 1, -1)
+        row +=1 
+        col = 0
+        layout.addWidget(self.osc_no_args_autorelease_widget, row, col, 1, -1)
+        row +=1 
+        col = 0
+        layout.addWidget(self.osc_autorelease_delay_widget, row, col, 1, -1)
 
         
         layout.setColumnStretch(stretch_col,2)
@@ -1533,6 +1544,14 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "OSC/MIDI")
+
+
+    @QtCore.Slot(bool)
+    def _handle_osc_no_arg_autorelease_changed(self, checked : bool):
+        self.config.osc_no_arg_autorelease = checked
+
+    def _handle_osc_autorelease_delay_changed(self, value):
+        self.config.osc_default_autorelease_delay = value / 1000 # to seconds
 
 
     @QtCore.Slot()

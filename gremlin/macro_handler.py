@@ -51,10 +51,21 @@ class MacroListModel(QtCore.QAbstractListModel):
         InputType.JoystickAxis:
             lambda entry: f"{entry.value:.3f}",
         InputType.JoystickButton:
-            lambda entry: "pressed" if entry.value else "released",
+            lambda entry: MacroListModel._get_button_value(entry.value),
         InputType.JoystickHat:
             lambda entry: MacroListModel._get_hat_value(entry.value)
     }
+
+    @staticmethod
+    def _get_button_value(value):
+        match value:
+            case "press":
+                return "Press"
+            case "release":
+                return "Release"
+            case "toggle":
+                return "Toggle"
+        return f"?? {value}"
 
     @staticmethod
     def _get_hat_value(value):

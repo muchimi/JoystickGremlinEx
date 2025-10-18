@@ -872,6 +872,8 @@ class JoystickAction(MacroAbstractAction):
         self.device_guid = device_guid
         self.input_type = input_type
         self.input_id = input_id
+        if isinstance(value, bool):
+            value = "pressed" if value else "release"
         self.value = value
         self.axis_type = axis_type
 
@@ -897,6 +899,7 @@ class JoystickAction(MacroAbstractAction):
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         """Emits an Event instance through the EventListener system."""
+        import gremlin.joystick_handling
         el = gremlin.event_handler.EventListener()
         if self.input_type == InputType.JoystickAxis:
             event = gremlin.event_handler.Event(
@@ -907,11 +910,25 @@ class JoystickAction(MacroAbstractAction):
                 force_remote = force_remote
             )
         elif self.input_type == InputType.JoystickButton:
+
+            match self.value:
+                case "toggle":
+                    current = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
+                    if current is not None:
+                        is_pressed = not current
+                case "press":
+                    is_pressed = True
+                case "release":
+                    is_pressed = False
+                case _:
+                    syslog.error(f"VJOY MACRO ACTION: don't know how to handle button mode: [{self.value}]")
+                    return # nothing to do
+                
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
                 identifier=self.input_id,
-                is_pressed=self.value,
+                is_pressed= is_pressed,
                 force_remote = force_remote
             )
         elif self.input_type == InputType.JoystickHat:
@@ -1270,9 +1287,20 @@ class VJoyMacroAction(MacroAbstractAction):
         elif self.input_type == InputType.JoystickButton:
             if is_local:
                 if verbose: syslog.info(f"MACRO: vjoy {self.vjoy_id} button: {self.input_id} press: {self.value}")
-                vjoy.button(self.input_id).is_pressed = self.value
+                match self.value:
+                    case "press":
+                        is_pressed = True
+                    case "release":
+                        is_pressed = False
+                    case "toggle":
+                        is_pressed = not vjoy.button(self.input_id).is_pressed
+                    case _:
+                        syslog.error(f"VJOY MACRO BUTTON ACTION: don't know how to handle: [{self.value}]")
+                        return
+
+            vjoy.button(self.input_id).is_pressed = is_pressed
             if is_remote:
-                gremlin.input_devices.remote_client.send_button(self.vjoy_id, self.input_id, self.value, force_remote)
+                gremlin.input_devices.remote_client.send_button(self.vjoy_id, self.input_id, is_pressed, force_remote)
         elif self.input_type == InputType.JoystickHat:
             if is_local:
                 vjoy.hat(self.input_id).direction = self.value

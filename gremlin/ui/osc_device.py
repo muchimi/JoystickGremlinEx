@@ -2048,15 +2048,16 @@ class OscInterface(QtCore.QObject):
         ''' removes a client from the pool '''
 
         key = (client._server_ip, client._output_port)    
-        if key in self._client_map:
-            if not key in self._client_map:
-                self._client_map[key] = []
-            if client_id in self._client_map[key]:
-                self._client_map[key].remove(client_id)
-        
+        if not key in self._client_map:
+            self._client_map[key] = []
+            
+        if client_id in self._client_map[key]:
+            self._client_map[key].remove(client_id)
+    
         if self._client_map[key]:
             # client is still used
             return 
+        
         if client is not None:
             
             if key in self._client_pool:
@@ -2067,7 +2068,7 @@ class OscInterface(QtCore.QObject):
                     syslog.info(f"OSC: unregister client {key}")
                 del self._client_pool[key]
 
-    
+        
     def stopClients(self):
         ''' stops all registered clients '''
         for client in self._client_pool.values():
@@ -2217,7 +2218,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
 
     def __init__(self, parent = None):
         super().__init__(parent=parent) # parent is the mode object this input belongs to
-        self.verbose = gremlin.config.Configuration().verbose_mode_osc
+        config = gremlin.config.Configuration()
+        self.verbose = config.verbose_mode_osc
         self._message = None # the OSC message command
         self._message_data = None # the list of values associated with that command
         self._message_data_string = None # the string representation of the data args
@@ -2233,8 +2235,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         self.setMessageKey(self._guid)
         self._min_range = 0.0
         self._max_range = 1.0 
-        self._autorelease = False # true if auto-release
-        self._autorelease_delay = 250 # default release delay
+        self._autorelease = None # not set
+        self._autorelease_delay = int(config.osc_default_autorelease_delay * 1000) # default release delay in milliseconds
         self._profile_mode = gremlin.shared_state.edit_mode
         self._autorelease_timer = None # autorelease timer for this input 
       
@@ -2558,6 +2560,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
             if self.verbose: syslog.info(f"OSC: xml source index: {self._source_index}")
             if "autorelease" in node.attrib:
                 self._autorelease = safe_read(node,"autorelease", bool, False)
+            else:
+                self._autorelease = None # not set
             if "autorelease_delay" in node.attrib:
                 self._autorelease_delay = safe_read(node,"autorelease_delay", int, 250)
 
@@ -2578,7 +2582,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         node.set("min", str(self._min_range))
         node.set("max", str(self._max_range))
         node.set("source_index", safe_format(self._source_index, int))
-        node.set("autorelease", str(self._autorelease))
+        if self._autorelease is not None:
+            node.set("autorelease", str(self._autorelease))
         node.set("autorelease_delay", str(self._autorelease_delay))
         return node
           
@@ -3191,7 +3196,9 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
     def _set_parameter(self, index, value):
         ''' sets a data parameter - if the index does not exist, it's created '''
-
+        if not Shiboken.isValid(self):
+            return
+        
         if not index in self._data_widgets:
             widget = gremlin.ui.ui_common.QDataLineEdit()
             widget.setReadOnly(True)
@@ -3227,6 +3234,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
     def _clear_parameters(self):
         ''' clears paramters UI '''
+        if not Shiboken.isValid(self):
+            return
         for index in self._data_widgets.keys():
             self._label_widgets[index].setVisible(False)
             self._select_widgets[index].setVisible(False)
@@ -3234,6 +3243,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
 
     def _update_parameters_from_command(self):
+        if not Shiboken.isValid(self):
+            return
         self._clear_parameters()
         for index, value in enumerate(self._command_data):
             self._set_parameter(index, value)
@@ -3251,6 +3262,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         parameters_visible = True
         range_visible = False
         delay_enabled = False
+        # config = gremlin.config.Configuration()
+
         if self._mode == OscInputItem.InputMode.Button:
             if self._autorelease:
                 msg = f"The input will trigger a press action when a message is received, followed by a release when the delay has lapsed.<br>Use This mode to trigger a button press/release when an OSC message arrives."    
@@ -4330,6 +4343,7 @@ class InputOscClient(QtCore.QObject):
         from gremlin.ui.osc_device import OscInputItem, OscDeviceTabWidget
         from gremlin.input_types import InputType
         # get the input items behind this message
+        config = gremlin.config.Configuration()
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         current_mode = gremlin.shared_state.current_mode
         cache = tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
@@ -4380,6 +4394,11 @@ class InputOscClient(QtCore.QObject):
                     is_pressed = False
                     is_axis = True
                     # update the current axis value for the input
+
+                    if len(args) == 0:
+                        # axis mode always requires at least a value parameter
+                        syslog.warning(f"OSC: no parameters received on OSC message for input set in axis mode.  Check mode and parameters for OSC input message [{input_item.message}]")
+                        continue
                     
                     event = gremlin.event_handler.Event(
                         event_type = InputType.OpenSoundControl,
@@ -4403,60 +4422,40 @@ class InputOscClient(QtCore.QObject):
                         continue
 
                 elif input_item.mode == OscInputItem.InputMode.OnChange:
+                    if len(args) == 0:
+                        # axis mode always requires at least a value parameter
+                        syslog.warning(f"OSC: no parameters received on OSC message for input set to change mode.  Check mode and parameters for OSC input message [{input_item.message}]")
+                        continue
                     is_pressed = True
                     value = raw_value
 
                 elif input_item.mode == OscInputItem.InputMode.Button:
                     # trigger a button press event
                     autorelease = input_item._autorelease
-                    if len(args) == 0:
-                        syslog.warning(f"Autorelease not set on OSC no param button.  Thay may cause no trigger.  Check mode for [{input_item.message}]")
-                        autorelease = True
-                        is_pressed = True
+                    
+                    if len(args) == 0 and not autorelease:
+                        if config.osc_no_arg_autorelease:
+                            # automatic autorelease mode for buttons on input with no args
+                            autorelease = True
+                            is_pressed = True
+
+                        else:
+                            syslog.warning(f"Autorelease not set on OSC no param button.  Thay may cause no trigger.  Check mode for [{input_item.message}]")
+                            autorelease = False
+                            is_pressed = True
                     else:
+                        # first argument is pressed if non zero
                         is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
 
                     value = 1 if is_pressed else 0
                     
                     input_item.setButtonValue(is_pressed)
-                    #extra_data = {"autorelease": autorelease} # set autorelease mode
-                    
-          
-                    
-
-                    # if not is_running:
-                    #     #event.event_type = InputType.OpenSoundControl
-                    #     event = gremlin.event_handler.Event(
-                    #         event_type = input_type,
-                    #         device_guid = OscDeviceTabWidget.device_guid,
-                    #         identifier = input_item,
-                    #         is_pressed = is_pressed,
-                    #         value = is_pressed,
-                    #         raw_value = is_pressed,
-                    #         data = index, # source index
-                    #         is_virtual = True, # indicate we are not a hardware input
-                    #         is_axis = False,
-                    #         override_input_type=InputType.JoystickButton,
-                    #         extra_data = extra_data
-                    #         )
-                    #     self._event_listener.button_state_change.emit(event)
-                    #     if autorelease:
-                    #         delay = input_item.autorelease_delay/1000 # ms to s
-                    #         release_event = event.clone()
-                    #         release_event.is_pressed = False
-                    #         release_event.value = 0
-                    #         timer = threading.Timer(delay, self._create_callback(input_item, release_event))
-                    #         input_item.autorelease_timer = timer # auto cancels the prior timer when the new value is set
-                    #         timer.start()
-
-
-                    #     continue
 
                     self._state_data[input_item.message_key] = is_pressed
 
                  
                     if self._verbose:
-                        syslog.info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
+                        syslog.info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis} mode: [{input_item.mode.name}]")
 
                     # button mode
                     event = gremlin.event_handler.Event(
