@@ -16,6 +16,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T81)
 - Fix: OSC - repeater incorrect on new OSC entry
+- Fix: OSC - repeater not updating reliably for OSC axis or button input
+
 
 
 ### (m76T80A)

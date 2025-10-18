@@ -587,15 +587,19 @@ class JoystickHook:
 
             if event.is_axis:
                 # axis input - get transforms
-                values = self._astate.getAxisValues(self._device_guid, self._input_id, event.value)
-                self._hook_value = values # event.value
+                if event.event_type == InputType.JoystickAxis:
+                    values = self._astate.getAxisValues(self._device_guid, self._input_id, event.value)
+                    self._hook_value = values # event.value
 
-                if self._calibrate:
-                    # get calibrated value
-                    calibrated = values.calibrated
-                    self._hook_calibrated_value = calibrated if calibrated is not None else values.actual
+                    if self._calibrate:
+                        # get calibrated value
+                        calibrated = values.calibrated
+                        self._hook_calibrated_value = calibrated if calibrated is not None else values.actual
+                    else:
+                        self._hook_calibrated_value = values.actual
                 else:
-                    self._hook_calibrated_value = values.actual
+                    self._hook_value = event.value
+                    
             else:
                 # button
                 self._hook_value = event.is_pressed
@@ -605,17 +609,18 @@ class JoystickHook:
             
             self._hook_callback(self._hook_value)
             
-            if self._is_state:
-                # see if we should trigger a highlight change
+            # if self._is_state:
+            if not gremlin.shared_state.is_running:
                 config = gremlin.config.Configuration()
                 if config.highlight_input_axis and config.highlight_enabled:
                     # ensure highlighting is enabled
+                    value = self._hook_value
                     
-                    trigger = self._last_state_value is None or abs(self._last_state_value - event.value) > 0.2
+                    trigger = self._last_state_value is None or abs(self._last_state_value - value) > 0.05
                     #device = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
                     #syslog.info(f"Device: {device.name} axis: {self._input_id} value: {event.value:0.3f} last value: {self._last_state_value}  trigger: {trigger}")
                     if trigger:
-                        self._last_state_value = event.value
+                        self._last_state_value = value
                         el = gremlin.event_handler.EventListener()
                         el.axis_state_change.emit(event)
 
