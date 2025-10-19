@@ -65,7 +65,7 @@ class ProfileConverter:
     """Handle converting and checking profiles."""
 
     # Current profile version number
-    current_version = 15
+    current_version = 16
 
     def __init__(self):
         pass
@@ -1030,6 +1030,8 @@ class ProfileConverter:
         ''' convert from V15 to V16 - convert macro button values from boolean to the new set to support toggle '''
         import gremlin.util
         root.attrib["version"] = "16" # change version
+
+        syslog.info("PROFILE CONVERT: V16")
 
         # change value for button macro actions from boolean to actual action names
         nodes = root.xpath("//macro/actions/vjoy[@input-type='button']")

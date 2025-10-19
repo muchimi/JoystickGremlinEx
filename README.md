@@ -14,9 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T82)
+- Fix: enable V16 profile conversions.
+- Fix: translate axis ID to DINPUT axis index for data read of axis data.
+
 ### (m76T81A)
 - New: VJOY REMAP gains an option to show/hide disconnected devices.  Note: if the device is referenced in the profile, it will override this setting and add the disconnected device to the list.
-- Fix: Axis names in UI may not pull the correct name/number if the input device has non sequential axis IDs
+- Fix: Axis names in UI may not pull the correct name/number if the input device has non sequential axis IDs.
 - Fix: QT garbage collection desync check in axis repeater
 
 

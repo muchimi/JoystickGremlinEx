@@ -1241,6 +1241,35 @@ class VJoyMacroAction(MacroAbstractAction):
         self.value = value
         self.axis_type = axis_type
 
+    @property
+    def value(self):
+        return self._value
+    @value.setter
+    def value(self, new_value):
+        if self.input_type == InputType.JoystickButton:
+            # convert boolean if provided
+            if isinstance(new_value, bool):
+                self._value = "press" if new_value else "release"
+                return
+            # handle case values
+            new_value = new_value.casefold()
+            match new_value:
+                case "press":
+                    self._value = "press"
+                case "release":
+                    self._value = "release"
+                case "true":
+                    self._value = "press"
+                case "false":
+                    self._value = "release"
+                case "toggle":
+                    self._value = "toggle"
+                case _:
+                    syslog.error(f"VJOY MACRO ACTION: don't know how to handle value: [{new_value}]")
+        else:
+            self._value = new_value
+        
+
         
     def __getstate__(self):
         ''' serialize '''
