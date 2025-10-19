@@ -3109,6 +3109,7 @@ class AxisData():
 		self.calibrated_value = None
 		self.curve_value = None
 
+
 	@property
 	def device(self) -> dinput.DeviceSummary:
 		import gremlin.joystick_handling
@@ -3135,7 +3136,7 @@ class AxisData():
 		if calibration and calibration.hasData:
 			return calibration
 		return None
-
+	
 	
 	def getAxisValues(self, value : float = None, action = None) -> AxisValues:
 		''' gets the axis value as an AxisValues named tuple
@@ -3223,10 +3224,12 @@ class AxisState():
 		self._last_axis_time = {} # time when last modified
 		self._delay = 0 # delay in seconds for filter - 0 = disabled
 		self._registered_devices = [] # guid of registered devices
+	
 
 		el = EventListener()
 		el.profile_unload.connect(self.reset)
 		el.profile_loaded.connect(self._update_inputs)
+
 
 
 	def reset(self):
@@ -3241,15 +3244,10 @@ class AxisState():
 		if profile:
 			self._update_inputs()
 
+
 	def _update_inputs(self):
 		''' reload all axes on profile load '''
-		# profile = gremlin.shared_state.current_profile
-		# for device_guid in profile.devices:
-		# 	for mode_name in profile.devices[device_guid].modes:
-		# 		mode_object = profile.devices[device_guid].modes[mode_name]
-		# 		for input_type in mode_object.config:
-		# 			for input_item in mode_object.config[input_type].values():
-		# 				self.registerAxisInputItem(input_item)
+		
 		import gremlin.joystick_handling
 		for device in gremlin.joystick_handling.getDevices():
 			if device.connected:

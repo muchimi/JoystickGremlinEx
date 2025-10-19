@@ -274,7 +274,7 @@ def get_axis_curve_data(guid, identifier):
     ''' gets the curve data for an axis '''   
 
 
-def get_curved_axis(guid, identifier):
+def get_curved_axis(guid, axis_id):
     ''' returns curved/calibrated data same as the event handler '''
     import gremlin.ui.osc_device
     import gremlin.ui.midi_device
@@ -287,17 +287,17 @@ def get_curved_axis(guid, identifier):
     device = get_device(guid)
     if not device.is_special:
         eh = gremlin.event_handler.EventListener()
-        value = dinput.DILL.get_axis(guid, identifier)
-        curved = eh.apply_transforms(guid, identifier, value)
+        value = dinput.DILL.get_axis(guid, axis_id)
+        curved = eh.apply_transforms(guid, axis_id, value)
         if verbose:
-            syslog.info(f"APPLY CURVE: {device.name} axis: [{identifier}] input: {value:0.3f} curved: {curved:0.3f}")
+            syslog.info(f"APPLY CURVE: {device.name} axis: [{axis_id}] input: {value:0.3f} curved: {curved:0.3f}")
         return curved
     
     else:
-        if device.device_type == DeviceType.Osc and isinstance(identifier, gremlin.ui.osc_device.OscInputItem) and identifier.is_axis:
+        if device.device_type == DeviceType.Osc and isinstance(axis_id, gremlin.ui.osc_device.OscInputItem) and axis_id.is_axis:
             osc = gremlin.ui.osc_device.InputOscClient()
             osc.start()
-            data = osc.getData(identifier.message) # gets data arguments or None if no data
+            data = osc.getData(axis_id.message) # gets data arguments or None if no data
             if data is None:
                 data = 0 # default is centered
             return data
@@ -305,7 +305,7 @@ def get_curved_axis(guid, identifier):
     return None
             
 
-def get_axis(guid, index, normalized = True):
+def get_axis(guid, index, normalized = True, translate = True):
     ''' gets the value of the specified axis
      
     :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
@@ -313,6 +313,10 @@ def get_axis(guid, index, normalized = True):
     '''
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
+    if translate:
+        dev = device_info_from_guid(guid)
+        if dev.device_type == DeviceType.Joystick and index in dev.axis_id_map:
+            index = dev.axis_id_map[index]
     if is_hardware_device(guid):
         value = dinput.DILL.get_axis(guid, index)
         if normalized:

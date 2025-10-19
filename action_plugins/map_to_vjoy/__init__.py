@@ -1457,26 +1457,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._relative_pulse_widget.setValue(self.action_data.relative_pulse_delay)
         self._relative_pulse_widget.valueChanged.connect(self._relative_pulse_value_changed)
 
-
-        # self._axis_start_value_enabled_widget = QtWidgets.QCheckBox("Start Value:")
-        # self._axis_start_value_enabled_widget.setChecked(self.action_data.axis_start_value_enabled)
-        # self._axis_start_value_enabled_widget.clicked.connect(self._axis_start_value_enabled)
-        # self._axis_start_value_enabled_widget.setToolTip("When set, sets the axis to the specified startup value on profile start.\nIf not set, uses the current axis input value on start.")
-        
-
-
-        #self.sb_start_value = gremlin.ui.ui_common.QFloatLineEdit(parent = self.container_axis_widget)
-        # w = 100
-        # self.set_width(self.sb_start_value,w)
-        # self.sb_start_value.setMinimum(-1.0)
-        # self.sb_start_value.setMaximum(1.0)
-        # self.sb_start_value.setDecimals(3)
-
-        # self.sync_on_start_widget = QtWidgets.QCheckBox("Sync on start")
-        # self.sync_on_start_widget.setToolTip("On profile start, reads the input axis to synchronize with output.")
-        # self.sync_on_start_widget.setChecked(self.action_data.sync_on_start)
-        # self.sync_on_start_widget.clicked.connect(self._sync_on_start_changed)
-
         self.relative_scaling_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.relative_scaling_widget.setMinimum(0)
         self.relative_scaling_widget.setMaximum(1000.0)
@@ -1493,18 +1473,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_output_mode_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Output mode:", min_height = self.container_height)
         self.main_layout.addWidget(self.container_output_mode_widget)
 
-        # # absolute mode options
-        # self.container_absolute_widget, _ = gremlin.ui.ui_common.getHContainer(min_height = self.container_height)
-        # self.main_layout.addWidget(self.container_absolute_widget)
-
-        # widgets = [
-        #     self._axis_start_value_enabled_widget,
-        #     self.sb_start_value,
-        # ]
-
-        # self.container_start_value_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height)
-        # self.main_layout.addWidget(self.container_start_value_widget)
-
+     
         # relative mode options
         widgets = [
             "Min:",
@@ -4058,10 +4027,15 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 case VjoyAction.VJoyAxis:
                     # straight axis
 
+                    input_id = self.action_data.hardware_input_id
+                    if verbose:
+                        device = gremlin.joystick_handling.device_info_from_guid(self.hardware_device_guid)
+                        
+                        device_stub = f"{device.name} input: {self.action_data.input_type.name} input id: {input_id}"
 
                     # straight axis
                     raw_input_type = self.action_data.hardware_raw_input_type
-                    input_id = self.action_data.hardware_input_id
+                    
 
                     
                     astate = gremlin.event_handler.AxisState()
@@ -4082,7 +4056,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     
                     trigger = False
 
-                    if self.verbose: vjoy_stub = f"VJOY REMAP: sync mode: [{self.action_data.sync_mode.name}] set start value:"
+                    if verbose: vjoy_stub = f"sync mode: [{self.action_data.sync_mode.name}] set start value for vjoy axis: {self.vjoy_input_id}"
                     match self.action_data.sync_mode:
                         case SyncMode.Default:
                             trigger = True
@@ -4090,25 +4064,25 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             value = self.action_data.axis_start_value
                         case SyncMode.Input:
                             trigger = True
-                            if self.verbose: syslog.info(f"{vjoy_stub} input : {value:0.3f}")
+                            if self.verbose: syslog.info(f"VJOY REMAP SYNC: {device_stub} {vjoy_stub} input : {value:0.3f}")
                             value = value
                         case SyncMode.LastOrInput:
                             trigger = True
                             last = self.action_data.axis_last_value
                             if last is None:
-                                if self.verbose: syslog.info(f"{vjoy_stub} last or input : use input value : {value:0.3f}")
+                                if self.verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use input value : {value:0.3f}")
                             else:
-                                if self.verbose: syslog.info(f"{vjoy_stub} last or input : use last value : {last:0.3f}")
+                                if self.verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use last value : {last:0.3f}")
                                 value = last
                         case SyncMode.LastOrDefault:
                             trigger = True
                             last = self.action_data.button_last_value
                             if last is None:
                                 value = self.action_data.state.default_value
-                                if self.verbose: syslog.info(f"{vjoy_stub} last or input : use default value : {value}")
+                                if self.verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use default value : {value}")
                                 
                             else:
-                                if self.verbose: syslog.info(f"{vjoy_stub} last or default: use last value : {last}")
+                                if self.verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or default: use last value : {last}")
                                 value = last
                         case SyncMode.Ignore:
                             pass # do nothing
