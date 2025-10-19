@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T81A)
+- Fix: Axis names in UI may not pull the correct name/number if the input device has non sequential axis IDs
+- Fix: QT garbage collection desync check in axis repeater
+
+
 ### (m76T81)
 - New: OSC - new global option to set default autorelease delay for OSC triggers
 - New: OSC - new global option to set autorelease mode on OSC messages with no parameters. This treats messages with no parameters/arguments as a button trigger.

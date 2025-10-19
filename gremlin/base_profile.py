@@ -2275,7 +2275,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     
                     info = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
                     if info:
-                        self._input_name = f"Axis {info.axis_names[input_id-1]}"
+                        self._input_name =  info.get_axis_name(input_id)
                     else:
                         self._input_name = f"Axis {input_id}"
 

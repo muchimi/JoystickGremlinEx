@@ -2612,3 +2612,10 @@ class Configuration(QtCore.QObject):
     @macro_last_input_id.setter
     def macro_last_input_id(self, id):
         self._set_data("macro_last_input_id", id)
+
+    @property
+    def vjoy_show_disconnected(self) -> bool:
+        return self._get_data("vjoy_show_disconnected", False)
+    @vjoy_show_disconnected.setter
+    def vjoy_show_disconnected(self, value : bool):
+        self._set_data("vjoy_show_disconnected", value)

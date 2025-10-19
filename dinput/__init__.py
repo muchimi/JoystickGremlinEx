@@ -426,6 +426,7 @@ class DeviceSummary:
             The data received from DILL and to be held by this instance
         """
         import gremlin.util
+        import gremlin.config
         self._connected = False # true if device is connected
         self.disabled = False # true if the device is disabled in GremlinEx
         if data is not None:    
@@ -455,21 +456,29 @@ class DeviceSummary:
             self.button_count = data.button_count
             self.hat_count = data.hat_count
             self.axismap_list = []
+            self.axis_id_map = {} # map of axis ID to linear ID
+            self.linear_id_map = {} # map of linear ID to axis ID
             self.usage_page = data.usage_page
             self.usage = data.usage
             self.axis_names = []
             logical_count = 0
             self.input_enabled = True # allow usage as an input device by default for special and physical devices
-            for i in range(8):
-                axis_map = AxisMap(data.axis_map[i])
+            for am in data.axis_map:
+                if am.axis_index == 0:
+                    continue # no mapped
+                axis_map = AxisMap(am)
                 self.axismap_list.append(axis_map)
                 axis_name = axis_map.getName()
+                self.axis_id_map[am.axis_index] = am.linear_index
+                self.linear_id_map[am.linear_index] = am.axis_index
+                
                 if not axis_name:
                     # axis name is not reporting in via directinput
-                    axis_name = f"({i+1})"
-                    #axis_name = f"({logical_count}/{i}/{axis_map.linear_index}/{axis_map.axis_index})"
+                    axis_name = f"({axis_map.linear_index+1})"
                 else:
                     logical_count += 1
+
+                # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
                 self.axis_names.append(axis_name)
             self.vjoy_id = -1
             self._connected = True # if dinput data is provided, the device is marked as connected
@@ -581,8 +590,14 @@ class DeviceSummary:
         self.vjoy_id = vjoy_id
         self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
-    def get_axis_name(self, input_id):
+    def get_axis_name(self, axis_id, is_axis_id = True):
         ''' gets the axis name based on the input # '''
+        if is_axis_id:
+            input_id = axis_id
+        else:
+            if axis_id in self.axis_id_map:
+                input_id = self.axis_id_map[axis_id]
+            
         if input_id == 1:
             axis_name = "X"
         elif input_id == 2:

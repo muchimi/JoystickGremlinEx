@@ -181,6 +181,13 @@ def is_vjoy_connected(vjoy_id : int) -> bool:
     ''' true if the vjoy device is connected '''
     global _vjoy_devices_map
     return vjoy_id in _vjoy_devices_map
+
+def is_vjoy_guid_connected(device_guid) -> bool:
+    vjoy_id = vjoy_id_from_guid(device_guid, None)
+    if vjoy_id is not None:
+        return is_vjoy_connected(vjoy_id)
+    return False
+
     
 
 def vjoy_devices(connected_only = True): # -> list[DeviceSummary]:
@@ -461,14 +468,15 @@ def vjoy_id_from_guid(guid, not_found_id = 1):
     """
     if isinstance(guid, int):
         # already a vjoy id = make sure it's defined
-        for dev in vjoy_devices():
+        for dev in _all_vjoy_devices_map.values():
             if dev.vjoy_id == guid:
                 return guid # valid
         return not_found_id
     
     if isinstance(guid, str):
         guid = util.parse_guid(guid) # convert to dinput GUID 
-    for dev in vjoy_devices():
+
+    for dev in _all_vjoy_devices_map.values():
         if gremlin.util.compare_guid(dev.device_guid, guid):
             return dev.vjoy_id
 
@@ -485,7 +493,7 @@ def vjoy_guid_from_id(vid: int):
 
 def registerSpecialDevice(dev):
     ''' adds a special device to the tracking list '''
-    assert (_joystick_initialized)
+    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
     device_guid = dev.device_guid
     if not device_guid in _joystick_device_guid_map:
         _joystick_device_guid_map[device_guid] = dev
@@ -509,7 +517,7 @@ def removeDevice(dev):
 
 def device_name_from_guid(device_guid) -> str:
     ''' gets device name from GUID '''
-    assert (_joystick_initialized)
+    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
     if isinstance(device_guid, str):
         device_guid = gremlin.util.parse_guid(device_guid) # GUID expected
     if device_guid in _joystick_device_guid_map:
@@ -539,7 +547,7 @@ def getDevice(device_guid):
 
 def device_info_from_guid(device_guid): # -> DeviceSummary:
     ''' gets physical device information '''
-    assert (_joystick_initialized)
+    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
     if isinstance(device_guid, str):
         device_guid = gremlin.util.parse_guid(device_guid)
     if device_guid in _joystick_device_guid_map:
@@ -556,7 +564,7 @@ def vjoy_info_from_vjoy_id(vjoy_id : int, connected_only = True): # -> DeviceSum
     :param vjoy_id: id of vjoy device 1 to 16
     :param connected_only: true to filter by connected vjoys only
     '''
-    assert (_joystick_initialized)
+    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
     global _all_vjoy_devices_map, _vjoy_devices_map
     if connected_only:
         if vjoy_id in _vjoy_devices_map:
@@ -577,7 +585,7 @@ def vjoy_device_map() -> dict:
 
 def is_device_connected(device_guid) -> bool:
     ''' true if the device is connected (reported in) '''
-    assert (_joystick_initialized)
+    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
     if device_guid in _joystick_device_guid_map:
         device : dinput.DeviceSummary = _joystick_device_guid_map[device_guid]
         return device.connected
@@ -1007,7 +1015,8 @@ def joystick_devices_initialization():
         # exit gracefully
         syslog.error("A fatal error was encountered during the detection and mapping of input devices - see the log for errors.")
         app = QtWidgets.QApplication.instance()
-        app.exit()
+        if app:
+            app.exit()
         sys.exit(1)
         return
         
@@ -1021,8 +1030,6 @@ def joystick_devices_initialization():
     vjoy_devices_list.sort(key = lambda x: x.vjoy_id)
     for dev in regular_devices_list:
         syslog.info(f"\tDevice: (regular) {str(dev)}")
-
-    
     for dev in vjoy_devices_list:
         syslog.info(f"\tDevice: (vjoy) {str(dev)}")
 

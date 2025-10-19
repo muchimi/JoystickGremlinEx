@@ -1652,8 +1652,7 @@ class InputItemWidget(QBoxFrame):
         self._lock_widget = gremlin.ui.ui_common.QIconCheckbox(icon_lock, icon_unlock, size = 16)
         
 
-        if self._input_type == InputType.State:
-            pass
+
 
         if isinstance(data, gremlin.base_profile.InputItem):
             input_item = data

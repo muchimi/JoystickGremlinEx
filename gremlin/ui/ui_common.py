@@ -5830,6 +5830,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         #self._set_value(index, value)
 
     def _set_value(self, index : int, value : float | list):
+        if not Shiboken.isValid(self):
+            return
         self.axes[index].setValue(value)
         widget = self.value_labels[index]
         if hasattr(value,"__iter__"):
@@ -11570,7 +11572,11 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
                     case InputType.JoystickAxis:
                         # add axes
                         if dev.axis_count:
-                            for input_id in range(1, dev.axis_count+1):
+                            for am in dev.axismap_list:
+                                input_id = am.axis_index
+                                if not input_id:
+                                    continue # does not exist
+                                axis_name = dev.get_axis_name(input_id)
                                 key = (input_type, input_id)
                                 axis_name = gremlin.joystick_handling.get_axis_name(input_id)
                                 self.input_selector_widget.addItem(f"Axis {input_id} ({axis_name})", key)
