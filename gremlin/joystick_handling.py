@@ -313,11 +313,11 @@ def get_axis(guid, index, normalized = True, translate = True):
     '''
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
-    if translate:
-        dev = device_info_from_guid(guid)
-        if dev.device_type == DeviceType.Joystick and index in dev.axis_id_map:
-            index = dev.axis_id_map[index]
     if is_hardware_device(guid):
+        if translate:
+            dev = device_info_from_guid(guid)
+            if dev.device_type == DeviceType.Joystick and hasattr(dev,"axis_id_map") and index in dev.axis_id_map:
+                index = dev.axis_id_map[index]
         value = dinput.DILL.get_axis(guid, index)
         if normalized:
             return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)

@@ -816,11 +816,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         #     and self.profile is not None\
         #     and self.profile.profile_file is not None\
         #     and os.path.isfile(self.profile.profile_file)
-        self._actionTabSubstitute.setEnabled(is_enabled)
+        # self._actionTabSubstitute.setEnabled(is_enabled)
         menu = QtWidgets.QMenu(self)
         menu.addAction(self._actionTabSort)
         menu.addAction(self._ationTabCopyAssignments)
-        menu.addAction(self._actionTabSubstitute)
+        # menu.addAction(self._actionTabSubstitute)
         #menu.addAction(self._actionTabImport)
         menu.addAction(self._actionTabRemoveDevice)
         menu.addAction(self._actionTabClearMap)
