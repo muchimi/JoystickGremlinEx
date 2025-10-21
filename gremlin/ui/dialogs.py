@@ -358,6 +358,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._create_osc_page()
         self._create_vigem_page()
         self._create_simconnect_page()
+        self._create_reporting_page()
 
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
@@ -967,15 +968,36 @@ class OptionsUi(ui_common.BaseDialogUi):
         page_layout.addWidget(self.enable_remote_control_widget)
         page_layout.addWidget(self.enable_remote_broadcast_widget)
 
+        self.remote_control_server_all_ip_widget = QtWidgets.QCheckBox("All IPs")
+        self.remote_control_server_all_ip_widget.setToolTip("Bind unicast to all IPs")
+        bind_all = self.config.broadcast_bind_all_ips
+        self.remote_control_server_all_ip_widget.setChecked(bind_all)
+        self.remote_control_server_all_ip_widget.clicked.connect(self._remote_control_all_ip_changed)
+
+        enabled = not bind_all
+        self.remote_control_server_widget = gremlin.ui.ui_common.QDataIPLineEdit(self.config.broadcast_host_ip)
+        self.remote_control_server_widget.textChanged.connect(self._remote_control_server_ip_changed)
+        self.remote_control_server_widget.setToolTip("Host IP of the broadcast host (local machine IP)")
+
+        self.remote_control_select_ip_widget = QtWidgets.QPushButton("Select")
+        self.remote_control_select_ip_widget.setToolTip("Selects a different IP address for the GremlinEx Broadcast server if the host has more than one IP address.")
+        self.remote_control_select_ip_widget.clicked.connect(self._remote_control_server_ip_select)
+
         self.remote_control_port_widget = QtWidgets.QDoubleSpinBox()
         self.remote_control_port_widget.setRange(4096,65535)
         self.remote_control_port_widget.setDecimals(0)
-        self.remote_control_port_widget.setValue(float(self.config.server_port))
+        self.remote_control_port_widget.setValue(float(self.config.broadcast_port))
         self.remote_control_port_widget.valueChanged.connect(self._remote_control_server_port)
         self.remote_control_port_widget.setToolTip("This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
 
 
-        widget, _ = ui_common.getHContainer(self.remote_control_port_widget, "Broadcast/Listen Port:")
+        page_layout.addWidget(self.remote_control_server_all_ip_widget)
+
+        widget, _ = ui_common.getHContainer([self.remote_control_server_widget, self.remote_control_select_ip_widget], "Broadcast Server:")
+        page_layout.addWidget(widget)
+
+
+        widget, _ = ui_common.getHContainer(self.remote_control_port_widget, "Broadcast Port:")
         page_layout.addWidget(widget)
         
 
@@ -997,9 +1019,34 @@ There should only be one GremlinEx master server on the subnet.
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Remote Control")
 
+        self.remote_control_select_ip_widget.setEnabled(enabled)
+        self.remote_control_server_widget.setEnabled(enabled)
+
+    def _create_reporting_page(self):
+        page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
+        
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Reporting Options")
+
+        gp = os.path.dirname(self.config.graphviz_executable)
+
+        self.graphviz_path_widget = gremlin.ui.ui_common.QPathLineItem(header = "GraphViz Folder",
+                                                                       text = gp, dir_mode=True)
+        self.graphviz_path_widget.pathChanged.connect(self._graphviz_path_changed)
+        
+        box = gremlin.ui.ui_common.QBoxFrameLayout(title = "GraphViz options", transparent = True)
+        box.addWidget(self.graphviz_path_widget)
+        page_layout.addWidget(box)
+
+    @QtCore.Slot(object, str)
+    def _graphviz_path_changed(self, widget, text):
+        if os.path.isdir(text):
+            self.config.graphviz_executable = text
+
     # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
+        
 
         self.enable_broadcast_speech_widget = gremlin.ui.ui_common.QDataCheckbox(
                                                                 "Enable TTS mode change cue on remote clients",
@@ -1563,6 +1610,20 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _osc_pad_args(self, checked):
         self.config.osc_pad_args = checked
 
+    @QtCore.Slot()
+    def _remote_control_server_ip_select(self):
+       ''' select a host IP address for hosts with multiple IPs '''
+       self._host_dialog = HostIpDialog(self._host_ip)
+       self._host_dialog.accepted.connect(self._broadcast_host_ip_selected)
+       self._host_dialog.setExistingOnly(True)
+       self._host_dialog.exec()
+       self._host_dialog = None        
+
+
+    @QtCore.Slot()
+    def _broadcast_host_ip_selected(self):
+        host_ip =self._host_dialog._host_ip
+        self.remote_control_server_widget.setText(host_ip)
 
     @QtCore.Slot()
     def _change_host_ip(self):
@@ -2136,6 +2197,18 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         ''' updates the remote control server port'''
         self.config.server_port = value
         self.config.save()
+
+    @QtCore.Slot()
+    def _remote_control_server_ip_changed(self):
+        widget = self.sender()
+        self.config.broadcast_host_ip = widget.text()
+
+    @QtCore.Slot(bool)
+    def _remote_control_all_ip_changed(self, checked : bool):
+        self.config.broadcast_bind_all_ips = checked
+        enabled = not checked
+        self.remote_control_select_ip_widget.setEnabled(enabled)
+        self.remote_control_server_widget.setEnabled(enabled)
 
     @QtCore.Slot(float)
     def _macro_axis_polling_rate(self, value):

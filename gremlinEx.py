@@ -48,6 +48,7 @@ from gremlin.types import TabDeviceType
 from shiboken6 import Shiboken
 import gremlin.tabstate
 
+
 import gremlin.joystick_handling
 
 ''' ALL gremlin modules should be imported here to avoid packaging errors '''
@@ -122,7 +123,7 @@ import gremlin.tts
 
 from gremlin.util import log_sys_error, compare_path
 import gremlin.util
-
+import pydot
 
 
 # Figure out the location of the code / executable and change the working
@@ -147,6 +148,8 @@ from PySide6 import QtCore
 from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
+
+import gremlin.reporting
 
 syslog = logging.getLogger("system")
 
@@ -460,6 +463,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.error(f"Unknown device GUID found in tabs: {device_guid}")
             return
         device_name = device.name
+
+        # ensure the device tab does not already exist
+        if device_guid in self._tab_device_map:
+            # already present - skip
+            syslog.info(f"ADDTAB: skip adding device [{device_name}] [{device_guid}] as this device already exists in the device list.")
+            return
 
         ts = gremlin.tabstate.TabState()
 
@@ -775,8 +784,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._ationTabCopyAssignments = QtGui.QAction("Copy to device...", self, triggered = self._tab_copy_cb)
         self._ationTabCopyAssignments.setToolTip("Copies assignments to specified target device")
 
-        self._actionTabSubstitute = QtGui.QAction("Device Swap...", self, triggered = self._tab_substitute_cb)
-        self._actionTabSubstitute.setToolTip("Swap one device ID for another device ID")
+        # self._actionTabSubstitute = QtGui.QAction("Device Swap...", self, triggered = self._tab_substitute_cb)
+        # self._actionTabSubstitute.setToolTip("Swap one device ID for another device ID")
 
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered = self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
@@ -788,7 +797,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         menuTools.addSeparator()
         menuTools.addAction(self._actionTabSort)
         menuTools.addAction(self._ationTabCopyAssignments)
-        menuTools.addAction(self._actionTabSubstitute)
+        #menuTools.addAction(self._actionTabSubstitute)
 
         menuTools.addAction(self._actionTabRemoveDevice)
         #menuTools.addAction(self._actionTabImport)
@@ -1209,8 +1218,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionCreate1to1Mapping.setEnabled(enabled)
         self.ui.actionModifyProfile.setEnabled(enabled)
         self.ui.menuRecent.setEnabled(enabled)
-        self.ui.actionSwapDevices.setEnabled(enabled)
-        self.ui.actionMergeAxis.setEnabled(enabled)
+        # self.ui.actionSwapDevices.setEnabled(enabled)
+        # self.ui.actionMergeAxis.setEnabled(enabled)
 
         self.ui.actionManageModes.setEnabled(enabled)
 
@@ -1611,8 +1620,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionExit.triggered.connect(self._force_close)
         # Actions
         self.ui.actionCreate1to1Mapping.triggered.connect(self._create_1to1_mapping)
-        self.ui.actionMergeAxis.triggered.connect(self.merge_axis)
-        self.ui.actionSwapDevices.triggered.connect(self.swap_devices)
+        # self.ui.actionMergeAxis.triggered.connect(self.merge_axis)
+        # self.ui.actionSwapDevices.triggered.connect(self.swap_devices)
 
         # Tools
         self.ui.actionDeviceInformation.triggered.connect(self.device_information)
@@ -3647,7 +3656,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             verbose = config.verbose_mode_device
             verbose_detailed = config.verbose_mode_details
 
+
             self.device_change_locked = True
+
+            # force a re-read of DINPUT data
+            syslog.warning("DILL: Device change reported by DINPUT - updating enumeration data:")
+            dinput.DILL.reset()
+
+
             while self._device_change_queue > 0:
 
                 try:
@@ -4187,15 +4203,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         :param file_format the format of the cheatsheet, html or pdf
         """
-        import gremlin.cheatsheet
-        fname, _ = QtWidgets.QFileDialog.getSaveFileName(
-            None,
-            "Save cheatsheet",
-            gremlin.shared_state.data_path,
-            "PDF files (*.pdf)"
-        )
-        if len(fname) > 0:
-            gremlin.cheatsheet.generate_cheatsheet(fname, self.profile)
+
+        import gremlin.reporting
+        report = gremlin.reporting.ReportEngine()
+        report.generate()
+
+
+        # import gremlin.cheatsheet
+        # fname, _ = QtWidgets.QFileDialog.getSaveFileName(
+        #     None,
+        #     "Save cheatsheet",
+        #     gremlin.shared_state.data_path,
+        #     "PDF files (*.pdf)"
+        # )
+        # if len(fname) > 0:
+        #     gremlin.cheatsheet.generate_cheatsheet(fname, self.profile)
 
     def _view_input_map(self):
         ''' display input map dialog '''
@@ -5296,7 +5318,8 @@ if __name__ == "__main__":
 
     gremlin.shared_state.char_width = gremlin.ui.ui_common.get_text_width("M")
 
-
+    # report ui
+    report = gremlin.reporting.ReportEngine()
 
 
     # Run UI

@@ -72,33 +72,6 @@ class ProcessMonitor(QtCore.QObject):
         #el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
         el.process_monitor_changed.connect(self._check_monitor)
 
-    # def registerCallback(self, process_list : str | list[str], callback : Callable):
-    #     ''' registers a monitoring callback when the processes change
-    #     :param procesds_list: list of processes to monitor (exes)
-    #     :param callback: callback
-    #     '''
-    #     if not isinstance(process_list, list):
-    #         process_list = [process_list]
-
-    #     for process in process_list:
-    #         process = process.casefold()
-    #         if not process in self._callback_map:
-    #             self._callback_map[process] = []
-    #         if not callback in self._callback_map[process]:
-    #             self._callback_map[process].append(callback)
-        
-    # def unRegisterCallback(self, process_list : str | list[str], callback : Callable):
-    #     ''' unregisters a monitoring callback when the processes change
-    #     :param procesds_list: list of processes to monitor (exes)
-    #     :param callback: callback
-    #     '''
-    #     if not isinstance(process_list, list):
-    #         process_list = [process_list]
-
-    #     for process in process_list:
-    #         process = process.casefold()
-    #         if process in self._callback_map and callback in self._callback_map[process]:
-    #             self._callback_map[process].remove(callback)
 
 
 

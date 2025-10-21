@@ -258,7 +258,7 @@ class ExecutionGraphFunctorNode(ExecutionGraphNode):
 
 class ExecutionGraphActionSetNode(ExecutionGraphNode):
     ''' holds an input item in the execution graph '''
-    def __init__(self, action_set : list):
+    def __init__(self, action_set : list = None):
         super().__init__(ExecutionGraphNodeType.ActionSet)
         self.action_set = action_set
 

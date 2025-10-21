@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T83)
+- Disabled legacy code for remap to prevent issues.  Use the copy device functionality instead from the context menu of the tab (select the device you want to copy from, right click, select "copy device...", select the destination device, click ok).
+- Experimental: Prelim work on the new reporting engine - this is experimental for internal testing at this point to evaluate options.  Do not attempt.
+- Added instrumentation on device connect/disconnect.
+- Fix: If DINPUT still reports a device after a disconnection - ensure the device does not get added twice.
+
 ### (m76T82)
 - Fix: enable V16 profile conversions.
 - Fix: translate axis ID to DINPUT axis index for data read of axis data.

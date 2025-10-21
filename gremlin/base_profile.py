@@ -2847,6 +2847,7 @@ class Profile():
 
     @property
     def graph(self) -> gremlin.profile_graph.ProfileGraph:
+        ''' gets the current profile graph'''
         return self._profile_graph
 
     def _evaluate_hash(self, obj, path):

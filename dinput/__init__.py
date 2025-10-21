@@ -864,7 +864,10 @@ class DILL:
             DILL.initalized = True
 
 
-           
+    @staticmethod
+    def reset():
+        ''' force a DINPUT re-enumeration '''
+        DILL.dumpDevices()
 
     @staticmethod
     def dumpDevices():

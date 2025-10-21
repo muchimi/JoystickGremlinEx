@@ -1,0 +1,60 @@
+// Profile Mapping: test_missing_device
+digraph {
+	f7616c8c46194d6fb5fd518dd70ee9c1 [label=<gremlin.profile_graph.ProfileRootNode object at 0x0000023BCDE61A70>]
+	"2e5e47bdcb1147fab235f24b03cce778" [label="Device: device: Alpha Flight Controls id: b11a3e70dde111ec8001444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "2e5e47bdcb1147fab235f24b03cce778"
+	"24cacd58bdc541abb2f241a8757af920" [label="Device: device: LEFT VPC Stick WarBRD id: c8d925a058e311f08002444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "24cacd58bdc541abb2f241a8757af920"
+	f42916a7a6f444f1a67f233db4000541 [label="Device: device: Controller (Xbox One For Windows) id: b63378606d5c11ef8001444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> f42916a7a6f444f1a67f233db4000541
+	c68d9b7a1af641c0a061e745b7e68b90 [label="Device: device: Bravo Throttle Quadrant id: 0d258fe01a6411ec8001444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> c68d9b7a1af641c0a061e745b7e68b90
+	"69e313094c734ab79ef2d83dc75205c5" [label="Device: device: MFG Crosswind V2/3 id: 9c5a2470da3111ee8002444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "69e313094c734ab79ef2d83dc75205c5"
+	"43d1e04ee6ab469dbc5b125e57a3a0d0" [label="Device: device: DSD Flight Series Button Controller id: a4f58a50215611e98001444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "43d1e04ee6ab469dbc5b125e57a3a0d0"
+	"4aaf66ede24f4ab38d59fb1c5e2a7e02" [label="Device: device: Throttle - HOTAS Warthog id: a60b853025e911e78003444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "4aaf66ede24f4ab38d59fb1c5e2a7e02"
+	"1e67dbcd3a854bd78b156671707553d3" [label="Device: device: RIGHT VPC Stick WarBRD id: f1d73a0058e311f08004444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "1e67dbcd3a854bd78b156671707553d3"
+	"7b60506395a3482d87f292caec9778bc" [label="Device: device: IFR1 id: 28a05bc088c811f08001444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "7b60506395a3482d87f292caec9778bc"
+	"57020222757d4f1b8c02ee512d4b67e5" [label="Device: device: Controller (XBOX 360 For Windows) id: 8c6e5cf00ea011e98001444553540000 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "57020222757d4f1b8c02ee512d4b67e5"
+	"86f53fb206b04b8aae540c6a8ba0df3e" [label="Device: device: LEFT VPC Stick WarBRD Missing id: e8d925a058e311f08002444553540100 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "86f53fb206b04b8aae540c6a8ba0df3e"
+	dacc188a17de466fbc663e7d29033f0f [label="Device: device: Octavi IFR1 id: e04aaf5348384763bc60d5c7f8e653a1 virtual: False remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> dacc188a17de466fbc663e7d29033f0f
+	b1eff06a79054a36aac8861508413723 [label="Device: device: VJoy 8/128/4 (1) id: 2d3260a06fa611e78002444553540000 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> b1eff06a79054a36aac8861508413723
+	"253fd28d32204fa58439b63ff64cca5a" [label="Device: device: VJoy 8/128/3 (2) id: 705dc1a0c17011e78003444553540000 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "253fd28d32204fa58439b63ff64cca5a"
+	"8cb0287f92d4470881a3248c470ec06d" [label="Device: device: VJoy 8/128/2 (3) id: 8245c100270511e98002444553540000 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "8cb0287f92d4470881a3248c470ec06d"
+	"910d66de1f1346b2b7312ce9383f12bc" [label="Device: device: VJoy 8/128/1 (4) id: 203c80e015c811ea8002444553540000 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "910d66de1f1346b2b7312ce9383f12bc"
+	"04302b165a05456187034a917b1f0db3" [label="Device: device: VJoy 8/128/0 (5) id: eab183b0a73911ed8002444553540000 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "04302b165a05456187034a917b1f0db3"
+	c049b1b0b6794daf9aed23562efeb707 [label="Device: device: (disc) Vjoy 8/127/4 (6) id: f928cbf2fbdc4291a6ab2cc2ae91c946 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> c049b1b0b6794daf9aed23562efeb707
+	"2a4eeb12bb7d4b6a8a1d85d5403f95a3" [label="Device: device: (disc) Vjoy 8/126/4 (7) id: 3807c5b51ad4420fb515e35ef922cb8e virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "2a4eeb12bb7d4b6a8a1d85d5403f95a3"
+	efde93f839d2469d95d45da288be9d44 [label="Device: device: (disc) Vjoy 8/125/4 (8) id: 61069136bd53456db880dece6b3e79ce virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> efde93f839d2469d95d45da288be9d44
+	"4bc150e57b19498c971ed0014f63c7cd" [label="Device: device: (disc) Vjoy 8/124/4 (9) id: 29c5d8a578df4dbda0b97137aaffc985 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "4bc150e57b19498c971ed0014f63c7cd"
+	"2e11731cd62745e9a002c9255ae63ac4" [label="Device: device: (disc) Vjoy 8/123/4 (10) id: 552aee3ed2b44e62a7a766d81342b505 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "2e11731cd62745e9a002c9255ae63ac4"
+	"934c24b26fcb4461a3e7a4936cddd199" [label="Device: device: (disc) Vjoy 8/122/4 (11) id: 6baf9715044a4c50895b9d2ebe20fcba virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "934c24b26fcb4461a3e7a4936cddd199"
+	"446f57b92df94a6c8a650cc99dede670" [label="Device: device: (disc) Vjoy 8/121/4 (12) id: 060e7f88ebac43d2905c79d3888df932 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "446f57b92df94a6c8a650cc99dede670"
+	b91ad902d27843bd9c1f1e9c5a0adb39 [label="Device: device: (disc) Vjoy 8/120/4 (13) id: b5833720b0ec441b9b591757c1f06f39 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> b91ad902d27843bd9c1f1e9c5a0adb39
+	ca780866d2a842cb9d29f1fd18293408 [label="Device: device: (disc) Vjoy 8/119/4 (14) id: 16baf95a67aa4fb6b3eeceba2d126f89 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> ca780866d2a842cb9d29f1fd18293408
+	"653966c132594ae487cab1c07e4b7d10" [label="Device: device: (disc) Vjoy 8/118/4 (15) id: 365d1ba4633e41c0acf61a0f1d6e9651 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> "653966c132594ae487cab1c07e4b7d10"
+	a85d007b05214c389d4c89cb5fafee5a [label="Device: device: (disc) Vjoy 8/117/4 (16) id: 14cba78584b646e2b179fd9edc691c18 virtual: True remap enabled: True"]
+	f7616c8c46194d6fb5fd518dd70ee9c1 -> a85d007b05214c389d4c89cb5fafee5a
+}

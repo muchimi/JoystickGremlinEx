@@ -28,6 +28,7 @@ import time
 import shutil
 import uuid
 import dinput
+import winreg
 import qtawesome as qta
 from lxml import etree as ElementTree
 from typing import Callable
@@ -2343,3 +2344,70 @@ def _xml_depth(node, depth) -> int:
 def _xml_paste_mode(node, extra_data) -> bool:
     ''' true if the xml should be read in paste mode '''
     return extra_data and "paste" in extra_data
+
+
+def find_executable(starts_with_name, exe_name):
+    ''' 
+        performs a windows registry search for the published name of an executable and the executable name 
+        Warning: not exactly fast as every key is searched.
+        Useful when app is not in the search path
+    '''
+
+    import winreg
+    def find_hive(hive, flag, starts_with_name):
+        aReg = winreg.ConnectRegistry(None, hive)
+        aKey = winreg.OpenKey(aReg, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                            0, winreg.KEY_READ | flag)
+
+        count_subkey = winreg.QueryInfoKey(aKey)[0]
+
+        software_list = []
+
+        for i in range(count_subkey):
+            software = {}
+            try:
+                asubkey_name = winreg.EnumKey(aKey, i)
+                asubkey = winreg.OpenKey(aKey, asubkey_name)
+                name = winreg.QueryValueEx(asubkey, "DisplayName")[0]
+                syslog.info(name)
+                
+                if name and name.casefold().startswith(starts_with_name):
+                    software['name'] = name
+                    try:
+                        software['version'] = winreg.QueryValueEx(asubkey, "DisplayVersion")[0]
+                    except EnvironmentError:
+                        software['version'] = 'undefined'
+                    try:
+                        software['publisher'] = winreg.QueryValueEx(asubkey, "Publisher")[0]
+                    except EnvironmentError:
+                        software['publisher'] = 'undefined'
+                    try:
+                        software['path'] = winreg.QueryValueEx(asubkey, "InstallLocation")[0]
+                    except EnvironmentError:
+                        software['path'] = ''
+                    software_list.append(software)
+            except EnvironmentError:
+                continue
+
+        return software_list
+
+
+    if starts_with_name == '' or exe_name == '':
+        return None
+    
+    starts_with_name = starts_with_name.casefold()
+    # look in 64 bit stuff
+    software_list = find_hive(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY,starts_with_name)
+    if not len(software_list):
+        # look in 32 bit stuff
+        software_list = find_hive(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY, starts_with_name)
+    if not len(software_list):       
+        software_list = find_hive(winreg.HKEY_CURRENT_USER, 0,starts_with_name)
+
+    if len(software_list):
+        path = software_list[0]['path']
+        exe = os.path.join(path,exe_name)
+        if os.path.exists(exe):
+            return exe
+
+    return None

@@ -930,24 +930,59 @@ class Configuration(QtCore.QObject):
             self._data["enable_broadcast_speech"] = value
             self.save()
 
+    # @property
+    # def server_port(self):
+    #     ''' port number to use for the gremlin server '''
+    #     return self._get_data("server_port",6012)
+    
+    # @server_port.setter
+    # def server_port(self, value):
+    #     if type(value) == float:
+    #         value = int(value)
+    #     elif type(value) == str and value.isnumeric():
+    #         value = int(value)
 
-
+    #     if type(value) == int:
+    #         self._data["server_port"] = value
+    #         self.save()
 
     @property
-    def server_port(self):
+    def broadcast_port(self):
         ''' port number to use for the gremlin server '''
-        return self._get_data("server_port",6012)
+        return self._get_data("broadcast_port",6012)
     
-    @server_port.setter
-    def server_port(self, value):
+    @broadcast_port.setter
+    def broadcast_port(self, value):
         if type(value) == float:
             value = int(value)
         elif type(value) == str and value.isnumeric():
             value = int(value)
 
         if type(value) == int:
-            self._data["server_port"] = value
+            self._data["broadcast_port"] = value
             self.save()
+
+
+
+
+    @property
+    def broadcast_host_ip(self):
+        ''' host for the broadcast server '''
+        return self._get_data("broadcast_host_ip","127.0.0.1")
+    
+    @broadcast_host_ip.setter
+    def broadcast_host_ip(self, value : str):
+        self._set_data("broadcast_host_ip", value)
+
+    @property
+    def broadcast_bind_all_ips(self):
+        ''' true if bound to all IPs (default)'''
+        return self._get_data("broadcast_bind_all_ips",True)
+    @broadcast_bind_all_ips.setter
+    def broadcast_bind_all_ips(self, value: bool):
+        self._set_data("broadcast_bind_all_ips", value)
+    
+
 
     @property
     def mode_change_message(self):
@@ -2619,3 +2654,11 @@ class Configuration(QtCore.QObject):
     @vjoy_show_disconnected.setter
     def vjoy_show_disconnected(self, value : bool):
         self._set_data("vjoy_show_disconnected", value)
+
+    @property
+    def graphviz_executable(self) -> str:
+        ''' path to graph viz executable '''
+        return self._get_data("graphviz_executable","")
+    @graphviz_executable.setter
+    def graphviz_executable(self, value: str):
+        self._set_data("graphviz_executable", value)

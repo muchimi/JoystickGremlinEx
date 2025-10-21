@@ -436,6 +436,7 @@ class Color():
 
         return css
     
+    
     @staticmethod
     def cssButtonState():
         ''' gets a pushbutton state for the input viewer '''
@@ -4078,7 +4079,8 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     escPressed = QtCore.Signal() # indicates the esc key was pressed
 
     def __init__(self, text = None, data = None, parent = None, width = 200):
-        super().__init__(text, parent)
+        super().__init__(parent = parent)
+        self.setText(text)
         self._data = data
         self._text_changed = True
         self.setAlignment(Qt.AlignLeft)
@@ -4998,7 +5000,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         if not Shiboken.isValid(self):
             return
         if self._last_state_value is None or self._last_state_value != is_pressed:
-            syslog.info(f"update button state: {is_pressed}")
+            # syslog.info(f"update button state: {is_pressed}")
             gremlin.util.InvokeUiMethod(self._update_pixmap_ui, is_pressed)
             self._last_state_value = is_pressed
               

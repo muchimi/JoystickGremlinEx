@@ -1087,10 +1087,11 @@ class RemoteClient(QtCore.QObject):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
         #self._host = "localhost"
-        config = gremlin.config.Configuration()
-        self._port = config.server_port
-        self._broadcast_enabled = config.enable_remote_broadcast
-        self._address = (RPCGremlin.MULTICAST_GROUP, self._port)
+        #config = gremlin.config.Configuration()
+        # self._port = config.broadcast_port
+        # self._broadcast_host = config.broadcast_host_ip
+        # self._broadcast_enabled = config.enable_remote_broadcast
+
         self._sock = None
         # unique ID of this client
         self._id = get_guid()
@@ -1115,10 +1116,19 @@ class RemoteClient(QtCore.QObject):
         # makes sure the socket exists
         import struct
         if not self._sock:
+            config = gremlin.config.Configuration()
+            broadcast_host = config.broadcast_host_ip
+            bind_all = config.broadcast_bind_all_ips
+            port = config.broadcast_port
+            self._address = (RPCGremlin.MULTICAST_GROUP, port)
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
             self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-            syslog.debug(f"Gremlin RPC client started... port: {self._port}")
+            if bind_all and broadcast_host:
+                self._sock.bind((broadcast_host, port))
+                syslog.debug(f"Gremlin RPC client started... IP: {broadcast_host} port: {port}")
+            else:
+                syslog.debug(f"Gremlin RPC client started... ALL IP - port: {port}")
 
     def stop(self):
         ''' closes the client socket'''
