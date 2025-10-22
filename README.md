@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T84)
+- Changed: VJOY devices used as input can be setup in settings for start values.  This is because we now allow VJOY usage as input and output concurrently in GremlinEx.
+- Changed: further updates to the axis translation logic from linear axis index to "skipped" axis index for controllers that have non linear axis definitions.
+- Changed: For improved clarity, the device list (Tools/Device Information) is now color coded and can optionally show disconnected devices. Device list is also sorted by physical hardware first, then virtual devices, then disconnected devices (if the option to show those is selected).  It can also be refreshed.
+- Fix: profile V15 to V16 error in default parameter.
+
 ### (m76T83)
 - Disabled legacy code for remap to prevent issues.  Use the copy device functionality instead from the context menu of the tab (select the device you want to copy from, right click, select "copy device...", select the destination device, click ok).
 - Experimental: Prelim work on the new reporting engine - this is experimental for internal testing at this point to evaluate options.  Do not attempt.

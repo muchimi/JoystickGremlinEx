@@ -3307,11 +3307,16 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
         self.profile = profile_data
 
-        self.devices = gremlin.joystick_handling.all_joystick_devices()
 
         self.setWindowTitle("Device Information")
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        config = gremlin.config.Configuration()
+
+        self.show_disconnected_widget = gremlin.ui.ui_common.QDataCheckbox("Show disconnected devices", callback = self._handle_disconnected_changed, value = config.show_disconnected)
+        self.refresh_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget("Refresh", callback = self._update_data)
+
+        
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
@@ -3343,7 +3348,8 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             "Vendor ID",
             "Product ID",
             "GUID",
-            "Device name (nocase)"
+            "Device name (nocase)",
+            "Connected"
         ]
 
         # table data
@@ -3351,7 +3357,6 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
 
         self.table.setColumnCount(len(headers))
-        self.table.setRowCount(len(self.devices))
         self.table.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
         self.table.setHorizontalHeaderLabels(headers)
         self.table.verticalHeader().setVisible(False)
@@ -3362,47 +3367,98 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         self.menu = None # context menu for the table
         self.menu_item = None # the cell item the menu applies to
 
+        # toolbar
+
+        self.script_copy_button = QtWidgets.QPushButton("Generate plugin script header")
+        self.script_copy_button.clicked.connect(self._copy_to_script)
+        
+
+        self.close_button = QtWidgets.QPushButton("Close")
+        self.close_button.clicked.connect(lambda: self.close())
+        
+
+        widgets = [
+            self.show_disconnected_widget,
+            "||",
+            self.refresh_widget,
+            self.script_copy_button,
+            self.close_button
+            ]
+        
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.main_layout.addWidget(widget)
+
+
+        # load the data
+        self._update_data()
+
+    @QtCore.Slot(bool)
+    def _handle_disconnected_changed(self, checked):
+         config = gremlin.config.Configuration()
+         config.show_disconnected = checked
+         self._update_data()
+
+    def _update_data(self):
+        ''' reloads the data in the table '''
+
+        config = gremlin.config.Configuration()
+        show_disconnected = config.show_disconnected
+
+        devices = gremlin.joystick_handling.all_joystick_devices()
+        
+        connected_devices = [d for d in devices if d.connected and not d.is_virtual] # list of connected hardware devices
+        connected_vjoy_devices = [d for d in devices if d.connected and d.is_virtual] # list of connected vjoy devices
+        
+        connected_devices.sort(key = lambda d: (d.device_type, d.vendor_id, d.name))
+        connected_vjoy_devices.sort(key = lambda d: d.vjoy_id)
+
+        if show_disconnected:
+            disconnected_devices = [d for d in devices if not d.connected] # list of disconnected devices, including vjoy devices
+            disconnected_devices.sort(key = lambda d: (d.vjoy_id, d.device_type, d.vendor_id, d.name))
+        else:
+            disconnected_devices = []
+
+        
+        
+
+        self.devices = connected_devices + connected_vjoy_devices + disconnected_devices
+
+        self.table.setRowCount(len(self.devices))
+
         for i, entry in enumerate(self.devices):
-            # w_name = QtWidgets.QLineEdit()
-            # w_name.setText(entry.name)
-            # w_name.setReadOnly(True)
-            # w_name.setMinimumWidth(w)
-            # w_name.setMaximumWidth(w)
             self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(entry.name))
             self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(str(entry.axis_count)))
             self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(str(entry.button_count)))
             self.table.setItem(i, 3, QtWidgets.QTableWidgetItem(str(entry.hat_count)))
             self.table.setItem(i, 4, QtWidgets.QTableWidgetItem(f"{entry.vendor_id:04X}"))
             self.table.setItem(i, 5, QtWidgets.QTableWidgetItem(f"{entry.product_id:04X}"))
-
-
-            # guid_field = QtWidgets.QLineEdit()
-            # guid_field.setText(str(entry.device_guid))
-            # guid_field.setReadOnly(True)
-            # guid_field.setMinimumWidth(w)
-            # guid_field.setMaximumWidth(w)
-
             self.table.setItem(i, 6, QtWidgets.QTableWidgetItem(str(entry.device_guid)))
             self.table.setItem(i, 7, QtWidgets.QTableWidgetItem(entry.name.lower()))
+            self.table.setItem(i, 8, QtWidgets.QTableWidgetItem(f"{"Y" if entry.connected else "N"}"))
+
+            # row color
+            is_dark = gremlin.shared_state.is_dark_theme    
+
+            if entry.is_virtual:
+                if is_dark:
+                    color = "#466333" if entry.connected else "#49451D"
+                else:
+                    color = "#7BAC5A" if entry.connected else "#9C923C"
+            else:
+                if is_dark:
+                    color = "#354927" if entry.connected else "#5C432C"
+                else:
+                    color = "#7BAC5A" if entry.connected else "#B38255"
+            qc = QtGui.QColor(color)
+            for col in range(9):
+                self.table.item(i, col).setBackground(qc)
+
+
 
         # resize
         self.table.resizeColumnsToContents()
 
-        # toolbar
 
-        self.tool_widget = QtWidgets.QWidget()
-        self.tool_layout = QtWidgets.QHBoxLayout()
-        self.tool_widget.setLayout(self.tool_layout)
-
-        self.script_copy_button = QtWidgets.QPushButton("Generate plugin script header")
-        self.script_copy_button.clicked.connect(self._copy_to_script)
-        self.tool_layout.addWidget(self.script_copy_button)
-
-        self.close_button = QtWidgets.QPushButton("Close")
-        self.close_button.clicked.connect(lambda: self.close())
-        self.tool_layout.addWidget(self.close_button)
-
-        self.main_layout.addWidget(self.tool_widget)
 
     def eventFilter(self, source, event):
         ''' table event filter '''

@@ -111,16 +111,12 @@ class VJoyProxy:
 
       
 def joystick_devices(): # -> list[DeviceSummary]:
-    """Returns the list of connected joystick like devices 
-    :return list containing information about all joystick like devices
-    """
+    """Returns the list of CONNECTED joysticks """
     return _joystick_devices
 
 
 def all_joystick_devices(): # -> list[DeviceSummary]:
-    """Returns the list of connected and disconnected joystick like devices 
-    :return list containing information about all joystick like devices
-    """
+    """Returns the list of CONNECTED AND DISCONNECTED  devices  """
     return _all_joystick_devices
 
 
@@ -299,7 +295,7 @@ def get_curved_axis(guid, axis_id):
             osc.start()
             data = osc.getData(axis_id.message) # gets data arguments or None if no data
             if data is None:
-                data = 0 # default is centered
+                data = 0 # default is centeredv
             return data
         
     return None
@@ -313,11 +309,10 @@ def get_axis(guid, index, normalized = True, translate = True):
     '''
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
-    if is_hardware_device(guid):
+    dev : dinput.DeviceSummary = device_info_from_guid(guid)
+    if dev and dev.axis_count:
         if translate:
-            dev = device_info_from_guid(guid)
-            if dev.device_type == DeviceType.Joystick and hasattr(dev,"axis_id_map") and index in dev.axis_id_map:
-                index = dev.axis_id_map[index]
+            index = dev.linear_index_from_assigned(index)
         value = dinput.DILL.get_axis(guid, index)
         if normalized:
             return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
@@ -513,7 +508,7 @@ def removeDevice(dev):
         
         _all_joystick_devices = [d for d in _all_joystick_devices if d.device_guid != device_guid]
         if dev.device_type == DeviceType.VJoy:
-            _vjoy_devices_map = [d for d in _vjoy_devices_map if d.device_guid != device_guid]
+            _vjoy_devices_map = {d.vjoy_id: d for d in _vjoy_devices_map if d.device_guid != device_guid}
             
         _joystick_devices = [d for d in _joystick_devices if d.device_guid != device_guid]
 
@@ -908,7 +903,7 @@ def joystick_devices_initialization():
             else:
                 device : dinput.DeviceSummary = dinput_vjoy_device_map[dinput_key]
                 device.vjoy_id = vjoy_index
-                device.setConnected(True)
+                device.setConnected(True) # connected means the VJOY device is not only shown in the API but also with DINPUT.
                 syslog.info(f"VJOY device [{vjoy_index}] matched to DINPUT device [{device.device_id}]")
                 _all_vjoy_devices_map[vjoy_index] = device
                 _vjoy_devices_map[vjoy_index] = device
@@ -930,7 +925,7 @@ def joystick_devices_initialization():
         config_map[vjoy_index] = (False, 8, count, 4) # fake configuration, varies by button count only
         device = _all_vjoy_devices_map[vjoy_index]
         device.button_count = count # update unique button count for disconnected devices
-        device.name = f"(disc) Vjoy {device.axis_count}/{device.button_count}/{device.hat_count} ({vjoy_index})"
+        device.name = f"Vjoy {device.axis_count}/{device.button_count}/{device.hat_count} ({vjoy_index})"
     
 
     for vjoy_index in range(1,17):  # list all possible vjoy devices index 1 up to 16

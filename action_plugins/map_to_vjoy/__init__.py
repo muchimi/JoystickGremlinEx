@@ -53,6 +53,7 @@ from functools import partial
 import psygnal
 from psygnal import Signal
 from gremlin.types import SyncMode
+import vjoy.vjoy
 
 
 IdMapToButton = -2 # map to button special ID
@@ -6256,6 +6257,152 @@ Supports axis merging, curved output, command, hat and button mappings.
         if self.vjoy_device_id is None or self.vjoy_input_id is None:
             return False
         return True
+    
+    def report_data(self) -> tuple:
+        ''' returns reporting row data for this action '''
+        rows = ("VJOY Remap")
+        rows.add(f"Mode: {VjoyAction.to_description(self.action_mode)}")
+        rows.add(f"VJOY: {self.vjoy_device_id}",
+                 f"Type: {self.action_type.name}",)
+        match self.action_mode:
+            case VjoyAction.VJoyAxis:
+                rows.add(f"Axis: {self.vjoy_axis_id}")
+            case VjoyAction.VJoyMergeAxis:
+                for data in self.action_data._merge_data:
+                     device_id, input_id = data.key
+                     device = gremlin.joystick_handling.device_info_from_guid(device_id)
+                     rows+= ((f"Merge: {device.name}", f"Axis: {input_id}"))
+            case VjoyAction.VJoyButton:
+                rows +=(f"Button: {self.vjoy_button_id}")
+            case VjoyAction.VJoyButtonPress:
+                rows +=(f"Button (press): {self.vjoy_button_id}")
+            case VjoyAction.VJoyButtonRelease:
+                rows +=(f"Button (release): {self.vjoy_button_id}")
+            case VjoyAction.VJoyToggle:
+                rows +=(f"Button (toggle): {self.vjoy_button_id}")
+            case VjoyAction.VJoyAxisToButton:
+                rows +=(f"Button (axis to button): {self.vjoy_button_id}")
+                rows +=(f"Range: [{self.button_range_min:0.3f},{self.button_range_max:0.3f}]")
+                rows +=(f"Mode: {self.button_mode.name}")
+            case VjoyAction.VJoyPulse:
+                rows += (f"Button (pulse): {self.vjoy_button_id}", 
+                         f"Pulse: {self.pulse_delay}ms")
+                if self.pulse_repeat:
+                    rows += (
+                        f"Repeat: {"yes" if self.pulse_repeat else "no"}",
+                        f"Repeat Delay: {self.pulse_repeat_delay}ms"                        
+                        )
+            case VjoyAction.VJoyInvertAxis:
+                rows += ("Invert Axis")
+            case VjoyAction.VJoySetAxis:
+                if self.use_relative_value:
+                    rows += (f"Set axis relative: {self.target_value:0.3f}")    
+                else:
+                    rows += (f"Set axis: {self.target_value:0.3f}")
+            case VjoyAction.VJoyDisableLocal:
+                rows += ("Disable local control")
+            case VjoyAction.VJoyDisablePairedRemote:
+                rows += ("Disable paired remote")
+            case VjoyAction.VJoyEnableLocal:
+                rows += ("Enable local control")                
+            case VjoyAction.VJoyEnableLocalAndRemote:
+                rows += ("Enable local and remote control")
+            case VjoyAction.VJoyEnableRemote:
+                rows += ("Disable remote control")
+            case VjoyAction.VJoyHat:
+                rows += ("Set hat position")
+            case VjoyAction.VJoyHatToButton:
+                for position in self.hat_map:
+                    input_id = self.action_data.hat_map[position]
+                    rows += (f"{vjoy.vjoy.Hat.direction_to_name(position)}: {input_id}")
+            case VjoyAction.VJoySetAxisStepped:
+                rows += ("Set stepped axis")
+            case _:
+                rows += self.action_mode.name
+                
+        return rows
+                
+    def report_record(self) -> tuple:
+        ''' returns reporting row record data for this action in graphvis format '''
+        
+        label = ""
+        label += f"| Mode | {VjoyAction.to_description(self.action_mode)} "
+        label += f"| VJoy ID | {self.vjoy_device_id}"
+
+        content = ""
+        
+
+        match self.action_mode:
+            case VjoyAction.VJoyAxis:
+                content += f"Axis | {self.vjoy_axis_id}"
+            case VjoyAction.VJoyMergeAxis:
+                content += "Merge"
+                subcontent = ""
+                for data in self.action_data._merge_data:
+                     device_id, input_id = data.key
+                     device = gremlin.joystick_handling.device_info_from_guid(device_id)
+                     subcontent += f"{device.name} | Axis: {input_id}"
+                content += f"| {{{subcontent}}}"
+            case VjoyAction.VJoyButton:
+                content += f"Button Hold | {self.vjoy_button_id}"
+            case VjoyAction.VJoyButtonPress:
+                content += f"Button Press | {self.vjoy_button_id}"
+            case VjoyAction.VJoyButtonRelease:
+                content += f"Button Release | {self.vjoy_button_id}"
+            case VjoyAction.VJoyToggle:
+                content += f"Button Toggle | {self.vjoy_button_id}"
+            case _:
+                content += f"{self.action_mode.name}"
+                
+            # case VjoyAction.VJoyAxisToButton:
+            #     rows +=(f"Button (axis to button): {self.vjoy_button_id}")
+            #     rows +=(f"Range: [{self.button_range_min:0.3f},{self.button_range_max:0.3f}]")
+            #     rows +=(f"Mode: {self.button_mode.name}")
+            # case VjoyAction.VJoyPulse:
+            #     rows += (f"Button (pulse): {self.vjoy_button_id}", 
+            #              f"Pulse: {self.pulse_delay}ms")
+            #     if self.pulse_repeat:
+            #         rows += (
+            #             f"Repeat: {"yes" if self.pulse_repeat else "no"}",
+            #             f"Repeat Delay: {self.pulse_repeat_delay}ms"                        
+            #             )
+            # case VjoyAction.VJoyInvertAxis:
+            #     rows += ("Invert Axis")
+            # case VjoyAction.VJoySetAxis:
+            #     if self.use_relative_value:
+            #         rows += (f"Set axis relative: {self.target_value:0.3f}")    
+            #     else:
+            #         rows += (f"Set axis: {self.target_value:0.3f}")
+            # case VjoyAction.VJoyDisableLocal:
+            #     rows += ("Disable local control")
+            # case VjoyAction.VJoyDisablePairedRemote:
+            #     rows += ("Disable paired remote")
+            # case VjoyAction.VJoyEnableLocal:
+            #     rows += ("Enable local control")                
+            # case VjoyAction.VJoyEnableLocalAndRemote:
+            #     rows += ("Enable local and remote control")
+            # case VjoyAction.VJoyEnableRemote:
+            #     rows += ("Disable remote control")
+            # case VjoyAction.VJoyHat:
+            #     rows += ("Set hat position")
+            # case VjoyAction.VJoyHatToButton:
+            #     for position in self.hat_map:
+            #         input_id = self.action_data.hat_map[position]
+            #         rows += (f"{vjoy.vjoy.Hat.direction_to_name(position)}: {input_id}")
+            # case VjoyAction.VJoySetAxisStepped:
+            #     rows += ("Set stepped axis")
+            # case _:
+            #     rows += self.action_mode.name
+                
+        if content:
+            label += f"| {{{content}}}"
+
+
+        return label                         
+            
+                         
+        
+                     
 
 
     def __str__(self):

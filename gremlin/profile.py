@@ -1036,7 +1036,7 @@ class ProfileConverter:
         # change value for button macro actions from boolean to actual action names
         nodes = root.xpath("//macro/actions/vjoy[@input-type='button']")
         for node in nodes:
-            value = safe_read(node, "value", "")
+            value = safe_read(node, "value", str, "")
             new_value = None
             match value.casefold():
                 case "true":

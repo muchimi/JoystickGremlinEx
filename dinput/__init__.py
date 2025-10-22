@@ -427,8 +427,30 @@ class DeviceSummary:
         """
         import gremlin.util
         import gremlin.config
+        import gremlin.types
         self._connected = False # true if device is connected
         self.disabled = False # true if the device is disabled in GremlinEx
+        self.axis_count = 0
+        self.button_count = 0
+        self.hat_count = 0
+        self.linear_id_map = {} # map of linear ID to axis ID
+        self.usage_page = 0 # HID usage page
+        self.usage = 0 # HID usage
+        self.axis_names = []
+        self.axismap_list = []
+        self.axis_id_map = {} # map of axis ID to linear ID
+        self.linear_id_map = {} # map of linear ID to axis ID      
+        self.input_enabled = False
+        self.vjoy_id = -1  
+        self.vendor_id = 0
+        self.name = None
+        self.is_special = False
+        self._device_type = gremlin.types.DeviceType.NotSet
+        self.data={}  # tracked data for this device, example, stepped index data for an axis
+        self._get_button_callback = None # custom callback to read a button value from this device if a special device
+        self._get_axis_callback = None # custom callback to read an axis value from this device if a special device
+        self._get_hat_callback = None # custom callback to read a hat value if this device is a special device
+
         if data is not None:    
             self.device_guid = GUID(data.device_guid)
             self.device_id = gremlin.util.normalize_guid(self.device_guid)
@@ -455,58 +477,56 @@ class DeviceSummary:
             self.axis_count = data.axis_count
             self.button_count = data.button_count
             self.hat_count = data.hat_count
-            self.axismap_list = []
-            self.axis_id_map = {} # map of axis ID to linear ID
-            self.linear_id_map = {} # map of linear ID to axis ID
             self.usage_page = data.usage_page
             self.usage = data.usage
-            self.axis_names = []
+            
             logical_count = 0
             self.input_enabled = True # allow usage as an input device by default for special and physical devices
+            index = 0
             for am in data.axis_map:
+                index += 1
                 if am.axis_index == 0:
-                    continue # no mapped
-                axis_map = AxisMap(am)
-                self.axismap_list.append(axis_map)
-                axis_name = axis_map.getName()
-                self.axis_id_map[am.axis_index] = am.linear_index
-                self.linear_id_map[am.linear_index] = am.axis_index
+                    self.axis_id_map[index] = index
+                    self.linear_id_map[index] = index
+                    axis_name = f"{index}"
+                else:                    
+                    axis_map = AxisMap(am)
+                    self.axismap_list.append(axis_map)
+                    axis_name = axis_map.getName()
+                    self.axis_id_map[am.axis_index] = am.linear_index
+                    self.linear_id_map[am.linear_index] = am.axis_index
                 
                 if not axis_name:
                     # axis name is not reporting in via directinput
-                    axis_name = f"({axis_map.linear_index+1})"
+                    axis_name = f"{index}"
                 else:
                     logical_count += 1
 
                 # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
                 self.axis_names.append(axis_name)
-            self.vjoy_id = -1
+            
             self._connected = True # if dinput data is provided, the device is marked as connected
 
-        else:
-            self.device_guid = None
-            self.device_id = None
-            self._device_type = gremlin.types.DeviceType.Joystick # assume it's joystick by default
-            self.vendor_id = None
-            self.product_id = None
-            self.joystick_id = None
-            self.name = None
-            self.axis_count = 0
-            self.button_count = 0
-            self.hat_count = 0
-            self.axismap_list = []
-            self.usage_page = None
-            self.usage = None
-            self.axis_names = []
-            logical_count = 0
-            self.input_enabled = False # do not allow usage as an input device
-            self.vjoy_id = -1
-        self.is_special = False
-        self.data={}  # tracked data for this device, example, stepped index data for an axis
-
-        self._get_button_callback = None # custom callback to read a button value from this device if a special device
-        self._get_axis_callback = None # custom callback to read an axis value from this device if a special device
-        self._get_hat_callback = None # custom callback to read a hat value if this device is a special device 
+        # else:
+        #     self.device_guid = None
+        #     self.device_id = None
+        #     self._device_type = gremlin.types.DeviceType.Joystick # assume it's joystick by default
+        #     self.vendor_id = None
+        #     self.product_id = None
+        #     self.joystick_id = None
+        #     self.name = None
+        #     self.axis_count = 0
+        #     self.button_count = 0
+        #     self.hat_count = 0
+        #     self.axismap_list = []
+        #     self.usage_page = None
+        #     self.usage = None
+        #     self.axis_names = []
+        #     logical_count = 0
+        #     self.input_enabled = False # do not allow usage as an input device
+        #     self.vjoy_id = -1
+        
+ 
 
     def setAxisCallback(self, callback):
         ''' sets a custom axis callback to get an axis value (parameter is the axis number) '''
@@ -539,6 +559,19 @@ class DeviceSummary:
         if self._get_hat_callback:
             return self._get_hat_callback(hat)
         return DILL.get_hat(self.device_guid, hat)
+    
+    def linear_index_from_assigned(self, index : int):
+        ''' converts an assigned (display) axis index to the linear DINPUT axis '''
+        if index in self.axis_id_map:
+            index = self.axis_id_map[index]
+        return index
+    
+    def assigned_index_from_linear_(self, index : int):
+        ''' converts from a linear DiNPUT axis to the display axis index '''
+        if index in self.linear_id_map:
+            return self.linear_id_map[index]
+        return index
+
         
 
     @property

@@ -2656,6 +2656,13 @@ class Configuration(QtCore.QObject):
         self._set_data("vjoy_show_disconnected", value)
 
     @property
+    def show_disconnected(self) -> bool:
+        return self._get_data("show_disconnected", False)
+    @show_disconnected.setter
+    def show_disconnected(self, value : bool):
+        self._set_data("show_disconnected", value)        
+
+    @property
     def graphviz_executable(self) -> str:
         ''' path to graph viz executable '''
         return self._get_data("graphviz_executable","")

@@ -132,14 +132,15 @@ class ProfileSettingsWidget(QDataWidget):
         box_layout.addWidget(grid_widget)
         box_layout.addStretch()
 
-        for dev in sorted(gremlin.joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id):
+        vjoy_devices = sorted(gremlin.joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id)
+        for dev in vjoy_devices:
             # Only show devices that are not treated as inputs
-            if not dev.connected:
-                # device is disconnected
-                continue
-            if self.profile_settings.vjoy_as_input.get(dev.vjoy_id) is True:
-                continue
-
+            # if not dev.connected:
+            #     # device is disconnected
+            #     continue
+            # if self.profile_settings.vjoy_as_input.get(dev.vjoy_id) is True:
+            #     continue
+            # update: allow vjoy devices used as input to be configured on profile start as we now support concurrent output/input
 
             dialog_widget = gremlin.ui.ui_common.Buttons.getEditWidget(callback = partial(self._edit_dialog, dev), label = f"Edit {dev.name} #{dev.vjoy_id}")
             grid_layout.addWidget(dialog_widget, row, col)
@@ -725,7 +726,8 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
             "used like a physical device, i.e. it can be forwarded to other "
             "vJoy devices or triggering actions. When vJoy is used in this way, it is possible to create "
             "endless loops if the input triggers the output that is also used as input. "
-            "Care should be used to prevent this situation. "
+            "Care should be used to prevent this situation."
+            "NOTE: This list only shows connected VJOY devices."
         )
 
         background_color = gremlin.ui.ui_common.Color.highlightBackgroundColor()

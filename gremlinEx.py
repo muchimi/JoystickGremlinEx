@@ -4203,6 +4203,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         :param file_format the format of the cheatsheet, html or pdf
         """
+        import gremlin.ui.ui_common
+        
+        gremlin.ui.ui_common.MessageBox(prompt="This feature is not currently available.")
+        return # disable in this version
 
         import gremlin.reporting
         report = gremlin.reporting.ReportEngine()
