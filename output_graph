@@ -1,0 +1,163 @@
+digraph G {
+graph [ label = "Profile Mappings for test_vjoy_as_input"
+labelloc = t
+fontsize = 20
+layout = dot
+rankdir = LR
+newrank = true
+]
+page="8.5, 11";
+size="30,30!";
+rankdir=LR;
+nodesep=0.8;
+ranksep=1.5;
+fontname="Helvetica,Arial,sans-serif";
+
+                        subgraph cluster_0 {
+                            style=filled;
+                            color=lightgrey;
+                            rankdir=LR;
+                            node [style=filled,shape=plaintext,fontname="Helvetica"];
+                        "b1bfc47bb5e44c3eb4fd2b8b2faf0f6c" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="0" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">
+<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Name</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">VJoy 8/128/4 (1)</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Type</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Joystick</TD>
+</TR>
+</TABLE>
+
+</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">
+<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">ID</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">2d3260a06fa611e78002444553540000</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Mappings</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">1</TD>
+</TR>
+</TABLE>
+
+</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "#7DC082"];
+"a766667c611c4efa9193fd430c76c44b" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Mode</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Default</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "#B07DC0"];
+"e4ac5872a1e84f589b5bc725b1d2df35" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Input</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">1</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Name</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Button 1</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "#B1C07D"];
+"c0f2a5f2e0e646c5b6b0d05d5afd8180" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Container</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Basic</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "#7DB6C0"];
+"dc06100de0334bde8079e7f337bb6387" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Action</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Map to State</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "None"];
+"b1bfc47bb5e44c3eb4fd2b8b2faf0f6c" -> "a766667c611c4efa9193fd430c76c44b";
+"a766667c611c4efa9193fd430c76c44b" -> "e4ac5872a1e84f589b5bc725b1d2df35";
+"e4ac5872a1e84f589b5bc725b1d2df35" -> "c0f2a5f2e0e646c5b6b0d05d5afd8180";
+"c0f2a5f2e0e646c5b6b0d05d5afd8180" -> "dc06100de0334bde8079e7f337bb6387";
+
+}
+
+                        subgraph cluster_1 {
+                            style=filled;
+                            color=lightgrey;
+                            rankdir=LR;
+                            node [style=filled,shape=plaintext,fontname="Helvetica"];
+                        "d49f5637f2b64de390cdea48f7219a65" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="0" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">
+<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Name</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">LEFT VPC Stick WarBRD</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Type</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Joystick</TD>
+</TR>
+</TABLE>
+
+</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">
+<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">ID</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">c8d925a058e311f08002444553540000</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Mappings</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">1</TD>
+</TR>
+</TABLE>
+
+</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "#7DC082"];
+"fbd5be3aecbf4eb3b3488a1cdddb9acb" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Mode</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Default</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "#B07DC0"];
+"2ba5ed4e686b45aca737da760f5ccfcd" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Input</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">12</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Name</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Button 12</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "#B1C07D"];
+"fdac8ae5bd6c447d8bde0687046b67eb" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Container</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Basic</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "#7DB6C0"];
+"98b57686679046e48383df7d8fab6a57" [label = <<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Action</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Vjoy Remap</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4"> </TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4"><TABLE BORDER="0" CELLBORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Mode</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">VJoyButton</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Vjoy Device</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">1</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Output Type:</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">Button</TD>
+</TR>
+<TR><TD BORDER="1" VALIGN="TOP" CELLPADING="4">Button (hold)</TD>
+<TD BORDER="1" VALIGN="TOP" CELLPADING="4">1</TD>
+</TR>
+</TABLE>
+</TD>
+</TR>
+</TABLE>
+>, shape= "none", fillcolor = "None"];
+"d49f5637f2b64de390cdea48f7219a65" -> "fbd5be3aecbf4eb3b3488a1cdddb9acb";
+"fbd5be3aecbf4eb3b3488a1cdddb9acb" -> "2ba5ed4e686b45aca737da760f5ccfcd";
+"2ba5ed4e686b45aca737da760f5ccfcd" -> "fdac8ae5bd6c447d8bde0687046b67eb";
+"fdac8ae5bd6c447d8bde0687046b67eb" -> "98b57686679046e48383df7d8fab6a57";
+
+}
+
+}

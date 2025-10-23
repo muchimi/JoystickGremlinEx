@@ -123,7 +123,7 @@ import gremlin.tts
 
 from gremlin.util import log_sys_error, compare_path
 import gremlin.util
-import pydot
+import graphviz
 
 
 # Figure out the location of the code / executable and change the working
@@ -180,7 +180,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.shared_state.ui = self
 
         super().__init__("main_window", parent)
-        
+
         self.ui = Ui_Gremlin()
         self.ui.setupUi(self)
   
@@ -383,9 +383,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # device. Sleep for a bit to avert race with devices being added
         # when they already exist.
 
-        time.sleep(0.1)
         el._init_joysticks()
-        el.device_change_event.connect(self._device_change_cb)
+  
 
         #self.apply_user_settings()
         self._apply_window_settings()
@@ -396,6 +395,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.ui.update_toolbar()
         el.config_option_changed.connect(self._config_option_changed)
+        el.device_change_event.connect(self._device_change_cb)
 
     def _update_toolbar(self):
         ''' updates the toolbar when the toolbar changes '''
@@ -3641,8 +3641,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _device_change_ui(self):
         """Handles addition and removal of joystick devices."""
-        # Update device tabs
 
+        if not gremlin.joystick_handling.joystick_initialized():
+            # not initialized yet
+            return
+        
+
+        # Update device tabs
         gremlin.util.pushCursor() # long running op
 
         # record the device change
@@ -4205,8 +4210,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """
         import gremlin.ui.ui_common
         
-        gremlin.ui.ui_common.MessageBox(prompt="This feature is not currently available.")
-        return # disable in this version
+        # gremlin.ui.ui_common.MessageBox(prompt="This feature is not currently available.")
+        # return # disable in this version
 
         import gremlin.reporting
         report = gremlin.reporting.ReportEngine()

@@ -314,7 +314,7 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
-        self.vjoy_device_id = action.vjoy_device_id
+        self.vjoy_id = action.vjoy_id
         self.vjoy_input_id = action.vjoy_input_id
         self.input_type = action.input_type
         self.axis_mode = action.axis_mode
@@ -341,8 +341,8 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 value = event.value
             
             if self.axis_mode == "absolute":
-                if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_device_id):
-                    joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+                if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                    joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
             else:
                 self.should_stop_thread = abs(event.value) < 0.05
                 self.axis_delta_value = \
@@ -356,25 +356,25 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     self.thread.start()
 
         elif input_type == InputType.JoystickButton:
-            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_device_id):
+            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                 if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
                         and event.is_pressed \
                         and self.needs_auto_release:
-                    input_devices.ButtonReleaseActions().register_button_release((self.vjoy_device_id, self.vjoy_input_id),event)
-                    joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = event.is_pressed
+                    input_devices.ButtonReleaseActions().register_button_release((self.vjoy_id, self.vjoy_input_id),event)
+                    joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = event.is_pressed
                 
             
 
         elif input_type == InputType.JoystickHat:
-            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_device_id):
-                joystick_handling.VJoyProxy()[self.vjoy_device_id].hat(self.vjoy_input_id).direction = value.current
+            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = value.current
 
         return True
 
     def relative_axis_thread(self):
-        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_device_id):
+        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
             self.thread_running = True
-            vjoy_dev = joystick_handling.VJoyProxy()[self.vjoy_device_id]
+            vjoy_dev = joystick_handling.VJoyProxy()[self.vjoy_id]
             self.axis_value = vjoy_dev.axis(self.vjoy_input_id).value
             while self.thread_running:
                 try:
@@ -436,7 +436,6 @@ Use Vjoy Remap instead.'''
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
         self.parent = parent
-        self.vjoy_device_id = None
         self.vjoy_input_id = None
         input_type = self.get_input_type()
         self._input_type = input_type
@@ -525,7 +524,7 @@ Use Vjoy Remap instead.'''
         """
         try:
             
-            self.vjoy_device_id = safe_read(node, "vjoy", int, 1)
+            self._vjoy_id = safe_read(node, "vjoy", int, 1)
             
             if "axis" in node.attrib:
                 self.input_type = InputType.JoystickAxis
@@ -551,7 +550,7 @@ Use Vjoy Remap instead.'''
                 self.axis_scaling = safe_read(node, "axis-scaling", float, 1.0)
         except ProfileError:
             self.vjoy_input_id = None
-            self.vjoy_device_id = None
+            self.vjoy_id = None
 
     def _generate_xml(self):
         """Returns an XML node encoding this action's data.

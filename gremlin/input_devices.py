@@ -1073,7 +1073,7 @@ class RemoteServer(QtCore.QObject):
 
 
 @gremlin.singleton_decorator.SingletonDecorator
-class RemoteClient(QtCore.QObject):
+class RemoteClient():
     """ Provides access to a remote Gremlin instance """
 
     class ClientMode(enum.Enum):
@@ -1085,12 +1085,6 @@ class RemoteClient(QtCore.QObject):
 
     def __init__(self):
         """Initialises a new object."""
-        QtCore.QObject.__init__(self)
-        #self._host = "localhost"
-        #config = gremlin.config.Configuration()
-        # self._port = config.broadcast_port
-        # self._broadcast_host = config.broadcast_host_ip
-        # self._broadcast_enabled = config.enable_remote_broadcast
 
         self._sock = None
         # unique ID of this client
@@ -1155,8 +1149,8 @@ class RemoteClient(QtCore.QObject):
 
     def _alive_ticker(self):
         ''' sends an alive packet to keep the ports alive '''
-
-        if self._broadcast_enabled:
+        enabled = gremlin.config.Configuration().enable_remote_broadcast
+        if enabled:
                 data = {}
                 data["sender"] = self._id
                 data["action"] = "hb"

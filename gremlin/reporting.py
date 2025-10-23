@@ -16,8 +16,8 @@
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
 
-
-import pydot
+from __future__ import annotations
+import graphviz
 import os
 import gremlin.util
 import gremlin.ui.ui_common
@@ -31,8 +31,21 @@ import enum
 import dinput
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
+from collections import namedtuple
 
 syslog = logging.getLogger("system")
+
+class CellInfo():
+    def __init__(self, text : str,  border : int = None, padding : int = None, valign : int = None ):
+        self.value = text
+        self.border = border
+        self.padding = padding
+        self.valign = valign
+
+    def toCell(self) -> ReportCell:
+        cell = ReportCell(self.text, self.border, self.padding, self.valign)
+        return cell
+
          
 
 class ReportNodeType(enum.Enum):
@@ -44,73 +57,172 @@ class ReportNodeType(enum.Enum):
     Action = 6
 
 class ReportCell():
-    def __init__(self, value, border : int = None, padding : int = None, valign : int = None ):
+    def __init__(self, index, value : str | CellInfo , border : int = None, cellpadding : int = 4, valign : int = None, port = None):
+        self.index = index # column index 0 to ...
+        if isinstance(value, CellInfo):
+            self.value = value.value
+            self.border = value.border
+            self.cellpadding = value.cellpadding
+            self.valign = value.valign
+            self.port = port
+            return
+        
         self.value = value
         self.border = border
-        self.padding = padding
+        self.cellpadding = cellpadding
         self.valign = valign
+        self.port = port
 
     def to_html(self) -> str:
         border_stub = f' BORDER="{self.border}"' if self.border is not None else ""
         valign_stub = f' VALIGN="{self.valign}"' if self.valign is not None else ""
-        return f"<TD{border_stub}{valign_stub}>{self.value}</TD>"
+        port_stub = f' PORT="{self.port}"' if self.port is not None else "" # graphviz port
+        cellpadding_stub = f' CELLPADING="{self.cellpadding}"' if self.cellpadding is not None else ""
+
+        # render to HTML if needed
+        if hasattr(self.value,"to_html"):
+            html = f"\n{self.value.to_html()}\n"
+        else:
+            html = self.value
+        return f"<TD{border_stub}{valign_stub}{cellpadding_stub}{port_stub}>{html}</TD>\n"
 
 class ReportRow():
     ''' single report cell '''
-    def __init__(self, columns : int = None ):
+    def __init__(self, index : int ,  data : str | CellInfo | list[CellInfo] = None, border : int = None, padding : int = None, valign : str =None):
+        ''' creates a row - data can be a list of strings or CellInfo objects '''
         self.cells = {}
-        self.columns = columns # automatic
-        self._next_index = 0
+        self.index = index # row index 0 to ...
+        if data:
+            if hasattr(data, "__iter__"):
+                insert_index = index
+                for item in data:
+                    self.addCell(insert_index, item, border, padding, valign)
+                    insert_index += 1
+            else:
+                self.addCell(index, item, border, padding, valign)
 
     def to_html(self) -> str:
-        tr = "<TR>"
-        col = 1
         if self.cells:
-            populated_list = [index for index in self.cells]
-            populated_list.sort()
-            for index in populated_list:
-                cell = self.cells[index]
-                while index > col:
-                    # pad
-                    tr += "<TD></TD>"
-                    col += 1
+            tr = "<TR>"
+            cell_order = [index for index in self.cells]
+            cell_order.sort()
+            current_index = 0
+            for cell_index in cell_order:
+                # while cell_index > current_index:
+                #     tr += "<TD> </TD>\n" # cannot use </TD> in DOT
+                #     current_index += 1
+                cell = self.cells[cell_index]
                 tr += cell.to_html()
-        tr += "</TR>"
+            tr += "</TR>\n"
+        else:
+            return "" # "<TR><TD> </TD></TR>\n"
         return tr
     
-    def addCell(self, value, border = None, padding = None, valign=None):
+    def addCell(self, index : int, value : str | CellInfo, border : int = None, padding : int = None, valign : str =None):
         if not hasattr(value, "__iter__"):
             values = [value]
         else:
             values = value
-        
-        index = self._next_index
+      
+        insert_index = index
         for value in values:
-            cell = ReportCell(value, border, padding, valign)
-            self.cells[index] = cell
-            index += 1
+            cell = ReportCell(insert_index, value, border, padding, valign)
+            self.cells[insert_index] = cell
+            insert_index += 1
 
-        self._next_index = index
+    def setCell(self, index : int, value, border = None, valign = None, port = None):
+        ''' adds a cell to the row at the specified index '''
+        if isinstance(value, ReportCell):
+            self.cells[index] = value
+        else:
+            cell = ReportCell(index, value, border = border, valign = valign, port = port)
+            self.cells[index] = cell
+                
+
+    def clear(self):
+        ''' removes cells '''
+        self.cells.clear()
     
 class ReportTable():
-    def __init__(self):
-        self.rows = []
-        self.border = None
-        self.padding = None
-        self.cellborder = None
+    def __init__(self, border : int = 0, cellpadding : int = 0, cellborder : int = 1, cellspacing = 0):
+        self.rows = {}
+        self.border = border
+        self.cellpadding = cellpadding
+        self.cellborder = cellborder
+        self.cellspacing = cellspacing
 
     def to_html(self):
         border_stub = f' BORDER="{self.border}"' if self.border is not None else ""
-        valign_stub = f' VALIGN="{self.valign}"' if self.valign is not None else ""
+        cellborder_stub = f' CELLBORDER="{self.cellborder}"' if self.cellborder is not None else ""
         cellpadding_stub = f' CELLPADDING="{self.cellpadding}"' if self.cellpadding is not None else ""
-        tb = f"<TABLE{border_stub}{valign_stub}{cellpadding_stub}>"
-        for row in self.rows:
+        cellspacing_stub = f' CELLSPACING="{self.cellspacing}"' if self.cellspacing is not None else ""
+        tb = f"<TABLE{border_stub}{cellborder_stub}{cellpadding_stub}{cellspacing_stub}>\n"
+        
+
+        # assume a sparse matrix of rows if they are not continuous
+        row_order = [index for index in self.rows]
+        row_order.sort()
+        
+        for row_index in row_order:
+            # while row_index > current_index:
+            #     # pad rows
+            #     tb += "<TR><TD> </TD></TR>\n" # cannot use </TR> in DOT or have blanks
+            #     current_index += 1
+            row = self.rows[row_index]
             tb += row.to_html()
-        tb+= "</TABLE"
+        tb+= "</TABLE>\n"
         return tb
+    
+    def addRow(self, index : int,  data : list[object | list[CellInfo] | list[object]] = None,  border : int = None, padding : int = None, valign : str =None):
+        if hasattr(data,"__iter__"):
+            # rows and cells
+            values = data
+        else:
+            # single cell
+            values = [data]
+
+        current_index = index
+        for item in values:
+            row = ReportRow(index, item, border, padding, valign)
+            self.rows[current_index] = row
+            current_index += 1
+
+    def addField(self, field_name  : str, value : str, border = 1, valign = "TOP", port = None):
+        ''' adds a field - two cells - in a row 
+        :param field_name : first cell name
+        :param value : second cell
+        :param index : optional, index - if not provided, automatic
+        
+        '''
+        if self.rows:
+            index = len(self.rows)
+        else:
+            index = 0
+        row = ReportRow(index)
+        cell1 = ReportCell(0,field_name, border = border, valign=valign, port = port)
+        cell2 = ReportCell(1,value, border = border, valign=valign)
+        row.setCell(0,cell1)
+        row.setCell(1,cell2)
+      
+        self.rows[index] = row
+
+    def setCell(self, row : int, col : int, cell, border = 1, valign = "TOP", port = None):
+        ''' sets a specific cell in the table'''
+        row_object : ReportRow
+        if row in self.rows:
+            row_object = self.rows[row]
+        else:
+            row_object = ReportRow(row)
+            self.rows[row] = row_object
+
+        row_object.setCell(col, cell, border, valign, port)
 
         
 
+        
+    def clear(self):
+        ''' removes rows'''
+        self.rows.clear()
 
 
 class ReportNode(anytree.NodeMixin):
@@ -121,8 +233,14 @@ class ReportNode(anytree.NodeMixin):
         self.table = ReportTable() # HTML representation of the node
         
 
-    def addRow(self):
-        pass
+    def addRow(self, index, data : list[str | list[CellInfo] | list[str]] = None,  border : int = None, padding : int = None, valign : str =None):
+        ''' adds a data row - row data is a list of cells'''
+        self.table.addRow(index, data, border, padding, valign)
+
+    def clear(self):
+        ''' removes all rows '''
+        self.table.clear()
+       
 
 
 
@@ -257,39 +375,38 @@ class ReportEngine():
         for child in node.children:
             self._convert_tree(child)
 
-    def _generate_table(self, rows : list | tuple):
-        ''' generates an HTML table based on row data - row data can contain different data tuples as well '''
-        row = rows if hasattr(rows,"__iter__") else [rows]
-        if rows:
-            tb = "<TABLE>"
-            for row in rows:
-                tr = "<TR>"
-                items = row if hasattr(row,"__iter__") else [row]
-                for item in items:
-                    if isinstance(item, tuple):
-                        # text, col span
-                        td = f"<TD colspan='{item[1]}'>{item[0]}</TD>"
-                    else:
-                        td = f"<TD>{item}</TD>"
-                tr += td
-                tb += tr
-            tb += "</TABLE"
-            return tb
-        return None
 
-
-    def _get_shape_label(self, node):
+    def _get_shape_label(self, node) -> tuple:
         ''' gets an HTML representation of the node for display purposes, returns shape, label '''
         rows = None
         match node.node_type:
             case ReportNodeType.Device:
                 # device node
                 device : dinput.DeviceSummary = node.data
-                # "hello\nworld |{ b |{c|<here> d|e}| f}| g | h"
-                #label = f"{{ \\l Device | \\l {device.name}\n{device.device_type.name} }} | {{ \\l ID | \\l{device.device_id} }}"
-                label = f"Device | {{ {{Name | {device.name}}} {{Type | {device.device_type.name} }} }} {{ ID | {device.device_id} }}"
-                syslog.info(label)
-                return "record", label
+
+                table = ReportTable()
+                device_table = ReportTable(cellpadding=4) # cell 1
+                info_table = ReportTable(cellpadding=4) # cell 2
+
+                device_table.addField("Name", device.name)
+                device_table.addField("Type", device.device_type.name)
+
+                syslog.info("DEVICE TABLE:")
+                syslog.info(device_table.to_html())
+
+                
+                info_table.addField("ID", device.device_id)
+                info_table.addField("Mappings", f"{len(node.children):,}")
+
+
+                table.setCell(0,0, device_table)
+                table.setCell(0,1, info_table)
+                
+                label = f"<{table.to_html()}>"
+                #syslog.info(label)
+                return "none", label
+                
+                
             
             case ReportNodeType.Mode:
                 # mode node
@@ -297,34 +414,57 @@ class ReportEngine():
                 mode = mode_object.name
                 if mode == gremlin.shared_state.master_mode:
                     mode = "Master Mode"
-                label = f"Mode | {mode}"
-                return "record", label
+
+                table = ReportTable(cellpadding=4)
+                table.addField("Mode",mode) 
+
+                label = f"<{table.to_html()}>"
+                return "none", label
             
             case ReportNodeType.InputItem:
                 input_item : gremlin.base_profile.InputItem = node.data
-                label = f"{{ Input | {input_item.input_id} }} | {{ Name | {input_item.display_name}}} "
+
+                table = ReportTable(cellpadding=4)
+                table.addField("Input", str(input_item.input_id) )
+                table.addField("Name", input_item.display_name)
+
+                
                 if input_item.input_description:
-                    label += f"{{Description | {input_item.input_description}}}"
-                return "record", label
+                    table.addField("Description", input_item.input_description)
+
+                label = f"<{table.to_html()}>"                    
+                return "none", label
 
             case ReportNodeType.Container:
                 # container node
                 container : gremlin.base_profile.AbstractContainer = node.data
-                label = f"Container | {container.name}"
+
+                
+                table = ReportTable(cellpadding=4)
+                table.addField("Container", container.name)
+                
                 if container.comment:
-                    label += f" | {{ {container.comment}}}"
-                return "record", label
+                    table.addField("Description", container.comment)
+
+                label = f"<{table.to_html()}>"
+                return "none", label
 
             case ReportNodeType.Action:
                 # action 
                 action : gremlin.base_profile.AbstractAction = node.data
-                label = f"Action | {action.name}"
-                if action.comment:
-                    label += f" Action | {action.name} | Description | {action.comment}"
-                if hasattr(action, "report_record"):
-                    label += f" | {{{action.report_record()}}}"
 
-                return "record", label
+                table = ReportTable(cellpadding=4)
+                table.addField("Action", action.name)
+                if action.comment:
+                    table.addField("Description", action.comment)
+
+                if hasattr(action, "to_html"):
+                    html = action.to_html()
+                    table.addField(" ", html)
+
+
+                label = f"<{table.to_html()}>"
+                return "none", label
                 
                 
 
@@ -346,6 +486,7 @@ class ReportEngine():
 
 
         root = ReportNode(ReportNodeType.Root)
+
         profile = gremlin.shared_state.current_profile
 
         for device in profile.devices.values():
@@ -371,50 +512,17 @@ class ReportEngine():
                                         action_node.parent = container_node
 
 
-        g = pydot.Dot("test", graph_type="digraph")
-        g.set("page", "8.5, 11")
-        g.set("size", "30!,30!") 
-        g.set("rankdir", 'LR')
-        g.set("nodesep", '0.8')
-        g.set("ranksep", '1.5' )
-        g.set("fontname","helvetica")
+       
 
+        pdf_file = gremlin.util.getTemporaryFile("pdf")
+        dot_file = gremlin.util.getTemporaryFile("dot")
+
+        cluster_entries = {} # clusters keyed by cluster index
+        node_entries = {} # nodes keyed by cluster index
+        edge_entries = {} # edges keyed by cluster index
         
-        '''
-        digraph G {
-
-        subgraph cluster_0 {
-            style=filled;
-            color=lightgrey;
-            rankdir=LR;
-            node [style=filled,shape=plaintext,fontname="Helvetica"];
-            a0 -> a1 -> a2 -> a3;
-        d1 [label = <
-        <TABLE CELLBORDER="1" CELLSPACING="0" CELLPADDING = "0" >
-        <TR>
-        <TD CELLPADDING="4" VALIGN="MIDDLE">Device</TD>
-        <TD  BORDER = "0" PORT="f1">
-            <table BORDER="0"  CELLSPACING="0" CELLPADDING = "4" >
-            <tr><td  BORDER="1" >Name 1</td><td BORDER="1" >value</td></tr>
-            <tr><td  BORDER="1" >Name 2</td><td BORDER="1" >value</td></tr>
-            <tr><td  BORDER="1" >Name 3</td><td BORDER="1" >value</td></tr>
-            <tr><td  BORDER="1" >Name 4</td><td BORDER="1" >value</td></tr>
-            </table>
-        </TD>
-        <TD CELLPADING ="4"  PORT="f2">right</TD></TR>
-        </TABLE>>];
-
-            
-        }
-
-        
-        start -> a0;
-        
-
-        start [shape=Mdiamond];
-        end [shape=Msquare];
-        }
-        '''
+        cluster_index = 0 # cluster number - one cluster per device 
+        current_cluster = 0
        
         #report_root = self._duplicate_tree(root)
         if root:
@@ -425,6 +533,23 @@ class ReportEngine():
                 match node.node_type:
                     case ReportNodeType.Device:
                         fillcolor = "#7DC082"
+
+                        # device starts a new cluster
+                        cluster = f'''
+                        subgraph cluster_{cluster_index} {{
+                            style=filled;
+                            color=lightgrey;
+                            rankdir=LR;
+                            node [style=filled,shape=plaintext,fontname="Helvetica"];
+                        '''
+
+                        current_cluster = cluster_index
+                        cluster_entries[current_cluster] = cluster
+                        node_entries[current_cluster] = []
+                        edge_entries[current_cluster] = []
+
+                        cluster_index += 1
+
                         shape, label = self._get_shape_label(node)
 
                     case ReportNodeType.Mode:
@@ -450,36 +575,57 @@ class ReportEngine():
                         label = "ignore"
                         # continue # ignore node
 
-                n = pydot.Node(node.id, label = label , shape=shape, fontname="Helvetica", rankdir="LR")
-                n.set("rankdir","LR")
-                if fillcolor:
-                    n.set("fillcolor", fillcolor)
-                    n.set("style", "filled")
-
-                g.add_node(n)
-                # parent = self._find_parent(node)
+                node_entry = f'"{node.id}" [label = {label}, shape= "{shape}", fillcolor = "{fillcolor}"];\n'
+                node_entries[current_cluster].append(node_entry)
+                
                 if node.parent and node.parent != root:
-                    e = pydot.Edge(node.parent.id, node.id)
-                    g.add_edge(e)
+                    edge_entry = f'"{node.parent.id}" -> "{node.id}";\n'
+                    edge_entries[current_cluster].append(edge_entry)
+                    
 
-            tmp_file = gremlin.util.getTemporaryFile("pdf")
+        # create the DOT file
+        with open(dot_file,"w") as f:
+            # DOT header
+            f.write("digraph G {\n")
+            f.write(f'graph [ label = "Profile Mappings for {profile.name}"\n')
+            f.write("labelloc = t\n")
+            f.write("fontsize = 20\n")
+            f.write("layout = dot\n")
+            f.write("rankdir = LR\n")
+            f.write("newrank = true\n")
+            f.write("]\n")
+            f.write('page="8.5, 11";\n')
+            f.write('size="30,30!";\n') 
+            f.write("rankdir=LR;\n")
+            f.write("nodesep=0.8;\n")
+            f.write("ranksep=1.5;\n" )
+            f.write('fontname="Helvetica,Arial,sans-serif";\n')
 
-            g.write_pdf(tmp_file)
-            gremlin.util.display_file(tmp_file)
+            for index in cluster_entries:
+                f.write(cluster_entries[index])
+                # write nodes
+                f.writelines(node_entries[index])
+                # write edges
+                f.writelines(edge_entries[index])
+                
+                f.write("\n}\n")
+                
+            # close digraph
+            f.write("\n}\n")
+
+            f.flush()
+            f.close()  
 
 
+        # g.write_dot(dot_file)
+        syslog.info(f"DOT FILE:")
+        syslog.info(dot_file)
 
-        # # Add nodes
-        # dot.node('A', 'Node A')
-        # dot.node('B', 'Node B')
-        # dot.node('C', 'Node C')
+        s = graphviz.Source.from_file(dot_file)
+        s.render(pdf_file, format='pdf', view=True, cleanup=True)
 
-        # # Add edges
-        # dot.edge('A', 'B', 'Connect A to B')
-        # dot.edge('B', 'C', 'Connect B to C')
-        # dot.edge('A', 'C', 'Connect A to C')
-
-        # Render and view the graph
-        #dot.render('simple_graph', view=True)
+        #gremlin.util.display_file(dot_file)
+            #g.write_pdf(tmp_file)
+            #gremlin.util.display_file(tmp_file)
 
 
