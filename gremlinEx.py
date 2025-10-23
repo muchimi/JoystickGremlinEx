@@ -3157,16 +3157,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # no current data
                 return
             
-            if not tabdata.populateEnabled:
-                # enable widget population for this tab for on-demand UI loading
-                if verbose: syslog.info(f"SELECT INPUT: activate tab for device: {tabdata.device.name}")
-                widget = self.getRegisteredWidget(device_guid)
-                # if not widget:
-                #     pass
-                if widget:
-                    tabdata.populateEnabled = True
-                    widget.ensureLoaded()
-
+            # if not tabdata.populateEnabled:
+            #     # enable widget population for this tab for on-demand UI loading
+            #     if verbose: syslog.info(f"SELECT INPUT: activate tab for device: {tabdata.device.name}")
+            #     widget = self.getRegisteredWidget(device_guid)
+            #     # if not widget:
+            #     #     pass
+          
             current_device_guid = tabdata.device_guid
             current_input_type, current_input_id = self._get_last_input(current_device_guid)
 
@@ -3236,6 +3233,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     self.ui.devices.setCurrentIndex(index)
                     gremlin.shared_state.current_tab_device_guid = device_guid
                     current_device_guid = device_guid
+                    # ensure the widget has been loaded
+                    widget = self.getRegisteredWidget(device_guid)
+                    widget.ensureLoaded() # ensure data is loaded and visible
+
                 if verbose: syslog.info(f"Tab change complete: device {gremlin.util.normalize_guid(device_guid)}")
                 switch_tabs = True # we are switching tabs
                 switch_input = True # we are switching inputs
@@ -3348,6 +3349,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         finally:
             
             # allow UI to refresh / update
+
+            # current widget
+            position = self.ui.devices.currentIndex()
+            tabdata = self.ui.devices.tabData(position)
+            current_tab_device_guid = tabdata.device_guid
+            widget : gremlin.ui.ui_common.QSplitTabWidget = self.getRegisteredWidget(current_tab_device_guid)
+            assert widget is not None, f"SELECT: sync issue: no widget found for the given device: {current_tab_device_guid}"
+            widget.ensureLoaded()    
             
 
             # validation check
@@ -3360,9 +3369,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 current_tab_device_guid = tabdata.device_guid
                 assert gremlin.util.compare_guid(current_tab_device_guid,device_guid), "SELECT: sync issue: tab device mismatch"
 
-                # current widget
-                widget : gremlin.ui.ui_common.QSplitTabWidget = self.getRegisteredWidget(device_guid)
-                assert widget is not None, f"SELECT: sync issue: no widget found for the given device: {device_guid}"
+    
+
 
                 # current input 
                 if hasattr(widget,"input_item_list_view"):

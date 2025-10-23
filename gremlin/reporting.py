@@ -27,23 +27,27 @@ import gremlin.shared_state
 import anytree
 import logging
 import gremlin.execution_graph as eg
+from gremlin.input_types import InputType
 import enum
 import dinput
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
 from collections import namedtuple
+import gremlin.base_conditions
 
 syslog = logging.getLogger("system")
 
 class CellInfo():
-    def __init__(self, text : str,  border : int = None, padding : int = None, valign : int = None ):
+    def __init__(self, text : str,  border : int = None, padding : int = None, align : str = None, valign : str = None ):
         self.value = text
         self.border = border
         self.padding = padding
         self.valign = valign
+        self.align = align
+        
 
     def toCell(self) -> ReportCell:
-        cell = ReportCell(self.text, self.border, self.padding, self.valign)
+        cell = ReportCell(self.text, self.border, self.padding, self.valign, self.align)
         return cell
 
          
@@ -57,34 +61,34 @@ class ReportNodeType(enum.Enum):
     Action = 6
 
 class ReportCell():
-    def __init__(self, index, value : str | CellInfo , border : int = None, cellpadding : int = 4, valign : int = None, port = None):
+    def __init__(self, index, value : str | CellInfo , border : int = None, valign : int = None, align = "LEFT", port = None):
         self.index = index # column index 0 to ...
         if isinstance(value, CellInfo):
             self.value = value.value
             self.border = value.border
-            self.cellpadding = value.cellpadding
             self.valign = value.valign
+            self.align = value.align
             self.port = port
             return
         
         self.value = value
         self.border = border
-        self.cellpadding = cellpadding
+        self.align = align
         self.valign = valign
         self.port = port
 
     def to_html(self) -> str:
         border_stub = f' BORDER="{self.border}"' if self.border is not None else ""
+        align_stub =  f' ALIGN="{self.align}"' if self.align is not None else ""
         valign_stub = f' VALIGN="{self.valign}"' if self.valign is not None else ""
         port_stub = f' PORT="{self.port}"' if self.port is not None else "" # graphviz port
-        cellpadding_stub = f' CELLPADING="{self.cellpadding}"' if self.cellpadding is not None else ""
-
+        
         # render to HTML if needed
         if hasattr(self.value,"to_html"):
             html = f"\n{self.value.to_html()}\n"
         else:
             html = self.value
-        return f"<TD{border_stub}{valign_stub}{cellpadding_stub}{port_stub}>{html}</TD>\n"
+        return f"<TD{border_stub}{valign_stub}{align_stub}{port_stub}>{html}</TD>\n"
 
 class ReportRow():
     ''' single report cell '''
@@ -144,19 +148,21 @@ class ReportRow():
         self.cells.clear()
     
 class ReportTable():
-    def __init__(self, border : int = 0, cellpadding : int = 0, cellborder : int = 1, cellspacing = 0):
+    def __init__(self, border : int = 0, cellpadding : int = 0, cellborder : int = 1, cellspacing = 0, bgcolor = None):
         self.rows = {}
         self.border = border
         self.cellpadding = cellpadding
         self.cellborder = cellborder
         self.cellspacing = cellspacing
+        self.bgcolor = bgcolor
 
     def to_html(self):
         border_stub = f' BORDER="{self.border}"' if self.border is not None else ""
         cellborder_stub = f' CELLBORDER="{self.cellborder}"' if self.cellborder is not None else ""
         cellpadding_stub = f' CELLPADDING="{self.cellpadding}"' if self.cellpadding is not None else ""
         cellspacing_stub = f' CELLSPACING="{self.cellspacing}"' if self.cellspacing is not None else ""
-        tb = f"<TABLE{border_stub}{cellborder_stub}{cellpadding_stub}{cellspacing_stub}>\n"
+        bgcolor_stub = f' BGCOLOR="{self.bgcolor}"' if self.bgcolor is not None else ""
+        tb = f"<TABLE{border_stub}{cellborder_stub}{cellpadding_stub}{cellspacing_stub}{bgcolor_stub}>\n"
         
 
         # assume a sparse matrix of rows if they are not continuous
@@ -200,7 +206,7 @@ class ReportTable():
             index = 0
         row = ReportRow(index)
         cell1 = ReportCell(0,field_name, border = border, valign=valign, port = port)
-        cell2 = ReportCell(1,value, border = border, valign=valign)
+        cell2 = ReportCell(1,value, border = border, valign = valign)
         row.setCell(0,cell1)
         row.setCell(1,cell2)
       
@@ -377,8 +383,9 @@ class ReportEngine():
 
 
     def _get_shape_label(self, node) -> tuple:
-        ''' gets an HTML representation of the node for display purposes, returns shape, label '''
+        ''' gets an HTML representation of the node for display purposes, returns shape, label, fillcolor '''
         rows = None
+        
         match node.node_type:
             case ReportNodeType.Device:
                 # device node
@@ -424,13 +431,22 @@ class ReportEngine():
             case ReportNodeType.InputItem:
                 input_item : gremlin.base_profile.InputItem = node.data
 
+     
                 table = ReportTable(cellpadding=4)
-                table.addField("Input", str(input_item.input_id) )
+                table.addField("Input", str(input_item.input_id))
                 table.addField("Name", input_item.display_name)
-
                 
                 if input_item.input_description:
                     table.addField("Description", input_item.input_description)
+
+                if hasattr(input_item,"to_html"):
+                    html = input_item.to_html()
+                    table.addField(" ", html)
+
+                if hasattr(input_item.input_id,"to_html"):
+                    html = input_item.input_id.to_html()
+                    table.addField(" ", html)
+                
 
                 label = f"<{table.to_html()}>"                    
                 return "none", label
@@ -446,17 +462,42 @@ class ReportEngine():
                 if container.comment:
                     table.addField("Description", container.comment)
 
+                if container.has_conditions:
+                    ct = ReportTable(cellpadding=4, bgcolor = "#C79AD4")
+                    ct.addField("Count", f"{len(container.activation_condition.conditions)}")
+                    for index, condition in enumerate(container.activation_condition.conditions):
+                        if hasattr(condition,"to_html"):
+                            ct.addField(f"C{index}", condition.to_html())      
+                    table.addField("Conditions", ct.to_html())               
+
+                if hasattr(container,"to_html"):
+                    html = container.to_html()
+                    table.addField(" ", html)
+
                 label = f"<{table.to_html()}>"
                 return "none", label
 
             case ReportNodeType.Action:
                 # action 
                 action : gremlin.base_profile.AbstractAction = node.data
+   
 
                 table = ReportTable(cellpadding=4)
                 table.addField("Action", action.name)
+                if action.data and isinstance(action.data, str):
+                    table.addField("Data", action.data)
+
                 if action.comment:
                     table.addField("Description", action.comment)
+
+                if action.has_conditions:
+                    ct = ReportTable(cellpadding=4, bgcolor = "#C79AD4")
+                    ct.addField("Count", f"{len(action.activation_condition.conditions)}")
+                    for index, condition in enumerate(action.activation_condition.conditions):
+                        if hasattr(condition,"to_html"):
+                            ct.addField(f"C{index}", condition.to_html())
+                            
+                    table.addField("Conditions", ct.to_html())                    
 
                 if hasattr(action, "to_html"):
                     html = action.to_html()
@@ -623,6 +664,7 @@ class ReportEngine():
 
         s = graphviz.Source.from_file(dot_file)
         s.render(pdf_file, format='pdf', view=True, cleanup=True)
+        os.unlink(dot_file) # clean up
 
         #gremlin.util.display_file(dot_file)
             #g.write_pdf(tmp_file)

@@ -993,6 +993,31 @@ Can also send mouse buttons, mouse wheel events.'''
         """
         # return true by default so the action gets saved even if it doesn't do anything
         return True
+    
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+
+        table = ReportTable(cellpadding=4)
+
+        key_stub = ""
+        for key in self.keys:
+            name = gremlin.keyboard.KeyMap.get_name(key)
+            if key_stub:
+                key_stub += " "
+            key_stub += name
+
+        table.addField("Key", key_stub)
+        table.addField("Mode", self.mode.name)
+        match self.mode:
+            case KeyboardOutputMode.Pulse:
+                table.addField("Delay", f"{self.delay} ms")
+            case KeyboardOutputMode.AutoRepeat:
+                table.addField("Delay", f"{self.delay }ms")
+                table.addField("Repeat Delay", f"{self._autorepeat_delay} ms")
+
+        return table.to_html()    
+
 
 
 version = 1

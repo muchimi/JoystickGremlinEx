@@ -1130,6 +1130,18 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
         """
         return True
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+
+        table = ReportTable(cellpadding=4)
+        table.addField("Message", self.command )
+
+        if self.comment:
+            table.addField("Description", self.comment)
+
+        return table.to_html()    
+
 
 version = 1
 name = "map-to-osc"

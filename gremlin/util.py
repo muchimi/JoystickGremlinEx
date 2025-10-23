@@ -693,25 +693,7 @@ def get_dinput_guid():
     ''' gets a DirectInput compatible GUID'''
     return parse_guid(get_guid(strip=False,no_brackets=True))
 
-def get_guid(strip=True,no_brackets = False) -> str:
-    ''' generates a reasonably lowercase unique guid string '''
-    import uuid
-    guid = f"{uuid.uuid4()}"
-    if strip:
-        guid = guid.replace("-",'')
-    if no_brackets:
-        guid = guid.replace("{",'').replace("}",'')
-    return guid
 
-def idString(value):
-    ''' converts a value to an id string'''
-    if not isinstance(value, str):
-        value = str(value)
-    value = value.casefold()
-    value = value.replace("-",'')
-    value = value.replace("{",'').replace("}",'')
-    return value
-    
 
    
 def find_files(root_folder, source_pattern = "*") -> list:
@@ -2258,6 +2240,38 @@ def isNumeric(input_string):
     
     return True
 
+def get_guid(strip=True,no_brackets = False) -> str:
+    ''' generates a reasonably lowercase unique guid string '''
+    import uuid
+    guid = f"{uuid.uuid4()}"
+    if strip:
+        guid = guid.replace("-",'')
+    if no_brackets:
+        guid = guid.replace("{",'').replace("}",'')
+    return guid
+
+def is_guid(value):
+    ''' verifies the quantity is a valid GUID '''
+    
+
+    if value is None:
+        return False
+    
+    value = normalize_guid(value)
+
+    if re.match(value, r'^[0-9a-fA-F]{32}$'):
+        return True
+    return False
+
+def idString(value):
+    ''' converts a value to an id string'''
+    if not isinstance(value, str):
+        value = str(value)
+    value = value.casefold()
+    value = value.replace("-",'')
+    value = value.replace("{",'').replace("}",'')
+    return value
+    
 
 def normalize_guid(device_guid) -> str:
     ''' normalizes a device GUID to a string'''

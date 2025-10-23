@@ -2622,7 +2622,7 @@ class Mapper():
                                 action = action_plugins.repository[vjoy_mapper](container)
                                 action.input_type = input_type
                                 action.vjoy_input_id = vjoy_input_id
-                                action.vjoy_device_id = vjoy_id
+                                action.vjoy_id = vjoy_id
 
                                 container.add_action(action)
                                 entry.containers.append(container)
@@ -2656,7 +2656,7 @@ class Mapper():
                                 action = action_plugins.repository[vjoy_mapper](container)
                                 action.input_type = input_type
                                 action.vjoy_input_id = vjoy_input_id
-                                action.vjoy_device_id = vjoy_id
+                                action.vjoy_id = vjoy_id
 
                                 container.add_action(action)
                                 entry.containers.append(container)
@@ -2701,7 +2701,7 @@ class Mapper():
                             action = action_plugins.repository[vjoy_mapper](container)
                             action.input_type = input_type
                             action.vjoy_input_id = vjoy_input_id
-                            action.vjoy_device_id = vjoy_id
+                            action.vjoy_id = vjoy_id
 
                             container.add_action(action)
                             entry.containers.append(container)

@@ -348,7 +348,7 @@ On long press the action receives a press input when the input is pressed, and a
         """
         super().__init__(parent, node)
         self.action_sets = [[]]
-        self.delay = 0.5
+        self.delay = 0.5 # in seconds
         self.shortPressMode = True # false to toggle on long press
 
 
@@ -360,6 +360,7 @@ On long press the action receives a press input when the input is pressed, and a
         super()._parse_xml(node, data)
         self.delay = safe_read(node, "delay", float, 0.5)
         self.shortPressMode = safe_read(node, "short-press-mode", bool, True)
+
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -383,6 +384,21 @@ On long press the action receives a press input when the input is pressed, and a
         :return True if the container is configured properly, False otherwise
         """
         return len(self.action_sets) == 1
+    
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+
+        table = ReportTable(cellpadding=4)
+        
+        count = sum(len(actions) for actions in self.action_sets)
+        table.addField("Count", f"{count}")
+        # count = sum(len(actions) for actions in self.action_sets[1])
+        # table.addField("Action B Count", f"{count}")
+        table.addField("Short press mode", "Yes" if self.shortPressMode else "No")
+        table.addField("Delay", f"{self.delay*1000:,} ms")
+
+        return table.to_html()
 
 
 # Plugin definitions

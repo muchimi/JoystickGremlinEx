@@ -200,27 +200,6 @@ class Repeater(QtCore.QObject):
         self._update_func("Waiting for input")
 
 
-    # def _vjoy_process_event(self, event):
-    #     ''' handles a vjoy output event '''
-    #     value = event.value
-    #     vjoy_device_id = gremlin.joystick_handling.vjoy_id_from_guid(event.device_guid, -1)
-    #     if vjoy_device_id == -1:
-    #         syslog = logging.getLogger("system")
-    #         syslog.warning(f"Device ID: {event.device_guid} is not a VJOY device")
-    #         return
-        
-    #     input_id = event.identifier
-    #     input_type = event.event_type
-    #     if event.is_axis:
-    #         joystick_handling.VJoyProxy()[vjoy_device_id].axis(input_id).value = value.current
-
-    #     elif input_type == InputType.JoystickButton:
-    #         joystick_handling.VJoyProxy()[vjoy_device_id].button(input_id).is_pressed = value.is_pressed
-
-    #     elif input_type == InputType.JoystickHat:
-    #         joystick_handling.VJoyProxy()[vjoy_device_id].hat(input_id).direction = value.current
-
-
 
 
 #class PulseWorker(QtCore.QObject):

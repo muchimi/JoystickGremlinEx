@@ -14,6 +14,14 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T86)
+- Experimental.  PDF profile visualization adds conditions, and details for most containers/actions. Notable exception: Gated Axis - still on the to-do list.
+- Fix: refactor variable change in vjoy remap causing an exception.
+- Fix: UI not always loading inputs depending on how the device tab selection occurred.
+- Fix: One more QT C++ garbage collection issue in State UI.
+
+
+
 ### (m76T85)
 - Fix: default vjoy device selector resetting when anything other than VJOY 1 is selected on profile reload. Bug introduced recently.  
 - Experimental: PDF viewer of profile maps.  This is a proof of concept and requires graphviz to be installed on the machine.  [graphviz](https://graphviz.org/) is an open source popular graphing renderer for complex connection diagrams.  There is a new option in global options that lets you select the location of the GraphViz binaries once installed (the default location is ```C:\Program Files\Graphviz\bin```).  This is extremely barebones right now and most of the actions are missing their information outside of vjoy remap.  More will be added to this feature in the coming days.  This features is entirely in active development and may completely blow up as this is work in progress.  The feature is access from the tools menu PDF Cheatsheet.  The feature currently creates temporary files in the GremlinEx profile folder that will not delete themselves. You can remove them manually for now.

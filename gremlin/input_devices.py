@@ -1934,7 +1934,7 @@ class ButtonReleaseActions(QtCore.QObject):
 
         Args:
             vjoy_input: the vjoy button to release, represented as
-                (vjoy_device_id, vjoy_button_id)
+                (vjoy_id, vjoy_button_id)
             physical_event: the button event when release should
                 trigger the release of the vjoy button
         """

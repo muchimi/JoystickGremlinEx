@@ -246,6 +246,9 @@ class Axis:
         import gremlin.event_handler
         from gremlin.input_types import InputType
 
+        if self.axis_id == 3 and self.vjoy_id == 1 and p_value == 0.0:
+            pass
+
 
         if p_value is None:
             syslog.warning("Invalid null value provided")
@@ -648,7 +651,7 @@ class VJoy:
         self._last_active = time.time()
         self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
         self._keep_alive_timer.daemon = True
-        self._keep_alive_timer.setName(f"VJOY{self.vjoy_id} keepalive")
+        self._keep_alive_timer.name = f"VJOY{self.vjoy_id} keepalive"
         self._keep_alive_timer.start()
 
         
@@ -859,6 +862,17 @@ class VJoy:
         """
         return index in self._hat
     
+    def keep_awake(self):
+        if self.vjoy_id is not None:
+           import gremlin.config
+           verbose = gremlin.config.Configuration().verbose
+           if verbose: syslog.info(f"VJOY AWAKE: check vjoy [{self.vjoy_id}]")
+           awake = device_available(self.vjoy_id)
+           if not awake:
+               syslog.warning(f"VJOY AWAKE: vjoy [{self.vjoy_id}] is reporting no longer available.")
+
+
+    
     def reset(self):
         gremlin.util.InvokeUiMethod(self._reset_ui) # ui thread
 
@@ -916,10 +930,11 @@ class VJoy:
         if self._last_active + VJoy.keep_alive_timeout < time.time():
             verbose = gremlin.config.Configuration().verbose_mode_vjoy
             if verbose: syslog.info("VJOY: keep alive reset initiated")
-            self.reset()
+            self.keep_awake()
+            #self.reset()
         self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
         self._keep_alive_timer.daemon = True
-        self._keep_alive_timer.setName(f"VJOY{self.vjoy_id} keepalive")
+        self._keep_alive_timer.name = f"VJOY{self.vjoy_id} keepalive"
         self._keep_alive_timer.start()
 
     def _init_axes(self):

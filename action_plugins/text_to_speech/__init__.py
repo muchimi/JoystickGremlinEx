@@ -384,6 +384,26 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     def abort(self, value : bool):
         self._abort = value
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4)    
+        tts = gremlin.tts.TextToSpeech()
+        voice_list = {index: voice for index,voice in enumerate(tts.getVoices())}
+        if self.voice_index in voice_list:
+            voice_name = voice_list[self.voice_index].name
+        else:
+            voice_name = 'Not found'
+
+        table.addField("Say",self.text)
+        table.addField("Volume", f"{self.volume}")
+        table.addField("Rate", f"{self.rate} wpm")
+        table.addField("Voice Index", f"{self.voice_index}")
+        table.addField("Voice Name", voice_name)
+
+        return table.to_html()
+            
+
 version = 1
 name = "text-to-speech"
 create = TextToSpeech

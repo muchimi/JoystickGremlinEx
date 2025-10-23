@@ -2240,6 +2240,26 @@ class AxisCurveData():
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
 
+    def to_html(self) -> str:    
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4) 
+        
+        table.addField("Mode", self.symmetry_mode.name)
+        table.addField("Control points", f"{len(self.control_points)}")
+        table.addField("Mapping", self.mapping_type.name)
+        table.addField("Sensitivity", f"{self.sensitivity:0.3f}")
+        table.addField("Centered", "Yes" if self.isCentered else "No")
+        table.addField("Deadzone Low",f"{self.deadzone[0]}")
+        table.addField("Deadzone Ctr Low",f"{self.deadzone[1]}")
+        table.addField("Deadzone Ctr High",f"{self.deadzone[2]}")
+        table.addField("Deadzone High",f"{self.deadzone[3]}")
+
+
+        return table.to_html()
+
+        
+
     @property
     def mapping_type(self) -> CurveType:
         return self._mapping_type

@@ -84,7 +84,7 @@ def test_ctor(joystick_init):
         types.InputType.JoystickButton
     )
 
-    assert r.vjoy_device_id == 1
+    assert r.vjoy_id == 1
     assert r.vjoy_input_id == 1
     assert r.vjoy_input_type == types.InputType.JoystickButton
     assert r.axis_mode == types.AxisMode.Absolute
@@ -97,7 +97,7 @@ def test_from_xml():
         types.InputType.JoystickButton
     )
     r.from_xml(ElementTree.fromstring(xml_button))
-    assert r.vjoy_device_id == 1
+    assert r.vjoy_id == 1
     assert r.vjoy_input_id == 12
     assert r.vjoy_input_type == types.InputType.JoystickButton
     assert r.axis_mode == types.AxisMode.Absolute
@@ -105,7 +105,7 @@ def test_from_xml():
 
     r = map_to_vjoy.MapToVjoyModel(profile_library.ActionTree())
     r.from_xml(ElementTree.fromstring(xml_axis))
-    assert r.vjoy_device_id == 2
+    assert r.vjoy_id == 2
     assert r.vjoy_input_id == 6
     assert r.vjoy_input_type == types.InputType.JoystickAxis
     assert r.axis_mode == types.AxisMode.Relative
@@ -119,7 +119,7 @@ def test_to_xml():
     )
 
     r._id = uuid.UUID("ac905a47-9ad3-4b65-b702-fbae1d133609")
-    r.vjoy_device_id = 2
+    r.vjoy_id = 2
     r.vjoy_input_id = 14
     r.vjoy_input_type = types.InputType.JoystickButton
 

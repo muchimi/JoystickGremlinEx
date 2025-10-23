@@ -165,7 +165,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         if input_type != self._last_input_type:
             
             self._last_input_type = input_type
-            self.action_data.vjoy_device_id = vjoy_data["device_id"]
+            self.action_data.vjoy_id = vjoy_data["device_id"]
             self.action_data.vjoy_input_id = vjoy_data["input_id"]
             self.action_data.input_type = input_type
 
@@ -178,8 +178,8 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Populates the UI components."""
         # Get the appropriate vjoy device identifier
         vjoy_dev_id = 0
-        if self.action_data.vjoy_device_id not in [0, None]:
-            vjoy_dev_id = self.action_data.vjoy_device_id
+        if self.action_data.vjoy_id not in [0, None]:
+            vjoy_dev_id = self.action_data.vjoy_id
 
         # Get the input type which can change depending on the container used
         input_type = self.action_data.input_type
@@ -251,7 +251,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             current_id = self.action_data.vjoy_input_id
             vjoy_id = vjoy_data["device_id"]
 
-            self.action_data.vjoy_device_id = vjoy_id
+            self.action_data.vjoy_id = vjoy_id
             self.action_data.vjoy_input_id = vjoy_data["input_id"]
             self.action_data.input_type = vjoy_data["input_type"]
 
@@ -278,7 +278,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
           if self.action_data.input_type == InputType.JoystickButton:
                 verbose = gremlin.config.Configuration().verbose_mode_vjoy
                 button_id =self.action_data.vjoy_input_id
-                vjoy_id = self.action_data.vjoy_device_id
+                vjoy_id = self.action_data.vjoy_id
                 el = gremlin.event_handler.EventListener()
             
                 if self._last_button_id != -1 and self._last_button_id != button_id:
@@ -299,7 +299,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         event.device_name = state._active_device_name
         event.device_input_type = self.action_data.input_type
         event.device_input_id = state._active_device_input_id
-        event.vjoy_device_id = self.action_data.vjoy_device_id
+        event.vjoy_id = self.action_data.vjoy_id
         event.vjoy_input_id = self.action_data.vjoy_input_id
         event.source = self.action_data
         if emit_profile_changed:
@@ -436,6 +436,7 @@ Use Vjoy Remap instead.'''
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
         self.parent = parent
+        self.vjoy_id = 1
         self.vjoy_input_id = None
         input_type = self.get_input_type()
         self._input_type = input_type
@@ -461,7 +462,7 @@ Use Vjoy Remap instead.'''
             input_string = "Button"
         elif self.input_type == InputType.JoystickHat:
             input_string = "Hat"
-        return f"Remap (legacy): Vjoy [{self.vjoy_device_id}] Mode: [{input_string}] Output: [{self.vjoy_input_id}]"
+        return f"Remap (legacy): Vjoy [{self.vjoy_id}] Mode: [{input_string}] Output: [{self.vjoy_input_id}]"
 
     def icon(self):
         """Returns the icon corresponding to the remapped input.
@@ -558,7 +559,7 @@ Use Vjoy Remap instead.'''
         :return XML node containing the action's data
         """
         node = ElementTree.Element("remap")
-        node.set("vjoy", str(self.vjoy_device_id))
+        node.set("vjoy", str(self.vjoy_id))
         if self.input_type == InputType.Keyboard:
             node.set(
                 InputType.to_string(InputType.JoystickButton),
@@ -582,7 +583,24 @@ Use Vjoy Remap instead.'''
 
         :return True if the action is configured correctly, False otherwise
         """
-        return not(self.vjoy_device_id is None or self.vjoy_input_id is None)
+        return not(self.vjoy_id is None or self.vjoy_input_id is None)
+    
+    def _get_output_name(self) -> str:
+        return InputType.to_display_name(self._input_type)
+
+    
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+
+        table = ReportTable(cellpadding=4)
+        table.addField("Mode", self.action_mode.name)
+        table.addField("Vjoy Device", self.vjoy_id)
+        table.addField("Output Type:", self._get_output_name())
+        table.addField("Output ID", self.vjoy_input_id)
+
+
+        return table.to_html()    
 
 
 version = 1

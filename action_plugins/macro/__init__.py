@@ -36,6 +36,7 @@ import gremlin.util
 import gremlin.ui.state_device
 import gremlin.ui.ui_common
 import gremlin.keyboard
+import gremlin.joystick_handling
 import gremlin.input_devices
 import gremlin.config
 import gremlin.macro_handler
@@ -2371,7 +2372,52 @@ To send complex sequences, please look at the sequence container.'''
             pass # use as-is
         elif action.input_type == InputType.JoystickHat:
             action.value = gremlin.util.hat_direction_to_tuple(action.value)
+        
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
 
+
+        table = ReportTable(cellpadding=4)
+        for entry in self.sequence:
+
+            if isinstance(entry, gremlin.macro.JoystickAction):
+                device_name = gremlin.joystick_handling.device_name_from_guid(entry.device_guid)
+                if not entry.device_guid or not device_name:
+                    table.addField("Joystick", "N/A")    
+                    continue
+                value_stub = f" Value: {entry.value:0.3f}" if  entry.input_type == InputType.JoystickAxis else ""
+                table.addField("Joystick", f"[{device_name}] Type: [{entry.input_type.name}] ID: [{entry.id}]{value_stub}")
+
+            elif isinstance(entry, gremlin.macro.KeyAction):
+                table.addField("Key", f"{gremlin.keyboard.KeyMap.get_name(entry.key)} Action: {'press' if entry.is_pressed else 'release'}")
+                
+            elif isinstance(entry, gremlin.macro.MouseButtonAction):
+                table.addField("Mouse", f"Button {entry.button.value} Action: {'press' if entry.is_pressed else 'release'}")
+                
+            elif isinstance(entry, gremlin.macro.MouseMotionAction):
+                table.addField("Mouse Motion", f"Dx {entry.dx} Dy {entry.dy}")
+                
+            elif isinstance(entry, gremlin.macro.PauseAction):
+                random_stub = f" Random: Yes Max Duration: {entry.duration_max:0.2f}" if entry.is_random else "" 
+                table.addField("Pause", f"Duration: {entry.duration:0.2f}{random_stub}")
+                
+            elif isinstance(entry, gremlin.macro.VJoyMacroAction):
+                table.addField("VJoy", f"Vjoy ID: {entry.vjoy_id}] Input Type: {entry.input_type.name} Value: {self._joy_value_to_str(entry)}")
+                
+            elif isinstance(entry, gremlin.macro.RemoteControlAction):
+                table.addField("Control",entry.command.name )
+                
+            elif isinstance(entry, gremlin.macro.StateAction):
+                sd = gremlin.ui.state_device.StateData()
+                state = sd.getState(entry.key)
+                if state:
+                    table.addField("State", state.to_html())
+                else:
+                    table.addField("State", "N/A")
+
+
+        return table.to_html()   
 
 version = 1
 name = "macro"

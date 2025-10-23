@@ -1457,6 +1457,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#osc-message-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC Message Requirements
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-mode-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC Mode Considerations
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3668,6 +3686,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#osc-message-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC Message Requirements
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#osc-mode-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      OSC Mode Considerations
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5672,6 +5708,73 @@ In the example below, the action is enabled when the input axis is between -0.09
 <tr>
 <td>non-zero</td>
 <td>Button press</td>
+</tr>
+</tbody>
+</table>
+<h3 id="osc-message-requirements">OSC Message Requirements<a class="headerlink" href="#osc-message-requirements" title="Permanent link">&para;</a></h3>
+<p>GremlinEx can accept any OSC message, with or without parameters.</p>
+<table>
+<thead>
+<tr>
+<th>Example OSC Message</th>
+<th>Parameter</th>
+<th>GremlinEx OSC Input Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>/set_speed</td>
+<td>0.0 to 1.0</td>
+<td>Axis</td>
+<td>Axis mapping -1 to +1</td>
+</tr>
+<tr>
+<td>/toggle_lights</td>
+<td>0 or 1</td>
+<td>Button</td>
+<td>Trigger a momentary input with 1 being the press event, and 0 being the release event.  Any non zero value will be considered to be a "press".</td>
+</tr>
+<tr>
+<td>/toggle_gear</td>
+<td>none</td>
+<td>Button</td>
+<td>Requires autorelease enabled. Trigger a "press" when the message is received.  GremlinEx automatically generates a "release" event after the delay has lapsed.</td>
+</tr>
+<tr>
+<td>/flight/trim_set</td>
+<td>0.0 to 1.0</td>
+<td>Axis</td>
+<td>Axis mapping -1 to +1</td>
+</tr>
+</tbody>
+</table>
+<p>Messages must start with a forward slash.</p>
+<p>A message can be interpreted as an axis if the first parameter provided is a floating point value, usually 0.0 (min) to 1.0 (max) which matches most OSC control surface defaults for faders and sliders.</p>
+<p>Messages for button control should also have a numeric parameter.  A value of 0.0 (or 0 for integer data) means released.  A non-zero value means pressed.</p>
+<p>If a message has no parameters, and the OSC input in GremlinEx can be setup to auto-release on message receipt.  In this situation, GremlinEx treats the receipt of the message as a "press" trigger for the button, and it will automatically generate a "release" trigger after a delay has lapsed.  This enables GremlinEx to use OSC input with no parameters.</p>
+<p>If the message has no parameters, a global option can be set in OSC options to automatically consider all messages with no parameters as trigger buttons, without the need to enable the autorelease mode on the button.</p>
+<p>Warnings will be placed in the log file if an OSC message arrives that is not suitable for the current GremlinEx input configuration and options selected.  For example, an input set to Axis mode when the message has no parameters.  In these situations, GremlinEx will just issue a warning in the log file and ignore the input.</p>
+<h3 id="osc-mode-considerations">OSC Mode Considerations<a class="headerlink" href="#osc-mode-considerations" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>GremlinEx OSC input mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Axis</td>
+<td>The input will look like an axis to actions and containers with an input range of -1.0 to +1.0.  The first argument in the received OSC message be in a range 0.0 to 1.0.</td>
+</tr>
+<tr>
+<td>Button</td>
+<td>The input will look like a button to actions and containers.  The first argument (integer or floating point) should be 0 for "released", and non zero for "pressed".</td>
+</tr>
+<tr>
+<td>Button (autorelease)</td>
+<td>The input will look like a button to actions and containers. GremlinEx will issue a "press" even on message receipt, and generate an automatic "release" when the delay has lapsed.</td>
 </tr>
 </tbody>
 </table>

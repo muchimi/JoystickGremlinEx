@@ -1576,6 +1576,27 @@ If needing a separate curve mapper, use the more advanced Response Curve Ex acti
         :return True if the action is configured correctly, False otherwise
         """
         return True
+    
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4) 
+        
+        table.addField("Mode", self.symmetry_mode.name)
+        table.addField("Control points", f"{len(self.control_points)}")
+        table.addField("Mapping", self.mapping_type)
+        table.addField("Deadzone Low",f"{self.deadzone[0]}")
+        table.addField("Deadzone Ctr Low",f"{self.deadzone[1]}")
+        table.addField("Deadzone Ctr High",f"{self.deadzone[2]}")
+        table.addField("Deadzone High",f"{self.deadzone[3]}")
+
+        if self.exec_on_press:
+            table.addField("Exec (press)", "Yes")
+        if self.exec_on_release:
+            table.addField("Exec (release)", "Yes")
+
+        return table.to_html()
+
 
 
 version = 1

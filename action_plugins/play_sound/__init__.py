@@ -285,6 +285,22 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         return self.sound_file is not None and os.path.isfile(self.sound_file) # and len(self.sound_file) > 0
 
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4) 
+        
+        table.addField("Play", self.sound_file)
+        table.addField("Volume", f"{self.volume}")
+
+        if self.exec_on_press:
+            table.addField("Exec (press)", "Yes")
+        if self.exec_on_release:
+            table.addField("Exec (release)", "Yes")
+
+        return table.to_html()
+
+
 version = 1
 name = "play-sound"
 create = PlaySound

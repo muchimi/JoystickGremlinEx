@@ -239,6 +239,18 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
             names.append(key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
         return f"Keyboard (legacy): {text}"
+    
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4)    
+        names = []
+        text = ""
+        for key in self.keys:
+            names.append(key_from_code(key[0],key[1]).name)
+        text += " + ".join(names)
+        table.addField("Key", text)
+        return table.to_html()
 
 version = 1
 name = "map-to-keyboard"

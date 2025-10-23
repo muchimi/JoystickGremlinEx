@@ -8030,6 +8030,7 @@ class QSplitTabWidget(QDataWidget):
             self._filtered = value
             self.update_used_filter(value)
 
+    
 
     @property 
     def tabData(self):
@@ -8236,6 +8237,10 @@ class QSplitTabWidget(QDataWidget):
         
         # select it
         self.selectRegisteredWidget(self._blank_input_id)
+
+    def ensureLoaded(self):
+        pass
+                
 
 
     def _ensure_blank_widget(self):
@@ -10490,9 +10495,9 @@ class GridClickWidget(QtWidgets.QWidget):
     pressPos = None
     clicked = Signal()
 
-    def __init__(self, vjoy_device_id, input_type, vjoy_input_id, parent = None):
+    def __init__(self, vjoy_id, input_type, vjoy_input_id, parent = None):
         super(GridClickWidget, self).__init__(parent=parent)
-        self.vjoy_device_id = vjoy_device_id
+        self.vjoy_id = vjoy_id
         self.input_type = input_type
         self.vjoy_input_id = vjoy_input_id
 

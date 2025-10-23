@@ -1068,7 +1068,7 @@ class VJoyUsageState():
 
   
     class MappingData:
-        vjoy_device_id = None
+        vjoy_id = None
         vjoy_input_type = None
         vjoy_input_id = None
         device_input_type = None
@@ -1076,8 +1076,8 @@ class VJoyUsageState():
         device_name = None
         device_input_id = None
 
-        def __init__(self, vjoy_device_id, input_type, vjoy_input_id, action):
-            self.vjoy_device_id = vjoy_device_id
+        def __init__(self, vjoy_id, input_type, vjoy_input_id, action):
+            self.vjoy_id = vjoy_id
             self.vjoy_input_type = input_type
             self.vjoy_input_id = vjoy_input_id
             input_item = action.get_input_item()
@@ -1100,8 +1100,8 @@ class VJoyUsageState():
         self._device_list = None
         self._profile = None
         self._load_list = []
-        self._button_usage = {} # list of used buttons and by what action / input  index is the [vjoy_device_id][button_index] = true if used, false if not
-        self._button_usage_map = {} # list of used buttons [vjoy_device_id][button_index] = [action, ...]
+        self._button_usage = {} # list of used buttons and by what action / input  index is the [vjoy_id][button_index] = true if used, false if not
+        self._button_usage_map = {} # list of used buttons [vjoy_id][button_index] = [action, ...]
         
 
         # holds the mapping by vjoy device, input and ID to a list of raw hardware defining the mapping
@@ -1456,7 +1456,7 @@ class VJoyUsageState():
                                                 
                                             
                                             if trigger:
-                                                vjoy_id = action.vjoy_device_id
+                                                vjoy_id = action.vjoy_id
                                                 if not vjoy_id in self._button_usage:
                                                     syslog.error(f"Profile action id [{action.id}] references a vjoy device [{vjoy_id}] that is no longer found.")
                                                 else:
@@ -1465,11 +1465,11 @@ class VJoyUsageState():
 
 
 
-    def get_action_map(self, vjoy_device_id, input_type, input_id):
+    def get_action_map(self, vjoy_id, input_type, input_id):
         ''' gets what's mapped to a vjoy device by input type and input id '''
         action_map = []
-        for action_data in self._button_usage_map[vjoy_device_id][input_id]:
-            data = self.MappingData(vjoy_device_id, input_type, input_id, action_data)
+        for action_data in self._button_usage_map[vjoy_id][input_id]:
+            data = self.MappingData(vjoy_id, input_type, input_id, action_data)
             action_map.append(data)
 
         return action_map
@@ -1487,13 +1487,17 @@ class VjoyStart():
         self._button_data = {} # map of start profile buttons indexed by [vjoyid][axis] = bool
         self._connected = False # tracks event hook (we don't hook on init because of possible python import issue and load order)
 
-    def setStartValue(self, device_id, id : int, value : float):
+    def setStartValue(self, device_id , id : int, value : float):
         ''' registers an axis start value '''
         import gremlin.event_handler
+        import gremlin.util
+        if not isinstance(device_id, int):
+            vjoy_id = vjoy_id_from_guid(device_id)
+        else:
+            vjoy_id = device_id # integer ID
 
-        vjoy_id = vjoy_id_from_guid(device_id)
         if vjoy_id is None:
-            syslog.warning(f"Register VJOY start value: unknown device {device_id}")
+            syslog.error(f"VJOY SET START: : vjoy device [{device_id}] not available")
             return
 
         if not self._connected:

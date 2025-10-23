@@ -319,8 +319,20 @@ To change the mode temporarily, use the temporary mode switch action.'''
 
     def _is_valid(self):
         return True
-        
+  
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4)    
 
+        table.addField("Switch To Mode", self.mode)
+
+        if self.exec_on_press:
+            table.addField("Exec (press)", "Yes")
+        if self.exec_on_release:
+            table.addField("Exec (release)", "Yes")
+
+        return table.to_html()
 
 version = 1
 name = "switch-mode"

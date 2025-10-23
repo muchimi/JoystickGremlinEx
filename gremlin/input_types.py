@@ -106,9 +106,11 @@ _InputType_to_string_lookup = {
     InputType.ModeControl : "modecontrol",
     InputType.State: "state",
     InputType.OctaviIfr1: "ifr1",
+    InputType.Mouse: "mouse",
 }
 
 _InputType_to_display_lookup = {
+    InputType.NotSet: "N/A",
     InputType.JoystickAxis: "Axis",
     InputType.JoystickButton: "Button",
     InputType.JoystickHat: "Hat",
@@ -118,13 +120,15 @@ _InputType_to_display_lookup = {
     InputType.Midi: "MIDI",
     InputType.ModeControl: "Mode Control",
     InputType.State: "State",
-    InputType.OctaviIfr1: "Octavi IFR1"
+    InputType.OctaviIfr1: "Octavi IFR1",
+    InputType.Mouse: "Mouse"
 }
 
 
 _InputType_to_enum_lookup = {
     "none": InputType.NotSet,
     "axis": InputType.JoystickAxis,
+    "mouse" : InputType.Mouse,
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,
     "key": InputType.Keyboard,

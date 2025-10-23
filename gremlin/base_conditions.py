@@ -175,6 +175,17 @@ class KeyboardCondition(AbstractCondition):
         from gremlin.ui.keyboard_device import Key
         key = Key(scan_code=self.scan_code, is_extended=self.is_extended)
         return f"Keyboard condition: id: {self.id} comparison: {self.comparison} key {key.debug_name}"
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.ui.keyboard_device import Key
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","Keyboard")
+        table.addField("Comparison", self.comparison)
+        key = Key(scan_code=self.scan_code, is_extended=self.is_extended)
+        table.addField("Key", key.name)
+        return table.to_html()
 
 
 class JoystickCondition(AbstractCondition):
@@ -221,7 +232,7 @@ class JoystickCondition(AbstractCondition):
         self.device_name = safe_read(node, "device-name", str, "")
         self.range = [
             safe_read(node, "range-low", float, 0),
-            safe_read(node, "range-high", float, 0)
+                 safe_read(node, "range-high", float, 0)
         ]
         self.use_calibrated_data = safe_read(node,"use-calibrated",bool,False)
         self.ignore_release = safe_read(node,"ignore-release",bool,False)
@@ -255,7 +266,24 @@ class JoystickCondition(AbstractCondition):
 
     def __str__(self):
         return f"Joystick Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} device: {self.device_name} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[0]:0.3f}]  use calibrated: {self.use_calibrated_data}"
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import gremlin.joystick_handling
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","Joystick")
+        table.addField("Comparison", self.comparison)
+        table.addField("Device", self.device_name)
+        table.addField("Type", self.input_type.name)
+        table.addField("ID", f"{self.input_id}")
+        if self.input_type == InputType.JoystickAxis:
+            table.addField("Range", f"[{self.range[0]:0.3f},{self.range[1]:0.3f}]")
+            table.addField("Use calibrated data", "Yes" if self.use_calibrated_data else "No")
 
+
+        table.addField("Ignore release","Yes" if self.ignore_release else "No")
+        return table.to_html()   
 
 
 class StateCondition(AbstractCondition):
@@ -306,7 +334,19 @@ class StateCondition(AbstractCondition):
     def __str__(self):
         return f"State Condition: [{self.key}] comparison: {self.comparison}"
     
-
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.ui.keyboard_device import Key
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","State")
+        table.addField("Comparison", self.comparison)
+        table.addField("State", self.key)
+        table.addField("Ignore release","Yes" if self.ignore_release else "No")
+        if self.description:
+            table.addField("Description", self.description)
+        return table.to_html()    
 
 class ModeCondition(AbstractCondition):
     ''' mode condition '''
@@ -354,6 +394,18 @@ class ModeCondition(AbstractCondition):
     
     def __str__(self):
         return f"Mode Condition:  Mode: [{self.mode}] comparison: {self.comparison}"    
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.ui.keyboard_device import Key
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","Mode")
+        table.addField("Comparison", self.comparison)
+        table.addField("Mode", self.mode)
+        if self.description:
+            table.addField("Description", self.description)
+        return table.to_html()    
     
 class VJoyCondition(AbstractCondition):
 
@@ -445,9 +497,22 @@ class VJoyCondition(AbstractCondition):
         return super().is_valid() and self.input_type is not None and self.vjoy_id > 0 and self.input_id > 0
 
     def __str__(self):
-        return f"Vjoy Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} vjoy device: {self.vjoy_id} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[0]:0.3f}]"
+        return f"Vjoy Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} vjoy device: {self.vjoy_id} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[1]:0.3f}]"
  
-
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.ui.keyboard_device import Key
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","VJoy")
+        table.addField("Comparison", self.comparison)
+        table.addField("Vjoy Device", self.vjoy_id)
+        table.addField("Type", self.input_type.name)
+        table.addField("ID", f"{self.input_id}")
+        table.addField("Ignore release","Yes" if self.ignore_release else "No")
+        if self.input_type == InputType.JoystickAxis:
+            table.addField("Range", f"[{self.range[0]:0.3f},{self.range[1]:0.3f}]")
+        return table.to_html()
 
 class InputActionCondition(AbstractCondition):
 
@@ -485,8 +550,15 @@ class InputActionCondition(AbstractCondition):
 
     def __str__(self):
         return f"Input Condition: id: [{self.id}] comparison: [{self.comparison}]"
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","Input")
+        table.addField("Comparison", self.comparison)
  
-
+        return table.to_html()   
 
 class AbstractFunctor(QtCore.QObject):
 

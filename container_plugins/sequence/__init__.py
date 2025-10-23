@@ -615,7 +615,34 @@ Unlike a macro, any action suitable for the input can be used.'''
         return True
         #return len(self.action_sets) > 0
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4)  
 
+        count = sum(len(actions) for actions in self.action_sets)
+
+        table.addField("Steps", f"{count}" )
+
+        if self.wiggle_mode:
+            table.addField("Wiggle Mode", "Enabled")
+            if self.wiggle_random:
+                table.addField("Wiggle Random", "Enabled")
+                table.addField("Random Steps", "Yes" if self.wiggle_randomize_steps else "No")
+                table.addField("Wigle Min Delay", f"{self.wiggle_min_delay} ms")
+                table.addField("Wigle Max Delay", f"{self.wiggle_max_delay} ms")
+                table.addField("Wigle Exec Delay", f"{self.wiggle_exec_delay} ms")
+
+
+        if self.exec_on_press:
+            table.addField("Exec (press)", "Yes")
+        if self.exec_on_release:
+            table.addField("Exec (release)", "Yes")
+
+
+
+        return table.to_html()
+    
 # Plugin definitions
 version = 1
 name = "sequence"

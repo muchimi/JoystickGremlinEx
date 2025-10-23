@@ -578,6 +578,22 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         return True
+  
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4)    
+
+        if self.motion_input:
+            # motion
+            table.addField("Direction", f"{self.direction}")
+            table.addField("Min Speed", f"{self.min_speed}")
+            table.addField("Max Speed", f"{self.max_speed}")
+            table.addField("Time to speed", f"{self.time_to_max_speed:0.3f} s")
+        else:
+            table.addField("Button", f"{self.button_id.value}")
+
+        return table.to_html()
 
 
 version = 1

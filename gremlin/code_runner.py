@@ -671,20 +671,21 @@ class CodeRunner:
             ec.registerCallbacks(eh.callbacks)
 
             # apply global start values 
-            for vjoy_device_id, vjoy_input_id, value in profile.settings.get_initial_vjoy_axis_value_list():
-                vs.setStartValue(vjoy_device_id, vjoy_input_id, value)
+            for vjoy_id, vjoy_input_id, value in profile.settings.get_initial_vjoy_axis_value_list():
+                vs.setStartValue(vjoy_id, vjoy_input_id, value)
 
             # applies profile start data 
             # this will override global settings
             for vjoy_device in gremlin.joystick_handling.vjoy_devices():
-                vjoy_device_id = vjoy_device.device_guid
+                vjoy_device_guid = vjoy_device.device_guid
+                vjoy_id = vjoy_device.vjoy_id
                 for vjoy_input_id in range(1,vjoy_device.axis_count+1):
-                    if profile.getStartAxisEnabled(vjoy_device_id, vjoy_input_id):
-                        value = profile.getStartAxisValue(vjoy_device_id, vjoy_input_id)
-                        vs.setStartValue(vjoy_device_id, vjoy_input_id, value)
+                    if profile.getStartAxisEnabled(vjoy_device_guid, vjoy_input_id):
+                        value = profile.getStartAxisValue(vjoy_id, vjoy_input_id)
+                        vs.setStartValue(vjoy_id, vjoy_input_id, value)
                 for vjoy_input_id in range(1,vjoy_device.button_count+1):
-                    state = profile.getStartButtonState(vjoy_device_id, vjoy_input_id)
-                    vs.setStartState(vjoy_device_id, vjoy_input_id, state)
+                    state = profile.getStartButtonState(vjoy_device_guid, vjoy_input_id)
+                    vs.setStartState(vjoy_id, vjoy_input_id, state)
                                 
 
             # hook profiles - this tells all functors to hook runtime events

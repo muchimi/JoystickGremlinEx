@@ -559,7 +559,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         result = msgbox.show()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             positions = self.action_data.hat_positions
-            vjoy_id = self.action_data.vjoy_device_id
+            vjoy_id = self.action_data.vjoy_id
             if vjoy_id in self.action_data:
                 dev = self.action_data.vjoy_map[vjoy_id]
                 button_count = dev.button_count
@@ -893,7 +893,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                                     if verbose: syslog.info(f"VJOY: trigger stop pulse state {state_name} hat {position}")
                                     self.pulse_stop(state_name)
 
-                                    # threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
+                                    # threading.Timer(0.01, self._fire_pulse, [self.vjoy_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
                             case ButtonOutputMode.Hold:
                                 if is_pressed:
                                     # release the prior buttons
@@ -1152,6 +1152,15 @@ class MapToState(gremlin.base_profile.AbstractAction):
         """
         return True # bool(self.key) # key has to be set for this to be valid
 
+
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+
+        state = self.state
+        if state:
+            return state.to_html()
+        return "N/A"
 
 version = 1
 name = "map_to_state"

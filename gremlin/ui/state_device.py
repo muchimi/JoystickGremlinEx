@@ -1121,7 +1121,30 @@ class StateInputItem(gremlin.base_profile.InputItem):
         return hash(self._id)
 
         
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
 
+        state = self
+        table = ReportTable(cellpadding=4)
+        table.addField("State", state.key)
+
+        if self.description:
+            table.addField("Description", self.description)
+
+        
+        category_name = state.category_name
+        if category_name:
+            table.addField("Category", category_name)
+
+
+        expression = state.expression
+        if expression:
+            table.addField("Expression",expression)
+        else:
+            table.addField("Default", "on" if state.default_value else "off")
+
+        return table.to_html()    
     
     
 
@@ -2493,6 +2516,8 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _handle_lock_inputs(self, data):
         ''' lock all inputs event'''
+        if not Shiboken.isValid(self):
+            return
         if data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)

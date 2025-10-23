@@ -1753,6 +1753,34 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
         self.osc_client.sendEx(self.command, params)
 
         return True
+    
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+
+        table = ReportTable(cellpadding=4)
+        table.addField("Message", self.command )
+
+        if self.comment:
+            table.addField("Description", self.comment)
+        if self._is_axis:
+            table.addField("Mode","Axis")
+        else:
+            table.addField("Mode","Button")
+
+        if self.exec_on_press:
+            table.addField("Exec (press)", "Yes")
+        if self.exec_on_release:
+            table.addField("Exec (release)", "Yes")
+        if self.exec_on_start:
+            table.addField("Exec (start)", "Yes")
+        if self.exec_on_stop:
+            table.addField("Exec (stop)", "Yes")
+        if self.exec_on_load:
+            table.addField("Exec (load)", "Yes")
+
+
+        return table.to_html()        
 
 version = 1
 name = "map-to-osc-ex"

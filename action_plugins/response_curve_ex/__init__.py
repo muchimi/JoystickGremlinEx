@@ -233,6 +233,12 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
         return True
 
 
+    def to_html(self) -> str:    
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        return self.curve_data.to_html()
+
+
 version = 1
 name = "response-curve-ex"
 create = ResponseCurveEx

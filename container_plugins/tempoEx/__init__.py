@@ -1123,7 +1123,9 @@ More than one action per short press or long press can be added.'''
                 action_set = gremlin.base_profile.ActionSet("double")
                 self._parse_action_xml(as_node, action_set, input_item, extra_data, "double")
                 self.double_action_sets.append(action_set)
-                self.action_sets.append(action_set)                
+                self.action_sets.append(action_set)     
+
+               
 
 
     def _generate_xml(self):
@@ -1147,18 +1149,21 @@ More than one action per short press or long press can be added.'''
                 as_node = ElementTree.Element("short-action-set")
                 for action in action_set:
                     as_node.append(action.to_xml())
+                    
                 node.append(as_node)
         for action_set in self.long_action_sets:
             if action_set:
                 as_node = ElementTree.Element("long-action-set")
                 for action in action_set:
                     as_node.append(action.to_xml())
+                    
                 node.append(as_node)
         for action_set in self.double_action_sets:
             if action_set:
                 as_node = ElementTree.Element("double-action-set")
                 for action in action_set:
                     as_node.append(action.to_xml())
+                    
                 node.append(as_node)
         
 
@@ -1182,6 +1187,24 @@ More than one action per short press or long press can be added.'''
         """ override method: returns action sets - override because we have custom sets """
         return self.action_sets
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+
+        table = ReportTable(cellpadding=4)
+        
+        count = sum(len(actions) for actions in self.short_action_sets)
+        table.addField("Short Steps", f"{count}")
+        count = sum(len(actions) for actions in self.long_action_sets)
+        table.addField("Long Steps", f"{count}")
+        count = sum(len(actions) for actions in self.double_action_sets)
+        table.addField("Double Steps", f"{count}")
+
+        table.addField("Exec on", self.activate_on)
+        table.addField("Long delay", f"{self.delay*1000:,} ms")
+        table.addField("Double tap delay", f"{self.doubletap_delay * 1000:,} ms")
+
+        return table.to_html()
 
 # Plugin definitions
 version = 1

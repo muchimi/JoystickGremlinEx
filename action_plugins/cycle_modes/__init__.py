@@ -345,6 +345,16 @@ on a round robin sequence.'''
             node.append(child)
         return node
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4) 
+        
+        for index, mode in enumerate(self.mode_list):
+            table.addField(f"Mode {index}", mode)
+
+        return table.to_html()
+
    
     
 version = 1

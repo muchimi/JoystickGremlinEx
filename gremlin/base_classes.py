@@ -589,7 +589,8 @@ class JoystickHook:
                 # axis input - get transforms
                 if event.event_type == InputType.JoystickAxis:
                     values = self._astate.getAxisValues(self._device_guid, self._input_id, event.value)
-                    self._hook_value = values # event.value
+                    #self._hook_values = values # event.value
+                    self._hook_value = values.actual
 
                     if self._calibrate:
                         # get calibrated value
@@ -599,6 +600,9 @@ class JoystickHook:
                         self._hook_calibrated_value = values.actual
                 else:
                     self._hook_value = event.value
+
+                assert isinstance(self._hook_value, float)
+                                        
                     
             else:
                 # button
@@ -615,14 +619,25 @@ class JoystickHook:
                 if config.highlight_input_axis and config.highlight_enabled:
                     # ensure highlighting is enabled
                     value = self._hook_value
+                    assert isinstance(value, float)
                     
                     trigger = self._last_state_value is None or abs(self._last_state_value - value) > 0.05
                     #device = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
                     #syslog.info(f"Device: {device.name} axis: {self._input_id} value: {event.value:0.3f} last value: {self._last_state_value}  trigger: {trigger}")
                     if trigger:
+                        
                         self._last_state_value = value
                         el = gremlin.event_handler.EventListener()
                         el.axis_state_change.emit(event)
+
+    # @property
+    # def _hook_value(self):
+    #     return self.__hook_value
+    # @_hook_value.setter
+    # def _hook_value(self, value):
+    #     if value is not None and not isinstance(value, float):
+    #         pass
+    #     self.__hook_value = value
 
     def triggerUpdate(self):
         ''' triggers a hook update by forcing a data read without an event '''
@@ -706,7 +721,7 @@ class JoystickHook:
 
                 # get the values as [actual, raw, calibrated, curved]
                 values = sdata.getAxisValues(self.device_guid, self.input_id)
-                self._hook_value = values
+                self._hook_value = values.actual
 
             if self._hook_callback:
                 self._hook_callback(self._hook_value)

@@ -1103,6 +1103,7 @@ class AbstractAction(ProfileData):
         el.profile_start.connect(self.profile_start)
         el.profile_stop.connect(self.profile_stop)
 
+
     def profile_start(self):
         ''' start event - override in subclass as needed '''
         pass
@@ -3860,14 +3861,14 @@ class Profile():
             
 
             type_name = InputType.to_string(act.input_type)
-            if not act.vjoy_device_id in vjoy \
+            if not act.vjoy_id in vjoy \
                     or act.vjoy_input_id in [0, None] \
-                    or act.vjoy_device_id in [0, None] \
-                    or act.vjoy_input_id not in vjoy[act.vjoy_device_id][type_name]:
+                    or act.vjoy_id in [0, None] \
+                    or act.vjoy_input_id not in vjoy[act.vjoy_id][type_name]:
                 continue
 
-            idx = vjoy[act.vjoy_device_id][type_name].index(act.vjoy_input_id)
-            del vjoy[act.vjoy_device_id][type_name][idx]
+            idx = vjoy[act.vjoy_id][type_name].index(act.vjoy_input_id)
+            del vjoy[act.vjoy_id][type_name][idx]
 
         return vjoy
     

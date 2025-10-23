@@ -2248,6 +2248,36 @@ class OscInputItem(gremlin.base_profile.InputItem):
         client = InputOscClient()
         client.registerInput(self)
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4)
+        table.addField("Message", self.message)
+        table.addField("Mode", self.mode.name)
+        table.addField("Command Mode", self._command_mode.name)
+        if self.autoRelease is None:
+            table.addField("Autorelease", "Global setting")
+        else:
+            table.addField("Autorelease", 'Yes' if self.autoRelease else 'No')
+        if self._message_data:
+            for index, data in enumerate(self._message_data):
+                if isinstance(data, str):
+                    if gremlin.util.isNumeric(data):
+                        data_stub = f"{float(data):0.3f}"
+                elif isinstance(data, float):
+                    data_stub = f"{data:03f}"
+                else:
+                    data_stub = data
+
+                table.addField(f"Data [{index}]", data_stub)
+        if self.mode == OscInputItem.InputMode.Axis:
+            table.addField("Axis Range",f"[{self._min_range:0.3f}, {self._max_range:0.3f}]")
+
+        return table.to_html()
+
+
+
+
     @property
     def autorelease_timer(self):
         return self._autorelease_timer

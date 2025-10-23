@@ -4443,7 +4443,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         event.device_name = self.item_data.device_name
         event.device_input_type = self.item_data.input_type
         event.device_input_id = self.item_data.input_id
-        event.vjoy_device_id = 0
+        event.vjoy_id = 0
         event.vjoy_input_id = 0
         event.source = self.item_data
         el.profile_device_changed.emit(event)
