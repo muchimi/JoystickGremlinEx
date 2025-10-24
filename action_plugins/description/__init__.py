@@ -27,6 +27,7 @@ from gremlin.util import safe_format, safe_read
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 import logging
 from shiboken6 import Shiboken
+import html
 
 syslog = logging.getLogger("system")
 
@@ -153,7 +154,7 @@ Also see notes on actions and containers.
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
         table = ReportTable(cellpadding=4) 
         
-        table.addField("Description", self.description)
+        table.addField("Description", html.escape(self.description))
 
         if self.exec_on_press:
             table.addField("Exec (press)", "Yes")

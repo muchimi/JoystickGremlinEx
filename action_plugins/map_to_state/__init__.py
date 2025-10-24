@@ -32,6 +32,7 @@ import enum, threading,time, random
 import gremlin.util
 from gremlin.util import *
 import gremlin.ui.state_device
+import html
 
 syslog = logging.getLogger("system")
 
@@ -1113,11 +1114,11 @@ class MapToState(gremlin.base_profile.AbstractAction):
         """
         node = ElementTree.Element(MapToState.tag)
         if self.key:
-            node.set("key", self.key)
+            node.set("key", html.escape(self.key))
             if self.state:
                 node.set("state-id", self.state.id)
             if self.description:
-                node.set("description", self.description)
+                node.set("description", html.escape(self.description))
             node.set("mode", self.mode)
             node.set("delay", safe_format(self.pulse_delay, int))
             node.set("exec_on_press", safe_format(self.exec_on_press, bool))

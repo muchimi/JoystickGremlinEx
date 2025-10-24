@@ -24,6 +24,7 @@ import gremlin.ui.ui_common
 import gremlin.singleton_decorator
 import gremlin.config
 import gremlin.shared_state
+import gremlin.gated_handler
 import anytree
 import logging
 import gremlin.execution_graph as eg
@@ -35,6 +36,7 @@ import gremlin.base_profile
 from collections import namedtuple
 import gremlin.base_conditions
 import traceback
+import html
 
 syslog = logging.getLogger("system")
 
@@ -59,7 +61,18 @@ class ReportNodeType(enum.Enum):
     Mode = 2
     InputItem = 4,
     Container = 5,
-    Action = 6
+    Action = 6,
+    GateDataGate = 7,
+    GateDataRange = 8,
+    GateDataCondition = 9, # gate or range condition container
+    
+class ReportOptions():
+    ''' reporting options '''
+    def __init__(self):
+        self.export_pdf = True
+        self.export_svg = True
+        self.open_files = True
+    
 
 class ReportCell():
     def __init__(self, index, value : str | CellInfo , border : int = None, valign : int = None, align = "LEFT", port = None):
@@ -86,10 +99,10 @@ class ReportCell():
         
         # render to HTML if needed
         if hasattr(self.value,"to_html"):
-            html = f"\n{self.value.to_html()}\n"
+            text = f"\n{self.value.to_html()}\n"
         else:
-            html = self.value
-        return f"<TD{border_stub}{valign_stub}{align_stub}{port_stub}>{html}</TD>\n"
+            text = self.value
+        return f"<TD{border_stub}{valign_stub}{align_stub}{port_stub}>{text}</TD>\n"
 
 class ReportRow():
     ''' single report cell '''
@@ -385,6 +398,7 @@ class ReportEngine():
 
     def _get_shape_label(self, node) -> tuple:
         ''' gets an HTML representation of the node for display purposes, returns shape, label, fillcolor '''
+
         rows = None
         
         match node.node_type:
@@ -396,7 +410,7 @@ class ReportEngine():
                 device_table = ReportTable(cellpadding=4) # cell 1
                 info_table = ReportTable(cellpadding=4) # cell 2
 
-                device_table.addField("Name", device.name)
+                device_table.addField("Name", html.escape(device.name))
                 device_table.addField("Type", device.device_type.name)
 
                 syslog.info("DEVICE TABLE:")
@@ -424,7 +438,11 @@ class ReportEngine():
                     mode = "Master Mode"
 
                 table = ReportTable(cellpadding=4)
-                table.addField("Mode",mode) 
+                table.addField("Mode",html.escape(mode))
+
+                # add parent nodes:
+                # profile = gremlin.shared_state.profile
+                # ancestors = profile.getModeHierarchy(mode_object.name)
 
                 label = f"<{table.to_html()}>"
                 return "none", label
@@ -435,18 +453,18 @@ class ReportEngine():
      
                 table = ReportTable(cellpadding=4)
                 table.addField("Input", str(input_item.input_id))
-                table.addField("Name", input_item.display_name)
+                table.addField("Name", html.escape(input_item.display_name))
                 
                 if input_item.input_description:
-                    table.addField("Description", input_item.input_description)
+                    table.addField("Description", html.escape(input_item.input_description))
 
                 if hasattr(input_item,"to_html"):
-                    html = input_item.to_html()
-                    table.addField(" ", html)
+                    text = input_item.to_html()
+                    table.addField(" ", text)
 
                 if hasattr(input_item.input_id,"to_html"):
-                    html = input_item.input_id.to_html()
-                    table.addField(" ", html)
+                    text = input_item.input_id.to_html()
+                    table.addField(" ", text)
                 
 
                 label = f"<{table.to_html()}>"                    
@@ -461,7 +479,7 @@ class ReportEngine():
                 table.addField("Container", container.name)
                 
                 if container.comment:
-                    table.addField("Description", container.comment)
+                    table.addField("Description", html.escape(container.comment))
 
                 if container.has_conditions:
                     ct = ReportTable(cellpadding=4, bgcolor = "#C79AD4")
@@ -472,16 +490,17 @@ class ReportEngine():
                     table.addField("Conditions", ct.to_html())               
 
                 if hasattr(container,"to_html"):
-                    html = container.to_html()
-                    table.addField(" ", html)
+                    text = container.to_html()
+                    table.addField(" ", text)
 
                 label = f"<{table.to_html()}>"
                 return "none", label
 
             case ReportNodeType.Action:
+
                 # action 
                 action : gremlin.base_profile.AbstractAction = node.data
-   
+
 
                 table = ReportTable(cellpadding=4)
                 table.addField("Action", action.name)
@@ -489,7 +508,7 @@ class ReportEngine():
                     table.addField("Data", action.data)
 
                 if action.comment:
-                    table.addField("Description", action.comment)
+                    table.addField("Description", html.escape(action.comment))
 
                 if action.has_conditions:
                     ct = ReportTable(cellpadding=4, bgcolor = "#C79AD4")
@@ -501,64 +520,120 @@ class ReportEngine():
                     table.addField("Conditions", ct.to_html())                    
 
                 if hasattr(action, "to_html"):
-                    html = action.to_html()
-                    table.addField(" ", html)
+                    text = action.to_html()
+                    table.addField(" ", text)
 
 
                 label = f"<{table.to_html()}>"
                 return "none", label
                 
-                
+            case ReportNodeType.GateDataGate:
+                # gate node for gated axis
+                gate : gremlin.gated_handler.GateInfo = node.data
+                table = ReportTable(cellpadding=4)
+                table.addField("Gate", gate.gate_display())
+
+                label = f"<{table.to_html()}>"
+                return "none", label
+
+            case ReportNodeType.GateDataRange:
+                # gate node for gated axis
+                rng : gremlin.gated_handler.RangeInfo = node.data
+                table = ReportTable(cellpadding=4)
+                table.addField("Range", rng.to_display())
+
+                label = f"<{table.to_html()}>"
+                return "none", label
+            
+            case ReportNodeType.GateDataCondition:
+                # gate crossing condition
+                table = ReportTable(cellpadding=4)
+                table.addField("Condition", node.data)
+                label = f"<{table.to_html()}>"
+                return "none", label
+
+
 
                     
 
         if rows:
-            html = self._generate_table(rows)
-            return "box", html
+            text = self._generate_table(rows)
+            return "box", text
         return None
 
                 
+    def generate_input_item(self, input_item, parent):
+        input_node = ReportNode(ReportNodeType.InputItem, data = input_item)
+        input_node.parent = parent
+        if input_item.containers:
+            # mapping exists, link to the tree
+           
+            for container in input_item.containers:
+                container_node = ReportNode(ReportNodeType.Container, data = container)
+                container_node.parent = input_node
+                for action_set in container.action_sets:
+                    for action in action_set:
+                        action_node = ReportNode(ReportNodeType.Action, data = action)
+                        action_node.parent = container_node
 
-    def generate(self):
+                        if action.tag == "gated-axis":
+                            # special handling for gated axis
+                            gate_data :  gremlin.gated_handler.GateData = action.gate_data
+                            gate : gremlin.gated_handler.GateInfo
+                            for gate in gate_data.getGates():
+                                gate_node = ReportNode(ReportNodeType.GateDataGate, data = gate)
+                                gate_node.parent = action_node
+
+                                # gate containers
+                                for condition, item in gate.item_data_map.items():
+                                    condition_node = ReportNode(ReportNodeType.GateDataCondition, data = condition.name)
+                                    condition_node.parent = gate_node
+                                    self.generate_input_item(item, condition_node)
+
+                            rng : gremlin.gated_handler.RangeInfo
+                            for rng in gate_data.getRanges():
+                                range_node = ReportNode(ReportNodeType.GateDataRange, data = rng)
+                                range_node.parent = action_node
+
+                                # gate containers
+                                for condition, item in rng.item_data_map.items():
+                                    condition_node = ReportNode(ReportNodeType.GateDataCondition, data = condition.name)
+                                    condition_node.parent = range_node
+                                    self.generate_input_item(item, condition_node)
+                                
+
+    def generate(self, options : ReportOptions):
         ''' generate a map of the current profile '''
         if not self._ensure_path():
             gremlin.ui.ui_common.MessageBox(prompt ="This feature requires GraphViz.\nGraphViz could not be located.")
             return 
         
+        # current profile
+        profile = gremlin.shared_state.current_profile
 
+        
 
         root = ReportNode(ReportNodeType.Root)
 
-        profile = gremlin.shared_state.current_profile
-
+        
         for device in profile.devices.values():
             device_node = ReportNode(ReportNodeType.Device, data = device)
             for mode_object in device.modes.values():
                 mode_node = ReportNode(ReportNodeType.Mode, data = mode_object)
+
+
                 for input_type in mode_object.config.keys():
                     for input_item in mode_object.config[input_type].values():
-                        input_node = ReportNode(ReportNodeType.InputItem, data = input_item)
                         if input_item.containers:
-                            # mapping exists, link to the tree
                             if not device_node.parent:
                                 device_node.parent = root
                             if not mode_node.parent:
                                 mode_node.parent = device_node
-                            input_node.parent = mode_node
-                            for container in input_item.containers:
-                                container_node = ReportNode(ReportNodeType.Container, data = container)
-                                container_node.parent = input_node
-                                for action_set in container.action_sets:
-                                    for action in action_set:
-                                        action_node = ReportNode(ReportNodeType.Action, data = action)
-                                        action_node.parent = container_node
+                            self.generate_input_item(input_item, mode_node)
+                                           
+        
 
-
-       
-
-        pdf_file = gremlin.util.getTemporaryFile("pdf")
-        dot_file = gremlin.util.getTemporaryFile("dot")
-
+    
         cluster_entries = {} # clusters keyed by cluster index
         node_entries = {} # nodes keyed by cluster index
         edge_entries = {} # edges keyed by cluster index
@@ -566,6 +641,9 @@ class ReportEngine():
         cluster_index = 0 # cluster number - one cluster per device 
         current_cluster = 0
        
+
+        dot_file = gremlin.util.getTemporaryFile("dot")
+
         #report_root = self._duplicate_tree(root)
         if root:
             # self._convert_tree(root)
@@ -610,11 +688,23 @@ class ReportEngine():
                         fillcolor = "#7DB6C0"
                         shape, label = self._get_shape_label(node)
 
+                    case ReportNodeType.GateDataGate:
+                        fillcolor = "#AEABD3"
+                        shape, label = self._get_shape_label(node)
+
+                    case ReportNodeType.GateDataRange:
+                        fillcolor = "#8083B4"
+                        shape, label = self._get_shape_label(node)
+
+                    case ReportNodeType.GateDataCondition:
+                        fillcolor = "#ABC6D3"
+                        shape, label = self._get_shape_label(node)                        
+
                     case ReportNodeType.Root:
                         continue
 
                     case _:
-                        label = "ignore"
+                        label = f"ignore: {node.node_type.name}"
                         # continue # ignore node
 
                 node_entry = f'"{node.id}" [label = {label}, shape= "{shape}", fillcolor = "{fillcolor}"];\n'
@@ -623,7 +713,7 @@ class ReportEngine():
                 if node.parent and node.parent != root:
                     edge_entry = f'"{node.parent.id}" -> "{node.id}";\n'
                     edge_entries[current_cluster].append(edge_entry)
-                    
+            
 
         # create the DOT file
         with open(dot_file,"w") as f:
@@ -663,10 +753,24 @@ class ReportEngine():
         syslog.info(f"DOT FILE:")
         syslog.info(dot_file)
 
+
+
+
         try:
-            s = graphviz.Source.from_file(dot_file)
-            s.render(pdf_file, format='pdf', view=True, cleanup=True)
+            view = options.open_files
+            if options.export_pdf:
+                pdf_file = gremlin.util.getTemporaryFile() # graphviz adds the .pdf
+                s = graphviz.Source.from_file(dot_file)
+                s.render(pdf_file, format='pdf', view=view, cleanup=True)
+            if options.export_svg:
+                       
+                svg_file = gremlin.util.getTemporaryFile()# graphviz adds the .svg
+                s = graphviz.Source.from_file(dot_file)
+                s.render(svg_file, format='svg', view=view, cleanup=True)
+
             os.unlink(dot_file) # clean up
         except Exception as err:
+            # if os.path.isfile(dot_file):
+            #     gremlin.util.display_file(dot_file)
             syslog.error(f"REPORT: error rendering: {err}\n{traceback.format_exc()}")
 

@@ -215,6 +215,17 @@ class MapToOctaviIfr1(gremlin.base_profile.AbstractAction):
         node.set("button", safe_format(self.button, int))
         node.set("action", self.action)
         return node
+    
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import html
+        table = ReportTable(cellpadding=4)    
+        
+        table.addField("Function", f"{self.button}")
+        table.addField("Action", self.action)
+
+        return table.to_html()
 
 version = 1
 name = "map-to-octavi-ifr1"

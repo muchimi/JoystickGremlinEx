@@ -722,7 +722,9 @@ class Icons():
     @staticmethod
     def noFilterIcon():
         return Icons._icon("mdi.filter-off")
-    
+    @staticmethod
+    def treeIcon(qta_color = "#a9aa4f"):
+        return Icons._icon("ph.tree-structure-thin", qta_color = qta_color)
     
     @staticmethod
     def collapseAllIcon():
@@ -8238,9 +8240,26 @@ class QSplitTabWidget(QDataWidget):
         # select it
         self.selectRegisteredWidget(self._blank_input_id)
 
-    def ensureLoaded(self):
-        pass
-                
+    def ensureLoaded(self):        
+        ts = gremlin.tabstate.TabState()
+        data = ts.getData(self._device_id)
+        if not data.populateEnabled:
+            data.populateEnabled = True # enable data loading
+            verbose = gremlin.config.Configuration().verbose_mode_ui    
+            if verbose: 
+                device_name = gremlin.joystick_handling.device_name_from_guid(self._device_id)
+                syslog.info(f"UI: enable device data population [{device_name}] [{self._device_id}]")
+
+            # verify this is a device tab
+            if hasattr(self, "input_item_list_model"):
+                # data needs to be populated - do this on the UI thread
+                gremlin.util.InvokeUiMethod(self._ensureLoaded_ui)
+
+    def _ensureLoaded_ui(self):
+        ''' ensures the data is loaded into the widget - runs on UI thread '''
+        if self.input_item_list_model.rows() == 0:
+            self.input_item_list_model.refresh()
+        self.input_item_list_view.redraw()   
 
 
     def _ensure_blank_widget(self):
@@ -8837,7 +8856,7 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
     return (widget, layout)
     
 
-def getVContainer(widget_or_list = None, label = None, alignment = None, font = None,  parent = None):
+def getVContainer(widget_or_list = None, label = None, alignment = None, font = None,  parent = None, no_stretch = False, bottom_stretch = False, top_stretch = False):
     ''' gets a qt H container widget '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QVBoxLayout(widget)
@@ -8846,6 +8865,9 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, font = 
     if alignment is None:
         alignment = QtCore.Qt.AlignmentFlag.AlignTop
     layout.setAlignment(widget, alignment)
+    if top_stretch:
+        layout.addStretch()
+
     stretch = False
     if label:
         layout.addWidget(QtWidgets.QLabel(label))
@@ -8870,8 +8892,9 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, font = 
         else:
             layout.addWidget(widget_or_list)
         stretch = True
-    if stretch:
+    if (not no_stretch and stretch) or bottom_stretch:
         layout.addStretch()
+    
     return (widget, layout)
 
 

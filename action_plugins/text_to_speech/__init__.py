@@ -387,6 +387,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import html
         table = ReportTable(cellpadding=4)    
         tts = gremlin.tts.TextToSpeech()
         voice_list = {index: voice for index,voice in enumerate(tts.getVoices())}
@@ -395,7 +396,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         else:
             voice_name = 'Not found'
 
-        table.addField("Say",self.text)
+        table.addField("Say", html.escape(self.text)) # ensure text does not interfere with DOT commands
         table.addField("Volume", f"{self.volume}")
         table.addField("Rate", f"{self.rate} wpm")
         table.addField("Voice Index", f"{self.voice_index}")

@@ -46,7 +46,7 @@ class ModuleManagementController(QtCore.QObject):
         self.profile_data = profile_data
 
         # The view managed by the controller
-        self.view = ModuleManagementView()
+        self.view = ModuleManagementViewWidget()
 
         # stores a map of instance widgets by instance
         self.instance_widget_map = {}
@@ -172,7 +172,7 @@ class ModuleManagementController(QtCore.QObject):
             instance.parent.file_name
         )
 
-        layout = self.view.right_panel.layout()
+        layout = self.view.right_panel_widget.layout()
         gremlin.ui.ui_common.clear_layout(layout)
 
 
@@ -333,50 +333,63 @@ class ModuleManagementController(QtCore.QObject):
         return instance
 
 
-class ModuleManagementView(QtWidgets.QSplitter):
-
+class ModuleManagementViewWidget(QtWidgets.QSplitter):
+    ''' plugin tab device widget '''
     add_module = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self.controller = None
-        
 
         # Create the left panel showing the modules and their instances
-        self.left_panel = QtWidgets.QWidget()
-        self.left_panel.setLayout(QtWidgets.QVBoxLayout())
+        
+        
+        
 
         # Displays the various modules and instances associated with them
         self.module_list = ModuleListWidget()
 
 
         # Button to add a new module
-       
-        self.btn_add_module = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.addIcon(), "Add Plugin")
-        
-        self.btn_add_module.clicked.connect(self._prompt_user_for_module)
+        self.add_widget = gremlin.ui.ui_common.Buttons.getAddWidget("Add Plugin",
+                                                  tooltip = "Adds a Python user plugin to the profile",
+                                                  callback=self._handle_add_module)
+        widget, _ = gremlin.ui.ui_common.getHContainer(self.add_widget, left_stretch=True)
 
-        self.left_panel.layout().addWidget(self.module_list)
-        self.left_panel.layout().addWidget(self.btn_add_module)
+
+
+
+        info_widget = gremlin.ui.ui_common.QInfoBox(
+"""
+Please add one or more Python modules to the profile. Each module will be loaded or reloaded at profile start and any errors will be shown at profile start.
+Modules get reloaded at every profile start.
+However module dependencies (imports), once loaded, will not be reloaded until GremlinEx is restarted.
+This is due to the way dynamic module loading and packaging works in Python.
+"""                                                    )
+        
+        
+        widgets = [self.module_list, widget, info_widget]
+        self.left_panel_widget, self.left_panel_layout = gremlin.ui.ui_common.getVContainer(widgets, no_stretch=True)
 
         # Create the right panel which will show the parameters of a
         # selected module instance
-        self.right_panel = QtWidgets.QWidget()
-        self.right_panel.setLayout(QtWidgets.QVBoxLayout())
+        self.right_panel_widget = QtWidgets.QWidget()
+        self.right_panel_widget.setLayout(QtWidgets.QVBoxLayout())
 
-        self.addWidget(self.left_panel)
-        self.addWidget(self.right_panel)
+        self.addWidget(self.left_panel_widget)
+        self.addWidget(self.right_panel_widget)
 
     def refresh_ui(self):
         pass
 
     def ensureLoaded(self):
+        # always loaded
         pass
 
 
 
-    def _prompt_user_for_module(self):
+    def _handle_add_module(self):
         """Asks the user to select the path to the module to add."""
         import gremlin.config
         import gremlin.util

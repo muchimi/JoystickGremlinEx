@@ -469,7 +469,13 @@ class Control(gremlin.base_profile.AbstractAction):
         #     return True
         # return False
 
-
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import html
+        table = ReportTable(cellpadding=4)    
+        table.addField("Control", f"{self.action.name}")
+        return table.to_html()
 
 version = 1
 name = "Control"

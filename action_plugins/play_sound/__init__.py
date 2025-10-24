@@ -288,9 +288,10 @@ class PlaySound(gremlin.base_profile.AbstractAction):
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import html
         table = ReportTable(cellpadding=4) 
         
-        table.addField("Play", self.sound_file)
+        table.addField("Play", html.escape(self.sound_file))
         table.addField("Volume", f"{self.volume}")
 
         if self.exec_on_press:

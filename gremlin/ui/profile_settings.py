@@ -68,19 +68,24 @@ class ProfileSettingsWidget(QDataWidget):
 
         self._create_ui()
 
-    def ensureLoaded(self):
-        self.refresh_ui()
+    def ensureLoaded(self):        
+        ts = gremlin.tabstate.TabState()
+        data = ts.getData(gremlin.shared_state.settings_tab_id)
+        if not data.populateEnabled:
+            data.populateEnabled = True
+            gremlin.util.InvokeUiMethod(self._refresh_ui, False) # UI thread            
 
-    def refresh_ui(self, emit=False):
-        """Refreshes the entire UI."""
+    def _refresh_ui(self, emit=False):
+        ''' reloads the tab '''
 
         gremlin.ui.ui_common.clear_layout(self.scroll_layout)
         self._create_ui()
         if emit:
             self.changed.emit()
 
+
     def refresh(self, emit = True):
-        gremlin.util.InvokeUiMethod(self.refresh_ui, emit) # UI thread
+        gremlin.util.InvokeUiMethod(self._refresh_ui, emit) # UI thread
         
 
     @QtCore.Slot(int, bool)

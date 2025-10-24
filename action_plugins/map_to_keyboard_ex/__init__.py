@@ -52,6 +52,8 @@ from gremlin import input_devices
 import gremlin.repeater
 import gremlin.windows_event_hook
 from shiboken6 import Shiboken
+import html
+
 syslog = logging.getLogger("system")
 
 class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -1007,7 +1009,7 @@ Can also send mouse buttons, mouse wheel events.'''
                 key_stub += " "
             key_stub += name
 
-        table.addField("Key", key_stub)
+        table.addField("Key", html.escape(key_stub))
         table.addField("Mode", self.mode.name)
         match self.mode:
             case KeyboardOutputMode.Pulse:

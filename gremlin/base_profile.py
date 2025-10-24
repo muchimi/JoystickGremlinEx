@@ -3204,6 +3204,9 @@ class Profile():
         self._ensure_mode_tree()
         return self._mode_tree
     
+    def getModeTree(self):
+        ''' gets the current mode tree as an anytree root '''
+        self.build_inheritance_tree()
 
         
     def getModeHierarchy(self, mode: str):
@@ -3217,6 +3220,7 @@ class Profile():
                 return mode_list
         return []
             
+
 
 
 

@@ -32,6 +32,7 @@ import gremlin.ui.input_item
 import gremlin.ui.ui_common
 from shiboken6 import Shiboken
 import gremlin.util
+import html
 
 class CycleModeModel(QtCore.QAbstractItemModel):
     def __init__(self):
@@ -351,7 +352,7 @@ on a round robin sequence.'''
         table = ReportTable(cellpadding=4) 
         
         for index, mode in enumerate(self.mode_list):
-            table.addField(f"Mode {index}", mode)
+            table.addField(f"Mode {index}", html.escape(mode))
 
         return table.to_html()
 

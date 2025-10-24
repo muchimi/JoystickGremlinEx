@@ -5229,7 +5229,22 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
     def __str__(self):
         return f"MapToSimConnect: command: {self.command} mode: {self.command_mode}"
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import html
 
+        table = ReportTable(cellpadding=4)
+        table.addField("Type", self._command_type.name)
+        table.addField("Command", html.escape(self.command) ) # ensure the text does not interfere with DOT commands
+
+        if self.trigger_on_press:
+            table.addField("Exec (press)", "Yes")
+        if self.trigger_on_release:
+            table.addField("Exec (release)", "Yes")
+
+
+        return table.to_html()        
 
 
 version = 1

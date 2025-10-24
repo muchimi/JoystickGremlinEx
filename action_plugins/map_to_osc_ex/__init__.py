@@ -44,6 +44,7 @@ import psygnal
 from psygnal import Signal
 import logging
 from shiboken6 import Shiboken
+import html
 
 syslog = logging.getLogger("system")
 
@@ -1759,10 +1760,10 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
 
         table = ReportTable(cellpadding=4)
-        table.addField("Message", self.command )
+        table.addField("Message", html.escape(self.command))
 
         if self.comment:
-            table.addField("Description", self.comment)
+            table.addField("Description", html.escape(self.comment))
         if self._is_axis:
             table.addField("Mode","Axis")
         else:

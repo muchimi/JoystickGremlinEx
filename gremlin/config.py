@@ -2669,3 +2669,27 @@ class Configuration(QtCore.QObject):
     @graphviz_executable.setter
     def graphviz_executable(self, value: str):
         self._set_data("graphviz_executable", value)
+
+    ''' report options '''
+    @property
+    def ReportPdfEnabled(self) -> bool:
+        return self._get_data("ReportPdfEnabled", True)
+    @ReportPdfEnabled.setter
+    def ReportPdfEnabled(self, value : bool):
+        self._set_data("ReportPdfEnabled", value)
+
+    @property
+    def ReportSvgEnabled(self) -> bool:
+        return self._get_data("ReportSvgEnabled", False)
+    @ReportSvgEnabled.setter
+    def ReportSvgEnabled(self, value : bool):
+        self._set_data("ReportSvgEnabled", value)        
+
+    @property
+    def ReportOpenFilesEnabled(self) -> bool:
+        return self._get_data("ReportOpenFilesEnabled", True)
+    @ReportOpenFilesEnabled.setter
+    def ReportOpenFilesEnabled(self, value : bool):
+        self._set_data("ReportOpenFilesEnabled", value)        
+
+    

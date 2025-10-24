@@ -285,6 +285,19 @@ class RunProcess(gremlin.base_profile.AbstractAction):
         except:
             pass
 
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import html
+        table = ReportTable(cellpadding=4)    
+        table.addField("Process", html.escape(self.process))
+        for index, arg in self.arguments:
+            table.addField(f"Arg [{index+1}", html.escape(arg))
+
+        if self.exec_on_release:
+            table.addField("Exec on release","Yes")
+            
+        return table.to_html()
 
 version = 1
 name = "run-process"

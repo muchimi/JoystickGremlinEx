@@ -620,19 +620,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.select_item(self._last_selected_index)
 
 
-    def ensureLoaded(self):
-        ''' ensures the data is loaded into the widget '''
-        if self.input_item_list_model.rows() == 0:
-            self.input_item_list_model.refresh()
-        ts = gremlin.tabstate.TabState()
-        data = ts.getData(self._device_id)
-        if not data.populateEnabled:
-            verbose = gremlin.config.Configuration().verbose_mode_ui
-            if verbose: 
-                device_name = gremlin.joystick_handling.device_name_from_guid(self._device_id)
-                syslog.info(f"UI: enable device data population [{device_name}] [{self._device_id}]")
-            data.populateEnabled = True # enable data loading
-            self.input_item_list_view.redraw()        
+     
 
 
 

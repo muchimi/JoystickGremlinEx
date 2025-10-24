@@ -774,6 +774,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
             self._select_input(device_guid = device_guid, input_type = restore_input_type, input_id = restore_input_id, force_update =True, force_switch=True, tab_changed = True)
 
+            # verify the data is being populated
+            self.ensureTabLoaded()
+
         gremlin.util.popCursor()
 
     def add_custom_tools_menu(self, menuTools):
@@ -1632,7 +1635,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.ui.actionReloadDevices.triggered.connect(self._reload_devices)
 
-        self.ui.actionPDFCheatsheet.triggered.connect(lambda: self._create_cheatsheet())
+        self.ui.actionCheatsheet.triggered.connect(lambda: self._create_cheatsheet())
         self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
         self.ui.actionOptions.triggered.connect(self.options_dialog)
         self.ui.actionLogDisplay.triggered.connect(self.log_window)
@@ -2796,12 +2799,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 syslog.info(f"SELECT TAB INDEX: {index}")
                 index = self.getTabIndexForDevice(last_device_guid)
                 if index is not None:
-                    data = ts.getData(last_device_guid)
-                    if data and not data.populateEnabled:
-                        data.populateEnabled = True
-                        widget = self.getRegisteredWidget(device_guid)
-                        widget.ensureLoaded()
-
                     self.ui.devices.setCurrentIndex(index)
                     self._select_input(last_device_guid, last_input_type, last_input_id, force_switch=True)
                 
@@ -3232,10 +3229,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 with QtCore.QSignalBlocker(self.ui.devices):
                     self.ui.devices.setCurrentIndex(index)
                     gremlin.shared_state.current_tab_device_guid = device_guid
-                    current_device_guid = device_guid
-                    # ensure the widget has been loaded
-                    widget = self.getRegisteredWidget(device_guid)
-                    widget.ensureLoaded() # ensure data is loaded and visible
+                    
 
                 if verbose: syslog.info(f"Tab change complete: device {gremlin.util.normalize_guid(device_guid)}")
                 switch_tabs = True # we are switching tabs
@@ -3349,15 +3343,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         finally:
             
             # allow UI to refresh / update
-
-            # current widget
-            position = self.ui.devices.currentIndex()
-            tabdata = self.ui.devices.tabData(position)
-            current_tab_device_guid = tabdata.device_guid
-            widget : gremlin.ui.ui_common.QSplitTabWidget = self.getRegisteredWidget(current_tab_device_guid)
-            assert widget is not None, f"SELECT: sync issue: no widget found for the given device: {current_tab_device_guid}"
-            widget.ensureLoaded()    
-            
+            self.ensureTabLoaded()
 
             # validation check
             if verbose:
@@ -3385,6 +3371,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             
             gremlin.util.popCursor()
             self._change_input_lock.release_lock()
+
+    def ensureTabLoaded(self):
+        ''' ensures a tab device UI is loaded/refreshed '''
+
+        position = self.ui.devices.currentIndex()
+        tabdata = self.ui.devices.tabData(position)
+        current_tab_device_guid = tabdata.device_guid
+        widget : gremlin.ui.ui_common.QSplitTabWidget = self.getRegisteredWidget(current_tab_device_guid)
+        assert widget is not None, f"SELECT: sync issue: no widget found for the given device: {current_tab_device_guid}"
+        widget.ensureLoaded()  
+
 
             
     @QtCore.Slot(object, object, object)
@@ -4217,24 +4214,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         :param file_format the format of the cheatsheet, html or pdf
         """
         import gremlin.ui.ui_common
+        import gremlin.ui.dialogs
         
         # gremlin.ui.ui_common.MessageBox(prompt="This feature is not currently available.")
         # return # disable in this version
 
-        import gremlin.reporting
-        report = gremlin.reporting.ReportEngine()
-        report.generate()
+        dialog = gremlin.ui.dialogs.CreateReportDialog(parent = self)
+        dialog.exec()
 
-
-        # import gremlin.cheatsheet
-        # fname, _ = QtWidgets.QFileDialog.getSaveFileName(
-        #     None,
-        #     "Save cheatsheet",
-        #     gremlin.shared_state.data_path,
-        #     "PDF files (*.pdf)"
-        # )
-        # if len(fname) > 0:
-        #     gremlin.cheatsheet.generate_cheatsheet(fname, self.profile)
 
     def _view_input_map(self):
         ''' display input map dialog '''

@@ -15,7 +15,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T86A) hotfix
-- Fix: 
+- Fix: Refactored delay load logic for UI as some device tabs would not populate in some situations.
+- Fix: Profile visualization report handles special characters that could cause a graph definition exception when not properly escaped.
+- New: added support for Gated Axis, Simconnect, Control, RunProcess, MapToGamepad, IFR1 in PDF output.
+- New: Report options dialog
+
+
 
 ### (m76T86)
 - Experimental.  PDF profile visualization adds conditions, and details for most containers/actions. Notable exception: Gated Axis - still on the to-do list.

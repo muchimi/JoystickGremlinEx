@@ -30,6 +30,7 @@ import gremlin.ui.input_item
 from gremlin.keyboard import key_from_code
 import gremlin.util
 from shiboken6 import Shiboken
+import html
 class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to keyboard key combinations."""
@@ -249,7 +250,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         for key in self.keys:
             names.append(key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
-        table.addField("Key", text)
+        table.addField("Key", html.escape(text))
         return table.to_html()
 
 version = 1

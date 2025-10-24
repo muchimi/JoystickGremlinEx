@@ -2320,7 +2320,18 @@ the input is in a specific range of values, or crosses gates.
 
     def _is_valid(self):
         return True
-
+    
+    
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import html
+        table = ReportTable(cellpadding=4)    
+        gate_count = len(self.gate_data.getUsedGates())
+        range_count = len(self.gate_data.getRanges())
+        table.addField("Gates", f"{gate_count}")
+        table.addField("Ranges",f"{range_count}")
+        return table.to_html()
 
 version = 1
 name = "gated-axis"

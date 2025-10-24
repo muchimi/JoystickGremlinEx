@@ -39,6 +39,7 @@ from gremlin.types import GamePadOutput
 from gremlin.input_devices import ButtonReleaseActions
 import psygnal
 from psygnal import Signal
+import html
 
 
 # import vigem.vigem_gamepad as vg
@@ -391,6 +392,15 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         return gremlin.gamepad_handling.gamepadAvailable()
+
+
+    def to_html(self) -> str:
+        ''' returns reporting graphviz data for this action '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import html
+        table = ReportTable(cellpadding=4)    
+        table.addField("Function", f"{GamePadOutput.to_display_name(self.output_mode)}")
+        return table.to_html()
 
 version = 1
 name = "map-to-gamepad"

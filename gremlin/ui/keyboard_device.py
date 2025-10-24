@@ -326,9 +326,6 @@ class KeyboardInputItem(AbstractInputItem):
         return self.to_string()
     
 
-            
-
-
 
 
 
@@ -448,10 +445,6 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None and selected_index != -1:
             self._select_item_cb(selected_index)
-
-    def ensureLoaded(self):
-        self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()        
 
 
 

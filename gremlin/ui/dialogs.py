@@ -3898,3 +3898,90 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
             self.accept()
             self.close()
 
+
+
+class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
+    ''' creates a report and provides report options for the current profile  '''
+
+    def __init__(self, parent = None):
+        import gremlin.config
+        import gremlin.ui.ui_common
+        super().__init__(self.__class__.__name__, parent = parent)
+
+        self.setWindowTitle("Profile Report Options")
+        self.setModal(True)
+
+        self.config = gremlin.config.Configuration()
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        label = QtWidgets.QLabel("Profile Report Options:")
+
+        self.pdf_widget = gremlin.ui.ui_common.QDataCheckbox("PDF", 
+                                                             tooltip = "Portable Document Format", 
+                                                             callback = self._handle_pdf_changed, 
+                                                             value = self.config.ReportPdfEnabled)
+        self.svg_widget = gremlin.ui.ui_common.QDataCheckbox("SVG",
+                                                             tooltip = "Scalable Vector Graphics format", 
+                                                             callback = self._handle_svg_changed,
+                                                             value = self.config.ReportSvgEnabled)
+        self.open_files_widget = gremlin.ui.ui_common.QDataCheckbox("View output",
+                                                                    tooltip = "Opens the report after viewing using the system default viewer",
+                                                                    callback = self._handle_open_files_changed, 
+                                                                    value = self.config.ReportPdfEnabled)
+
+        self.main_layout.addWidget(label)
+        widgets = [
+            self.pdf_widget,
+            self.svg_widget,
+            self.open_files_widget,
+            gremlin.ui.ui_common.QHorizontalLine()
+        ]
+        widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
+        widget.setContentsMargins(4,0,0,0)
+        self.main_layout.addWidget(widget)
+
+
+        self.ok_widget = QtWidgets.QPushButton("Ok")
+        self.ok_widget.clicked.connect(self._ok_button_cb)
+
+        self.cancel_widget = QtWidgets.QPushButton("Cancel")
+        self.cancel_widget.clicked.connect(self._cancel_button_cb)
+
+        widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget],left_stretch=True)
+
+        self.main_layout.addWidget(widget)
+
+    @QtCore.Slot(bool)
+    def _handle_pdf_changed(self, checked):
+         self.config.ReportPdfEnabled = checked
+        
+    @QtCore.Slot(bool)
+    def _handle_svg_changed(self, checked):
+         self.config.ReportSvgEnabled = checked
+
+    @QtCore.Slot(bool)
+    def _handle_open_files_changed(self, checked):
+         self.config.ReportOpenFilesEnabled = checked
+
+    
+
+    @QtCore.Slot()
+    def _ok_button_cb(self):
+        import gremlin.reporting
+        report = gremlin.reporting.ReportEngine()
+
+
+        options = gremlin.reporting.ReportOptions()
+        options.export_pdf = self.config.ReportPdfEnabled
+        options.export_svg = self.config.ReportSvgEnabled
+        options.open_files = self.config.ReportOpenFilesEnabled
+
+        report.generate(options)
+        self.close()
+
+    @QtCore.Slot()
+    def _cancel_button_cb(self):
+        self.close()
+
+

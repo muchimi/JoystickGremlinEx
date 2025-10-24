@@ -43,6 +43,7 @@ import logging
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+import html
 
 syslog = logging.getLogger("system")
 
@@ -1135,10 +1136,10 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
 
         table = ReportTable(cellpadding=4)
-        table.addField("Message", self.command )
+        table.addField("Message", html.escape(self.command ))
 
         if self.comment:
-            table.addField("Description", self.comment)
+            table.addField("Description", html.escape(self.comment))
 
         return table.to_html()    
 
