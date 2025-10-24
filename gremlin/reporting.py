@@ -34,6 +34,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
 from collections import namedtuple
 import gremlin.base_conditions
+import traceback
 
 syslog = logging.getLogger("system")
 
@@ -662,12 +663,10 @@ class ReportEngine():
         syslog.info(f"DOT FILE:")
         syslog.info(dot_file)
 
-        s = graphviz.Source.from_file(dot_file)
-        s.render(pdf_file, format='pdf', view=True, cleanup=True)
-        os.unlink(dot_file) # clean up
-
-        #gremlin.util.display_file(dot_file)
-            #g.write_pdf(tmp_file)
-            #gremlin.util.display_file(tmp_file)
-
+        try:
+            s = graphviz.Source.from_file(dot_file)
+            s.render(pdf_file, format='pdf', view=True, cleanup=True)
+            os.unlink(dot_file) # clean up
+        except Exception as err:
+            syslog.error(f"REPORT: error rendering: {err}\n{traceback.format_exc()}")
 

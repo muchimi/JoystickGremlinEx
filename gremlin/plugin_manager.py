@@ -377,7 +377,7 @@ class ActionPlugins:
                 if root.tag == "multi_containers":
                     # encoded as a multi container
                     container_nodes = root.xpath("//container")
-                elif node.tag == "container":
+                elif root.tag == "container":
                     # encoded as a single container
                     container_nodes = [root]
                 else:

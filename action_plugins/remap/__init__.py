@@ -594,7 +594,6 @@ Use Vjoy Remap instead.'''
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
 
         table = ReportTable(cellpadding=4)
-        table.addField("Mode", self.action_mode.name)
         table.addField("Vjoy Device", self.vjoy_id)
         table.addField("Output Type:", self._get_output_name())
         table.addField("Output ID", self.vjoy_input_id)

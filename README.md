@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T86A) hotfix
+- Fix: 
+
 ### (m76T86)
 - Experimental.  PDF profile visualization adds conditions, and details for most containers/actions. Notable exception: Gated Axis - still on the to-do list.
 - Fix: refactor variable change in vjoy remap causing an exception.
