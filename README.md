@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T88A)
+- Fix: OSC arg release option in global options causing an exception on save.
+
 ### (m76T88)
 - Fix: fixed an issue with axis returning 0.0 value for non-zero data.
 - Fix: reworked Input Viewer axis input repeaters.

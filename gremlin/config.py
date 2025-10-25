@@ -1499,7 +1499,7 @@ class Configuration(QtCore.QObject):
         return self._get_data("osc_no_arg_autorelease", True)
     @osc_no_arg_autorelease.setter
     def osc_no_arg_autorelease(self, value : bool):
-        self._set_data["osc_no_arg_autorelease", value]
+        self._set_data("osc_no_arg_autorelease", value)
 
     @property
     def osc_default_autorelease_delay(self) -> float:

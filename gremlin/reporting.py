@@ -727,11 +727,12 @@ class ReportEngine():
             f.write("newrank = true\n")
             f.write("]\n")
             f.write('page="8.5, 11";\n')
-            f.write('size="30,30!";\n') 
+            f.write('size="36,36!";\n') 
             f.write("rankdir=LR;\n")
             f.write("nodesep=0.8;\n")
             f.write("ranksep=1.5;\n" )
             f.write('fontname="Helvetica,Arial,sans-serif";\n')
+            #f.write("edge [minlen=2];")
 
             for index in cluster_entries:
                 f.write(cluster_entries[index])
