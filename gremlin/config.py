@@ -930,21 +930,20 @@ class Configuration(QtCore.QObject):
             self._data["enable_broadcast_speech"] = value
             self.save()
 
-    # @property
-    # def server_port(self):
-    #     ''' port number to use for the gremlin server '''
-    #     return self._get_data("server_port",6012)
+    @property
+    def server_port(self):
+        ''' port number to use for the gremlin server '''
+        return self._get_data("server_port",6012)
     
-    # @server_port.setter
-    # def server_port(self, value):
-    #     if type(value) == float:
-    #         value = int(value)
-    #     elif type(value) == str and value.isnumeric():
-    #         value = int(value)
+    @server_port.setter
+    def server_port(self, value):
+        if type(value) == float:
+            value = int(value)
+        elif type(value) == str and value.isnumeric():
+            value = int(value)
 
-    #     if type(value) == int:
-    #         self._data["server_port"] = value
-    #         self.save()
+        if type(value) == int:
+            self._set_data("server_port", value)
 
     @property
     def broadcast_port(self):
@@ -959,10 +958,7 @@ class Configuration(QtCore.QObject):
             value = int(value)
 
         if type(value) == int:
-            self._data["broadcast_port"] = value
-            self.save()
-
-
+            self._set_data("broadcast_port", value)
 
 
     @property

@@ -22,6 +22,7 @@ import threading
 from PySide6 import QtCore, QtGui, QtWidgets
 import lxml.etree
 import dinput
+import traceback
 
 import gremlin
 import gremlin.config
@@ -52,6 +53,7 @@ class VisualizationConfig():
     def __init__(self):
         self._config = {}  # map of device guid, input_type, input_id - selected flag
         self.reload()
+        self._lock = threading.Lock()
 
     def register(self, device_id, input_type : VisualizationType):
         ''' registers a configuration entry 
@@ -69,37 +71,50 @@ class VisualizationConfig():
 
 
     def save(self):
-        ''' saves to the config file '''
-        fname = self.get_config()
+        gremlin.util.InvokeUiMethod(self._save_ui) # ensure save on UI thread
 
-        syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose
-        if verbose: 
-            syslog.info("INPUT VIEWER: save configuration")
+    def _save_ui(self):
+        locked = self._lock.acquire(timeout = 2)
+        if locked:   
+            try:
 
-        root = etree.Element("config")
-        for device_id in self._config:
-            for id in self._config[device_id]:
-                value = self._config[device_id][id]
-                node = etree.Element("data")
-                node.set("device-guid", device_id)
-                node.set("id", gremlin.util.safe_format(id, int)) # visualization type
-                node.set("value", gremlin.util.safe_format(value, bool))
-                root.append(node)
-                if gremlin.joystick_handling.joystick_initialized():
-                    device_name = gremlin.joystick_handling.device_name_from_guid(device_id)
-                else:
-                    device_name = ""
-                    input_type = VisualizationType(id).name
-                    node_comment = etree.Comment(f"{device_name} {device_id} type: {input_type}")
-                    node.addprevious(node_comment)
+                ''' saves to the config file '''
+                fname = self.get_config()
+
+                syslog = logging.getLogger("system")
+                verbose = gremlin.config.Configuration().verbose
+                if verbose: 
+                    syslog.info("INPUT VIEWER: save configuration")
+
+                root = etree.Element("config")
+                for device_id in self._config:
+                    for id in self._config[device_id]:
+                        value = self._config[device_id][id]
+                        node = etree.Element("data")
+                        node.set("device-guid", device_id)
+                        node.set("id", gremlin.util.safe_format(id, int)) # visualization type
+                        node.set("value", gremlin.util.safe_format(value, bool))
+                        root.append(node)
+                        if gremlin.joystick_handling.joystick_initialized():
+                            device_name = gremlin.joystick_handling.device_name_from_guid(device_id)
+                        else:
+                            device_name = ""
+                            input_type = VisualizationType(id).name
+                            node_comment = etree.Comment(f"{device_name} {device_id} type: {input_type}")
+                            node.addprevious(node_comment)
 
 
-        try:
-            tree = etree.ElementTree(root)
-            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-        except:
-            pass
+                try:
+                    tree = etree.ElementTree(root)
+                    tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+                except:
+                    pass
+            except Exception as err:
+                syslog.error("VIZ CONFIG SAVE")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
+            finally:
+                self._lock.release()
+        
 
     def clear(self):
         ''' clears config selection '''

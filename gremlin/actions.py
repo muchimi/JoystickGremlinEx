@@ -322,14 +322,17 @@ class StateCondition(AbstractCondition):
         verbose = gremlin.config.Configuration().verbose_mode_condition
         syslog = logging.getLogger("system")
 
-        if verbose:
-            logtabs = gremlin.shared_state.logTabs(True)
-
+      
         sd = gremlin.ui.state_device.StateData()
         value = sd.value(self.key)
+
+        if verbose:
+            logtabs = gremlin.shared_state.logTabs(True)
+            state_stub = f"StateCondition: key: [{self.key}] comparison: [{self.comparison}] received value: [{value}] ignore release: [{self.ignore_release}]"
+
         if value is None:
             # success if the state is not found
-            if verbose: syslog.info(f"{logtabs}StateCondition: key: [N/A] condition return state: PASS")
+            if verbose: syslog.info(f"{logtabs}{state_stub} - condition return state: PASS")
             return True
 
         state = False
@@ -341,7 +344,7 @@ class StateCondition(AbstractCondition):
         elif self.comparison == "released" and not value:
             state = True
 
-        if verbose: syslog.info(f"{logtabs}StateCondition: key: [{self.key}] pressed {value} - condition return state: {"PASS" if state else "FAIL"}")
+        if verbose: syslog.info(f"{logtabs}{state_stub} - condition return state: {"PASS" if state else "FAIL"}")
         return state
         
         

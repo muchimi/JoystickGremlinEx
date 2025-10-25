@@ -486,15 +486,14 @@ class DeviceSummary:
             for am in data.axis_map:
                 index += 1
                 if am.axis_index == 0:
-                    self.axis_id_map[index] = index
-                    self.linear_id_map[index] = index
-                    axis_name = f"{index}"
-                else:                    
-                    axis_map = AxisMap(am)
-                    self.axismap_list.append(axis_map)
-                    axis_name = axis_map.getName()
-                    self.axis_id_map[am.axis_index] = am.linear_index
-                    self.linear_id_map[am.linear_index] = am.axis_index
+                    # no axis
+                    continue
+                
+                axis_map = AxisMap(am)
+                self.axismap_list.append(axis_map)
+                axis_name = axis_map.getName()
+                self.axis_id_map[am.axis_index] = am.linear_index
+                self.linear_id_map[am.linear_index] = am.axis_index
                 
                 if not axis_name:
                     # axis name is not reporting in via directinput
@@ -507,24 +506,7 @@ class DeviceSummary:
             
             self._connected = True # if dinput data is provided, the device is marked as connected
 
-        # else:
-        #     self.device_guid = None
-        #     self.device_id = None
-        #     self._device_type = gremlin.types.DeviceType.Joystick # assume it's joystick by default
-        #     self.vendor_id = None
-        #     self.product_id = None
-        #     self.joystick_id = None
-        #     self.name = None
-        #     self.axis_count = 0
-        #     self.button_count = 0
-        #     self.hat_count = 0
-        #     self.axismap_list = []
-        #     self.usage_page = None
-        #     self.usage = None
-        #     self.axis_names = []
-        #     logical_count = 0
-        #     self.input_enabled = False # do not allow usage as an input device
-        #     self.vjoy_id = -1
+
         
  
 

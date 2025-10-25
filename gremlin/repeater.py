@@ -97,8 +97,12 @@ class Repeater(QtCore.QObject):
         """
         # Ignore VJoy events as well as events occurring when
         # events are repeated
-        if self.is_running or \
-                event.device_guid in self._vjoy_device_guids:
+        if self.is_running:
+            return
+        if isinstance(event, gremlin.event_handler.VjoyEvent):
+            # ignore internal vjoy events
+            return
+        if event.device_guid in self._vjoy_device_guids:
             return
 
         if not input_devices.JoystickInputSignificant().should_process(event):

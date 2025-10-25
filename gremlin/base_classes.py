@@ -589,7 +589,6 @@ class JoystickHook:
                 # axis input - get transforms
                 if event.event_type == InputType.JoystickAxis:
                     values = self._astate.getAxisValues(self._device_guid, self._input_id, event.value)
-                    #self._hook_values = values # event.value
                     self._hook_value = values.actual
 
                     if self._calibrate:
@@ -720,8 +719,12 @@ class JoystickHook:
                 sdata = gremlin.event_handler.AxisState()
 
                 # get the values as [actual, raw, calibrated, curved]
-                values = sdata.getAxisValues(self.device_guid, self.input_id)
-                self._hook_value = values.actual
+                values = sdata.getAxisValues(self.device_guid, self.input_id, linear = False)
+                if values is None:
+                    self._hook_value = 0.0
+                    #values = sdata.getAxisValues(self.device_guid, self.input_id, linear = False)
+                else:
+                    self._hook_value = values.actual
 
             if self._hook_callback:
                 self._hook_callback(self._hook_value)

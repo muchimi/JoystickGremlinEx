@@ -244,26 +244,26 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
 
 
         
-def get_axis_name(input_id):
+def get_axis_name(axis_id):
     ''' gets the axis name based on the input # '''
-    if input_id == 1:
+    if axis_id == 1:
         axis_name = "X"
-    elif input_id == 2:
+    elif axis_id == 2:
         axis_name = "Y"
-    elif input_id == 3:
+    elif axis_id == 3:
         axis_name = "Z"
-    elif input_id == 4:
+    elif axis_id == 4:
         axis_name = "RX"
-    elif input_id == 5:
+    elif axis_id == 5:
         axis_name = "RY"
-    elif input_id == 6:
+    elif axis_id == 6:
         axis_name = "RZ"
-    elif input_id == 7:
+    elif axis_id == 7:
         axis_name = "S1"
-    elif input_id == 8:
+    elif axis_id == 8:
         axis_name = "S2"
     else:
-        axis_name = f"(unknown [{input_id}])"
+        axis_name = f"(unknown [{axis_id}])"
     return axis_name     
 
 def get_axis_curve_data(guid, identifier):
@@ -301,7 +301,7 @@ def get_curved_axis(guid, axis_id):
     return None
             
 
-def get_axis(guid, index, normalized = True, translate = True):
+def get_axis(guid, index, normalized = True, linear = False):
     ''' gets the value of the specified axis
      
     :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
@@ -311,11 +311,11 @@ def get_axis(guid, index, normalized = True, translate = True):
         guid = gremlin.util.parse_guid(guid)
     dev : dinput.DeviceSummary = device_info_from_guid(guid)
     if dev and dev.axis_count:
-        if translate:
-            index = dev.linear_index_from_assigned(index)
-        value = dinput.DILL.get_axis(guid, index)
+        axis_id = dev.linear_id_map[index] if linear else index
+        value = dinput.DILL.get_axis(guid, axis_id)
         if normalized:
-            return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+            value = gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+        return value
     return 0.0
 
 def get_hat(guid, index) -> int:
@@ -834,15 +834,24 @@ def joystick_devices_initialization():
     virtual_devices = {}
     dinput_vjoy_device_map = {} # map of vjoy devices by vjoy ID 
     
+    syslog.info("DINPUT device list:")
     for device_index in range(device_count):
         # these are all connected devices
         dev = dinput.DILL.get_device_information_by_index(device_index)
-
+        syslog.info(f"\tDevice: {dev.name} ID {dev.device_id}  Type: {dev.device_type.name}")
         if dev.vendor_id == 0x4d8 and dev.product_id == 0xe6d6 and dev.button_count == 35:
             # IFR1 device, disable
-            syslog.warning("INIT: Octavi IFR1 is disabled in GremlinEx as a regular joystick as it's handled at the HID level.")
+            syslog.warning("\t\tOctavi IFR1 is disabled in GremlinEx as a regular joystick as it's handled at the HID level.")
             dev.disabled = True
 
+        if dev.axis_count:
+            syslog.info(f"\t\tAxis definitions: {dev.axis_count} found")
+            for i in range(dev.axis_count):
+                linear = i + 1
+                axis_id = dev.linear_id_map[linear]
+                axis_name = dev.get_axis_name(axis_id)
+                syslog.info(f"\t\t\tAxis {axis_name} A{axis_id} L{linear} {"(sequential)" if linear == axis_id else "(non-sequential)"}")
+                
 
         devices.append(dev)
         syslog.info(f"\tindex: [{device_index}] {str(dev)}")

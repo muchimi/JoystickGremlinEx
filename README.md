@@ -14,6 +14,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T88)
+- Fix: fixed an issue with axis returning 0.0 value for non-zero data.
+- Fix: reworked Input Viewer axis input repeaters.
+- Fix: handled a threading issue with possible concurrent save of profile mapping configuration data.
+- Fix: remote control - restored removed UDP port property.
+- Changed: added more properties to state condition log output.
+- Changed: minor optimizations.
+
+### (m76T87)
+- Minor fixes.
+
 ### (m76T86A) hotfix
 - Fix: Refactored delay load logic for UI as some device tabs would not populate in some situations.
 - Fix: Profile visualization report handles special characters that could cause a graph definition exception when not properly escaped.

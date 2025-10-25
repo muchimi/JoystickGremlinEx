@@ -2572,18 +2572,7 @@ class EventHandler(QtCore.QObject):
 				syslog.info(f"EVENT EXECUTE: process event - mode [{mode}] event: {str(event)}")
 
 
-			# if event.extra_data and "vjoy" in event.extra_data:
-			# 	# event is a vjoy event
-			# 	syslog.info(f"EXEC EVENT: got vjoy event: {event.extra_data["vjoy"]}")
-			# 	if self._last_vjoy_event:
-			# 		k1 = event.extra_data["vjoy"]
-			# 		k2 = self._last_vjoy_event.extra_data["vjoy"]
-			# 		if k1 == k2:
-			# 			syslog.info(f"EXEC EVENT: skipping duplicate vjoy event: {k1}")
-			# 			return 
-			# 	self._last_vjoy_event = event # record last vjoy event
-			# 	syslog.info(f"EXEC EVENT: processing vjoy event: {event.extra_data["vjoy"]}")
-					
+
 			
 
 			# list of callbacks
@@ -3216,7 +3205,7 @@ class AxisData():
 @gremlin.singleton_decorator.SingletonDecorator
 class AxisState():
 	def __init__(self):
-		self._data = {}
+		self._data = {} # keypair of device_id/linear axis id
 
 		# map of axis input items that could be curved
 		self._joystick_input_item_map = {}
@@ -3266,17 +3255,14 @@ class AxisState():
 		''' registers axes for a given device '''
 		if device.axis_count:
 			device_guid = device.device_guid
-			device_id = gremlin.util.normalize_guid(device_guid)
+			device_id = device.device_id
 			if not device_id in self._registered_devices:
 				self._registered_devices.append(device_id)
 
-			for index in range(device.axis_count):
-				input_id = device.getAxisInputId(index)
-				if input_id is None:
-					continue # not valid
-				key = self._get_key(device_guid, input_id)
+			for axis_id in device.axis_id_map:
+				key = self._get_key(device_id, axis_id)
 				if not key in self._data:
-					self._data[key] = AxisData(device_guid, input_id)
+					self._data[key] = AxisData(device_id, axis_id)
 
 	def registerDeviceGuid(self, device_guid):
 		import gremlin.joystick_handling
@@ -3316,57 +3302,98 @@ class AxisState():
 				device = gremlin.joystick_handling.getDevice(device_guid)
 				syslog.info(f"Register axis: {device.name} {device_guid} axis: {input_id}  {device.getAxisName(input_id)}")
 
-	def queueAxisEvent(self, device_guid, input_id):
+	def queueAxisEvent(self, device_guid, axis_id):
 		''' queues a joystick update event to trigger UI updates for example '''
-		values = self.getAxisValues(device_guid, input_id)
+		values = self.getAxisValues(device_guid, axis_id)
 		if values:
 			device_guid = gremlin.util.parse_guid(device_guid)
-			event = Event(InputType.JoystickAxis, input_id, device_guid, is_axis = True, value = values.actual, extra_data={"queuedEvent" : True})
+			event = Event(InputType.JoystickAxis, axis_id, device_guid, is_axis = True, value = values.actual, extra_data={"queuedEvent" : True})
 			el = EventListener()
 			el.custom_joystick_event.emit(event)
 			
 
-	def _get_key(self, device_guid, input_id):
+	def _get_key(self, device_guid, axis_id):
 		if not isinstance(device_guid, str):
 			device_guid = gremlin.util.normalize_guid(device_guid)
-		return (device_guid, input_id)
+		return (device_guid, axis_id)
 	
-	def getAxis(self, device_guid, input_id):
+	def getAxis(self, device_guid, axis_id):
 		''' gets the axis data block '''
 		if device_guid:
-			return self.register(device_guid, input_id)
+			return self.register(device_guid, axis_id)
 		return None
 	
-	def getItem(self, device_guid, input_id):
+	def getItem(self, device_guid, axis_id):
 		''' gets registered axis input item '''
 		if device_guid:
-			key = self._get_key(device_guid, input_id)
+			key = self._get_key(device_guid, axis_id)
 			if key in self._joystick_input_item_map:
 				item = self._joystick_input_item_map[key]
 				return item
 		return None
 	
-	def getAxisData(self, device_guid, input_id):
+	def getAxisData(self, device_guid, axis_id):
 		if device_guid:
 			device_guid = gremlin.util.normalize_guid(device_guid)
-			key = self._get_key(device_guid, input_id)
+			key = self._get_key(device_guid, axis_id)
 			if key in self._data:
 				return self._data[key]
 		return None
 	
 
-	def getAxisValues(self, device_guid, input_id, value : float = None) -> list:
+	def getAxisValues(self, device_guid, input_id, value : float = None, linear = False) -> list:
 		''' gets an axis input values, including actual, raw, calibrated and curved as a list of floating point values
 			a value of None indicates the item is not used.
-			the frist value is the computed value based on applied calibration
-
+			the fiest value is the computed value based on applied calibration
 			if the value is not provided, the axis is queried for the current value
+
+			:param device_guid: id of the device 
+			:param input_id: axis index, linear or axis id based on the flag 
+			:param value: default value if needed
+			:param linar: flag indicating if the index given is linear or axis
 				
 		'''
+		import gremlin.types
+		import gremlin.util
+		
 		if device_guid:
-			data= self.getAxisData(device_guid, input_id)
+			dev : dinput.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(device_guid)
+			if dev.device_type == gremlin.types.DeviceType.Joystick:
+				if linear:
+					# input is sequential
+					if not input_id in dev.linear_id_map:
+						syslog.error(f"AXIS STATE: invalid axis linear ID {input_id} - valid linear IDs are [{[id for id in dev.linear_id_map]}]")
+						return None
+					linear_id = input_id
+					axis_id = dev.linear_id_map[linear_id]
+					
+				else:
+					# translate to linear
+					if not input_id in dev.axis_id_map:
+						syslog.error(f"AXIS STATE: invalid axis ID {input_id} - valid axis IDs are [{[id for id in dev.axis_id_map]}]")
+						return None
+					linear_id = dev.axis_id_map[input_id]
+					axis_id = input_id
+			else:
+				axis_id = input_id
+
+			data = self.getAxisData(device_guid, axis_id)
 			if data:
-				return data.getAxisValues(value)
+				values = data.getAxisValues(value)
+				if not values:
+					syslog.error(f"AXIS STATE: no axis data found for device {dev.name} ID: {input_id} linear: {linear}")
+					return None
+				return values
+			else:
+				if hasattr(input_id,"display_name"):
+					input_stub = input_id.display_name
+				else:
+					input_stub = f"{input_id}"
+				syslog.error(f"AXIS STATE: no axis data found for device {dev.name} ID: {input_stub} linear: {linear}")
+				known_axes = [i for (d, i) in self._data if d == dev.device_id]
+				syslog.info(f"\tknown list: {known_axes}")
+
+				return None
 		return None
 	
 	def getRawAxisValue(self, device_guid, input_id):
