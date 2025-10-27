@@ -23,7 +23,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import lxml.etree
 import dinput
 import traceback
-
+from shiboken6 import Shiboken
 import gremlin
 import gremlin.config
 import gremlin.gamepad_handling
@@ -578,6 +578,7 @@ States can be toggled by clicking on the state button.  Expression states will u
     @QtCore.Slot()
     def _closed(self):
         ''' save the config on close'''
+        assert gremlin.util.is_ui_thread()
         if self.keyboard_widget:
             self.keyboard_widget.unhook()
         # unhook widgets that need unhooked
@@ -597,7 +598,7 @@ States can be toggled by clicking on the state button.  Expression states will u
     @QtCore.Slot()
     def _clear(self):
         ''' clears all widgets '''
-        
+        assert gremlin.util.is_ui_thread()
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.state_widget_selector.setChecked(False)
             self._state_visible = False
@@ -634,6 +635,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         :param is_active if True the visualization is added, if False it is
             removed
         """
+        assert gremlin.util.is_ui_thread()
+        if not Shiboken.isValid(self):
+            return
         key = (device.device_id, visualization)
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if enabled:
@@ -666,6 +670,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         
     def showKeyboard(self):
         ''' keyboard device '''
+        assert gremlin.util.is_ui_thread()
         if not self._keyboard_visualizer_widget:
             
             self._keyboard_visualizer_widget =  QtWidgets.QGroupBox("Keyboard")
@@ -920,9 +925,13 @@ States can be toggled by clicking on the state button.  Expression states will u
         config = VisualizationConfig()
         config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, checked)
            
+    def _update_view(self):    
+        gremlin.util.InvokeUiMethod(self._update_view_ui) # ensure Ui thread
 
-    def _update_view(self):
-        ''' rebuids the view '''
+    def _update_view_ui(self):
+        ''' rebuids the view - on UI thread'''
+        if not Shiboken.isValid(self):
+            return
         self.view_container_layout.removeWidget(self.views)
         self.views = InputViewerArea()
         self.view_container_layout.addWidget(self.views)
@@ -971,6 +980,7 @@ class InputViewerArea(QtWidgets.QScrollArea):
 
         :param widget the widget to add
         """
+        assert gremlin.util.is_ui_thread()
         self.widgets.append(widget)
         self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, widget)
         widget.show()
@@ -984,11 +994,13 @@ class InputViewerArea(QtWidgets.QScrollArea):
         self.setMinimumWidth(width+40)
         # self.setMinimumSize(QtCore.QSize(width+40, height))
 
+    
     def remove_widget(self, widget):
         """Removes a widget from the visualization area.
 
         :param widget the widget to remove
         """
+        assert gremlin.util.is_ui_thread()
         if hasattr(widget,"unhook"):
             widget.unhook()
         self.scroll_layout.removeWidget(widget)
@@ -999,7 +1011,7 @@ class InputViewerArea(QtWidgets.QScrollArea):
 
     def clear(self):
         ''' clears all widgets '''
-
+        assert gremlin.util.is_ui_thread()
         for widget in self.widgets:
             if hasattr(widget,"unhook"):
                 widget.unhook()

@@ -4643,6 +4643,8 @@ class QProgressBar(QtWidgets.QWidget):
             gremlin.util.InvokeUiMethod(self._set_value_ui, value)
 
     def _set_value_ui(self, value):
+        if not Shiboken.isValid(self):
+            return
         if hasattr(value,"toList"):
             value = value.toList()
         if hasattr(value,"__iter__"):
@@ -5269,7 +5271,7 @@ class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
         
         '''
 
-        gremlin.util.assert_ui_thread()
+        # gremlin.util.assert_ui_thread()
 
         if not Shiboken.isValid(self):
             return
@@ -8616,6 +8618,7 @@ class BaseDialogUi(QRememberDialog):
         :param parent the parent of this widget
         """
         super().__init__(key, parent = parent)
+        
 
     def closeEvent(self, event):
         """Closes the calibration window.
@@ -8624,8 +8627,8 @@ class BaseDialogUi(QRememberDialog):
         """
         if hasattr(self, "confirmClose"):
             self.confirmClose(event)
-        if event.isAccepted():
-            self.closed.emit()
+        self.closed.emit()
+        super().closeEvent(event)
 
 class QDataTab(QtWidgets.QTabWidget):
     ''' tab header with a data field '''
@@ -10508,6 +10511,8 @@ class QInfoBox(QtWidgets.QFrame):
             self.setText(text)
 
     def setText(self, text):
+        if not Shiboken.isValid(self):
+            return
         self._label_widget.setHtml(text)
         
         

@@ -1096,21 +1096,33 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         dialog.setWindowModality(QtCore.Qt.ApplicationModal)
         dialog.ensurePolished()
         gremlin.util.centerDialog(dialog, width = dialog.width(), height=dialog.height())
-        dialog.closed.connect(lambda: self.apply_user_settings(ignore_minimize=True, auto_start = False))
-        dialog.closed.connect(lambda: self._remove_modal_window("options"))
-        
-        dialog.closed.connect(self.options_closed)
-        dialog.show()
+        dialog.closed.connect(self._handle_options_closed)
+        dialog.exec()
         dialog.apply_window_settings()
-        
-    def options_closed(self):
-        dialog = self.sender()
-        if dialog.reload_profile:
-            self.refresh()
 
+
+    def _handle_options_closed(self):
+        dialog = self.sender()
+        self.modal_windows["options"] = None
+        if not dialog.accepted:
+            return
+        
+        self._apply_user_settings_ui(ignore_minimize=True, auto_start = False)
+
+        # if dialog.reload_profile:
+        self.refresh()
+        # else:
         # tell components of the possible changes to the options
         el = gremlin.event_handler.EventListener()
         el.options_changed.emit()
+
+
+        
+    # def options_closed(self):
+    #     dialog = self.sender()
+    #     if dialog.reload_profile:
+    #         self.refresh()
+
 
 
     def profile_creator(self):
@@ -4191,6 +4203,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _apply_user_settings_ui(self, ignore_minimize=False, auto_start = True):
         ''' Configures the program based on user settings. UI thread '''
 
+        
+
         # gamepad count
         gremlin.gamepad_handling.gamepad_reset()
 
@@ -4602,27 +4616,32 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _refresh_ui(self):
         ''' refresh the UI '''
 
-        # save selection
-        current_device_guid = gremlin.shared_state.current_tab_device_guid
-        current_input_type, current_input_id = self._get_last_input(current_device_guid)
+        gremlin.util.pushCursor()
+        try:
 
-        self._create_tabs()
+            # save selection
+            current_device_guid = gremlin.shared_state.current_tab_device_guid
+            current_input_type, current_input_id = self._get_last_input(current_device_guid)
 
-        current_profile =gremlin.shared_state.current_profile
-        current_mode = gremlin.shared_state.current_mode
+            self._create_tabs()
 
-
-
-        # Make the first root node the default active mode
-        self.mode_selector.populate_selector(current_profile, current_mode, emit = False)
-        self._update_mode_status_bar()
+            current_profile =gremlin.shared_state.current_profile
+            current_mode = gremlin.shared_state.current_mode
 
 
-        # refresh current device tab
-        #self._refresh_tab()
 
-        # select
-        self._select_input(current_device_guid, current_input_type, current_input_id, True)
+            # Make the first root node the default active mode
+            self.mode_selector.populate_selector(current_profile, current_mode, emit = False)
+            self._update_mode_status_bar()
+
+
+            # refresh current device tab
+            #self._refresh_tab()
+
+            # select
+            self._select_input(current_device_guid, current_input_type, current_input_id, True)
+        finally:
+            gremlin.util.popCursor()
 
 
     def _force_close(self):

@@ -2181,6 +2181,7 @@ class OscInterface(QtCore.QObject):
             self._started = False
             el = gremlin.event_handler.EventListener()
             el.heartbeat.disconnect(self._keep_alive)
+
             
 
 
@@ -2235,7 +2236,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
         self.setMessageKey(self._guid)
         self._min_range = 0.0
         self._max_range = 1.0 
-        self._autorelease = None # not set
+        self._trigger_autorelease = None # trigger with autorelease when message received
         self._autorelease_delay = int(config.osc_default_autorelease_delay * 1000) # default release delay in milliseconds
         self._profile_mode = gremlin.shared_state.edit_mode
         self._autorelease_timer = None # autorelease timer for this input 
@@ -2258,7 +2259,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
         if self.autoRelease is None:
             table.addField("Autorelease", "Global setting")
         else:
-            table.addField("Autorelease", 'Yes' if self.autoRelease else 'No')
+            table.addField("Autorelease", 'Yes' if self._trigger_autorelease else 'No')
         if self._message_data:
             for index, data in enumerate(self._message_data):
                 if isinstance(data, str):
@@ -2327,10 +2328,13 @@ class OscInputItem(gremlin.base_profile.InputItem):
 
     @property
     def autoRelease(self) -> bool:
-        return self._autorelease
+        if self._trigger_autorelease is None:
+            return False
+        return self._trigger_autorelease
+    
     @autoRelease.setter
     def autoRelease(self, value: bool):
-        self._autorelease = value
+        self._trigger_autorelease = value
         self._update()
 
     @property
@@ -2589,9 +2593,10 @@ class OscInputItem(gremlin.base_profile.InputItem):
             self.source_index = safe_read(node,"source_index", int, 0)
             if self.verbose: syslog.info(f"OSC: xml source index: {self._source_index}")
             if "autorelease" in node.attrib:
-                self._autorelease = safe_read(node,"autorelease", bool, False)
+                self._trigger_autorelease = safe_read(node,"autorelease", bool, False)
             else:
-                self._autorelease = None # not set
+                self._trigger_autorelease = None # not set
+
             if "autorelease_delay" in node.attrib:
                 self._autorelease_delay = safe_read(node,"autorelease_delay", int, 250)
 
@@ -2612,8 +2617,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         node.set("min", str(self._min_range))
         node.set("max", str(self._max_range))
         node.set("source_index", safe_format(self._source_index, int))
-        if self._autorelease is not None:
-            node.set("autorelease", str(self._autorelease))
+        if self._trigger_autorelease is not None:
+            node.set("autorelease", str(self._trigger_autorelease))
         node.set("autorelease_delay", str(self._autorelease_delay))
         return node
           
@@ -2829,13 +2834,13 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._config_widget.setLayout(self._config_layout)
         self._current_mode = current_mode
         self.index = index
-        self.identifier = data
+        self.input_item = data
         self._mode : OscInputItem = OscInputItem.InputMode.Button
         self._command_mode : OscInputItem = OscInputItem.CommandMode.Message
         self._mode_locked = False # if set, prevents flipping input modes axis to a button mode
         self._min_range = 0.0 # min value for axis mapping (maps to -1.0 in vjoy)
         self._max_range = 1.0 # max value for axis mapping (maps to 1.0 in vjoy)
-        self._autorelease = data._autorelease
+        self._trigger_autorelease = data._trigger_autorelease
         self._pulse_delay = data._autorelease_delay
         self._source_index = data._source_index
         
@@ -2932,36 +2937,14 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._mode_on_change_widget.clicked.connect(self._mode_change_cb)
         self._mode_locked_widget = gremlin.ui.ui_common.QIconLabel()
 
-        self._autorelease_widget = QtWidgets.QCheckBox("Autorelease Button")
-        self._autorelease_widget.setToolTip("For OSC inputs that only issue a press, GremlinEx will auto-issue a release trigger")
-        self._autorelease_widget.setChecked(self._autorelease)
-        self._autorelease_widget.clicked.connect(self._autorelease_change_cb)
-
-
         self._trigger_on_message_widget = QtWidgets.QCheckBox("Trigger on message")
-        self._trigger_on_message_widget.setChecked(self._autorelease)
+        if self._trigger_autorelease is not None:
+            self._trigger_on_message_widget.setChecked(self._trigger_autorelease)
         self._trigger_on_message_widget.clicked.connect(self._autorelease_change_cb)
         self._trigger_on_message_widget.setToolTip("When enabled, receiving a message regardless of parameter will trigger the action with an autorelease.<br>Use this option when the OSC source message does not send >0 for press, 0 for release.")
         self._trigger_on_message_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self._pulse_delay, callback = self._pulse_value_changed)
         
-
         self._container_trigger_widget, _ = gremlin.ui.ui_common.getHContainer([self._trigger_on_message_widget, self._trigger_on_message_delay_widget])
-
-
-        # self._autorelease_container_widget = QtWidgets.QWidget()
-        # self._autorelease_container_layout = QtWidgets.QHBoxLayout(self._autorelease_container_widget)
-
-        # self.pulse_spin_widget = QtWidgets.QSpinBox()
-        # self.pulse_spin_widget.setMinimum(0)
-        # self.pulse_spin_widget.setMaximum(60000)
-        # self.pulse_spin_widget.setValue(self._pulse_delay)
-        # self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
-
-        # self._autorelease_container_layout.addWidget(self._autorelease_widget)
-        # self._autorelease_container_layout.addWidget(QtWidgets.QLabel("Pulse duration (ms):"))
-        # self._autorelease_container_layout.addWidget(self.pulse_spin_widget)
-        # self._autorelease_container_layout.addStretch()
-        
 
 
         self._container_mode_radio_layout.addWidget(QtWidgets.QLabel("Action mode:"))
@@ -3172,7 +3155,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
     @QtCore.Slot(bool)
     def _autorelease_change_cb(self, checked):
-        self._autorelease = checked
+        self.input_item._trigger_autorelease = checked
         self._update_display()
 
     @QtCore.Slot()
@@ -3295,7 +3278,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         # config = gremlin.config.Configuration()
 
         if self._mode == OscInputItem.InputMode.Button:
-            if self._autorelease:
+            if self.input_item._trigger_autorelease:
                 msg = f"The input will trigger a press action when a message is received, followed by a release when the delay has lapsed.<br>Use This mode to trigger a button press/release when an OSC message arrives."    
                 delay_enabled = True
             else:
@@ -3409,9 +3392,9 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         
         if not data and command:
             # no args - enable auto release
-            self._autorelease = True
-            with QtCore.QSignalBlocker(self._autorelease_widget):
-                self._autorelease_widget.setChecked(True)
+            self._trigger_autorelease = True
+            with QtCore.QSignalBlocker(self._trigger_on_message_widget):
+                self._trigger_on_message_widget.setChecked(True)
 
 
 
@@ -4130,7 +4113,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         command_mode = self._edit_dialog.command_mode
         min_range = self._edit_dialog.min_range
         max_range = self._edit_dialog.max_range
-        autorelease = self._edit_dialog._autorelease
+        autorelease = self._edit_dialog._trigger_autorelease
         autorelease_delay = self._edit_dialog._pulse_delay
         
 
@@ -4142,7 +4125,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item._command_mode = command_mode
         input_item._min_range = min_range
         input_item._max_range = max_range
-        input_item._autorelease = autorelease
+        input_item._trigger_autorelease = autorelease
         input_item._autorelease_delay = autorelease_delay
         input_item._source_index = self._edit_dialog.source_index
 
@@ -4348,6 +4331,7 @@ class InputOscClient(QtCore.QObject):
         ''' stops the client '''
         if self._started:
             self._interface.osc_message.disconnect(self._osc_message_cb)
+            self._interface.stop()
             self._interface = None
         self._started = False
 
@@ -4427,6 +4411,7 @@ class InputOscClient(QtCore.QObject):
                     event = gremlin.event_handler.Event(
                         event_type = InputType.OpenSoundControl,
                         device_guid = OscDeviceTabWidget.device_guid,
+                        override_input_type = InputType.JoystickAxis,
                         identifier = input_item,
                         is_pressed = False,
                         value = value,
@@ -4434,7 +4419,7 @@ class InputOscClient(QtCore.QObject):
                         data = index, # source index
                         is_virtual = True, # indicate we are not a hardware input
                         is_axis = True, 
-                        override_input_type= InputType.JoystickAxis
+                        
                         )
                     
                     self._state_data[input_item.message_key] = normalized_args # this can have multiple axis values returned
@@ -4455,7 +4440,7 @@ class InputOscClient(QtCore.QObject):
 
                 elif input_item.mode == OscInputItem.InputMode.Button:
                     # trigger a button press event
-                    autorelease = input_item._autorelease
+                    autorelease = input_item.autoRelease
                     
                     if len(args) == 0 and not autorelease:
                         if config.osc_no_arg_autorelease:
@@ -4485,6 +4470,7 @@ class InputOscClient(QtCore.QObject):
                     event = gremlin.event_handler.Event(
                         event_type = input_type,
                         device_guid = OscDeviceTabWidget.device_guid,
+                        override_input_type= InputType.JoystickButton,
                         identifier = input_item,
                         is_pressed = is_pressed,
                         value = value,
@@ -4499,6 +4485,7 @@ class InputOscClient(QtCore.QObject):
 
                     if autorelease:
                         # schedule an autorelease event
+                        input_item.autoRelease = True
                         delay = input_item.autorelease_delay/1000 # ms to s
                         release_event = event.clone()
                         release_event.is_pressed = False
@@ -4530,6 +4517,7 @@ class InputOscClient(QtCore.QObject):
                             event.value = value
                             event.raw_value = raw_value
                             event.data = normalized_args
+                            
                             self._event_listener.osc_event.emit(event)
 
 

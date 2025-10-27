@@ -1323,9 +1323,6 @@ class EventListener:
 			
 
 		event_list = []
-
-		#breakpoint()
-		
 		
 		
 		is_virtual = device.is_virtual if device is not None else False
@@ -1383,7 +1380,7 @@ class EventListener:
 				is_axis = True,
 				is_virtual = is_virtual
 			)
-
+			
 			event_list.append(event)
 
 			# notify axis change for tab switches
@@ -1469,8 +1466,6 @@ class EventListener:
 				if not gremlin.shared_state.is_running:
 					for evt in event_list:
 						gremlin.util.singleShot(lambda : self.button_state_change.emit(evt))
-
-
 
 		if event_list:		
 			for event in event_list:

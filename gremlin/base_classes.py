@@ -581,9 +581,9 @@ class JoystickHook:
                 return
         
                 
-            if not self._astate.shouldProcess(event):
-                # anti-spam filter
-                return
+            # if not self._astate.shouldProcess(event):
+            #     # anti-spam filter
+            #     return
 
             if event.is_axis:
                 # axis input - get transforms

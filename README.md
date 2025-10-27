@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T90)
+- Fix: continued work on fatal windows exception (C++ error) in Python linked to the option window.
+- Fix: on UI refresh, axis input repeaters (bars) may be throttled (not update regularly)
+
+
 ### (m76T89A) hotfix
 - Fix: reset verbosity override for internal debug
 - Change: added thread safety checks around more file I/O
