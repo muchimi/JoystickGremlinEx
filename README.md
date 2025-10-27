@@ -14,6 +14,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T89A) hotfix
+- Fix: reset verbosity override for internal debug
+- Change: added thread safety checks around more file I/O
+- Revert: event handling for all vjoy to filter only if vjoy as input
+
 ### (m76T89)
 - Fix: autostart mode enabled can cause an exception due to portion of UI not initialized yet.
 - Fix: state selector index reverts to default because the state cannot be found.

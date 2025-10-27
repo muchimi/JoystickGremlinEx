@@ -256,7 +256,15 @@ class Configuration(QtCore.QObject):
             self._data[field] = value
             self.save()
 
+
     def reload_profile(self):
+        import gremlin.util
+        if QtWidgets.QApplication.instance():
+            gremlin.util.InvokeUiMethod(self._reload_profile_ui) # ensure on UI thread
+        else:
+            self._reload_profile_ui()
+
+    def _reload_profile_ui(self):
         """Loads the profile's configuration file's content."""
         if self._last_profile_reload is not None and \
                 time.time() - self._last_profile_reload < 1:
@@ -307,22 +315,38 @@ class Configuration(QtCore.QObject):
                 hdl.flush()
                 hdl.close()
         except Exception as ex:
-            syslog.error("CONFIG: unable to save file:")
+            syslog.error(f"CONFIG: unable to save file: {fname}")
             syslog.error(ex)
         finally:
             self._lock = False
 
-
     def save_profile(self):
+        import gremlin.util
+        if QtWidgets.QApplication.instance():
+            gremlin.util.InvokeUiMethod(self._save_profile_ui) # ensure on UI thread
+        else:
+            self._save_profile_ui()
+
+    def _save_profile_ui(self):
         ''' saves to the profile specific config file '''
-        fname = self._profile_config_fname
-        if fname:
-            with open(fname, "w") as hdl:
-                encoder = json.JSONEncoder(
-                    sort_keys=True,
-                    indent=4
-                )
-                hdl.write(encoder.encode(self._profile_data))
+        if self._lock:
+            # ignore concurrent save requests (technically not necessary due to UI thread placement)
+            return
+        try:
+            self._lock = True
+            fname = self._profile_config_fname
+            if fname:
+                with open(fname, "w") as hdl:
+                    encoder = json.JSONEncoder(
+                        sort_keys=True,
+                        indent=4
+                    )
+                    hdl.write(encoder.encode(self._profile_data))
+        except Exception as ex:
+            syslog.error(f"CONFIG: unable to save profile: {fname}")
+            syslog.error(ex)
+        finally:
+            self._lock = False
 
     
     @property
@@ -429,9 +453,8 @@ class Configuration(QtCore.QObject):
     
     @initial_load_mode_tts.setter
     def initial_load_mode_tts(self, value):
-        self._data["initial_load_mode_tts"] = value
-        self.save()
-
+        self._set_data("initial_load_mode_tts", value)
+        
 
     @property
     def initial_load_rate_tts(self):
@@ -440,8 +463,8 @@ class Configuration(QtCore.QObject):
     
     @initial_load_rate_tts.setter
     def initial_load_rate_tts(self, value):
-        self._data["initial_load_rate_tts"] = value
-        self.save()        
+        self._set_data("initial_load_rate_tts",value)
+        
 
     @property
     def initial_volume_tts(self):
@@ -450,8 +473,7 @@ class Configuration(QtCore.QObject):
     
     @initial_volume_tts.setter
     def initial_volume_tts(self, value):
-        self._data["initial_volume_tts"] = value
-        self.save()        
+        self._set_data("initial_volume_tts", value)
 
 
     @property
@@ -483,9 +505,7 @@ class Configuration(QtCore.QObject):
     
     @runtime_ui_update.setter
     def runtime_ui_update(self, value):
-        self._data["runtime_ui_update"] = value
-        self.save()
-
+        self._set_data("runtime_ui_update", value)
 
     @property
     def reset_mode_on_process_activate(self):
@@ -494,8 +514,8 @@ class Configuration(QtCore.QObject):
     
     @reset_mode_on_process_activate.setter
     def reset_mode_on_process_activate(self, value):
-        self._data["reset_mode_on_process_activate"] = value
-        self.save()
+        self._set_data("reset_mode_on_process_activate",value)
+        
 
     def set_calibration(self, dev_id, limits):
         """Sets the calibration data for all axes of a device.

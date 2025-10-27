@@ -4186,7 +4186,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     # +---------------------------------------------------------------
 
     def apply_user_settings(self, ignore_minimize=False, auto_start = True):
-        """Configures the program based on user settings."""
+        gremlin.util.InvokeUiMethod(self._apply_user_settings_ui, ignore_minimize, auto_start) # run on UI thread
+
+    def _apply_user_settings_ui(self, ignore_minimize=False, auto_start = True):
+        ''' Configures the program based on user settings. UI thread '''
 
         # gamepad count
         gremlin.gamepad_handling.gamepad_reset()
@@ -4218,6 +4221,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         gremlin.util.InvokeUiMethod(self._auto_start_activate_ui)
 
+        syslog.info("autostart completed")
+
     def _auto_start_activate_ui(self):
         ''' auto activate on UI thread'''        
         self.ui.actionActivate.setChecked(True)
@@ -4226,10 +4231,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
     def _create_cheatsheet(self):
-        """Creates the cheatsheet and stores it in the desired place.
+        ''' Creates a profile cheatsheet  '''
 
-        :param file_format the format of the cheatsheet, html or pdf
-        """
         import gremlin.ui.ui_common
         import gremlin.ui.dialogs
         

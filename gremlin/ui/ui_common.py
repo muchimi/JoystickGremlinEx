@@ -2568,7 +2568,6 @@ class ActionSelector(QtWidgets.QWidget):
         self._input_item = input_item
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
         self._input_type = input_type
-        
 
         self.action_dropdown = QComboBox()
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)

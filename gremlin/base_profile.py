@@ -5352,6 +5352,9 @@ class ProfileMap():
         self._update()
 
     def save_profile_map(self):
+        gremlin.util.InvokeUiMethod(self._save_profile_map_ui)
+
+    def _save_profile_map_ui(self):
         ''' saves the profile configuration '''
         self.validate()
         fname = self.get_profile_map_file()

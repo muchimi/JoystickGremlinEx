@@ -1336,24 +1336,24 @@ class EventListener:
 				if verbose: syslog.info(f"Ignore input: {device.name} input: {event.input_index} type: {event.input_type}")
 				return
 		
-			# if self.js.vjoyAsInput(vjoy_id):
+			if self.js.vjoyAsInput(vjoy_id):
 				# update the event tracker for loop back devices
 				# we need to record the event because vjoy can sometimes trigger, or not trigger a DINPUT event when it's receiving commands.
-			verbose_vjoy = self._verbose_vjoy
-			input_id = event.input_index
-			value = event.value
-			if event.input_type == dinput.InputType.Axis:
-				input_type = InputType.JoystickAxis
-			elif event.input_type == dinput.InputType.Button:
-				input_type = InputType.JoystickButton
-				value = value != 0 # convert to boolean - true if pressed, false if not
-			elif event.input_type == dinput.InputType.Hat:
-				input_type = InputType.JoystickHat
-				# convert value to tuple for hat value comparisons
-				value = vjoy.vjoy.Hat.getDirection(value)
-			else:
-				if verbose_vjoy: syslog.error(f"DINPUT VJOY LOOPBACK: don't know how to handle input type: {event.input_type}")
-				input_type = None
+				verbose_vjoy = self._verbose_vjoy
+				input_id = event.input_index
+				value = event.value
+				if event.input_type == dinput.InputType.Axis:
+					input_type = InputType.JoystickAxis
+				elif event.input_type == dinput.InputType.Button:
+					input_type = InputType.JoystickButton
+					value = value != 0 # convert to boolean - true if pressed, false if not
+				elif event.input_type == dinput.InputType.Hat:
+					input_type = InputType.JoystickHat
+					# convert value to tuple for hat value comparisons
+					value = vjoy.vjoy.Hat.getDirection(value)
+				else:
+					if verbose_vjoy: syslog.error(f"DINPUT VJOY LOOPBACK: don't know how to handle input type: {event.input_type}")
+					input_type = None
 
 			if input_type:
 				# track the input event

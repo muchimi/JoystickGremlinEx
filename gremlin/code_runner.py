@@ -305,7 +305,6 @@ class CodeRunner:
             # Create input callbacks based on the profile's content
             
             verbose = gremlin.config.Configuration().verbose_mode_exec
-            verbose = True
             device : gremlin.base_profile.Device
             for device in profile.devices.values():
                 device_info = gremlin.joystick_handling.device_info_from_guid(device.device_guid)
