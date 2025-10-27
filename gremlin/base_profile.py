@@ -2249,7 +2249,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """Returns a list of valid containers for this input  """
         container_list = []
         for entry in gremlin.plugin_manager.ContainerPlugins().repository.values():
-            if not entry.input_types or self.input_type in entry.input_types:
+            input_type = self.get_input_type()
+            if not entry.input_types or input_type in entry.input_types:
                 # if no input types provided, all are ok
                 if entry.axis_only:
                     # container requires an axis
@@ -3227,7 +3228,7 @@ class Profile():
     
     def traverse_mode(self):
         ''' returns the current mode list as a list of (level, mode) '''
-        self.dumpModeTree()
+        # self.dumpModeTree()
         nodes = [(node.depth-1, node.name) for node in anytree.PreOrderIter(self._mode_tree) if node.name]
         return nodes
     
@@ -3681,9 +3682,9 @@ class Profile():
                 m_parent_node = node_map[parent_mode_name]
                 m_node.parent = m_parent_node
             
-        verbose = gremlin.config.Configuration().verbose
-        if verbose: self.dumpModeTree()
-        pass
+        # verbose = gremlin.config.Configuration().verbose
+        # if verbose: self.dumpModeTree()
+        # pass
             
     
     def rename_mode(self, old_mode:str, new_mode:str, emit = False) -> bool:

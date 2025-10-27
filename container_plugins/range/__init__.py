@@ -167,7 +167,8 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         action_label = QtWidgets.QLabel("Actions")
         self.ui_action_dropdown = gremlin.ui.ui_common.QComboBox()
-
+        # entries = list(gremlin.plugin_manager.ActionPlugins().repository.values())
+        # for entry in entries:
         for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
             self.ui_action_dropdown.addItem(entry.name, entry)
 

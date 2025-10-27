@@ -2561,6 +2561,9 @@ class ActionSelector(QtWidgets.QWidget):
         super().__init__(parent)
         import gremlin.base_profile
 
+        if not input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+            pass
+
         assert isinstance(input_item, gremlin.base_profile.InputItem), "expected an input item, wrong type passed"
         self._input_item = input_item
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
@@ -7048,7 +7051,17 @@ class QDelayWidget(QtWidgets.QWidget):
     valueChanged = QtCore.Signal(int) # fired when the value changes
     invalid = QtCore.Signal() # fires when the input is invalid
 
-    def __init__(self, value = 250, max_value_seconds = 60, is_seconds = False, callback = None, invalid_callback = None, validation_callback = None, show_shortcuts = True, parent = None, label = None):
+    def __init__(self, 
+                 value = 250, 
+                 max_value_seconds = 60,
+                 is_seconds = False, 
+                 callback = None, 
+                 invalid_callback = None, 
+                 validation_callback = None, 
+                 show_shortcuts = True, 
+                 parent = None, 
+                 label = None,
+                 tooltip = None):
         '''
 
         :params value: default delay in milliseconds '''
@@ -7060,10 +7073,6 @@ class QDelayWidget(QtWidgets.QWidget):
         self._callback = callback # callback when value change 
         self._invalid_callback = invalid_callback # callback on invalid input
         self._validation_callback = validation_callback # callback that accepts a value and returns True if the value can be used
-
-        self.delay_container_widget = QtWidgets.QWidget()
-        self.delay_container_layout = QtWidgets.QHBoxLayout()
-        self.delay_container_widget.setLayout(self.delay_container_layout)
 
         self._is_seconds = is_seconds
         self._max_value = max_value_seconds * 1000 # max value possible
@@ -7077,9 +7086,7 @@ class QDelayWidget(QtWidgets.QWidget):
         self._delay_widget.setValue(value) # default
         self._delay_widget.valueChanged.connect(self._value_changed)
 
-
-        self.delay_container_layout.addWidget(delay_label)
-        self.delay_container_layout.addWidget(self._delay_widget)
+        widgets = [delay_label, self._delay_widget]
 
         if show_shortcuts:
 
@@ -7091,12 +7098,13 @@ class QDelayWidget(QtWidgets.QWidget):
             half_sec_button.clicked.connect(self._half_sec_delay)
             sec_button.clicked.connect(self._sec_delay)
 
+            widgets.extend([quarter_sec_button, half_sec_button, sec_button])
 
-            
-            self.delay_container_layout.addWidget(quarter_sec_button)
-            self.delay_container_layout.addWidget(half_sec_button)
-            self.delay_container_layout.addWidget(sec_button)
-            self.delay_container_layout.addStretch()
+        self.delay_container_widget, self.delay_container_layout = getHContainer(widgets)
+
+        if tooltip:
+            self.delay_container_widget.setToolTip(tooltip)
+
 
         self.main_layout.addWidget(self.delay_container_widget)
 

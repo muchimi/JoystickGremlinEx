@@ -4722,7 +4722,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         if extra_data and "autorelease" in extra_data:
                             auto_release = extra_data["autorelease"]
                         else:
-                            auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release 
+                            auto_release = input_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release 
                         if auto_release:
                             if verbose: syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
                             input_devices.ButtonReleaseActions().register_button_release(
@@ -4792,7 +4792,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # toggle action
                 
                 if fire_event:
-                    if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
+                    if input_type in [InputType.JoystickButton, InputType.Keyboard] \
                             and event.is_pressed:
                         if is_local:
                             if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
@@ -4914,6 +4914,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
         elif input_type == InputType.JoystickHat:
+            
             if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} direction: {action_value.current}")
             if is_local:
                 if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):

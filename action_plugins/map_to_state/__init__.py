@@ -74,7 +74,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         self._default_off_widget.clicked.connect(self._default_changed)    
         self._default_on_widget.clicked.connect(self._default_changed)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer(["Default:",self._default_on_widget, self._default_off_widget])
+        widget, _ = gremlin.ui.ui_common.getHContainer(["Default:",self._default_on_widget, self._default_off_widget])
         main_layout.addWidget(widget)
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
@@ -83,7 +83,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget],left_stretch=True)
+        widget, _ = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget],left_stretch=True)
         main_layout.addWidget(widget)
 
 
@@ -292,19 +292,25 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.state_selector.clear()
             sd = gremlin.ui.state_device.StateData()
             for key, data in sd.getStates().items():
+                # syslog.info(f"found state: {key}")
                 self.state_selector.addItem(key, data)
 
             state = self.action_data.state
             if state:
-                index = self.state_selector.findData(state)
-                if index >= 0:
-                    self.state_selector.setCurrentIndex(index)                
+                index = self.state_selector.findText(state.key)
+                if index != -1:
+                    self.state_selector.setCurrentIndex(index)
+                else:
+                    syslog.warning(f"STATE: attempt to select state failed - [{state.key}] - state not found - defaulting to [{self.state_selector.currentText()}].")
+                    
             else:
                 key = self.action_data.key
                 if key:
                     index = self.state_selector.findText(key)
-                    if index >= 0:
+                    if index != -1:
                         self.state_selector.setCurrentIndex(index)
+                    else:
+                        syslog.warning(f"STATE: attempt to select state failed - [{key}] - state not found - defaulting to [{self.state_selector.currentText()}].")
                 else:
                     # pick the first as the default
                     self.action_data.state = self.state_selector.currentData()
@@ -809,8 +815,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
 
 
-        
-        
+
 
     def process_event(self, event, value, extra_data = None):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
@@ -841,7 +846,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         
         if trigger:
             # trigger mode (act as press)
-            match input_type:
+            match event.event_type:
                 case InputType.JoystickButton:
                     # button
                     match mode:
@@ -874,39 +879,51 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
                 case InputType.JoystickHat:
                     # hat button handling
+
+                    if verbose and "comments" in event.extra_data:
+                        syslog.info(f"STATE FUNCTOR: event comment: {event.extra_data["comments"]}")   
+
+                    if "old_position"  in event.extra_data:
+                        # hat press event has extra data to release
+                        old_position = event.extra_data["old_position"]
+                    else:
+                        old_position = None
+                    
+                    # release the old position
+                    if old_position:
+                        if old_position in self.pressed_hat_buttons:
+                            state_name = self.pressed_hat_buttons[old_position]
+                            if state_name:
+                                self.sd.setValue(state_name, False, force = True)
+                            del self.pressed_hat_buttons[old_position]
+
+
                     position = event.raw_value
-                    pressed_positions = list(self.pressed_hat_buttons.keys())
                     is_pressed = event.is_pressed
                     mode = self.action_data.hat_mode_map[position]
 
                     state_name = self.action_data.hat_map[position]
                     self.hat_position = position
+
+                    if verbose: syslog.info(f"STATE FUNCTOR: received button hat event hat {position} pressed: {is_pressed}")
+
                     
                     if state_name:
                         match mode:
                             case ButtonOutputMode.Pulse:
                                 if is_pressed:
-                                    if verbose: syslog.info(f"VJOY: trigger start pulse state {state_name} hat {position}")
+                                    if verbose: syslog.info(f"STATE FUNCTOR: trigger start pulse state {state_name} hat {position}")
                                     repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
                                     self.pulse_start(state_name, self.action_data.pulse_delay/1000, repeat_interval)
                                     
                                 else:
-                                    if verbose: syslog.info(f"VJOY: trigger stop pulse state {state_name} hat {position}")
+                                    if verbose: syslog.info(f"STATE FUNCTOR: trigger stop pulse state {state_name} hat {position}")
                                     self.pulse_stop(state_name)
 
                                     # threading.Timer(0.01, self._fire_pulse, [self.vjoy_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
                             case ButtonOutputMode.Hold:
-                                if is_pressed:
-                                    # release the prior buttons
-                                    if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] hold")
-                                    for pressed_position in pressed_positions:
-                                        if position == pressed_position:
-                                            continue
-                                        release_input_id = self.pressed_hat_buttons[pressed_position]
-                                        if release_input_id > 0:
-                                                self.sd.setValue(state_name, False)
-                                        del self.pressed_hat_buttons[pressed_position]
-
+                                pass
+                                
                             case ButtonOutputMode.Press:
                                 if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] press/on")
                                 is_pressed = True
@@ -922,8 +939,9 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                                 return True
                             
                         # set the new button
+                        if verbose: syslog.info(f"STATE FUNCTOR: state [{state_name}] set new state: {is_pressed}")
                         self.pressed_hat_buttons[position] = state_name
-                        self.sd.setValue(state_name, is_pressed)
+                        self.sd.setValue(state_name, is_pressed, force = True)
 
 
                     else:
@@ -937,12 +955,6 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                             case ButtonOutputMode.Release:
                                 return True
 
-                        for pressed_position in pressed_positions:
-                            state_name = self.pressed_hat_buttons[pressed_position]
-                            if state_name:
-                                self.sd.setValue(state_name, False)
-
-                            del self.pressed_hat_buttons[pressed_position]
 
 
         return True

@@ -114,8 +114,8 @@ class Event:
 		self.event_type = event_type
 		self._identifier = identifier
 		self.device_guid = device_guid
-		self._is_pressed = is_pressed
-		#self.is_pressed = is_pressed
+		#self._is_pressed = is_pressed
+		self.is_pressed = is_pressed
 		#self._value = value
 		self.value = value
 		self.raw_value = raw_value
@@ -133,15 +133,13 @@ class Event:
 		self.override_input_type = override_input_type # override input type - used as the input type for actions 
 		self.extra_data = extra_data
 
-	@property
-	def is_pressed(self):
-		return self._is_pressed
+	# @property
+	# def is_pressed(self):
+	# 	return self._is_pressed
 	
-	@is_pressed.setter
-	def is_pressed(self, value):
-		if not value and self.event_type == InputType.JoystickHat:
-			pass
-		self._is_pressed = value
+	# @is_pressed.setter
+	# def is_pressed(self, value):
+	# 	self._is_pressed = value
 
 	@property
 	def curve_value(self) -> float:
@@ -196,6 +194,16 @@ class Event:
 		if self.override_input_type:
 			return self.override_input_type
 		return self.event_type
+	
+	# @property
+	# def event_type(self):
+	# 	if self.override_input_type:
+	# 		return self.override_input_type
+	# 	return self._event_type
+	
+	# @event_type.setter
+	# def event_type(self, value):
+	# 	self._event_type = value
 
 
 
@@ -1328,30 +1336,30 @@ class EventListener:
 				if verbose: syslog.info(f"Ignore input: {device.name} input: {event.input_index} type: {event.input_type}")
 				return
 		
-			if self.js.vjoyAsInput(vjoy_id):
+			# if self.js.vjoyAsInput(vjoy_id):
 				# update the event tracker for loop back devices
 				# we need to record the event because vjoy can sometimes trigger, or not trigger a DINPUT event when it's receiving commands.
-				verbose_vjoy = self._verbose_vjoy
-				input_id = event.input_index
-				value = event.value
-				if event.input_type == dinput.InputType.Axis:
-					input_type = InputType.JoystickAxis
-				elif event.input_type == dinput.InputType.Button:
-					input_type = InputType.JoystickButton
-					value = value != 0 # convert to boolean - true if pressed, false if not
-				elif event.input_type == dinput.InputType.Hat:
-					input_type = InputType.JoystickHat
-					# convert value to tuple for hat value comparisons
-					value = vjoy.vjoy.Hat.getDirection(value)
-				else:
-					if verbose_vjoy: syslog.error(f"DINPUT VJOY LOOPBACK: don't know how to handle input type: {event.input_type}")
-					input_type = None
+			verbose_vjoy = self._verbose_vjoy
+			input_id = event.input_index
+			value = event.value
+			if event.input_type == dinput.InputType.Axis:
+				input_type = InputType.JoystickAxis
+			elif event.input_type == dinput.InputType.Button:
+				input_type = InputType.JoystickButton
+				value = value != 0 # convert to boolean - true if pressed, false if not
+			elif event.input_type == dinput.InputType.Hat:
+				input_type = InputType.JoystickHat
+				# convert value to tuple for hat value comparisons
+				value = vjoy.vjoy.Hat.getDirection(value)
+			else:
+				if verbose_vjoy: syslog.error(f"DINPUT VJOY LOOPBACK: don't know how to handle input type: {event.input_type}")
+				input_type = None
 
-				if input_type:
-					# track the input event
-					if verbose_vjoy: syslog.info(f"DINPUT VJOY LOOPBACK: register vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
-					if not self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
-						return # skip DINPUT event
+			if input_type:
+				# track the input event
+				if verbose_vjoy: syslog.info(f"DINPUT VJOY LOOPBACK: register vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
+				if not self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
+					return # skip DINPUT event
 
 		if event.input_type == dinput.InputType.Axis:
 			if verbose and verbose_extra:
@@ -1427,17 +1435,22 @@ class EventListener:
 				self._hat_state[key] = value
 
 				# release the old value
-				new_event = Event(
+				release_event = Event(
 					event_type= InputType.JoystickHat,
 					device_guid = event.device_guid,
 					identifier = event.input_index,
 					is_pressed = False,
 					is_virtual = is_virtual,
 					value = value,
-					raw_value= current
+					raw_value= current,
+					extra_data={"comments": "Hat release event"}
 				)
 
-				event_list.append(new_event)
+				event_list.append(release_event)
+
+				extra_data = {}
+				extra_data["comments"] =  f"Hat press event - prior hat position: {current}  new position: {value}"
+				extra_data[f"old_position"] = current
 
 				# press the new value
 				new_event = Event(
@@ -1447,7 +1460,8 @@ class EventListener:
 					is_pressed = True,
 					is_virtual = is_virtual,
 					value = value ,
-					raw_value= value
+					raw_value= value,
+					extra_data= extra_data
 				)
 
 				event_list.append(new_event)

@@ -295,18 +295,22 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
             
         # delay
-        self.delay_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self.delay_widget.setRange(0,5000)
         if self._gate_info:
-            self.delay_widget.setValue(self._gate_info.delay)
+            value = self._gate_info.delay
         else:
-            self.delay_widget.setValue(self._range_info.delay)
+            value = self._range_info.delay
 
-        self.delay_widget.setToolTip("Delay in milliseconds between a press and release event for gate crossings or range enter/exit triggers")
-        self.delay_widget.valueChanged.connect(self._delay_changed_cb)
+        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = value,
+            tooltip = "Delay in milliseconds between a press and release event for gate crossings or range enter/exit triggers",
+            callback = self._delay_changed_cb,
+            label = "Trigger Delay:",
+            show_shortcuts=False
+        )
+    
         self.trigger_condition_layout.addStretch()
-        self.trigger_condition_layout.addWidget(QtWidgets.QLabel("Trigger Delay:"))
-        self.trigger_condition_layout.addWidget(self.delay_widget)
+        self.trigger_condition_layout.addWidget(self.delay_widget, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
+        
 
             
         el = gremlin.event_handler.EventListener()
@@ -381,14 +385,12 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         if value is not None:
             self.axis_widget.setValue(value)
 
-
-    QtCore.Slot()
-    def _delay_changed_cb(self):
+    def _delay_changed_cb(self, delay):
         ''' delay value changed for gates or ranges '''
         if self._gate_info:
-            self._gate_info.delay = self.delay_widget.value()
+            self._gate_info.delay = delay
         elif self._range_info:
-            self._range_info.delay = self.delay_widget.value()
+            self._range_info.delay = delay
 
     QtCore.Slot()
     def _delete_gate_confirm_cb(self):

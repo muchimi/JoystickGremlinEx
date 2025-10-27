@@ -277,7 +277,8 @@ class ActionPlugins:
             self._type_to_action_map[input_type] = []
 
         for entry in self._plugins.values():
-            for input_type in entry.input_types:
+            input_types = entry.input_types
+            for input_type in input_types:
                 self._type_to_action_map[input_type].append(entry)
 
     def _create_action_name_map(self):

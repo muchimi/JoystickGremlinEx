@@ -4784,11 +4784,9 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         
         
 
-        # default input type
-        input_type = self._input_type
         # check for an override for the inputs that can change types (such as OSC)
-        
         input_type = self.item_data.getInputType()
+
 
         self.sync_widget = gremlin.ui.ui_common.Buttons.getListSyncWidget(callback = self._sync_list)
 

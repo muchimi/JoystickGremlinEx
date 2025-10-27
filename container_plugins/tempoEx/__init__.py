@@ -176,21 +176,24 @@ class TempoExContainerWidget(AbstractContainerWidget):
         
 
         self.short_action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type(),
+            #self.profile_data.get_input_type(),
+            InputType.JoystickButton,
             self.profile_data.input_item
         )
         self.short_action_selector.action_label.setText("Short Press Action(s)")
         
 
         self.long_action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type(),
+            #self.profile_data.get_input_type(),
+            InputType.JoystickButton,
             self.profile_data.input_item
         )
         self.long_action_selector.action_label.setText("Long Press Action(s)")
 
 
         self.double_action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type(),
+            #self.profile_data.get_input_type(),
+            InputType.JoystickButton,
             self.profile_data.input_item
         )
         self.double_action_selector.action_label.setText("Double Tap Action(s)")
@@ -552,6 +555,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         self.short_nodes = [] # list of short action set nodes
         self.long_nodes = [] # list of long action set nodes
         self.double_nodes = [] # list of double tap actions
+        self.event_release = None
         
 
         # Determine if we need to switch the action index after a press or
@@ -802,22 +806,37 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
 
         if not self.valid:
             return False
-
-        if event.event_type == InputType.JoystickHat:
+        
+        input_type = event.getInputType()
+        
+        if input_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
         else:
             is_pressed = event.is_pressed # use new API for GremlinEx
 
         
         verbose = self.verbose
+        verbose = True
+
+
+        self.value_press = copy.deepcopy(value)
+        self.value_release = copy.deepcopy(value)
+
+        self.event_press = event.clone()
+        self.event_release = event.clone()
+
+        
+        self.event_press.is_axis = False
+        self.event_release.is_axis = False
+        
+        self.event_press.is_pressed = True
+        self.event_release.is_pressed = False
+        
+        
 
         if is_pressed:
             if verbose: syslog.info(f"TEMPOEX: input press processing - trigger mode: [{self.trigger_mode}]")
-            self.value_press = copy.deepcopy(value)
-            self.event_press = event.clone()
-            self.event_release = event.clone()
-            self.event_release.is_pressed = False
-            self.value_release = copy.deepcopy(value)
+           
         
             time_now = time.time() # current time
             self.trigger_release = False # press mode
@@ -882,6 +901,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
             self.start_time = time_now # reset start
 
         else:
+
             # input is released
             if verbose: syslog.info(f"TEMPOEX: input release processing - trigger mode: [{self.trigger_mode}]")
             if self.activate_on == "press":
@@ -1042,15 +1062,9 @@ More than one action per short press or long press can be added.'''
 
     functor = TempoExContainerFunctor
     widget = TempoExContainerWidget
-    # input_types = [
-    #     InputType.JoystickAxis,
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
+    
     input_types = [
          InputType.JoystickButton,
-         InputType.JoystickHat,
     ]
 
     interaction_types = [
@@ -1083,6 +1097,10 @@ More than one action per short press or long press can be added.'''
     def action_sets(self):
         ''' gets the action sets for this container '''
         return self.short_action_sets + self.long_action_sets + self.double_action_sets
+    
+    def get_input_type(self):
+        ''' override input type when actions check what input type they are hooked to '''
+        return InputType.JoystickButton 
     
     @action_sets.setter
     def action_sets(self, value):

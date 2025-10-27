@@ -154,9 +154,18 @@ class GUID:
             Mapping of a C struct representing a device GUID
         """
 
-        if isinstance(guid, uuid.UUID):
+        if isinstance(guid, str):
+            try:
+                guid = uuid.UUID(guid)
+            except:
+                syslog.error(f"GUID: Unable to convert ID {guid} to UUID")
+                return None
+            guid = _GUID(guid.int) # convert to internal _GUID
+
+        elif isinstance(guid, uuid.UUID):
             # convert to ctypes structure using the integer value if the class is given a regular python UUID
             guid = _GUID(guid.int)
+        
         assert isinstance(guid, _GUID)
         self._ctypes_guid = copy.deepcopy(guid)
         self.guid = (

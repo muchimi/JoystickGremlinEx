@@ -14,6 +14,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T89)
+- Fix: autostart mode enabled can cause an exception due to portion of UI not initialized yet.
+- Fix: state selector index reverts to default because the state cannot be found.
+- As designed: Map to keyboard EX can only be mapped to a momentary input.  If the input reports as being an axis (linear), Map to Keyboard EX will not be available, along with other similar actions with this requirement.  Note: the legacy keyboard mapper IS available on linear axes because it implements a virtual button, which the other actions do not, including Map to Keyboard Ex, as a virtual button would prevent the action from working correctly.  
+- Fix: Gate Axis trigger delay not recalled.
+- Change: VJOY event filter now always enabled.
+- Fix: Missing event release on TempoEx in some cases.
+- Fix: map to state not releasing when mapped to a hat. Hat button events now carry data for the hat position prior to the position change so single events can still issue a button release on hat inputs.
+
 ### (m76T88A)
 - Fix: OSC arg release option in global options causing an exception on save.
 

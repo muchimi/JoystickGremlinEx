@@ -178,6 +178,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """
 
         gremlin.shared_state.ui = self
+        self.initialized = False
 
         super().__init__("main_window", parent)
 
@@ -396,6 +397,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.update_toolbar()
         el.config_option_changed.connect(self._config_option_changed)
         el.device_change_event.connect(self._device_change_cb)
+
+        self.initialized = True
 
     def _update_toolbar(self):
         ''' updates the toolbar when the toolbar changes '''
@@ -1093,7 +1096,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         dialog.setWindowModality(QtCore.Qt.ApplicationModal)
         dialog.ensurePolished()
         gremlin.util.centerDialog(dialog, width = dialog.width(), height=dialog.height())
-        dialog.closed.connect(lambda: self.apply_user_settings(ignore_minimize=True))
+        dialog.closed.connect(lambda: self.apply_user_settings(ignore_minimize=True, auto_start = False))
         dialog.closed.connect(lambda: self._remove_modal_window("options"))
         
         dialog.closed.connect(self.options_closed)
@@ -2796,7 +2799,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         last_input_id = input_item.input_id
                         last_input_type = input_item.input_type
                 
-                syslog.info(f"SELECT TAB INDEX: {index}")
+                if verbose: syslog.info(f"SELECT TAB INDEX: {index}")
                 index = self.getTabIndexForDevice(last_device_guid)
                 if index is not None:
                     self.ui.devices.setCurrentIndex(index)
@@ -4079,6 +4082,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' updates the mode status bar with current runtime and edit modes '''
         try:
 
+            verbose = gremlin.config.Configuration().verbose
             is_running = gremlin.shared_state.is_running
             runtime_mode = gremlin.shared_state.runtime_mode
 
@@ -4095,13 +4099,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not is_running:
                 msg = f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
                 if self._status_bar_last_edit_mode != edit_mode:
-                    syslog.info(f"Mode: New edit mode: [{edit_mode}] (last mode [{self._status_bar_last_edit_mode}])")
+                    if verbose: syslog.info(f"Mode: New edit mode: [{edit_mode}] (last mode [{self._status_bar_last_edit_mode}])")
                     self._status_bar_last_edit_mode = edit_mode
 
             else:
                 msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
                 if self._status_bar_last_runtime_mode != runtime_mode:
-                    syslog.info(f"CHANGE MODE: To: [{runtime_mode}] (from [{self._status_bar_last_runtime_mode}])")
+                    if verbose: syslog.info(f"CHANGE MODE: To: [{runtime_mode}] (from [{self._status_bar_last_runtime_mode}])")
                     self._status_bar_last_runtime_mode = runtime_mode
 
 
@@ -4181,7 +4185,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     # | Utilities
     # +---------------------------------------------------------------
 
-    def apply_user_settings(self, ignore_minimize=False):
+    def apply_user_settings(self, ignore_minimize=False, auto_start = True):
         """Configures the program based on user settings."""
 
         # gamepad count
@@ -4193,20 +4197,33 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if not ignore_minimize and self.config.start_minimized:
             self.setHidden(self.config.start_minimized)
    
-        config = gremlin.config.Configuration()
-        if config.activate_on_launch:
-            self.ui.actionActivate.setChecked(True)
-            self.activate(True)
+        if auto_start:
+            config = gremlin.config.Configuration()
+            if config.activate_on_launch:
+                syslog.info("autostart requested")
+                thread = threading.Thread(target = self._auto_start_runner)
+                thread.name = "autostart"
+                thread.start()
+                
+    
+    def _auto_start_runner(self):
+        while gremlin.shared_state.ui is None or not gremlin.shared_state.ui.initialized:
+            syslog.info("autostart waiting to start...")
+            time.sleep(0.1)
+            if gremlin.shared_state.terminating:
+                # app is terminating
+                return
+            
+        syslog.info("autostart starting")
 
-    # def apply_window_settings(self):
-    #     """Restores the stored window geometry settings."""
-    #     config = gremlin.config.Configuration()
-    #     window_size = config.window_size
-    #     window_location = config.window_location
-    #     if window_size:
-    #         self.resize(window_size[0], window_size[1])
-    #     if window_location:
-    #         self.move(window_location[0], window_location[1])
+        gremlin.util.InvokeUiMethod(self._auto_start_activate_ui)
+
+    def _auto_start_activate_ui(self):
+        ''' auto activate on UI thread'''        
+        self.ui.actionActivate.setChecked(True)
+        self.activate(True)
+
+
 
     def _create_cheatsheet(self):
         """Creates the cheatsheet and stores it in the desired place.
@@ -5327,12 +5344,6 @@ if __name__ == "__main__":
 
 
     # Run UI
-    
-    gremlin.shared_state.ui_ready = True
-
-    syslog.info("Init completed...")
-    el.ui_ready.emit()
-    el.toggle_highlight.emit(ui.is_highligthing_enabled, ui.is_axis_highlighting, ui.is_button_highlighting)
 
 
     # for some reason QT shows the window with a white background and ignores stylesheets/background color
@@ -5341,6 +5352,16 @@ if __name__ == "__main__":
     # show the window normally
     ui.showMinimized()
     app.processEvents()
+
+
+        
+    gremlin.shared_state.ui_ready = True
+
+    syslog.info("Init completed...")
+    el.ui_ready.emit()
+    el.toggle_highlight.emit(ui.is_highligthing_enabled, ui.is_axis_highlighting, ui.is_button_highlighting)
+
+  
     syslog.info("Apply settings...")
     ui.apply_user_settings() 
 
@@ -5360,6 +5381,7 @@ if __name__ == "__main__":
 
     syslog.info("GremlinEx UI terminated")
 
+    gremlin.shared_state.terminating = True
 
 
     # Terminate potentially running EventListener loop

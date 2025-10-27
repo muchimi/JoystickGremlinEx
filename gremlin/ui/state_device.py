@@ -115,11 +115,12 @@ class CategoryValidator(QtGui.QValidator):
         super().__init__()
         self._category_names = None
         self._cm = None
+        self._cm = StateCategories()
+        self._cm.changed.connect(self._update_categories)
+        
 
     def _update_categories(self):
-        if not self._cm:
-            self._cm = StateCategories()
-            self._cm.changed.connect(self._update_categories)
+        if self._cm:
             self._category_names = self._cm.getCategoryNames()
 
         
@@ -546,16 +547,19 @@ class StateInputItem(gremlin.base_profile.InputItem):
     
     @value.setter
     def value(self, data : bool):
-        if self.key == "b" and data:
-            pass
+        self.setValue(data)
+        
+    def setValue(self, data : bool, force = False):
         if data is None or not isinstance(data, bool):
             syslog.warning(f"State setter: state: [{self.key}] id: [{self.id}] attempt to set invalid value [{data}]")
             return
-        if not self._expression and self._value != data:
+        if force or not self._expression and self._value != data:
             # only set value on non expression states and only if the value has changed
             self._last_value = self._value
             self._value = data
             self._fire_changed(data)
+
+
 
     @property
     def lastValue(self) -> bool | None:
@@ -1302,12 +1306,13 @@ class StateData(QtCore.QObject):
             return self._id_map[id]
         return None
 
-    def setValue(self, key : str, value, emit = True):
+    def setValue(self, key : str, value, emit = True, force = False):
         ''' sets state value (and registers if needed) '''
         key = key.casefold().strip()
         verbose = gremlin.config.Configuration().verbose_mode_state
         if verbose: syslog.info(f"STATE SET: set state [{key}] -> {value}")
-        self._data[key].value = value
+        self._data[key].setValue(value, force)
+                                 
 
     
     def description(self, key : str) -> str:

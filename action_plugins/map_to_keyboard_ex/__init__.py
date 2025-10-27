@@ -771,10 +771,12 @@ Can also send mouse buttons, mouse wheel events.'''
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
+
     input_types = [
          InputType.JoystickButton,
          InputType.JoystickHat,
     ]
+
 
     functor = MapToKeyboardExFunctor
     widget = MapToKeyboardExWidget
