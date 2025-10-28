@@ -1098,6 +1098,30 @@ There should only be one GremlinEx master server on the subnet.
         box.addWidget(self.suppress_duplicate_widget)
 
         tts = gremlin.tts.TextToSpeech()
+
+        self.voice_widget = gremlin.ui.ui_common.QComboBox()
+        tts = gremlin.tts.TextToSpeech()
+        for voice in tts.getVoices():
+            self.voice_widget.addItem(voice.name, voice.id)
+        index = self.config.TTSDefaultVoiceIndex
+        if index < self.voice_widget.count():
+            self.voice_widget.setCurrentIndex(index)
+        self.voice_widget.currentIndexChanged.connect(self._voice_change_cb)
+
+        self.apply_voice_index_widget = QtWidgets.QPushButton("Apply")
+        self.apply_voice_index_widget.setToolTip("Applies default selection to all TTS entries in the profile")
+        self.apply_voice_index_widget.clicked.connect(self._handle_apply_voice_index)
+
+        self.apply_voice_volume_widget = QtWidgets.QPushButton("Apply")
+        self.apply_voice_volume_widget.setToolTip("Applies default volume to all TTS entries in the profile")
+        self.apply_voice_volume_widget.clicked.connect(self._handle_apply_voice_volume)
+
+        self.apply_voice_rate_widget = QtWidgets.QPushButton("Apply")
+        self.apply_voice_rate_widget.setToolTip("Applies default playback rate (wpm) to all TTS entries in the profile")
+        self.apply_voice_rate_widget.clicked.connect(self._handle_apply_voice_rate)
+
+
+
         self.tts_rate_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.tts_rate_widget.setRange(tts.rate_offset_min, tts.rate_offset_max)
         self.tts_rate_widget.setValue(self.config.initial_load_rate_tts)
@@ -1113,11 +1137,13 @@ There should only be one GremlinEx master server on the subnet.
         self.tts_volume_widget.setToolTip("Default volume percent (0..100)")
 
         
-
-        widget, _ = ui_common.getHContainer(self.tts_rate_widget, "  TTS Playback Rate (WPM):")
+        widget, _ = ui_common.getHContainer([self.voice_widget, self.apply_voice_index_widget], "  TTS Default Voice:")
         box.addWidget(widget)
 
-        widget, _ = ui_common.getHContainer(self.tts_volume_widget, "  TTS Playback Volume:")
+        widget, _ = ui_common.getHContainer([self.tts_rate_widget, self.apply_voice_rate_widget], "  TTS Playback Rate (WPM):")
+        box.addWidget(widget)
+
+        widget, _ = ui_common.getHContainer([self.tts_volume_widget, self.apply_voice_volume_widget], "  TTS Playback Volume:")
         box.addWidget(widget)
 
         info_box = ui_common.QInfoBox("Normal playback speed is 100 words per minute (WPM).")
@@ -1131,6 +1157,51 @@ There should only be one GremlinEx master server on the subnet.
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Voice (TTS)")
+
+
+    @QtCore.Slot()
+    def _voice_change_cb(self):
+        self.config.TTSDefaultVoiceIndex = self.voice_widget.currentIndex()
+
+
+    @QtCore.Slot()
+    def _handle_apply_voice_index(self):
+        ''' applies the default voice to all TTS speech in the profile '''
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            voice_index = self.voice_widget.currentIndex()
+            gremlin.util.pushCursor()
+            count = profile.apply_voice(voice_index = voice_index)
+            gremlin.util.popCursor()
+            if count:
+                gremlin.ui.ui_common.MessageBox(prompt = f"{count:,} TTS entries were changed.")
+
+    @QtCore.Slot()
+    def _handle_apply_voice_volume(self):
+        ''' applies the default voice to all TTS speech in the profile '''
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            voice_index = self.voice_widget.currentIndex()
+            gremlin.util.pushCursor()
+            count = profile.apply_voice(voice_volume = self.config.initial_volume_tts)
+            gremlin.util.popCursor()
+            if count:
+                gremlin.ui.ui_common.MessageBox(prompt = f"{count:,} TTS entries were changed.")
+
+    @QtCore.Slot()
+    def _handle_apply_voice_rate(self):
+        ''' applies the default voice to all TTS speech in the profile '''
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            
+            gremlin.util.pushCursor()
+            count = profile.apply_voice(voice_rate = self.config.initial_load_rate_tts)
+            gremlin.util.popCursor()
+            if count:
+                gremlin.ui.ui_common.MessageBox(prompt = f"{count:,} TTS entries were changed.")
+
+
+
 
 
     # --------------------------------------------------------------------------------------------------------------------

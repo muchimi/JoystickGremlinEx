@@ -1457,6 +1457,12 @@ class Configuration(QtCore.QObject):
         ''' true if verbose mode is in output mode '''
         return self.verbose and VerboseMode.Remote in self.verbose_mode
         
+    @property
+    def verbose_mode_tts(self):
+        ''' true if verbose mode is in TTS mode '''
+        return self.verbose and VerboseMode.TTS in self.verbose_mode
+        
+    
     
     @property
     def midi_enabled(self):
@@ -2707,5 +2713,12 @@ class Configuration(QtCore.QObject):
     @ReportOpenFilesEnabled.setter
     def ReportOpenFilesEnabled(self, value : bool):
         self._set_data("ReportOpenFilesEnabled", value)        
+
+    @property
+    def TTSDefaultVoiceIndex(self) -> int:
+        return self._get_data("TTSDefaultVoiceIndex", 0)
+    @TTSDefaultVoiceIndex.setter
+    def TTSDefaultVoiceIndex(self, value : int):
+        self._set_data("TTSDefaultVoiceIndex", value)        
 
     

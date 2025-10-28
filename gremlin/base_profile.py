@@ -208,7 +208,7 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         if self._input_item is not None:
             mode = self._input_item.profile_mode
             if mode == gremlin.shared_state.master_mode:
-                return "Master"
+                return gremlin.shared_state.master_mode_name
             return mode
         return None
 
@@ -2719,7 +2719,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         ''' debug string for this item'''
         mode = self.profile_mode
         if mode == gremlin.shared_state.master_mode:
-            mode = "Master"
+            mode = gremlin.shared_state.master_mode_name
         return f"InputItem: [{gremlin.shared_state.get_device_name(self.device_guid)}] Input: [{InputType.to_display_name(self.input_type)}] Type: [{self.display_name}] mode: [{mode}]"
 
     def __eq__(self, other):
@@ -4613,6 +4613,45 @@ class Profile():
             el = gremlin.event_handler.EventListener()
             el.request_reload.emit()
 
+    def apply_voice(self, voice_index = None, voice_volume = None, voice_rate = None) -> int:
+        ''' applies this voice to all profile TTS entries - returns the count of entries impacted '''
+        count = 0
+        
+        if voice_index is not None or voice_volume is not None or voice_rate is not None:
+            for dev_guid in self.devices:
+                dev = self.devices[dev_guid]
+                for mode_name in dev.modes:
+                    mode_object = dev.modes[mode_name]
+                    for input_type in mode_object.config.keys():
+                        for item in mode_object.config[input_type].values():
+                            for container in item.containers:
+                                for actions in [a for a in container.action_sets if a is not None]:
+                                    for action in actions:
+                                        if action.tag == "text-to-speech":
+                                            updated = False
+                                            if voice_index is not None and voice_index != action.voice_index:
+                                                action.voice_index = voice_index
+                                                updated = True
+                                            if voice_volume is not None and voice_volume != action.volume:
+                                                action.volume = voice_volume
+                                                updated = True
+                                            if voice_rate is not None and voice_rate != action.rate:
+                                                action.rate = voice_rate
+                                                updated = True
+
+
+                                            if updated:
+                                                count += 1
+                                                
+                                        
+        if count:
+            # indicate the profile has to be reloaded
+            el = gremlin.event_handler.EventListener()
+            el.request_reload.emit()
+
+        return count
+    
+''' END PROFILE '''
 
 class Mode:
 

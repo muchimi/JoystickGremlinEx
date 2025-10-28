@@ -559,7 +559,7 @@ class ViewInput(gremlin.ui.ui_common.QRememberDialog):
                 add_mode = False
                 mode_object = profile.devices[device_guid].modes[mode]
                 if mode == gremlin.shared_state.master_mode:
-                    mode_name = "Master"
+                    mode_name = gremlin.shared_state.master_mode_name
                 else:
                     mode_name = mode_object.name
                 tree_mode_item = QtWidgets.QTreeWidgetItem([f"Mode: [{mode_name}]"])

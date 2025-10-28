@@ -619,24 +619,19 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.input_item_list_view.redraw()        
             self.select_item(self._last_selected_index)
 
-
-     
-
-
-
     def redraw(self):
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
         ''' updates the list widget '''
         self.input_item_list_view.redraw()
-        
-    def refresh(self, emit = True):
-        """Refreshes the current selection, ensuring proper synchronization."""
-        
-        self._select_item_cb(self.input_item_list_view.current_index, force_update = True, emit = emit)
 
-        # self.redraw()
+    def refresh(self, emit = True):
+        gremlin.util.InvokeUiMethod(self._refresh_ui, emit) # ensure on UI thread
         
-        # if self.input_item_list_view.current_index is not None:
-        #     self._select_item_cb(self.input_item_list_view.current_index, force_update = True)
+    def _refresh_ui(self, emit = True):
+        """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread """
+        self._select_item_cb(self.input_item_list_view.current_index, force_update = True, emit = emit)
 
 
     def _create_change_cb(self, index):

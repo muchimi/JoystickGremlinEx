@@ -1047,7 +1047,8 @@ class VerboseMode(IntFlag):
     Octavi = auto()
     dinput = auto()
     Curve = auto()
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra | Remote | Container | Octavi | dinput | Curve
+    TTS = auto()
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI | ExecDetails | VJoy | State | Extra | Remote | Container | Octavi | dinput | Curve | TTS
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

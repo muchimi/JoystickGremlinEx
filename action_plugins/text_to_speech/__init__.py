@@ -249,12 +249,6 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
     # override default allowed inputs here
-    # input_types = [
-    #     InputType.JoystickAxis,
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
 
     input_types = [
          InputType.JoystickButton,
@@ -272,7 +266,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self._text = ""
         self.volume = config.initial_volume_tts # default volume set in options
         self.rate = config.initial_load_rate_tts # default wpm set in options
-        self.voice_index = 0
+        self.voice_index = config.TTSDefaultVoiceIndex # default voice index
         self._voice_name = ''
         self._abort = False # true if the action aborts any current TTS
         self.clearQueue = False # true if pending items are cleared when new voice items are queued

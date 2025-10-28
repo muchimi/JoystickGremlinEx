@@ -6534,12 +6534,14 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if self._device.vjoy_id != event.vjoy_id:
             return
         if event.input_type in (InputType.JoystickButton, InputType.JoystickHat):
+            
             event = gremlin.event_handler.Event(event_type = event.input_type,
                                                 identifier = event.input_id,
                                                 is_pressed = event.value,
                                                 is_virtual= True,
                                                 device_guid= self.device_guid,
-                                                value = event.value)
+                                                value = event.value,
+                                                )
             gremlin.util.InvokeUiMethod(self._vjoy_button_hat_update_ui, event) # on ui thread
 
     def _vjoy_button_hat_update_ui(self, event : gremlin.event_handler.VjoyEvent):
@@ -6567,7 +6569,9 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                                                 is_virtual=True,
                                                 identifier = event.input_id,
                                                 device_guid = self.device_guid,
-                                                value=event.value)
+                                                value=event.value,
+                                                is_axis = True,
+                                                )
             gremlin.util.InvokeUiMethod(self._vjoy_current_axis_update_ui, event) # on ui thread
 
 

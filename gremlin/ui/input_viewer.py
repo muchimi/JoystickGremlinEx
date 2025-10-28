@@ -107,8 +107,9 @@ class VisualizationConfig():
                 try:
                     tree = etree.ElementTree(root)
                     tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-                except:
-                    pass
+                except Exception as err:
+                    syslog.error("VIZ CONFIG SAVE (write error):")
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
             except Exception as err:
                 syslog.error("VIZ CONFIG SAVE")
                 syslog.error(f"{err}\n{traceback.format_exc()}")

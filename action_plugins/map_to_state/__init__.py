@@ -825,7 +825,6 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             return
 
         verbose = gremlin.config.Configuration().verbose_mode_state
-        input_type = self.action_data.get_input_type()
 
         key = self.action_data.key
         mode = self.action_data.mode
@@ -833,20 +832,18 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         trigger = (is_pressed and self.action_data.exec_on_press) or \
                 (not is_pressed and self.action_data.exec_on_release) or \
                 mode in ("actual","pulse")        
+
+
+
+        input_type = event.getInputType()
         
 
-        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}]")
-        # if not is_pressed:
-        #     self.debug_count += 1
-        #     if self.debug_count == 2:
-        #          self.debug_count = 0
-                
-            # syslog.info("STATE FUNCTOR traceback:")
-            # syslog.info(traceback.format_stack())
-        
+        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}] input type: [{input_type.name}] mode: [{mode}]")
+
+
         if trigger:
             # trigger mode (act as press)
-            match event.event_type:
+            match input_type:
                 case InputType.JoystickButton:
                     # button
                     match mode:

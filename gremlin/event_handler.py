@@ -498,6 +498,7 @@ class EventListener:
 	profile_unhook = Signal() # unhook functors - when profiles stop
 	profile_start = Signal() # profile start signal (when a profile starts)
 	profile_started = Signal() # profile started signal (after a profile starts and all process start functions are completed)
+	profile_after_start = Signal() # occurs after the profile started signal
 	profile_stop = Signal() # profile stop signal (when a profile stops)
 	profile_stopping = Signal() # profile is about to stop (before a profile stops)
 	profile_stopped = Signal() # profile stopped (after a profile stopped)
@@ -711,7 +712,7 @@ class EventListener:
 
 		self.profile_start.connect(self._profile_start)
 		self.profile_stopping.connect(self._profile_stopping_cb)
-		self.profile_started.connect(self._profile_started_cb)
+		self.profile_after_start.connect(self._profile_started_cb)
 		self.options_changed.connect(self._options_changed)
 		
 		
@@ -859,13 +860,15 @@ class EventListener:
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
 						device_guid= device_guid,
 						is_pressed=True,
-						extra_data = extra_data)
+						extra_data = extra_data,
+						override_input_type=InputType.JoystickButton)
 		
 		event_stop_released = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
 						device_guid= device_guid,
 						is_pressed=False,
-						extra_data = extra_data)
+						extra_data = extra_data,
+						override_input_type=InputType.JoystickButton)
 		
 
 		eh = EventHandler()
@@ -891,13 +894,15 @@ class EventListener:
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
 						device_guid= device_guid,
 						is_pressed=True,
-						extra_data = extra_data)
+						extra_data = extra_data,
+						override_input_type=InputType.JoystickButton)
 		
 		event_start_released = Event(InputType.ModeControl, 
 						identifier = gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
 						device_guid= device_guid,
 						is_pressed=False,
-						extra_data = extra_data)
+						extra_data = extra_data,
+						override_input_type=InputType.JoystickButton)
 		
 		
 		
@@ -905,12 +910,15 @@ class EventListener:
 						identifier = mode_enter,
 						device_guid= device_guid,
 						is_pressed=True,
-						extra_data = extra_data)
+						extra_data = extra_data,
+						override_input_type=InputType.JoystickButton
+						)
 		event_enter_released = Event(InputType.ModeControl, 
 						identifier = mode_enter,
 						device_guid= device_guid,
 						is_pressed=False,
-						extra_data = extra_data)
+						extra_data = extra_data,
+						override_input_type=InputType.JoystickButton)
 		
 
 		# read the starting hat states
@@ -2474,8 +2482,15 @@ class EventHandler(QtCore.QObject):
 					
 					# fire mode change control for mode exit (press + release)
 					m1_list, f1_list = self.execute_event(event_exit_pressed)
-					exit_release = Timer(delay, lambda : self._execute_callbacks(event_exit_released, m1_list, f1_list))
+					callback = self._create_change_mode_callback(event_exit_pressed, m1_list, f1_list)
+					exit_release = Timer(delay, callback)
 					exit_release.start()
+
+					callback = self._create_change_mode_callback(event_exit_released, m1_list, f1_list)
+					exit_release = Timer(delay, callback)
+					exit_release.start()
+					
+					# CHANGE THE MODE
 					
 					if validate:
 						result = self.runModeValidator(new_mode)
@@ -2496,7 +2511,12 @@ class EventHandler(QtCore.QObject):
 
 					# fire mode change for mode enter (press + release)
 					m2_list, f2_list = self.execute_event(event_enter_pressed)
-					enter_release = Timer(delay, lambda : self._execute_callbacks(event_enter_released, m2_list, f2_list))
+					callback = self._create_change_mode_callback(event_enter_pressed, m2_list, f2_list)
+					enter_release = Timer(delay, callback)
+					enter_release.start()
+
+					callback = self._create_change_mode_callback(event_enter_released, m2_list, f2_list)
+					enter_release = Timer(delay, callback)
 					enter_release.start()
 
 			else:
@@ -2526,8 +2546,9 @@ class EventHandler(QtCore.QObject):
 			gremlin.util.popCursor()
 
 		
-
-
+	def _create_change_mode_callback(self, event, m_list, f_list):
+		''' gets a return callback for mode changes '''
+		return lambda: self._execute_callbacks(event, m_list, f_list)
 
 	
 

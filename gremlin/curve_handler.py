@@ -768,8 +768,10 @@ class DataPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
         self.y = y
         self.redraw()
 
-
     def redraw(self):
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
         """Forces a position update of the ui element."""
         if not Shiboken.isValid(self):
             return
@@ -810,6 +812,9 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
         self.eh = gremlin.event_handler.EventListener()
 
     def redraw(self):
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
         """Forces a position update of the ui element."""
         if not Shiboken.isValid(self):
             return
@@ -907,8 +912,11 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
 
 
         self.eh = gremlin.event_handler.EventListener()
-
+        
     def redraw(self):
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
         """Forces a position update of the ui element."""
         if not Shiboken.isValid(self):
             return
@@ -1289,6 +1297,8 @@ class CurveView(QtWidgets.QGraphicsScene):
             else:
                 index = -1
             eh.selected_item.emit(self.point_editor, item, index)
+
+
             
 
     def redraw_scene(self):

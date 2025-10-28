@@ -1593,7 +1593,10 @@ class ConditionView(ui_common.AbstractView):
         config.condition_selector = self.condition_selector.currentText()
 
     def redraw(self):
-        """Redraws the entire view."""
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
+        """Redraws the entire view.  must be on UI thread"""
 
         # el = gremlin.event_handler.EventListener()
         # el.condition_redraw.emit(self.model.action_data)

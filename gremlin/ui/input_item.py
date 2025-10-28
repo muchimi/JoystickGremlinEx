@@ -758,8 +758,12 @@ class InputItemListView(ui_common.AbstractView):
         if index != -1:
             self._scroll_to_item(widget)
 
-
     def redraw(self):
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
+        """Redraws the entire view.  must be on UI thread"""
+
         """Redraws the entire model.
         """
         if not Shiboken.isValid(self):
@@ -853,9 +857,11 @@ class InputItemListView(ui_common.AbstractView):
             self.setUpdatesEnabled(True)
             self.update()
 
-
-
     def redraw_index(self, index : int):
+        gremlin.util.InvokeUiMethod(self._redraw_index_ui, index) # ensure on UI thread
+
+
+    def _redraw_index_ui(self, index : int):
         """Redraws the view entry at the given index.
 
         :param index the index of the entry to redraw
@@ -1370,6 +1376,10 @@ class ActionSetView(ui_common.AbstractView):
             self.setStyleSheet("")
 
     def redraw(self):
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
+        """Redraws the entire view.  must be on UI thread"""
 
         if not Shiboken.isValid(self):
             return
@@ -5093,7 +5103,11 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
 
     def redraw(self):
-        """Redraws the entire view."""
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
+        """Redraws the entire view.  must be on UI thread"""
+
         import gremlin.util
         import gremlin.ui.ui_common
         gremlin.util.assert_ui_thread()

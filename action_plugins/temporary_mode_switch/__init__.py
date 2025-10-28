@@ -36,6 +36,7 @@ import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
 import gremlin.util
+from gremlin.util import safe_format, safe_read
 
 syslog = logging.getLogger("system")
 
@@ -53,13 +54,46 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
             return
         self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
         self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
-        self.main_layout.addWidget(self.mode_selector_widget)
+        
         self.ec = gremlin.execution_graph.ExecutionContext()
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._update_modes)
         el.execution_context_changed.connect(self._update_modes)
+
+        self.return_mode_widget = QtWidgets.QCheckBox("Return to specific mode:")
+        self.return_mode_widget.setToolTip("If enabled, the return mode will be the specified mode instead of the last mode.")
+        self.return_mode_widget.clicked.connect(self._change_enable_return_mode)
+
+        self.return_mode_selector_widget =  gremlin.ui.ui_common.QComboBox()
+        self.return_mode_selector_widget.currentIndexChanged.connect(self._return_mode_selected_changed)
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget,"Mode:")
+        self.main_layout.addWidget(widget)
+
+        widget, _ = gremlin.ui.ui_common.getHContainer([self.return_mode_widget, self.return_mode_selector_widget])
+        self.main_layout.addWidget(widget)
+
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
+        self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
+
+        self.main_layout.addWidget(self._execute_widget)
+
+
         self._update_modes_ui()
 
+    @QtCore.Slot(bool)
+    def _execute_on_press_changed(self, checked : bool):
+        self.action_data.exec_on_press = checked
+
+    @QtCore.Slot(bool)
+    def _execute_on_release_changed(self, checked : bool):
+        self.action_data.exec_on_release = checked  
+
+    @QtCore.Slot(bool)
+    def _change_enable_return_mode(self, checked : bool):
+        self.action_data.enable_return_mode = checked
+        self.return_mode_selector_widget.setEnabled(checked)
 
     def _update_modes(self):
         gremlin.util.InvokeUiMethod(self._update_modes_ui) # ensure on UI method
@@ -69,29 +103,42 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
         # update the list of available modes 
         if not Shiboken.isValid(self.mode_selector_widget):
             return
-        with QtCore.QSignalBlocker(self.mode_selector_widget):
-            current_mode = self.action_data.mode # current mode
-            self.mode_selector_widget.clear()
-            
+        with QtCore.QSignalBlocker(self.return_mode_widget):
+            self.return_mode_widget.setChecked(self.action_data.enable_return_mode)
 
-            # remove the current mode so we cannot switch to ourselves
-            
-            modes = self.ec.getModeNames(as_tuple=True, include_current = False) # (display, mode)
-            if not modes:
-                # allow to select self if that's the only option (display, mode)
-                modes = self.ec.getModeNames(as_tuple=True)
+        with QtCore.QSignalBlocker(self.mode_selector_widget):
+            with QtCore.QSignalBlocker(self.return_mode_selector_widget):
+                current_mode = self.action_data.mode # current mode
+                self.mode_selector_widget.clear()
+                self.return_mode_selector_widget.clear()
                 
-            index = 0
-            select_index = None
-            for display, mode in modes:
-                #print (f"Mode: {display} -> {mode}")
-                self.mode_selector_widget.addItem(display, mode)
-                if select_index is None and mode == current_mode and current_mode is not None:
-                    select_index = index
-                index += 1
-            if select_index is not None:
-                with QtCore.QSignalBlocker(self.mode_selector_widget):
-                    self.mode_selector_widget.setCurrentIndex(select_index)
+
+                # remove the current mode so we cannot switch to ourselves
+                
+                modes = self.ec.getModeNames(as_tuple=True, include_current = False) # (display, mode)
+                if not modes:
+                    # allow to select self if that's the only option (display, mode)
+                    modes = self.ec.getModeNames(as_tuple=True)
+                    
+                index = 0
+                select_index = None
+                for display, mode in modes:
+                    #print (f"Mode: {display} -> {mode}")
+                    self.mode_selector_widget.addItem(display, mode)
+                    self.return_mode_selector_widget.addItem(display, mode)
+                    if select_index is None and mode == current_mode and current_mode is not None:
+                        select_index = index
+                    index += 1
+                if select_index is not None:
+                        self.mode_selector_widget.setCurrentIndex(select_index)
+
+                if self.action_data.enable_return_mode and self.action_data.return_mode:
+                    # select the correct return mode if specified
+                    index = self.return_mode_selector_widget.findData(self.action_data.return_mode)
+                    if index != -1:
+                        self.return_mode_selector_widget.setCurrentIndex(index)
+
+        self.return_mode_selector_widget.setEnabled(self.action_data.enable_return_mode)
 
         # ensure the displayed mode is saved
         mode = self.mode_selector_widget.currentData()
@@ -102,6 +149,12 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
             return
         mode = self.mode_selector_widget.currentData()
         self.action_data.mode = mode                
+
+    def _return_mode_selected_changed(self):
+        if not Shiboken.isValid(self.return_mode_selector_widget):
+            return
+        mode = self.return_mode_selector_widget.currentData()
+        self.action_data.return_mode = mode
 
 
     def _populate_ui(self):
@@ -128,14 +181,24 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
         import gremlin.shared_state
         verbose = gremlin.config.Configuration().verbose
 
+        trigger = (event.is_pressed and self.action_data.exec_on_press) \
+            or (not event.is_pressed and self.action_data.exec_on_release)
+        if trigger:
 
-
-        if event.is_pressed:
             next_mode = self.action_data.mode
             current_mode = gremlin.shared_state.runtime_mode
+            
+            if self.action_data.enable_return_mode and self.action_data.return_mode is not None:
+                return_mode = self.action_data.return_mode
+            else:
+                return_mode = current_mode
+
+            if verbose: syslog.info(f"Temporary mode change: [{current_mode}] - next mode: [{next_mode}] - return mode: [{return_mode}] - specific mode to return: [{'enabled' if self.action_data.enable_return_mode else 'disabled'}]")
+
+
             if next_mode != current_mode:
                 self.action_data.restore_mode = current_mode
-                gremlin.input_devices.ButtonReleaseActions().register_callback(lambda : self._restore_callback(current_mode), event)
+                gremlin.input_devices.ButtonReleaseActions().register_callback(lambda : self._restore_callback(return_mode), event)
                 gremlin.event_handler.EventHandler().change_mode(next_mode)
              
             else:
@@ -201,7 +264,12 @@ When the trigger is released, the mode reverts to the prior mode.'''
             elif node.parent:
                 mode = node.parent.name
         self._mode = mode
+        self.enable_return_mode = False # true if the return mode is enabled instead of the last mode
+        self.return_mode = None # if set, returns to that mode instead of the prior mode
         self.restore_mode = None # set at runtime - holds the mode to restore
+
+        self.exec_on_press = True # true if the mode should execute on input press
+        self.exec_on_release = False # true if the mode should execute on input release
 
     @property
     def mode(self) -> str:
@@ -235,10 +303,22 @@ When the trigger is released, the mode reverts to the prior mode.'''
 
     def _parse_xml(self, node, data = None, extra_data = None):
         self._mode = node.get("name")
+        if "return-mode-enabled" in node.attrib:
+            self.enable_return_mode = safe_read(node, "return-mode-enabled", bool, False)
+        if "return-mode" in node.attrib:
+            self.return_mode = node.get("return-mode")
+            
+        self.exec_on_press = safe_read(node,"exec-on-press", bool, True)
+        self.exec_on_release = safe_read(node,"exec-on-release", bool, False)
 
     def _generate_xml(self):
         node = ElementTree.Element("temporary-mode-switch")
         node.set("name", self._mode)
+        node.set("return-mode-enabled", safe_format(self.enable_return_mode, bool))
+        node.set("return-mode", safe_format(self.return_mode, str))
+
+        node.set("exec-on-press", safe_format(self.exec_on_press, bool))
+        node.set("exec-on-release", safe_format(self.exec_on_release, bool))
         return node
 
     def _is_valid(self):
@@ -248,8 +328,12 @@ When the trigger is released, the mode reverts to the prior mode.'''
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
         table = ReportTable(cellpadding=4) 
-        
         table.addField("Mode", self.mode)
+        table.addField("Return mode", 'last mode' if not self.enable_return_mode else self.return_mode)
+        if self.exec_on_press:
+            table.addField("Exec (press)", "Yes")
+        if self.exec_on_release:
+            table.addField("Exec (release)", "Yes")
 
         return table.to_html()
 

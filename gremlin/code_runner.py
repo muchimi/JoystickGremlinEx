@@ -696,7 +696,8 @@ class CodeRunner:
             load_state = gremlin.shared_state.profile_state
             if load_state:
                 # profile state ok = profile started correctly
-                el.profile_started.emit()
+                el.profile_started.emit() # start event
+                el.profile_after_start.emit() # after start event
 
             # change to the start mode
             if verbose:syslog.info(f"Using profile start mode: '{mode}'")

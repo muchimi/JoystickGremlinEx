@@ -56,7 +56,7 @@ class TextToSpeech:
         self._last_hash = None
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose
+        verbose = config.verbose_mode_tts
 
         try:
             self.engine = pyttsx3.init()
@@ -131,7 +131,7 @@ class TextToSpeech:
         if text:
 
             config = gremlin.config.Configuration()
-            verbose = config.verbose
+            verbose = config.verbose_mode_tts
 
             
             if config.tts_suppress_duplicate:
@@ -175,7 +175,7 @@ class TextToSpeech:
     def _speak_single_ui(self, text, rate = None, clear = False, threaded = True):        
         if text and self.valid:
             # syslog = logging.getLogger("system")
-            verbose = gremlin.config.Configuration().verbose
+            verbose = gremlin.config.Configuration().verbose_mode_tts
             if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
             self._lock.acquire_lock()
             if clear:
@@ -198,7 +198,7 @@ class TextToSpeech:
             self.engine.setProperty('rate', new_rate)
             self.engine.say(text)
 
-            verbose = gremlin.config.Configuration().verbose
+            verbose = gremlin.config.Configuration().verbose_mode_tts
             if verbose: syslog.info(f"TTS: Engine speech requested: {text}")
 
             try:
@@ -278,7 +278,7 @@ class TextToSpeech:
         ''' processes the speech queue '''
         # syslog = logging.getLogger("system")
         threading.current_thread().reset()
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_tts
         while not self._queue_thread.stopped():
             if self._queue:
                 self._lock.acquire_lock()

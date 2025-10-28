@@ -14,8 +14,19 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T91)
+- New: Temporary Mode Switch gains exec on press/release options.
+- New: Feature Request. Temporary Mode Switch gains a feature to name a mode to switch back to after the temporary mode switch.
+- New: Feature Request. TTS global options gains a default voice selector.  
+- New: TTS global options gains apply buttons for selected voice, volume and playback rate.  The apply button will apply the corresponding default to existing TTS entries in the profile.
+- New: Verbose mode gains a TTS mode for TTS log output.
+- Fix: further hardening for garbage collection and threading issues with QT C++
+- Fix: Profile startup events not using correct override input types, causing actions to ignore the trigger (profile start/stop handling).
+- Fix: Profile startup event sequencing changed to allow status flags to update before profile start/stop events are triggered.
+- Fix: Mode entry / exit actions gain a press and release event (previously would only fire the press event).  Note: there is no delay between events, they are fired sequentially one after the other.  Mapped actions should account for this behavior.  This will resolve some actions not receiving two events for for actions mapped to mode changes in the mode device tab.
+
 ### (m76T90)
-- Fix: continued work on fatal windows exception (C++ error) in Python linked to the option window.
+- Fix: proposed fix for fatal windows exception (C++ error) in Python linked to the option window.
 - Fix: on UI refresh, axis input repeaters (bars) may be throttled (not update regularly)
 
 

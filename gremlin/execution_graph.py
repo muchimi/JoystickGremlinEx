@@ -184,7 +184,7 @@ class ExecutionGraphModeNode(ExecutionGraphNode):
     def to_string(self):
         mode = self.mode
         if mode == gremlin.shared_state.master_mode:
-            mode = "Master"
+            mode = gremlin.shared_state.master_mode_name
         stub = f"Mode: [{mode}]"
         return f"{self.node_string()} {stub}"
 
@@ -1572,7 +1572,7 @@ class ExecutionContext():
                         syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.device.name}")
                         continue
 
-                    
+
 
                     mode_item = mode_nodes[mode_name]
                     mode_node = ExecutionGraphModeNode()
@@ -1838,6 +1838,8 @@ class ExecutionContext():
                 functor_list = node.getActionFunctors()
                 if functor_list:
                     for functor in functor_list:
+                        if functor.__class__.__name__ == "MapToStateFunctor":
+                            pass
                         action_result =  self.process_functor(functor, event, value, extra_data, manual)
                         description = str(functor.action_data)
                         if verbose_exec: 
