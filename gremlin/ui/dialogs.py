@@ -781,6 +781,8 @@ class OptionsUi(ui_common.BaseDialogUi):
             widget.clicked.connect(self._theme_changed)
             widgets.append(widget)
 
+        widgets.append("(Restart Required)")
+
         self.theme_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
         self.theme_widget.setToolTip("Theme changes take effect at the next start.")
 
@@ -3999,13 +4001,19 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
         self.open_files_widget = gremlin.ui.ui_common.QDataCheckbox("View output",
                                                                     tooltip = "Opens the report after viewing using the system default viewer",
                                                                     callback = self._handle_open_files_changed, 
-                                                                    value = self.config.ReportPdfEnabled)
+                                                                    value = self.config.ReportOpenFilesEnabled)
+        
+        self.show_files_widget = gremlin.ui.ui_common.QDataCheckbox("Open Folder",
+                                                                    tooltip = "Opens the report folder",
+                                                                    callback = self._handle_show_folder_changed, 
+                                                                    value = self.config.ReportShowFolder)
 
         self.main_layout.addWidget(label)
         widgets = [
             self.pdf_widget,
             self.svg_widget,
             self.open_files_widget,
+            self.show_files_widget,
             gremlin.ui.ui_common.QHorizontalLine()
         ]
         widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
@@ -4036,6 +4044,10 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
          self.config.ReportOpenFilesEnabled = checked
 
     
+    @QtCore.Slot(bool)
+    def _handle_show_folder_changed(self, checked):
+         self.config.ReportShowFolder = checked
+    
 
     @QtCore.Slot()
     def _ok_button_cb(self):
@@ -4047,6 +4059,7 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
         options.export_pdf = self.config.ReportPdfEnabled
         options.export_svg = self.config.ReportSvgEnabled
         options.open_files = self.config.ReportOpenFilesEnabled
+        options.show_folder = self.config.ReportShowFolder
 
         report.generate(options)
         self.close()

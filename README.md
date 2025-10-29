@@ -14,6 +14,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T92)
+- New: added states to the profile visualizer.
+- New: added open folder option to profile visualizer.
+- New: PDF or SVG files will be named after the profile being visualized - a new indexed file will be created if an older file exists.
+- Fix: TTS global setting change didn't find actions mapped to states (new feature in T90).
+- Fix: additional gated axis UI hardening for threading/QT garbage collection challenges.  These can cause random Python environment hard crashes.
+- Fix: Configuration readers handle mode lookups for actions attached to inputs that have no mode (example, states).  This could cause a profile read exception in some situations.
+- Updated documentation at https://muchimi.github.io/JoystickGremlinEx/
+
 ### (m76T91)
 - New: Temporary Mode Switch gains exec on press/release options.
 - New: Feature Request. Temporary Mode Switch gains a feature to name a mode to switch back to after the temporary mode switch.

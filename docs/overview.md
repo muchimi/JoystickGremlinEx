@@ -6,51 +6,47 @@ GremlinEx is oriented towards simpits and hardware vendor integration, without t
 
 The integration piece comes from the ability to combine inputs together into a logical output via a set of filters and transformations, and output this to applications running on the same system.
 
-## What can GremlinEx do?
+## Key Features: What can GremlinEx do?
 
 This is a high level summary of some of the feature set in GremlinEx.
 
 ### Mapping and transforms
 
-GrmelinEx takes input such as a physical USB joystick, keyboard, mouse, and other specialized input devices like a state, and lets you apply a mapping, also known as a transform, to each button, axis, hat, or more complex inputs such as latched keys (one or more keypress combination), and other input such as MIDI or OSC input (described below).
+GrmelinEx takes input such physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages, and lets you apply a mapping, also known as a transform, to each input.  GremlinEx supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).
 
-The mapping process can have logic applied to it, such as conditions, so that the mapping can be conditional on a specific context being true.  This can be "is this button also pressed", "is this axis value in this range", "are these keys also pressed", "is this state off", all in various combinations.
+The mapping process can have logic applied to it, such as conditions, so that the mapping can be conditional on a specific context being true.  This can be "is this button also pressed", "is this axis value in this range", "are these keys also pressed", "is this state off", all in various combinations.  Conditions work across all inputs so one input can be used to manage the mapping of another device.
 
 Axis (linear) input can be curved and calibrated.  In fact, multiple curves can be applied, and the curves can be conditional as well.  For example, you can invert an axis but only if a condition is true, and when the condition is false, the axis will not be inverted.
 
-GremlinEx can also combine axes together and derive an output value based on the simultaneous input - scenarios that are helpful in flight simulation for trim, space sims for throttles, and for combining toe-brakes on a rudder in a single axis if the game doesn't support separate mappings.
-
-GremlinEx can do multiple mappings concurrently - so the input can be routed to different outputs depending on the need, and this can be changed dynamically on the fly.
+GremlinEx handles multiple inputs and outputs concurrently.  Routing can change mappings based on conditions, modes and states, and this can be changed dynamically on the fly.
 
 As of M76T68, GremlinEx supports using vJoy as an input and output device simultaneously.  This enables scenarios where an input in GremlinEx triggers map to a vJoy device, and when that vJoy device changes, it triggers an input back into GremlinEx to trigger more actions.  This can create loops, so care should be excercised to not build a loop regardless of the sequence of events.  GremlinEx does not check for loops as they are too expensive performance wise to detect and guard against at runtime.
 
-### Benefits
-
-#### Agreggation of multiple devices
+### Agreggation of multiple devices
 
 GremlinEx is designed to simplify mapping for a game or application so that the application has much fewer devices to map.  The first major benefit is to reduce the number of input devices, as many titles only "see" a few joysticks, and if you have a simpit, you could have left, right, center controllers all connected at the same time, and you may use some of them, or all of them, to map to the same input.  This can be very difficult to do in some games.
 
 GremlinEx is vendor agnostic so any mapping software that is proprietary to a particular manufacturer does not need to be used in most cases.  GremlinEx will use the raw device capabilities as seen by Windows, so as long as the device shows in Windows without software as a game controller, GremlinEx can create mappings for it.
 
-#### Dynamic routing
+### Dynamic routing
 
 Because GremlinEx has conditions and modes and states, you can "route" the input to different outputs, as well as modify the output in a dynamic way. You can take a single input and map it to different outputs depending on what you need.  So a toe brake on a rudder can become an accelerator or brake pedal for a vehicle on the ground, or an up/down strafe if you are in a spaceship, or plain toe brakes if you are in an airplane with differential left and right brakes.   You can have a button that is normally your primary trigger button control different weapon groups depending on the mode GremlinEx is in.  An axis can inverted dynamically, or different response curves applied to control, for example sensitivity.
 
-#### In-game mapper augmentation
+### In-game mapper augmentation
 
 GremlinEx can achieve very complex mappings that are not supported by a game.  It can take complicated inputs (such as from multiple controllers) and map it to something the game does support, and the game does not need to be aware of these inputs, as it will not see them.  The game will only see a supported command.
 
 For example, you can combine inputs such as a keyboard key in combination with a joystick button and map that to a unique function in the game, even if the buit-in game mapper does not support these kinds of cross-hardware combinations.
 
-#### Easy mapping to game defaults
+### Easy mapping to game defaults
 
 Certain titles have less than ideal mappings, for example, not supporting DirectInput joysticks but having support for a console game controller.   GremlinEx can bridge this gap by producing output the game expects, even if the game doesn't support specific inputs that GremlinEx supports.
 
 It is generally recommended to use GremlinEx to map to default settings in a game, which avoids having to change mappings in the game itself.  This can greatly simplify game mapping for simulators in particular.
 
-#### Using glass surfaces and input panels like Streamdeck
+### Input and output from/to glass surface panels (touchscreens)
 
-GremlinEx can map input from glass surfaces (touch screens) and hardware panels like Streamdeck using the OSC protocol using open source software.
+GremlinEx map input from/to glass surfaces (touch screens) and hardware panels like Streamdeck using the OSC protocol using open source software.  Using OSC open source software like Open Stage Control, you can design custom glass surface input screens and map them over the network to GremlinEx.   GremlinEx supports both message triggers, and axis including multi-axis data inboud from a glass surface, such as a slider or an XY pad.  
 
 #### Networked devices support
 
@@ -104,31 +100,33 @@ Rare: If you need to apply different calibrations to each device on a per profil
 
 ### Axis gating and processing
 
-GremlinEx supports several options when it comes to split and manipulate an input axis.  On the simpler side, GremlinEx provides a stepped axis action to split the input into a number of steps.  GremlinEx can also, via the vjoy mapper, map an axis to buttons based on position within the range.
+GremlinEx supports several axis splitting tools, including the advanced Gated Axis that introduces the notion of gates (fixed points on an axis) and the ranges between them.  Gates and ranges have their own trigger points.  Gated axis is aware of when a gate is crossed, the direction the crossing happened, and if the current position is entering or exiting a range, outside a range, or within a range.
 
-GremlinEx also introduces Gated Axis which enables advanced options to map an input axis. Gated Axis lets you define fixed points on an axis called gates.  Gates create ranges (a section of linear input between two gates).
+GremlinEx can trigger separate mappings (actions) when the input axis crosses a gate or is within a range.
 
-GremlinEx can trigger separate mappings (actios) when the input axis crosses a gate.  Different actions can be taken depending on how the gate is crossed.  Ranges also have mappings, two of which are momentary triggers on range entry, range exit, and a linear one for when the input is in range.  
+Because each gate or range has its own separate triggers, it allows for very detailed and customized control of mappings at specific points, or within ranges of the axis or slider.
 
-Because each Gated Axis trigger has its own mapping, more sophisticated handling of a single axis input can be applied at the subrange level.
-
-Gated Axis can be used for example
+#### Gated Axis Examples
 
 - to implement gates on an axis like on aircraft throttles, such as the F16, A10, Airbus throttle or a turboprop aircraft for flight simulation and helicopter collectives, and thrust reverse mapping.
-- to implement different actions based on the direction of travel when the input crosses a particular point.
+- to trigger different output based on the direction of travel when the input crosses a particular point.
 - to implement multiple response curves on the same axis by section.
 - to split an axis into several non linear ranges, each with its own output curve, scale, direction, including no output/deadzones.
 - to trigger outputs based on the direction of travel on the input, so a trigger passing through a point going up can be different from a trigger of the same point going down.
+- to scale output within a range
+- to setup deadzones or fixed value zones within an axis (no output or fixed output while in range)
+- to support gated hardware or physical detents on input hardware that does not trigger inputs at these locations
+- to implement virtual hardware detents if the hardware does not support physical detents
 
 ### Axis merging
 
-GremlinEx's vjoy mapper can merge multiple input axes, including from different devices, and apply min, max, average and sum operations to the merged data.
+GremlinEx's vjoy mapper can merge multiple input axes (two or more) from the same or different devices.  Each merge can apply a specific calculation such as min, max, average and sum operations to the merged data.  Scaling of one axis with another is also supported.
 
 A use-case for this feature is the need to combine two inputs into a single output, such as brake pedal toe-brakes to a single linear axis (used in Star Citizen staffe for example).
 
 Another use case is to scale one axis with another.
 
-### Integrates with Elgato Streamdeck, LoupeDeck and any support panels by BitFocus Companion
+### Integrates with Elgato (R) Streamdeck, LoupeDeck and any support panels by BitFocus Companion
 
 GremlinEx integrates with any control surface supported by [BitFocus Companion](https://bitfocus.io/companion) via the OSC protocol.  This is a two way communication so GremlinEx can accept OSC messages triggered by Bitfocus Companion, and send messages back to BitFocus Companion to update the panels.  With this integration, it is possible for GrmelinEx to accept input, and send data back to hardware panels connected locally and on the network.
 
@@ -157,13 +155,23 @@ Note: Windows is currently not able to support input from a touch screen without
 
 ### Supports MIDI inputs
 
-GremlinEx can accept input from a MIDI controller.  These controllers like the Korg Mini include buttons and faders that can be used to map to a game.  Many MIDI control surfaces, while using an older protocol, can still be effective in a simpit due to the number of knobs, faders and buttons typically available on a MIDI controller.  It's also possible to network MIDI via [RTP-MIDI](https://www.tobias-erichsen.de/software/rtpmidi.html).
+GremlinEx can accept input from older MIDI controllers.  These controllers like the Korg Mini include buttons and faders that can be used to map to a game.  Many MIDI control surfaces, while using an older protocol, can still be effective in a simpit due to the number of knobs, faders and buttons typically available on a MIDI controller.  It's also possible to network MIDI via [RTP-MIDI](https://www.tobias-erichsen.de/software/rtpmidi.html).
 
 To use local MIDI devices, a [MIDI loopback tool](https://www.tobias-erichsen.de/software/loopmidi.html) will typically be needed to make the necessary ports available.  
 
 ### State machine
 
-GremlinEx implements a state machine.  A state is a binary entity that has either an on/pressed state, or an off/released state.   States can be set or cleared via any GremlinEx input. A state can be defined using other states using boolean expressions, and any expression state evaluates its value if one of the states in the expression changes values.  States behave like input buttons, so mapping can be attached to states and they will trigger a press or release whenever the state changes.  States are defined per profile and are mode agnostic.
+GremlinEx implements a state machine.  A state is a binary entity that has either an on/pressed state, or an off/released state.  A state can be seen as a virtual button, or a boolean (on/off) variable inside a profile.
+
+States can be set or cleared via any GremlinEx input using the Map to State action.
+
+The value of a state can also be defined using other states using boolean expressions.  In this mode, a state gets its value from a computation of the dependent states in the expression.  This value is updated whenevever one of the states in the expression changes values. 
+
+States look like input buttons to containers and actions, so any mapping that can be attached to a button can be attached to a state as well.  
+
+States can also be used as conditions.
+
+States are mode agnostic - so they exist all the time in a profile, and can be accessed by any mode, or set by any mode.
 
 This feature allows simple, yet interesting grammar based control schemes, such as conditions and compound mappings.  States generally simplify complex mapping scenarios.
 
@@ -171,17 +179,18 @@ States can be set from any input via the "map to state" action or from a macro.
 
 States auto-update if the state is an expression and a dependent state changes.
 
-States can be used as conditions.
+States trigger both a press and release event, so to actions look like any joystick button and no different from pressing and releasing a physical button.
 
-States trigger both a press and release, so to actions look like any joystick button.
+Because there is no limit to the number of states a profile can have, states can be also viewed as virtual button pads.
 
-Some examples of where states can be used in a profile:
 
-- a state can simplify mappings by mapping actions to a state rather than multiple copies on inputs, which makes mapping management simpler. Each input sets or clears the state, and the state triggers the mapping when the value changes.
-- profile wide conditions, because states are mode agnostic and global to a profile.  If you set a state, it can be used from within any mode. A state can be used as a condition.
-- latching multiple inputs.  Some states can be defined as A or B or C, or A and B or C or any boolean expression.  So each state A, B and C can be controlled by different inputs, and the final mapping only executing when the condition of the expression is set, even if the inputs come from different sources (hardware, OSC, MIDI or keyboard/mouse).
-- simple [state machine grammar](https://en.wikipedia.org/wiki/Finite-state_machine) implementation
-- states can often act as a mode or even replace some mode scenarios, or work with modes for sophisticated mapping scenarios.
+#### Examples of state usage
+
+- A state can be set by multiple inputs, enabling shared used of mappings between devices.  This avoids having a copy of the same mapping for differentt inputs, and reduces the maintenance load if the mapping needs to change.
+- States can be used as a condition that itself is based on multiple other states using the expression capability.
+- Setup a simple [state machine grammar](https://en.wikipedia.org/wiki/Finite-state_machine) implementation
+- States can often replace modes, or be used as sub-modes within a mode.
+- States replace the need to use VJOY as input which is far more performing and flexible than using VJOY as both output and input into a profile to add virtual buttons.
 
 ### Modes
 
@@ -248,6 +257,12 @@ GremlinEx exposes much of its internal API to custom Python based modules that c
 Plugins can be used to set LEDs, or do complex logic that would be difficult to do with states and conditions alone.
 
 User-defined mapping plugins and containers can also be created and installed into GremlinEx.  These need to meet specific requirements and allow custom expansion of GremlinEx capabilities.  Most containers and actions in GremlinEx are implemented using these plugins.
+
+### Visualization
+
+As of m76T85, GremlinEx can create a graphical view of a profile leveraging the open source [GraphViz library](https://graphviz.org/).  This creates a PDF or SVG visual graph of the profile (PDF is recommended)
+
+![Visualization](assets/visualization.png)
 
 ## Supported environments
 

@@ -1562,7 +1562,8 @@ class ExecutionContext():
                 import gremlin.ui.state_device
                 sd = gremlin.ui.state_device.StateData()
                 input_items = sd.getInputItems()
-                self._build_input(device_node, input_items, device_node, "")
+                if input_items:
+                    self._build_input(device_node, input_items, device_node, "")
             else:
                 # mode mapped device
             

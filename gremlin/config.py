@@ -2715,6 +2715,13 @@ class Configuration(QtCore.QObject):
         self._set_data("ReportOpenFilesEnabled", value)        
 
     @property
+    def ReportShowFolder(self) -> bool:
+        return self._get_data("ReportShowFolder", False)
+    @ReportShowFolder.setter
+    def ReportShowFolder(self, value : bool):
+        self._set_data("ReportShowFolder", value)        
+
+    @property
     def TTSDefaultVoiceIndex(self) -> int:
         return self._get_data("TTSDefaultVoiceIndex", 0)
     @TTSDefaultVoiceIndex.setter

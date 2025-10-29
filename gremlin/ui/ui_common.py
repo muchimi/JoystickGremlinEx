@@ -243,7 +243,7 @@ class Color():
         return "#458ae6"
     @staticmethod
     def buttonBackgroundColor():
-        return "#414141" if gremlin.shared_state.is_dark_theme else "#414141"
+        return "#414141" if gremlin.shared_state.is_dark_theme else "#9B9B9B"
     @staticmethod
     def buttonColor():
         return Color.normalColor()
@@ -281,7 +281,7 @@ class Color():
         return "#5A725A" if gremlin.shared_state.is_dark_theme else "#678867"
     @staticmethod
     def inputTitleUnselectedColor(): # color for the input title bar
-        return "#3A3A3A" if gremlin.shared_state.is_dark_theme else "#7C7C7C"
+        return "#3A3A3A" if gremlin.shared_state.is_dark_theme else "#C9C9C9"
     @staticmethod
     def repeaterColor(): # color for repeaters
         return "#0C8D12"

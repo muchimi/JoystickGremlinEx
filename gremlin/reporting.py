@@ -72,6 +72,7 @@ class ReportOptions():
         self.export_pdf = True
         self.export_svg = True
         self.open_files = True
+        self.show_folder = False
     
 
 class ReportCell():
@@ -435,7 +436,7 @@ class ReportEngine():
                 mode_object : gremlin.base_profile.Mode = node.data
                 mode = mode_object.name
                 if mode == gremlin.shared_state.master_mode:
-                    mode = "Master Mode"
+                    mode = gremlin.shared_state.master_mode_name
 
                 table = ReportTable(cellpadding=4)
                 table.addField("Mode",html.escape(mode))
@@ -615,21 +616,39 @@ class ReportEngine():
 
         root = ReportNode(ReportNodeType.Root)
 
+
         
         for device in profile.devices.values():
             device_node = ReportNode(ReportNodeType.Device, data = device)
-            for mode_object in device.modes.values():
-                mode_node = ReportNode(ReportNodeType.Mode, data = mode_object)
+            
 
-
-                for input_type in mode_object.config.keys():
-                    for input_item in mode_object.config[input_type].values():
-                        if input_item.containers:
-                            if not device_node.parent:
-                                device_node.parent = root
-                            if not mode_node.parent:
-                                mode_node.parent = device_node
-                            self.generate_input_item(input_item, mode_node)
+            # special handling of state device
+            if device.device_type == gremlin.types.DeviceType.State:
+                # state device (modeless) - special handling of state input items
+                state_data = gremlin.shared_state.current_profile.state
+                input_items = [state_data[key].input_item for key in state_data]
+                if input_items:
+                    device_node.parent = root
+                    mode_object = gremlin.base_profile.Mode(device)
+                    mode_object.name = gremlin.shared_state.master_mode_name
+                    mode_node = ReportNode(ReportNodeType.Mode, data = mode_object)
+                    mode_node.parent = device_node
+                for input_item in input_items:
+                    self.generate_input_item(input_item, mode_node)
+              
+             
+            else:
+                # non state device
+                for mode_object in device.modes.values():
+                    mode_node = ReportNode(ReportNodeType.Mode, data = mode_object)
+                    for input_type in mode_object.config.keys():
+                        for input_item in mode_object.config[input_type].values():
+                            if input_item.containers:
+                                if not device_node.parent:
+                                    device_node.parent = root
+                                if not mode_node.parent:
+                                    mode_node.parent = device_node
+                                self.generate_input_item(input_item, mode_node)
                                            
         
 
@@ -758,16 +777,33 @@ class ReportEngine():
 
 
         try:
-            view = options.open_files
+            
+            # get a report file matching the profile
+            file_base, _ = os.path.splitext(profile.profile_file)
+            
             if options.export_pdf:
-                pdf_file = gremlin.util.getTemporaryFile() # graphviz adds the .pdf
+                pdf_file = gremlin.util.next_file(file_base + ".pdf", False)
                 s = graphviz.Source.from_file(dot_file)
-                s.render(pdf_file, format='pdf', view=view, cleanup=True)
+                s.render(pdf_file, format='pdf', view=False, cleanup=False)
+                pdf_file += ".pdf"
             if options.export_svg:
-                       
-                svg_file = gremlin.util.getTemporaryFile()# graphviz adds the .svg
+                svg_file = gremlin.util.next_file(file_base + ".svg", False)
                 s = graphviz.Source.from_file(dot_file)
-                s.render(svg_file, format='svg', view=view, cleanup=True)
+                s.render(svg_file, format='svg', view=False, cleanup=False)
+                svg_file += ".svg"
+
+            if options.show_folder:
+                # open the file in the folder
+                if options.export_pdf and os.path.isfile(pdf_file):
+                    gremlin.util.open_folder(pdf_file)
+                elif options.export_svg and os.path.isfile(svg_file):
+                    gremlin.util.open_folder(svg_file)
+
+            if options.open_files:
+                if options.export_pdf and os.path.isfile(pdf_file):
+                    gremlin.util.display_file(pdf_file)
+                if options.export_svg and os.path.isfile(svg_file):
+                    gremlin.util.display_file(svg_file)
 
             os.unlink(dot_file) # clean up
         except Exception as err:

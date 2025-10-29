@@ -2178,7 +2178,19 @@ Warning: By design, there are no guardrails with states, so loops are possible, 
 
 ## State Condition
 
-The state condition is used to apply conditional execution on a container or action based on the current value of a state.  The condition will prompt for the name of the state, and whether the c
+The state condition is used to apply conditional execution on a container or action based on the current value of a state.  The condition will prompt for the name of the state, and whether the condition should be pressed or released.
+
+## Profile visualization
+
+GremlinEx can create a directed graph in PDF or SVG formats of a profile, provided that you have the open source [GraphViz library](https://graphviz.org/) installed.   Graphviz will be configured and executed by GremlinEx to produce the relevant files.
+
+The visualizer dialog is accessible from the Tools menu under Tools/Profile Visualization.
+
+![profile visualization](assets/profile_visualization_dialog.png)
+
+WARNING: generated SVG files can be quite large (several megabytes) compared to a PDF file.
+
+GremlinEx currently does not do any pagination of a profile.  This can be done if needed with an external application.  The purpose of the PDF is not to print, but to visualize the profile graph on a screen using a viewer can can be zoomed in and moved to any location.
 
 ## User Scripts (plugins)
 

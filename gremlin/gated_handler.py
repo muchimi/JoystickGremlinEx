@@ -3439,8 +3439,6 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         gh.display_mode_changed.connect(self._display_mode_changed)
         gh.gate_index_changed.connect(self._gate_index_changed)
 
-        
-
         self._create_widget(gate, 
                             configure_handler,
                             delete_confirm_handler,
@@ -3474,23 +3472,29 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
     def cleanup(self):
         self.value_widget.valueChanged.disconnect(self._value_changed_cb) # hook manual changes made to the widget
-        eh = GateEventHandler()
-        eh.gate_used_changed.disconnect(self._gate_used_changed)
-        eh.gate_value_changed.disconnect(self._gate_value_changed)
-        eh.gate_configuration_changed.disconnect(self._gate_configuration_changed)
-        eh.display_mode_changed.disconnect(self._display_mode_changed)
-        
+        gh = GateEventHandler()
+        gh.gate_used_changed.disconnect(self._gate_used_changed)
+        gh.gate_value_changed.disconnect(self._gate_value_changed)
+        gh.gate_configuration_changed.disconnect(self._gate_configuration_changed)
+        gh.display_mode_changed.disconnect(self._display_mode_changed)
+        gh.gate_index_changed.disconnect(self._gate_index_changed)
 
-    @QtCore.Slot(GateInfo)
     def _gate_used_changed(self, gate):
         ''' called when the usage flag changes '''
-        if gate.id == self.gate.id:
+        gremlin.util.InvokeUiMethod(self._gate_used_changed_ui, gate)
+
+    def _gate_used_changed_ui(self, gate):
+        ''' called when the usage flag changes '''
+        if Shiboken.isValid(self) and gate.id == self.gate.id:
             self.setVisible(gate.used)
 
-    @QtCore.Slot(GateInfo)
+    
     def _gate_value_changed(self, gate):
+        gremlin.util.InvokeUiMethod(self._gate_value_changed_ui, gate)
+
+    def _gate_value_changed_ui(self, gate):
         ''' called when the gate value changes '''
-        if gate.id == self.gate.id:
+        if Shiboken.isValid(self) and gate.id == self.gate.id:
             verbose = gremlin.config.Configuration().verbose_mode_gate
             if verbose: syslog.info(f"GWI: Gate {self.gate.index} value change to {gate.value}")
             self._update_value(gate.value)
@@ -3500,12 +3504,13 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
             self._update_icon()
 
-    @QtCore.Slot(GateInfo)
-    def _gate_configuration_changed(self, gate):            
+    def _gate_configuration_changed(self, gate):
+        gremlin.util.InvokeUiMethod(self._gate_configuration_changed_ui, gate)
+    
+    def _gate_configuration_changed_ui(self, gate):            
         ''' called when a gate changes configuration '''
-        if Shiboken.isValid(self):
-            if gate.id == self.gate.id:
-                self._update_icon()
+        if Shiboken.isValid(self) and gate.id == self.gate.id:
+            self._update_icon()
 
     def _update_value(self, value):
         gremlin.util.InvokeUiMethod(self._update_value_ui, value)
@@ -3516,14 +3521,18 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
             with QtCore.QSignalBlocker(self.value_widget):
                 # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
                 self.value_widget.setValue(value)
-
-    @QtCore.Slot(GateInfo)
+    
     def _gate_index_changed(self, gate):
-        if self.gate == gate:
+        gremlin.util.InvokeUiMethod(self._gate_index_changed_ui, gate)
+
+    def _gate_index_changed_ui(self, gate):
+        if Shiboken.isValid(self) and gate.id == self.gate.id:
             self._update_gate_label()
 
-    @QtCore.Slot(DisplayMode)
     def _display_mode_changed(self, display_mode):
+        gremlin.util.InvokeUiMethod(self._display_mode_changed_ui, display_mode)
+
+    def _display_mode_changed_ui(self, display_mode):
         ''' set the display mode '''
         if Shiboken.isValid(self):
             with QtCore.QSignalBlocker(self.value_widget):
@@ -3711,11 +3720,11 @@ class RangeWidgetInfo(QtWidgets.QWidget):
 
 
         # hooks
-        eh = GateEventHandler()
-        eh.gate_value_changed.connect(self._gate_value_changed) #  gate value changes for display value updates
-        eh.range_used_changed.connect(self._range_used_changed) # gate usage for range visibility
-        eh.display_mode_changed.connect(self._display_mode_changed)
-        eh.range_configuration_changed.connect(self._range_configuration_changed) # called when range data changes
+        gh = GateEventHandler()
+        gh.gate_value_changed.connect(self._gate_value_changed) #  gate value changes for display value updates
+        gh.range_used_changed.connect(self._range_used_changed) # gate usage for range visibility
+        gh.display_mode_changed.connect(self._display_mode_changed)
+        gh.range_configuration_changed.connect(self._range_configuration_changed) # called when range data changes
         
         # display default value
         self.update_value()
@@ -3729,22 +3738,27 @@ class RangeWidgetInfo(QtWidgets.QWidget):
             self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
 
     def cleanup(self):
-        eh = GateEventHandler()
-        eh.gate_value_changed.disconnect(self._gate_value_changed) #  gate value changes for display value updates
-        eh.range_used_changed.disconnect(self._range_used_changed) # gate usage for range visibility
-        eh.display_mode_changed.disconnect(self._display_mode_changed)
+        gh = GateEventHandler()
+        gh.gate_value_changed.disconnect(self._gate_value_changed) #  gate value changes for display value updates
+        gh.range_used_changed.disconnect(self._range_used_changed) # gate usage for range visibility
+        gh.display_mode_changed.disconnect(self._display_mode_changed)
+        gh.range_configuration_changed.disconnect(self._range_configuration_changed) 
 
-
-    @QtCore.Slot(RangeInfo)
     def _range_configuration_changed(self, rnginfo):
-        if self._rng == rnginfo:
+        gremlin.util.InvokeUiMethod(self._range_configuration_changed_ui, rnginfo)
+    
+    def _range_configuration_changed_ui(self, rnginfo):
+        if Shiboken.isValid(self) and self._rng == rnginfo:
             self._update_icon()
 
-    @QtCore.Slot(DisplayMode)
     def _display_mode_changed(self, display_mode):
+        gremlin.util.InvokeUiMethod(self._display_mode_changed_ui, display_mode)
+    
+    def _display_mode_changed_ui(self, display_mode):
         ''' set the display mode '''
-        # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
-        self.update_value()
+        if Shiboken.isValid(self):
+            # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
+            self.update_value()
 
     def set_decimals(self, value):
         self.decimals = value
@@ -3753,20 +3767,20 @@ class RangeWidgetInfo(QtWidgets.QWidget):
     def range_info(self):
         return self._rng
     
-
-    @QtCore.Slot(GateInfo)
     def _gate_value_changed(self, gate):
+        gremlin.util.InvokeUiMethod(self._gate_value_changed_ui, gate)
+    
+    def _gate_value_changed_ui(self, gate):
         ''' respond to gate value changes if the range is mapped to the gate changing value '''
-        if gate.index == self._rng.g1.index:
-            
+        if Shiboken.isValid(self) and gate.index in (self._rng.g1.index, self._rng.g2.index):
             self.update_value()
-        elif gate.index == self._rng.g2.index:
             
-            self.update_value()
 
-    @QtCore.Slot(RangeInfo)
     def _range_used_changed(self, rng):
-        if self._rng.id == rng.id:
+        gremlin.util.InvokeUiMethod(self._range_used_changed_ui, rng)
+    
+    def _range_used_changed_ui(self, rng):
+        if Shiboken.isValid(self) and self._rng.id == rng.id:
             syslog.info(f"RWI: Range {self._rng.range_gate_display()} usage changed to {rng.used}")
             self.setVisible(rng.used)
 

@@ -1230,13 +1230,17 @@ def get_xml_parent(node, tag : str):
 
 def get_xml_mode(node):
     ''' gets the mode from a parent xml node '''
+    import gremlin.shared_state
     # grab the mode
     mode_node = node
-    while mode_node is not None and mode_node.tag != "mode":
+    while mode_node is not None and mode_node.tag in ("mode","state"):
         mode_node = mode_node.getparent()
 
     if mode_node is not None:
-        mode = mode_node.get("name")
+        if mode_node.tag == "state":
+            mode = gremlin.shared_state.master_mode
+        else:
+            mode = mode_node.get("name")
         return mode
     
     return None
@@ -1706,7 +1710,15 @@ def display_file(path):
     else:
         syslog.error(f"DISPLAYFILE: warning: file not found: {path}")
 
-
+def open_folder(path):
+    ''' opens the folder for a file or folder in explorer '''
+    path = os.path.normpath(path)
+    if os.path.isfile(path):
+        path = os.path.dirname(path)
+    if os.path.isdir(path):
+        os.startfile(path)
+    
+        
 def debug_pickle(instance, exception=None, string='', first_only=True):
     """
     Recursively go through all attributes of instance and return a list of whatever
@@ -2425,3 +2437,29 @@ def find_executable(starts_with_name, exe_name):
             return exe
 
     return None
+
+
+def next_file(file_base, include_extension = True) -> str:
+    ''' gets the next file name
+    
+    :param file_base: input file with full path and optional extension
+    :param include_extension: if true, the new file has an extension, if false, it does not.
+    '''
+    if not file_base:
+        no_ext_file = getTemporaryFile()  
+        extension = None
+    else:
+        no_ext_file, extension = os.path.splitext(file_base)
+    no_ext_file_base = no_ext_file
+    ext_file_base = no_ext_file + extension
+    # find the next file index that doesn't exist
+    index = 1
+    while os.path.isfile(ext_file_base):
+        no_ext_file = f"{no_ext_file_base}_{index}"
+        ext_file_base = no_ext_file + ".pdf"
+        index += 1
+
+    if include_extension:
+        return ext_file_base
+    return no_ext_file
+

@@ -1022,41 +1022,29 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         :param node: the XML node to parse
         :param data: tuple containing (input_item, container) associated with this condition
         """
-        import gremlin.base_profile
-        import gremlin.ui.ui_common
-
+        # import gremlin.base_profile
+        # import gremlin.ui.ui_common
+        import gremlin.shared_state
         
         if "condition_id" in node.attrib:
             self._id = node.get("condition_id")
 
-        # import_data = gremlin.base_profile.ProfileImportData()
-        # if self._id in import_data.used_ids:
-        #     new_id = gremlin.util.get_guid()
-        #     verbose = gremlin.config.Configuration().verbose
-        #     if verbose: syslog.warning(f"PROFILE: duplicate ID found - Activation Condition: [{id}] - assigning new id: [{new_id}]")
-        #     self._id = new_id
-        
-        # import_data.used_ids[self._id] = self
-
         rule = ActivationCondition.rule_lookup[safe_read(node, "rule", str, "")]
         tracker = ConditionTracker()
         mode_node = node
-        while mode_node is not None and mode_node.tag != "mode":
+        while mode_node is not None and mode_node.tag not in ("mode","state"):
             mode_node = mode_node.getparent()
         if mode_node is not None:
-            mode = mode_node.get("name")
+            if mode_node.tag == "state":
+                mode = gremlin.shared_state.master_mode
+            else:
+                mode = mode_node.get("name")
         else:
-            import gremlin.shared_state
+            
             mode = gremlin.shared_state.edit_mode
-        assert data is not None,"XML: error: data not provided for activation condition"    
+        assert data is not None,f"XML: error: data not provided for activation condition - offending line: {node.sourceline}"    
         input_item, container = data
         self.rule = rule
-
-        
-        #assert input_item is not None,"XML: error:input_item not provided for activation condition"
-        # if input_item is None:
-        #     gremlin.ui.ui_common.MessageBox(prompt="The source action does not support pasting conditions to the new input.")
-        #     return
         
         for cond_node in node.findall("condition"):
             condition_type = safe_read(cond_node, "condition-type", str, "")

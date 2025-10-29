@@ -1277,8 +1277,8 @@ class StateData(QtCore.QObject):
     def _sort(self):
         self._data = dict(sorted(self._data.items()))
 
-    def getStates(self):
-        ''' gets all input items '''
+    def getStates(self) -> dict:
+        ''' gets state map '''
         return self._data
     
     def getStateNames(self):
@@ -1286,7 +1286,7 @@ class StateData(QtCore.QObject):
         return list(self._data.keys())
     
     def getInputItems(self):
-        ''' gets a dict of input items for each state'''
+        ''' gets a dict of input items for each state in the current profile '''
         input_items = {}
         for key, item in self._data.items():
             input_items[key] = item.input_item

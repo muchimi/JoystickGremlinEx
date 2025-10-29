@@ -37,6 +37,7 @@ import gremlin.ui.mode_device
 from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
+import gremlin.types
 from lxml import etree
 from gremlin.types import DeviceType
 from gremlin.plugin_manager import ContainerPlugins
@@ -4613,35 +4614,72 @@ class Profile():
             el = gremlin.event_handler.EventListener()
             el.request_reload.emit()
 
+    def _filter_actions_input_item(self, input_item, tag, callback):
+        ''' '''
+        for container in input_item.containers:
+            for action_set in container.action_sets:
+                for action in action_set:
+                    if action.tag == "gated-axis":
+                        # special handling for gated axis
+                        gate_data :  gremlin.gated_handler.GateData = action.gate_data
+                        gate : gremlin.gated_handler.GateInfo
+                        for gate in gate_data.getGates():
+
+                            # gate containers
+                            for condition, item in gate.item_data_map.items():
+                                self._filter_actions_input_item(item, tag, callback)
+
+                        rng : gremlin.gated_handler.RangeInfo
+                        for rng in gate_data.getRanges():
+                            # gate containers
+                            for condition, item in rng.item_data_map.items():
+                                self._filter_actions_input_item(item, tag, callback)
+
+                    if action.tag == tag:
+                        callback(action)
+
+    def filter_actions(self, tag, callback):
+        ''' issues a callback for every matching action tag found in the profile callback(action)'''
+        for dev_guid in self.devices:
+                dev = self.devices[dev_guid]
+                if dev.device_type == gremlin.types.DeviceType.State:
+                    # state device (modeless) - special handling of state input items
+                    state_data = gremlin.shared_state.current_profile.state
+                    input_items = [state_data[key].input_item for key in state_data]
+                    for item in input_items:
+                        self._filter_actions_input_item(item, tag, callback)
+                else:
+                    for mode_name in dev.modes:
+                        mode_object = dev.modes[mode_name]
+                        for input_type in mode_object.config.keys():
+                            for item in mode_object.config[input_type].values():
+                                self._filter_actions_input_item(item, tag, callback)
+
+
     def apply_voice(self, voice_index = None, voice_volume = None, voice_rate = None) -> int:
         ''' applies this voice to all profile TTS entries - returns the count of entries impacted '''
+        
         count = 0
         
         if voice_index is not None or voice_volume is not None or voice_rate is not None:
-            for dev_guid in self.devices:
-                dev = self.devices[dev_guid]
-                for mode_name in dev.modes:
-                    mode_object = dev.modes[mode_name]
-                    for input_type in mode_object.config.keys():
-                        for item in mode_object.config[input_type].values():
-                            for container in item.containers:
-                                for actions in [a for a in container.action_sets if a is not None]:
-                                    for action in actions:
-                                        if action.tag == "text-to-speech":
-                                            updated = False
-                                            if voice_index is not None and voice_index != action.voice_index:
-                                                action.voice_index = voice_index
-                                                updated = True
-                                            if voice_volume is not None and voice_volume != action.volume:
-                                                action.volume = voice_volume
-                                                updated = True
-                                            if voice_rate is not None and voice_rate != action.rate:
-                                                action.rate = voice_rate
-                                                updated = True
 
+            def _apply_voice_callback(action):
+                nonlocal count
+                updated = False
+                if voice_index is not None and voice_index != action.voice_index:
+                    action.voice_index = voice_index
+                    updated = True
+                if voice_volume is not None and voice_volume != action.volume:
+                    action.volume = voice_volume
+                    updated = True
+                if voice_rate is not None and voice_rate != action.rate:
+                    action.rate = voice_rate
+                    updated = True
 
-                                            if updated:
-                                                count += 1
+                if updated:
+                    count += 1
+
+            self.filter_actions("text-to-speech", _apply_voice_callback)
                                                 
                                         
         if count:
