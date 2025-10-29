@@ -2315,6 +2315,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#profile-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Profile visualization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#user-scripts-plugins" class="md-nav__link">
     <span class="md-ellipsis">
       User Scripts (plugins)
@@ -4544,6 +4553,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#profile-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Profile visualization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#user-scripts-plugins" class="md-nav__link">
     <span class="md-ellipsis">
       User Scripts (plugins)
@@ -6729,7 +6747,13 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 <p>Whenever a state changes, if it is mapped to containers/actions, these will execute and look to the mapped containers/actions as a joystick button (pressed or released).  Important: when a state changes, the events are queued immediately when the change occurs, to ensure that any actions execute on state change.</p>
 <p>Warning: By design, there are no guardrails with states, so loops are possible, and this is usually not a desired outcome as it will result in endless looping in some situations.  While some state machine designs must allow loops, but it could result in an endless loop if A toggles B, B toggles C, C toggles A.  This is allowed for the time being.  As of this writing, this is a concious design decision to allow this as the runtime performance impact and logic required to catch these would be a negative impact, so use states with loops in mind to avoid this situation currently.  If you do enter into a loop inadvertently, depending on the loop, the profile would need to be stopped.  In some cases, a hard process kill via task manager may be needed.</p>
 <h2 id="state-condition">State Condition<a class="headerlink" href="#state-condition" title="Permanent link">&para;</a></h2>
-<p>The state condition is used to apply conditional execution on a container or action based on the current value of a state.  The condition will prompt for the name of the state, and whether the c</p>
+<p>The state condition is used to apply conditional execution on a container or action based on the current value of a state.  The condition will prompt for the name of the state, and whether the condition should be pressed or released.</p>
+<h2 id="profile-visualization">Profile visualization<a class="headerlink" href="#profile-visualization" title="Permanent link">&para;</a></h2>
+<p>GremlinEx can create a directed graph in PDF or SVG formats of a profile, provided that you have the open source <a href="https://graphviz.org/">GraphViz library</a> installed.   Graphviz will be configured and executed by GremlinEx to produce the relevant files.</p>
+<p>The visualizer dialog is accessible from the Tools menu under Tools/Profile Visualization.</p>
+<p><a class="glightbox" href="../assets/profile_visualization_dialog.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="profile visualization" src="../assets/profile_visualization_dialog.png" /></a></p>
+<p>WARNING: generated SVG files can be quite large (several megabytes) compared to a PDF file.</p>
+<p>GremlinEx currently does not do any pagination of a profile.  This can be done if needed with an external application.  The purpose of the PDF is not to print, but to visualize the profile graph on a screen using a viewer can can be zoomed in and moved to any location.</p>
 <h2 id="user-scripts-plugins">User Scripts (plugins)<a class="headerlink" href="#user-scripts-plugins" title="Permanent link">&para;</a></h2>
 <p>GremlinEx uses Python decorators to facilitate custom scripting and control from Python.</p>
 <h3 id="gremlininput_devicesgremlin_start">@gremlin.input_devices.gremlin_start<a class="headerlink" href="#gremlininput_devicesgremlin_start" title="Permanent link">&para;</a></h3>
