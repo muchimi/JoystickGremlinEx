@@ -1263,6 +1263,8 @@ class ActionSetView(ui_common.AbstractView):
 
         super().__init__(parent)
 
+        self._redraw_lock = False
+
         self.has_edit_controls = False # assume no edit controls
         self.view_type = view_type
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -1383,83 +1385,90 @@ class ActionSetView(ui_common.AbstractView):
 
         if not Shiboken.isValid(self):
             return
-
         
-        cache = ActionSetViewCache()
-
-        
-        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if verbose_ui: object_name = self.objectName()
-        if verbose_ui: syslog.info(f"ActionSet: redraw start: {object_name}")
-
-        widgets = gremlin.util.get_layout_widgets(self.left_layout)
-        if widgets:
-            if verbose_ui: syslog.info(f"ActionSet: redraw cleanup start: {object_name}")
-            for widget in widgets:
-                cache.clearWidget(widget)
-                if hasattr(widget,"_cleanup_ui"):
-                    widget._cleanup_ui()
-                widget.hide()
-                widget.setParent(None)
-                widget.deleteLater()
-            self._widgets.clear()
-            
-
-            if verbose_ui: syslog.info(f"ActionSet: redraw cleanup complete: {object_name}")
-
-
-        #ui_common.clear_layout(self.action_layout)
-        self.left_layout.removeWidget(self.action_widget)
-        self.action_widget.hide()
-        self.action_widget.deleteLater()
-        
-        
-        self.action_widget, self.action_layout = gremlin.ui.ui_common.getVContainer()
-        self.left_layout.addWidget(self.action_widget)
-
-        
-        if self.model is None:
+        if self._redraw_lock:
             return
         
-        with self.model.data_changed.blocked():
+        try:
+            self._redraw_lock = True
+        
+            cache = ActionSetViewCache()
 
-            clipboard = Clipboard()
-            clipboard.disable()
-            if self.view_type == ui_common.ContainerViewTypes.Action:
-                for index in range(self.model.rows()):
-                    data = self.model.data(index)
-                    if verbose_ui: syslog.info(f"ActionSet: redraw action widget start: {object_name}")
-                    widget = data.widget(data)
-                    cache.registerWidget(data.id, widget)
-                    widget.action_modified.connect(self.model.data_changed.emit)
-                    wrapped_widget = BasicActionWrapper(widget)
-                    wrapped_widget.closed.connect(self._create_closed_cb(widget))
-                    self.action_layout.addWidget(wrapped_widget)
-                    self._widgets.append(wrapped_widget)
-                    if verbose_ui: syslog.info(f"ActionSet: redraw action widget completed: {object_name}")
-                    
-            elif self.view_type == ui_common.ContainerViewTypes.Conditions:
-                for index in range(self.model.rows()):
-                    is_cached = True
-                    data = self.model.data(index)
-                    if verbose_ui: syslog.info(f"ActionSet: redraw condition widget start: {object_name}")
-                    widget = cache.getWidget(data.id)
-                    if not widget:
-                        is_cached = False
-                        widget = data.widget(data)
-                    #widget.action_modified.connect(self.model.data_changed.emit)
-                    wrapped_widget = ConditionActionWrapper(widget)
-                    if not is_cached and hasattr(widget,"_cleanup_ui"):
+            
+            verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+            if verbose_ui: object_name = self.objectName()
+            if verbose_ui: syslog.info(f"ActionSet: redraw start: {object_name}")
+
+            widgets = gremlin.util.get_layout_widgets(self.left_layout)
+            if widgets:
+                if verbose_ui: syslog.info(f"ActionSet: redraw cleanup start: {object_name}")
+                for widget in widgets:
+                    cache.clearWidget(widget)
+                    if hasattr(widget,"_cleanup_ui"):
                         widget._cleanup_ui()
-                        widget.deleteLater()
-                    if verbose_ui: syslog.info(f"ActionSet: redraw condition widget completed: {object_name}")
-                    self.action_layout.addWidget(wrapped_widget)
-                    self._widgets.append(wrapped_widget)
+                    widget.hide()
+                    widget.setParent(None)
+                    widget.deleteLater()
+                self._widgets.clear()
+                
+
+                if verbose_ui: syslog.info(f"ActionSet: redraw cleanup complete: {object_name}")
 
 
-            clipboard.enable()
+            #ui_common.clear_layout(self.action_layout)
+            self.left_layout.removeWidget(self.action_widget)
+            self.action_widget.hide()
+            self.action_widget.deleteLater()
+            
+            
+            self.action_widget, self.action_layout = gremlin.ui.ui_common.getVContainer()
+            self.left_layout.addWidget(self.action_widget)
 
-        if verbose_ui: syslog.info(f"ActionSet: redraw complete: {object_name}")
+            
+            if self.model is None:
+                return
+            
+            with self.model.data_changed.blocked():
+
+                clipboard = Clipboard()
+                clipboard.disable()
+                if self.view_type == ui_common.ContainerViewTypes.Action:
+                    for index in range(self.model.rows()):
+                        data = self.model.data(index)
+                        if verbose_ui: syslog.info(f"ActionSet: redraw action widget start: {object_name}")
+                        widget = data.widget(data)
+                        cache.registerWidget(data.id, widget)
+                        widget.action_modified.connect(self.model.data_changed.emit)
+                        wrapped_widget = BasicActionWrapper(widget)
+                        wrapped_widget.closed.connect(self._create_closed_cb(widget))
+                        self.action_layout.addWidget(wrapped_widget)
+                        self._widgets.append(wrapped_widget)
+                        if verbose_ui: syslog.info(f"ActionSet: redraw action widget completed: {object_name}")
+                        
+                elif self.view_type == ui_common.ContainerViewTypes.Conditions:
+                    for index in range(self.model.rows()):
+                        is_cached = True
+                        data = self.model.data(index)
+                        if verbose_ui: syslog.info(f"ActionSet: redraw condition widget start: {object_name}")
+                        widget = cache.getWidget(data.id)
+                        if not widget:
+                            is_cached = False
+                            widget = data.widget(data)
+                        #widget.action_modified.connect(self.model.data_changed.emit)
+                        wrapped_widget = ConditionActionWrapper(widget)
+                        if not is_cached and hasattr(widget,"_cleanup_ui"):
+                            widget._cleanup_ui()
+                            widget.deleteLater()
+                        if verbose_ui: syslog.info(f"ActionSet: redraw condition widget completed: {object_name}")
+                        self.action_layout.addWidget(wrapped_widget)
+                        self._widgets.append(wrapped_widget)
+
+
+                clipboard.enable()
+
+            if verbose_ui: syslog.info(f"ActionSet: redraw complete: {object_name}")
+        finally:
+            self._redraw_lock = False
 
     def _add_action(self, action_name):
         import gremlin.plugin_manager
@@ -5042,7 +5051,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
-        self.redraw_lock = threading.Lock()
+        self._redraw_lock = False
         self._deleted = False
 
         self.input_item = None
@@ -5107,20 +5116,21 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
     def _redraw_ui(self):
         """Redraws the entire view.  must be on UI thread"""
-
         import gremlin.util
         import gremlin.ui.ui_common
-        gremlin.util.assert_ui_thread()
+
         if not Shiboken.isValid(self):
             return
 
         if not Shiboken.isValid(self.scroll_area):
             return
         
+        if self._redraw_lock:
+            return
         
-        with self.model.data_changed.blocked():
-            try:
-                self.redraw_lock.acquire()
+        self._redraw_lock = True
+        try:
+            with self.model.data_changed.blocked():
                 self._clear_widgets()
                 container_count = self.model.rows()    
                 if container_count:
@@ -5140,9 +5150,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                     #widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
                     self.scroll_layout.addWidget(widget)
                 self.scroll_layout.addStretch()
-            finally:
-                self.redraw_lock.release()
-
+        finally:
+            self._redraw_lock = False
 
         # gremlin.util.singleShot(lambda: self.doLayout())
 
