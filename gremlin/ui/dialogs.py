@@ -2130,7 +2130,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         for i in range(key_info[1]):
             value_info = winreg.EnumValue(key_handle, i)
-            if value_info[0] == "Joystick Gremlin":
+            if value_info[0] == "Joystick Gremlin Ex":
                 return True
         return False
 

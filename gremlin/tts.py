@@ -32,6 +32,7 @@ from . import event_handler, util
 import pyttsx3
 import gremlin.singleton_decorator
 from PySide6 import QtCore
+import queue
 import gremlin.util
 syslog = logging.getLogger("system")
 
@@ -50,7 +51,7 @@ class TextToSpeech:
         el.tts_change.connect(self._tts_changed)
         el.shutdown.connect(self.end)
         el.profile_start.connect(self.profile_start)
-        self._lock = threading.Lock()
+        el.profile_stop.connect(self.profile_stop)
 
         self._current_rate  = 100 # default rate (global)
         self._last_hash = None
@@ -66,7 +67,7 @@ class TextToSpeech:
             self.valid = config.tts_enabled
             self._tts_thread = None
             self._queue_thread = None
-            self._queue = []
+            self._queue = queue.Queue()
 
             
             if verbose:
@@ -85,7 +86,13 @@ class TextToSpeech:
                 
 
     def profile_start(self):
+        ''' called on profile start '''
         self._last_hash = None # reset prior speech
+
+    def profile_stop(self):
+        ''' called on profile stop '''
+        self.stop()
+
         
     @QtCore.Slot(bool)
     def _tts_changed(self, enabled : bool):
@@ -142,14 +149,20 @@ class TextToSpeech:
                 self._last_hash = h
             
             if verbose: syslog.info(f"TTS: SPEAK add to queue: {text}")
-
-            self._lock.acquire_lock()
+            
             if clear or not text:
                 # clear on no message.
-                self._queue.clear()
+                self._clear_queue()
             if text:
-                self._queue.append(lambda : self._speak(text, rate))
-            self._lock.release_lock()
+                self._queue.put(lambda : self._speak(text, rate))
+                
+
+    def _clear_queue(self):
+        ''' clears the queue'''
+        while not self._queue.empty():
+            self._queue.get()
+            self._queue.task_done()
+
 
     def _speak(self, text, rate = None):        
         ''' speaks the text'''
@@ -177,11 +190,10 @@ class TextToSpeech:
             # syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose_mode_tts
             if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
-            self._lock.acquire_lock()
             if clear:
-                self._queue.clear()
-            self._queue.append(lambda : self._speak_single(text, rate))
-            self._lock.release_lock()
+                self._clear_queue()
+            self._queue.put(lambda : self._speak_single(text, rate))
+                
 
 
     def _speak_single(self, text, rate = None):
@@ -217,14 +229,11 @@ class TextToSpeech:
     def _abort_ui(self):
         ''' aborts current speech and resets the queue '''
         self.engine.stop()
-        self._lock.acquire_lock()
-        self._queue.clear()
-        self._lock.release_lock()
+        self._clear_queue()
 
     def stop(self):
-        if not self._started:
-            return
-        gremlin.util.InvokeUiMethod(self._stop_ui) # ensure on UI thread
+        if self._started:
+            gremlin.util.InvokeUiMethod(self._stop_ui) # ensure on UI thread
 
     def _stop_ui(self):
         ''' stops any speech '''
@@ -236,16 +245,15 @@ class TextToSpeech:
             self._tts_thread.stop()
             self._tts_thread.join()
             self.engine.stop()
-            self._lock.acquire_lock()
-            self._queue.clear()
-            self._lock.release_lock()
+            self._clear_queue()
             self._started = False
 
         except Exception as err:
             syslog.error(f"Error in TTS: {err}")
 
     def start(self):
-        gremlin.util.InvokeUiMethod(self._start_ui) # ensure on UI thread
+        if not self._started:
+            gremlin.util.InvokeUiMethod(self._start_ui) # ensure on UI thread
 
     def _start_ui(self):
         ''' starts the loop '''
@@ -280,16 +288,15 @@ class TextToSpeech:
         threading.current_thread().reset()
         verbose = gremlin.config.Configuration().verbose_mode_tts
         while not self._queue_thread.stopped():
-            if self._queue:
-                self._lock.acquire_lock()
-                functor = self._queue.pop(0)
-                self._lock.release_lock()
+            if not self._queue.empty():
+                functor = self._queue.get()
                 if verbose: syslog.info("TTS: POP queue")
                 functor()
+                self._queue.task_done()
             time.sleep(0.05)
 
         # terminate any remaining queue items
-        self._queue.clear()
+        self._clear_queue()
 
     def end(self):
         gremlin.util.InvokeUiMethod(self._end_ui) # ensure on UI thread

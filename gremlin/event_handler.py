@@ -149,6 +149,11 @@ class Event:
 	def curve_value(self, value : float):
 		self._curve_value = value
 
+	@property
+	def id(self) -> str:
+		''' event ID '''
+		return self._id
+
 
 	def clone(self):
 		"""Returns a clone of the event.
@@ -666,10 +671,15 @@ class EventListener:
 	def __init__(self):
 		"""Creates a new instance."""
 		import gremlin.windows_event_hook
+		import gremlin.threading
 
             
 		self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
 		self.keyboard_hook.register(self._keyboard_handler)
+
+		
+
+
 
 		config = gremlin.config.Configuration()
 		self._mouse_hook_stack = 0
@@ -679,6 +689,7 @@ class EventListener:
 
 		# Calibration function for each axis of all devices
 		self._calibrations = {}
+
 
 		
 		
@@ -743,6 +754,13 @@ class EventListener:
 		self._vjoy_events_use_time = False # config.vjoy_loopback_use_time
 		self.vjoy_event.connect(self._handle_vjoy_event) # hook internal vjoy events generated whenever something is output to vjoy
 
+		# setup the event queue for joystick events
+		self._event_queue = queue.Queue() # holds the queue of events waiting to be processed
+		self._event_thread =  gremlin.threading.AbortableThreadX(target = self._event_runner, eh = self)
+		self._event_thread.name = "EVENTLISTENER listener"
+		self._event_thread.start()
+
+
 	def registerVjoyCallback(self, callback):
 		if not callback in self._vjoy_callbacks:
 			self._vjoy_callbacks.append(callback)
@@ -755,10 +773,39 @@ class EventListener:
 		for callback in self._vjoy_callbacks:
 			callback(event)
 
+	def queueJoystickEvent(self, event):
+		''' queues a single joystick event '''
+		verbose = gremlin.config.Configuration().verbose
+		if verbose: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")		
+		self._event_queue.put_nowait(event)
+
+	def queueJoystickEventList(self, event_list):
+		''' queues a list of joystick events '''
+		verbose = gremlin.config.Configuration().verbose_mode_inputs
+		for event in event_list:
+			if verbose: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")
+			self._event_queue.put_nowait(event)
+
+	def _event_runner(self):
+		''' runner for inbound joystick events '''
+		verbose = gremlin.config.Configuration().verbose_mode_inputs
+		while not self._event_thread.stopped():
+			if self._event_queue.empty():
+				time.sleep(0.01)
+				continue
+			event = self._event_queue.get()
+			if verbose: syslog.info(f"EVENTLISTEN: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")		
+			self.joystick_event.emit(event)	
+			if not event.is_axis and not gremlin.shared_state.is_running:
+				self.button_state_change.emit(event) # for button repeaters
+
+			self._event_queue.task_done()
+
 	@QtCore.Slot()
 	def _shutdown_handler(self):
 		''' terminate threads '''
 		import gremlin.windows_event_hook
+		verbose = gremlin.config.Configuration().verbose_mode_inputs
 		if self._keep_alive_thread:
 			self._keep_alive_event.set()
 			self._keep_alive_thread.join()
@@ -769,6 +816,17 @@ class EventListener:
 			self._run_thread.join()
 			self._run_thread = None
 
+		# event runner	
+		if self._event_thread.is_alive():
+			if verbose: syslog.info("EVENTLISTENER: listen stop")
+			self._event_thread.stop()
+			self._event_thread.join()
+			self._event_thread = None
+
+		# mark all events processed
+		while not self._event_queue.empty():
+			self._event_queue.get_nowait()
+
 		# shutdown keyboard hook if enabled
 		kh = gremlin.windows_event_hook.KeyboardHook()
 		kh.shutdown()
@@ -776,6 +834,8 @@ class EventListener:
 		# shutdown mouse hook if enabled
 		mh = gremlin.windows_event_hook.MouseHook()
 		mh.shutdown()
+
+		
 
 	@property
 	def calibrationManager(self):
@@ -788,8 +848,7 @@ class EventListener:
 	
 	def _fire_event_list(self, event_list):
 		''' fires a series of events '''
-		for event in event_list:
-			self.joystick_event.emit(event)
+		self.queueJoystickEventList(event_list)
 	
 	def _load_hat_states(self):
 		''' loads current hats '''
@@ -816,9 +875,8 @@ class EventListener:
 				)
 				event_list.append(event)
 		if event_list:
-			for event in event_list:
-				self.joystick_event.emit(event)
-		#gremlin.util.singleShot(lambda: self._fire_event_list(event_list))
+			self.queueJoystickEventList(event_list)
+
 
 
 	def _options_changed(self):
@@ -1411,10 +1469,6 @@ class EventListener:
 				value = is_pressed
 			)
 			
-			if not gremlin.shared_state.is_running:
-				# wrap event so it fires on UI thread
-				#gremlin.util.singleShot(lambda : self.button_state_change.emit(event))
-				self.button_state_change.emit(event)
 
 			event_list.append(event)
 
@@ -1471,13 +1525,10 @@ class EventListener:
 
 				event_list.append(new_event)
 				
-				if not gremlin.shared_state.is_running:
-					for evt in event_list:
-						gremlin.util.singleShot(lambda : self.button_state_change.emit(evt))
 
 		if event_list:		
-			for event in event_list:
-				self.joystick_event.emit(event)
+			self.queueJoystickEventList(event_list)
+
 			
 
 	def _joystick_device_handler(self, data, action):
@@ -3500,4 +3551,5 @@ class AxisState():
 			self._last_axis_values[key] = current_value
 			self._last_axis_time[key]  = now
 		return True
+
 

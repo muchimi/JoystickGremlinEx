@@ -1844,7 +1844,7 @@ class InputItemWidget(QBoxFrame):
         # repeater
         self._repeater_container_widget, self._repeater_container_layout = gremlin.ui.ui_common.getVContainer()
         self._repeater_container_widget.setContentsMargins(0,0,0,2)
-        
+
         if self._debug_layout: self._repeater_container_widget.setStyleSheet("background: red;")
         self._container_layout.addWidget(self._repeater_container_widget)
         
@@ -2077,88 +2077,67 @@ class InputItemWidget(QBoxFrame):
             return
         
         config = gremlin.config.Configuration()
-        remove_axis = False
-        remove_button = False
-        current_axis_widget = self.axis_widget
-        current_button_widget = self.button_widget
-        
+
         widget = None # widget created for the repeater
 
         # if self.identifier.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
         #     pass
         input_type = self.identifier.input_type
-        
+
         if config.show_input_axis:
+
+            self.axis_widget = None
+            self.button_widget = None
+            gremlin.util.clear_layout(self._repeater_container_layout)
             
             if (self.identifier.is_axis or self.identifier.is_button or self.identifier.is_hat) or \
                 input_type in (InputType.JoystickAxis, InputType.JoystickButton,  InputType.JoystickHat, InputType.OpenSoundControl, InputType.Midi):
 
-                if not self.identifier.is_valid:
-                    # not valid
-                    remove_axis = True
-                    remove_button = True
-                else:
+                if self.identifier.is_valid:
+
                     if self.identifier.is_axis:
                         # axis
-                        if not current_axis_widget:
-                            widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
-                            widget.sizeChanged.connect(self._repeater_size_changed)
-       
+                        widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
+                        widget.unhooked.connect(self._axis_widget_unhooked)
+                        widget.sizeChanged.connect(self._repeater_size_changed)
+                        widget.data = self
+                        self.axis_widget = widget
+                        self._repeater_container_layout.addWidget(widget)                
+                        self._repeater_container_layout.addStretch()
 
-                            widget.data = self
-                            self.axis_widget = widget
-                        # remove button widget if we changed modes
-                        if self.button_widget:
-                            remove_button = True
+                        widget.setMaximumWidth(200)
+                        if self._debug_layout:
+                            widget.setStyleSheet("background: purple;")
+                        widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
+                        height = widget.sizeHint().height() + 4
+                        self._setWidgetHeight(self._repeater_container_widget, height)
 
                         self.axis_widget.triggerUpdate() # force an update
-
                     else: 
                         # button
-                        if not self.button_widget:
-                            widget = gremlin.ui.ui_common.ButtonStateWidget()
-                            self.button_widget = widget
-                            widget.hookDevice(self._device_guid, input_type, self._input_id )
-                        # remove axis widget if we changed modes
-                        if self.axis_widget:
-                            remove_axis = True
-
-                
-        else:
-            # remove both axis and button
-            remove_axis = True
-            remove_button = True
+                        widget = gremlin.ui.ui_common.ButtonStateWidget()
+                        widget.unhooked.connect(self._button_widget_unhooked)
+                        widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
+                        #widget.hookDevice(self._device_guid, input_type, self._input_id )
+                        self.button_widget = widget
+                        self._repeater_container_layout.addWidget(widget)                
+                        self._repeater_container_layout.addStretch()
+                        if self._debug_layout:
+                            widget.setStyleSheet("background: purple;")
+                        height = widget.sizeHint().height() + 4
+                        self._setWidgetHeight(self._repeater_container_widget, height)
                 
 
-                
-        if current_axis_widget and remove_axis:
-            current_axis_widget.unhookDevice()
-            gremlin.util.clear_layout(self._repeater_container_layout)
-            self.axis_widget = None
-            self._setWidgetHeight(self._repeater_container_widget, 0)
 
-        if current_button_widget and remove_button:
-            current_button_widget.unhookDevice()
-            gremlin.util.clear_layout(self._repeater_container_layout)
-            self.button_widget = None
-            self._setWidgetHeight(self._repeater_container_widget, 0)
-               
 
-        if widget:
-            # widget created
-            widget.setMaximumWidth(200)
-            if self._debug_layout:
-                widget.setStyleSheet("background: purple;")
-            widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
-            self._repeater_container_layout.addWidget(widget)                
-            self._repeater_container_layout.addStretch()
-            #height = self._getRowHeight()
-            #height = 20 # single row height
-            #height = 50 # self._repeater_container_widget.sizeHint().height()
-            height = widget.sizeHint().height() + 4
-            self._setWidgetHeight(self._repeater_container_widget, height)
+    def _button_widget_unhooked(self):
+        self.button_widget = None # force a new button widget
+        gremlin.util.clear_layout(self._repeater_container_layout)
 
-           
+    def _axis_widget_unhooked(self):
+        self.axis_widget = None
+        gremlin.util.clear_layout(self._repeater_container_layout)
+        
 
 
     def _repeater_size_changed(self):

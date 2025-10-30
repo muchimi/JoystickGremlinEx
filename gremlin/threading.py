@@ -31,9 +31,12 @@ class AbortableThread(threading.Thread):
 
         super().__init__(*args, **kwargs)
         
-        import gremlin.event_handler
-
-        eh = gremlin.event_handler.EventListener()
+        if "eh" in kwargs:
+            eh = kwargs["eh"]
+        else:
+            import gremlin.event_handler
+            eh = gremlin.event_handler.EventListener()
+            
         eh.shutdown.connect(self.stop)
         
         #self._stop_event = threading.Event()
@@ -52,6 +55,34 @@ class AbortableThread(threading.Thread):
         return self._shutdown_requested
         #return self._stop_event.is_set()
 
+class AbortableThreadX(threading.Thread):
+    ''' killable thread '''
+
+    def __init__(self, target = None, eh = None):
+
+        super().__init__(target = target)
+        
+        if not eh:
+            import gremlin.event_handler
+            eh = gremlin.event_handler.EventListener()
+            
+        eh.shutdown.connect(self.stop)
+        
+        #self._stop_event = threading.Event()
+        self._shutdown_requested = False
+
+
+    def reset(self):
+        ''' reset the thread'''
+        self._shutdown_requested = False
+
+    def stop(self):
+        #self._stop_event.set()
+        self._shutdown_requested = True
+
+    def stopped(self):
+        return self._shutdown_requested
+        #return self._stop_event.is_set()
 
 
 
@@ -109,3 +140,37 @@ class _TimerEx():
         syslog.info(f"timer reset {self._name if self._name else ''}")
         self.cancel()
         self.start(oneshot)
+
+
+# class Lock():
+#     ''' handles simple lock mechanism to work around QT threading problems with python thread locks '''
+
+#     def __init__(self):
+#         self._lock = False
+        
+
+#     def acquire_lock(self, block = True, timeout = 0) -> bool:
+        
+#         if block:
+#             if timeout > 0:
+#                 lapsed = time.time() + timeout
+#                 while self._lock and lapsed < time.time():
+#                     time.sleep(0.01)
+#         if self._lock:
+#             # timed out
+#             return False
+
+#         if not self._lock:
+#             self._lock = True
+#             return True
+#         return False
+    
+    
+#     def release_lock(self):
+#         self._lock = False
+
+#     def locked(self) -> bool:
+#         return self._lock
+    
+
+

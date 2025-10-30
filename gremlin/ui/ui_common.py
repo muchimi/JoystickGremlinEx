@@ -4809,6 +4809,9 @@ class QProgressBar(QtWidgets.QWidget):
 
 class QHookedProgressBar(QProgressBar, gremlin.base_classes.JoystickHook):
     ''' hooked progress bar to a hardware input '''
+
+    unhooked = QtCore.Signal() # fires on unhook
+
     def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float | list = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None, parent = None):
         super().__init__(orientation, value, min, max, readonly, step, data, parent)
         #super(gremlin.base_classes.JoystickHook, self).__init__()
@@ -4833,6 +4836,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
     ''' visualizes the state of a button '''
 
     deleted = QtCore.Signal() # triggers on delete
+    unhooked = QtCore.Signal() # triggers when unhooked
     
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -4910,6 +4914,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._tab_selected(device_guid)
         el = gremlin.event_handler.EventListener()
         el.button_state_change.connect(self.process_event)
+        self.unhooked.emit()
 
 
     def process_event(self, event):
@@ -4953,10 +4958,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
             return
         self._hooked = False
         el = gremlin.event_handler.EventListener()
-        el.joystick_event.disconnect(self.process_event)
-
-
-        # self._tab_unselected(self._device_guid)
+        el.button_state_change.disconnect(self.process_event)
         
  
 

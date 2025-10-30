@@ -14,6 +14,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T93)
+- Logic: Gated handler event processing moved to a queued system (this decouples gated axis events from input events)
+- Logic: Joystick handler event processing moved a queued system (this decouples DINPUT events from internal input events)
+- Logic: TTS speech events moved to a queued system (this ensures sequencing of multiple messages regardless of what thread they come from).
+- Fix: TTS will stop on profile stop (now captures that event)
+- Fix: button state repeaters going dormant in some situations due to UI cleanup/redraw.
+- Fix: Removed Gated Axis slider widget potential conflict with QT causing a random hard crash.
+- Updated documentation at https://muchimi.github.io/JoystickGremlinEx/
+
 ### (m76T92)
 - New: added states to the profile visualizer.
 - New: added open folder option to profile visualizer.

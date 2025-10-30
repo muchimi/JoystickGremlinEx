@@ -49,6 +49,7 @@ import gremlin.joystick_handling
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
+import gremlin.threading
 
 
 syslog = logging.getLogger("system")
@@ -1161,23 +1162,43 @@ class GateEventHandler(QtCore.QObject):
         super().__init__()
         self._value_changed_callbacks = {} # tracks value change callbacks
 
+        self.verbose = gremlin.config.Configuration().verbose_mode_gate
+        if self.verbose: syslog.info("GATEHANDLER: listen start")
+        self._event_queue = queue.Queue() # holds the queue of events to process
+        
+        self._event_thread =  gremlin.threading.AbortableThread(target = self._event_runner)
+        self._event_thread.name = "GatedHandler listener"
+        self._event_thread.start()
+
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_handler)
-        self._lock = threading.Lock()
-
+       
         self._joystick_event_callbacks = {} # tracks callbacks for event changes
 
         el.shutdown.connect(self._shutdown)
 
 
-    def _joystick_event_handler(self, event):        
-        self._lock.acquire() # make sure we only process one event at a time
-        try:
+    def _joystick_event_handler(self, event):   
+        ''' enqueues the received event for later processing '''
+        if self.verbose: syslog.info(f"GATEHANDLER: QUEUE event {event.id}")
+        self._event_queue.put_nowait(event)
+
+    def _event_runner(self):
+        ''' runner for inbound joystick events '''
+        while not self._event_thread.stopped():
+            if self._event_queue.empty():
+                time.sleep(0.01)
+                continue
+            event = self._event_queue.get()
+            if self.verbose: syslog.info(f"GATEHANDLER: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")
+            
             for callback in self._joystick_event_callbacks.values():
                 callback(event)
+            self._event_queue.task_done()
 
-        finally:
-            self._lock.release()
+
+        
+
 
 
     def registerJoystickCallback(self, key, callback):
@@ -1226,6 +1247,17 @@ class GateEventHandler(QtCore.QObject):
     def _shutdown(self):
         el = gremlin.event_handler.EventListener()
         el.joystick_event.disconnect(self._joystick_event_handler)
+
+        # clear the queue
+        if self._event_thread.is_alive():
+            if self.verbose: syslog.info("GATEHANDLER: listen stop")
+            self._event_thread.stop()
+            self._event_thread.join()
+            self._event_thread = None
+
+        # mark all events processed
+        while not self._event_queue.empty():
+            self._event_queue.get_nowait()
 
         self._joystick_event_callbacks.clear()
 
@@ -2613,7 +2645,6 @@ class GateData():
         range_info : RangeInfo
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_exec or config.verbose_mode_gate
-        verbose = True
         
         if value < range_info.v1 or value > range_info.v2:
             # not in range

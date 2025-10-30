@@ -379,6 +379,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#differences-with-joystick-gremlin" class="md-nav__link">
+    <span class="md-ellipsis">
+      Differences with Joystick Gremlin
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       Installation
@@ -387,6 +396,15 @@
   
     <nav class="md-nav" aria-label="Installation">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Test versions
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#required-additional-tools" class="md-nav__link">
@@ -435,6 +453,24 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-gremlinex-for-the-first-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running GremlinEx for the first time
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uac-user-access-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      UAC (user access control)
+    </span>
+  </a>
   
 </li>
       
@@ -597,6 +633,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#differences-with-joystick-gremlin" class="md-nav__link">
+    <span class="md-ellipsis">
+      Differences with Joystick Gremlin
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       Installation
@@ -605,6 +650,15 @@
   
     <nav class="md-nav" aria-label="Installation">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Test versions
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#required-additional-tools" class="md-nav__link">
@@ -653,6 +707,24 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-gremlinex-for-the-first-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running GremlinEx for the first time
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uac-user-access-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      UAC (user access control)
+    </span>
+  </a>
   
 </li>
       
@@ -708,12 +780,22 @@
 <p><a class="glightbox" href="assets/gremlinex_diagram.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="general_architecture" src="assets/gremlinex_diagram.png" /></a></p>
 <p>GremlinEx takes inputs from multiple sources, local and network, performs the transformations and mappings specififed in the profile based on the current profile options, container and action configurations, and sends the output as required.</p>
 <p>There should be no expectation that a single input always results in a single output. A single input can produce multiple outputs, and multiple inputs can provide a single output.  It's also possible that no output is produced if the input(s) should be ignored based on the particular context.</p>
+<h2 id="differences-with-joystick-gremlin">Differences with Joystick Gremlin<a class="headerlink" href="#differences-with-joystick-gremlin" title="Permanent link">&para;</a></h2>
+<p>GremlinEx is not Joystick Gremlin or a new version of Joystick Gremlin.  They may have a lot in common, however they are significantly different in how they work and function in many respects, including runtime.  GremlinEx started as a fork, however in the last several years is mostly a gut/replace.</p>
+<p>GremlinEx is far more event driven and threaded, has networking and support for non-joystick devices, and has many actions, functions and options that do not exist in the original because they evolved differently.</p>
+<p>The internal wiring is significantly different along with a completely new execution graph logic so any expectation that GremlinEx works like Joystick Gremlin may be misplaced and not applicable.  GremlinEx is the essence of the original it's based on, has a general shared pedigree, however it does things differently.</p>
+<p>While most Joystick Gremlin profiles should load as-is, some may not depending on the version of the profile and features used, especially if the features were deprecated in GremlinEx and replaced.  This said, simpler profiles should work "as-is".  A lot of care was applied to ensuring older profiles can load "as is" with the necessary conversions happening automatically - however this only goes so far.</p>
+<p>Also note that once a profile has been touched by GremlinEx, it may not work at all with any other prior version, including Joystick Gremlin because of changes to the profile file.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <p>GremlinEx comes as a zip file in the <a href="https://github.com/muchimi/JoystickGremlinEx/releases">release section of GitHub</a> that contains all you need.</p>
-<p>The contents of the zip file should be extracted to a folder that is not a system folder such as "Program Files" or "Windows".</p>
+<p>The contents of the zip file should be extracted to a folder that is not a protected system folder such as "Program Files" or "Windows".</p>
 <p>The recommendation is to install GremlinEx in its own folder, like "GremlinEx" and if you will use multiple versions, it's recommended you also name the folder after the version.  This is automatic if you extract the zip File using tools like 7Zip or Nanazip as the folder will be the same name as the zip file.  This enables you to have multiple versions installed.</p>
 <p>The master repository can be found here on GitHub: <a href="https://github.com/muchimi/JoystickGremlinEx">https://github.com/muchimi/JoystickGremlinEx
 </a>.</p>
+<h3 id="test-versions">Test versions<a class="headerlink" href="#test-versions" title="Permanent link">&para;</a></h3>
+<p>GremlinEx uses an open development philosphy.  As such, test releases are frequently available that introduce not only fixes but desired features as well.  Some of the versions are more robust than others, however test versions are more likely to have issues, especially with new features.</p>
+<p>To this end, GremlinEx offers in the configuration an option to "Version" profile folders so that configurations and profiles are safe from mishaps, such as a new profile version making it incompatible with a prior version of GremlinEx.</p>
+<p>It is a best practice regardless ot make a copy of the data folder (default is %USERPROFILE%\Joystick Gremlin Ex) to safeguard any files and configurations, just in case.</p>
 <h3 id="required-additional-tools">Required additional tools<a class="headerlink" href="#required-additional-tools" title="Permanent link">&para;</a></h3>
 <p>GremlinEx works with a number of tools to function as a device integrator, such as VJOY.   Some tools are mandatory (VJOY), others are not (VIGEM, Bitfocus) but recommended.</p>
 <p>Please see the <a href="resources/">resources section</a> for a list of required and optional tools.</p>
@@ -726,6 +808,11 @@
 <p>Please see the <a href="usage/#osc-device-open-sound-control">OSC configuration section</a> for OSC specific setup to enable this feature.  </p>
 <h3 id="virus-false-positives">Virus False positives<a class="headerlink" href="#virus-false-positives" title="Permanent link">&para;</a></h3>
 <p>Unfortunately, some older anti-virus and anti-malware programs may flag GremlinEx (and any Python packaged applications) incorrectly, known as a false-positive.  See more on the topic and options in <a href="usage/#antivirus-false-positives">this section of the documentation</a>.  It should be noted that most malware and anti-virus tools correctly handle the false-positive.</p>
+<h2 id="running-gremlinex-for-the-first-time">Running GremlinEx for the first time<a class="headerlink" href="#running-gremlinex-for-the-first-time" title="Permanent link">&para;</a></h2>
+<p>The first time you run GremlinEx, as it is written (mostly) in Python, the Python environment will most likely be running first a first run optimization and cache creation process.  This happens for every new version of GremlinEx, but only the first time a module is used/loaded.  This process is automatic and part of the normal Python environment.  You may thus experience an increase in load times and decrease in performance when first running a new version, especially at design time.  This however should not persist on a restart once the caches are created and the optimization done by the Python environment has completed.  This is less noticeable on systems with very fast storage solutions as Python creates a number of files during this process, however it can still be noticeable.</p>
+<p>It is thus recommended to run the software once, and then restart.</p>
+<h2 id="uac-user-access-control">UAC (user access control)<a class="headerlink" href="#uac-user-access-control" title="Permanent link">&para;</a></h2>
+<p>Windows UAC may prevent GremlinEx from starting with Windows (if the option is selected) unless the process is given higher permissions.  Typically this will manifest itself as a load error, DLL not found error or some other I/O error, even if the program runs fine when started normally.  This is not a GremlinEx issue but a UAC security issue.</p>
 <h2 id="resources-and-help">Resources and help<a class="headerlink" href="#resources-and-help" title="Permanent link">&para;</a></h2>
 <p><a class="glightbox" href="assets/discord_small.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="Discord Icon" src="assets/discord_small.png" /></a>&nbsp;Please join our  <a href="https://discord.gg/pNadcReth9">GremlinEx Discord</a> server!</p>
 <h2 id="history">History<a class="headerlink" href="#history" title="Permanent link">&para;</a></h2>

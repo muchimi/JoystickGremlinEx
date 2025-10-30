@@ -35,17 +35,40 @@ GremlinEx takes inputs from multiple sources, local and network, performs the tr
 There should be no expectation that a single input always results in a single output. A single input can produce multiple outputs, and multiple inputs can provide a single output.  It's also possible that no output is produced if the input(s) should be ignored based on the particular context.
 
 
+## Differences with Joystick Gremlin
+
+GremlinEx is not Joystick Gremlin or a new version of Joystick Gremlin.  They may have a lot in common, however they are significantly different in how they work and function in many respects, including runtime.  GremlinEx started as a fork, however in the last several years is mostly a gut/replace.
+
+GremlinEx is far more event driven and threaded, has networking and support for non-joystick devices, and has many actions, functions and options that do not exist in the original because they evolved differently.
+
+The internal wiring is significantly different along with a completely new execution graph logic so any expectation that GremlinEx works like Joystick Gremlin may be misplaced and not applicable.  GremlinEx is the essence of the original it's based on, has a general shared pedigree, however it does things differently.
+
+While most Joystick Gremlin profiles should load as-is, some may not depending on the version of the profile and features used, especially if the features were deprecated in GremlinEx and replaced.  This said, simpler profiles should work "as-is".  A lot of care was applied to ensuring older profiles can load "as is" with the necessary conversions happening automatically - however this only goes so far.
+
+Also note that once a profile has been touched by GremlinEx, it may not work at all with any other prior version, including Joystick Gremlin because of changes to the profile file.
 
 ## Installation
 
 GremlinEx comes as a zip file in the [release section of GitHub](https://github.com/muchimi/JoystickGremlinEx/releases) that contains all you need.
 
-The contents of the zip file should be extracted to a folder that is not a system folder such as "Program Files" or "Windows".
+The contents of the zip file should be extracted to a folder that is not a protected system folder such as "Program Files" or "Windows".
 
 The recommendation is to install GremlinEx in its own folder, like "GremlinEx" and if you will use multiple versions, it's recommended you also name the folder after the version.  This is automatic if you extract the zip File using tools like 7Zip or Nanazip as the folder will be the same name as the zip file.  This enables you to have multiple versions installed.
 
 The master repository can be found here on GitHub: [https://github.com/muchimi/JoystickGremlinEx
 ](https://github.com/muchimi/JoystickGremlinEx).
+
+
+### Test versions
+
+GremlinEx uses an open development philosphy.  As such, test releases are frequently available that introduce not only fixes but desired features as well.  Some of the versions are more robust than others, however test versions are more likely to have issues, especially with new features.
+
+To this end, GremlinEx offers in the configuration an option to "Version" profile folders so that configurations and profiles are safe from mishaps, such as a new profile version making it incompatible with a prior version of GremlinEx.
+
+It is a best practice regardless ot make a copy of the data folder (default is %USERPROFILE%\Joystick Gremlin Ex) to safeguard any files and configurations, just in case.
+
+
+
 
 ### Required additional tools
 
@@ -70,6 +93,16 @@ Please see the [OSC configuration section](usage.md#osc-device-open-sound-contro
 ### Virus False positives
 
 Unfortunately, some older anti-virus and anti-malware programs may flag GremlinEx (and any Python packaged applications) incorrectly, known as a false-positive.  See more on the topic and options in [this section of the documentation](usage.md#antivirus-false-positives).  It should be noted that most malware and anti-virus tools correctly handle the false-positive.
+
+## Running GremlinEx for the first time
+
+The first time you run GremlinEx, as it is written (mostly) in Python, the Python environment will most likely be running first a first run optimization and cache creation process.  This happens for every new version of GremlinEx, but only the first time a module is used/loaded.  This process is automatic and part of the normal Python environment.  You may thus experience an increase in load times and decrease in performance when first running a new version, especially at design time.  This however should not persist on a restart once the caches are created and the optimization done by the Python environment has completed.  This is less noticeable on systems with very fast storage solutions as Python creates a number of files during this process, however it can still be noticeable.
+
+It is thus recommended to run the software once, and then restart.
+
+## UAC (user access control)
+
+Windows UAC may prevent GremlinEx from starting with Windows (if the option is selected) unless the process is given higher permissions.  Typically this will manifest itself as a load error, DLL not found error or some other I/O error, even if the program runs fine when started normally.  This is not a GremlinEx issue but a UAC security issue.
 
 ## Resources and help
 
@@ -101,3 +134,5 @@ GremlinEx is in active development and thus may include bugs and issues refered 
 
 I am a firm believer that open development outweighs the drawbacks, it encourages feedback and input and participation from the community. I appreciate the patience as not everything will work in every pre-release patch as expected, that is part of the process.
   
+
+
