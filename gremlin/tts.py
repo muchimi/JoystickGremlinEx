@@ -187,6 +187,8 @@ class TextToSpeech:
 
     def _speak_single_ui(self, text, rate = None, clear = False, threaded = True):        
         if text and self.valid:
+            if not self._started:
+                self._start_ui()
             # syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose_mode_tts
             if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
