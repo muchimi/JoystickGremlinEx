@@ -678,8 +678,7 @@ class EventListener:
 		self.keyboard_hook.register(self._keyboard_handler)
 
 		
-
-
+	
 
 		config = gremlin.config.Configuration()
 		self._mouse_hook_stack = 0
@@ -718,6 +717,8 @@ class EventListener:
 		self._verbose_dinput = False
 		self._verbose_dinput_extra = False
 		self._verbose_vjoy = False
+		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
+
 
 		self._profile_started = False
 
@@ -1500,9 +1501,9 @@ class EventListener:
 					identifier = event.input_index,
 					is_pressed = False,
 					is_virtual = is_virtual,
-					value = value,
+					value = current,
 					raw_value= current,
-					extra_data={"comments": "Hat release event"}
+					extra_data={"comments": f"Hat release event for position: {current}"}
 				)
 
 				event_list.append(release_event)
@@ -2404,7 +2405,7 @@ class EventHandler(QtCore.QObject):
 				self._last_tts_data.profile = profile
 				tts = gremlin.tts.TextToSpeech()
 				rate = gremlin.config.Configuration().initial_load_rate_tts
-				tts.speak(f"New mode {mode}", rate) # default rate is 100
+				tts.speak( f"New mode {mode}", rate) # default rate is 100
 
 	def TTSNotify(self, text):
 			''' outputs a notification only if TTS notifications are enabled and the profile/mode is different from the last message issued'''
@@ -3048,19 +3049,19 @@ class JoystickState():
 			# Octavi IFR1 exception - this is ignored because the device also reports in as a game controller - however we read data from it using HID directly, not dinput
 			#Vendor: 0x1240 Product: 0x59094
 			if dev.product_id == 59094 and dev.vendor_id == 1240 and dev.name == 'IFR1':
-				self.setInputIgnored(dev.device_guid, True)
-				self.setOutputIgnored(device_guid, True)
+				self.setInputEnabled(dev.device_guid, False)
+				self.setOutputEnabled(device_guid, True)
 			elif dev.is_virtual:
-				is_input = current_profile.settings.vjoy_as_input.get(dev.vjoy_id, False)
-				is_output = not is_input
-				self.setInputIgnored(device_guid, is_output)
-				self.setOutputIgnored(device_guid, is_input)
-				self.setVjoyAsInput(dev.vjoy_id, is_input)
+				is_input_enabled = current_profile.settings.vjoy_as_input.get(dev.vjoy_id, False)
+				is_output_enabled = True # not is_input
+				self.setInputEnabled(device_guid, is_output_enabled)
+				self.setOutputEnabled(device_guid, is_input_enabled)
+				self.setVjoyAsInput(dev.vjoy_id, is_input_enabled)
 
-				if verbose: syslog.info(f"VJOY: {dev.name} [{dev.vjoy_id}] used as {'input' if is_input else 'output'}")
+				if verbose: syslog.info(f"VJOY: {dev.name} [{dev.vjoy_id}] used as {'input' if is_input_enabled else 'output'}")
 			else:
-				self.setInputIgnored(device_guid, False)
-				self.setOutputIgnored(device_guid, True)
+				self.setInputEnabled(device_guid, False)
+				self.setOutputEnabled(device_guid, True)
 
 	def setVjoyAsInput(self, vid : int, enabled : bool):
 		self._vjoy_as_input[vid] = enabled
@@ -3102,7 +3103,7 @@ class JoystickState():
 			return self._output_ignored_device_list[device_guid]
 		return False
 
-	def setInputIgnored(self, device_guid, enabled : bool):
+	def setInputEnabled(self, device_guid, enabled : bool):
 		''' marks a device as input ingnored '''
 		import gremlin.config
 		verbose = gremlin.config.Configuration().verbose_mode_vjoy
@@ -3111,22 +3112,22 @@ class JoystickState():
 		if verbose:
 			device = gremlin.joystick_handling.device_info_from_guid(device_guid)	
 			syslog.info(f"VJOY: {device.name} input: {'off' if enabled else 'on'}")
-		self._input_ignored_device_list[device_guid] = enabled
+		self._input_ignored_device_list[device_guid] = not enabled
 		if verbose: syslog.info("VJOY ")
 
-	def setOutputIgnored(self, device_guid, enabled : bool):
+	def setOutputEnabled(self, device_guid, enabled : bool):
 		''' marks a device as output ignored '''
 		import gremlin.joystick_handling
 		import gremlin.config
 		verbose = gremlin.config.Configuration().verbose_mode_vjoy
 		if not isinstance(device_guid, str):
 			device_guid = gremlin.util.normalize_guid(device_guid)
-		self._output_ignored_device_list[device_guid] = enabled
+		self._output_ignored_device_list[device_guid] = not enabled
 		device = gremlin.joystick_handling.device_info_from_guid(device_guid)
 		if verbose:
 			syslog.info(f"VJOY: {device.name} output: {'off' if enabled else 'on'}")
 		if device.is_virtual:
-			self._vjoy_output_ignored_list[device.vjoy_id] = enabled
+			self._vjoy_output_ignored_list[device.vjoy_id] = not enabled
 		
 
 	def _vjoy_as_input_changed(self, vjoy_id : int, enabled : bool):
@@ -3134,8 +3135,8 @@ class JoystickState():
 		if dev:
 			# vjoy input is enabled, disable output to it
 			device_guid = gremlin.util.normalize_guid(dev.device_guid)
-			self.setOutputIgnored(device_guid, enabled) # vjoy used as input cannot be used as output
-			self.setInputIgnored(device_guid, not enabled)
+			self.setOutputEnabled(device_guid, enabled) # vjoy used as input cannot be used as output
+			self.setInputEnabled(device_guid, not enabled)
 			self.setVjoyAsInput(vjoy_id, enabled)
 
 class AxisValues(NamedTuple):

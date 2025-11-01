@@ -14,6 +14,14 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T94)
+
+- New: Map to state gains a "reset to default" option on profile stop.  This will set the state (or states in the case of a hat input) to their defined default values when the profile stops, if the feature is enabled.  If disabled, this will leave the state in whatever state it was.  The default is enabled.
+- New: Input Viewer VJoy buttons and hats, when clicked, will toggle the corresponding VJoy button/hat like states to facilitate profile testing at design time or to change VJoy button/hats at runtime.  This feature only applies to Vjoy button/hats and does not apply to Vjoy axes.
+- Change: The input viewer toolbar button will toggle the Input Viewer window.  To bring it forward, use ctrl-click.  This is a more standard toolbar button behavior.
+- Fix: Map to state sync mode not applied to hat inputs.
+
 ### (m76T93)
 - Logic: Gated handler event processing moved to a queued system (this decouples gated axis events from input events)
 - Logic: Joystick handler event processing moved a queued system (this decouples DINPUT events from internal input events)

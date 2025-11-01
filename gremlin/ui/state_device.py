@@ -577,6 +577,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
     @property
     def default_value(self):
+        ''' default value for the state (set in the state definition)'''
         return self._default_value
     
     @default_value.setter

@@ -1431,7 +1431,7 @@ class LeftRightPushButton(QtWidgets.QPushButton):
     # Signal emitted when the button is pressed using the right mouse button
     clicked_right = QtCore.Signal()
 
-    def __init__(self, label, parent=None):
+    def __init__(self, label = None, parent=None):
         """Creates a new button instance.
 
         :param label the text to display on the button
@@ -3974,6 +3974,7 @@ class QDataPushButton(QtWidgets.QPushButton):
             self.setToolTip(tooltip)
         if callback:
             self.clicked.connect(callback)
+
 
     @property
     def data(self):
@@ -6623,7 +6624,7 @@ class ButtonState(QtWidgets.QGroupBox):
         self._device = device
         self.setObjectName("state_repeater")
 
-        is_disabled = True
+        is_disabled =  True
         if device.is_virtual:
             self.setTitle(f"{device.name} #{device.vjoy_id:d} - Buttons")
             is_disabled = False
@@ -8797,7 +8798,18 @@ def getLayoutWidgetHeight(layout, max_height = None):
 
 
    
-def getHContainer(widget_or_list = None, label = None, parent = None, left_stretch = False, right_stretch = True, alignment = None, set_alignment = True, min_height = None, use_vcontainers = False, font = None):
+def getHContainer(widget_or_list = None, 
+                  label = None, 
+                  parent = None, 
+                  left_stretch = False, 
+                  right_stretch = True, 
+                  alignment = None, 
+                  set_alignment = True, 
+                  min_height = None, 
+                  use_vcontainers = False,
+                  font = None,
+                  left_margin = 0,
+                  right_margin = 0):
     ''' gets a qt H container widget 
     
     :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically, use "|" for separator, "||" to insert a stretch
@@ -8809,7 +8821,7 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
     '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QHBoxLayout(widget)
-    widget.setContentsMargins(0,0,0,0)
+    widget.setContentsMargins(left_margin,0,right_margin,0)
     layout.setContentsMargins(0,0,0,0)
     stretch = left_stretch
 
@@ -8861,6 +8873,8 @@ def getHContainer(widget_or_list = None, label = None, parent = None, left_stret
         else:
             if right_stretch:
                 layout.addStretch()
+
+
     return (widget, layout)
     
 

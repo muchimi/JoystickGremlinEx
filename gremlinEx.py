@@ -1404,8 +1404,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self.modal_windows["input_viewer"]:
             # set the focus to that window
             dialog =self.modal_windows["input_viewer"]
-            dialog.activateWindow()
-            self.ui.actionInputViewer.setChecked(True)
+            el = gremlin.event_handler.EventListener()
+            if el.get_control_state():
+                
+                dialog.activateWindow()
+                self.ui.actionInputViewer.setChecked(True)
+            else:
+                # close the window
+                dialog.close()
+                
 
         else:
             dialog = gremlin.ui.input_viewer.InputViewerUi()

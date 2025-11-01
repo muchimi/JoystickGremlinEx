@@ -1006,6 +1006,7 @@ class Device:
                 mode.get_data(InputType.JoystickButton, idx)
             for idx in range(1, device.hat_count + 1):
                 mode.get_data(InputType.JoystickHat, idx)
+                
 
         return mode
 
@@ -1625,8 +1626,8 @@ class Settings:
             device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vid)
             if device:
                 device_guid = device.device_guid
-                sd.setOutputIgnored(device_guid, True) # ignore as output
-                sd.setInputIgnored(device_guid, False) # allow as input
+                sd.setOutputEnabled(device_guid, True) # allow as output
+                sd.setInputEnabled(device_guid, True) # allow as input
             self.vjoy_as_input[vid] = True
             
             

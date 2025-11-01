@@ -147,6 +147,7 @@ fake_tab_id = gremlin.util.normalize_guid(fake_tab_guid)
 master_mode = str(mode_tab_guid)
 master_mode_name = "Master"
 
+
 # holds the current selected device guid (string) for a tab
 current_tab_device_guid = None
 

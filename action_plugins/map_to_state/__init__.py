@@ -230,9 +230,19 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._sync_widget = gremlin.ui.ui_common.QSyncModeWidget(mode = self.action_data.sync_mode, label = "State on profile start:", callback = self._sync_changed)
 
-        widgets = [self._execute_widget, self._sync_widget]
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self._reset_default_widget = gremlin.ui.ui_common.QDataCheckbox(label = "Reset to Default on stop",
+                                                                        tooltip= "If enabled, state values will return to default values on profile stop",
+                                                                        callback = self._handle_reset_default_changed,
+                                                                        value = self.action_data.reset_default_on_stop
+                                                                        )
 
+        widgets = [self._execute_widget, self._reset_default_widget]
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.main_layout.addWidget(widget)
+
+        widgets = [self._sync_widget]
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets, left_margin =12)
+        
         self.main_layout.addWidget(widget)
 
         self.populate_selector()
@@ -244,6 +254,10 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _sync_changed(self, mode):
         self.action_data.sync_mode = mode
+
+    @QtCore.Slot(bool)
+    def _handle_reset_default_changed(self, checked : bool):
+        self.action_data.reset_default_on_stop = checked
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
@@ -697,6 +711,18 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         # create the state if it doesn't exist
         self.sd = gremlin.ui.state_device.StateData()
         key = self.action_data.key
+
+        self.hat_state_map = {} # holds the list of states to hat
+        input_type = self.action_data.get_input_type()
+        if input_type == InputType.JoystickHat:
+            # load all the states we need to track
+            positions = self.action_data.hat_positions
+            for position in positions:  # 9 positions - 8 cardinal and center push
+                state_name = self.action_data.hat_map[position]
+                state : gremlin.ui.state_device.StateInputItem = self.sd.getState(state_name)
+                self.hat_state_map[position] = state if not state.isExpression else None # don't set expression states
+
+        
         if key and not self.sd.exists(key):
             description = self.action_data.description
             self.sd.register(key,False, description if description else "auto-created state")
@@ -741,6 +767,23 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                 self.action_data.state.value = self.action_data.state.default_value
             case SyncMode.Input:
                 if self.verbose: syslog.info(f"\t sync to input : {is_pressed}")
+                
+                if input_type == InputType.JoystickHat:
+                    positions = self.action_data.hat_positions
+                    for position in positions:  # 9 positions - 8 cardinal and center push
+                        state = self.hat_state_map[position]
+                        if state: # mapped
+                            state.value = position == self.hat_position
+                else:
+                    # regular mapping
+                    state = self.action_data.state
+                    if state and not state.isExpression:
+                        state.value = is_pressed
+                    
+       
+
+
+
                 self.action_data.state.value = is_pressed
             case SyncMode.LastOrInput:
                 last = self.action_data.state.lastValue
@@ -770,6 +813,25 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         # occurs on profile stop
         self._started = False
 
+
+        if self.action_data.reset_default_on_stop:
+            if self.verbose: syslog.info("MAP TO STATE: reset state on profile stop enabled")
+            # reset the state to the default position
+            input_type = self.action_data.get_input_type()
+            if input_type == InputType.JoystickHat:
+                positions = self.action_data.hat_positions
+                for position in positions:  # 9 positions - 8 cardinal and center push
+                    state = self.hat_state_map[position]
+                    if state: # mapped
+                        state.value = state.default_value
+                        if self.verbose: syslog.info(f"\t[{state.key}] -> {state.value}")
+            else:
+                # regular mapping
+                state = self.action_data.state
+                if state and not state.isExpression:
+                    state.value = state.default_value
+                    if self.verbose: syslog.info(f"\t[{state.key}] -> {state.value}")
+                    
         
 
         
@@ -880,7 +942,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                     if verbose and "comments" in event.extra_data:
                         syslog.info(f"STATE FUNCTOR: event comment: {event.extra_data["comments"]}")   
 
-                    if "old_position"  in event.extra_data:
+                    if event.extra_data and "old_position" in event.extra_data:
                         # hat press event has extra data to release
                         old_position = event.extra_data["old_position"]
                     else:
@@ -990,7 +1052,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.parent = parent
         
         
-        self.state : gremlin.ui.state_device.StateInputItem = None # mapped state
+        self.state : gremlin.ui.state_device.StateInputItem = None # mapped state for non-hat mappings
         self.description = None # state description (used to recreate the state if needed)
         self.mode = "toggle" # valid modes are "pressed", "released", "toggle", "pulse"
         self.pulse_delay = 250 # delay for pulse mode in milliseconds
@@ -999,7 +1061,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
         self.sync_mode = SyncMode.Ignore # ignore by default
-
+        self.reset_default_on_stop = True # if set, when a profile stops, the state is reset to the default state value
         self.hat_map = {} # map of button id keyed by hat position tuple
         self.hat_positions = list(vjoy.vjoy.Hat.to_continuous_direction.keys())
         self.hat_mode_map = {} # bool table keyed by hat position
@@ -1087,6 +1149,8 @@ class MapToState(gremlin.base_profile.AbstractAction):
         if "sync-mode" in node.attrib:
             self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
 
+        self.reset_default_on_stop = safe_read(node,"default-reset", bool, True)
+
 
         input_type = self.get_input_type()
         if input_type == InputType.JoystickHat:
@@ -1137,6 +1201,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
                 node.set("repeat", safe_format(self.pulse_repeat, bool))
                 node.set("repeat-delay", safe_format(self.pulse_repeat_delay, int))
 
+            node.set("default-reset", safe_format(self.reset_default_on_stop, bool))
 
             input_type = self.get_input_type()
             if input_type == InputType.JoystickHat:
