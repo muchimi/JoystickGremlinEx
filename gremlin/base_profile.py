@@ -528,6 +528,8 @@ class AbstractContainer(ProfileData):
         for action_set in self.get_action_sets():
             for action in action_set:
                 action.setId(gremlin.util.get_guid())
+                if hasattr(action,"generateGuids"):
+                    action.generateGuids() # action ID change
 
         if self.activation_condition:
             self.activation_condition.setId(gremlin.util.get_guid())
@@ -541,7 +543,8 @@ class AbstractContainer(ProfileData):
 
             el = gremlin.event_handler.EventListener()
             el.condition_state_changed.emit(self)
-        
+
+
 
 
 
@@ -1981,8 +1984,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def hasContainers(self) -> bool:
         ''' true if the input item has at least one container '''
         return len(self._containers) > 0
-        
-
+  
     @property
     def hasCalibration(self):
         ''' for axis input devices, returns True if the device has an active calibration '''
@@ -2378,7 +2380,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                         # new style
                         for child in node:
                             if child.tag == "input":
-                                input_item.parse_xml(child, data)
+                                input_item.parse_xml(child, data, extra_data = extra_data)
                                 break
                 self.input_type = InputType.KeyboardLatched # force new input type
                 #syslog.info(f"Loaded key input: {input_item.display_name}")
@@ -2393,7 +2395,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 midi_input_item = MidiInputItem(parent = mode_object)
                 for child in node:
                     if child.tag == "input":
-                        midi_input_item.parse_xml(child, data)
+                        midi_input_item.parse_xml(child, data, extra_data = extra_data)
                 self.input_id = midi_input_item
                 if midi_input_item.is_axis:
                     self.setOverrideInputType(InputType.JoystickAxis)
@@ -2407,7 +2409,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 osc_input_item = OscInputItem(parent = mode_object)
                 for child in node:
                     if child.tag == "input":
-                        osc_input_item.parse_xml(child, data)
+                        osc_input_item.parse_xml(child, data, extra_data)
                 self.input_id = osc_input_item
                 if osc_input_item.is_axis:
                     self.setOverrideInputType(InputType.JoystickAxis)
@@ -2463,7 +2465,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             assert self.input_id is not None,"Error processing input - check types"
                 
 
-        
+        # read containers 
         for child in container_node:
             if child.tag in ("latched", "input", "keylatched") or gremlin.base_profile._is_curve_tag(child.tag):
                 # ignore extra data
@@ -2714,7 +2716,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             
             return container_list
 
-    
+    def generateGuids(self):
+        ''' generate a set of new GUIDs for mapped items '''
+        for container in self.containers:
+            container.generateGuids()
 
     @property
     def debug_display(self):
@@ -3911,7 +3916,8 @@ class Profile():
         verbose = gremlin.config.Configuration().verbose
         import_data = ProfileImportData()
         import_data.used_ids = {} # reset used list
-        
+
+
         profile_converter = gremlin.profile.ProfileConverter()
         profile_was_updated = False
         if not profile_converter.is_current(fname):
@@ -3952,6 +3958,7 @@ class Profile():
             self.state.clear()
         for node in mode_nodes:
             self.state.from_xml(node)
+
 
         # Parse each device into separate DeviceConfiguration objects
         devices = root.xpath("//profile/devices/device")

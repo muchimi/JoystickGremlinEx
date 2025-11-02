@@ -100,6 +100,12 @@ class Ui_Gremlin(object):
         self.actionActivate.setCheckable(True)
         self.actionActivate.setObjectName("actionActivate")
         self.actionActivate.setToolTip("Activate Gremlin Ex")
+
+        self.actionToggleRemoteControl = QtGui.QAction(main_window)
+        self.actionToggleRemoteControl.setCheckable(True)
+        self.actionToggleRemoteControl.setToolTip("Enable or disable remote control of GremlinEx clients")
+        self.actionToggleRemoteControl.setObjectName("actionToggleRemote Control")
+
         self.actionNewProfile = QtGui.QAction(main_window)
         self.actionNewProfile.setObjectName("actionNewProfile")
         self.actionSaveProfile = QtGui.QAction(main_window)
@@ -174,6 +180,10 @@ class Ui_Gremlin(object):
 
         self.actionInputViewer = QtGui.QAction(main_window)
         self.actionInputViewer.setObjectName("actionInputViewer")
+
+
+        
+
         self.menuRecent.addAction(self.actionEmpty)
         self.menuFile.addAction(self.actionNewProfile)
         self.menuFile.addAction(self.actionLoadProfile)
@@ -187,10 +197,12 @@ class Ui_Gremlin(object):
         self.menuFile.addAction(self.actionModifyProfile)
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionExit)
+
         self.menuTools.addAction(self.actionManageModes)
         self.menuTools.addAction(self.actionInputRepeater)
         self.menuTools.addAction(self.actionDeviceInformation)
         self.menuTools.addAction(self.actionReloadDevices)
+        self.menuTools.addAction(self.actionToggleRemoteControl)
 
         #self.menuTools.addAction(self.actionCalibration)
         self.menuTools.addAction(self.actionInputViewer)
@@ -223,11 +235,14 @@ class Ui_Gremlin(object):
         self.toolBar.addAction(self.actionOpen)
         self.toolBar.addAction(self.actionActivate)
 
+
         # separator widget
         widget = QtWidgets.QWidget()
         widget.setMinimumWidth(32)
         #self.toolBar.addWidget(QtWidgets.QLabel(" "*5))
-        self.toolbar_options.addWidget(widget)
+        # self.toolbar_options.addWidget(widget)
+        self.toolbar_options.addAction(self.actionToggleRemoteControl)
+        self.toolbar_options.addSeparator()
         self.toolbar_options.addAction(self.actionInputViewer)
         self.toolbar_options.addAction(self.actionOptions)
 

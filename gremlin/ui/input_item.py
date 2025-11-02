@@ -738,6 +738,11 @@ class InputItemListView(ui_common.AbstractView):
             return
         widgets = gremlin.util.get_layout_widgets(self.scroll_layout)
         return widgets
+    
+    def count(self) -> int:
+        ''' return the number of widgets in the list '''
+        widgets = self.getWidgets()
+        return len(widgets)
 
     def getWidgetAt(self, index):
         ''' gets a specific widgets at the given index '''
@@ -758,10 +763,10 @@ class InputItemListView(ui_common.AbstractView):
         if index != -1:
             self._scroll_to_item(widget)
 
-    def redraw(self):
-        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+    def redraw(self, force : bool = False):
+        gremlin.util.InvokeUiMethod(self._redraw_ui, force) # ensure on UI thread
 
-    def _redraw_ui(self):
+    def _redraw_ui(self, force :bool = False):
         """Redraws the entire view.  must be on UI thread"""
 
         """Redraws the entire model.
@@ -771,9 +776,10 @@ class InputItemListView(ui_common.AbstractView):
         
         ts = gremlin.tabstate.TabState()
         data = ts.getData(self._device_id)
-        if not data or not data.populateEnabled:
-            # do not populate the list
-            return 
+        if not force:
+            if not data or not data.populateEnabled:
+                # do not populate the list yet
+                return 
         self.setUpdatesEnabled(False)
         try:
 
@@ -1386,6 +1392,8 @@ class ActionSetView(ui_common.AbstractView):
         if not Shiboken.isValid(self):
             return
         
+        gremlin.util.assert_ui_thread()
+        
         if self._redraw_lock:
             return
         
@@ -1428,7 +1436,7 @@ class ActionSetView(ui_common.AbstractView):
             if self.model is None:
                 return
             
-            with self.model.data_changed.blocked():
+            with QtCore.QSignalBlocker(self.model): # .data_changed.blocked():
 
                 clipboard = Clipboard()
                 clipboard.disable()
@@ -1908,6 +1916,10 @@ class InputItemWidget(QBoxFrame):
         self._update_repeater() # create the correct repeater widget
         self._update_selected_ui()
         self._update_display_ui()
+
+    @property
+    def input_item(self):
+        return self._input_item
 
     def eventFilter(self, widget, event):
         # trap mouse click
@@ -3164,7 +3176,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             f"{self._get_window_title()} ({mode})",
             hint,
             self._container_remove,
-            self._container_copy,
+            self._copy_container,
             data = profile_data)
         
         
@@ -3577,17 +3589,23 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         """Emits the closed event when this widget is being closed."""
         self.closed.emit(self)
 
-    def _container_copy(self, _):
+    def _copy_container(self, _):
         """Emits the copy clipboard when the widget is being copied """
         clipboard = Clipboard()
         container = self.profile_data
+
+        # create a new container
+
         node = container.to_xml()
+
+        
         xml = lxml.etree.tostring(node)
-        oc = ObjectEncoder(container, xml, container.name, EncoderType.Container)
-        oc.name = container.name
-        clipboard.data = oc
+        encoder = ObjectEncoder(container, xml, container.name, EncoderType.Container)
+        encoder.name = container.name
+        clipboard.data = encoder
         #clipboard.data = self.profile_data
-        syslog.info(f"container {self.profile_data.name} copied to clipboard")
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: syslog.info(f"container {self.profile_data.name} copied to clipboard")
 
     def _handle_interaction(self, widget, action):
         """Handles interaction with widgets inside the container.
@@ -4110,9 +4128,9 @@ class BasicActionWrapper(AbstractActionWrapper):
         action =  self.action_widget.action_data
         node = action.to_xml()
         xml = lxml.etree.tostring(node)
-        oc =  ObjectEncoder(action, xml, action.name, EncoderType.Action)
+        encoded =  ObjectEncoder(action, xml, action.name, EncoderType.Action)
         #clipboard.data = action
-        clipboard.data = oc
+        clipboard.data = encoded
         syslog.info(f"copy to clipboard: {action.name}")
 
 
@@ -4531,8 +4549,11 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                  node = container.to_xml()
                  root.append(node)
             xml = lxml.etree.tostring(root)
-            oc = ObjectEncoder(self.item_data.containers, xml, "multi", EncoderType.MultiContainer)
-            clipboard.data = oc
+            # debug
+            # filename = gremlin.util.save_xml("copy_container.xml", root)
+            # gremlin.util.display_file(filename)
+            encoded = ObjectEncoder(self.item_data.containers, xml, "multi", EncoderType.MultiContainer)
+            clipboard.data = encoded
             syslog.info(f"multi container copied to clipboard")
     
 
@@ -4672,6 +4693,8 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
                         container_list.append(new_container)
 
+              
+
             elif oc.encoder_type == EncoderType.MultiContainer:
                 xml = oc.data
 
@@ -4695,10 +4718,21 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                             container_list.append(new_container)
 
 
+                            # debug
+                            root = lxml.etree.Element("generate-guid-containers")
+                            node = new_container.to_xml()
+                            root.append(node)
+                            # filename = gremlin.util.save_xml("container_new_id.xml", root)
+                            # gremlin.util.display_file(filename)
+                                                    
+
+
+
         else:
             new_container = plugin_manager.duplicate(container, self.item_data)
             new_container.generateGuids()
             container_list.append(new_container)
+
 
         if container_list:
             for new_container in container_list:
@@ -4708,6 +4742,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                     plugin_manager.set_container_data(self.item_data, new_container)
                     self.action_model.add_container(new_container)
                     
+
 
 
             

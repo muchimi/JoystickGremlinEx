@@ -15,6 +15,24 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
+### (m76T95)
+- New: Input Viewer now allows the manual setting of VJOY axes using either the mouse wheel on the current axis visualizer "bar", or the mouse wheel on the input box, or through manual data input.  This will update VJoy devices "live".  This is the companion function to the feature added in T94 that enables VJoy button/hat interaction via the Input Viewer. The rate of change is controlled by the shift and ctrl keys as follows:
+	+ Wheel alone = normal change
+	+ Wheel + shift = slow change
+	+ Wheel + Ctrl = fast change
+	+ Wheel + Shift + Ctrl = very slow change
+	+ DoubleClick = reset the axis to 0.0 (center)
+- New: Added function to enable remote control at design time so the VJoy events set in Input Viewer propagate to clients on the network.  There is a new toolbar icon (left of Input Viewer) to enable/disable this capability at design time.  This may require a bit more work interaction wise.
+- Fix: Gated Axis action paste - possible missing ranges/gates.
+- Fix: Paste action for some actions/containers unique ID not generated on paste
+- Fix: Device inputs may not show on initial profile load until the tab is cycled due to recent on-demand performance optimization.
+
+Monitoring: Reports of a random hard crash believed to be caused by the QT library (the usual suspect) that takes the Python environment down.  If this happens, please include log file and steps to systematically reproduce the crash if possible.
+
+### (m76T94A)
+- Fix: ensure TTS re-starts after profile stop if needed.
+
+
 ### (m76T94)
 
 - New: Map to state gains a "reset to default" option on profile stop.  This will set the state (or states in the case of a hat input) to their defined default values when the profile stops, if the feature is enabled.  If disabled, this will leave the state in whatever state it was.  The default is enabled.

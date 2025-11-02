@@ -199,7 +199,15 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             selected_index = -1
         self._select_item_cb(selected_index)
 
-     
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        return self.input_item_list_model.rows()
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return self.input_item_list_view.count()
 
 
     def _handle_lock_inputs(self, data):
@@ -519,11 +527,9 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.current_mode = mode
         self.ensureInputItems()
         self.input_item_list_model.mode = mode
-        #self.input_item_list_view.select_item(-1)
-        if gremlin.shared_state.isDeviceTabActive(self._device_id):
-            self.input_item_list_model.refresh()
-            self.input_item_list_view.redraw()        
-            self._select_item_cb(self._last_selected_index)
+        self.input_item_list_model.refresh()
+        self.input_item_list_view.redraw(force=True)        
+        self._select_item_cb(self._last_selected_index)
 
  
 

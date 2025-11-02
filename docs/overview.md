@@ -8,7 +8,7 @@ The integration piece comes from the ability to combine inputs together into a l
 
 ## Key Features: What can GremlinEx do?
 
-This is a high level summary of some of the feature set in GremlinEx.
+This is a summary of some of the feature set in GremlinEx.
 
 ### Mapping and transforms
 
@@ -28,9 +28,25 @@ GremlinEx is designed to simplify mapping for a game or application so that the 
 
 GremlinEx is vendor agnostic so any mapping software that is proprietary to a particular manufacturer does not need to be used in most cases.  GremlinEx will use the raw device capabilities as seen by Windows, so as long as the device shows in Windows without software as a game controller, GremlinEx can create mappings for it.
 
+GremlinEx can combine inputs from multiple types of devices:  GremlinEx lets you merge data from different devices (such as axes on two or more controllers), or use controller button and axis values as conditions to decide if other output should go through or not.
+
 ### Dynamic routing
 
 Because GremlinEx has conditions and modes and states, you can "route" the input to different outputs, as well as modify the output in a dynamic way. You can take a single input and map it to different outputs depending on what you need.  So a toe brake on a rudder can become an accelerator or brake pedal for a vehicle on the ground, or an up/down strafe if you are in a spaceship, or plain toe brakes if you are in an airplane with differential left and right brakes.   You can have a button that is normally your primary trigger button control different weapon groups depending on the mode GremlinEx is in.  An axis can inverted dynamically, or different response curves applied to control, for example sensitivity.
+
+### VJoy output
+
+The main purpose of GremlinEx is to map inputs from various devices to VJoy virtual joystick devices.  The idea is while the actual joystick hardware connected to the machine is hidden from an application or game via HidHide, the application or game can then map its inputs to the virtual VJoy devices.  This allows much simpler mapping in a game when multiple hardware devices are available, as well as very complex mapping scenarios using conditions, modes, combination of inputs, tracking of state applied to the logic controlling the VJoy devices.   This feature, when combined with mouse and keyboard management done by GremlinEx allows for a highly customized experience with application and game control.
+
+### VJoy as input
+
+GremlinEx supports concurrently VJoy as an output device, as well as VJoy as an input device in the same profile.  When a VJoy device is configured as an input, it will add a new VJoy device to the list of input devices that can be mapped to in GremlinEx. When the VJoy button, hat or axis is set, either by another GremlinEx mapping, or a third party application, the input will trigger and GremlinEx will generate output based on the mappings for that input.
+
+By design a mapping that triggers a VJoy output will also trigger that VJoy's input, if mapped and enabled, from the same profile.  This allows VJoy to be used as a bank of axes, hats and buttons for multiple parts of a profile to interact with.  A common scenario is to setup extra VJoy devices to increas the number of buttons, hats and axes GremlinEx can use to keep track of states without having to use custom plugins, or the GremlinEx state machine.
+
+### VJoy manual control
+
+GremlinEx's Input Viewer, as of m76T95, can be used to manually set buttons, hats and axes on any VJoy device interactively via the Input Viewer.  This can be helpful to assist with profile design and testing.
 
 ### In-game mapper augmentation
 
@@ -278,7 +294,7 @@ GremlinEx comes with a WASM module for Microsoft Flight Simulator that must be p
 
 GremlinEx was tested with MSFS 2024 including all current beta versions.
 
-### VJOY support
+### VJoy support
 
 GremlinEx was tested with VJOY 2.9.1 64bit.  There are several releases of VJOY however however 2.9.1 is the one tested and verified to function with Windows 11.  
 
@@ -287,6 +303,8 @@ GremlinEx does not currently support force feedback inputs, nor output via VJOY.
 GremlinEx supports up to 8 axes, 128 buttons and four 8-way hats on each VJOY devices.
 
 It is recommended to have no more than three or four output VJOY devices, the primary reason being that many games only understand the first three HID devices.
+
+
 
 ## General structure of GremlinEx
 

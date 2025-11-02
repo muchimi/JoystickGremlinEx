@@ -68,6 +68,16 @@ class ProfileSettingsWidget(QDataWidget):
 
         self._create_ui()
 
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        return 0
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return 0
+
     def ensureLoaded(self):        
         ts = gremlin.tabstate.TabState()
         data = ts.getData(gremlin.shared_state.settings_tab_id)

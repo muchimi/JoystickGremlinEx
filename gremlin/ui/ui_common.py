@@ -289,6 +289,32 @@ class Color():
         return "#374438"
     
     @staticmethod
+    def ansiRed(): 
+        return '\033[91m'
+    @staticmethod
+    def ansiGreen(): 
+        return '\033[92m'
+    @staticmethod
+    def ansiBlue(): 
+        return '\033[94m'
+    @staticmethod
+    def ansiYellow(): 
+        return '\033[93m'
+    @staticmethod
+    def ansiMagenta(): 
+        return '\033[95m'
+    @staticmethod
+    def ansiCyan(): 
+        return '\033[96m'
+    @staticmethod
+    def ansiWhite():     
+        return '\033[97m'
+    @staticmethod
+    def ansiReset(): 
+        return '\033[0m'
+
+
+    @staticmethod
     def cssInputHeader(): 
         background_color = Color.inputTitleColor()
         button_background_color = Color.buttonBackgroundColor()
@@ -1508,7 +1534,7 @@ class QFloatLineEdit(QtWidgets.QWidget):
         self.main_layout.setContentsMargins(0,0,0,0)
         self._widget = QLineEdit()
         self._widget.focusOut.connect(self._focus_out)
-        
+          
         # validate on field lost focus only
         #self._widget.textChanged.connect(self._validate)
 
@@ -1523,7 +1549,6 @@ class QFloatLineEdit(QtWidgets.QWidget):
             self._update_width(chars)
         else:
             self.chars = 0
-
 
     def _focus_out(self):
         # syslog.info("focus loss")
@@ -1569,8 +1594,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
                 return True # cannot change the value if readonly
             v = self._to_value()
             if v is not None:
-                eh = gremlin.event_handler.EventListener()
-                is_shifted = eh.get_shifted_state()
+                el = gremlin.event_handler.EventListener()
+                is_shifted = el.get_shifted_state()
                 factor = 0.1 if is_shifted else 1.0
                 if event.angleDelta().y() > 0:
                     # up
@@ -1616,7 +1641,7 @@ class QFloatLineEdit(QtWidgets.QWidget):
         return super().keyPressEvent(event)
 
 
-    def _update_value(self, value, format = True):
+    def _update_value(self, value, emit : bool = True, format : bool = True):
         gremlin.util.assert_ui_thread()
         if not Shiboken.isValid(self):
             return
@@ -1632,7 +1657,8 @@ class QFloatLineEdit(QtWidgets.QWidget):
             self._widget.setText(s_value)
         if current_value is None or current_value != value:
             self._value = value
-            self.valueChanged.emit(value)
+            if emit:
+                self.valueChanged.emit(value)
 
 
 
@@ -1648,10 +1674,10 @@ class QFloatLineEdit(QtWidgets.QWidget):
             return False
         
 
-    def setValue(self, value : float):
+    def setValue(self, value : float, emit : bool = True):
         ''' sets the value '''
         #if not gremlin.util.is_close(self._value, value):
-        gremlin.util.InvokeUiMethod(self._update_value, value)
+        gremlin.util.InvokeUiMethod(self._update_value, value, emit)
             
 
     def _to_value(self, text : str = None):
@@ -4470,7 +4496,7 @@ class QProgressBar(QtWidgets.QWidget):
         
         self.setRange(min, max)
         self.installEventFilter(self)
-        
+
 
     @property
     def data(self):
@@ -4492,6 +4518,7 @@ class QProgressBar(QtWidgets.QWidget):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
+            syslog.info("PB: wheel!")
             if self._readOnly:
                 return True # cannot change the value if readonly
             v = self._value
@@ -4499,7 +4526,20 @@ class QProgressBar(QtWidgets.QWidget):
                 # keyboard shifted state
                 eh = gremlin.event_handler.EventListener()
                 is_shifted = eh.get_shifted_state()
-                factor = 0.1 if is_shifted else 1.0
+                is_control = eh.get_control_state()
+                if is_control and is_shifted:
+                    # double slow
+                    factor = 0.01
+                elif is_control:
+                    # fast
+                    factor = 1.5
+                elif is_shifted:
+                    # slow
+                    factor = 0.1
+                else:
+                    # normal
+                    factor = 1.0
+                
                 if event.angleDelta().y() > 0:
                     # up
                     v += self._step * factor
@@ -4509,9 +4549,14 @@ class QProgressBar(QtWidgets.QWidget):
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
                 self.valueChanged.emit()
-
-            return True # filter the wheel event
-        return False
+                return True # indicate handled
+        elif t == QtCore.QEvent.Type.MouseButtonDblClick:
+            # set to 0 on double click
+            if self._value != 0:
+                self.setValue(0.0)
+                self.valueChanged.emit()
+            return True # indicate handled
+        return super().eventFilter(widget, event)
 
     @property
     def channels(self) -> int:
@@ -4639,11 +4684,11 @@ class QProgressBar(QtWidgets.QWidget):
         self._max_range = max
         self._update_value()
 
-    def setValue(self, value : float | list):
+    def setValue(self, value : float | list, emit = True):
         if value is not None:
-            gremlin.util.InvokeUiMethod(self._set_value_ui, value)
+            gremlin.util.InvokeUiMethod(self._set_value_ui, value, emit)
 
-    def _set_value_ui(self, value):
+    def _set_value_ui(self, value : float | list, emit : bool = True):
         if not Shiboken.isValid(self):
             return
         if hasattr(value,"toList"):
@@ -4817,12 +4862,12 @@ class QHookedProgressBar(QProgressBar, gremlin.base_classes.JoystickHook):
         super().__init__(orientation, value, min, max, readonly, step, data, parent)
         #super(gremlin.base_classes.JoystickHook, self).__init__()
 
-    def eventFilter(self, widget, event):
-        ''' grab mouse wheel events to avoid random scrolling '''
-        t = event.type()
-        if t == QtCore.QEvent.Type.Wheel:
-            return True
-        return False
+    # def eventFilter(self, widget, event):
+    #     ''' grab mouse wheel events to avoid random scrolling '''
+    #     t = event.type()
+    #     if t == QtCore.QEvent.Type.Wheel:
+    #         return True
+    #     return False
 
 
     def hookDevice(self, device_guid, input_type, input_id):    
@@ -5741,7 +5786,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
     """Displays the current state of all axes on a device (input viewer)"""
 
-    def __init__(self, device : DeviceSummary, parent=None):
+    def __init__(self, device : DeviceSummary, step = 0.01, parent=None):
         """Creates a new instance.
 
         :param device the device of which to display the axes sate
@@ -5749,9 +5794,18 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         """
         super().__init__(parent)
 
+        self._manual_lock = False # semaphore for manual updates
         self.device = device
+        self._readonly = True
+        self._min_range = -1.0
+        self._max_range = 1.0
+        self._step = step
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        
         if device.is_virtual:
             self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
+            self._readonly = False
         else:
             self.setTitle(f"{device.name} - Axes")
 
@@ -5783,7 +5837,10 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 syslog.error(f"AxisCurrentState: unregistered axis [{device.name}] id: [{device.device_guid}] axis: A{axis_id} L{linear_id}]") 
                 continue
 
-            axis_widget = QHookedProgressBar()
+            axis_widget = QHookedProgressBar(data = axis_id)
+            if not self._readonly:
+                axis_widget.valueChanged.connect(self._manual_bar_changed) # axis set by the user
+            axis_widget.setReadOnly(self._readonly)
             
             
             value = values[0]
@@ -5791,7 +5848,10 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             
             if self.device.is_virtual:
                 value_widget = QFloatLineEdit(data = axis_id)
-                value_widget.valueChanged.connect(self._value_changed)
+                value_widget.setReadOnly(self._readonly)
+                if not self._readonly:
+                    value_widget.valueChanged.connect(self._manual_input_changed)
+                
             else:
                 value_widget = QtWidgets.QLabel(f"{value:+0.3f}")
 
@@ -5823,11 +5883,44 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         #axes_layout.addStretch()
         axes_layout.setColumnStretch(i+1,2)
-        self.setLayout(axes_layout)
+        self.main_layout.addLayout(axes_layout)
+
+
+        self._readonly = value
+
+
+    def isReadOnly(self) -> bool:
+        return self._readonly
+    
+    @QtCore.Slot()
+    def _manual_bar_changed(self):
+        ''' called when the axis is manually set '''
+        if self._manual_lock:
+            return 
+        
+        if Shiboken.isValid(self):
+            self._manual_lock = True    
+            widget = self.sender()
+            axis_id = widget.data
+            value = widget.value()
+            gremlin.joystick_handling.set_axis(self.device.device_guid, axis_id, value)
+    
+                
 
     @QtCore.Slot()
-    def _value_changed(self):
-        pass
+    def _manual_input_changed(self):
+        ''' called when the axis is manually set '''
+        if self._manual_lock:
+            return 
+        
+        if Shiboken.isValid(self):
+            self._manual_lock = True    
+            widget = self.sender()
+            axis_id = widget.data
+            value = widget.value()
+            gremlin.joystick_handling.set_axis(self.device.device_guid, axis_id, value)
+            
+                
 
 
     def _set_value(self, axis_id : int, value : float | list):
@@ -5843,7 +5936,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         if hasattr(value,"__iter__"):
             value = value[0]
         if hasattr(widget, "setValue"):
-            widget.setValue(value)
+            widget.setValue(value, emit = False)
         else:
             widget.setText(f"{value:+0.3f}")
         percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
@@ -5856,6 +5949,9 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         :param event the event with which to update the state display
         """
 
+       
+
+
         if event.event_type == InputType.JoystickAxis:
             axis_id = event.identifier
             linear_id = self.device.axis_id_map[axis_id]
@@ -5863,9 +5959,15 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             if self.show_raw and not event.is_virtual:
                 sd = gremlin.event_handler.AxisState()
                 values = sd.getAxisValues(self.device.device_guid, axis_id)
+
                 self._set_value(axis_id, values)    
             else:
                 self._set_value(axis_id, value)
+
+            if self._manual_lock:
+                self._manual_lock = False
+                
+        
 
 
 class HatWidget(QtWidgets.QWidget):
@@ -6344,7 +6446,7 @@ class VigemDeviceWidget(QtWidgets.QWidget):
 
 class JoystickDeviceWidget(QtWidgets.QWidget):
 
-    """ joystick visualization widget  """
+    """ joystick visualization widget in the input viewer """
 
     def __init__(self, device : DeviceSummary, vis_type, parent=None):
         """Creates a new instance.
@@ -6659,11 +6761,14 @@ class ButtonState(QtWidgets.QGroupBox):
         
     @QtCore.Slot()
     def _button_clicked(self):
+        ''' called when the button is clicked'''
         btn = self.sender()
         input_id = btn.data
         device_guid = self._device.device_guid
+        # set the button
         is_pressed = not gremlin.joystick_handling.get_button(device_guid, input_id)
-        gremlin.joystick_handling.set_button(device_guid, input_id, is_pressed)
+        # update the remote clients if needed
+        gremlin.joystick_handling.set_button(device_guid, input_id, is_pressed, update_remote = True)
 
     def unhook(self):
         ''' unhooks buttons '''
@@ -8041,6 +8146,16 @@ class QSplitTabWidget(QDataWidget):
             self.update_used_filter(value)
 
     
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        assert False,"Must be implemented by derived class"
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        assert False,"Must be implemented by derived class"
+
 
     @property 
     def tabData(self):
@@ -10125,14 +10240,15 @@ class QOnOffWidget(QtWidgets.QWidget):
     def value(self):
         return self._value
     
-    def setValue(self, value : bool):
+    def setValue(self, value : bool, emit = True):
         if value != self._value:
             self._value = value
             with QtCore.QSignalBlocker(self._on_widget):
                 self._on_widget.setChecked(value)
             with QtCore.QSignalBlocker(self._off_widget):
                 self._off_widget.setChecked(not value)
-            self.valueChanged.emit(value)
+            if emit:
+                self.valueChanged.emit(value)
 
 
 class QAxisSourceSelector(QtWidgets.QWidget):

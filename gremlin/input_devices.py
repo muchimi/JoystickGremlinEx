@@ -342,6 +342,7 @@ class RemoteControl():
             
             el = gremlin.event_handler.EventListener()
             el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
+            el.remote_control_changed.emit(is_remote)
 
         if self._is_paired != is_paired:
             # pairing mode changed
@@ -1094,7 +1095,16 @@ class RemoteClient():
         self._started = False
 
         el = gremlin.event_handler.EventListener()
-        el.profile_stop.connect(self.stop) # hook stop event
+        # el.profile_stop.connect(self.stop) # hook stop event
+        el.shutdown.connect(self.stop) # hook stop event
+        el.remote_control_enable.connect(self._enable_control)
+        el.remote_control_disable.connect(self.stop)
+
+    def _enable_control(self):
+        ''' called when request to enable remote control has been made '''
+        self.start()
+        remote_control = RemoteControl()
+        remote_control.setRemote(True) # enable remote control
 
     def start(self):
         ''' creates a multicast client send socket on profile start '''

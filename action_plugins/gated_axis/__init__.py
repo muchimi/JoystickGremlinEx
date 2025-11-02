@@ -1789,18 +1789,6 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         gate = self._gate_data.findGate(value) if check_exists else None
         if gate and gate.used:
             return gate
-            # # display a warning a gate is already there
-            # message_box = QtWidgets.QMessageBox()
-            # message_box.setText("A gate already exists at this location")
-            # # pixmap = gremlin.util.load_pixmap("warning.svg")
-            # # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-            # pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
-            # message_box.setIconPixmap(pixmap)
-            # message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
-            # message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-            # gremlin.util.centerDialog(message_box)
-            # message_box.exec()
-            # return
         
         if not gate:
             # get one of the available gates
@@ -1824,12 +1812,12 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         # mark it used
         gate.setUsed(True)
         gate.setValue(value, False)
-        self._reload_widgets()
 
         # update ranges
         self.gate_data._update_ranges()
 
-       
+        self._reload_widgets()
+
         return gate
     
     def _set_gate_count(self, gate_count):
@@ -2294,6 +2282,11 @@ the input is in a specific range of values, or crosses gates.
     def _parse_xml(self, node, data = None, extra_data = None):
         # load gate data
         import gremlin.util
+
+        if extra_data and "paste" in extra_data:
+            paste_mode = extra_data["paste"]
+        else:
+            paste_mode = False
         
         gates = []
         gate_node = gremlin.util.get_xml_child(node,"gates")
@@ -2329,6 +2322,8 @@ the input is in a specific range of values, or crosses gates.
 
     def _is_valid(self):
         return True
+    
+
     
     
     def to_html(self) -> str:

@@ -481,6 +481,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         try:
 
+            if self.inputCount > 0 and self.inputWidgetCount == 0:
+                self.input_item_list_view.redraw(force = True)
+
+
             self.setUpdatesEnabled(False)
 
             config = gremlin.config.Configuration()
@@ -539,6 +543,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     widget.action_model.data_changed.connect(self._create_change_cb(index))
                     widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
                     widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
+
+
 
                     # indicate the input changed
 
@@ -658,7 +664,15 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.device_profile.label = text
 
 
-
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        return self.input_item_list_model.rows()
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return self.input_item_list_view.count()
 
     def input_item_index_lookup(self, index):
         """Returns the profile data belonging to the provided index.

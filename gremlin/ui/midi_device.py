@@ -341,7 +341,7 @@ class MidiInputItem(AbstractInputItem):
         interface = MidiInterface()
         return interface.port_valid(self._port_name)
 
-    def parse_xml(self, node, data = None):
+    def parse_xml(self, node, data = None, extra_data : dict = None):
         ''' reads an input item from xml '''
         if node.tag == "input":
             self.id = read_guid(node, "guid")
@@ -1584,7 +1584,15 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if selected_index is not None:
                 self._select_item_cb(selected_index)
 
-
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        return self.input_item_list_model.rows()
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return self.input_item_list_view.count()
 
     def _handle_lock_inputs(self, data):
         ''' lock all inputs event'''

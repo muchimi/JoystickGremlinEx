@@ -54,6 +54,16 @@ class ModuleManagementController(QtCore.QObject):
         self.view.add_module.connect(self.new_module)
         self.refresh_module_list()
 
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        return 0
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return 0
+
     def module_list(self):
         return [module.file_name for module in self.profile_data.plugins]
 
@@ -379,6 +389,16 @@ This is due to the way dynamic module loading and packaging works in Python.
 
         self.addWidget(self.left_panel_widget)
         self.addWidget(self.right_panel_widget)
+
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        return 0
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return 0
 
     def refresh_ui(self):
         pass

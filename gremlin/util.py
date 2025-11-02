@@ -2463,3 +2463,56 @@ def next_file(file_base, include_extension = True) -> str:
         return ext_file_base
     return no_ext_file
 
+
+def save(file_name, text):
+    ''' 
+    saves text to a file 
+    - file is overwritten if it exists
+    - placed in the user profile folder if no folder is provided 
+    '''
+    if not text:
+        syslog.warning("SAVE: nothing to write")
+        return
+    if isinstance(text, bytes):
+        text = text.decode()
+    if not isinstance(text, str):
+        text = f"{str(text)}"
+
+    dir_name = os.path.dirname(file_name)
+    if not dir_name:
+        file_name = os.path.join(userprofile_path(), file_name)
+    if os.path.exists(file_name):
+        os.unlink(file_name)
+    with open(file_name, "w") as f:
+        f.write(text)
+        f.flush()
+        f.close()
+
+    syslog.info(f"File written to: {file_name}")
+    return file_name
+
+def save_xml(file_name, root):
+    from lxml import etree
+    dir_name = os.path.dirname(file_name)
+    if not dir_name:
+        file_name = os.path.join(userprofile_path(), file_name)
+    if os.path.exists(file_name):
+        os.unlink(file_name)
+    tree = etree.ElementTree(root)
+    tree.write(file_name, pretty_print=True,xml_declaration=True,encoding="utf-8")
+
+    syslog.info(f"File written to: {file_name}")
+    return file_name
+
+def ansiText(value, color = None):
+    ''' converts a value to an ansi colored expression '''
+    import gremlin.ui.ui_common
+    ansiReset = gremlin.ui.ui_common.Color.ansiReset()
+    if not color and isinstance(value, bool):
+        if value:
+            ansiColor = gremlin.ui.ui_common.Color.ansiYellow()
+        else:
+            ansiColor = gremlin.ui.ui_common.Color.ansiGreen()
+    else:
+        ansiColor = color
+    return f"{ansiColor}{value}{ansiReset}"

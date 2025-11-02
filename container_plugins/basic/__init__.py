@@ -259,7 +259,7 @@ class BasicContainer(AbstractContainer):
 
         :param node the XML node with which to populate the container
         """
-        pass
+        
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

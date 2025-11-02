@@ -342,44 +342,73 @@ def get_button(guid, index) -> bool:
        
 
 
-def set_button(guid, index : int, is_pressed : bool):
-    ''' sets a vjoy device button if the index and guid exists '''
+def set_button(guid, index : int, is_pressed : bool, update_remote : bool = False):
+    ''' sets a vjoy device button if the index and guid exists 
+    
+    :param guid: vjoy device ID
+    :param index: button id
+    :param is_pressed: state of the button to set
+    :param update_remot: if enabled, and remote control is enabled, also updates the remote client
+    
+    '''
     import gremlin.event_handler
+    import gremlin.input_devices
     sd = gremlin.event_handler.JoystickState()
     if isinstance(guid, str):
         guid = gremlin.util.parse_guid(guid)
+
+    device = get_device(guid)        
+    if not device:
+        syslog.error(f"VJOY SET BUTTON: Don't know device [{guid}]")
+        return 
     
-    if sd.outputIgnored(guid):
+    if not device.is_virtual and sd.outputIgnored(guid):
         # output ignored 
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose:
             device = device_info_from_guid(guid)
             syslog.info(f"VJOY SET BUTTON: {device.name} output ignored [{index}] pressed: {is_pressed}")
         return
-    device = get_device(guid)
-    if device and device.is_virtual:
-        vjoy_id = device.vjoy_id
-        if 0 < index <= device.button_count:
-            proxy = gremlin.joystick_handling.VJoyProxy()
-            proxy[vjoy_id].button(index).is_pressed = is_pressed
     
-def set_axis(guid, index : int, value : float):
+    # local input    
+    vjoy_id = device.vjoy_id
+    if 0 < index <= device.button_count:
+        proxy = gremlin.joystick_handling.VJoyProxy()
+        proxy[vjoy_id].button(index).is_pressed = is_pressed
+
+        if update_remote:
+            (_, is_remote) = gremlin.input_devices.remote_state.state
+            if is_remote:
+                remote_client = gremlin.input_devices.remote_client
+                remote_client.send_button(vjoy_id, index, is_pressed)
+             
+    
+def set_axis(guid, index : int, value : float, update_remote : bool = False):
     ''' sets a vjoy axis '''
     import gremlin.event_handler
     sd = gremlin.event_handler.JoystickState()
-    if sd.outputIgnored(guid):
+    device = get_device(guid)
+    if not device:
+        syslog.error(f"VJOY SET AXIS: Don't know device [{guid}]")
+        return 
+    if not device.is_virtual and sd.outputIgnored(guid):
         # output ignored 
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose:
-            device = device_info_from_guid(guid)
             syslog.info(f"VJOY SET AXIS: {device.name} output ignored [{index}] value: {value: 0.3f}")
         return
-    device = get_device(guid)
+    
     if device and device.is_virtual:
         vjoy_id = device.vjoy_id
         if 0 < index <= device.axis_count:
             proxy = gremlin.joystick_handling.VJoyProxy()
             proxy[vjoy_id].axis(index).value = value
+
+            if update_remote:
+                (_, is_remote) = gremlin.input_devices.remote_state.state
+                if is_remote:
+                    remote_client = gremlin.input_devices.remote_client
+                    remote_client.send_axis(vjoy_id, index, value)
 
 
 

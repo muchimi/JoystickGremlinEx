@@ -1169,15 +1169,15 @@ class ConditionHelper:
         if isinstance(condition, ActivationCondition):
             node = condition.to_xml()
             xml = lxml.etree.tostring(node)
-            oc = ObjectEncoder(condition, xml, "activation-condition", EncoderType.ActivationCondition)
-            clipboard.data = oc
+            encoded = ObjectEncoder(condition, xml, "activation-condition", EncoderType.ActivationCondition)
+            clipboard.data = encoded
             syslog.info(f"activation condition copied to clipboard")
         elif isinstance(condition, AbstractCondition):
             # regular condition
             node = condition.to_xml()
             xml = lxml.etree.tostring(node)
-            oc = ObjectEncoder(condition, xml, "condition", EncoderType.Condition)
-            clipboard.data = oc
+            encoded = ObjectEncoder(condition, xml, "condition", EncoderType.Condition)
+            clipboard.data = encoded
             syslog.info(f"condition copied to clipboard")
         else:
             syslog.warning("Unable to copy data - unsupported condition type")

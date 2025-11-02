@@ -668,6 +668,13 @@ class EventListener:
 	calibration_options_changed = Signal(object) # fires when calibration options are changed for the UI to update (InputItem)
 	sync_input = Signal(object) # request to sync the input (InputItem)
 	
+	remote_control_enable = Signal() # request to enable remote control
+	remote_control_disable = Signal() # request to disable remote control
+	remote_control_changed = Signal(bool) # tell the UI the remote control is ON (bool), True = enabled
+
+	request_vjoy_axis_change = Signal(object, int, float) # request to change axis for VJOY (device, axis_id, value)
+	
+
 	def __init__(self):
 		"""Creates a new instance."""
 		import gremlin.windows_event_hook
@@ -1394,6 +1401,7 @@ class EventListener:
 		
 		is_virtual = device.is_virtual if device is not None else False
 		if is_virtual:
+			input_type = None
 			vjoy_id = device.vjoy_id
 			if self.js.inputIgnored(data.device_guid):
 				# ignore if the device is set to input ignore

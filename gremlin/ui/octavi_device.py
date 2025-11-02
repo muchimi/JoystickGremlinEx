@@ -709,6 +709,16 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             selected_index = -1
         self._select_item_cb(selected_index)
 
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        return self.input_item_list_model.rows()
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return self.input_item_list_view.count()        
+
     def _handle_lock_inputs(self, data):
         ''' lock all inputs event'''
         if data == self.device_guid:
@@ -938,4 +948,5 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
+        self.input_item_list_view.redraw(force = True)
         self._select_item_cb(self.input_item_list_view.current_index, emit)

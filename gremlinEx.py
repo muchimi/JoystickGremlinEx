@@ -342,7 +342,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
         el.input_selection_changed.connect(self._input_changed_handler)
-        
+        el.remote_control_changed(self._remote_control_changed)
 
         
         # hook input selection
@@ -1186,6 +1186,18 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             el.profile_stop_toolbar.emit()
         self.activate(activate)
 
+    def toggle_remote(self, enable):
+        el = gremlin.event_handler.EventListener()
+        if enable:
+            # request to enable
+            el.remote_control_enable.emit()
+        else:
+            # request to disable
+            el.remote_control_disable.emit()
+
+
+
+
 
     def abort(self, message = None):
         gremlin.util.InvokeUiMethod(self._abort_ui, message) # run on UI thread
@@ -1669,6 +1681,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionActivate.triggered.connect(self.menu_activate)
         self.ui.actionOpen.triggered.connect(self.load_profile)
         self.ui.actionSave.triggered.connect(self.save_profile)
+        self.ui.actionToggleRemoteControl.triggered.connect(self.toggle_remote)
         
 
         # Tray icon
@@ -3122,7 +3135,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             return
         
         verbose = gremlin.config.Configuration().verbose_mode_inputs
+        # verbose = True
         
+        widget = None
         try:
         
             self._change_input_lock.acquire_lock()
@@ -3144,6 +3159,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not force_update and self._last_input_change_timestamp + self._input_delay > time.time():
                     # delay not occured yet
                     return
+            
             self._last_input_change_timestamp = time.time()
 
             
@@ -3176,16 +3192,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # no current data
                 return
             
-            # if not tabdata.populateEnabled:
-            #     # enable widget population for this tab for on-demand UI loading
-            #     if verbose: syslog.info(f"SELECT INPUT: activate tab for device: {tabdata.device.name}")
-            #     widget = self.getRegisteredWidget(device_guid)
-            #     # if not widget:
-            #     #     pass
+
           
             current_device_guid = tabdata.device_guid
             current_input_type, current_input_id = self._get_last_input(current_device_guid)
 
+            # get the device widget
+            widget = self.getRegisteredWidget(device_guid)
+
+            input_count = widget.inputCount
+            input_widget_count = widget.inputWidgetCount
+            if verbose: syslog.info(f"Device widget: input count: {input_count:,}  widget count: {input_widget_count}")
+
+            if input_count and input_widget_count == 0:
+                # widget not loaded, load it
+                widget.refresh(emit = False)
+                input_widget_count = widget.inputWidgetCount
+                if verbose: syslog.info(f"Post refresh: Device widget: input count: {input_count:,}  widget count: {input_widget_count}")
             
             #device = gremlin.joystick_handling.device_info_from_guid(device_guid)
             has_inputs = gremlin.util.compare_guid(device_guid, (gremlin.shared_state.settings_tab_guid, gremlin.shared_state.plugins_tab_guid)) # settings and plugins tabs don't have inputs
@@ -3209,7 +3232,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 input_id = input_item.input_id
                 has_containers = len(input_item.containers) > 0
                 switch_input = not input_item.selected or not has_containers # switch inputs if the input is not currently selected
-
+                
+               
 
             if verbose:
                 syslog.info(f"SELECT INPUT: new input: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}  current mode: {gremlin.shared_state.current_mode}")
@@ -3224,38 +3248,46 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # validate the requested device exists (this could be because the device is disconnected for example)
                 
                 if index is None:
-                    syslog.warning(f"SELECT INPUT: tab not found for device {gremlin.util.normalize_guid(device_guid)} - device does not exist - selecting default")
-                    # change to the first
-                    device : DeviceSummary = gremlin.joystick_handling.default_device()
-                    if not device:
-                        syslog.warning(f"SELECT INPUT: no default device to select found - aborting selection")
-                        return
-                    device_guid = device.device_guid
-                    # get a default input for that device (first axis or first button)
-                    if device.axis_count:
-                        input_id = device.getAxisInputId(0)
-                    elif device.button_count:
-                        input_item = self._get_input_item(device_guid, 0)
+                    device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+                    if device.is_virtual:
+                        # use the current tab if the VJOY device is not visible
+                        last_device_guid, last_input_type, input_id = self.config.get_last_input(device_guid)
+                        index = self._find_tab_index(device_guid)
+
                     else:
-                        syslog.warning(f"SELECT INPUT: default device has no default input - aborting selection")
-                        return
+                        # not virtual
+                        syslog.warning(f"SELECT INPUT: tab not found for device {gremlin.util.normalize_guid(device_guid)} - device does not exist - selecting default")
+                        # change to the first
+                        device : DeviceSummary = gremlin.joystick_handling.default_device()
+                        if not device:
+                            syslog.warning(f"SELECT INPUT: no default device to select found - aborting selection")
+                            return
+                        device_guid = device.device_guid
+                        # get a default input for that device (first axis or first button)
+                        if device.axis_count:
+                            input_id = device.getAxisInputId(0)
+                        elif device.button_count:
+                            input_item = self._get_input_item(device_guid, 0)
+                        else:
+                            syslog.warning(f"SELECT INPUT: default device has no default input - aborting selection")
+                            return
 
-                    switch_input = True
+                        switch_input = True
 
-                    index = self._find_tab_index(device_guid)
-                    if index is None:
-                        syslog.warning(f"SELECT INPUT: default device not found in device tabs: {str(device)} - aborting selection")
-                        return
+                        index = self._find_tab_index(device_guid)
+                        if index is None:
+                            syslog.warning(f"SELECT INPUT: default device not found in device tabs: {str(device)} - aborting selection")
+                            return
 
 
-                with QtCore.QSignalBlocker(self.ui.devices):
-                    self.ui.devices.setCurrentIndex(index)
-                    gremlin.shared_state.current_tab_device_guid = device_guid
-                    
+                        with QtCore.QSignalBlocker(self.ui.devices):
+                            self.ui.devices.setCurrentIndex(index)
+                            gremlin.shared_state.current_tab_device_guid = device_guid
+                            
 
-                if verbose: syslog.info(f"Tab change complete: device {gremlin.util.normalize_guid(device_guid)}")
-                switch_tabs = True # we are switching tabs
-                switch_input = True # we are switching inputs
+                        if verbose: syslog.info(f"Tab change complete: device {gremlin.util.normalize_guid(device_guid)}")
+                        switch_tabs = True # we are switching tabs
+                        switch_input = True # we are switching inputs
 
 
             if switch_tabs and not force_switch and not config.highlight_autoswitch:
@@ -3288,7 +3320,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._update_highlight_toolbar_enabled()
 
             if not switch_input:
-                widget = self.getRegisteredWidget(device_guid)
+                
                 if widget and isinstance(widget, gremlin.ui.ui_common.QSplitTabWidget):
                     current_input_id = widget.getContentInputId()
                     if current_input_id:
@@ -3297,7 +3329,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if input_id is not None and switch_input:
                 # select a particular input within a tab
-                widget = self.getRegisteredWidget(device_guid)
+                
 
                 if widget:
                     if isinstance(widget, gremlin.ui.ui_common.QSplitTabWidget): # some tabs are not the standard widget - ignore those as they have no inputs
@@ -3317,8 +3349,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         #widget.refresh(False)
 
                         item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
-                        # if not item:
-                        #     item = widget.input_item_list_view.select_item(index, emit = False)
                         if verbose: assert item is not None, f"SELECT: sync issue: no selection"
                         item = widget.input_item_list_view.selected_item()
                         if verbose: assert item is not None, f"SELECT: sync issue: no selection"
@@ -3381,7 +3411,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
                 # current input 
-                if hasattr(widget,"input_item_list_view"):
+                if widget and hasattr(widget,"input_item_list_view"):
                     lv : gremlin.ui.input_item.InputItemListView = widget.input_item_list_view
                     item : gremlin.base_profile.InputItem = lv.selected_item()
                     assert item is not None, f"SELECT: sync issue: no selection"
@@ -3647,8 +3677,22 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         activate_icon = QtGui.QIcon()
         activate_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
         activate_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
-        self.ui.actionActivate.setCheckable(True)
+
+        #self.ui.actionActivate.setCheckable(True)
         self.ui.actionActivate.setIcon(activate_icon)
+
+
+        remote_icon = load_icon("mdi.remote", qta_color=normal_color)
+        remote_on_icon = load_icon("mdi.remote", qta_color=active_color)
+        pixmap_off = remote_icon.pixmap(24,24)
+        pixmap_on = remote_on_icon.pixmap(24,24)
+
+        remote_activate_icon = QtGui.QIcon()
+        remote_activate_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
+        remote_activate_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
+        
+        #self.ui.actionToggleRemotecontrol.setCheckable(True)
+        self.ui.actionToggleRemoteControl.setIcon(remote_activate_icon)
         
 
 
@@ -4048,6 +4092,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         import gremlin.input_devices
         self._is_active = is_active
         self._update_status_bar(gremlin.input_devices.remote_state.to_state_event())
+
+    def _remote_control_changed(self, enabled : bool):
+        gremlin.util.InvokeUiMethod(self._remote_control_changed_ui, enabled)
+    
+    def _remote_control_changed_ui(self, enabled : bool):
+        ''' called when remote control state changes '''
+        with QtCore.QSignalBlocker(self.ui.actionToggleRemoteControl):
+            self.ui.actionToggleRemoteControl.setChecked(enabled)
 
     def _update_status_bar(self, event = None):
         # updates the status bar
