@@ -15,6 +15,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
+### (m76T95A) hotfix
+- Fix: SetAxis ignores execution mode and forces relative mode.
+
 ### (m76T95)
 - New: Input Viewer now allows the manual setting of VJOY axes using either the mouse wheel on the current axis visualizer "bar", or the mouse wheel on the input box, or through manual data input.  This will update VJoy devices "live".  This is the companion function to the feature added in T94 that enables VJoy button/hat interaction via the Input Viewer. The rate of change is controlled by the shift and ctrl keys as follows:
 	+ Wheel alone = normal change

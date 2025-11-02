@@ -4824,21 +4824,27 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             elif self.action_mode == VjoyAction.VJoySetAxis:
                 # set the value on the specified axis
-                if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                    target_value_valid = self.target_value_valid or self.action_data.use_relative_value
-                    if target_value_valid and fire_event:
-                        target_value = self.target_value
-                        # read the current output axis value
-                        value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
-                    
-                        # apply the offset
-                        value = gremlin.util.clamp(value + target_value)
-                        if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
-                        self.action_data.axis_last_value = value
-                        if is_local:
-                            joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
-                        if is_remote:
-                            self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, self.target_value)
+                if fire_event:
+                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                        target_value_valid = self.target_value_valid or self.action_data.use_relative_value
+                        if target_value_valid and fire_event:
+                            target_value = self.target_value
+
+                            if self.action_data.use_relative_value:
+                                # read the current output axis value
+                                value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+                                # apply the offset
+                                value += target_value
+                            else:
+                                value = target_value
+                            
+                            value = gremlin.util.clamp(value)
+                            if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
+                            self.action_data.axis_last_value = value
+                            if is_local:
+                                joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
+                            if is_remote:
+                                self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, self.target_value)
 
 
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
@@ -4852,49 +4858,50 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     remote_state.mode = self.action_mode
 
             elif self.action_mode == VjoyAction.VJoySetAxisStepped:
-                latched = self.action_data._stepped_latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id
-                primary = event.device_guid == self.hardware_device_guid and event.identifier == self.hardware_input_id
-           
-                if primary or latched:
-                    trigger = False
-                    trigger = (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release)
-                    if trigger:
+                if fire_event:
+                    latched = self.action_data._stepped_latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id
+                    primary = event.device_guid == self.hardware_device_guid and event.identifier == self.hardware_input_id
+            
+                    if primary or latched:
                         trigger = False
-                        key = ("stepped-axis",self.vjoy_input_id)
-                        device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
-                        if not key in device.data:
-                            device.data[key] = self.action_data.target_step_start_index
-                        start_index = device.data[key]
-                        index = start_index
-                        direction = self.action_data.target_step_direction
-                     
-                        if primary:
-                            # up direction
-                            if verbose: syslog.info(f"STEPPED AXIS: Step {'up' if direction == 1 else 'down'}")
-                            index += direction
-                            trigger = True
-                        elif latched:
-                            # down direction
-                            if verbose: syslog.info(f"STEPPED AXIS: Step {'down' if direction == 1 else 'up'}")
-                            index -= direction
-                            trigger = True
-
+                        trigger = (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release)
                         if trigger:
-                            
-                            count = len(self.action_data.target_step_list)
-                            index = gremlin.util.clamp(index, 0, count-1)
-                            value = self.action_data.target_step_list[index]
-                            if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis {self.vjoy_input_id} value: {value:0.3f}")
-                            self.action_data.axis_last_value = value
-                            if is_local:
-                                if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                                    joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
-                            if is_remote:
-                                self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, value)
+                            trigger = False
+                            key = ("stepped-axis",self.vjoy_input_id)
+                            device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
+                            if not key in device.data:
+                                device.data[key] = self.action_data.target_step_start_index
+                            start_index = device.data[key]
+                            index = start_index
+                            direction = self.action_data.target_step_direction
+                        
+                            if primary:
+                                # up direction
+                                if verbose: syslog.info(f"STEPPED AXIS: Step {'up' if direction == 1 else 'down'}")
+                                index += direction
+                                trigger = True
+                            elif latched:
+                                # down direction
+                                if verbose: syslog.info(f"STEPPED AXIS: Step {'down' if direction == 1 else 'up'}")
+                                index -= direction
+                                trigger = True
 
-                            device.data[key] = index
-                            if verbose: syslog.info(f"STEPPED AXIS: start index: {start_index} new index: {index} step value: {value:0.3f}")
-                            pass
+                            if trigger:
+                                
+                                count = len(self.action_data.target_step_list)
+                                index = gremlin.util.clamp(index, 0, count-1)
+                                value = self.action_data.target_step_list[index]
+                                if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis {self.vjoy_input_id} value: {value:0.3f}")
+                                self.action_data.axis_last_value = value
+                                if is_local:
+                                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                                        joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
+                                if is_remote:
+                                    self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, value)
+
+                                device.data[key] = index
+                                if verbose: syslog.info(f"STEPPED AXIS: start index: {start_index} new index: {index} step value: {value:0.3f}")
+                                pass
                 else:
                     # wrong input
                     result = False
