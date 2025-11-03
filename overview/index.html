@@ -422,6 +422,33 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vjoy-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      VJoy output
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-as-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      VJoy as input
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-manual-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      VJoy manual control
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#in-game-mapper-augmentation" class="md-nav__link">
     <span class="md-ellipsis">
       In-game mapper augmentation
@@ -673,7 +700,7 @@
           <li class="md-nav__item">
   <a href="#vjoy-support" class="md-nav__link">
     <span class="md-ellipsis">
-      VJOY support
+      VJoy support
     </span>
   </a>
   
@@ -984,6 +1011,33 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vjoy-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      VJoy output
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-as-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      VJoy as input
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-manual-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      VJoy manual control
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#in-game-mapper-augmentation" class="md-nav__link">
     <span class="md-ellipsis">
       In-game mapper augmentation
@@ -1235,7 +1289,7 @@
           <li class="md-nav__item">
   <a href="#vjoy-support" class="md-nav__link">
     <span class="md-ellipsis">
-      VJOY support
+      VJoy support
     </span>
   </a>
   
@@ -1429,7 +1483,7 @@
 <p>GremlinEx is oriented towards simpits and hardware vendor integration, without the need to run individual vendor's software.  </p>
 <p>The integration piece comes from the ability to combine inputs together into a logical output via a set of filters and transformations, and output this to applications running on the same system.</p>
 <h2 id="key-features-what-can-gremlinex-do">Key Features: What can GremlinEx do?<a class="headerlink" href="#key-features-what-can-gremlinex-do" title="Permanent link">&para;</a></h2>
-<p>This is a high level summary of some of the feature set in GremlinEx.</p>
+<p>This is a summary of some of the feature set in GremlinEx.</p>
 <h3 id="mapping-and-transforms">Mapping and transforms<a class="headerlink" href="#mapping-and-transforms" title="Permanent link">&para;</a></h3>
 <p>GrmelinEx takes input such physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages, and lets you apply a mapping, also known as a transform, to each input.  GremlinEx supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).</p>
 <p>The mapping process can have logic applied to it, such as conditions, so that the mapping can be conditional on a specific context being true.  This can be "is this button also pressed", "is this axis value in this range", "are these keys also pressed", "is this state off", all in various combinations.  Conditions work across all inputs so one input can be used to manage the mapping of another device.</p>
@@ -1439,8 +1493,16 @@
 <h3 id="agreggation-of-multiple-devices">Agreggation of multiple devices<a class="headerlink" href="#agreggation-of-multiple-devices" title="Permanent link">&para;</a></h3>
 <p>GremlinEx is designed to simplify mapping for a game or application so that the application has much fewer devices to map.  The first major benefit is to reduce the number of input devices, as many titles only "see" a few joysticks, and if you have a simpit, you could have left, right, center controllers all connected at the same time, and you may use some of them, or all of them, to map to the same input.  This can be very difficult to do in some games.</p>
 <p>GremlinEx is vendor agnostic so any mapping software that is proprietary to a particular manufacturer does not need to be used in most cases.  GremlinEx will use the raw device capabilities as seen by Windows, so as long as the device shows in Windows without software as a game controller, GremlinEx can create mappings for it.</p>
+<p>GremlinEx can combine inputs from multiple types of devices:  GremlinEx lets you merge data from different devices (such as axes on two or more controllers), or use controller button and axis values as conditions to decide if other output should go through or not.</p>
 <h3 id="dynamic-routing">Dynamic routing<a class="headerlink" href="#dynamic-routing" title="Permanent link">&para;</a></h3>
 <p>Because GremlinEx has conditions and modes and states, you can "route" the input to different outputs, as well as modify the output in a dynamic way. You can take a single input and map it to different outputs depending on what you need.  So a toe brake on a rudder can become an accelerator or brake pedal for a vehicle on the ground, or an up/down strafe if you are in a spaceship, or plain toe brakes if you are in an airplane with differential left and right brakes.   You can have a button that is normally your primary trigger button control different weapon groups depending on the mode GremlinEx is in.  An axis can inverted dynamically, or different response curves applied to control, for example sensitivity.</p>
+<h3 id="vjoy-output">VJoy output<a class="headerlink" href="#vjoy-output" title="Permanent link">&para;</a></h3>
+<p>The main purpose of GremlinEx is to map inputs from various devices to VJoy virtual joystick devices.  The idea is while the actual joystick hardware connected to the machine is hidden from an application or game via HidHide, the application or game can then map its inputs to the virtual VJoy devices.  This allows much simpler mapping in a game when multiple hardware devices are available, as well as very complex mapping scenarios using conditions, modes, combination of inputs, tracking of state applied to the logic controlling the VJoy devices.   This feature, when combined with mouse and keyboard management done by GremlinEx allows for a highly customized experience with application and game control.</p>
+<h3 id="vjoy-as-input">VJoy as input<a class="headerlink" href="#vjoy-as-input" title="Permanent link">&para;</a></h3>
+<p>GremlinEx supports concurrently VJoy as an output device, as well as VJoy as an input device in the same profile.  When a VJoy device is configured as an input, it will add a new VJoy device to the list of input devices that can be mapped to in GremlinEx. When the VJoy button, hat or axis is set, either by another GremlinEx mapping, or a third party application, the input will trigger and GremlinEx will generate output based on the mappings for that input.</p>
+<p>By design a mapping that triggers a VJoy output will also trigger that VJoy's input, if mapped and enabled, from the same profile.  This allows VJoy to be used as a bank of axes, hats and buttons for multiple parts of a profile to interact with.  A common scenario is to setup extra VJoy devices to increas the number of buttons, hats and axes GremlinEx can use to keep track of states without having to use custom plugins, or the GremlinEx state machine.</p>
+<h3 id="vjoy-manual-control">VJoy manual control<a class="headerlink" href="#vjoy-manual-control" title="Permanent link">&para;</a></h3>
+<p>GremlinEx's Input Viewer, as of m76T95, can be used to manually set buttons, hats and axes on any VJoy device interactively via the Input Viewer.  This can be helpful to assist with profile design and testing.</p>
 <h3 id="in-game-mapper-augmentation">In-game mapper augmentation<a class="headerlink" href="#in-game-mapper-augmentation" title="Permanent link">&para;</a></h3>
 <p>GremlinEx can achieve very complex mappings that are not supported by a game.  It can take complicated inputs (such as from multiple controllers) and map it to something the game does support, and the game does not need to be aware of these inputs, as it will not see them.  The game will only see a supported command.</p>
 <p>For example, you can combine inputs such as a keyboard key in combination with a joystick button and map that to a unique function in the game, even if the buit-in game mapper does not support these kinds of cross-hardware combinations.</p>
@@ -1579,7 +1641,7 @@ The other is the sequential container which allows for actions that are not dire
 <h3 id="microsoft-flight-simulator-simconnect-sdk-support">Microsoft Flight Simulator SimConnect SDK support<a class="headerlink" href="#microsoft-flight-simulator-simconnect-sdk-support" title="Permanent link">&para;</a></h3>
 <p>GremlinEx comes with a WASM module for Microsoft Flight Simulator that must be placed in the community folder.  This module enables GremlinEx to send calculator expressions to the simulator to control aircraft and systems not available yet via the SimConnect SDK.</p>
 <p>GremlinEx was tested with MSFS 2024 including all current beta versions.</p>
-<h3 id="vjoy-support">VJOY support<a class="headerlink" href="#vjoy-support" title="Permanent link">&para;</a></h3>
+<h3 id="vjoy-support">VJoy support<a class="headerlink" href="#vjoy-support" title="Permanent link">&para;</a></h3>
 <p>GremlinEx was tested with VJOY 2.9.1 64bit.  There are several releases of VJOY however however 2.9.1 is the one tested and verified to function with Windows 11.  </p>
 <p>GremlinEx does not currently support force feedback inputs, nor output via VJOY.</p>
 <p>GremlinEx supports up to 8 axes, 128 buttons and four 8-way hats on each VJOY devices.</p>
