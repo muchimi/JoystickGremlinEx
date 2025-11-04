@@ -3095,10 +3095,14 @@ class GateData():
 
         # save range data
 
+        self._update_ranges()
 
         range_info : RangeInfo
         range_list = self.getUsedRanges()
-        assert len(range_list) == len(gate_list)-1,"Invalid range count - check ranges"
+        range_count = len(range_list)
+        used_gates = self.getUsedGates()
+        gate_count = len(used_gates)
+        assert range_count == gate_count - 1,f"Invalid range count: {range_count} gate count: {gate_count}"
         for range_info in range_list:
             if verbose:
                 log_info(f"Saving range {range_info.id} default: {range_info.is_default} min: {range_info.range_min}  max: {range_info.range_max} containers count: {range_info.containerCount:,}")
@@ -3218,6 +3222,7 @@ class GateData():
 
             gate_info : GateInfo = self.getUnusedGate()
             if gate_info is None:
+                syslog.error(f"GATE: XML load - unable to find an unused gate for entry [{index}]")
                 if index >= GateData.max_gates:
                     # no valid gate
                     syslog.error("GATE: too many gates defined")
