@@ -14,6 +14,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T96)
+- Fix: modified VJoy interface keep alive behavior to a persisted object that will check all vjoy devices.  Default is every 120 seconds.
+- Fix: no available gates in gated axis profile loading.  Will auto-add any missing gates if needed until the max of 20, then issue an error message if the profile has too many gates.
 
 ### (m76T95A) hotfix
 - Fix: SetAxis ignores execution mode and forces relative mode.

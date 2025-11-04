@@ -3210,13 +3210,22 @@ class GateData():
 
         gate_list = []
         range_list = []
-        for child in node_gates:
+        for index,  child in enumerate(node_gates):
             gate_default = safe_read(child, "default", bool, False)
             if gate_default:
                 # ignore legacy profile default gate
                 continue
 
             gate_info : GateInfo = self.getUnusedGate()
+            if gate_info is None:
+                if index >= GateData.max_gates:
+                    # no valid gate
+                    syslog.error("GATE: too many gates defined")
+                    continue
+                gate_info = GateInfo()
+                self._gates.append(gate_info)
+
+
             
             gate_id = safe_read(child, "id", str,"")
             

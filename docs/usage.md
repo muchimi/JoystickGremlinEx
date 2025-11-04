@@ -1,8 +1,154 @@
 # GremlinEx feature usage guide
 
+
+## Concepts
+
+### Devices
+
+A device in GremlinEx is a hardware or virtual device used as input.  It can be a joystick or game controller.  A device can also be a state list, a keyboard/mouse, MIDI or OSC input mapper, and special devices.  They appear as tabs in the user interface below the toolbar.  There is one device per compatible input detected by GremlinEx based on what you have connected to the computer, along with any referenced but nor currently connected device, and special devices like settings or plugins.
+
+### Inputs
+
+Each device (non special) has a number of available inputs.  An input for a joystick can be a hat, button or axis.  Some devices, like keyboard/mouse and OSC, do not have defined inputs because inputs are customizable for each profile for these devices.  If you want to trigger an action on a keys or a mouse button, an input mut be defined for the specific key(s) or mouse buttons in the keyboard device.  Similarly, if you want to trigger on receiving an OSC network message, an OSC input must defined in the OSC device.
+
+If you would like to define a new state in the profile, that state needs to be defined as an input in the state device.
+
+To use VJoy as input devices, that must be enabled in the settings tab and GremlinEx will make that Vjoy device available as an input device, each with its own tab.\
+
+### Triggers
+
+Inputs generate triggers.  There are two types of triggers.  Linear and momentary.
+
+#### Linear
+
+Axis or sliders generate an event whenever the input value is changed.  The typical range of these values is normalized in GremlinEx to -1.0 to +1.0 as a floating point number. Center is 0.0.  When a linear trigger is issued, the value is passed on to each mapping to process that value.   If the input device has a curve or calibration applied to it, the value passed to mappings is already curved/calibrated.
+
+#### Momentary
+
+For buttons and keystrokes, a momentary trigger is issued. This is a "press" or "on" event, followed by a "release" or "off" trigger.   Mappings receive these events and process them in their own way.
+
+#### Autoreleases
+
+Some inputs like rotary encoders and some hats only trigger a trigger when the input is changed.  There is no separate "release" although GremlinEx will generate virtual releases in many cases automatically for you.  For example, hats will issue a "press" when the position is changed, and GremlinEx will typically issue a "release" for the old position so mappings can turn off.
+
+This is important because most mappings rely on two triggers to function properly - they need both a "press" and "release.
+
+GremlinEx will usually generate an autorelease trigger for inputs that do not have one, however this may be configurable depending on the input and the mapping through options selected in the profile.
+
+#### Input Detection
+
+GremlinEx monitors the DINPUT (DirectInput) API for notification from the device a button, axis or hat was changed.   The received data is converted to a normalized range of -1.0 to +1.0 with the center position being 0.0.  DINPUT data includes physical devices as well as VJoy data (when VJoy devices are also used as input).
+
+GremlinEx monitors the Windows API for keyboard inputs.  Inputs must be defined in the Keyboard/Mouse device for GremlinEx to actually respond to keystrokes.  GremlinEx handles all keys Windows can recognize, including keys that are not typically visible on a standard keyboard like F13 to F24.  GremlinEx can trigger on latched keys (any number of keys that are pressed together) which goes beyond the modifier keys.  For example it is possible to map non standard key combinations like left-alt + F1 + F2 + F3 together to trigger a specific mapping.   GremlinEx uses scan codes and extended codes.  GremlinEx is not localized for any software but usually expects the QWERTY US English keyboard layout.
+
+GrmelinEx monitors the Windows API for mouse button and wheel inputs.  GremlinEx does not monitor mouse movement.  The mouse button and mouse wheel input are also defined in the Keyboard/Mouse device as a combined input that handles both mouse and keyboard inputs.
+
+GremlinEx monitors UDP for OSC messages.  Received messages decode their parameters to either a linear trigger (if in axis/slider mode) or a momentary trigger.  OSC is used to detect inputs for devices connected to BitFocus companion which includes, for example, Elgato Streamdeck. The listen port must be defined in GremlinEx and enabled.  It is recommended to send OSC packets to the actual local IP address of the host, rather than using localhost.  Note that OSC, since it works over UDP, requires firewalls to allow this traffic.  This is normally enabled by default the first time the UDP port is opened by GremlinEx as Windows will prompt for this access to be allowed, the first time only.  If a firewall is not configured correctly, GremlinEx may not be able to see any of this UDP traffic, thus not be able to trigger.   You can validate OSC traffic via third party free utilities listed in the resources section.
+
+GremlinEx monitors MIDI inputs via the midi interface.  Note that this interface can be networked using certain MIDI open source tools (see resources).  It is recommended to use OSC instead of MIDI in most cases, because it is signficantly simpler to setup than networked MIDI and OSC in general is much more advanced and has higher resolution for axes and sliders.  You can monitor MIDI traffic via third party free utilities listed in the resources section.  
+
+### Outputs
+
+GremlinEx will directly send VJoy output data to the VJoy interface.  GremlinEx does not keep a lock of the VJoy device - the lock is only for the purpose of telling VJoy to expect data.  This is done to avoid conflicts with other applications that may use VJoy.
+
+GremlinEx will send OSC data via UDP to the network using the configured host IP.  Do not use localhost for sending as the data may not be sent.  If you use VPN, be sure to use the local IP of the machine on the local network, not the VPN Tunnel virtual IP.
+
+GremlinEx will send keyboard and mouse data directly via the Windows API.  Note that this may require elevated privileges as some machine security policies may disable the ability for one application to send keyboard/mouse input to another.  If this happens, the policy must be changed to allow GremlinEx to send keystrokes and mouse data to other processes, or GremlinEx must be running under an account that has these permissions.  They are enabled by default unless changed.  The default user on Windows usually is fine and does not require GremlinEx to run in Administrator mode, although it is completely dependent on User Access COntrol (UAC) and the local policies in effect on the machine running GremlinEx.
+
+GremlinEx will send TTS (text to speech) using the PyTsx3 library which internally talks to the Windows speech API.
+
+GremlinEx will send MSFS commands via the Microsoft/Asobo SimConnect API, or the GremlinEx WASM module if installed to execute MSFS calculator code.  Note that many commands are not supported by the default SimConnect SDK, especially when it comes to add-on third party aircraft, and the WASM module should be installed in the simulator's Community folder before running GremlinEx or this functionality may not work.
+
+GremlinEx will play sounds using the QT multimedia library.  WAV file is recommended as the default multimedia library may not support compressed or encoded sound formats like MP3.  Output is directed to the default audio device configured for the application or Windows if no output is configured for GremlinEx.
+
+Additional outputs can be added via a custom user plugin.
+
+### Manual output to VJoy / Injector
+
+While GremlinEx mappings directly output to Vjoy, it is also possible at edit time to manually manipulate VJoy devices from GremlinEx via the Input Viewer.  As of GremlinEx m76T94 allows for for manual output/control of VJoy buttons, hats and axes to  from within Input Viewer.
+
+### Manual output to states / Injector
+
+States can be set via the Map to State action, as well as manually from the Input Viewer.
+
+### Edit vs Run (active) profile mode
+
+Mapping logic is only executed if the profile is set to "active" or runtime.  When GremlinEx is in edit mode, mappings do not get executed and no logic is evaluated.  To test conditions and logic and mappings, the profile must be in "active" mode.
+
+When a profile stops, it actively terminates any active output action by GremlinEx.
+
+
+### Mappings
+
+A mapping represents a set of containers and actions to execute whenever the input is triggered.  There is one mapping for each profile mode, so you can have each input do different things depending on the current profile runtime mode.
+
+A mapping contains one or more containers.
+
+
+### Containers
+
+Once an input is defined (manually or automatically depending on the type of device it is), you can select that input and add a container to it.  A container is an entity that contains one or more actions.  There are multiple container types, each with unique capabilities and options that control how the mapping happens.
+
+Containers by themselves do not produce output.  Containers contain actions.  Containers have options and conditions that determine at runtime what actions execute and how.
+
+Containers must have at least one action.  Nearly all containers can contain multiple actions.
+
+Each container in GremlinEx is a plugin, so it is possible to add custom containers.
+
+The simplest container is called the basic container, which is the default.  Container types also include things like tempoEx that let you map actions based on short press, long press or double-clicks.  There is a sequence container which lets you execute actions either in sequence, or randomly and with variable delays, like a macro.  Containers can also simplify mappings of axis (linear input) to a series of actions by range (Range container), etc...  
+
+Some containers (like range) have similar, but not identical functionality to some actions.
+
+### Actions
+
+Actions are specific entities that actually produce output.  Actions are contained by containers.
+
+GremlinEx actions typically fall in two categories:
+
+- actions that work on a linear input (like an axis or slider)
+- actions that work on a momentary input (like a button or hat)
+
+If you select an input, and you do not see an available action, it's likely because that action does not work with the selected input type.
+
+
+Actions are self contained, meaning that each action functions independently of other actions, which makes it possible for the same action to be added multiple times to the same container for example.
+
+The main action to map to a Vjoy device is called Map to Vjoy.  There is an older, legacy mapper called Remap for compatibiliy with the original Joystick Gremlin, however it's not suggested it gets used for new profiles because of the significant capabilities of Map to Vjoy.
+
+### Axis Curves
+
+All axis inputs and most action output to a Vjoy axis can have curves applied to them that modify the response of the linear input.  Curves are cubic or Bezier and can be hand-drawn if needed.
+
+Curve applied to an input apply to the axis for that device across the entire profile.  This is helpful to deal with deadzones and response curve for very sensitive devices.
+
+In most cases, you will want to apply a curve in the action directly, specifically, Map to Vjoy.   You can also apply curve actions to a container, however this is mostly a legacy feature at this point.
+
+### Conditions
+
+Conditions apply to containers and actions.  A condition is a pass/fail logic gate applied to the input determines if an action should execute or not.  A condition applied to a container appies to all actions it contains.  Conditions applied to actions only apply to that action.
+
+Conditions can check for a key press, a button press, an input axis being in a specific range.  Conditions can also check for a state.
+
+Conditions are either cumulative or "all", so requires all conditions to pass.  In this mode, all conditions have to pass for the mapping to trigger.   The other mode is "any", meaning, one of many. In thi smode, the mapping executes if one condition passes out of all conditions.
+
+Conditions are evaluated as blocks.   If a mapping has nested conditions, they will all be evaluated based on the mapping hierarchy.   Container conditions are evaluated before action conditions.
+
+If a condition fails, the processing of the mapping is aborted.
+
+It can be difficult to diagnose why a mapping does not execute when it is expected to, GremlinEx has three verbose modes dedicated to showing this information at runtime in the log file.  These are turned off by default because they generate a large amount of log data.  The Exec and Extra verbose mode will show the execution tree, and the Condition verbose mode will add to the tree the pass/fail status for each condition and the sequence followed.
+
+### Startup state
+
+It is recommended to configure profiles to set a known startup state.  The Map to Vjoy and Map to State actions both have the ability to "read" the current input, such as an axis or a physical switch or button to synchronize the profile with the hardware.  If sync is not enabled, GremlinEx allows defaults for state and VJoy to be set, although it is recommended in general to:
+
+- use sync mode to ensure the current hardware configuration matches the profile start.  Be mindful that if you sync a throttle, and the lever is not set to idle, the game will get whatever throttle position you've set on GremlinEx start which may not be desireable.
+- use the profile start input in the Mode/profile device to send output to the game on profile start.  This ensures a known state on the game as well.  You can also use the Mode Entry event to send default outputs when entering a mode.
+
 ## User Interface Overview
 
 ![user_interface](assets/ui_overview.png)
+
+![user_interface](assets/ui_overview_2.png)
 
 ### Menu
 

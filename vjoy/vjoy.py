@@ -593,7 +593,7 @@ class VJoy:
     """Represents a vJoy device present in the system."""
 
     # Duration of inactivity after which the keep alive routine is run
-    keep_alive_timeout = 120
+    keep_alive_timeout =  10
 
     # Axis name mapping
     axis_equivalence = {
@@ -647,12 +647,12 @@ class VJoy:
         self._button = self._init_buttons()
         self._hat = self._init_hats()
 
-        # Timestamp of the last time the device was used
-        self._last_active = time.time()
-        self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
-        self._keep_alive_timer.daemon = True
-        self._keep_alive_timer.name = f"VJOY{self.vjoy_id} keepalive"
-        self._keep_alive_timer.start()
+        # # Timestamp of the last time the device was used
+        # self._last_active = time.time()
+        # self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
+        # self._keep_alive_timer.daemon = True
+        # self._keep_alive_timer.name = f"VJOY{self.vjoy_id} keepalive"
+        # self._keep_alive_timer.start()
 
         
 
@@ -705,10 +705,10 @@ class VJoy:
             return
         
 
-        if self._keep_alive_timer:
-            self._keep_alive_timer.cancel()
-            self._keep_alive_timer.join()
-            self._keep_alive_timer = None
+        # if self._keep_alive_timer:
+        #     self._keep_alive_timer.cancel()
+        #     self._keep_alive_timer.join()
+        #     self._keep_alive_timer = None
         if VJoyInterface.vJoyEnabled():
             VJoyInterface.RelinquishVJD(vjoy_id)
             self.reset()

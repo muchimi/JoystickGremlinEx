@@ -1100,10 +1100,12 @@ def joystick_devices_update():
 MAX_VJOY_DEVICE = 16 # number of devices 1..16 supported by VJOY - this includes devices that may not be configured
 MAX_VJOY_BUTTON = 128 # max number of buttons per VJOY device
 
+KEEP_ALIVE_DELAY = 120 # keep alive pulse in second
+
 @gremlin.singleton_decorator.SingletonDecorator
 class VJoyUsageState():
 
-
+    
   
     class MappingData:
         vjoy_id = None
@@ -1128,7 +1130,7 @@ class VJoyUsageState():
     
 
     def __init__(self, profile = None):
-
+        import gremlin.threading
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self.ensure_profile)
 
@@ -1171,7 +1173,40 @@ class VJoyUsageState():
         el.action_delete.connect(self._action_deleted_cb)
         el.profile_unloaded.connect(self._profile_changed)
         el.set_vjoy_button_usage.connect(self._handle_request_button_change)
+        el.shutdown.connect(self._handle_shutdown)
         self.ensure_vjoy()
+
+        
+        self._keep_alive_delay =  KEEP_ALIVE_DELAY
+        self._keep_alive_thread = gremlin.threading.AbortableThread(target = self._keep_alive_runner)
+        self._keep_alive_thread.name = "Vjoy Keepalive"
+        self._keep_alive_thread.start()
+        
+    def _handle_shutdown(self):
+        if self._keep_alive_thread.is_alive():
+            self._keep_alive_thread.stop()
+            self._keep_alive_thread.join()
+            self._keep_alive_thread = None
+
+    def _keep_alive_runner(self):
+        ''' keep alive runner for all vjoy devices '''
+        syslog.info("VJOY: Keepalive start")
+        next_pulse = time.time()
+        
+        while not self._keep_alive_thread.stopped():
+            # ping connected devices
+            now = time.time()
+            if next_pulse <= now:
+                verbose = gremlin.config.Configuration().verbose_mode_vjoy
+                if verbose: syslog.info(f"VJOY: Keepalive {now}")
+                for dev in vjoy_devices():
+                    vid = dev.vjoy_id
+                    vjoy.device_available(vid)
+                    next_pulse = now + self._keep_alive_delay
+            time.sleep(1) # slow tick ok for keep alive
+
+        syslog.info("VJOY: Keepalive shutdown")
+
 
     def _handle_request_button_change(self, vjoy_id, button_id, state, key):
         ''' handles request for button changes '''

@@ -398,6 +398,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.config_option_changed.connect(self._config_option_changed)
         el.device_change_event.connect(self._device_change_cb)
 
+        self.vjoy_state = gremlin.joystick_handling.VJoyUsageState()
+
         self.initialized = True
 
     def _update_toolbar(self):
@@ -5382,15 +5384,6 @@ if __name__ == "__main__":
     gremlin.plugin_manager.ActionPlugins()
     gremlin.plugin_manager.ContainerPlugins()
 
-    # splash_pixmap = QtGui.QPixmap("gremlin-ex-logo.png")
-    # splash = QtWidgets.QSplashScreen(splash_pixmap)
-    # splash.show()
-    # app.processEvents()
-
-    # hid test
-    #_hid = gremlin.hid.Hid()
-
-
     # Create Gremlin UI
     ui = GremlinUi()
 
@@ -5453,6 +5446,8 @@ if __name__ == "__main__":
 
     # generate icons if needed
     #_icon_generator = gremlin.ui.ui_common.IconGenerator()
+
+    
 
     syslog.info("GremlinEx UI launching")
     try:
