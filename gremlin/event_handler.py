@@ -2298,6 +2298,7 @@ class EventHandler(QtCore.QObject):
 			if verbose:
 				syslog.info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 		else:
+			# keyboard event
 			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			device_guid = event.device_guid
 			# index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)

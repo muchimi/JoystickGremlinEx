@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T97)
+
+- Change: simplified how gates and ranges are tracked in Gated Axis.
+- Fix: keyboard device refactor missing a pair of API calls and using legacy no-data widget (this could cause the keyboard device to not update).
+- Fix: backslash "\" key duplicate virtual codes. Note: if you mapped backslash ("\") as an input, you will need to edit the input and re-select it to set the correct data.  Same if you used Map to Keyboard or Map to Keyboard Ex to output the backslash.  The correct code is 0x2B/43.
+- Fix: keyboard device missing a pair of functions post refactor of device widget in T94.
+
 ### (m76T96A) hotfix
 - Fix: incorrect assertion on gated axis using the incorrect gate list.
 

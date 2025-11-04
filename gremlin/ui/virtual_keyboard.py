@@ -455,6 +455,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
                         widget.setIcon(load_icon(icon))
                         widget.setIconSize(QtCore.QSize(14,14))
 
+      
                     action_key = gremlin.keyboard.key_from_name(key_name)
                     widget.key = action_key # this name must be defined in keybpoard.py 
                     widget.normal_key = key

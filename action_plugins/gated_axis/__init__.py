@@ -1308,40 +1308,44 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     @QtCore.Slot(float)
     def _slider_range_add_gate_cb(self, value):
         ''' fired when the user clicked on the groove - adds a gate at that location '''
-        
-        count = len(self._gate_data.getGates())
-        gate = self._gate_data.findGate(value)
-        if not gate and count < 20:
-            self._add_gate(value)
-            self._update_ui()
+        if Shiboken.isValid(self):
+            count = len(self._gate_data.getGates())
+            gate = self._gate_data.findGate(value)
+            if not gate and count < 20:
+                self._add_gate(value)
+                self._update_ui()
 
     @QtCore.Slot(float)
     def _slider_range_configure_cb(self, value):
         ''' fired when the user clicked on the groove - adds a gate at that location '''
-        rng = self._gate_data.findRangeByValue(value)
-        if rng is not None:
-            self._configure_range_exec(rng)
+        if Shiboken.isValid(self):
+            rng = self._gate_data.findRangeByValue(value)
+            if rng is not None:
+                self._configure_range_exec(rng)
         
     @QtCore.Slot(int)
     def _slider_drag_start_cb(self, handle_index):
         ''' called when a handle is being dragged '''
-        self._pushState()
+        if Shiboken.isValid(self):        
+            self._pushState()
 
 
 
     @QtCore.Slot(int, float)
     def _slider_value_changed_cb(self, index, value):
         ''' occurs when the slider values change '''
-        gate : GateInfo = self._gate_data.getGateSliderIndex(index)
-        if gate is not None:
-            gate.setValue(value, emit = False)
+        if Shiboken.isValid(self):
+            gate : GateInfo = self._gate_data.getGateSliderIndex(index)
+            if gate is not None:
+                gate.setValue(value, emit = False)
 
     def _set_slider_gate_value(self, index, value):
         ''' sets a gate value on the slider '''
-        values = self.gate_data.getGateValues(as_dict = True)
-        #values = list(self._slider.value())
-        values[index] = value
-        self._update_slider(values)
+        if Shiboken.isValid(self):
+            values = self.gate_data.getGateValues(as_dict = True)
+            #values = list(self._slider.value())
+            values[index] = value
+            self._update_slider(values)
 
     def _convert(self, values):
         ''' converts values to a list '''
@@ -1786,14 +1790,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
     def _add_gate(self, value, check_exists = True):
         ''' adds gate '''
-        gate = self._gate_data.findGate(value) if check_exists else None
-        if gate and gate.used:
-            return gate
-        
-        if not gate:
-            # get one of the available gates
-            gate : GateInfo = self.gate_data.getUnusedGate()
-
+        gate = self._gate_data.addGate(value, profile_mode= gremlin.shared_state.edit_mode)
         if not gate:
             # ran too many gates
             message_box = QtWidgets.QMessageBox()
@@ -1808,14 +1805,6 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             return
         
         self._pushState() # for undo
-
-        # mark it used
-        gate.setUsed(True)
-        gate.setValue(value, False)
-
-        # update ranges
-        self.gate_data._update_ranges()
-
         self._reload_widgets()
 
         return gate
@@ -1915,7 +1904,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
     def _set_steps_cb(self):
         ''' sets the number of steps to set/reset when the set step button is clicked'''
         target_count = self.sb_steps_widget.value()
-        gate_count = self._gate_data.steps
+        gate_count = self._gate_data.gateCount()
         if gate_count > target_count:
             # if reducing gates - warn
             message_box = QtWidgets.QMessageBox()
@@ -2106,6 +2095,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
                 self._set_slider(lv)
             self._update_steps_cb()
             self._update_output_value()
+
 
     
     def _update_ui(self):

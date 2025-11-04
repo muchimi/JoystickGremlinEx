@@ -446,7 +446,15 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if selected_index is not None and selected_index != -1:
             self._select_item_cb(selected_index)
 
-
+    @property
+    def inputCount(self) -> int:
+        ''' number of inputs in the device '''
+        return self.input_item_list_model.rows()
+    
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return self.input_item_list_view.count()        
 
     def _handle_lock_inputs(self, data):
         ''' lock all inputs event'''
@@ -671,8 +679,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             #self.input_item_list_view.select_item(index, False)
             self.selectRegisteredWidget(key)
         else:
-            widget = InputItemMappingWidget(object_name = "Blank inputitemconfig for keyhboard device (select item cb - no item data)")
-            self.setRightPanelWidget(widget)
+            self._blank_input()
+            # widget = InputItemWidget(object_name = "Blank inputitemconfig for keyhboard device (select item cb - no item data)")
+            # self.setRightPanelWidget(widget)
             
 
         self._last_selected_index = index           

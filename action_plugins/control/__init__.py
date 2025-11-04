@@ -50,9 +50,8 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create(self, action_data):
         ''' initialization '''
-        self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.connect(self._profile_edit_mode_changed)
+        pass
+
         
     def _create_ui(self):
         """Creates the UI components."""
@@ -73,28 +72,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.action_widget.currentIndexChanged.connect(self._action_changed_cb)
 
-        # list of modes the action applies to
-        self.mode_selector = gremlin.ui.ui_common.NoWheelComboBox()
-        self.mode_selector.currentIndexChanged.connect(self._mode_changed_cb)
-
-
-        # list of input widgets/devices
-        self.device_widget = gremlin.ui.ui_common.NoWheelComboBox()
-        self.device_widget.currentIndexChanged.connect(self._device_changed_cb)
-
-        # list of inputs for a given device
-        self.input_widget = gremlin.ui.ui_common.NoWheelComboBox()
-        self.input_widget.currentIndexChanged.connect(self._input_changed_cb)
-        
-
-        # update the device list
-        self._update_mode_list()
-        self._update_device_list()
-        self.action_data.device_guid = self.device_widget.currentData().device_guid
-        self._update_input_list()
-
-        
-        self.grid_input_widget, grid_input_layout = gremlin.ui.ui_common.getGridContainer()
+ 
 
         self.grid_action_widget, grid_action_layout = gremlin.ui.ui_common.getGridContainer()
 
@@ -103,74 +81,15 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         grid_action_layout.addWidget(self.action_widget, row, 1)
         grid_action_layout.addWidget(QtWidgets.QWidget(),row, 2)
 
-        row = 0
-        grid_input_layout.addWidget(QtWidgets.QLabel("Mode:"), row, 0)
-        grid_input_layout.addWidget(self.mode_selector, row, 1)
-        grid_input_layout.addWidget(QtWidgets.QWidget(),row, 2)
-        row +=1
-        grid_input_layout.addWidget(QtWidgets.QLabel("Device:"), row, 0)
-        grid_input_layout.addWidget(self.device_widget, row, 1)
-        row +=1
-        grid_input_layout.addWidget(QtWidgets.QLabel("Input:"), row, 0)
-        grid_input_layout.addWidget(self.input_widget, row, 1)
 
-        
         grid_action_layout.setColumnStretch(2,2)
-        grid_input_layout.setColumnStretch(2,2)
 
         self.main_layout.addWidget(self.grid_action_widget)
-        self.main_layout.addWidget(self.grid_input_widget)
 
-        gremlin.ui.ui_common.synchronize_grids([self.grid_action_widget, self.grid_input_widget])
-
-        
-        self._update_ui()
-        
         
 
     def _populate_ui(self):
         pass
-
-    def _update_mode_list(self):
-        ''' updates the mode display'''
-
-        with QtCore.QSignalBlocker(self.mode_selector):
-            self.mode_selector.clear()
-        
-            # Create mode name labels visualizing the tree structure
-            inheritance_tree = self.profile.build_inheritance_tree()
-            labels = []
-            gremlin.ui.ui_common._inheritance_tree_to_labels(labels, inheritance_tree, 0)
-
-            # Filter the mode names such that they only occur once below
-            # their correct parent
-            mode_names = []
-            display_names = []
-            mode_list = []
-            for entry in labels:
-                if entry[0] in mode_names:
-                    idx = mode_names.index(entry[0])
-                    if len(entry[1]) > len(display_names[idx]):
-                        del mode_names[idx]
-                        del display_names[idx]
-                        mode_names.append(entry[0])
-                        display_names.append(entry[1])
-                else:
-                    mode_names.append(entry[0])
-                    display_names.append(entry[1])
-
-            mode = self.action_data.mode        
-            index = 1
-            set_index = None
-            self.mode_selector.addItem("Any Mode", None)
-            for display_name, mode_name in zip(display_names, mode_names):
-                self.mode_selector.addItem(display_name, mode_name)
-                if set_index is None and mode_name == mode:
-                    set_index = index
-
-            if set_index:
-                self.mode_selector.setCurrentIndex(set_index)
-            
 
     def _update_device_list(self):
         # device list
@@ -245,52 +164,6 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         action = self.action_widget.currentData()
         self.action_data.action = action
         gremlin.config.Configuration().last_control_action = action
-        self._update_ui()
-        
-
-    def _update_ui(self):
-        ''' updates UI config '''
-        action = self.action_data.action
-        show_device = action in (ControlAction.EnableInput, 
-                                 ControlAction.EnableInput,
-                                 ControlAction.ToggleInput)
-        self.grid_input_widget.setVisible(show_device)
-
-
-                    
-    @QtCore.Slot()
-    def _mode_changed_cb(self):
-        mode = self.mode_selector.currentData()
-        self.action_data.mode = mode # None means an mode
-        self._update_device_list()
-        self._update_input_list()
-
-    @QtCore.Slot()
-    def _profile_edit_mode_changed(self):
-        ''' called when the list of modes changes in the profile '''
-        modes = self.profile.get_modes()
-        if self.action_data.mode in modes:
-            # nothing to do
-            return
-        # mode no longer exists
-        self.action_data.mode = None
-        self._update_mode_list()
-        self._update_device_list()
-        self._update_input_list()
-
-
-                            
-    @QtCore.Slot()
-    def _device_changed_cb(self):
-        device = self.device_widget.currentData()
-        self.action_data.device_guid = device.device_guid
-        self._update_input_list()
-
-    @QtCore.Slot()
-    def _input_changed_cb(self):
-        input_item = self.input_widget.currentData()
-        self.action_data.target_input_item = input_item
-        
         
 
 class ControlFunctor(gremlin.base_conditions.AbstractFunctor):
@@ -400,9 +273,6 @@ class Control(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         self.action : ControlAction = ControlAction.TTSAbort
-        self.mode = gremlin.shared_state.edit_mode # selected mode
-        self.device_guid = None
-        self.target_input_item = None
         self.setPriority(899) # run ahead of other actions in the same content but before mode change 
       
 
@@ -411,8 +281,6 @@ class Control(gremlin.base_profile.AbstractAction):
     
     def requires_virtual_button(self):
         return False
-    
-  
     
     def _parse_xml(self, node, data = None, extra_data = None):
         self.mode = None
@@ -423,42 +291,14 @@ class Control(gremlin.base_profile.AbstractAction):
         if "action" in node.attrib:
             action = safe_read(node,"action", str, 0)
             action = ControlAction.from_string(action)
-            if action is None:
-                action = ControlAction.TTSAbort
-            
-            self.action = action
-        
-        if "mode" in node.attrib:
-            self.mode = node.get("mode")
-        if "device_guid" in node.attrib:
-            self.device_guid = parse_guid(node.get("device_guid"))
-            #device_type = gremlin.types.DeviceType.to_enum(node.get("device_type"))
-        for node_target in node:
-            input_item = gremlin.base_profile.InputItem()
-            input_item.from_xml(node_target, data)
-            self.target_input_item = input_item
-            break
-
+            if action:
+                self.action = action
 
     
     def _generate_xml(self):
         node = ElementTree.Element(Control.tag)
 
         node.set("action", safe_format(self.action.name.casefold(), str))
-
-        if self.mode is not None:
-            node.set("mode", self.mode)
-        if self.device_guid is not None:
-            node.set("device_guid", str(self.device_guid))
-            device_type = self.get_device_type()
-            if device_type is not None:
-                node.set("device_type", gremlin.types.DeviceType.to_string(device_type))
-            
-
-        if self.target_input_item is not None:
-            node_target = self.target_input_item.to_xml()
-            node_target.set("target_type", type(self.target_input_item).__name__)
-            node.append(node_target)
 
         return node
     

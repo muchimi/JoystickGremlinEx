@@ -912,11 +912,11 @@ class KeyMap:
 
    
     @staticmethod
-    def register(key):
+    def register(key : Key):
         assert key.lookup_name
+        if key.name in KeyMap._key_map:
+            return # already registered (by special mapping)
 
-
-        
         if key.virtual_code > 0:
             if not key.virtual_code in KeyMap._g_virtual_code_to_key:
                 KeyMap._g_virtual_code_to_key[key.virtual_code] = key
@@ -928,6 +928,8 @@ class KeyMap:
                 name = key.lookup_name.lower().replace(" ", "")
                 if name:
                     KeyMap._key_map[name] = key
+
+
 
     @staticmethod
     def find(scan_code, is_extended):
@@ -1433,6 +1435,7 @@ class KeyMap:
         "apps": ("Apps", 0x5d, True, win32con.VK_APPS),
         "enter": ("Enter", 0x1c, False, win32con.VK_RETURN),
         "esc": ("Esc", 0x01, False, win32con.VK_ESCAPE),
+        "\\" : ("\\", 0x2B, False, 0xDC),
 
 
         "mediaprevtrack": ("Prev Track", 0x23, True, win32con.VK_MEDIA_PREV_TRACK),
@@ -1504,7 +1507,6 @@ for name_, data in KeyMap._g_name_map.items():
     key._lookup_name =  name_
     KeyMap._g_map[(data[1],data[2])] = key
     KeyMap.register(key)
-
 
 # register regular scan codes
 for enum_code_value in scan_codes:
