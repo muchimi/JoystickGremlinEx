@@ -486,6 +486,11 @@ class QSliderWidget(QtWidgets.QWidget):
         finally:
             self.lock.release()
 
+    def markerValue(self) -> float:
+        ''' gets the marker value '''
+        return self._marker_pos
+
+
     def minimum(self) -> float:  # type: ignore
         ''' gets the slider's minimum value '''
         return self._minimum

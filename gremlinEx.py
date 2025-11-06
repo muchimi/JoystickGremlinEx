@@ -695,7 +695,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
 
         el = gremlin.event_handler.EventListener()
-        is_control = el.get_control_state()
+        is_control = el.get_control_shift_state()
         if not self.is_axis_highlighting and not is_control:
             # highlight disabled - reset tracking 
             self._last_state_device_guid = None
@@ -5011,7 +5011,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         el = gremlin.event_handler.EventListener()
         is_hotkey_autoswitch = self.config.highlight_hotkey_autoswitch
-        is_control = el.get_control_state()
+        is_control = el.get_control_shift_state()
         if is_control:
             return False # listen to axis only
         is_shifted = el.get_shifted_state() if is_hotkey_autoswitch else False
@@ -5033,7 +5033,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         is_shifted = el.get_shifted_state()
         if is_shifted:
             return False # listen to buttons only
-        is_control = el.get_control_state() if is_hotkey_autoswitch else False
+        is_control = el.get_control_shift_state() if is_hotkey_autoswitch else False
         return self.config.highlight_input_axis or is_control or self._axis_highlighting_enabled
     
     @property

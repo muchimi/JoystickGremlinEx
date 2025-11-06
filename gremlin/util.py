@@ -2516,3 +2516,17 @@ def ansiText(value, color = None):
     else:
         ansiColor = color
     return f"{ansiColor}{value}{ansiReset}"
+
+
+def triplets(items):
+    ''' returns triplets'''
+    t_list = []
+    # pad to NULL 
+    for t in [items[i:i+3] for i in range(0, len(items), 3)]:
+        count = len(t)
+        if count == 1:
+            t.extend([None, None])
+        elif count == 2:
+            t.append(None)
+        t_list.append(t)
+    return t_list

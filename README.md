@@ -14,6 +14,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T98)
+- Change: Gated Axis - rework of gate add/remove/set logic
+- Change: Gated Axis - enforcement of 0.001 gate separations
+- Change: Gated Axis - enforcement of gate movement boundaries
+- Change: Axis highlight "listen" mode hotkey changed to CTRL+SHFT (to avoid conflicts with Windows hotkeys)
+- Fix: gate index not valid for end values.
+
 ### (m76T97)
 
 - Change: simplified how gates and ranges are tracked in Gated Axis.

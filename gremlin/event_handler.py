@@ -1681,6 +1681,20 @@ class EventListener:
 		if self.get_key_state(rctrl_key):
 			return True
 		return False
+	
+	def get_control_shift_state(self):
+		''' true if control + shift states active '''
+		return self.get_control_state() and self.get_shifted_state()
+	
+	def get_alt_state(self):
+		''' returns true if either of the alt keys are down '''
+		lalt_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_altLeft)
+		if self.get_key_state(lalt_key):
+			return True
+		ralt_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_altRight)
+		if self.get_key_state(ralt_key):
+			return True
+		return False
 
 
 	def _mouse_handler(self, event):
