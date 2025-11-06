@@ -91,9 +91,7 @@ class InputConfigurationWidgetCache():
         syslog.info("UI widget cache dump")
         for index, input_item_config in enumerate(items):
             item: gremlin.base_profile.InputItem = input_item_config.item_data
-            if not current_mode or current_mode != item.profile_mode:
-                current_mode = item.profile_mode
-                syslog.info(f"Mode {current_mode}:")
+           
             if not current_device_guid or current_device_guid != item.device_guid:
                 device_name = gremlin.shared_state.get_device_name(item.device_guid)
                 current_device_guid = item.device_guid
@@ -754,16 +752,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.container_options_widget.setContentsMargins(0,0,0,0)
         
 
-        self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
-        self.container_options_widget.setContentsMargins(0,0,0,0)
-
-        # self._use_default_range_widget = QtWidgets.QCheckBox("Use default range for axis output")
-        # self._use_default_range_widget.setChecked(self._gate_data.use_default_range)
-        # self._use_default_range_widget.clicked.connect(self._use_default_range_changed_cb)
-        # self._use_default_range_widget.setToolTip("When set, the axis output uses the default range setting for value output, sub-ranges can still be used to trigger actions based on entry/exit of ranges")
-
         self._display_label_widget = QtWidgets.QLabel("Display Mode:")
-        self._display_mode_widget = gremlin.ui.ui_common.QComboBox()
+        self._display_mode_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
         self._show_output_mode = show_output_mode
         if show_output_mode:
             self._display_mode_widget.addItem("Output range", userData = DisplayMode.Normal)
@@ -778,38 +768,49 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._display_mode_widget.setCurrentIndex(index)
         self._display_mode_widget.currentIndexChanged.connect(self._display_mode_changed_cb)
 
-        self.container_options_layout.addWidget(self._configure_trigger_widget)
-        #self.container_options_layout.addWidget(self._use_default_range_widget)
-        self.container_options_layout.addWidget(self._display_label_widget)
-        self.container_options_layout.addWidget(self._display_mode_widget)
-        self.container_options_layout.addStretch()
+        widgets = [
+            self._configure_trigger_widget,
+            self._display_label_widget,
+            self._display_mode_widget
+        ]
+
+
+        self.container_options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, left_margin=12)
 
 
         # holds gateinfo widgets
         self.container_gate_ui_widget, self.container_gate_ui_layout = gremlin.ui.ui_common.getVContainer()
         self.container_gate_ui_widget.setContentsMargins(8,0,0,0)
         
-        css_table = "QTableWidget {border: none;}"
+        # css_table = "QTableWidget {border: none;}"
 
         self.container_gate_widget, self.container_gate_layout = gremlin.ui.ui_common.getVContainer()
-        table = QtWidgets.QTableWidget()
-        table.setStyleSheet(css_table)
-        self.gate_table_widget = table
 
+        # table = QtWidgets.QTableWidget()
+        # table.setStyleSheet(css_table)
+        # self.gate_table_widget = table
+
+        
 
         self.gate_count_widget = QtWidgets.QLabel()
-        self.container_gate_layout.addWidget(self.gate_count_widget)
-        self.container_gate_layout.addWidget(self.gate_table_widget)
+        self.container_gate_ui_layout.addWidget(self.gate_count_widget)
+
+        self.gate_flow_widget, self.gate_flow_layout = gremlin.ui.ui_common.getFlowContainer()
+        self.container_gate_ui_layout.addWidget(self.gate_flow_widget)
+
+        #self.container_gate_layout.addWidget(self.gate_table_widget)
         
+
+        self.range_flow_widget, self.range_flow_layout = gremlin.ui.ui_common.getFlowContainer()
         self.container_range_widget, self.container_range_layout = gremlin.ui.ui_common.getVContainer()
-        table = QtWidgets.QTableWidget()
-        table.setStyleSheet(css_table)
-        self.range_table_widget = table
+        # table = QtWidgets.QTableWidget()
+        # table.setStyleSheet(css_table)
+        # self.range_table_widget = table
         
 
         self.range_count_widget = QtWidgets.QLabel()
         self.container_range_layout.addWidget(self.range_count_widget)
-        self.container_range_layout.addWidget(self.range_table_widget)
+        self.container_range_layout.addWidget(self.range_flow_widget)
         
         self.container_gate_ui_layout.addWidget(self.container_gate_widget)
         self.container_gate_ui_layout.addWidget(self.container_range_widget)
@@ -821,9 +822,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         # ranged container
         self._create_output_ui()
 
-        msg = """Removing gates or re-ordering gates may cause a loss of mapping information.
-Please configure gate positions before adding mappings to gates or associated ranges.
-Consider saving existing mappings in gates or ranges via action duplication, saving to templates or clipboard before
+        msg = """Removing gates may cause a loss of mapping information for the gates and their related ranges.
+It is recommended to configure and finalize the general number of gates before adding mappings.
+It is also possible to save existing mappings via action duplication to the same or different container, saving the mappings to templates or the clipboard before
 making changes that impact the order of gates or ranges."""
 
         warning_widget = gremlin.ui.ui_common.QInfoBox(text = msg)
@@ -860,6 +861,8 @@ making changes that impact the order of gates or ranges."""
         self.hook()
         gh = GateEventHandler()
         gh.slider_update_event.connect(self._handle_slider_update)
+        gh.range_trigger_display.connect(self._handle_range_trigger_display)
+        gh.gate_trigger_display.connect(self._handle_gate_trigger_display)
 
 
         # create range data 
@@ -1083,23 +1086,26 @@ making changes that impact the order of gates or ranges."""
         if not Shiboken.isValid(self):
             return
 
-        if not Shiboken.isValid(self.gate_table_widget):
-            return
+        # if not Shiboken.isValid(self.gate_table_widget):
+        #     return
 
         self._gwi_map.clear()
-        table = self.gate_table_widget
-        table.clear()
+        # table = self.gate_table_widget
+        # table.clear()
         
+        flow_layout= self.gate_flow_layout
+        gremlin.util.clear_layout(flow_layout)
+
         row = 0
         col = 0
         gate_list = self.gate_data.getUsedGates()
         gate_count = len(gate_list)
 
-        max_col = self._max_col if gate_count > self._max_col else gate_count
-        max_row = 1 + (len(gate_list) // max_col)
-        max_col += (max_col-1) # spacer columns
-        table.setColumnCount(max_col)
-        table.setRowCount(max_row)
+        # max_col = self._max_col if gate_count > self._max_col else gate_count
+        # max_row = 1 + (len(gate_list) // max_col)
+        # max_col += (max_col-1) # spacer columns
+        # table.setColumnCount(max_col)
+        # table.setRowCount(max_row)
         verbose = gremlin.config.Configuration().verbose_mode_gate
 
         if verbose: syslog.info("Gate table:")
@@ -1110,7 +1116,7 @@ making changes that impact the order of gates or ranges."""
                                     self._delete_gate_confirm_cb,
                                     self._grab_cb,
                                     is_container=gate.hasAnyContainers(),
-                                    parent = table
+                                    parent = self.gate_flow_widget
                                     )
             
             # determine min/max for this gate
@@ -1137,28 +1143,30 @@ making changes that impact the order of gates or ranges."""
                 v1,v2 = v2, v1
             
             widget.setRange(v1,v2)
-            syslog.info (f"sort range: {index} {v1:0.3f} {v2:0.3f} ")
+            
 
             self._update_gate_icon(gate.slider_index, gate)
 
-            table.setCellWidget(row, col, widget)
-            self._gwi_map[gate] = ((row, col), widget)
-            if verbose: syslog.info(f"\t{gate.to_display()} ({row},{col})")
+            flow_layout.addWidget(widget)
+            # table.setCellWidget(row, col, widget)
+            #table.setCellWidget(row, col, QtWidgets.QLabel(""))
+            self._gwi_map[gate] = widget # ((row, col), widget)
+            #if verbose: syslog.info(f"\t{gate.to_display()} ({row},{col})")
 
-            col += 1
-            table.setCellWidget(row, col, QtWidgets.QLabel("")) # spacer
-            col += 1
+            # col += 1
+            # table.setCellWidget(row, col, QtWidgets.QLabel("")) # spacer
+            # col += 1
             
 
             
-            if col >= max_col:
-                col = 0
-                row += 1
+            # if col >= max_col:
+            #     col = 0
+            #     row += 1
         
-        table.resizeColumnsToContents()
-        table.resizeRowsToContents()
-        table.horizontalHeader().setVisible(False)
-        table.verticalHeader().setVisible(False)
+        # table.resizeColumnsToContents()
+        # table.resizeRowsToContents()
+        # table.horizontalHeader().setVisible(False)
+        # table.verticalHeader().setVisible(False)
 
         self.gate_count_widget.setText(f"Gates ({gate_count}):")
 
@@ -1172,18 +1180,20 @@ making changes that impact the order of gates or ranges."""
 
         self._rwi_map.clear()
 
-        table = self.range_table_widget
-        table.clear()
+        # table = self.range_table_widget
+        # table.clear()
+
+        gremlin.util.clear_layout(self.range_flow_layout)
         
         range_list = self._gate_data.updateRanges()
         range_count = len(range_list)
         assert range_count > 0, "Invalid gate data - no ranges are defined "
 
-        max_col = self._max_col if range_count > self._max_col else range_count
-        max_row = 1 + (len(range_list) // max_col)
-        max_col += (max_col-1) # spacer columns
-        table.setColumnCount(max_col)
-        table.setRowCount(max_row)
+        # max_col = self._max_col if range_count > self._max_col else range_count
+        # max_row = 1 + (len(range_list) // max_col)
+        # max_col += (max_col-1) # spacer columns
+        # table.setColumnCount(max_col)
+        # table.setRowCount(max_row)
 
 
         verbose = gremlin.config.Configuration().verbose_mode_gate
@@ -1200,27 +1210,28 @@ making changes that impact the order of gates or ranges."""
                                 rng,
                                 decimals,
                                 self._configure_range_cb,
-                                parent = table
+                                parent = self.range_flow_widget
                                 )
             
-            table.setCellWidget(row, col, widget)
+            #table.setCellWidget(row, col, widget)
+            self.range_flow_layout.addWidget(widget)
             
             if verbose: syslog.info(f"\tRange: {rng.to_display()} ({row},{col})")
-            self._rwi_map[rng] = (row, col)
+            self._rwi_map[rng] = widget # (row, col)
             
-            col += 1
-            table.setCellWidget(row, col, QtWidgets.QLabel(" ")) # spacer
-            col += 1
+        #     col += 1
+        #     table.setCellWidget(row, col, QtWidgets.QLabel(" ")) # spacer
+        #     col += 1
 
-            if col >= max_col:
-                col = 0
-                row += 1
+        #     if col >= max_col:
+        #         col = 0
+        #         row += 1
 
 
-        table.resizeColumnsToContents()
-        table.resizeRowsToContents()
-        table.horizontalHeader().setVisible(False)
-        table.verticalHeader().setVisible(False)
+        # table.resizeColumnsToContents()
+        # table.resizeRowsToContents()
+        # table.horizontalHeader().setVisible(False)
+        # table.verticalHeader().setVisible(False)
 
         self._update_range_display()
 
@@ -1311,7 +1322,7 @@ making changes that impact the order of gates or ranges."""
     def get_gate_gwi(self, gate : GateInfo) -> GateWidgetInfo:
         ''' gets the gate widget info for a given gate '''
         if gate in self._gwi_map.keys():
-            _, widget = self._gwi_map[gate]  # contains (row, col), widget
+            widget = self._gwi_map[gate]  # contains (row, col), widget
             if Shiboken.isValid(widget):
                 return widget
         return None
@@ -1323,9 +1334,12 @@ making changes that impact the order of gates or ranges."""
     def get_range_widget(self, rng : RangeInfo):
         ''' returns the widget for the corresponding range '''
         if rng in self._rwi_map.keys():
-            row, col  = self._rwi_map[rng]
-            widget = self.range_table_widget.cellWidget(row, col)
-            return widget
+            widget = self._rwi_map[rng]
+            if Shiboken.isValid(widget):
+                return widget
+            # row, col  = self._rwi_map[rng]
+            # widget = self.range_table_widget.cellWidget(row, col)
+            #return widget
         return None
 
         
@@ -1434,7 +1448,7 @@ making changes that impact the order of gates or ranges."""
         gate : GateInfo
         gate, widget = self.sender().data  # the button's data field contains the widget to update
         gwi : GateWidgetInfo
-        _, gwi = self._gwi_map[gate]
+        gwi = self._gwi_map[gate]
         if Shiboken.isValid(gwi):
             value = self._axis_value
             gwi.setValue(value)
@@ -1686,7 +1700,7 @@ making changes that impact the order of gates or ranges."""
 
                 with QtCore.QSignalBlocker(self._slider_widget):
                     self._slider_widget.setMarkerValue(value)
-                    self._update_output_value()
+                    
 
                 if verbose_ui: syslog.info(f"GATE Widget: update slider marker completed")
         finally:
@@ -1835,7 +1849,7 @@ making changes that impact the order of gates or ranges."""
             if gate:
                 gremlin.ui.ui_common.MessageBox(prompt ="A gate already exists at this location")
                 return
-        gate = self._gate_data.addGate(value, profile_mode= gremlin.shared_state.edit_mode)
+        gate = self._gate_data.addGate(value)
         if not gate:
             # ran too many gates
             gremlin.ui.ui_common.MessageBox(prompt =f"Unable to add gate.  Check the log.")
@@ -2025,26 +2039,34 @@ making changes that impact the order of gates or ranges."""
                 widget._update_icon()
 
 
-    def _update_output_value(self):
-        gremlin.util.InvokeUiMethod(self._update_output_value_ui)
+    def _handle_range_trigger_display(self):
+        ''' updates the range trigger display '''
+        gremlin.util.InvokeUiMethod(self._handle_range_trigger_display_ui) # ensure UI thread
 
-    def _update_output_value_ui(self):
-        ''' updates triggers and UI when the slider input value changes '''
+    def _handle_range_trigger_display_ui(self):
+        ''' updates the range trigger display '''
         if not Shiboken.isValid(self):
             return
-        if self._gate_data is not None:
-            self.output_range_trigger_widget.setPlainText(self._gate_data.trigger_range_text)
-            # scroll to bottom
-            vbar = self.output_range_trigger_widget.verticalScrollBar()
-            vbar.setValue(vbar.maximum())
 
-            self.output_gate_trigger_widget.setPlainText(self._gate_data.trigger_gate_text)
-            # scroll to bottom
-            vbar = self.output_gate_trigger_widget.verticalScrollBar()
-            vbar.setValue(vbar.maximum())
+        self.output_range_trigger_widget.setPlainText(self._gate_data.trigger_range_text)
+        # scroll to bottom
+        vbar = self.output_range_trigger_widget.verticalScrollBar()
+        vbar.setValue(vbar.maximum())
+
+    def _handle_gate_trigger_display(self):
+        ''' updates the gate trigger display'''
+        gremlin.util.InvokeUiMethod(self._handle_gate_trigger_display_ui) # ensure UI thread
+
+    def _handle_gate_trigger_display_ui(self):
+        ''' updates the gate trigger display'''
+        if not Shiboken.isValid(self):
+            return
+        self.output_gate_trigger_widget.setPlainText(self._gate_data.trigger_gate_text)
+        # scroll to bottom
+        vbar = self.output_gate_trigger_widget.verticalScrollBar()
+        vbar.setValue(vbar.maximum())
+
         
-
-
 
 
     QtCore.Slot()
@@ -2061,7 +2083,7 @@ making changes that impact the order of gates or ranges."""
                 
             
             self._update_steps_cb()
-            self._update_output_value()
+            
 
     QtCore.Slot()
     def _max_changed_cb(self):
@@ -2075,7 +2097,7 @@ making changes that impact the order of gates or ranges."""
             with QtCore.QSignalBlocker(self._slider_widget):
                 self._set_slider(lv)
             self._update_steps_cb()
-            self._update_output_value()
+            
 
 
     
@@ -2085,7 +2107,7 @@ making changes that impact the order of gates or ranges."""
             return
         if Shiboken.isValid(self._slider_widget):
             self._update_slider(self._gate_data.getGateValues())
-            self._update_output_value()
+            
 
     def deleteGate(self, gate):
         gremlin.util.InvokeUiMethod(self._delete_gate_ui, gate)
@@ -2129,15 +2151,16 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.setObjectName(object_name)
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if verbose_ui: syslog.info(f"Gated Axis Action: init : {object_name}")
+        if verbose_ui: 
+            syslog.info(f"Create gate widget for {object_name} profile mode:  {self.action_data.profile_mode}")
         
 
-        syslog.info(f"Create gate widget for {object_name} profile mode:  {self.action_data.profile_mode}")
+        
         self.gate_widget = QGatedAxisWidget(action_data = self.action_data,
-                                                            show_configuration=False,
-                                                            parent=self,
-                                                            object_name = object_name
-                                                            )
+                                            show_configuration=False,
+                                            parent=self,
+                                            object_name = object_name
+                                            )
         
         
         #cache.register(self.action_data, widget)
@@ -2184,7 +2207,7 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
         self.action_data.gate_data.stop()
 
     def process_event(self, event, value, extra_data = None):
-        # all the work happens in the gate widget hook function 
+        #all the work happens in the gate widget hook function 
         return True
 
 
@@ -2231,7 +2254,7 @@ the input is in a specific range of values, or crosses gates.
     
 
     def display_name(self):
-        return f"Gated Axis: gates: [{len(self.gates)}]"
+        return f"Gated Axis: [{self.id}]"
 
     def _cleanup_ui(self):
         ''' clean ourselves up '''

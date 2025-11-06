@@ -1922,7 +1922,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _toggle_tabswitch_highlight(self):
         eh = gremlin.event_handler.EventListener()
         status = self.config.highlight_autoswitch
-        eh.toggle_highlight.emit(not status, None, None)
+        status = not status
+        eh.toggle_highlight.emit(status, None, None)
+        self.config.highlight_autoswitch = status
         
         
     @QtCore.Slot()
@@ -5433,7 +5435,7 @@ if __name__ == "__main__":
 
     syslog.info("Init completed...")
     el.ui_ready.emit()
-    el.toggle_highlight.emit(ui.is_highligthing_enabled, ui.is_axis_highlighting, ui.is_button_highlighting)
+    # el.toggle_highlight.emit(ui.is_highligthing_enabled, ui.is_axis_highlighting, ui.is_button_highlighting)
 
   
     syslog.info("Apply settings...")

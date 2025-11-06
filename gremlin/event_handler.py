@@ -174,7 +174,11 @@ class Event:
 		memo[id(self)] = result
 		for k, v in self.__dict__.items():
 			try:
-				setattr(result, k, copy.deepcopy(v, memo))
+				if k == "extra_data":
+					# shallow copy passed extra data
+					setattr(result, k, v)	
+				else:
+					setattr(result, k, copy.deepcopy(v, memo))
 			except:
 				# cannot copy = do a shallow copy
 				setattr(result, k, v)
@@ -673,6 +677,8 @@ class EventListener:
 	remote_control_changed = Signal(bool) # tell the UI the remote control is ON (bool), True = enabled
 
 	request_vjoy_axis_change = Signal(object, int, float) # request to change axis for VJOY (device, axis_id, value)
+
+	process_manual_event = Signal(object, object, object) # fires when a manual event should be processed (event, value, extra_data)
 	
 
 	def __init__(self):

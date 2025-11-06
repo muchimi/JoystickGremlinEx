@@ -796,8 +796,7 @@ class Configuration(QtCore.QObject):
     
     @restore_profile_mode_on_start.setter
     def restore_profile_mode_on_start(self, value):
-        self._data["restore_mode_on_start"] = value
-        self.save()
+        self._set_data("restore_mode_on_start", value)
 
     @property
     def highlight_autoswitch(self):
@@ -808,8 +807,7 @@ class Configuration(QtCore.QObject):
     def highlight_autoswitch(self, value):
 
         if value != self.highlight_autoswitch:
-            self._data["highlight_switch"] = value
-            self.save()
+            self._set_data("highlight_switch", value)
 
     @property
     def highlight_input_axis(self):

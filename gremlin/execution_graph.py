@@ -546,7 +546,6 @@ class ExecutionContext():
         
         self.used_items = {}  # nodes can only be used once
         self._build_error = False # true if a build error occurred
-        #self._functor_map = {} # quick access to functor IDs
         self._build_execution_tree()
         assert len(self.graph.children) > 0
 
@@ -574,7 +573,7 @@ class ExecutionContext():
         config = gremlin.config.Configuration() 
         self._verbose_exec = config.verbose_mode_execution
         self._verbose_condition = config.verbose_mode_condition
-        self.reset()
+        #self.reset()
         for functor in self._functors:
             functor.hook()
         if config.verbose: syslog.info(f"CONTEXT: profile start with {len(self._functors):,} functors")    
@@ -1343,8 +1342,8 @@ class ExecutionContext():
                         gate_group.parent = action_node
 
                         for gate_info in gates:
-
-                            for condition_type, item_data in gate_info.item_data_map.items():
+                            items = list(gate_info.item_data_map.items())
+                            for condition_type, item_data in items:
                                 if not item_data.containers:
                                     # no containers to process for this condition
                                     continue
@@ -1472,18 +1471,14 @@ class ExecutionContext():
             return False
         
         profile = gremlin.shared_state.current_profile
-        self._functor_map = {}
-        self._node_map = {}
-        self._exec_map = {} # map of node id to the node's execution entry node
+        self._functor_map.clear() # map of functor ID to functors
+        self._node_map.clear()
+        self._exec_map.clear() # map of node id to the node's execution entry node
         verbose = gremlin.config.Configuration().verbose_mode_execution
         mode_source = gremlin.shared_state.current_profile.traverse_mode()
         mode_source.sort(key = lambda x: x[0]) # sort parent to child
         mode_list = [mode for (_,mode) in mode_source if mode] # parent mode first
         # syslog = logging.getLogger("system")
-
-        tracker = gremlin.base_profile.ConditionTracker()
-        eh = gremlin.event_handler.EventHandler()
-
 
         # build the mode tree
         self._mode_tree = ExecutionModeNode()
@@ -1681,8 +1676,11 @@ class ExecutionContext():
                 if not result:
                     return False
         else:
-            if functor.manual_callback and not manual:
-                return False
+            if functor.manual_callback:
+                el = gremlin.event_handler.EventListener()
+                el.process_manual_event.emit(event, value, extra_data)
+                if not manual:
+                    return False
                 
             return functor.process_event(event, value, extra_data)
 
@@ -1746,7 +1744,7 @@ class ExecutionContext():
                 extra_data = {}
             extra_data["node"] = node
 
-            if verbose_detailed:  syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
+            if verbose_detailed:  syslog.info(f"{logTabs}EXEC:[{node.id}] name: [{node.nodeType.name}] description: {node.description}")
             
             if node.nodeType in (ExecutionGraphNodeType.Group,ExecutionGraphNodeType.Gate, ExecutionGraphNodeType.Range):
                 # group type nodes: every subnode is executed regardless of the return value
@@ -1839,7 +1837,7 @@ class ExecutionContext():
                 functor_list = node.getActionFunctors()
                 if functor_list:
                     for functor in functor_list:
-                        if functor.__class__.__name__ == "MapToStateFunctor":
+                        if functor.__class__.__name__ == "GatedAxisFunctor":
                             pass
                         action_result =  self.process_functor(functor, event, value, extra_data, manual)
                         description = str(functor.action_data)

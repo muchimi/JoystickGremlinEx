@@ -302,7 +302,8 @@ class GateInfo():
     ''' holds gate data information '''
     
 
-    def __init__(self, index = -1, id = None, value = None, profile_mode = None, parent = None, delay = 250, slider_index = None, used = False):
+
+    def __init__(self, index = -1, id = None, value = None, parent = None, delay = 250, slider_index = None, used = False):
         ''' holds gate information data 
         :param index: gate index
         :param id: id (str) guid of this gate - unique
@@ -319,8 +320,7 @@ class GateInfo():
 
         assert parent is not None, "Gates must be parented to a GateData object " # = must provide this parameter
         self.parent : GateData = parent
-        if not profile_mode:
-            profile_mode = gremlin.shared_state.current_mode
+
         
         assert value is not None, "Gate must have a value"
         self._id = get_guid() if id is None else id
@@ -329,7 +329,7 @@ class GateInfo():
         value = gremlin.util.clamp(value, -1, 1)
         self._value = value
         self._description = None
-        self.profile_mode = profile_mode
+
         self._last_condition = GateConditionType.OnCross
         self.item_data_map = {}
         
@@ -452,10 +452,12 @@ class GateInfo():
         ''' sets the used flag without firing a change event '''
         self._used = value
 
+
+    
+    
     @staticmethod
     def copy_from(other : GateInfo):
         gi = GateInfo(value = other.value,
-                      profile_mode = other.profile_mode,
                       condition = other.condition,
                       parent = other.parent,
                       delay=other.delay,
@@ -620,16 +622,15 @@ class GateInfo():
 class RangeInfo():
     
 
-    def __init__(self, min_gate, max_gate, profile_mode = None, 
-                    mode = GateRangeOutputMode.Normal, parent = None,  used = False):
-        
+
+    def __init__(self, min_gate, max_gate,  mode = GateRangeOutputMode.Normal, parent = None,  used = False):
 
         assert parent is not None, "Ranges must be parented to a GateData object " # = must provide this parameter
         #assert min_gate is not None and max_gate is not None, "Gates must be provided on range object"
         self.parent : GateData = parent
         self._id = gremlin.util.get_guid()
         # print (f"Range: create new range id: {id}")
-        self.profile_mode = profile_mode
+
         self._output_mode = None
         self._output_range_min = None
         self._output_range_max = None
@@ -744,7 +745,7 @@ class RangeInfo():
 
     def copy_from(self, other : RangeInfo):
         ''' copies data from another range object '''
-        self.profile_mode = other.profile_mode
+
         self._condition = other._condition
         self._output_mode = other._output_mode
         self._fixed_value = other._fixed_value
@@ -1143,6 +1144,8 @@ class GateEventHandler(QtCore.QObject):
 
     unhook_gate = Signal(object) # fires when the gate is unhooked, object = the gate data object
 
+    range_trigger_display = Signal() # adds a range trigger line to the range output display
+    gate_trigger_display = Signal() # adds a gate trigger line to the gate output display
 
 
 
@@ -1275,10 +1278,9 @@ class GateData():
                  process_callback = None,  # callback for process changes
                  ):
         ''' GateData constructor '''
-        import gremlin.macro
         import gremlin.execution_graph
 
-        #assert profile_mode is not None, "profile mode must be provided"
+
         
         self._process_trigger_lock = threading.Lock()
         self._hooked = False
@@ -1611,6 +1613,7 @@ class GateData():
         For gate crossings, we mimic a button push (for now) so functors get both a press and release call
         
         '''
+        import gremlin.execution_graph
 
         self._lock.acquire()
 
@@ -1679,7 +1682,7 @@ class GateData():
 
             # run mode - execute the functors with the gate data
             
-            triggers = self.process_triggers(input_value, self._active_ranges)
+            triggers = self.process_triggers(input_value)
             trigger: TriggerData
 
             # if triggers and gremlin.shared_state.is_running:
@@ -1694,8 +1697,6 @@ class GateData():
             if not gremlin.shared_state.is_running:
                 # raw input value updates
                 self._axis_value = input_value
-                #remove_callbacks = []
-
                 gh = GateEventHandler()
                 gh.slider_update_event.emit(event)
                 gh.fireValueChangedCallbacks(self._device_id, self._input_id, input_value)
@@ -1706,14 +1707,23 @@ class GateData():
                 
                 range_event = event.clone()
                 range_event.event_type = InputType.JoystickAxis # force linear
-                
+                if not range_event.extra_data:
+                    range_event.extra_data = {}
+                range_event.extra_data["triggers"] = triggers
 
     
                 for trigger in triggers:
                     trigger_event = event.clone()
                     trigger_value = value.clone()
+                    
+                    if not trigger_event.extra_data:
+                        trigger_event.extra_data = {}
+                    trigger_event.extra_data["trigger"] = trigger
+
+
                     short_press = False
                     delay = trigger.delay
+                    if verbose: syslog.info(f"Exec Trigger: got trigger: {trigger.mode.name}")
                     match trigger.mode:
                         case TriggerMode.FixedValue:
                             if verbose: syslog.info(f"Exec Trigger: fixed value: {trigger.range.range_display() if trigger.range else trigger.gate.slider_index} : value {input_value:0.3f}")
@@ -1778,15 +1788,20 @@ class GateData():
                         el.custom_joystick_event.emit(trigger_event) # have widgets update at design time
 
                         return True
+                    
                     else:
+                        # runtime mode
+
 
                         if not gremlin.shared_state.runtime_mode in self.valid_mode_list:
                             # incorrect mode or not started yet
+                            verbose = gremlin.config.Configuration().verbose_mode_gate
                             if verbose:
                                 syslog.info(f"GATED AXIS TRIGGER: FAIL - invalid mode [{gremlin.shared_state.runtime_mode}]")
                                 for mode in self.valid_mode_list:
                                     syslog.info(f"\tAvailable modes: [{mode}]")
-                            return
+                                return
+     
 
                         # profile is running - trigger the execution node for the containers
                         # the extra data contains the trigger condition type so the correct execution path is taken
@@ -1794,7 +1809,7 @@ class GateData():
                         extra_data = {}
                         extra_data["condition_type"] = trigger.condition
                         extra_data["trigger"] = trigger
-                        if trigger.is_range:
+                        if trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.InRange, GateConditionType.OutsideRange):
                         
                             if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
                             action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
@@ -1820,12 +1835,18 @@ class GateData():
                                 release = lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, extra_data, True)
                                 worker = gremlin.repeater.PulseWorker(delay, -1, None, release)
                                 worker.start()
-       
+
+
+
                 
             # if verbose:
             #     syslog.info("Trigger: end")
         finally:
             self._lock.release()
+
+
+    
+
 
     def _short_press(self, functor, event, value, delay = 250):
         ''' triggers a short press of a trigger (gate crossing)'''
@@ -1941,8 +1962,8 @@ class GateData():
         gates = self.getGates()
         if not gates:
             # create a pair of gates for new ranges
-            g1 = self.addGate(-1, profile_mode = self.profile_mode, update = False)
-            g2 = self.addGate(1, profile_mode = self.profile_mode, update = False)
+            g1 = self.addGate(-1, update = False)
+            g2 = self.addGate(1, update = False)
             gates = [g1, g2]
             self._update_gate_index()
             self._update_ranges()
@@ -2123,7 +2144,7 @@ class GateData():
         return next((gate for gate in self._gates if gate.id == id), None)
     
 
-    def addGate(self, value : float, profile_mode = None, update = True) -> GateInfo:
+    def addGate(self, value : float,  update = True) -> GateInfo:
         ''' registers a gate and marks it as used, return None on error (if the gate count is exceeded)
         If a gate value already exists, the gate is "nudged" to the next gate
 
@@ -2142,7 +2163,7 @@ class GateData():
             value = v
             
         # add the gate
-        gate = GateInfo(value = value, used = True, profile_mode=profile_mode, parent = self)
+        gate = GateInfo(value = value, used = True, parent = self)
         self._gates.append(gate)
         if update:
             self._update_gate_index() # update the gate index and maps
@@ -2839,7 +2860,7 @@ class GateData():
         
 
 
-    def process_triggers(self, current_value : float , ranges : list[RangeInfo], update_last = True):
+    def process_triggers(self, current_value : float , update_last = True):
         ''' processes an axis input value and returns all triggers collected since the last call based on the previous value
 
         **This is a high frequency call whenever an input is changed**
@@ -2855,18 +2876,20 @@ class GateData():
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_gate
         verbose_detailed = config.verbose_mode_gate and config.verbose_mode_extra
+        gh = GateEventHandler()
 
+        
         with self._process_trigger_lock:
 
 
             tt = TriggerTracking() # tracking object
             tt.clear() # reset any prior triggers
-
+            ranges = self.getUsedRanges() # list of all ranges
 
             last_value = self._last_value # last value processed
             if last_value is None:
                 # not set, first go at processing - setup initial range triggers
-                ranges = self.getUsedRanges() # list of all ranges
+                
                 for r in ranges:
                     if r.valueInRange(current_value):
                         # two triggers - in range and enter range
@@ -3090,21 +3113,27 @@ class GateData():
                 self._last_value = current_value
 
             if not gremlin.shared_state.is_running:
-                # update trigger lines
+                # update trigger lines at edit time
                 for trigger in tt.triggers:
                     mode = trigger.mode
                     
                     if not mode in self.filter_map.keys():
                         self.filter_map[mode] = True
                     if self.filter_map[mode]:
-                        if trigger.is_range:
-                            self._trigger_range_lines.append(str(trigger))
-                        else:
+                        if trigger.is_gate:
                             self._trigger_gate_lines.append(str(trigger))
+                            # keep it within max lines
+                            self._trigger_gate_lines = self._trim_list(self._trigger_gate_lines, self._trigger_line_count)
+                            gh.gate_trigger_display.emit()
                 
-                # keep it within max lines
-                self._trigger_range_lines = self._trim_list(self._trigger_range_lines, self._trigger_line_count)
-                self._trigger_gate_lines = self._trim_list(self._trigger_gate_lines, self._trigger_line_count)
+                        else:
+                            self._trigger_range_lines.append(str(trigger))
+                            # keep it within max lines
+                            self._trigger_range_lines = self._trim_list(self._trigger_range_lines, self._trigger_line_count)
+                            gh.range_trigger_display.emit()
+                        
+                
+                
 
             if verbose_detailed:
                 # dump the triggerrs
@@ -3126,7 +3155,7 @@ class GateData():
         item_data._device_guid = current_item_data._device_guid
         item_data._input_id = current_item_data._input_id
         item_data._is_action = is_action
-        #item_data._profile_mode = current_item_data._profile_mode
+
         item_data._device_name = current_item_data._device_name
 
         # add the input data to the profile
@@ -3338,7 +3367,8 @@ class GateData():
             
             gate_id = safe_read(child, "id", str,"")
             
-            
+            if verbose: 
+                syslog.info(f"GATE XML: loading gate {gate_id}:")
 
             gate_value = safe_read(child, "value", float, 0.0)
             gate_condition = safe_read(child, "condition", str, "")
@@ -3350,7 +3380,7 @@ class GateData():
                 return
             gate_condition = GateConditionType.to_enum(gate_condition)
 
-            gate_info = self.addGate(value = gate_value, profile_mode = profile_mode, update = False) # just add, no range update until all gates are in
+            gate_info = self.addGate(value = gate_value, update = False) # just add, no range update until all gates are in
 
             if paste_mode:
                 # paste mode = keep new gate ID
@@ -3366,7 +3396,7 @@ class GateData():
                 gate_index = safe_read(child,"index",int, 0)
                 gate_info.slider_index = gate_index
 
-            gate_info.profile_mode = profile_mode
+            
             
             
             # gate_info = self.registerGate(gate_value, gate_default)
@@ -3395,12 +3425,11 @@ class GateData():
                     item_node.tag = item_node.get("type")
                     item_data.from_xml(item_node, data, extra_data = extra_data)
                     if paste_mode:
-                        item_data.generateGuids() # update GUIDs if pasting
-                        # root = lxml.etree.Element("test")
-                        # item_data.to_xml(root)
-                        # filename = gremlin.util.save_xml("pasted_item.xml", root)
-                        # gremlin.util.display_file(filename)
+                        item_data.generateGuids() 
+
                     gate_info.item_data_map[condition] = item_data
+                    if verbose: 
+                        syslog.info(f"\tLoading condition: {condition.name}: {str(item_data)}")
       
             # remember added gate
             gate_list.append(gate_info)
@@ -3493,7 +3522,7 @@ class GateData():
             range_info.id = range_id
             range_info.setLastCondition(range_condition)
             range_info.mode = range_mode
-            range_info.profile_mode = profile_mode
+            
             range_info.setUsed(True)
             range_info.g1 = g1
             range_info.g2 = g2
@@ -3601,6 +3630,11 @@ class TriggerData():
     def is_range(self) -> bool:
         ''' true if the trigger is a linear trigger '''
         return self.condition in (GateConditionType.InRange, GateConditionType.OutsideRange)
+    
+    @property
+    def is_gate(self) -> bool:
+        ''' true if the trigger is a gate trigger '''
+        return self.mode in (TriggerMode.GateDecrease, TriggerMode.GateCrossed, TriggerMode.GateCrossed)
 
     @property 
     def raw_value(self) -> float:
@@ -4075,49 +4109,22 @@ class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
     def process_event(self, event, value, extra_data : dict = None):
         verbose = gremlin.config.Configuration().verbose_mode_gate
 
-        if extra_data and "trigger" in extra_data:
-            # if we get a trigger, this is kicked off by the gated axis so we compare types only as we're already in the right branch and checked inputs
-            trigger = extra_data["trigger"]
-            result = False
-            if trigger.gate:
-                condition_type = extra_data["condition_type"]
-                result = self._condition_type == condition_type and self.gate_info.id == trigger.gate.id
-                if verbose: syslog.info(f"GATE TRIGGER {self._condition_type.name}:  result: {result}")
-            return result
 
-
-        if not event.is_axis:
-            return False #  not an axis event
+        trigger = extra_data["trigger"]
+        condition_type = extra_data["condition_type"]
         
-        current_value = value.raw
-        gate_value = self.gate_info.value
-        last_value = self._last_value
-
         
         result = False
-        match self._condition_type:
-            case GateConditionType.OnCross:
-                if current_value >= gate_value:
-                    result = last_value < gate_value
-                elif current_value < gate_value:
-                    result = last_value >= gate_value
-                if verbose: syslog.info(f"GATE CROSS: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {result}")
-                
-            case GateConditionType.OnCrossIncrease:
-                if current_value >= gate_value:
-                    result = last_value < gate_value
-                if verbose: syslog.info(f"GATE CROSS INC: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {result}")
-                
-            case GateConditionType.OnCrossDecrease:
-                if current_value < gate_value:
-                    result = last_value >= gate_value
-                if verbose: syslog.info(f"GATE CROSS DEC: gate: {gate_value:0.3f} current: {current_value:0.3f} last: {last_value:0.3} result: {result}")
-
-        self._last_value = current_value    
-
-        
+        if trigger.gate:
+            if self.gate_info.id != trigger.gate.id:
+                # not the correct gate
+                return False
+            result = self._condition_type == condition_type
+            if verbose: 
+                logTabs = gremlin.shared_state.logTabs()
+                syslog.info(f"{logTabs}GATED AXIS: gate condition [{self.gate_info.id}] [{self.gate_info.index}] value: [{self.gate_info.value:0.03f} TRIGGER {self._condition_type.name}:  result: {result}")
         return result
-
+        
 
         
     def condition_name(self) -> str:
@@ -4147,50 +4154,22 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
     def process_event(self, event, value, extra_data : dict = None):
         verbose = gremlin.config.Configuration().verbose_mode_gate
 
-        if extra_data and "trigger" in extra_data:
-            # if we get a trigger, this is kicked off by the gated axis so we compare types only as we're already in the right branch and checked inputs
-            trigger = extra_data["trigger"]
-            result = False
-            if trigger.range:
-                condition_type = extra_data["condition_type"]
-                result = self._condition_type == condition_type and self.range_info.id == trigger.range.id
-                if verbose: syslog.info(f"RANGE TRIGGER {self._condition_type.name}:  result: {result}")
-            return result
+      
+        condition_type = extra_data["condition_type"]
+        trigger = extra_data["trigger"]
 
-
-        if not event.is_axis:
-            return False #  not an axis event
-
-        require_axis = self._condition_type in (GateConditionType.InRange, GateConditionType.OutsideRange)
-        if event.is_axis != require_axis:
-            return False # FAIL - wrong event type
-        current = value.raw
-        last_value = self._last_value
-        self._last_value = current
-        if extra_data and "condition_type" in extra_data:
-            condition_type = extra_data["condition_type"]
-            if self._condition_type != condition_type:
-                return False
-        # check range
-        result = False 
-        match self._condition_type:
-            case GateConditionType.InRange:
-                result = self.range_info.inRange(current)
-            case GateConditionType.OutsideRange:
-                result = not self.range_info.inRange(current)
-            case GateConditionType.EnterRange:
-                result = not self.range_info.inRange(last_value) and self.range_info.inrange(current)
-            case GateConditionType.ExitRange:
-                result = self.range_info.inRange(last_value) and not self.range_info.inrange(current)
-            
-        verbose = gremlin.config.Configuration().verbose_mode_condition
-        if verbose:
-            logtabs = gremlin.shared_state.logTabs()
-            syslog.info(f"{logtabs}Range Condition: {self._condition_type.name} value: {current:0.3f} range: {self.range_info.range_display()} result: {'PASS' if result else 'FAIL'}")
-        # if result:
-        #     pass
+        
+        result = False
+        if trigger.range:
+            r1 = self.range_info
+            r2 = trigger.range
+            result = self._condition_type == condition_type and r1.g1 == r2.g1 and r1.g2 == r2.g2
+            if verbose: 
+                logTabs = gremlin.shared_state.logTabs()
+                syslog.info(f"{logTabs}GATED AXIS: range condition compare trigger range [{trigger.range.to_display()}] to [{self.range_info.to_display()}] TRIGGER {self._condition_type.name}:  result: {result}")
         return result
-    
+
+
 
      
 

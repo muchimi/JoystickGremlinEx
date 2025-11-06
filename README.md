@@ -16,10 +16,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 ### (m76T98)
 - Change: Gated Axis - rework of gate add/remove/set logic
-- Change: Gated Axis - enforcement of 0.001 gate separations
+- Change: Gated Axis - rework of some UI elements to minimize QT shenanigans
+- Change: Gated Axis - enforcement of 0.001 gate minimum separation gap.
 - Change: Gated Axis - enforcement of gate movement boundaries
-- Change: Axis highlight "listen" mode hotkey changed to CTRL+SHFT (to avoid conflicts with Windows hotkeys)
-- Fix: gate index not valid for end values.
+- Update: Gated Axis - help screen.
+- Change: axis highlight "listen" mode hotkey changed to CTRL+SHFT (to avoid conflicts with Windows hotkeys)
+- Fix: auto-highlight: auto-device change option not persisted between sessions.
+- Fix: Gated Axis: gate index not valid for end values.
+- Fix: Gated Axis: not all mapped conditions executed on trigger on a gate/range if more than one mapping is made.
+
+
 
 ### (m76T97)
 
