@@ -416,6 +416,9 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._dirty = True # indicates the state is stale and must be recomputed (expressions only)
         self._expression_states = [] # dependent expression states - list of states that need to be evaluated when they change
         self._last_expression_value = False # last computed expression result
+        self._autorelease_delay = 1.0 # auto toggle timer in seconds
+        self._autorelease = False # true if autoreleases
+
 
 
         
@@ -725,6 +728,10 @@ class StateInputItem(gremlin.base_profile.InputItem):
             node.set("expression", self._expression)
         node.set("is_expression", safe_format(self._is_expression, bool))
 
+        
+        node.set("autorelease",safe_format(self._autorelease, bool))
+        node.set("autorelease-delay", safe_format(self._autorelease, float))
+
         # write container data
         self._input_item.to_xml(node)
         
@@ -770,6 +777,9 @@ class StateInputItem(gremlin.base_profile.InputItem):
             else:
                 # suitable default based on existing value
                 self._is_expression = bool(self.expression)
+
+        self._autorelease = safe_read(node,"autorelease", bool, False)
+        self._autorelease_delay = safe_read(node,"autorelease-delay", float, 1.0)
 
         self._default_value = value
         self._value = value

@@ -313,6 +313,7 @@ class Axis:
             syslog.error(
                 f"Failed setting axis value - { _error_string(self.vjoy_id, self.axis_id, self._value)}"
             )
+        
         self.vjoy_dev.used()
 
 
@@ -363,6 +364,8 @@ class Button:
                 self.button_id
         ):
             syslog.error(f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}")
+            return
+        
         self.vjoy_dev.used()
         
         el = gremlin.event_handler.EventListener()
@@ -593,7 +596,7 @@ class VJoy:
     """Represents a vJoy device present in the system."""
 
     # Duration of inactivity after which the keep alive routine is run
-    keep_alive_timeout = 120
+    keep_alive_timeout = 60
 
     # Axis name mapping
     axis_equivalence = {
@@ -679,20 +682,20 @@ class VJoy:
         By checking for ownership and reacquiring if needed this can be solved.
         """
         if self.vjoy_id is None:
-            return
+            return False
         
         if self.pid != VJoyInterface.GetOwnerPid(self.vjoy_id):
             retry_count = 5
             while retry_count:
                 if VJoyInterface.AcquireVJD(self.vjoy_id):
                     self._acquired = True # indicate we own this
-                    return
+                    return True
                 retry_count -= 1
                 time.sleep(0.01)
                     
             syslog.error(f"VJOY API: Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             #raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
-            return
+            return False
         
     def ensure_released(self):
         gremlin.util.InvokeUiMethod(self._ensure_released_ui) # ui thread
@@ -864,12 +867,23 @@ class VJoy:
     
     def keep_awake(self):
         if self.vjoy_id is not None:
-           import gremlin.config
-           verbose = gremlin.config.Configuration().verbose
-           if verbose: syslog.info(f"VJOY AWAKE: check vjoy [{self.vjoy_id}]")
-           awake = device_available(self.vjoy_id)
-           if not awake:
-               syslog.warning(f"VJOY AWAKE: vjoy [{self.vjoy_id}] is reporting no longer available.")
+            import gremlin.config
+            verbose = gremlin.config.Configuration().verbose
+            if verbose: syslog.info(f"VJOY AWAKE: check vjoy [{self.vjoy_id}]")
+            status = VJoyInterface.GetVJDStatus(self.vjoy_id)
+            status = VJoyState(status)
+            if status == VJoyState.Owned:
+                return
+            elif status == VJoyState.Free:
+                awake = self._ensure_ownership_ui()
+                if awake:
+                    return
+        
+            #awake = device_available(self.vjoy_id)
+            
+            syslog.warning(f"VJOY AWAKE: vjoy [{self.vjoy_id}] is reporting no longer available. code: {status}")
+            
+
 
 
     
@@ -923,7 +937,7 @@ class VJoy:
     def _keep_alive(self):
         """Timer callback ensuring the vJoy device stays active.
 
-        If the device hasn't been used in the last 60 seconds the device will
+        If the device hasn't been used in the last 60 seconds the device willis reporting no longer available
         be reset to ensure it doesn't time out.
         """
         import gremlin.config

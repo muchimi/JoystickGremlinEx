@@ -13,12 +13,17 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+
+### (m76T99A)
+- Change: Keepalive timer down to 60 seconds - changed alive check on VJOY API and improved status readouts in verbose mode.
+
 ### (m76T99)
 - Change: Tab (device) headers will include a "mapped" icon if the device is mapped. 
 - New: Tab (device) headers now include an icon when a device is mapped.
 - New: Tab (device) headers gain a color code for devices that are mapped, but not in the current mode.  This is to more easily identify devices that have a mapping in any mode.
 - Change: Color scheme for light mode has more contrast.
 - Fix: Macro Action - updated legacy mouse step button selection
+- Fix: reverted - keep alive model for VJOY
 
 
 ### (m76T98)
