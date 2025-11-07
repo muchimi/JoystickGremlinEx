@@ -82,6 +82,8 @@ class Color():
     @staticmethod
     def normalColor():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+    def disabledColor():
+        return "#5F5F5F" if gremlin.shared_state.is_dark_theme else "#9C9C9C"
     @staticmethod
     def normalDarkColor():
         return "#AAAAAA" 
@@ -93,10 +95,44 @@ class Color():
         return "#111111" 
     @staticmethod
     def normalGradientColor():
-        return "#777777" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
+        return "#A7A7A7" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
     @staticmethod
     def backgroundColor():
         return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    @staticmethod
+    def tabBackgroundColor():
+        return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    @staticmethod
+    def tabForegroundColor():
+        return "#B6B6B6" if gremlin.shared_state.is_dark_theme else "#303030"
+    @staticmethod
+    def tabMissingForegroundColor():
+        return "#8a761c" if gremlin.shared_state.is_dark_theme else "#725919"
+    @staticmethod
+    def tabUsedForegroundColor():
+        return "#FFFFFF" if gremlin.shared_state.is_dark_theme else "#000000"
+    @staticmethod
+    def tabUsedOtherForegroundColor():
+        return "#B9B9B9" if gremlin.shared_state.is_dark_theme else "#777777"
+    @staticmethod
+    def blueColor():
+        return "#34b7eb" if gremlin.shared_state.is_dark_theme else "#0B15AA"
+    @staticmethod
+    def orangeColor():
+        return "#ebd034" if gremlin.shared_state.is_dark_theme else "#968215"
+    @staticmethod
+    def greenColor():
+        return "#2abd38" if gremlin.shared_state.is_dark_theme else "#088814"
+    @staticmethod
+    def yellowColor():
+        return "#d9eb34" if gremlin.shared_state.is_dark_theme else "#818b20"
+    @staticmethod
+    def buttonGradientStartColor():
+        return "#757575" if gremlin.shared_state.is_dark_theme else "#E2E2E2"
+    @staticmethod
+    def buttonGradientEndColor():
+        return "#5A5A5A" if gremlin.shared_state.is_dark_theme else "#BDBDBD"
+    
     @staticmethod
     def selectedBackgroundColor():
         return Color.selectColor()
@@ -115,7 +151,7 @@ class Color():
         return "#222222" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
     @staticmethod
     def warningColor():
-        return "#b39f32"
+        return Color.orangeColor()
     @staticmethod
     def selectColor():
         return "#658265" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
@@ -272,10 +308,10 @@ class Color():
         return "#ffffff" #if gremlin.shared_state.is_dark_theme else "#5a5a5a"
     @staticmethod
     def listenColor(): # color used for listen type buttons
-        return "#34b7eb"
+        return Color.blueColor()
     @staticmethod
     def infoColor(): # color used for information boxes
-        return "#92882b"
+        return "#92882b"  if gremlin.shared_state.is_dark_theme else "#dbd496"
     @staticmethod
     def inputTitleColor(): # color for the input title bar
         return "#5A725A" if gremlin.shared_state.is_dark_theme else "#678867"
@@ -286,7 +322,7 @@ class Color():
     def repeaterColor(): # color for repeaters
         return "#0C8D12"
     def repeaterBackgroundColor(): # color for repeaters
-        return "#374438"
+        return "#374438" if gremlin.shared_state.is_dark_theme else "#829784"
     
     @staticmethod
     def ansiRed(): 
@@ -475,11 +511,13 @@ class Color():
         selected_border_color = Color.selectBorderColor()
         selected_color = Color.selectColor()
         selected_gradient_color = Color.selectGradientColor()
+        gradient_start = Color.buttonGradientStartColor()
+        gradient_end = Color.buttonGradientEndColor()
         css = f'''
         QPushButton {{
             border: 2px solid #8f8f91;
             border-radius: 15px;
-            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {normal_color}, stop: 1 {normal_gradient_color});
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {gradient_start}, stop: 1 {gradient_end});
             min-width: 30px;
             min-height: 30px;
             max-width: 30px;
@@ -509,20 +547,21 @@ class Color():
     
     @staticmethod
     def _cssStateButton(font_size,
-                        normal_color,
-                        normal_gradient_color,
-                        background_color,
-                        border_color,
+                        background_start_color,
+                        background_end_color,
+                        foreground_color,
                         selected_border_color,
                         selected_color,
-                        selected_gradient_color):
+                        selected_gradient_color,
+                        foreground_disabled):
         min_size = font_size * 2
         radius = font_size 
         css = f'''
         QPushButton {{
             border: 2px solid #8f8f91;
             border-radius: {radius}px;
-            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {normal_color}, stop: 1 {normal_gradient_color});
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {background_start_color}, stop: 1 {background_end_color});
+            color: {foreground_color};
             min-width: {min_size}px;
             min-height: {min_size}px;
             padding-left: 4px;
@@ -547,7 +586,7 @@ class Color():
 
         QPushButton:!enabled
         {{
-             color: {background_color};
+             color: {foreground_disabled};
         }}
         '''
         return css
@@ -558,42 +597,41 @@ class Color():
         ''' gets a pushbutton state for the input viewer '''
 
         normal_color = Color.normalColor()
-        normal_gradient_color = Color.normalGradientColor()
-        background_color = Color.keyBackgroundColor()
-        
-        border_color = Color.borderColor()
+        background_start_color = Color.buttonGradientStartColor()
+        background_end_color = Color.buttonGradientEndColor()
         selected_border_color = Color.selectBorderColor()
         selected_color = Color.selectColor()
         selected_gradient_color = Color.selectGradientColor()
+        disabled_color = Color.disabledColor()
         return Color._cssStateButton(font_size, 
+                                    background_start_color,
+                                    background_end_color,
                                     normal_color,
-                                    normal_gradient_color,
-                                    background_color,
-                                    border_color,
                                     selected_border_color,
                                     selected_color,
-                                    selected_gradient_color)
+                                    selected_gradient_color,
+                                    disabled_color)
 
     
     @staticmethod
     def cssStateExpressionButton(font_size = 16):
         ''' gets a pushbutton state for the input viewer '''
 
+        background_start_color = Color.buttonGradientStartColor()
+        background_end_color = Color.buttonGradientEndColor()
         normal_color = Color.normalColor()
-        normal_gradient_color = Color.normalGradientColor()
-        background_color = Color.keyBackgroundColor()
-        border_color = Color.borderColor()
         selected_border_color = Color.alternateSelectBorderColor()
         selected_color = Color.alternateSelectColor()
         selected_gradient_color = Color.alternateSelectGradientColor()
+        disabled_color = Color.disabledColor()
         return Color._cssStateButton(font_size, 
+                                background_start_color,
+                                background_end_color,
                                 normal_color,
-                                normal_gradient_color,
-                                background_color,
-                                border_color,
                                 selected_border_color,
                                 selected_color,
-                                selected_gradient_color)
+                                selected_gradient_color,
+                                disabled_color)
  
     
     
@@ -641,34 +679,43 @@ class Icons():
     def listBottomIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.caret-circle-double-down-light", qta_color)
     @staticmethod
-    def trashIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def trashIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("ei.trash", qta_color)
     @staticmethod
-    def eraserIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def eraserIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("fa6s.eraser", qta_color)
     @staticmethod
-    def folderIcon(qta_color = "#ebd034") -> QtGui.QIcon:
+    def folderIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.yellowColor()
         return Icons._icon("fa5s.folder-open", qta_color)
     @staticmethod
-    def saveIcon(qta_color = "#ebd034") -> QtGui.QIcon:
+    def saveIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.yellowColor()
         return Icons._icon("fa5s.save", qta_color)
     @staticmethod
-    def keyboardIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def keyboardIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("fa6s.keyboard", qta_color)
     @staticmethod
-    def addIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def addIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("msc.diff-added", qta_color)
     @staticmethod
-    def sortIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def sortIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("fa5s.sort-amount-down-alt", qta_color)
     @staticmethod
-    def removeIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def removeIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("fa6s.minus", qta_color)
     @staticmethod
     def gearIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.gear", qta_color)
     @staticmethod
-    def findIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def findIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("ei.search", qta_color)
     @staticmethod
     def sortUpIcon(qta_color = None) -> QtGui.QIcon:
@@ -677,7 +724,8 @@ class Icons():
     def sortDownIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("mdi.sort-descending", qta_color)
     @staticmethod
-    def questionIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def questionIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("fa5s.question-circle", qta_color)
     @staticmethod
     def refreshIcon(qta_color = None) -> QtGui.QIcon:
@@ -686,16 +734,19 @@ class Icons():
     def resizeIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("ph.frame-corners", qta_color)
     @staticmethod
-    def copyIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def copyIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("fa6.copy", qta_color)
     @staticmethod
-    def pasteIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def pasteIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("fa6.paste", qta_color)
     @staticmethod
     def configureIcon(qta_color = None) -> QtGui.QIcon:
         return Icons._icon("fa6s.gear", qta_color)
     @staticmethod
-    def editIcon(qta_color = "#34b7eb") -> QtGui.QIcon:
+    def editIcon(qta_color = None) -> QtGui.QIcon:
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("mdi6.rename-box-outline", qta_color)
     @staticmethod
     def horizontalSeparatorIcon(qta_color = None) -> QtGui.QIcon:
@@ -725,31 +776,45 @@ class Icons():
     def listenIcon(qta_color = "#34b7eb"):
         return Icons._icon("fa6s.microphone", qta_color = qta_color)
     @staticmethod
-    def disconnectedIcon(qta_color = Color.disconnectedColor()):
+    def disconnectedIcon(qta_color = Color.tabMissingForegroundColor()):
         return Icons._icon("mdi.power-plug-off", qta_color = qta_color)
+    @staticmethod
+    def usedIcon(qta_color = Color.tabUsedForegroundColor()):
+        return Icons._icon("fa6s.sitemap", qta_color = qta_color)
+
     @staticmethod
     def warningIcon():
         return Icons._icon("ph.shield-warning-fill",qta_color=QtGui.QColor(Color.warningColor()))
     @staticmethod
-    def mappedIcon():
-        return Icons._icon("fa5.map")
+    def mappedIcon(qta_color = None):
+        if not qta_color: qta_color = Color.normalColor()
+        return Icons._icon("ph.tree-structure-fill", qta_color = qta_color)
+    @staticmethod
+    def mappedOtherIcon(qta_color = None):
+        if not qta_color: qta_color = Color.normalColor()
+        return Icons._icon("ph.tree-structure-thin", qta_color = qta_color)
+    
     @staticmethod
     def aircraftIcon():
         return Icons._icon("mdi.airplane")
     @staticmethod
-    def lockIcon(qta_color = "#c47418"):
+    def lockIcon(qta_color = None):
+        if not qta_color: qta_color = Color.orangeColor()
         return Icons._icon("fa5s.lock", qta_color = qta_color)
     @staticmethod
-    def unlockIcon(qta_color = "#2abd38"):
+    def unlockIcon(qta_color = None):
+        if not qta_color: qta_color = Color.greenColor()
         return Icons._icon("fa5s.lock-open", qta_color = qta_color)
     @staticmethod
-    def filterIcon(qta_color = "#2aa7bd"):
+    def filterIcon(qta_color = None):
+        if not qta_color: qta_color = Color.blueColor()
         return Icons._icon("mdi.filter", qta_color = qta_color)
     @staticmethod
     def noFilterIcon():
         return Icons._icon("mdi.filter-off")
     @staticmethod
-    def treeIcon(qta_color = "#a9aa4f"):
+    def treeIcon(qta_color = None):
+        if not qta_color: qta_color = Color.yellowColor()
         return Icons._icon("ph.tree-structure-thin", qta_color = qta_color)
     
     @staticmethod
@@ -3267,7 +3332,7 @@ class InputListenerWidget(QBoxFrame):
         self._callback = callback
         self._accepted = False # true if the input is accepted
         self._virtual_only = virtual_only # only listen to virtual devices if set
-        
+        self.selection = None # holds whatever was selecteed
         
         self._listen_mouse = InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
 
@@ -3364,6 +3429,7 @@ class InputListenerWidget(QBoxFrame):
         if self._callback:
             self._callback(event)
         self.item_selected.emit(event)
+        self.selection = event
         self.close()
 
 
@@ -3403,6 +3469,8 @@ class InputListenerWidget(QBoxFrame):
                     self.item_selected.emit([key])
                 else:
                     self.item_selected.emit(event)
+
+                self.selection = [key]
                 self._accepted = True
                 self._abort_timer.cancel()
                 self.close()
@@ -3423,6 +3491,7 @@ class InputListenerWidget(QBoxFrame):
                         self._multi_key_storage.append(event)
                     self.keyInput.emit(key) # notify a key was pressed
                     self._echo_key(key)
+                    self.selection = self._multi_key_storage
 
     def _mouse_event_ui(self, event):
         ''' process mouse events on UI thread '''
@@ -3439,11 +3508,13 @@ class InputListenerWidget(QBoxFrame):
                     return # ignore if click is on the button
                 self._multi_key_storage.append(key)
                 self.keyInput.emit(key) # notify a key was pressed
+                self.selection = self._multi_key_storage
                 self._echo_key(key)
             else:
                 # not listening to multiple keys
                 self.keyInput.emit(key) # notify a key was pressed
                 self.item_selected.emit([key])
+                self.selection = [key]
                 self._accepted = True
                 self.close()                    
                 
@@ -6528,14 +6599,16 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             self._create_current_axis()
             el.joystick_event.connect(self._current_axis_update)
-            el.vjoy_event.connect(self._vjoy_current_axis_update) # hook vjoy separately
+            #el.vjoy_event.connect(self._vjoy_current_axis_update) # hook vjoy separately
+            el.vjoy_output_event.connect(self._vjoy_current_axis_update) # hook vjoy separately
             # if self._device.is_virtual:
             #     el.registerVjoyCallback(self._vjoy_current_axis_update)
                 
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             self._create_temporal_axis()
             el.joystick_event.connect(self._temporal_axis_update)
-            el.vjoy_event.connect(self._vjoy_temporal_axis_update) # hook vjoy separately
+            #el.vjoy_event.connect(self._vjoy_temporal_axis_update) # hook vjoy separately
+            #el.vjoy_output_event.connect(self._vjoy_temporal_axis_update) # hook vjoy separately
             # if self._device.is_virtual:
             #     el.registerVjoyCallback(self._vjoy_temporal_axis_update)
             for widget in self.widgets:
@@ -6545,7 +6618,9 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._create_button_hat()
             el.joystick_event.connect(self._button_hat_update)
-            el.vjoy_event.connect(self._vjoy_button_hat_update) # hook vjoy separately
+            #el.vjoy_event.connect(self._vjoy_button_hat_update) # hook vjoy separately
+            el.vjoy_output_event.connect(self._vjoy_button_hat_update)
+            el.vjoy_output_event.connect(self._vjoy_button_hat_update) # hook vjoy separately
             # if self._device.is_virtual:
             #     el.registerVjoyCallback(self._vjoy_button_hat_update)
 
@@ -6561,18 +6636,19 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             el.joystick_event.disconnect(self._current_axis_update)
-            el.vjoy_event.disconnect(self._vjoy_current_axis_update) # hook vjoy separately
+            #el.vjoy_event.disconnect(self._vjoy_current_axis_update) # hook vjoy separately
             # if self._device.is_virtual:
             #     el.unregisterVjoyCallback(self._vjoy_current_axis_update)
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             el.joystick_event.disconnect(self._temporal_axis_update)
-            el.vjoy_event.disconnect(self._vjoy_temporal_axis_update) # hook vjoy separately
+            #el.vjoy_event.disconnect(self._vjoy_temporal_axis_update) # hook vjoy separately
             # if self._device.is_virtual:
             #     el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._unhook_buttons()
             el.joystick_event.disconnect(self._button_hat_update)
-            el.vjoy_event.connect(self._vjoy_button_hat_update)
+            #el.vjoy_event.connect(self._vjoy_button_hat_update)
+            el.vjoy_output_event.connect(self._vjoy_button_hat_update)
             # if self._device.is_virtual:
             #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
@@ -8757,7 +8833,27 @@ class QDataTab(QtWidgets.QTabWidget):
     def __init__(self, data = None, parent = None):
         super().__init__(parent)
         self._data = data
+        
+    #     self._update_color()
 
+    # def setStatus(self, index : int, status : str):
+    #     self.setTabProperty(index, "tabStatus", status)
+
+    # def _update_color(self):
+    #     background_color = Color.tabBackgroundColor()
+    #     normal_color = Color.tabForegroundColor()
+    #     missing_color = Color.tabMissingForegroundColor()
+    #     used_color = Color.tabUsedForegroundColor()
+
+    #     css = f"""
+    #         QTabBar::tab {{ background-color: {background_color}; }}
+    #         QTabBar::tab[tabStatus="normal"] {{ color: {normal_color}; }}
+    #         QTabBar::tab[tabStatus="used"] {{ color: {used_color}; }}
+    #         QTabBar::tab[tabStatus="missing"] {{ color: {missing_color}; }}
+    #         """
+        
+    #     self.setStyleSheet(css)
+            
 
     @property
     def data(self):

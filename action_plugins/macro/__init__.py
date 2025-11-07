@@ -480,17 +480,14 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements["key_container"] = container
         self.ui_elements["key_delay"] = delay_widget
 
-
         self.action_layout.addWidget(self.ui_elements["key_label"])
         self.action_layout.addWidget(self.ui_elements["key_input"])
         self.action_layout.addWidget(self.ui_elements["key_press"])
         self.action_layout.addWidget(self.ui_elements["key_release"])
-        
 
         widget,_ = gremlin.ui.ui_common.getHContainer((self.ui_elements["key_add_press"], self.ui_elements["key_add_release"]))
         self.action_layout.addWidget(widget)
         self.action_layout.addWidget(container)
-
 
 
     @QtCore.Slot()
@@ -504,7 +501,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         if action is None:
             return
 
-        self.ui_elements["mouse_label"] = QtWidgets.QLabel("Button")
+        self.ui_elements["mouse_label"] = QtWidgets.QLabel("Mouse Button")
         self.ui_elements["mouse_input"] = \
             gremlin.ui.ui_common.NoKeyboardPushButton(
                 gremlin.types.MouseButton.to_string(action.button)
@@ -1030,19 +1027,32 @@ class MacroActionEditor(QtWidgets.QWidget):
         import gremlin.joystick_handling
         import gremlin.ui.ui_common
 
-        # if InputType.Keyboard in input_types:
-        #     callback = self._modify_key
-        # elif InputType.Mouse in input_types:
-        #     callback = self._modify_mouse
-        # else:
-        #     # joystick input
-        #     callback = self._modify_joystick
-
+        
         if InputType.Keyboard in input_types:
             dialog = InputKeyboardDialog(parent = self, select_single=True, index = -1)
             dialog.accepted.connect(self._keyboard_dialog_cb)
             dialog.setModal(True)
             dialog.showNormal()
+        elif InputType.Mouse in input_types:
+            dialog = gremlin.ui.ui_common.InputListenerWidget(
+            [InputType.Mouse],
+            return_kb_event=False
+            )
+            dialog.closed.connect(self._handle_mouse_button_selected)
+            root = self
+            while root.parent():
+                root = root.parent()
+            geom = root.geometry()
+
+            dialog.setGeometry(
+                int(geom.x() + geom.width() / 2 - 150),
+                int(geom.y() + geom.height() / 2 - 75),
+                300,
+                150
+            )
+            dialog.show()
+
+            
         else:
 
             
@@ -1067,7 +1077,20 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.button_press_dialog = dialog
             dialog.exec()
 
-        
+    def _handle_mouse_button_selected(self, accepted):
+        if accepted:
+            dialog = self.sender()
+            if dialog.selection:
+                key = dialog.selection[0]
+                mouse_button = gremlin.types.MouseButton(key.mouse_button)
+                self.model.set_entry(
+                    gremlin.macro.MouseButtonAction(mouse_button, True),
+                    self.index.row()
+                )
+                self._update_model()
+                gremlin.ui.ui_common.clear_layout(self.action_layout)
+                self.ui_elements = {}
+                self._mouse_button_ui()
 
     def _handle_input_selected(self, dialog):
         ''' occurs when macro input selection is made '''

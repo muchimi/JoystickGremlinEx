@@ -519,8 +519,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._tab_device_map[device_guid] = position
         self._tab_index_map[position] = device_guid
         self._tab_name_map[device_guid] = tab_name
-        
-        
+     
 
         if tab_type == TabDeviceType.Joystick:
             self._joystick_device_guids.append(device_guid)
@@ -533,7 +532,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         return position
     
-    def _has_mapping(self, device_guid) -> bool:
+    def _has_mapping(self, device_guid, any_mode = False) -> bool:
         ''' true if the device has mappings '''
         if isinstance(device_guid, str):
             device_guid = gremlin.util.parse_guid(device_guid)
@@ -558,8 +557,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         if device_guid in devices:
             device_data = devices[device_guid]
-            if edit_mode in device_data.modes:
-                mode_data = device_data.modes[edit_mode]
+            mode_list = [mode for mode in device_data.modes] if any_mode else ([edit_mode] if edit_mode in device_data.modes else [])
+            for mode_name in mode_list:
+                mode_data = device_data.modes[mode_name]
                 for input_type, input_items in mode_data.config.items():
                     for input_item in input_items.values():
                         if look_for_containers:
@@ -569,6 +569,50 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             # input count indicates content
                             return True
         return False
+    
+    def _get_mappings(self, device_guid) -> dict:
+        ''' returns a map of [mode], has_mapping '''
+        if isinstance(device_guid, str):
+            device_guid = gremlin.util.parse_guid(device_guid)
+        profile = gremlin.shared_state.current_profile
+        edit_mode = gremlin.shared_state.edit_mode
+        devices = profile.devices
+        look_for_containers = True
+        # special devices
+        if device_guid == gremlin.shared_state.state_tab_guid:
+            # state
+            sd = gremlin.ui.state_device.StateData()
+            names = sd.getStateNames()
+            return {edit_mode:True} if names else {}
+        elif device_guid == gremlin.shared_state.settings_tab_guid:
+            return {}
+        elif device_guid == gremlin.shared_state.plugins_tab_guid:
+            # plugins
+            plugins = gremlin.shared_state.current_profile.plugins
+            return {edit_mode:True} if len(plugins) > 0 else {}
+        elif device_guid == gremlin.shared_state.keyboard_tab_guid:
+            look_for_containers = False
+
+        mode_map = {}
+
+        if device_guid in devices:
+            device_data = devices[device_guid]
+            for mode_name in device_data.modes:
+                mode_data = device_data.modes[mode_name]
+                mode_map[mode_name] = False
+                for input_type, input_items in mode_data.config.items():
+
+                    for input_item in input_items.values():
+                        if look_for_containers:
+                            if input_item.containers:
+                                mode_map[mode_name] = True
+                                break
+                        else:
+                            # input count indicates content
+                            mode_map[mode_name] = True
+                            break
+                    
+        return mode_map
 
     def _get_tab_map(self):
         ''' gets tab configuration data as a dictionary indexed by tab index holding device id, device name and device widget type
@@ -1404,6 +1448,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             el.keyboard_event.connect(self.repeater.process_event)
             el.joystick_event.connect(self.repeater.process_event)
             el.vjoy_event.connect(self.repeater.process_event)
+            el.vjoy_output_event.connect(self.repeater.process_event)
             self._update_statusbar_repeater("Waiting for input")
         else:
             el.keyboard_event.disconnect(self.repeater.process_event)
@@ -2254,22 +2299,41 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.util.InvokeUiMethod(self._update_tab_ui, device_id)
     
     def _update_tab_ui(self, device_id: str):
-        ''' updates the given tab for mapping and connection status '''
+        ''' updates the given tab for mapping and connection status - sets tab color and icons based on the device '''
         position = self.getTabIndexForDevice(device_id)
+        
+        
         if position is not None:
+            # determine the status
             device = gremlin.joystick_handling.device_info_from_guid(device_id)
             device.update() # update connection state
             if not device.connected:
                 # indicate device is disconnected
-                color = gremlin.ui.ui_common.Color().disconnectedColor()
+                color = gremlin.ui.ui_common.Color.tabMissingForegroundColor()
                 icon = gremlin.ui.ui_common.Icons.disconnectedIcon() #.load_icon("mdi.power-plug-off", qta_color = color)
                 self.ui.devices.setTabIcon(position, icon)
-                self.ui.devices.setTabTextColor(position, color)   
+                self.ui.devices.setTabTextColor(position, color)
             else:
                 # tab color based on mapping
-                has_mapping = self._has_mapping(device_id)
-                color = gremlin.ui.ui_common.Color().mappedColor() if has_mapping else gremlin.ui.ui_common.Color().unmappedColor()
+                mode_map = self._get_mappings(device_id)
+                edit_mode = gremlin.shared_state.edit_mode
+                has_active_map =  edit_mode in mode_map and mode_map[edit_mode]
+                has_map = False
+                if has_active_map:
+                    color = gremlin.ui.ui_common.Color.tabUsedForegroundColor()
+                    icon = gremlin.ui.ui_common.Icons.mappedIcon(qta_color =color)
+                else:
+                    has_map = sum(mode_map.values()) > 0
+                    if has_map:
+                        color = gremlin.ui.ui_common.Color.tabUsedOtherForegroundColor()    
+                        icon = gremlin.ui.ui_common.Icons.mappedOtherIcon(qta_color =color)
+                    else:
+                        color = gremlin.ui.ui_common.Color.tabForegroundColor()    
+                        icon = QtGui.QIcon()
+                
+                
                 self.ui.devices.setTabTextColor(position, color)
+                self.ui.devices.setTabIcon(position, icon ) # clear the icon
         
 
 
@@ -3203,7 +3267,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # get the device widget
             widget = self.getRegisteredWidget(device_guid)
-
+            if not widget:
+                return 
             input_count = widget.inputCount
             input_widget_count = widget.inputWidgetCount
             if verbose: syslog.info(f"Device widget: input count: {input_count:,}  widget count: {input_widget_count}")

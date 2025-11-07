@@ -1177,35 +1177,36 @@ class VJoyUsageState():
         self.ensure_vjoy()
 
         
-        self._keep_alive_delay =  KEEP_ALIVE_DELAY
-        self._keep_alive_thread = gremlin.threading.AbortableThread(target = self._keep_alive_runner)
-        self._keep_alive_thread.name = "Vjoy Keepalive"
-        self._keep_alive_thread.start()
+        # self._keep_alive_delay =  KEEP_ALIVE_DELAY
+        # self._keep_alive_thread = gremlin.threading.AbortableThread(target = self._keep_alive_runner)
+        # self._keep_alive_thread.name = "Vjoy Keepalive"
+        # self._keep_alive_thread.start()
         
     def _handle_shutdown(self):
-        if self._keep_alive_thread.is_alive():
-            self._keep_alive_thread.stop()
-            self._keep_alive_thread.join()
-            self._keep_alive_thread = None
+        pass
+        # if self._keep_alive_thread.is_alive():
+        #     self._keep_alive_thread.stop()
+        #     self._keep_alive_thread.join()
+        #     self._keep_alive_thread = None
 
-    def _keep_alive_runner(self):
-        ''' keep alive runner for all vjoy devices '''
-        syslog.info("VJOY: Keepalive start")
-        next_pulse = time.time()
+    # def _keep_alive_runner(self):
+    #     ''' keep alive runner for all vjoy devices '''
+    #     syslog.info("VJOY: Keepalive start")
+    #     next_pulse = time.time()
         
-        while not self._keep_alive_thread.stopped():
-            # ping connected devices
-            now = time.time()
-            if next_pulse <= now:
-                verbose = gremlin.config.Configuration().verbose_mode_vjoy
-                if verbose: syslog.info(f"VJOY: Keepalive {now}")
-                for dev in vjoy_devices():
-                    vid = dev.vjoy_id
-                    vjoy.device_available(vid)
-                    next_pulse = now + self._keep_alive_delay
-            time.sleep(1) # slow tick ok for keep alive
+    #     while not self._keep_alive_thread.stopped():
+    #         # ping connected devices
+    #         now = time.time()
+    #         if next_pulse <= now:
+    #             verbose = gremlin.config.Configuration().verbose_mode_vjoy
+    #             if verbose: syslog.info(f"VJOY: Keepalive {now}")
+    #             for dev in vjoy_devices():
+    #                 vid = dev.vjoy_id
+    #                 vjoy.device_available(vid)
+    #                 next_pulse = now + self._keep_alive_delay
+    #         time.sleep(1) # slow tick ok for keep alive
 
-        syslog.info("VJOY: Keepalive shutdown")
+    #     syslog.info("VJOY: Keepalive shutdown")
 
 
     def _handle_request_button_change(self, vjoy_id, button_id, state, key):

@@ -444,6 +444,7 @@ class EventListener:
 	hardware_input_event = Signal(object, object, object) # called for any input event (device_guid, input_type, input_id)
 
 	vjoy_event = Signal(VjoyEvent) # Signal(VjoyEvent)
+	vjoy_output_event = Signal(VjoyEvent) # sent on button output
 
 
 	# Signal emitted when keyboard events are received

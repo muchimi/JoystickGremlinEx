@@ -4031,10 +4031,6 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     # straight axis
 
                     input_id = self.action_data.hardware_input_id
-                    if verbose:
-                        device = gremlin.joystick_handling.device_info_from_guid(self.hardware_device_guid)
-                        
-                        device_stub = f"{device.name} input: {self.action_data.input_type.name} input id: {input_id}"
 
                     # straight axis
                     raw_input_type = self.action_data.hardware_raw_input_type
@@ -4059,7 +4055,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     
                     trigger = False
 
-                    if verbose: vjoy_stub = f"sync mode: [{self.action_data.sync_mode.name}] set start value for vjoy axis: {self.vjoy_input_id}"
+                    if verbose:
+                        device = gremlin.joystick_handling.device_info_from_guid(self.hardware_device_guid)
+                        vjoy_stub = f"sync mode: [{self.action_data.sync_mode.name}] set start value for vjoy axis: {self.vjoy_input_id}"
+                        device_stub = f"{device.name} input: {self.action_data.input_type.name} input id: {input_id}"
+
                     match self.action_data.sync_mode:
                         case SyncMode.Default:
                             trigger = True
