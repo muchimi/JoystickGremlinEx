@@ -75,24 +75,38 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.options_widget, self.options_layout = gremlin.ui.ui_common.getVContainer()
 
         self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Long Press Delay (ms):")
-        self.longpress_delay_widget.setToolTip("Delay to detect long press, should be greater than double tap delay")
+        self.longpress_delay_widget.setToolTip("Delay to detect long press, should be greater than double tap delay.\nIf the input is released before this value, a short press is executed.\nIf the input is released on or after this value, a long press is executed.")
         self.longpress_delay_widget.setValue(self.profile_data.delay * 1000)
         self.longpress_delay_widget.valueChanged.connect(self._delay_changed_cb)
 
         self.dtap_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Double-Tap Delay (ms):")
-        self.dtap_delay_widget.setToolTip("Delay to detect double tap")
+        self.dtap_delay_widget.setToolTip("Delay to detect double tap.  If the input is pressed twice within this timeframe, a double-tap will be executed.")
         self.dtap_delay_widget.setValue(self.profile_data.doubletap_delay * 1000)
         self.dtap_delay_widget.valueChanged.connect(self._dtap_delay_changed_cb)
 
-        self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Autorelease Delay (ms):")
+        self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Autorelease Delay (ms):", tooltip="Time between a press and release trigger.  Set to 0 to disable autoreleases.")
         self.autorelease_delay_widget.setValue(self.profile_data.autorelease_delay * 1000)
         self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
                 
+        self.warning_widget = gremlin.ui.ui_common.QWarningWidget(text = "")
+
+#         msg = """TempoEx triggers when the input is <u>released</u> as it measures how long the input was held to determine short press vs long press.
+#  If the input is released before the delay lapses, a short press is triggered. If the input is released on or after the specified delay, a long press is issued.<br>
+# Double-tap triggers on dual <u>presses</u> detected within the double tap delay and the container is in release mode.<br>
+# The auto-release delay determines the time that lapses between the press and release triggers that actions receive from this container on short and double-tap.<br>
+# Long presses do not use the auto-release delay and will release whenever the input releases.
+# Setting auto-release to zero (0) disables the release trigger from being issued to actions.
+# """
+#         self.info_widget = gremlin.ui.ui_common.QInfoBox(msg)
+
+
 
         widgets = [
             self.longpress_delay_widget,
             self.dtap_delay_widget,
             self.autorelease_delay_widget,
+            self.warning_widget,
+            #self.info_widget,
         ]
 
         widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
@@ -133,6 +147,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.chain_double_widget = QtWidgets.QCheckBox("double tap actions")
         self.chain_double_widget.setChecked(self.profile_data.chain_double)
         self.chain_double_widget.clicked.connect(self._chain_double_changed_cb)
+
+        
+        
 
         widgets = [
             self.chain_short_widget,
@@ -210,6 +227,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.long_action_selector.action_paste.connect(self._paste_long_action)
         self.double_action_selector.action_added.connect(self._add_double_action)
         self.double_action_selector.action_paste.connect(self._paste_double_action)
+
+        
         
 
 
@@ -265,6 +284,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self.content_widget)
 
 
+        self._update_warnings()
 
 
     def _create_condition_ui(self):
@@ -409,12 +429,14 @@ class TempoExContainerWidget(AbstractContainerWidget):
         # dtap_value = self.profile_data.doubletap_delay
         # if value <= dtap_value:
         self.profile_data.delay = value/1000 # to seconds
+        self._update_warnings()
 
     def _dtap_delay_changed_cb(self, value):
         ''' double tap value change 
         :param value the value after which the long press action activates
         '''
         self.profile_data.doubletap_delay = value/1000 # to seconds
+        self._update_warnings()
 
     @QtCore.Slot()
     def _autorelease_delay_changed_cb(self, value):
@@ -423,6 +445,32 @@ class TempoExContainerWidget(AbstractContainerWidget):
         :param value the value after which the long press action activates
         """
         self.profile_data.autorelease_delay = value / 1000
+        self._update_warnings()
+        
+            
+
+    def _update_warnings(self):
+        ''' updates warnings based on configuration '''
+        warnings = []
+        value = self.profile_data.autorelease_delay
+        if value == 0:
+            warnings.append("Autorelease when set to zero (0) turns off any release trigger sent to containers or actions.")
+
+        if self.profile_data.activate_on == "press":
+            warnings.append('DoubleTap does not trigger when the container is in <u>activate on press mode</u>.')
+
+        if self.profile_data.delay < self.profile_data.doubletap_delay:
+            warnings.append("Long press delay should be greater than the double tap delay.")
+
+        if warnings:
+            msg = ""
+            for warning in warnings:
+                msg += warning + "\n"
+            self.warning_widget.setText(msg)
+            self.warning_widget.setVisible(True)
+        else:
+            self.warning_widget.setVisible(False)
+
 
     
     def _activation_changed_cb(self, value):
@@ -434,6 +482,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.profile_data.activate_on = "press"
         else:
             self.profile_data.activate_on = "release"
+
+        self._update_warnings()
 
     @QtCore.Slot(bool)
     def _chain_short_changed_cb(self, checked):
@@ -538,6 +588,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         self.start_time = 0
         self.long_press_timer = None
         self.short_press_timer = None
+        
         self.value_press = None
         self.event_press = None
         self.chain_short = True # chain by default
@@ -545,6 +596,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         self.short_index = 0
         self.long_index = 0
         self.double_index = 0
+        
         self.last_short_execution = 0.0
         self.last_long_execution = 0.0
         self.last_short_value = None
@@ -591,6 +643,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         self.last_short_value = None
         self.dtap_timeout = None
         self.verbose = gremlin.config.Configuration().verbose_mode_container
+        
         self.last_trigger = None
         self.trigger_mode = None # what to trigger (short or long press)
 
@@ -709,27 +762,13 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                 # wrong mode
                 return
             self.last_trigger = None # reset
-        
-        
-        time_now = time.time()
-        
+
 
         if self.verbose:
             if is_pressed:            
                 syslog.info("single tap (press)")
             else:
                 syslog.info("single tap (release)")
-
-        # event_clone = event.clone()
-        # self.long_press_timer = threading.Timer(self.dtap_offset, lambda: self._trigger_double_tap(event_clone, value, extra_data))
-
-        # regular short press processing
-        # if self.short_timeout and self.short_timeout > 0.0:
-        #     if self.last_short_execution + self.short_timeout < time_now:
-        #         # syslog.info(f"reset short index")
-        #         self.short_index = 0
-        #     self.last_short_execution = time_now
-
     
         node_count = len(self.short_nodes)
         if node_count:
@@ -738,9 +777,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                 ec = gremlin.execution_graph.ExecutionContext()
                 node = self.short_nodes[self.short_index]
                 ec.execute_node(node, event, value, extra_data)
-                #self.short_set[self.short_index].process_event(event, value)
 
-        
             if self.chain_short and (self.switch_on_press and is_pressed) or not is_pressed:
                 # bump short index if chaining
                 self.short_index = (self.short_index + 1) % node_count
@@ -837,6 +874,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         if is_pressed:
             if verbose: syslog.info(f"TEMPOEX: input press processing - trigger mode: [{self.trigger_mode}]")
            
+
         
             time_now = time.time() # current time
             self.trigger_release = False # press mode
@@ -1005,8 +1043,18 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
 
         self._kill_timers()
         self._trigger_short_press(event_p, value_p, extra_data)
-        time.sleep(self.autorelease_delay)
-        self._trigger_short_press(event_r, value_r, extra_data)
+        if self.autorelease_delay:
+            callback = self._create_callback(self._trigger_short_press, event_r, value_r, extra_data)
+            timer = threading.Timer(self.autorelease_delay, callback)
+            if self.verbose: syslog.info("\tstart short press release timer")
+            timer.start()
+
+    def _handle_short_press_release(self, event, value, extra_data):
+        if self.verbose: syslog.info("\tshort press release timer lapsed")
+        self._trigger_short_press(event, value, extra_data)
+        
+    def _create_callback(self, functor, event, value, extra_data):
+        return lambda : functor(event, value, extra_data)
 
     def _double_press(self, event_p, value_p, event_r, value_r, extra_data):
         """Callback executed for a short press action.
@@ -1020,8 +1068,16 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         if self.verbose: syslog.info("TEMPOEX: handle dtap press")
 
         self._trigger_double_press(event_p, value_p, extra_data)
-        time.sleep(self.autorelease_delay)
-        self._trigger_double_press(event_r, value_r, extra_data)        
+        if self.autorelease_delay:
+            callback = self._create_callback(self._handle_double_tap_release, event_r, value_r, extra_data)
+            timer = threading.Timer(self.autorelease_delay, callback)
+            if self.verbose: syslog.info("\tstart double tap release timer")
+            timer.start()
+
+    def _handle_double_tap_release(self, event, value, extra_data):
+        if self.verbose: syslog.info("\tdouble tap release timer lapsed")
+        self._trigger_double_press(event, value, extra_data)
+
 
 
     def _long_press(self, event_p, value_p, event_r, value_r, extra_data):
@@ -1029,8 +1085,15 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
 
         if self.verbose: syslog.info("TEMPOEX: handle long press")
         self._trigger_long_press(event_p, value_p, extra_data)
-        time.sleep(self.autorelease_delay)
-        self._trigger_long_press(event_r, value_r, extra_data)        
+        if self.autorelease_delay and self.action_data.activate_on == "release":
+            callback = self._create_callback(self._trigger_long_press, event_r, value_r, extra_data)
+            timer = threading.Timer(self.autorelease_delay, callback)
+            if self.verbose: syslog.info("\tstart long press release timer")
+            timer.start()
+
+    def _handle_long_press_release(self, event, value, extra_data):
+        if self.verbose: syslog.info("\tlong press release timer lapsed")
+        self._trigger_long_press(event, value, extra_data)
 
 
     def _kill_timers(self):
@@ -1042,6 +1105,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
             if self.verbose: syslog.info("stop short press timer")
             self.short_press_timer.cancel()
             self.short_press_timer = None
+        
 
 
 

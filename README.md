@@ -14,6 +14,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T100)
+- Added: Warning box in TempoEx.
+- Changed: TempoEx uses timers for auto-release.
+- Fix: lock/unlock QT exception.
+
+
 ### (m76T99B)
 - New: States gain an auto-release mechanism. The option is available from the state's configuration page.
 

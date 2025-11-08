@@ -2720,21 +2720,27 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' number of input widgets currently in the device '''
         return self.input_item_list_view.count()        
 
-
     def _handle_lock_inputs(self, data):
+        gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
+
+    def _handle_unlock_inputs(self, data):
+        gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data)  # ensure on UI thread
+            
+
+    def _handle_lock_inputs_ui(self, data):
         ''' lock all inputs event'''
-        if not Shiboken.isValid(self):
-            return
-        if data == self.device_guid:
+        
+        if Shiboken.isValid(self) and data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)
             for input_item in self.input_item_list_model.getFilteredItems():
                 input_item.locked = len(input_item.containers) > 0 # don't lock if not mapped
             self.setUpdatesEnabled(True)
+
     
-    def _handle_unlock_inputs(self, data):
+    def _handle_unlock_inputs_ui(self, data):
         ''' unlock all inputs event '''
-        if data == self.device_guid:
+        if Shiboken.isValid(self) and data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)
             for input_item in self.input_item_list_model.getFilteredItems():
@@ -3214,10 +3220,6 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         else:
             widget.addWidget(QtWidgets.QLabel(f"Default: {input_id.display_value}"))
 
-
-            
-        # widget.disable_close()
-        # widget.disable_edit()
         widget.setIcon("mdi.state-machine")
 
 

@@ -7280,6 +7280,7 @@ class QDelayWidget(QtWidgets.QWidget):
         self._delay_widget.invalid.connect(self._handle_invalid_input)
         # self._delay_widget.setRange(0, self._max_value) 
         self._delay_widget.setMaximumWidth(width)
+        self._delay_widget.setMinimum(0)
         self._delay_widget.setValue(value) # default
         self._delay_widget.valueChanged.connect(self._value_changed)
 
@@ -11101,20 +11102,25 @@ class QWarningWidget(QtWidgets.QWidget):
     ''' warning widget'''
     def __init__(self, text = None,  parent = None):
         super().__init__(parent)
-        self._text = text
+        
+        self._label_widget = QtWidgets.QLabel(text)
         main_layout = QtWidgets.QVBoxLayout(self)
-        warning_color = Color.warningColor()
+        
         icon = Icons.warningIcon()
-        self._widget = QIconLabel(icon_path = icon, text=text)
-        widget, _ = getHContainer(self._widget)
+        widget = QIconLabel(icon_path = icon)
+
+        left_panel, _ = getVContainer(widget)
+        left_panel.setFixedWidth(32)
+        right_panel, _ = getVContainer(self._label_widget)
+
+        widget, _ = getHContainer([left_panel, right_panel],alignment = QtCore.Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(widget)
 
     def text(self) -> str:
-        return self._text
+        return  self._label_widget.text()
     
     def setText(self, text : str):
-        self._text = text
-        self._widget.setText(text)
+         self._label_widget.setText(text)
 
     def hasText(self) -> bool:
         return bool(self._text)

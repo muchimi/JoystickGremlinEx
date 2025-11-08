@@ -232,9 +232,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
 
-        # # lock all inputs
-        # el.lock_inputs.connect(self._handle_lock_inputs)
-        # el.unlock_inputs.connect(self._handle_unlock_inputs)
+
 
         self.updating = False
         self.last_event = None
