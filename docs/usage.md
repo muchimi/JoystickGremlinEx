@@ -361,6 +361,14 @@ Starting with 1.0ex m74, GremlinEx supports user-defined  [states](usage.md#stat
 
 Currently states are either pressed (on/true) or released (off/false) and function like a virtual joystick button.  When a state has mapping, the actions and containers mapped to it will see the input as a joystick button, so all containers/actions able to use momentary inputs can be mapped to a state.
 
+States can be set to auto-release after being set.  If this option is selected, whenever the state is set, it will start a timer.  If the timer lapses, the state's value will be reset based on the auto-release mode.
+
+| Mode | Action |
+|---|---|
+| Toggle | The state's value will be toggled upon auto-release |
+| On | The state will be set to on upon auto-release |
+| Off | The state will be set to off upon auto-release |
+
 States are read by [conditions](#conditions) and specifically the [state condition](#state-condition).
 
 In GremlinEx, states can be mapped via the State Device, the "map to state" action is used to clear, set, toggle or pulse a state, and the state condition is used to determine, based on state, if a container or action should execute or not.

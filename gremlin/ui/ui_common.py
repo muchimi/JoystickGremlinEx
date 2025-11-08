@@ -1588,7 +1588,7 @@ class QFloatLineEdit(QtWidgets.QWidget):
     valueChanged = QtCore.Signal(float) # fires when the value changes
     doubleClick = QtCore.Signal() # fires when the input is double clicked
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3,  step = 0.01, value = 0.0, chars = 8, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3,  step = 0.01, value = 0.0, chars = 8, callback = None, tooltip = None, parent = None):
         super().__init__(parent)
         self._min_range = min_range
         self._max_range = max_range
@@ -1614,6 +1614,11 @@ class QFloatLineEdit(QtWidgets.QWidget):
             self._update_width(chars)
         else:
             self.chars = 0
+
+        if tooltip:
+            self.setToolTip(tooltip)
+        if callback:
+            self.valueChanged.connect(callback)
 
     def _focus_out(self):
         # syslog.info("focus loss")
@@ -1843,7 +1848,7 @@ class QFloatLineEditEx(QtWidgets.QWidget):
     doubleClick = QtCore.Signal() # fires when the input is double clicked
 
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, callback = None, parent = None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
@@ -1870,6 +1875,9 @@ class QFloatLineEditEx(QtWidgets.QWidget):
             self._update_width(chars)
         else:
             self.chars = 0
+
+        if callback:
+            self.valueChanged.connect(callback)
         
 
 
@@ -9092,12 +9100,12 @@ def getHContainer(widget_or_list = None,
 
 
 
-def getVContainer(widget_or_list = None, label = None, alignment = None, font = None,  parent = None, no_stretch = False, bottom_stretch = False, top_stretch = False):
+def getVContainer(widget_or_list = None, label = None, alignment = None, font = None,  parent = None, no_stretch = False, bottom_stretch = False, top_stretch = False, left_margin = 0):
     ''' gets a qt H container widget '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QVBoxLayout(widget)
     widget.setContentsMargins(0,0,0,0)
-    layout.setContentsMargins(0,0,0,0)
+    layout.setContentsMargins(left_margin,0,0,0)
     if alignment is None:
         alignment = QtCore.Qt.AlignmentFlag.AlignTop
     layout.setAlignment(widget, alignment)

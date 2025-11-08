@@ -386,7 +386,16 @@ class StateInputItem(gremlin.base_profile.InputItem):
     MAX_STACK_SIZE = 100 # maximum number of expressions in a stack (circuit breaker to detect recursion)
     
 
-    def __init__(self, key : str = None, default_value = False, description = None, is_expression = False, expression = None, category = None):
+    def __init__(self, key : str = None,
+                 default_value = False,
+                 description = None, 
+                 is_expression = False, 
+                 expression = None, 
+                 category = None,
+                 autorelease = False,
+                 autorelease_delay = 1,
+                 autorelease_mode = "toggle", 
+                 autorelease_trigger_mode = "on"):
         master_mode = gremlin.shared_state.master_mode
 
 
@@ -416,10 +425,12 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._dirty = True # indicates the state is stale and must be recomputed (expressions only)
         self._expression_states = [] # dependent expression states - list of states that need to be evaluated when they change
         self._last_expression_value = False # last computed expression result
-        self._autorelease_delay = 1.0 # auto toggle timer in seconds
-        self._autorelease = False # true if autoreleases
 
-
+        self._autorelease = autorelease # true if autoreleases
+        self._autorelease_delay = autorelease_delay # auto toggle timer in seconds
+        self._autorelease_mode = autorelease_mode # autorelease behavior when the timer lapses
+        self._autorelease_timer = None # timer when triggered for autorelease
+        self._autorelease_trigger_mode = autorelease_trigger_mode # trigger mode required to enable the autorelease timer
 
         
         item = gremlin.base_profile.InputItem(parent = mode_object) #self._custom_name_handler)
@@ -445,7 +456,16 @@ class StateInputItem(gremlin.base_profile.InputItem):
     def clone(self):
         ''' clones the input item (gives it a new ID)'''
 
-        return StateInputItem(self.key, self.default_value, self.description, self.isExpression, self.expression, self.category)
+        return StateInputItem(self.key,
+                              self.default_value, 
+                              self.description, 
+                              self.isExpression, 
+                              self.expression, 
+                              self.category,
+                              self.autorelease,
+                              self.autorelease_delay,
+                              self.autorelease_mode,
+                              self.autorelease_trigger_mode)
         
     
     def getOverrideInputType(self):
@@ -556,13 +576,75 @@ class StateInputItem(gremlin.base_profile.InputItem):
         if data is None or not isinstance(data, bool):
             syslog.warning(f"State setter: state: [{self.key}] id: [{self.id}] attempt to set invalid value [{data}]")
             return
+        if self._autorelease_timer:
+            self._autorelease_timer.cancel()
+            self._autorelease_timer = None
+
         if force or not self._expression and self._value != data:
             # only set value on non expression states and only if the value has changed
             self._last_value = self._value
             self._value = data
             self._fire_changed(data)
 
+            if self._autorelease and self._autorelease_delay > 0:
+                trigger_mode = self._autorelease_trigger_mode
+                trigger = False
+                match trigger_mode:
+                    case "any":
+                        trigger = True
+                    case "on":
+                        trigger = data == True
+                    case "off":
+                        trigger = data == False
+                if trigger:
+                    self._autorelease_timer = threading.Timer(self._autorelease_delay, self._handle_autorelease)
+                    self._autorelease_timer.start()
 
+    def _handle_autorelease(self):
+        ''' called when the auto release timer lapses '''
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose:
+            syslog.info(f"State: autorelease - mode {self._autorelease_mode}")
+        match self._autorelease_mode:
+            case "toggle":
+                value = not self._value
+            case "on":
+                value = True
+            case _:
+                value = False
+        self.setValue(value)
+
+    @property
+    def autorelease(self) -> bool:
+        return self._autorelease
+    @autorelease.setter
+    def autorelease(self, value : bool):
+        self._autorelease = value
+
+    @property
+    def autorelease_delay(self) -> float:
+        return self._autorelease_delay
+    @autorelease_delay.setter
+    def autorelease_delay(self, value : float):
+        if value >= 0:
+            self._autorelease_delay = value
+
+    @property
+    def autorelease_mode(self) -> str:
+        return self._autorelease_mode
+    @autorelease_mode.setter
+    def autorelease_mode(self, value : str):
+        if value in ("toggle","on","off"):
+            self._autorelease_mode = value
+
+    @property
+    def autorelease_trigger_mode(self) -> str:
+        return self._autorelease_trigger_mode
+    @autorelease_trigger_mode.setter
+    def autorelease_trigger_mode(self, value : str):
+        if value in ("any","on","off"):
+            self._autorelease_trigger_mode = value
+ 
 
     @property
     def lastValue(self) -> bool | None:
@@ -730,7 +812,9 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
         
         node.set("autorelease",safe_format(self._autorelease, bool))
-        node.set("autorelease-delay", safe_format(self._autorelease, float))
+        node.set("autorelease-delay", safe_format(self._autorelease_delay, float))
+        node.set("autorelease-mode", safe_format(self._autorelease_mode, str))
+        node.set("autorelease-trigger", safe_format(self._autorelease_trigger_mode, str))
 
         # write container data
         self._input_item.to_xml(node)
@@ -778,8 +862,11 @@ class StateInputItem(gremlin.base_profile.InputItem):
                 # suitable default based on existing value
                 self._is_expression = bool(self.expression)
 
-        self._autorelease = safe_read(node,"autorelease", bool, False)
-        self._autorelease_delay = safe_read(node,"autorelease-delay", float, 1.0)
+        self.autorelease = safe_read(node,"autorelease", bool, False)
+        self.autorelease_delay = safe_read(node,"autorelease-delay", float, 1.0)
+        self.autorelease_mode = safe_read(node,"autorelease-mode", str, "toggle")
+        self.autorelease_trigger_mode = safe_read(node,"autorelease-trigger", str, "on")
+
 
         self._default_value = value
         self._value = value
@@ -1908,6 +1995,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent # list view
         self._is_edit = state is not None
+    
 
         el = gremlin.event_handler.EventListener()
         
@@ -1941,6 +2029,78 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._description_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._description_widget.setText(state._description)
         self._description_widget.textChanged.connect(self._description_changed)
+
+        self._autorelease_widget = gremlin.ui.ui_common.QDataCheckbox("Autorelease", value = state.autorelease, callback = self._handle_autorelease_changed)
+        self._autorelease_delay_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range = 0, max_range = 1000,step = 0.1,value = state.autorelease_delay, callback = self._handle_autorelease_delay_changed)
+        self._autorelease_mode_widget = gremlin.ui.ui_common.QDataComboBox()
+        modes = [
+            ("Toggle", "toggle"),
+            ("On", "on"),
+            ("Off", "off"),
+        ]
+        for mode, data in modes:
+            self._autorelease_mode_widget.addItem(mode, data)
+
+        index = self._autorelease_mode_widget.findData(self.data.autorelease_mode)
+        if index != -1:
+            self._autorelease_mode_widget.setCurrentIndex(index)
+
+        self._autorelease_mode_widget.currentIndexChanged.connect(self._handle_autorelease_mode_changed)
+
+
+        self._autorelease_trigger_mode_widget = gremlin.ui.ui_common.QDataComboBox()
+        modes = [
+            ("Any", "any"),
+            ("On", "on"),
+            ("Off", "off"),
+        ]
+        for mode, data in modes:
+            self._autorelease_trigger_mode_widget.addItem(mode, data)
+
+        index = self._autorelease_trigger_mode_widget.findData(self.data.autorelease_trigger_mode)
+
+        if index != -1:
+            self._autorelease_trigger_mode_widget.setCurrentIndex(index)
+
+        self._autorelease_trigger_mode_widget.currentIndexChanged.connect(self._handle_autorelease_trigger_mode_changed)
+
+
+        widgets = [
+            "Delay (s):",
+            self._autorelease_delay_widget,
+        ]
+
+        r1_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+
+        widgets = [
+            "Set Value:",
+            self._autorelease_mode_widget,
+        ]
+
+        r2_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)        
+
+        widgets = [
+            "Trigger on:",
+            self._autorelease_trigger_mode_widget
+        ]
+
+        r3_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)        
+
+
+        widgets = [
+            r1_widget,
+            r2_widget,
+            r3_widget
+            ]
+        
+        self._autorelease_options_container_widget, _ = gremlin.ui.ui_common.getVContainer(widgets, left_margin=12)
+
+        widgets = [
+            self._autorelease_widget,
+            self._autorelease_options_container_widget
+        ]
+
+        self._autorelease_container_widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
 
         self._status_widget = gremlin.ui.ui_common.QWarningWidget()
 
@@ -1992,6 +2152,9 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._config_layout.addWidget(self._expression_container_widget, row, col, 1, -1)
 
         row += 1
+        self._config_layout.addWidget(self._autorelease_container_widget, row, col, 1, -1)
+
+        row += 1
         
         self._default_on_widget = gremlin.ui.ui_common.QDataRadioButton("On", True)
         self._default_on_widget.setToolTip("If checked, the state will default to Active/On/Pressed")
@@ -2022,10 +2185,25 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         main_layout.addWidget(widget)
         self._update_ui()
 
+    @QtCore.Slot(bool)
+    def _handle_autorelease_changed(self, checked):        
+        self.data.autorelease = checked
+        self._update_ui()
+
+    @QtCore.Slot()
+    def _handle_autorelease_mode_changed(self):
+        self.data.autorelease_mode = self._autorelease_mode_widget.currentData()
+
+    @QtCore.Slot()
+    def _handle_autorelease_trigger_mode_changed(self):
+        self.data.autorelease_trigger_mode = self._autorelease_trigger_mode_widget.currentData()
+        
+    def _handle_autorelease_delay_changed(self, value):
+        self.data.autorelease_delay = value
+
     def _set_status(self, text : str):
         ''' sets the status text '''
         self._status_widget.setText(text)
-        visible = bool(text)
         self._update_ui()
 
     def _clear_status(self):
@@ -2179,6 +2357,14 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._expression_container_widget.setVisible(expression_visible)
         self._default_container_widget.setVisible(not expression_visible)
         self._status_widget.setVisible(bool(self._status_widget.text()))
+
+        if expression_visible:
+            self._autorelease_container_widget.setVisible(False)
+            
+        else:
+            self._autorelease_container_widget.setVisible(True)
+            visible = self.data.autorelease
+            self._autorelease_options_container_widget.setVisible(visible)
 
 
 class  StateFilterWidget(QtWidgets.QWidget):
@@ -2716,6 +2902,11 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item.isExpression = data.isExpression
         input_item.expression = data.expression
         
+        input_item.autorelease = data.autorelease
+        input_item.autorelease_delay = data.autorelease_delay
+        input_item.autorelease_mode = data.autorelease_mode
+        input_item.autorelease_trigger_mode = data.autorelease_trigger_mode
+        
 
 
         
@@ -2739,12 +2930,17 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._edit_item.enableEvents()
 
+
         self._edit_item.description = data.description
         self._edit_item.setCategory(data.category)
         self._edit_item.default_value = data.default_value
-        
         self._edit_item.isExpression = data.isExpression    
         self._edit_item.expression = data.expression    
+
+        self._edit_item.autorelease = data.autorelease
+        self._edit_item.autorelease_delay = data.autorelease_delay
+        self._edit_item.autorelease_mode = data.autorelease_mode
+        self._edit_item.autorelease_trigger_mode = data.autorelease_trigger_mode
         
         self.input_item_list_model.refresh()
         index = sd.index(self._edit_item)

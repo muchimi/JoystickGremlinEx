@@ -1118,7 +1118,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         if "state-id" in node.attrib:
             state_id = node.get("state-id")
             state = sd.getStateById(state_id)
-
+        
         if not state and key:
             # grab state ID for legacy profiles
             state = sd.getState(key)
@@ -1127,7 +1127,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
             self.state = state
         else:
             # state not found - see if we can find the missing datas  
-            syslog.error(f"STATE: (map to state): [{key}] does not exist - creating state")
+            syslog.warning(f"STATE: (map to state): [{key}] does not exist - creating state")
             state = sd._register(key)
             self.state = state
 

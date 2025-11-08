@@ -14,6 +14,25 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T99B)
+- New: States gain an auto-release mechanism. The option is available from the state's configuration page.
+
+What it does: when a state's value changes - and the auto-release mode is set, a timer starts that will automatically set the state to either flip (toggle), or turn on or off when the timer lapses. The timer resets whenever the state changes again.  More options may be added later.
+
+Options:
+
+- delay : in seconds, delay until the state resets
+- mode: determines what the state is set to upon autorelease (toggle, on or off)
+- trigger: determines when autorelease triggers - any value, when the state is flipped on, or when the state is flipped off.  
+
+This function is helpful to:
+
+- reset a state automatically to a known value after time lapses based on what the state was set to in the first place.
+- setup a timed condition using the auto-release on a state, and using the state as a condition for another input to either enable or disable that mapping.
+- enables map to state for inputs that do not release.
+
+
+
 ### (m76T99A)
 - Change: Keepalive timer down to 60 seconds - changed alive check on VJOY API and improved status readouts in verbose mode.
 
