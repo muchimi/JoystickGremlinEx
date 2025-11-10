@@ -1139,7 +1139,9 @@ class ConditionHelper:
                     condition = gremlin.base_conditions.ActivationCondition.condition_lookup[condition_type]()
                     condition.from_xml(node, data)
                     condition.setId(gremlin.util.get_guid())
-                    container.activation_condition.conditions.append(condition)
+
+                    container.condition_view._add_condition(condition)
+                    #container.activation_condition.conditions.append(condition)
                     condition.setOwner(container.activation_condition)
                     rule = container.activation_condition.rule
                     input_item = container.parent

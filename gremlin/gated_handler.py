@@ -1174,7 +1174,7 @@ class GateEventHandler(QtCore.QObject):
     def _joystick_event_handler(self, event):   
         ''' enqueues the received event for later processing '''
         if self.verbose: syslog.info(f"GATEHANDLER: QUEUE event {event.id}")
-        self._event_queue.put_nowait(event)
+        self._event_queue.put(event)
 
     def _event_runner(self):
         ''' runner for inbound joystick events '''

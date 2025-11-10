@@ -117,8 +117,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             widgets.append(rb)
 
         
-        self.description_widget = QtWidgets.QLabel()
-        self.description_widget.setWordWrap(True)
+        self.description_widget = gremlin.ui.ui_common.QInfoBox()
+        
 
 
         self.delay_box.valueChanged.connect(self._delay_changed)
@@ -335,7 +335,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             case KeyboardOutputMode.Release:
                 description = "<b>Release</b> mode will release keys(s) previously pressed with the Press mode (keyboard 'break'). If no key is sent, the release mode will also clear any auto-repeat actions to cancel them."
             case KeyboardOutputMode.Hold:
-                description = "<b>Hold</b> mode will keep the key(s) pressed until the input is released."
+                description = "<b>Hold</b> mode will keep the key(s) pressed while the input is on/pressed.  The key(s) will release when the input is off/released.<br>This mode <b>does not</b> autorepeat.  To autorepeat, select autorepeat mode."
             case KeyboardOutputMode.Pulse:
                 delay_visible = True
                 description = "<b>Pulse</b> mode will press the key(s), wait for the delay, then release the key(s)."

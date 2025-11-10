@@ -52,6 +52,7 @@ _all_vjoy_devices_map = {}# all vjoy devices (int) -> device
 
 _joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID
 
+
 # Joystick initialization lock
 _joystick_init_lock = threading.Lock()
 
@@ -528,7 +529,7 @@ def registerSpecialDevice(dev):
         syslog.info(f"SPECIAL DEVICE: {dev.device_id} / {dev.device_type.name} -> {dev.name}")
 
 
-def removeDevice(dev):
+def removeDevice(dev : dinput.DeviceSummary):
     ''' removes a device from the tracking list'''
     global _all_joystick_devices, _vjoy_devices_map, _joystick_devices
     device_guid = dev.device_guid
@@ -540,7 +541,6 @@ def removeDevice(dev):
             _vjoy_devices_map = {d.vjoy_id: d for d in _vjoy_devices_map if d.device_guid != device_guid}
             
         _joystick_devices = [d for d in _joystick_devices if d.device_guid != device_guid]
-
 
 
 def device_name_from_guid(device_guid) -> str:
@@ -568,6 +568,10 @@ def getKnownDevicesGuids() -> list:
 def getDevices() -> list[dinput.DeviceSummary]:
     ''' gets a list of known devices, physical and virtual '''
     return [dev for dev in _joystick_device_guid_map.values()]
+
+def getPhysicalDevices() -> list[dinput.DeviceSummary]:
+    return [dev for dev in _joystick_device_guid_map.values() if dev.device_type == DeviceType.Joystick and not dev.is_virtual]
+
 
 def getDevice(device_guid):
     ''' gets a device summary '''
@@ -817,6 +821,7 @@ def joystick_devices_initialization():
     config = gremlin.config.Configuration()
     verbose = config.verbose_mode_inputs
     verbose_detailed = verbose and config.verbose_mode_extra
+    
 
     _joystick_init_lock.acquire()
 
@@ -887,7 +892,7 @@ def joystick_devices_initialization():
         _joystick_devices.append(dev)
         _all_joystick_devices.append(dev)
         _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
-        _joystick_device_guid_map[dev.device_id] = dev # key by string ID
+        # _joystick_device_guid_map[dev.device_id] = dev # key by string ID
         if dev.is_virtual: 
             virtual_count += 1
             virtual_devices[dev.hashkey] = dev

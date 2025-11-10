@@ -244,9 +244,14 @@ class TextToSpeech:
             syslog.info("TTS: stop")
             self._queue_thread.stop()
             self._queue_thread.join()
+            self._queue_thread
+
             self._tts_thread.stop()
             self._tts_thread.join()
+            self._tts_thread = None
+
             self.engine.stop()
+
             self._clear_queue()
             self._started = False
 

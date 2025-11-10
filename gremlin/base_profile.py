@@ -1100,6 +1100,7 @@ class AbstractAction(ProfileData):
         self._priority = 5 # default priority
         self.data = None # additional data for runtime purposes, context dependent used to tag actions at runtime for some purpose like action grouping
         self.data_ex = None # additional data for 
+        self.condition_view = None # holds the condition view object for this action
 
         el = gremlin.event_handler.EventListener()
         el.action_created.emit(self)
@@ -2824,6 +2825,7 @@ class Profile():
         self.state = gremlin.ui.state_device.StateData()
         self.state.clear()
         self._start_state = {}  # profile startup output state - index by [device_id (str)][buttons/axis (str)][id (int)] = value (float or bool)
+        self._removed_devices = [] # list of removed devices from the profile, list of device_id (str)
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
@@ -3481,22 +3483,89 @@ class Profile():
 
         return True
     
+    def isRemovedDevice(self, id):
+        ''' true if a device was removed by the user and should not be displayed '''
+        id = gremlin.util.normalize_guid(id)
+        return id in self._removed_devices
+    
+    def removedDeviceMap(self) -> {}:
+        ''' returns the list of devices removed '''
+        result = {}
+        for id in self._removed_devices:
+            device = gremlin.joystick_handling.device_info_from_guid(id)
+            result[id] = device
+
+        return result
+
+    def setDeviceRemoved(self, id, removed : bool):
+        ''' marks a profile device removed or not '''
+        if removed and not id in self._removed_devices:
+            self._removed_devices.append(id)
+        elif not removed and id in self._removed_devices:
+            self._removed_devices.remove(id)
+            
+    def hasMapping(self, device_guid, any_mode = False) -> bool:
+        ''' true if the device has mappings '''
+        if isinstance(device_guid, str):
+            device_guid = gremlin.util.parse_guid(device_guid)
+        profile = gremlin.shared_state.current_profile
+        edit_mode = gremlin.shared_state.edit_mode
+        devices = profile.devices
+        look_for_containers = True
+        # special devices
+        if device_guid == gremlin.shared_state.state_tab_guid:
+            # state
+            sd = gremlin.ui.state_device.StateData()
+            names = sd.getStateNames()
+            return len(names) > 0
+        elif device_guid == gremlin.shared_state.settings_tab_guid:
+            return True
+        elif device_guid == gremlin.shared_state.plugins_tab_guid:
+            # plugins
+            plugins = gremlin.shared_state.current_profile.plugins
+            return len(plugins) > 0
+        elif device_guid == gremlin.shared_state.keyboard_tab_guid:
+            look_for_containers = False
+
+        if device_guid in devices:
+            device_data = devices[device_guid]
+            mode_list = [mode for mode in device_data.modes] if any_mode else ([edit_mode] if edit_mode in device_data.modes else [])
+            for mode_name in mode_list:
+                mode_data = device_data.modes[mode_name]
+                for input_type, input_items in mode_data.config.items():
+                    for input_item in input_items.values():
+                        if look_for_containers:
+                            if input_item.containers:
+                                return True
+                        else:
+                            # input count indicates content
+                            return True
+        return False
+    
     def remove_device(self, device : dinput.DeviceSummary):
         ''' removes the specified device from the profile '''
-        if device.connected:
-            syslog.error(f"PROFILE: cannot remove a connected device: {device.name}")
+
+        if device.device_type != DeviceType.Joystick:
+            syslog.error(f"PROFILE: cannot remove non-joystick device: {device.name}")
             return
         
-        gremlin.util.pushCursor()
-        device_guid = device.device_guid
-        if device_guid in self.devices:
-            del self.devices[device_guid]
+        if not device.device_id in self._removed_devices:
+            self._removed_devices.append(device.device_id)
 
-        gremlin.joystick_handling.removeDevice(device)
+        # if device.connected:
+        #     syslog.error(f"PROFILE: cannot remove a connected device: {device.name}")
+        #     return
+        
+        # gremlin.util.pushCursor()
+        # device_guid = device.device_guid
+        # if device_guid in self.devices:
+        #     del self.devices[device_guid]
 
-        node = self.graph.get_device_node(device.device_guid)
-        if node is not None:
-            node.parent = None
+        # gremlin.joystick_handling.removeDevice(device)
+
+        # node = self.graph.get_device_node(device.device_guid)
+        # if node is not None:
+        #     node.parent = None
 
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(True) # reset and rebuild data around the profile
@@ -3959,6 +4028,15 @@ class Profile():
         for node in mode_nodes:
             self.state.from_xml(node)
 
+        # removed devices 
+        self._removed_devices.clear()
+        removed_nodes = root.xpath("//removed-devices/device")
+        for node in removed_nodes:
+            id = node.get("id")
+            self._removed_devices.append(id)
+
+        
+
 
         # Parse each device into separate DeviceConfiguration objects
         devices = root.xpath("//profile/devices/device")
@@ -4190,6 +4268,16 @@ class Profile():
             nodes[mode] = node # track it
             parent_mode = tree_node.parent.name if tree_node.parent else None
             root_mode_node.append(node)
+
+        # new as m76t101 - removed mode list
+        # this is the list of devices removed by the user
+        if self._removed_devices:
+            removed_device_node = etree.Element("removed-devices")
+            for id in self._removed_devices:
+                id_node = etree.Element("device")
+                id_node.set("id", id)
+                removed_device_node.append(id_node)
+            root.append(removed_device_node)
 
         # Device settings
         devices = etree.Element("devices")

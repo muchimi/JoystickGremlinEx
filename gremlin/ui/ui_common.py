@@ -3385,14 +3385,12 @@ class InputListenerWidget(QBoxFrame):
         self.setPalette(palette)
 
         # Start listening to user key presses
-        event_listener = gremlin.event_handler.EventListener()
-        event_listener.keyboard_event.connect(self._kb_event_cb)
-        if InputType.JoystickAxis in self._event_types or \
-                InputType.JoystickButton in self._event_types or \
-                InputType.JoystickHat in self._event_types:
-            event_listener.joystick_event.connect(self._joy_event_cb)
+        el = gremlin.event_handler.EventListener()
+        el.keyboard_event.connect(self._kb_event_cb)
+        if InputType.JoystickAxis in self._event_types or InputType.JoystickButton in self._event_types or InputType.JoystickHat in self._event_types:
+            el.joystick_event.connect(self._joy_event_cb)
+        
         if self._listen_mouse:
-
             # hook the mouse
             mh = gremlin.windows_event_hook.MouseHook()
             mh.register(self._mouse_event_cb)
@@ -3418,9 +3416,12 @@ class InputListenerWidget(QBoxFrame):
             return
 
         # Ensure the event corresponds to a significant enough change in input
-        process_event = gremlin.input_devices.JoystickInputSignificant().should_process(event)
-        if event.event_type == InputType.JoystickButton:
+        if event.is_axis:
+            process_event = gremlin.input_devices.JoystickInputSignificant().should_process(event)
+        elif event.event_type == InputType.JoystickButton:
             process_event &= event.is_pressed
+        elif event.event_type == InputType.JoystickHat:
+            process_event = event.value != (0,0)
 
         if process_event:
             gremlin.input_devices.JoystickInputSignificant().reset()
@@ -8624,7 +8625,7 @@ def get_main_window():
 
 class QShowAtCursorDialog(QtWidgets.QDialog):
     ''' a dialog that pops up near the cursor '''
-    dialog_closed = Signal(object)
+    dialog_closed = QtCore.Signal(object)
 
     def __init__(self, key = None, parent = None):
         super().__init__(parent)
@@ -8678,7 +8679,7 @@ class QShowAtCursorDialog(QtWidgets.QDialog):
 class QRememberDialog(QtWidgets.QDialog):
     ''' a dialog window that remembers its size and location '''
 
-    dialog_closed = Signal(object)
+    dialog_closed = QtCore.Signal(object)
 
     def __init__(self, key: str, parent = None):
         super().__init__(parent)

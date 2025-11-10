@@ -5393,7 +5393,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     if verbose: curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
                     value = curve_value
 
-                if verbose: syslog.info(f"AXIS Filter: applied curve: {curve_msg} final curve value: {curve_value:0.3f}  input: {raw_value:0.3f}")
+                if verbose: syslog.info(f"VJOY AXIS Filter: applied curve: {curve_msg} final curve value: {curve_value:0.3f}  input: {raw_value:0.3f}")
 
                 
 
@@ -5405,9 +5405,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                         target_min=self.output_range_min,
                         target_max=self.output_range_max,
                         invert = is_reverse)
-                if verbose: syslog.info(f"AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}]  scaled: {is_scaled} reversed: {is_reverse} -> Filtered: [{value:0.3f}]")    
+                if verbose: syslog.info(f"VJOY AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}]  scaled: {is_scaled} reversed: {is_reverse} -> Filtered: [{value:0.3f}]")    
             else:
-                if verbose: syslog.info(f"AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}] -> Filtered: [{value:0.3f}]")
+                if verbose: syslog.info(f"VJOY AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}] -> Filtered: [{value:0.3f}]")
                 
 
 

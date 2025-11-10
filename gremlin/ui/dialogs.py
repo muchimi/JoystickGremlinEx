@@ -312,7 +312,137 @@ class HostIpDialog(ui_common.BaseDialogUi):
     @QtCore.Slot()
     def _cancel_cb(self):
         self.close()
+
+
+class RemovedDeviceUi(ui_common.BaseDialogUi):
+    ''' dialog controlling which devices are removed from a particular profile '''
+    def __init__(self, parent=None):
+        super().__init__(self.__class__.__name__, parent)
+
+        self.setWindowTitle("Profile Device List")
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.setModal(True)
+
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_widget = QtWidgets.QWidget()
+        self.scroll_layout = QtWidgets.QVBoxLayout()
+
+        # Configure the widget holding the layout with all the buttons
+        self.scroll_widget.setLayout(self.scroll_layout)
+        self.scroll_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+        )
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+        # Configure the scroll area
+        self.scroll_area.setMinimumWidth(300)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)
+
+
+        profile = gremlin.shared_state.current_profile
+        removed_map = profile.removedDeviceMap()
         
+        # list all devices that can be removed from the profile
+        devices = gremlin.joystick_handling.getDevices()
+        devices.sort(key = lambda x: x.name)
+        self.device_widgets = []
+        always_on_devices = [
+            gremlin.shared_state.mode_tab_id,
+            gremlin.shared_state.settings_tab_id,
+        ]
+        for device in devices:
+            # filter devices that cannot be removed
+            if device.device_id in always_on_devices or device.disabled or device.is_virtual:
+                continue
+            
+            widget = gremlin.ui.ui_common.QDataCheckbox(device.name, data = device, value = not device.device_id in removed_map)
+            self.device_widgets.append(widget)
+
+        widget, _ = gremlin.ui.ui_common.getVContainer(self.device_widgets)
+        
+        self.scroll_layout.addWidget(widget)
+        self.scroll_layout.addStretch()
+
+        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget.clicked.connect(self._cancel_cb)
+
+        all_widget = QtWidgets.QPushButton("All")
+        all_widget.setToolTip("Selects all")
+        all_widget.clicked.connect(self._select_all)
+
+        none_widget = QtWidgets.QPushButton("None")
+        none_widget.setToolTip("Deselects all")
+        none_widget.clicked.connect(self._select_none)
+
+        mapped_widget = QtWidgets.QPushButton("Mapped")
+        mapped_widget.setToolTip("Selects only mapped devices")
+        mapped_widget.clicked.connect(self._select_mapped)
+        
+
+        ok_button_widget = QtWidgets.QPushButton("Ok")
+        ok_button_widget.clicked.connect(self._ok_cb)
+
+        widget, _ = gremlin.ui.ui_common.getHContainer(
+            [
+                all_widget,
+                none_widget,
+                mapped_widget,
+                "||",
+                ok_button_widget,
+                cancel_button_widget
+            ]
+            )
+        button_container_widget = widget
+        
+        self.main_layout.addWidget(self.scroll_area)
+
+        info_widget = gremlin.ui.ui_common.QInfoBox("Unselected devices will not show on the available device list for this profile.<br>You can re-enable them later if needed.")
+        self.main_layout.addWidget(info_widget)
+        self.main_layout.addWidget(button_container_widget)
+        self.setModal(True)
+
+    def _select_all(self):
+        ''' selects all the items in the list '''
+        for widget in self.device_widgets:
+            widget.setChecked(True)
+
+    def _select_none(self):
+        ''' deselects all items '''
+        for widget in self.device_widgets:
+            widget.setChecked(False)
+
+    def _select_mapped(self):
+        ''' deselects all items '''
+        profile = gremlin.shared_state.current_profile
+        for widget in self.device_widgets:
+            device = widget.data
+            mapped =  profile.hasMapping(device.device_guid, any_mode = True)
+            widget.setChecked(mapped)
+
+    @QtCore.Slot()
+    def _ok_cb(self):
+
+        # commit the changes to the profile and re-load
+        for widget in self.device_widgets:
+            device = widget.data
+            removed = not widget.isChecked()
+            profile = gremlin.shared_state.current_profile
+            profile.setDeviceRemoved(device.device_id, removed)
+
+        ec = gremlin.execution_graph.ExecutionContext()
+        ec.reset(True) # reset and rebuild data around the profile
+        
+        el = gremlin.event_handler.EventListener()
+        el.request_reload.emit()
+
+        self.close()
+
+    @QtCore.Slot()
+    def _cancel_cb(self):
+        self.close()       
 
 
 

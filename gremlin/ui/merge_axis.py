@@ -174,7 +174,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
     """UI dialog which allows configuring how to merge two axes."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = Signal(QtWidgets.QWidget)
+    closed = QtCore.Signal(QtWidgets.QWidget)
 
     # Palette used to render widgets
     palette = QtGui.QPalette()

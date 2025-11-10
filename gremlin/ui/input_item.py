@@ -3105,13 +3105,13 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     """Base class for container widgets."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = Signal(QtWidgets.QWidget)
+    closed = QtCore.Signal(QtWidgets.QWidget)
 
     # fires when the container is about to be closed
-    closing = Signal()
+    closing = QtCore.Signal()
 
         
-    container_modified = Signal()  # container contents changed
+    container_modified = QtCore.Signal()  # container contents changed
 
 
    
@@ -3390,10 +3390,6 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         ''' called when conditions change '''
         if container.id == self.container.id and self.activation_condition_widget:
             self.activation_condition_widget._update_conditions_ui()
-
-    # def _ui_ready(self):
-    #     ''' called when UI is loaded '''
-    #     self._update_ui(self.container)
 
     @QtCore.Slot()
     def _condition_redraw(self, data):
@@ -4073,7 +4069,7 @@ class BasicActionWrapper(AbstractActionWrapper):
     """Wraps an action widget and displays the basic config dialog."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = Signal(QtWidgets.QWidget)
+    closed = QtCore.Signal(QtWidgets.QWidget)
 
     def __init__(self, action_widget, parent=None):
         """Wraps an existing action widget.
@@ -4163,6 +4159,7 @@ class ConditionActionWrapper(AbstractActionWrapper):
             container.activation_condition
         )
         self.condition_view = ui_activation_condition.ConditionView()
+        container.condition_view = self.condition_view
         self.condition_view.setContainer(container)
         self.condition_view.setModel(self.condition_model)
         self.condition_view.redraw()

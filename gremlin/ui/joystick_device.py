@@ -93,7 +93,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Store parameters
 
         self.data : gremlin.ui.tab= data
-        
+        self._refresh_lock = False # semaphore to block refresh in progress
         
         self.curve_update_handler = {} # map of curve handlers to the input by index
 
@@ -575,8 +575,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         finally:    
             self.setUpdatesEnabled(True)
-            #gremlin.util.dumpWidgets(self._right_container_layout)
             self.update()
+            
         
        
 
@@ -635,7 +635,13 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
     def _refresh_ui(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread """
-        self._select_item_cb(self.input_item_list_view.current_index, force_update = True, emit = emit)
+        if self._refresh_lock:
+            return
+        try:
+            self._refresh_lock = True
+            self._select_item_cb(self.input_item_list_view.current_index, force_update = True, emit = emit)
+        finally:
+            self._refresh_lock = False
 
 
     def _create_change_cb(self, index):

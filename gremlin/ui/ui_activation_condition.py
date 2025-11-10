@@ -1513,6 +1513,7 @@ class ConditionView(ui_common.AbstractView):
         super().__init__(parent)
 
         self._container = None
+        self._redraw_lock = False
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
@@ -1598,35 +1599,44 @@ class ConditionView(ui_common.AbstractView):
     def _redraw_ui(self):
         """Redraws the entire view.  must be on UI thread"""
 
-        # el = gremlin.event_handler.EventListener()
-        # el.condition_redraw.emit(self.model.action_data)
         if not Shiboken.isValid(self):
             return
-        if not Shiboken.isValid(self.conditions_layout):
+        if self._redraw_lock:
             return
         
-        ui_common.clear_layout(self.conditions_layout)
+        try:
+            self._redraw_lock = True
+        
+        
+            ui_common.clear_layout(self.conditions_layout)
 
-        lookup = {}
-        for entry in ConditionView.condition_map.values():
-            lookup[entry[0]] = entry[1]
+            lookup = {}
+            for entry in ConditionView.condition_map.values():
+                lookup[entry[0]] = entry[1]
 
-        for i in range(self.model.rows()):
-            data = self.model.data(i)
-            condition_widget = lookup[type(data)](data)
-            condition_widget.deleted.connect(
-                lambda local_data: self.model.delete_condition(local_data)
-            )
-            self.conditions_layout.addWidget(condition_widget)
+            for i in range(self.model.rows()):
+                data = self.model.data(i)
+                condition_widget = lookup[type(data)](data)
+                condition_widget.deleted.connect(
+                    lambda local_data: self.model.delete_condition(local_data)
+                )
+                self.conditions_layout.addWidget(condition_widget)
+
+        finally:
+            self._redraw_lock = False
+            
 
         
-        #el.condition_state_changed.emit(self.model.action_data)
 
-    def _add_condition(self):
+
+    def _add_condition(self, condition = None):
         """Adds a condition to the view's model."""
         
-        data_type = ConditionView.condition_map[self.condition_selector.currentText().split()[0]][0]
-        self.model.add_condition(data_type())
+        if not condition:
+            data_type = ConditionView.condition_map[self.condition_selector.currentText().split()[0]][0]
+            self.model.add_condition(data_type())
+        else:
+            self.model.add_condition(condition)
         
 
     def _rule_changed_cb(self, text):

@@ -77,13 +77,11 @@ Mapping logic is only executed if the profile is set to "active" or runtime.  Wh
 
 When a profile stops, it actively terminates any active output action by GremlinEx.
 
-
 ### Mappings
 
 A mapping represents a set of containers and actions to execute whenever the input is triggered.  There is one mapping for each profile mode, so you can have each input do different things depending on the current profile runtime mode.
 
 A mapping contains one or more containers.
-
 
 ### Containers
 
@@ -203,6 +201,35 @@ Special devices in GremlinEx are non-joystick devices, or configuration devices.
 Note that the MIDI and OSC tabs only appear if MIDI and OSC are enabled in options (this is by default enabled).
 
 
+#### Device List
+
+Available devices are down as a tab near the top of the interface.  Physical, virtual, and special devices will show in the list.
+
+#### Device Order
+
+The list can be re-ordered by dragging and dropping device names to the desired location.  This setting will be persisted.  Note that the order of devices does not change the order of devices as seen by Windows.  Devices in Windows cannot be re-ordered, but GremlinEx will let you change the order visually based on your preference.
+
+#### Device Visibility
+
+Devices can be hidden if they are not used to declutter the UI and improve performance.  While GremlinEx will not load a device until it is selected, performance and memory usage decreases when fewer devices are displayed.  To determine which devices are visible, you can call up the visible device dialog from the tools menu, or from the device context menu.
+
+Device visibility is persisted by profile.   Save the profile after making changes.
+
+
+![device visibiliy dialog](assets/device_visible_dialog.png)
+
+
+#### Device appearance
+
+Each device tab will include an icon if the device is mapped.  The icon will be solid if the device has a mapping in the current profile edit mode.  The icon will be hollow if the device has a mapping in a different profile mode.  
+
+Disconnected devices will show with a disconnect plug icon.
+
+![device appearance](assets/device_appearance.png)
+
+
+
+
 #### Disconnected devices
 
 ![disconnected device tabs](assets/disconnected_device_tabs.png)
@@ -210,6 +237,8 @@ Note that the MIDI and OSC tabs only appear if MIDI and OSC are enabled in optio
 If a device was saved to a profile, the profile is loaded, and the device is no longer detected, GremlinEx will indicate the device is not currently available with a disconnected flag as shown above.  The device can be reconnected by plugging it back in, or deleted via the context (right click) menu.  Disconnected devices are normal when opening a profile created on a different machine as device hardware IDs will be different.
 
 It is possible for the disconnected device to have the same name of a current device if the device has a different hardware ID from what is currently detected.
+
+
 
 #### Tip: copy mapping from one device to the other
 
@@ -2063,6 +2092,9 @@ It also adds a delay (pulse) function to hold a key down for a preset period of 
 The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.
 
 ![keyboard mapper](assets/keyboard_mapper_ex.png)
+
+
+
 
 ### Output modes
 

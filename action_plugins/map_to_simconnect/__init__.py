@@ -1657,7 +1657,7 @@ Please select the mode for this aicraft:
 
 class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to set individual simconnect  settings """
-    closed = Signal() # fires when we close this dialog 
+    closed = QtCore.Signal() # fires when we close this dialog 
 
     def __init__(self, simconnect : SimConnect, parent=None):
         from gremlin.ui import ui_common

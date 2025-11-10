@@ -174,14 +174,14 @@ class Event:
 		memo[id(self)] = result
 		for k, v in self.__dict__.items():
 			try:
-				if k == "extra_data":
-					# shallow copy passed extra data
-					setattr(result, k, v)	
+				if k in ("data","extra_data"):
+					# shallow copy passed data or extra data 
+					setattr(result, k, copy.copy(v))
 				else:
 					setattr(result, k, copy.deepcopy(v, memo))
 			except:
 				# cannot copy = do a shallow copy
-				setattr(result, k, v)
+				setattr(result, k, copy.copy(v))
 		return result
 	
 	@property
@@ -434,6 +434,8 @@ class EventListener:
 
 	ui_ready = Signal() # tell the UI all is ready
 
+	ui_initialized = Signal() # signal to tell the UI to refresh 
+
 	# Signal emitted when joystick events are received
 	joystick_event = Signal(Event) # Signal(Event)
 	
@@ -600,6 +602,7 @@ class EventListener:
 	# request profile activate/deactivate
 	request_activate = Signal(bool)  # param - flag - true to activate, false to deactivate
 
+
 	# abort load
 	abort = Signal() # tells loops/thread at active time to stop - called when a profile needs to stop due to a start error
 
@@ -624,8 +627,8 @@ class EventListener:
 	toggle_highlight = Signal(object, object, object) # param (axis,button)
 	enable_highlight_changed = Signal(bool) # fires when highlight enable is turned on param(enabled)
 
-	button_state_change = Signal(Event) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
-	axis_state_change = Signal(Event) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
+	button_state_change = Signal(Event) # indicates a change in button state params: (event)
+	axis_state_change = Signal(Event) # indicates a change in axis state params: (event)
 
 	update_input_state = Signal(object) # request to update all axis and button input states in the UI for a given device: (device_guid) 
 	
@@ -811,8 +814,12 @@ class EventListener:
 			event = self._event_queue.get()
 			if verbose: syslog.info(f"EVENTLISTEN: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")		
 			self.joystick_event.emit(event)	
-			if not event.is_axis and not gremlin.shared_state.is_running:
-				self.button_state_change.emit(event) # for button repeaters
+			if not gremlin.shared_state.is_running:
+				if event.is_axis:
+					self.axis_state_change.emit(event)
+				else:
+					self.button_state_change.emit(event) # for button repeaters
+
 
 			self._event_queue.task_done()
 

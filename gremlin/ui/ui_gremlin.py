@@ -122,6 +122,9 @@ class Ui_Gremlin(object):
         self.actionOpenGremlinExFolder = QtGui.QAction(main_window)
         self.actionOpenGremlinExFolder.setObjectName("actionOpenGremlinExFolder")
 
+        self.actionProfileDevices = QtGui.QAction(main_window)
+        self.actionProfileDevices.setObjectName("actionProfileDevice")
+
         self.actionGenerate = QtGui.QAction(main_window)
         self.actionGenerate.setObjectName("actionGenerate")
         self.actionDeviceInformation = QtGui.QAction(main_window)
@@ -201,8 +204,9 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionManageModes)
         self.menuTools.addAction(self.actionInputRepeater)
         self.menuTools.addAction(self.actionDeviceInformation)
+        self.menuTools.addAction(self.actionProfileDevices)
         self.menuTools.addAction(self.actionReloadDevices)
-        self.menuTools.addAction(self.actionToggleRemoteControl)
+        #self.menuTools.addAction(self.actionToggleRemoteControl)
 
         #self.menuTools.addAction(self.actionCalibration)
         self.menuTools.addAction(self.actionInputViewer)
@@ -215,6 +219,7 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionLogDisplay)
         self.menuTools.addAction(self.actionLogEdit)
         self.menu_Help.addAction(self.actionAbout)
+
         self.menuActions.addAction(self.actionCreate1to1Mapping)
         # self.menuActions.addAction(self.actionMergeAxis)
         # self.menuActions.addAction(self.actionSwapDevices)
@@ -295,10 +300,11 @@ class Ui_Gremlin(object):
         self.actionSaveProfile.setText(_translate("GremlinEx", "&Save Profile"))
         self.actionSaveProfileAs.setText(_translate("GremlinEx", "&Save Profile As"))
         self.actionRevealProfile.setText(_translate("GremlinEx", "&Reveal Profile in Explorer..."))
-        self.actionOpenLogFile.setText(_translate("GremlinEx", "Open &Log file in editor..."))
-        self.actionOpenXmlProfile.setText(_translate("GremlinEx","&Open profile XML in editor..."))
-        self.actionOpenGremlinExFolder.setText(_translate("GremlinEx","&Open GremlinEx folder..."))
+        self.actionOpenLogFile.setText(_translate("GremlinEx", "Open &Log file in Editor..."))
+        self.actionOpenXmlProfile.setText(_translate("GremlinEx","&Open profile XML in Editor..."))
+        self.actionOpenGremlinExFolder.setText(_translate("GremlinEx","&Open GremlinEx Folder..."))
         self.actionGenerate.setText(_translate("GremlinEx", "Generate"))
+        self.actionProfileDevices.setText(_translate("GremlinEx", "Change Visible Devices..."))
         self.actionDeviceInformation.setText(_translate("GremlinEx", "Device Information"))
         self.actionAbout.setText(_translate("GremlinEx", "&About"))
         self.actionManageCustomModules.setText(_translate("GremlinEx", "&Manage Custom Modules"))

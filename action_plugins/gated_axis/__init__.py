@@ -1521,10 +1521,12 @@ making changes that impact the order of gates or ranges."""
         if connected:
             self.configure_range_requested.emit(rng)
         else:
+            gremlin.shared_state.push_suspend_highlighting()
             dialog = ActionContainerUi(gate_data = self._gate_data, info_object = rng, action_data = self.action_data, input_type = InputType.JoystickAxis)
             dialog.exec()
             gh = GateEventHandler()
             gh.range_configuration_changed.emit(rng)
+            gremlin.shared_state.pop_suspend_highlighting()
 
 
 

@@ -57,6 +57,18 @@ class _GUID(ctypes.Structure):
         for b in self.Data4:
             s += f"{b:02x}"
         return s
+    
+    # def __deepcopy__(self, memo):
+    #     cls = self.__class__
+    #     result = cls.__new__(cls)
+    #     memo[id(self)] = result
+    #     for k, v in self.__dict__.items():
+    #         try:
+    #             setattr(result, k, copy.deepcopy(v, memo))
+    #         except:
+    #             # cannot copy = do a shallow copy
+    #             setattr(result, k, v)
+    #     return result
 
 
 

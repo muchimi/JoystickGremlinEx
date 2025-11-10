@@ -14,6 +14,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T101)
+- New: Tool menu to select which devices are visible (also from device tab context menu).  Some devices can never be hidden, such as mode/profile, settings. Persists to the profile.  This can significantly increase UI performance if you have devices you do not use.
+- Change: Reworked some UI events to simplify profile start/stop, and increase performance at runtime by separating out axis and button repeater events.
+- Updated: documentation.
+- Fix: only one device can be hidden from the profile (see new feature).
+- Fix: a situation when a device mapping may not be visible on profile start.
+- Fix: adding a condition via the paste button on an action does not update the UI.
+
+
+
 ### (m76T100)
 - Added: Warning box in TempoEx.
 - Changed: TempoEx uses timers for auto-release.
