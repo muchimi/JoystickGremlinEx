@@ -49,7 +49,7 @@ class MacroListModel(QtCore.QAbstractListModel):
 
     value_format = {
         InputType.JoystickAxis:
-            lambda entry: f"{entry.value:.3f}",
+            lambda entry: f"Set value: {entry.value:.3f}",
         InputType.JoystickButton:
             lambda entry: MacroListModel._get_button_value(entry.value),
         InputType.JoystickHat:

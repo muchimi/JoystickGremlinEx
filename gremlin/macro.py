@@ -901,13 +901,15 @@ class JoystickAction(MacroAbstractAction):
         """Emits an Event instance through the EventListener system."""
         import gremlin.joystick_handling
         el = gremlin.event_handler.EventListener()
+        extra_data = {"macro": True} # indicate the source of the event is a macro
         if self.input_type == InputType.JoystickAxis:
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
                 identifier=self.input_id,
                 value=self.value,
-                force_remote = force_remote
+                force_remote = force_remote,
+                extra_data = extra_data
             )
         elif self.input_type == InputType.JoystickButton:
 
@@ -929,7 +931,8 @@ class JoystickAction(MacroAbstractAction):
                 device_guid=self.device_guid,
                 identifier=self.input_id,
                 is_pressed= is_pressed,
-                force_remote = force_remote
+                force_remote = force_remote,
+                extra_data = extra_data
             )
         elif self.input_type == InputType.JoystickHat:
             event = gremlin.event_handler.Event(
@@ -937,9 +940,12 @@ class JoystickAction(MacroAbstractAction):
                 device_guid=self.device_guid,
                 identifier=self.input_id,
                 value=self.value,
-                force_remote = force_remote
+                force_remote = force_remote,
+                extra_data = extra_data
             )
 
+        event.is_virtual = True
+        
         el.joystick_event.emit(event)
 
 

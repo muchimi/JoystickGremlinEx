@@ -14,6 +14,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T102)
+- Change: Added "default" mode hide option to profile mode editor dialog.
+- Change: Feature request:  If the "default" mode is hidden, modified the user interface and logic to hide it from the current edit mode list, provided that an alternate mode exists in the profile.  This required some trauma center level one UI surgery so it may lead to more dragons.
+- Fix: button state repeater only updates if highlighting for buttons is enabled (highlighting controls selection, the buttons should update if repeaters are visible)
+- Fix: when holding the control key on "show button grid" in VJoy Remap, sets all Vjoy Remaps to the same grid visibility value. 
+- Fix: Macro joystick virtual output to non programmable devices does not update input viewer.
+- Fix: a situation where automatic highlight did not switch to the correct device tab.  
+
+Known issue: In some cases, the last selected input will not come into view in the scrollable input list on profile load.  This is a known QT bug.
+
+
 ### (m76T101)
 - New: Tool menu to select which devices are visible (also from device tab context menu).  Some devices can never be hidden, such as mode/profile, settings. Persists to the profile.  This can significantly increase UI performance if you have devices you do not use.
 - Change: Reworked some UI events to simplify profile start/stop, and increase performance at runtime by separating out axis and button repeater events.

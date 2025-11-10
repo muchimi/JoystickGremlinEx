@@ -3682,6 +3682,18 @@ class Profile():
                             return True
         return False
 
+    def get_selectable_modes(self):
+        ''' gets the list of all selectable modes in the profile'''
+        self._ensure_mode_tree()
+        modes = [node.name for node in self._mode_tree.descendants]
+        hide_default = gremlin.config.Configuration().hide_default_mode
+        master_mode = gremlin.shared_state.master_mode
+        if master_mode in modes:
+            modes.remove(master_mode)
+        if hide_default and len(modes) > 1 and "Default" in modes:
+            modes.remove("Default")
+        return modes
+    
     
     def get_mode_map(self, casefold = False) -> dict:
         ''' gets profile modes as a map of profiles, keyed by name, holds the parent name '''
@@ -3971,7 +3983,7 @@ class Profile():
     
     def get_default_mode(self):
         ''' gets the default mode for this profile - this is the mode used if the default startup mode is not specified '''
-        modes = self.get_root_modes()
+        modes = self.get_selectable_modes()
         if modes:
             return modes[0]
 
@@ -4710,7 +4722,7 @@ class Profile():
             el = gremlin.event_handler.EventListener()
             el.request_reload.emit()
 
-    def _filter_actions_input_item(self, input_item, tag, callback):
+    def _filter_actions_input_item(self, input_item, tag, callback, extra_data : dict = None):
         ''' '''
         for container in input_item.containers:
             for action_set in container.action_sets:
@@ -4723,18 +4735,18 @@ class Profile():
 
                             # gate containers
                             for condition, item in gate.item_data_map.items():
-                                self._filter_actions_input_item(item, tag, callback)
+                                self._filter_actions_input_item(item, tag, callback, extra_data)
 
                         rng : gremlin.gated_handler.RangeInfo
                         for rng in gate_data.getRanges():
                             # gate containers
                             for condition, item in rng.item_data_map.items():
-                                self._filter_actions_input_item(item, tag, callback)
+                                self._filter_actions_input_item(item, tag, callback, extra_data)
 
                     if action.tag == tag:
-                        callback(action)
+                        callback(action, extra_data)
 
-    def filter_actions(self, tag, callback):
+    def filter_actions(self, tag, callback, extra_data : dict = None):
         ''' issues a callback for every matching action tag found in the profile callback(action)'''
         for dev_guid in self.devices:
                 dev = self.devices[dev_guid]
@@ -4743,13 +4755,13 @@ class Profile():
                     state_data = gremlin.shared_state.current_profile.state
                     input_items = [state_data[key].input_item for key in state_data]
                     for item in input_items:
-                        self._filter_actions_input_item(item, tag, callback)
+                        self._filter_actions_input_item(item, tag, callback, extra_data)
                 else:
                     for mode_name in dev.modes:
                         mode_object = dev.modes[mode_name]
                         for input_type in mode_object.config.keys():
                             for item in mode_object.config[input_type].values():
-                                self._filter_actions_input_item(item, tag, callback)
+                                self._filter_actions_input_item(item, tag, callback, extra_data)
 
 
     def apply_voice(self, voice_index = None, voice_volume = None, voice_rate = None) -> int:
@@ -4759,7 +4771,7 @@ class Profile():
         
         if voice_index is not None or voice_volume is not None or voice_rate is not None:
 
-            def _apply_voice_callback(action):
+            def _apply_voice_callback(action, extra_data : dict = None):
                 nonlocal count
                 updated = False
                 if voice_index is not None and voice_index != action.voice_index:

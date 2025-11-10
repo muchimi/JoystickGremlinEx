@@ -731,7 +731,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
 
     def _create_joystick_inputs_ui(self, action):
-        # Handle display of value based on the actual input type
+        ''' creates the joystick macro UI when joystick is the selected type '''
         import gremlin.joystick_handling
         device = gremlin.joystick_handling.device_info_from_guid(action.device_guid)
         if device:

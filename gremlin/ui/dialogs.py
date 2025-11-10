@@ -3213,6 +3213,12 @@ The setting can be overriden by the global mode reload option set in Options for
         button_container_layout = layout
         button_container_widget = widget
 
+        hide_default_mode_widget = gremlin.ui.ui_common.QDataCheckbox("Hide 'Default' mode",
+                                                                      value = gremlin.config.Configuration().hide_default_mode,
+                                                                      tooltip ="Hide or show 'Default' mode",
+                                                                      callback = self._handle_hide_default_mode_changed)
+
+
 
         widget, layout = gremlin.ui.ui_common.getHContainer()
         layout.addWidget(self.mode_restore_flag)
@@ -3235,10 +3241,16 @@ The setting can be overriden by the global mode reload option set in Options for
         self.main_layout.addWidget(header_widget)
         self.main_layout.addWidget(self.scroll_area)
         self.main_layout.addWidget(options_container_widget)
+        self.main_layout.addWidget(hide_default_mode_widget)
+
         self.main_layout.addWidget(label)
         self.main_layout.addWidget(button_container_widget)
 
         self._populate_mode_layout()
+
+    @QtCore.Slot(bool)
+    def _handle_hide_default_mode_changed(self, checked : bool):
+        gremlin.config.Configuration().hide_default_mode = checked
 
     @QtCore.Slot()
     def _close_cb(self):

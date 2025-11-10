@@ -747,7 +747,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
         veh = gremlin.event_handler.VjoyRemapEventHandler()
-        veh.grid_visible_changed.connect(self._grid_visible_changed)
+        veh.grid_visible_changed.connect(self.refresh_grid)
 
         try:
             VJoyRemapWidget.locked = True
@@ -882,13 +882,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             curves.append(self.action_data.curve_data)
 
         return curves
-
-    # def _button_usage_changed(self, vjoy_id):
-    #     ''' button state changed somewhere '''
-    #     if vjoy_id == self.action_data.vjoy_id:
-    #         # update if it's our device
-    #         self.refresh_grid()
-
 
     def _get_selector_input_type(self):
         ''' gets a modified input type based on the current mode '''
@@ -3023,10 +3016,15 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     def refresh_grid(self):
         ''' refreshes the grid '''
         if VjoyAction.is_button_action(self.action_data.action_mode):
-            self._refresh_grid_ui() # ensure on UI thread
+            gremlin.util.InvokeUiMethod(self._refresh_grid_ui) # ensure on UI thread
 
     def _refresh_grid_ui(self):
-        self._populate_grid()
+        if Shiboken.isValid(self):
+            with QtCore.QSignalBlocker(self.grid_visible_widget):
+                self.grid_visible_widget.setChecked(self.action_data.grid_visible)
+
+            self._populate_grid()
+            self._update_ui()
 
     def notify_device_changed(self):
         state = gremlin.joystick_handling.VJoyUsageState()
@@ -3091,7 +3089,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             index = self.cb_vjoy_input_selector.findData(self.action_data.vjoy_input_id)
             if index != -1:
                 self.cb_vjoy_input_selector.setCurrentIndex(index)
-            #self._populate_grid()
+            
 
 
     @QtCore.Slot(float)
@@ -3111,6 +3109,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_ui(self):
         ''' updates ui based on the current action requested to show/hide needed components '''
+        if not Shiboken.isValid(self):
+            return
 
         if not self._ui_loaded:
             return
@@ -3448,24 +3448,21 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(bool)
     def _grid_visible_cb(self, visible):
         el = gremlin.event_handler.EventListener()
-        if el.get_control_state():
-            veh = gremlin.event_handler.VjoyRemapEventHandler()
-            veh.grid_visible_changed.emit(visible)
-        else:
-            self.action_data.grid_visible = visible    
-            self._update_ui()
+        self.action_data.grid_visible = visible
+        self._update_ui()
 
-
-
-    @QtCore.Slot(bool)
     def _grid_visible_changed(self, visible):
+        gremlin.util.InvokeUiMethod(self._grid_visible_changed_ui, visible) # ensure on UI thread
+
+    def _grid_visible_changed_ui(self, visible):
         ''' global grid visible change event '''
         if not Shiboken.isValid(self):
             return
-        self.action_data.grid_visible = visible
+        
         with QtCore.QSignalBlocker(self.grid_visible_widget):
             self.grid_visible_widget.setChecked(visible)
-        self._update_ui()
+        
+        self._populate_grid()
 
 
     @QtCore.Slot()
@@ -5724,19 +5721,39 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @property
     def grid_visible(self) -> bool:
-        config = gremlin.config.Configuration()
-        if self._grid_visible is None:
+        if self._grid_visible is None: 
+            # not set
+            config = gremlin.config.Configuration()
             return config.button_grid_visible
         return self._grid_visible
+    
     @grid_visible.setter
     def grid_visible(self, value : bool):
-        
+        if value != self._grid_visible:
+            self._grid_visible = value
+            
+
+            el = gremlin.event_handler.EventListener()
+            if el.get_control_state():
+                # also update global if button grid is set to control
+                config = gremlin.config.Configuration()
+                config.button_grid_visible = value
+
+                # also reset ALL vjoy remaps
+                extra_data = {"value": value}
+                gremlin.shared_state.current_profile.filter_actions(self.tag, self._update_grid_callback, extra_data)
+
+            # notify all visible controls to update
+            veh = gremlin.event_handler.VjoyRemapEventHandler()
+            veh.grid_visible_changed.emit(value)
+
+    def setGridVisible(self, value):
         self._grid_visible = value
-        el = gremlin.event_handler.EventListener()
-        if el.get_control_state():
-            # also update global if button grid is set to control
-            config = gremlin.config.Configuration()
-            config.button_grid_visible = value
+
+
+    def _update_grid_callback(self, action : VjoyRemap, extra_data : dict = None):
+        value = extra_data["value"]
+        action.setGridVisible(value)
 
     def icon(self):
         """Returns the icon corresponding to the remapped input.

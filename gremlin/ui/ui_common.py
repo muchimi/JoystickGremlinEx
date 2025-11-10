@@ -3061,24 +3061,7 @@ class ModeWidget(QtWidgets.QWidget):
                 last_edit_mode = profile.get_default_mode()
                 #hide_default_mode = False # show default mode
 
-            if hide_default_mode:
-                # see if another root level mode exists
-                root_modes = profile.get_root_modes()
-                master_mode = gremlin.shared_state.master_mode
-                if "Default" in root_modes:
-                    root_modes.remove("Default")
-                if master_mode in root_modes:
-                    root_modes.remove(master_mode)
-                if not root_modes:
-                    # no root mode available - don't hide default mode
-                    hide_default_mode = False
-                else:
-                    # more than one root available - see if we have any mappings in the default mode
-                    if profile.get_mode_used("Default"):
-                        hide_default_mode = False # default mode has mappings, don't hide default mode
-
-                
-
+            default_mode = profile.get_default_mode() # profile.get_root_modes()
 
             master_mode = gremlin.shared_state.master_mode
             for display_name, mode_name in mode_list_pairs:
@@ -3094,8 +3077,12 @@ class ModeWidget(QtWidgets.QWidget):
                     current_index = index
                 index += 1
 
-            if select_index:
+            if default_mode:
+                select_index = self.edit_mode_selector.findData(default_mode)
+
+            if select_index != -1:
                 self.edit_mode_selector.setCurrentIndex(select_index)    
+                current_index = select_index
             else:
                 self.edit_mode_selector.setCurrentIndex(current_index)
             if emit:
@@ -3387,8 +3374,8 @@ class InputListenerWidget(QBoxFrame):
         # Start listening to user key presses
         el = gremlin.event_handler.EventListener()
         el.keyboard_event.connect(self._kb_event_cb)
-        if InputType.JoystickAxis in self._event_types or InputType.JoystickButton in self._event_types or InputType.JoystickHat in self._event_types:
-            el.joystick_event.connect(self._joy_event_cb)
+        #if InputType.JoystickAxis in self._event_types or InputType.JoystickButton in self._event_types or InputType.JoystickHat in self._event_types:
+        el.joystick_event.connect(self._joy_event_cb)
         
         if self._listen_mouse:
             # hook the mouse
@@ -3417,9 +3404,9 @@ class InputListenerWidget(QBoxFrame):
 
         # Ensure the event corresponds to a significant enough change in input
         if event.is_axis:
-            process_event = gremlin.input_devices.JoystickInputSignificant().should_process(event)
+            process_event = True # gremlin.input_devices.JoystickInputSignificant().should_process(event)
         elif event.event_type == InputType.JoystickButton:
-            process_event &= event.is_pressed
+            process_event = event.is_pressed
         elif event.event_type == InputType.JoystickHat:
             process_event = event.value != (0,0)
 
@@ -5044,9 +5031,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
 
     def process_event(self, event):
-        config = gremlin.config.Configuration()
-        if not (config.highlight_enabled and config.highlight_input_buttons):
-            return
+        # config = gremlin.config.Configuration()
+        # if not (config.highlight_enabled and config.highlight_input_buttons):
+        #     return
         if not Shiboken.isValid(self):
             return
         if self._suspended:
@@ -6039,6 +6026,10 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             if self.show_raw and not event.is_virtual:
                 sd = gremlin.event_handler.AxisState()
                 values = sd.getAxisValues(self.device.device_guid, axis_id)
+                extra_data = event.extra_data
+                if extra_data and "macro" in extra_data:
+                    values.actual = event.value
+                
 
                 self._set_value(axis_id, values)    
             else:

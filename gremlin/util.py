@@ -1528,28 +1528,25 @@ _cursor_level = []
 
 
 def pushCursor():
-    InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
-
-def _pushCursor_ui():
     global _cursor_push
     if _cursor_push == 0:
-        #win32gui.LoadCursor(0, win32con.IDC_WAIT)
-        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
-        #QtWidgets.QApplication.processEvents()
+        InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
     _cursor_push += 1
 
-def popCursor(reset = False):
-    InvokeUiMethod(_popCursor_ui, reset)
+def _pushCursor_ui():
+    QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+    
 
-def _popCursor_ui(reset = False):
-    ''' restores form wait cusor '''
+def popCursor(reset = False):
     global _cursor_push
     if _cursor_push > 0:
         _cursor_push -= 1
     if _cursor_push == 0 or reset:
-        #win32gui.LoadCursor(0, win32con.IDC_ARROW)
-        QtWidgets.QApplication.restoreOverrideCursor()
-        #QtWidgets.QApplication.processEvents()
+        InvokeUiMethod(_popCursor_ui, reset)
+
+def _popCursor_ui(reset = False):
+    ''' restores form wait cusor '''
+    QtWidgets.QApplication.restoreOverrideCursor()
 
 def isWaitCursor() -> bool:
     ''' true if the cursor is an hourglass '''
