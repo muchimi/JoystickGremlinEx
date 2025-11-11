@@ -1061,8 +1061,7 @@ class Device:
             if mode_node is not None:
                 node.append(mode_node)
 
-        # syslog.info(f"device: {self.name}")
-        # syslog.info(etree.tostring(node,pretty_print=True))
+
         return node
 
 
@@ -1955,9 +1954,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         return self._locked
     @locked.setter
     def locked(self, value : bool):
+        
         if self._locked != value:
-            if value and not self.containers:
-                return # cannot lock an input that has no mappings
+            # changed in m76T102 by request - allow locking of any input regardless of mapping
+            #     if value and not self.containers:
+            #         return # cannot lock an input that has no mappings
             self._locked = value
             self.lockedChanged.emit(self)
 
@@ -2336,7 +2337,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         #assert data is not None, "InputItem must be provided"
         import gremlin.ui.octavi_device
 
-        container_node = node # node that holds the container information
+        container_node = node # node that holds the container informationf
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
@@ -2527,8 +2528,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         from gremlin.keyboard import Key
         if parent_node is None:
             node = etree.Element(InputType.to_string(self.input_type))
-            if node.tag == "none":
-                pass
+
             container_node = node # default container node to the input node
             if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
                 if isinstance(self.input_id, Key):
@@ -2573,7 +2573,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
 
         # lock state
-        node.set("locked", safe_format(self._locked, bool))
+        if self._locked:
+            # only save if the flag is set
+            node.set("locked", safe_format(self._locked, bool))
         
         for entry in self.containers:
             # gremlinex change: containers can still be saved if they are invalid if they are still being configured:
@@ -4297,6 +4299,7 @@ class Profile():
             self.devices.values(),
             key=lambda x: str(x.device_guid)
         )
+
         # strip the unused nodes that don't contain any data where possible to reduce the size of the profile
         for device in device_list:
             node = device.to_xml()
@@ -4312,6 +4315,9 @@ class Profile():
                 # remove empty nodes
                 if depth > 0:
                     devices.append(node)
+
+                  
+                
             else:
                 # check for inputs
                 if device.device_type in (DeviceType.Keyboard, DeviceType.Osc, DeviceType.Midi):
@@ -4930,8 +4936,12 @@ class Mode:
             for item in item_list:
                 #if item.is_valid_for_save():
                 item_node = item.to_xml()
-                depth = gremlin.util.xmlNodeDepth(item_node)
+                
+                # include the item in the xml if it has attributes we need to save to the profile 
                 do_include = False
+                if item.locked:
+                    do_include = True
+                depth = gremlin.util.xmlNodeDepth(item_node)
                 match item.device_type:
                     case DeviceType.Joystick:
                         if item.description or depth > 1:

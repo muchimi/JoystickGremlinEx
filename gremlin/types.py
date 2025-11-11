@@ -598,6 +598,10 @@ class HatDirection(Enum):
             )
         
     @staticmethod
+    def to_position(value : HatDirection) -> tuple:
+        return value.value
+        
+    @staticmethod
     def to_display_name(value: HatDirection) -> str:
         return value.name
 

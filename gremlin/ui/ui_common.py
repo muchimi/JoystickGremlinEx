@@ -2352,7 +2352,11 @@ class AbstractInputSelector(QtWidgets.QWidget):
 
     input_changed = QtCore.Signal() # fires when the input changes 
 
-    def __init__(self, change_cb, valid_types, parent=None):
+    def __init__(self,
+                  activate_callback = None,
+                  selected_callback = None,
+                  valid_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
+                  parent=None):
         super().__init__(parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -2362,7 +2366,8 @@ class AbstractInputSelector(QtWidgets.QWidget):
         self.grid_layout.addWidget(QtWidgets.QWidget(),0,2)
         self.grid_layout.setColumnStretch(2,2)
 
-        self.change_cb = change_cb
+        self._callback = activate_callback
+        self._selected_callback = selected_callback
         self.valid_types = valid_types
         self.device_list = []
 
@@ -2379,6 +2384,9 @@ class AbstractInputSelector(QtWidgets.QWidget):
         device_id = None
         input_id = None
         input_type = None
+
+        if not self.input_item_dropdowns:
+            return None
 
         device_index = self.device_dropdown.currentIndex()
         if device_index != -1:
@@ -2400,8 +2408,10 @@ class AbstractInputSelector(QtWidgets.QWidget):
             "input_type": input_type
         }
 
-    def set_selection(self, input_type, device_id, input_id):
+    def set_selection(self, input_type, device_id, input_id, emit = False):
+        device_id = gremlin.util.parse_guid(device_id) # ensure a GUID
         if device_id not in self._device_id_registry:
+            syslog.error(f"INPUT SELECTOR: device not found: {device_id}")
             return
 
         # Get the index of the combo box associated with this device
@@ -2437,10 +2447,11 @@ class AbstractInputSelector(QtWidgets.QWidget):
                 entry.setVisible(True)
                 entry.setCurrentIndex(entry_id)
 
+        if emit:
+            self.input_changed.emit(self.get_selection())
 
 
     def _update_device(self, index):
-        # Hide all selection dropdowns
 
         for entry in self.input_item_dropdowns:
             with QtCore.QSignalBlocker(entry):
@@ -2452,6 +2463,8 @@ class AbstractInputSelector(QtWidgets.QWidget):
             entry.setVisible(True)
             entry.setCurrentIndex(0)
         self._execute_callback()
+        self._execute_selected_callback()
+        
 
 
     def _initialize(self):
@@ -2476,7 +2489,8 @@ class AbstractInputSelector(QtWidgets.QWidget):
             self._device_id_registry.append(self._device_identifier(device))
         self.grid_layout.addWidget(QtWidgets.QLabel("Device:"),0,0)
         self.grid_layout.addWidget(self.device_dropdown,0,1)
-        self.device_dropdown.activated.connect(self._update_device)
+        #self.device_dropdown.activated.connect(self._update_device)
+        self.device_dropdown.currentIndexChanged.connect(self._update_device)
 
 
 
@@ -2504,21 +2518,22 @@ class AbstractInputSelector(QtWidgets.QWidget):
             # Add items based on the input type
             max_col = 32
 
-            for input_type in self.valid_types:
-                item_count = count_map[input_type](device)
-                for i in range(item_count):
-                    input_id = i+1
-                    if input_type == InputType.JoystickAxis:
-                        input_id = device.axismap_list[i].axis_index
-                        s_ui = f"Axis {device.axis_names[i]}"
-                    else:
-                        s_ui = gremlin.common.input_to_ui_string(
-                            input_type,
-                            input_id
-                        )
-                    selection_widget.addItem(s_ui, (input_type, input_id))
+            with QtCore.QSignalBlocker(selection_widget):
+                for input_type in self.valid_types:
+                    item_count = count_map[input_type](device)
+                    for i in range(item_count):
+                        input_id = i+1
+                        if input_type == InputType.JoystickAxis:
+                            input_id = device.axismap_list[i].axis_index
+                            s_ui = f"Axis {device.axis_names[i]}"
+                        else:
+                            s_ui = gremlin.common.input_to_ui_string(
+                                input_type,
+                                input_id
+                            )
+                        selection_widget.addItem(s_ui, (input_type, input_id))
 
-                    self._input_type_registry[-1].append(input_type)
+                        self._input_type_registry[-1].append(input_type)
 
             # Add the selection and hide it
             selection_widget.setVisible(False)
@@ -2537,11 +2552,21 @@ class AbstractInputSelector(QtWidgets.QWidget):
     @QtCore.Slot()
     def _input_changed(self):
         ''' called when the input changes '''
-        self.input_changed.emit()
+        self._execute_selected_callback()
+
 
 
     def _execute_callback(self):
-        self.change_cb(self.get_selection())
+        data = self.get_selection()
+        if data and self._callback:
+            self._callback(data)
+
+    def _execute_selected_callback(self):
+        data = self.get_selection()
+        if data:
+            if self._selected_callback:
+                self._selected_callback(data)
+            self.input_changed.emit()
 
     def sync(self):
         ''' forces the change cb to be called to update dependents based on values '''
@@ -2555,14 +2580,18 @@ class JoystickSelector(AbstractInputSelector):
     """Widget allowing the selection of input items on a physical joystick."""
 
 
-    def __init__(self, change_cb, valid_types, parent=None):
+    def __init__(self, callback = None,
+                 valid_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
+                 parent=None):
         """Creates a new JoystickSelector instance.
 
         :param change_cb function to call when changes occur
         :param valid_types valid input types for selection
         :param parent the parent of this widget
         """
-        super().__init__(change_cb, valid_types, parent)
+        super().__init__(selected_callback = callback,
+                         valid_types = valid_types,
+                         parent = parent)
 
 
     def _initialize(self):
@@ -2609,7 +2638,9 @@ class VJoySelector(AbstractInputSelector):
         :param parent of this widget
         """
         self.invalid_ids = invalid_ids
-        super().__init__(change_cb, valid_types, parent)
+        super().__init__(selected_callback = change_cb,
+                         valid_types = valid_types,
+                         parent = parent)
 
     def _initialize(self):
         potential_devices = sorted(
@@ -4254,13 +4285,19 @@ class QDataIPLineEdit(QDataLineEdit):
 
 class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
-    def __init__(self, data = None, parent = None, wheel_enabled = True, auto_adjust = False):
+    def __init__(self, data = None, callback = None, parent = None, wheel_enabled = True, auto_adjust = False):
         super().__init__(parent)
         self._data = data
         self._wheel_enabled = wheel_enabled
         self.installEventFilter(self)
         if auto_adjust:
             self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._callback = callback
+        if self._callback:
+            self.currentIndexChanged.connect(self._handle_callback)
+
+    def _handle_callback(self):
+        self._callback(self.currentData())
 
     
     def eventFilter(self, widget, event):
@@ -4295,37 +4332,50 @@ class QHatSelectorComboBox(QDataComboBox):
 
     valueChanged = QtCore.Signal(HatDirection) # fires when a value is selected 
 
-    def __init__(self, data = None, parent = None):
-
-        super().__init__(data, parent)
+    def __init__(self, value : HatDirection = HatDirection.Center, callback = None, tooltip = None, data = None, parent = None):
+        import vjoy.vjoy
+        super().__init__(data, callback = callback, parent = parent)
 
         self._direction = HatDirection.Center
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-
+        
+        
         for position in HatDirection:
-            match position:
-                case HatDirection.Center:
-                    png = f"{prefix}hat_ctr.png"
-                case HatDirection.North:
-                    png = f"{prefix}hat_n.png"
-                case HatDirection.NorthEast:
-                    png = f"{prefix}hat_ne.png"
-                case HatDirection.NorthWest:
-                    png = f"{prefix}hat_nw.png"
-                case HatDirection.East:
-                    png = f"{prefix}hat_e.png"
-                case HatDirection.South:
-                    png = f"{prefix}hat_s.png"
-                case HatDirection.SouthEast:
-                    png = f"{prefix}hat_se.png"
-                case HatDirection.SouthWest:
-                    png = f"{prefix}hat_sw.png"      
-                case HatDirection.West:
-                    png = f"{prefix}hat_w.png"  
-            icon = load_icon(png)   
+            icon = load_icon(vjoy.vjoy.Hat.direction_to_icon[position.value])
+            # match position:
+            #     case HatDirection.Center:
+            #         png = f"{prefix}hat_ctr.png"
+            #     case HatDirection.North:
+            #         png = f"{prefix}hat_n.png"
+            #     case HatDirection.NorthEast:
+            #         png = f"{prefix}hat_ne.png"
+            #     case HatDirection.NorthWest:
+            #         png = f"{prefix}hat_nw.png"
+            #     case HatDirection.East:
+            #         png = f"{prefix}hat_e.png"
+            #     case HatDirection.South:
+            #         png = f"{prefix}hat_s.png"
+            #     case HatDirection.SouthEast:
+            #         png = f"{prefix}hat_se.png"
+            #     case HatDirection.SouthWest:
+            #         png = f"{prefix}hat_sw.png"      
+            #     case HatDirection.West:
+            #         png = f"{prefix}hat_w.png"  
+            # icon = load_icon(png)   
             #icon_active = load_icon(png_active)        
+            
             self.addItem(icon, HatDirection.to_display_name(position), HatDirection.to_enum(position))
             
+
+        if value:
+            index = self.findData(value)
+            if index != -1:
+                self.setCurrentIndex(index)
+
+
+        if tooltip:
+            self.setToolTip(tooltip)
+
         self.currentIndexChanged.connect(self._update_value)
 
     @property
@@ -4341,6 +4391,7 @@ class QHatSelectorComboBox(QDataComboBox):
     
     def setValue(self, value, emit = False):
         ''' sets the value as a tuple '''
+
         with QtCore.QSignalBlocker(self):
             if isinstance(value, tuple):
                 value = HatDirection(value)
@@ -4349,6 +4400,7 @@ class QHatSelectorComboBox(QDataComboBox):
             index = self.findData(value)
             if index != -1:
                 self.setCurrentIndex(index)
+        
         if emit:
             self._update_value()
 
@@ -4585,7 +4637,7 @@ class QProgressBar(QtWidgets.QWidget):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
-            syslog.info("PB: wheel!")
+            # syslog.info("PB: wheel!")
             if self._readOnly:
                 return True # cannot change the value if readonly
             v = self._value
@@ -6021,7 +6073,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         if event.event_type == InputType.JoystickAxis:
             axis_id = event.identifier
-            linear_id = self.device.axis_id_map[axis_id]
+            #linear_id = self.device.axis_id_map[axis_id]
             value = event.value
             if self.show_raw and not event.is_virtual:
                 sd = gremlin.event_handler.AxisState()
@@ -6736,6 +6788,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             gremlin.util.InvokeUiMethod(self._current_axis_update_ui, event)
 
     def _current_axis_update_ui(self, event : gremlin.event_handler.Event):
+        
         for widget in self.widgets:
             widget.show_raw = self.show_raw
             widget.process_event(event)
@@ -10271,7 +10324,9 @@ class QGroupBox(QtWidgets.QGroupBox):
         #self.setStyleSheet("QGroupBox {border: none;}")
 
 
-        
+class QHatDirectionSelector(QHatSelectorComboBox):
+    pass
+    
 
 class QTypeSelectorWidget(QtWidgets.QWidget):
     ''' implements a type selector widget to select a data type '''

@@ -13,6 +13,7 @@ import lxml.etree
 # import importlib
 # import msgpack
 from enum import IntEnum
+import win32clipboard
 
 import gremlin.base_profile
 from gremlin.singleton_decorator import SingletonDecorator
@@ -176,28 +177,40 @@ class Clipboard(QtCore.QObject):
                         syslog.error(f"DILL serializationf failed: {error}")        
 
 
-    def set_windows_clipboard_text(self, value : str):
+    def set_windows_clipboard_text(self, value : str, use_qt = False):
         ''' sets the windows clipboard text '''
-        # method 1
-        clipboard = QApplication.clipboard()
-        clipboard.clear(mode = QClipboard.Mode.Clipboard)
-        if value is not None:
-            clipboard.setText(value, mode = QClipboard.Mode.Clipboard)
         
-        # method 2
-        # win32clipboard.OpenClipboard()
-        # win32clipboard.EmptyClipboard()
-        # win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
-        # win32clipboard.CloseClipboard()
+        if value is not None:
+            if use_qt:
+                # method 1 - this is prone to a bunch of MIME and OLE errors due to a bug in QT
+                clipboard = QApplication.clipboard()
+                clipboard.clear(mode = QClipboard.Mode.Clipboard)
+                clipboard.setText(value, mode = QClipboard.Mode.Clipboard)
+            else:
+                # method 2 - use pywin32
+                win32clipboard.OpenClipboard()
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
+                win32clipboard.CloseClipboard()
 
-    def get_windows_clipboard_text(self) -> str:
+    def get_windows_clipboard_text(self, use_qt = False) -> str:
         ''' gets the windows clipboard text '''
 
-        try:
-            clipboard = QApplication.clipboard()
-            return clipboard.text(mode = QClipboard.Mode.Clipboard)
-        except:
-            return None
+        if use_qt:
+            try:
+                clipboard = QApplication.clipboard()
+                return clipboard.text(mode = QClipboard.Mode.Clipboard)
+            except:
+                return None
+        else:
+            try:
+                win32clipboard.OpenClipboard()
+                value = win32clipboard.GetClipboardData(win32clipboard.CF_TEXT)
+                win32clipboard.CloseClipboard()
+                return value
+            except:
+                syslog.error("CLIBOARD: failed to get text")
+                return None
 
         
                 

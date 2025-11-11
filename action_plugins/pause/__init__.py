@@ -140,7 +140,7 @@ class PauseAction(gremlin.base_profile.AbstractAction):
 
     name = "Pause"
     tag = "pause"
-    hit = '''Pauses the profile.
+    hint = '''Pauses the profile.
 Note: containers that are marked as always execute
 do not pause even if the profile is paused.'''
 

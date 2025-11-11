@@ -854,35 +854,48 @@ def get_icon_path(path):
         
         if the_path in gremlin.shared_state._icon_path_cache.keys():
             return gremlin.shared_state._icon_path_cache[the_path]
-
-   
-        # syslog.info(f"icon path: {the_path}  root: {root_path}")
-        icon_file = os.path.join(root_path, the_path)
-        icon_file = icon_file.replace("/",os.sep).lower()
-        if icon_file:
+        
+        # find the file
+        if not "/" in the_path and not os.sep in the_path:
+            # raw find fine
+            icon_file = _find_file(the_path, root_path)
             if os.path.isfile(icon_file):
-                if verbose:
-                    syslog.info(f"Icon file (straight) found: {icon_file}")
                 gremlin.shared_state._icon_path_cache[the_path] = icon_file
                 return icon_file
-            if not icon_file.endswith(".png"):
-                icon_file_png = icon_file + ".png"
-                if os.path.isfile(icon_file_png):
+
+        if "gfx" in the_path.casefold():
+            search_path = [the_path]
+        else:
+            search_path = [the_path, os.path.normpath(os.path.join("gfx",the_path))]
+        for stub_path in search_path:
+   
+            # syslog.info(f"icon path: {the_path}  root: {root_path}")
+            icon_file = os.path.join(root_path, stub_path)
+            icon_file = icon_file.replace("/",os.sep).lower()
+            if icon_file:
+                if os.path.isfile(icon_file):
                     if verbose:
-                        syslog.info(f"Icon file (png) found: {icon_file_png}")
-                    gremlin.shared_state._icon_path_cache[the_path] = icon_file_png
-                    return icon_file_png
-            if not icon_file.endswith(".svg"):
-                icon_file_svg = icon_file + ".svg"
-                if os.path.isfile(icon_file_svg):
-                    if verbose:
-                        syslog.info(f"Icon file (svg) found: {icon_file_svg}")
-                    gremlin.shared_state._icon_path_cache[the_path] = icon_file_svg
-                    return icon_file_svg
-            brute_force = find_file(the_path)
-            if brute_force and os.path.isfile(brute_force):
-                gremlin.shared_state._icon_path_cache[the_path] = brute_force
-                return brute_force
+                        syslog.info(f"Icon file (straight) found: {icon_file}")
+                    gremlin.shared_state._icon_path_cache[the_path] = icon_file
+                    return icon_file
+                if not icon_file.endswith(".png"):
+                    icon_file_png = icon_file + ".png"
+                    if os.path.isfile(icon_file_png):
+                        if verbose:
+                            syslog.info(f"Icon file (png) found: {icon_file_png}")
+                        gremlin.shared_state._icon_path_cache[the_path] = icon_file_png
+                        return icon_file_png
+                if not icon_file.endswith(".svg"):
+                    icon_file_svg = icon_file + ".svg"
+                    if os.path.isfile(icon_file_svg):
+                        if verbose:
+                            syslog.info(f"Icon file (svg) found: {icon_file_svg}")
+                        gremlin.shared_state._icon_path_cache[the_path] = icon_file_svg
+                        return icon_file_svg
+                brute_force = find_file(the_path)
+                if brute_force and os.path.isfile(brute_force):
+                    gremlin.shared_state._icon_path_cache[the_path] = brute_force
+                    return brute_force
         
         syslog.error(f"Icon file not found: {icon_file}")
     

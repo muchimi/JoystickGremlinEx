@@ -2726,4 +2726,26 @@ class Configuration(QtCore.QObject):
     def TTSDefaultVoiceIndex(self, value : int):
         self._set_data("TTSDefaultVoiceIndex", value)        
 
+    @property
+    def trigger_last_device_id(self):
+        ''' id of the last device selected as an input for triggers '''
+        return self._get_data("trigger_last_device_id", "")
+    @trigger_last_device_id.setter
+    def trigger_last_device_id(self, id : str):
+        self._set_data("trigger_last_device_id",id)
     
+    @property
+    def trigger_last_input_type(self):
+        ''' id of the last device input type as an input for triggers '''
+        return self._get_data("trigger_last_input_type", "")
+    @trigger_last_input_type.setter
+    def trigger_last_input_type(self, input_type):
+        self._set_data("trigger_last_input_type", input_type)
+
+    @property
+    def trigger_last_input_id(self):
+        ''' id of the last device input type as an input for triggers '''
+        return self._get_data("trigger_last_input_id", 1)
+    @trigger_last_input_id.setter
+    def trigger_last_input_id(self, id):
+        self._set_data("trigger_last_input_id", id)

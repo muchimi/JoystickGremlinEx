@@ -908,6 +908,7 @@ class JoystickAction(MacroAbstractAction):
                 device_guid=self.device_guid,
                 identifier=self.input_id,
                 value=self.value,
+                is_axis = True,
                 force_remote = force_remote,
                 extra_data = extra_data
             )

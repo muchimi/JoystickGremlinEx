@@ -522,7 +522,8 @@ def vjoy_guid_from_id(vid: int):
 
 def registerSpecialDevice(dev):
     ''' adds a special device to the tracking list '''
-    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
+
+    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
     device_guid = dev.device_guid
     if not device_guid in _joystick_device_guid_map:
         _joystick_device_guid_map[device_guid] = dev
@@ -545,7 +546,7 @@ def removeDevice(dev : dinput.DeviceSummary):
 
 def device_name_from_guid(device_guid) -> str:
     ''' gets device name from GUID '''
-    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
+    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
     if isinstance(device_guid, str):
         device_guid = gremlin.util.parse_guid(device_guid) # GUID expected
     if device_guid in _joystick_device_guid_map:
@@ -579,7 +580,7 @@ def getDevice(device_guid):
 
 def device_info_from_guid(device_guid): # -> DeviceSummary:
     ''' gets physical device information '''
-    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
+    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
     if isinstance(device_guid, str):
         device_guid = gremlin.util.parse_guid(device_guid)
     if device_guid in _joystick_device_guid_map:
@@ -596,7 +597,7 @@ def vjoy_info_from_vjoy_id(vjoy_id : int, connected_only = True): # -> DeviceSum
     :param vjoy_id: id of vjoy device 1 to 16
     :param connected_only: true to filter by connected vjoys only
     '''
-    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
+    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
     global _all_vjoy_devices_map, _vjoy_devices_map
     if connected_only:
         if vjoy_id in _vjoy_devices_map:
@@ -617,7 +618,7 @@ def vjoy_device_map() -> dict:
 
 def is_device_connected(device_guid) -> bool:
     ''' true if the device is connected (reported in) '''
-    assert _joystick_initialized, "CRITICAL: Joysticks not initialized"
+    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
     if device_guid in _joystick_device_guid_map:
         device : dinput.DeviceSummary = _joystick_device_guid_map[device_guid]
         return device.connected
@@ -662,7 +663,7 @@ def noOpCallback(self, value):
 
 def noOpHatCallback(self, value):
     ''' dummy callback for special devices that don't have a hat (returns neutral position)'''
-    return -1
+    return -1 # center position
 
 
 def registerSpecialDevices():
@@ -1084,6 +1085,7 @@ def joystick_devices_initialization():
     registerSpecialDevices()
 
 def joystick_initialized():
+    global _joystick_initialized
     return _joystick_initialized
 
 

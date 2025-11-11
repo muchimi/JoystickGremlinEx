@@ -877,15 +877,22 @@ class EventListener:
 		from gremlin.util import dill_hat_lookup
 		import gremlin.joystick_handling
 		self._hat_state = {}
-		device_list = [dev for dev in gremlin.joystick_handling.joystick_devices() if dev.hat_count]
+		
+		device_list = [dev for dev in gremlin.joystick_handling.joystick_devices() if dev.hat_count > 0]
 		event_list = []
 		for device in device_list:
 			for input_id in range(1, device.hat_count+1):
 				key = (device.device_id, input_id)
 				value = gremlin.joystick_handling.get_hat(device.device_guid, input_id)
-				value = dill_hat_lookup[value]
+				if value in dill_hat_lookup:
+					value = dill_hat_lookup[value]
+				else:
+					# invalid value received for the hat position
+					syslog.warning(f"HAT STATE: received an invalid hat value: device: {device.name} id [{device.device_id}] - got hat position: [{value}] for hat [{input_id}] - forcing (0,0)")
+					value = (0,0)
+
 				self._hat_state[key] = value
-	
+		
 				event = Event(
 					event_type= InputType.JoystickHat,
 					device_guid= device.device_guid,
@@ -896,6 +903,7 @@ class EventListener:
 					raw_value= value
 				)
 				event_list.append(event)
+				
 		if event_list:
 			self.queueJoystickEventList(event_list)
 
@@ -1384,7 +1392,7 @@ class EventListener:
 
 		import vjoy.vjoy
 
-		if not gremlin.joystick_handling._joystick_initialized:
+		if not gremlin.joystick_handling.joystick_initialized():
 			# not initialized yet
 			return 
 

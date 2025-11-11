@@ -137,6 +137,18 @@ _InputType_to_enum_lookup = {
     "midi": InputType.Midi,
     "modecontrol" : InputType.ModeControl,
     "state" : InputType.State,
-    "ifr1" : InputType.OctaviIfr1
+    "ifr1" : InputType.OctaviIfr1,
+    "NotSet": InputType.NotSet,
+    "JoystickAxis": InputType.JoystickAxis,
+    "Mouse" : InputType.Mouse,
+    "JoystickButton": InputType.JoystickButton,
+    "JoystickHat": InputType.JoystickHat,
+    "Keyboard": InputType.Keyboard,
+    "KeyboardLatched": InputType.KeyboardLatched,
+    "OpenSoundControl": InputType.OpenSoundControl,
+    "Midi": InputType.Midi,
+    "ModeControl" : InputType.ModeControl,
+    "State" : InputType.State,
+    "OctaviIfr1" : InputType.OctaviIfr1
 }
 

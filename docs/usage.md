@@ -657,6 +657,34 @@ This action lets you send complex sequences of outputs (joystick, keyboard, mous
 
 This action lets you play a sound file located on disk.
 
+### Trigger (Joystick)
+
+(requires m76T103 or later)
+
+![trigger map](assets/trigger_map.png)
+
+
+This action is a loopback action that allows one device input (axis, button or hat) to trigger an input on the same or another device called the target device, as if the target had generated that trigger.  The action lets you select the target joystick like device.
+
+Based on the selection, the action will present the ability to set an axis value if the output is an axis.  For buttons, the ability to press or release a button are available.  For hats, the position of the hat can be selected.
+
+A special mode, called actual, will use the actual input value (axis, button or hat) and use that value to trigger the output.  If the input is an axis, it will send the input axis value to the output.  If the input is a button, it will send both press and release triggers to the output based on the state of the input button.  For hats, it will synchronize the input hat with the output hat position.
+
+Additionally, if a button is mapped to a hat output, an input press will set the hat value to the position listed in the action, and the release will set the hat to the center position.
+
+It is not possible to map an axis input to a button or a hat and a warning will be displayed for this particular combination.
+
+Examples of how this action can be used:
+
+- to use an axis on one device and duplicate this axis on another axis on a different device.
+- to press a button on one device and duplicate this button state on another button on another device.
+- at runtime, to trigger mappings on one device from another device.
+- to set the value of an axis on another device by pressing a button.
+
+![trigger map button](assets/trigger_map_button.png)
+
+
+
 ## Conditions
 
 GremlinEx can apply conditions to triggers to modify what should happen when an input trigger happens. 

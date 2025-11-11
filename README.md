@@ -14,6 +14,26 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T103)
+- Changed: locked state is now permitted on inputs that have no mappings
+- Fix: workaround for QT clipboard OLE/MIME bug when copying text to the windows clipboard
+- Fix: locked state does not persist due to profile save optimization
+- Fix: icon lookup not finding some icon files if stored as files.
+- New: Trigger (Joystick) action.  This action is a loopback action that allows the mapped input (axis, button or hat) to trigger another input on the same or different device as if the target device triggered it itself.   
+
+Features:
+
+	- the actual input value can be used which lets the trigger stay synchronized with the axis or button or hat.  This lets you map a button from one input and make it look like you pressed the button on another device.  Same for hats or axes.
+	- in actual input mode, a button can be used to trigger a hat on the target device, in which case the hat value will be whatever is set in the trigger action, and when the button is released, it will send the hat back to the center position.
+	- you can set an axis to a set value
+	- you can set a button to a press or release state
+	- you can set a hat to a specific position
+	- the action can be used in the sequence container and any other container.
+	- as with any other loopback mechanism in GremlinEx, do not map the output to self, that would cause an endless loop at runtime. As is typical, this is allowed as there are some situations where you want that (for example, when used with conditions) but it can still be dangerous if you inadvertently create a loop.
+	
+
+
+
 ### (m76T102)
 - Change: Added "default" mode hide option to profile mode editor dialog.
 - Change: Feature request:  If the "default" mode is hidden, modified the user interface and logic to hide it from the current edit mode list, provided that an alternate mode exists in the profile.  This required some trauma center level one UI surgery so it may lead to more dragons.
