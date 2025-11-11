@@ -1091,6 +1091,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#trigger-joystick" class="md-nav__link">
+    <span class="md-ellipsis">
+      Trigger (Joystick)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3461,6 +3470,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#trigger-joystick" class="md-nav__link">
+    <span class="md-ellipsis">
+      Trigger (Joystick)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5226,6 +5244,18 @@ GremlinEx names the VJOY devices using their axis/button/hat count and the VJOY 
 </tbody>
 </table>
 <p>Note that the MIDI and OSC tabs only appear if MIDI and OSC are enabled in options (this is by default enabled).</p>
+<h4 id="device-list_1">Device List<a class="headerlink" href="#device-list_1" title="Permanent link">&para;</a></h4>
+<p>Available devices are down as a tab near the top of the interface.  Physical, virtual, and special devices will show in the list.</p>
+<h4 id="device-order">Device Order<a class="headerlink" href="#device-order" title="Permanent link">&para;</a></h4>
+<p>The list can be re-ordered by dragging and dropping device names to the desired location.  This setting will be persisted.  Note that the order of devices does not change the order of devices as seen by Windows.  Devices in Windows cannot be re-ordered, but GremlinEx will let you change the order visually based on your preference.</p>
+<h4 id="device-visibility">Device Visibility<a class="headerlink" href="#device-visibility" title="Permanent link">&para;</a></h4>
+<p>Devices can be hidden if they are not used to declutter the UI and improve performance.  While GremlinEx will not load a device until it is selected, performance and memory usage decreases when fewer devices are displayed.  To determine which devices are visible, you can call up the visible device dialog from the tools menu, or from the device context menu.</p>
+<p>Device visibility is persisted by profile.   Save the profile after making changes.</p>
+<p><a class="glightbox" href="../assets/device_visible_dialog.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="device visibiliy dialog" src="../assets/device_visible_dialog.png" /></a></p>
+<h4 id="device-appearance">Device appearance<a class="headerlink" href="#device-appearance" title="Permanent link">&para;</a></h4>
+<p>Each device tab will include an icon if the device is mapped.  The icon will be solid if the device has a mapping in the current profile edit mode.  The icon will be hollow if the device has a mapping in a different profile mode.  </p>
+<p>Disconnected devices will show with a disconnect plug icon.</p>
+<p><a class="glightbox" href="../assets/device_appearance.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="device appearance" src="../assets/device_appearance.png" /></a></p>
 <h4 id="disconnected-devices">Disconnected devices<a class="headerlink" href="#disconnected-devices" title="Permanent link">&para;</a></h4>
 <p><a class="glightbox" href="../assets/disconnected_device_tabs.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="disconnected device tabs" src="../assets/disconnected_device_tabs.png" /></a></p>
 <p>If a device was saved to a profile, the profile is loaded, and the device is no longer detected, GremlinEx will indicate the device is not currently available with a disconnected flag as shown above.  The device can be reconnected by plugging it back in, or deleted via the context (right click) menu.  Disconnected devices are normal when opening a profile created on a different machine as device hardware IDs will be different.</p>
@@ -5309,6 +5339,29 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <h3 id="state-device">State device<a class="headerlink" href="#state-device" title="Permanent link">&para;</a></h3>
 <p>Starting with 1.0ex m74, GremlinEx supports user-defined  <a href="./#states">states</a>.  A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="./#map-to-state">map to state</a> action anywhere in the profile, via a <a href="#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
 <p>Currently states are either pressed (on/true) or released (off/false) and function like a virtual joystick button.  When a state has mapping, the actions and containers mapped to it will see the input as a joystick button, so all containers/actions able to use momentary inputs can be mapped to a state.</p>
+<p>States can be set to auto-release after being set.  If this option is selected, whenever the state is set, it will start a timer.  If the timer lapses, the state's value will be reset based on the auto-release mode.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Toggle</td>
+<td>The state's value will be toggled upon auto-release</td>
+</tr>
+<tr>
+<td>On</td>
+<td>The state will be set to on upon auto-release</td>
+</tr>
+<tr>
+<td>Off</td>
+<td>The state will be set to off upon auto-release</td>
+</tr>
+</tbody>
+</table>
 <p>States are read by <a href="#conditions">conditions</a> and specifically the <a href="#state-condition">state condition</a>.</p>
 <p>In GremlinEx, states can be mapped via the State Device, the "map to state" action is used to clear, set, toggle or pulse a state, and the state condition is used to determine, based on state, if a container or action should execute or not.</p>
 <h3 id="octavi-ifr1-device">Octavi IFR1 device<a class="headerlink" href="#octavi-ifr1-device" title="Permanent link">&para;</a></h3>
@@ -5446,6 +5499,22 @@ This container was specifically created for output needs that have "gates", such
 <h3 id="play-sound">Play Sound<a class="headerlink" href="#play-sound" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_play_sound.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="play sound" src="../assets/action_play_sound.png" /></a></p>
 <p>This action lets you play a sound file located on disk.</p>
+<h3 id="trigger-joystick">Trigger (Joystick)<a class="headerlink" href="#trigger-joystick" title="Permanent link">&para;</a></h3>
+<p>(requires m76T103 or later)</p>
+<p><a class="glightbox" href="../assets/trigger_map.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="trigger map" src="../assets/trigger_map.png" /></a></p>
+<p>This action is a loopback action that allows one device input (axis, button or hat) to trigger an input on the same or another device called the target device, as if the target had generated that trigger.  The action lets you select the target joystick like device.</p>
+<p>Based on the selection, the action will present the ability to set an axis value if the output is an axis.  For buttons, the ability to press or release a button are available.  For hats, the position of the hat can be selected.</p>
+<p>A special mode, called actual, will use the actual input value (axis, button or hat) and use that value to trigger the output.  If the input is an axis, it will send the input axis value to the output.  If the input is a button, it will send both press and release triggers to the output based on the state of the input button.  For hats, it will synchronize the input hat with the output hat position.</p>
+<p>Additionally, if a button is mapped to a hat output, an input press will set the hat value to the position listed in the action, and the release will set the hat to the center position.</p>
+<p>It is not possible to map an axis input to a button or a hat and a warning will be displayed for this particular combination.</p>
+<p>Examples of how this action can be used:</p>
+<ul>
+<li>to use an axis on one device and duplicate this axis on another axis on a different device.</li>
+<li>to press a button on one device and duplicate this button state on another button on another device.</li>
+<li>at runtime, to trigger mappings on one device from another device.</li>
+<li>to set the value of an axis on another device by pressing a button.</li>
+</ul>
+<p><a class="glightbox" href="../assets/trigger_map_button.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="trigger map button" src="../assets/trigger_map_button.png" /></a></p>
 <h2 id="conditions_1">Conditions<a class="headerlink" href="#conditions_1" title="Permanent link">&para;</a></h2>
 <p>GremlinEx can apply conditions to triggers to modify what should happen when an input trigger happens. </p>
 <p>Conditions can be used to:</p>
