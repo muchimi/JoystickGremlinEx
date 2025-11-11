@@ -2734,7 +2734,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # ours
             self.setUpdatesEnabled(False)
             for input_item in self.input_item_list_model.getFilteredItems():
-                input_item.locked = len(input_item.containers) > 0 # don't lock if not mapped
+                input_item.locked = True
             self.setUpdatesEnabled(True)
 
     

@@ -19,9 +19,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 
-### (m76T10B) hotfix
+### (m76T10C) hotfix
 - Fix: gated axis: record button on gate value widget can cause a crash.
 - Fix: gated axis: refactor of legacy call.
+- Fix: lock all function on joystick devices
 
 ### (m76T103)
 - Changed: locked state is now permitted on inputs that have no mappings

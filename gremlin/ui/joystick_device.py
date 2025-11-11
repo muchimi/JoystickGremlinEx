@@ -231,7 +231,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.edit_mode_changed.connect(self._handle_edit_mode_changed)
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
-
+        # lock all inputs
+        el.lock_inputs.connect(self._handle_lock_inputs)
+        el.unlock_inputs.connect(self._handle_unlock_inputs)
 
 
         self.updating = False
@@ -246,6 +248,36 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # update all curve icons
         self.update_curve_icons()
+
+    @property
+    def inputWidgetCount(self) -> int:
+        ''' number of input widgets currently in the device '''
+        return self.input_item_list_view.count()        
+    
+    def _handle_lock_inputs(self, data):
+        gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
+        
+    def _handle_unlock_inputs(self, data):
+        gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data) # ensure on UI thread
+
+    def _handle_lock_inputs_ui(self, data):
+        ''' lock all inputs event'''
+        if Shiboken.isValid(self) and data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = True
+            self.setUpdatesEnabled(True)
+    
+    def _handle_unlock_inputs_ui(self, data):
+        ''' unlock all inputs event '''
+        if Shiboken.isValid(self) and data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.input_item_list_model.getFilteredItems():
+                input_item.locked = False
+            self.setUpdatesEnabled(True)
+
 
 
     def _handle_filter_changed(self, value : bool):
