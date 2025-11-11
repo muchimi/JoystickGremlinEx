@@ -640,6 +640,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         import gremlin.ui.ui_common
 
         super().__init__(parent)
+        self._sort_lock = False
 
         self.id = gremlin.util.get_guid() # unique ID for this widget
 
@@ -1079,13 +1080,20 @@ making changes that impact the order of gates or ranges."""
 
     
     def _sort_gate_layout(self):
-        gremlin.util.InvokeUiMethod(self._sort_gate_layout_ui)
+        if self._sort_lock:
+            return
+        self._sort_lock = True
+        try:
+            gremlin.util.InvokeUiMethod(self._sort_gate_layout_ui)
+        finally:
+            self._sort_lock = False
     
     def _sort_gate_layout_ui(self):
         ''' updates and sorts the gate container layout '''
         if not Shiboken.isValid(self):
             return
 
+        
         # if not Shiboken.isValid(self.gate_table_widget):
         #     return
 
@@ -1096,8 +1104,6 @@ making changes that impact the order of gates or ranges."""
         flow_layout= self.gate_flow_layout
         gremlin.util.clear_layout(flow_layout)
 
-        row = 0
-        col = 0
         gate_list = self.gate_data.getUsedGates()
         gate_count = len(gate_list)
 
@@ -1148,25 +1154,8 @@ making changes that impact the order of gates or ranges."""
             self._update_gate_icon(gate.slider_index, gate)
 
             flow_layout.addWidget(widget)
-            # table.setCellWidget(row, col, widget)
-            #table.setCellWidget(row, col, QtWidgets.QLabel(""))
             self._gwi_map[gate] = widget # ((row, col), widget)
-            #if verbose: syslog.info(f"\t{gate.to_display()} ({row},{col})")
 
-            # col += 1
-            # table.setCellWidget(row, col, QtWidgets.QLabel("")) # spacer
-            # col += 1
-            
-
-            
-            # if col >= max_col:
-            #     col = 0
-            #     row += 1
-        
-        # table.resizeColumnsToContents()
-        # table.resizeRowsToContents()
-        # table.horizontalHeader().setVisible(False)
-        # table.verticalHeader().setVisible(False)
 
         self.gate_count_widget.setText(f"Gates ({gate_count}):")
 
@@ -1446,13 +1435,9 @@ making changes that impact the order of gates or ranges."""
 
 
         gate : GateInfo
-        gate, widget = self.sender().data  # the button's data field contains the widget to update
-        gwi : GateWidgetInfo
-        gwi = self._gwi_map[gate]
-        if Shiboken.isValid(gwi):
-            value = self._axis_value
-            gwi.setValue(value)
-            self._set_slider_gate_value(gate.slider_index, value)
+        gate, _ = self.sender().data  # the button's data field contains the widget to update
+        value = self._axis_value
+        gate.setValue(value)
         
 
     def _prompt_delete(self) -> bool:
@@ -1486,7 +1471,7 @@ making changes that impact the order of gates or ranges."""
     def _remove_gate_ui(self, gate, prompt : bool):
 
         # ensure there are at least two gates left
-        count = len(self._gate_data._gate_used_gates())
+        count = len(self._gate_data.getGates())
         if count <= 2:
             syslog.warning("Unable to delete gate: at least two gates must be defined.")
             gremlin.ui.ui_common.MessageBox(prompt="Unable to remove this gate.  At least two gates must be defined.")

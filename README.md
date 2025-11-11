@@ -18,6 +18,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+
+### (m76T10B) hotfix
+- Fix: gated axis: record button on gate value widget can cause a crash.
+- Fix: gated axis: refactor of legacy call.
+
 ### (m76T103)
 - Changed: locked state is now permitted on inputs that have no mappings
 - Fix: workaround for QT clipboard OLE/MIME bug when copying text to the windows clipboard

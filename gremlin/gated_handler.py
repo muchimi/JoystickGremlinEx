@@ -3681,6 +3681,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.display_index = 0 # display index for ordering
         self.warning_visible = False # flag for warning label/icon
         self._lock = False
+        self._set_value_lock = False
         
 
         # hook gate used flag to update widget visibility
@@ -3898,12 +3899,16 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
     def setValue(self, value : float, emit=True):
         ''' sets the gate value on the widget'''
-        if self._lock:
+        if self._set_value_lock:
             return
-        if value != self.value_widget.value():
-            with QtCore.QSignalBlocker(self.value_widget):
-                self.value_widget.setValue(value)
-        self.gate.setValue(value, emit=emit)
+        self._set_value_lock = True
+        try:
+            if value != self.value_widget.value():
+                with QtCore.QSignalBlocker(self.value_widget):
+                    self.value_widget.setValue(value)
+            self.gate.setValue(value, emit=False)
+        except:
+            self._set_value_lock = False
 
     def setUsed(self, value : bool):
         ''' sets the used state of the widget and associated gate '''
