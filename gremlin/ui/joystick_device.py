@@ -480,23 +480,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return None
         return self.input_item_list_model.data(index)
     
-    def _handle_lock_inputs(self, data):
-        ''' lock all inputs event'''
-        if data == self.device_guid:
-            # ours
-            self.setUpdatesEnabled(False)
-            for input_item in self.input_item_list_model.getFilteredItems():
-                input_item.locked = True # change by request in m76T102 - lock regardless of mapping state - old: len(input_item.containers) > 0 # don't lock if not mapped
-            self.setUpdatesEnabled(True)
-    
-    def _handle_unlock_inputs(self, data):
-        ''' unlock all inputs event '''
-        if data == self.device_guid:
-            # ours
-            self.setUpdatesEnabled(False)
-            for input_item in self.input_item_list_model.getFilteredItems():
-                input_item.locked = False
-            self.setUpdatesEnabled(True)
+
 
     @QtCore.Slot()
     def _select_item_cb(self, index, force_update = False, emit = True):
