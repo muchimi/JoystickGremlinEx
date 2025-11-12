@@ -62,6 +62,7 @@ class MacroState(enum.Enum):
 
 
 
+
 def _create_function(lib_name, fn_name, param_types, return_type):
     """Creates a handle to a windows dll library function.
 

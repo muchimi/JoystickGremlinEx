@@ -675,17 +675,20 @@ class InputItemListView(ui_common.AbstractView):
         gremlin.util.InvokeUiMethod(self._sync_input_ui, input_item)
 
     def _sync_input_ui(self, input_item):
-        if not Shiboken.isValid(self):
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self.scroll_layout):
             return
+        
         if self.model.hasInputItem(input_item):
             index = self.model.indexOfInputItem(input_item)
             self.scrollToIndex(index)
-            widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout)]
-            # shenanigans to have the selectred input visible in the scroll area of inputs
+            widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout) if Shiboken.isValid(w)]
+            # shenanigans to have the selected input visible in the scroll area of inputs
             # the size() on the widget returns the wrong size so each widget has an "actual size" function trapping the event 
             # so we get the correct height as rendered
             # then we compute the pixel offset and tell the scroll area to scroll to that pixel height
+
             if widgets and widgets[0].widget_height is not None:
+                
                 h = 0
                 for i, widget in enumerate(widgets):
                     h += widget.widget_height

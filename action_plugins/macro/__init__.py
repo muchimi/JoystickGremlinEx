@@ -1333,13 +1333,11 @@ class MacroSettingsWidget(gremlin.ui.ui_common.QContentWidget):
         self.repeat_dropdown = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
         self.repeat_dropdown.addItems(["None", "Count", "Toggle", "Hold"])
         self.repeat_widget = None
+        self.container_repeat_widget, self.container_repeat_layout = gremlin.ui.ui_common.getVContainer()
+
         if type(self.data.repeat) in MacroSettingsWidget.storage_to_name:
-            mode_name = MacroSettingsWidget.storage_to_name[
-                type(self.data.repeat)
-            ]
-            self.repeat_widget = MacroSettingsWidget.name_to_widget[mode_name](
-                self.data.repeat
-            )
+            mode_name = MacroSettingsWidget.storage_to_name[type(self.data.repeat)]
+            self.repeat_widget = MacroSettingsWidget.name_to_widget[mode_name](self.data.repeat)
 
         # Populate UI elements
         self.exclusive_checkbox.setChecked(self.data.exclusive)
@@ -1362,11 +1360,17 @@ class MacroSettingsWidget(gremlin.ui.ui_common.QContentWidget):
         widget, _ = gremlin.ui.ui_common.getHContainer([self.exclusive_checkbox, self.force_remote_checkbox])
         self.group_layout.addWidget(widget)
 
-        if self.repeat_widget is not None:
-            widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_dropdown)
-            self.group_layout.addWidget(self.repeat_widget)
+        widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_dropdown, "Repeat Mode:")
+        self.group_layout.addWidget(widget)
 
-    def _update_settings(self, value):
+        self.group_layout.addWidget(self.container_repeat_widget)
+        
+        if self.repeat_widget is not None:
+            #widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_dropdown)
+            widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_widget)
+            self.container_repeat_layout.addWidget(widget)
+
+    def _update_settings(self, value = None):
         """Updates the action data based on UI content.
 
         :param value the value of a change (ignored)
@@ -1384,23 +1388,17 @@ class MacroSettingsWidget(gremlin.ui.ui_common.QContentWidget):
             None
         )
         if widget_type is None and self.repeat_widget is not None:
+
+            gremlin.util.clear_layout(self.container_repeat_layout)
             self.data.repeat = None
             self.repeat_widget = None
 
-            old_item = self.group_layout.takeAt(2)
-            if old_item is not None:
-                old_item.widget().hide()
-                old_item.widget().deleteLater()
-        elif widget_type is not None and \
-                not isinstance(self.repeat_widget, widget_type):
+        elif widget_type is not None and  not isinstance(self.repeat_widget, widget_type):
             self.data.repeat = storage_type()
             self.repeat_widget = widget_type(self.data.repeat)
-
-            old_item = self.group_layout.takeAt(2)
-            if old_item is not None:
-                old_item.widget().hide()
-                old_item.widget().deleteLater()
-            self.group_layout.addWidget(self.repeat_widget)
+            gremlin.util.clear_layout(self.container_repeat_layout)
+            widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_widget)
+            self.container_repeat_layout.addWidget(widget)
 
 class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -1675,7 +1673,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # ,alignment=QtCore.Qt.AlignmentFlag.AlignTop |QtCore.Qt.AlignmentFlag.AlignLeft
             # assemble right panel
-            self.right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer([self.editor_container_widget,self.settings_widget])
+            #self.right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer(self.editor_container_widget)
+            self.right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer([self.editor_container_widget, self.settings_widget])
 
             grid_layout = QtWidgets.QGridLayout()
             grid_layout.addWidget(self.left_panel_widget, 0, 0)
@@ -1689,6 +1688,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             #self.panel_widget, self.panel_layout = gremlin.ui.ui_common.getHContainer([self.left_panel_widget, self.right_panel_widget], right_stretch=False) # main panel left and right
             #self.main_layout.addWidget(self.panel_widget) 
             self.main_layout.addLayout(grid_layout)
+            #self.main_layout.addWidget(self.settings_widget)
 
             
         finally:
@@ -2115,6 +2115,7 @@ To send complex sequences, please look at the sequence container.'''
         self.sequence = []
         self.exclusive = False
         self.repeat = None
+
         self.force_remote = False
         self.execute_on_press = True # true if macro executes on input press/change
         self.execute_on_release = False # true if macro executs on input release
@@ -2146,7 +2147,8 @@ To send complex sequences, please look at the sequence container.'''
         # Reset storage
         self.sequence = []
         self.exclusive = False
-        self.repeat = None
+        
+        
         self.force_remote = False
         self.execute_on_press = True # true if macro executes on input press/change
         self.execute_on_release = False # true if macro executs on input release
@@ -2172,6 +2174,7 @@ To send complex sequences, please look at the sequence container.'''
             elif child.tag == "force_remote":
                 self.force_remote = True
             elif child.tag == "repeat":
+
                 repeat_type = child.get("type")
                 if repeat_type == "count":
                     self.repeat = gremlin.macro.CountRepeat()

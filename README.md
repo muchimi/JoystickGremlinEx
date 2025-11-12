@@ -18,6 +18,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T104A)
+- Fix: added a supplemental check on ui sync call for QT desync
+- Changed: re-added missing repeat mode on macros.
+
 ### (m76T104)
 - New: for joystick inputs, right clicking the filter button will jump to the first mapped input of that device.  Nothing happens is the device is not mapped.
 - Change: Gated Axis: Removing a gate from Gated Axis will only prompt if the deleted gate and/or associated ranges have mapped content that could be impacted by the deletion.
