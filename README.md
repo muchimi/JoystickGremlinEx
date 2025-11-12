@@ -18,11 +18,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T104)
+- New: for joystick inputs, right clicking the filter button will jump to the first mapped input of that device.  Nothing happens is the device is not mapped.
+- Change: Gated Axis: Removing a gate from Gated Axis will only prompt if the deleted gate and/or associated ranges have mapped content that could be impacted by the deletion.
+- Change: Gated Axis: Added range size to range display.
+- Fix: refactor of Gated Axis UI components (widgets). GremlinEx no longer relies on Python for QT tracking widget memory references correctly. This was responsible for random crashes using Gated Axis.
 
-### (m76T10C) hotfix
+### (m76T103D) hotfix
 - Fix: gated axis: record button on gate value widget can cause a crash.
 - Fix: gated axis: refactor of legacy call.
 - Fix: lock all function on joystick devices
+- Fix: QT exception on lock all joystick devices
 
 ### (m76T103)
 - Changed: locked state is now permitted on inputs that have no mappings

@@ -210,7 +210,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
                 gremlin.profile.parse_bool(child.get("extended"))
             ))
 
-        pass
+    
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.

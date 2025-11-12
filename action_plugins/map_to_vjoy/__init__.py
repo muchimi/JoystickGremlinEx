@@ -975,8 +975,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                         #self._repeater_button_widget.setValue(False)
                 case VjoyAction.VJoyAxis:
                     # plain axis output
-                    if self.action_data.curve_data:
-                        pass
+                 
                     values = self.action_data.get_filtered_axis_value(curves=curves, channels = True)
                     #syslog.info(f"got data: {data}")
                     if not Shiboken.isValid(self._repeater_axis_widget):
@@ -1833,8 +1832,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         if gremlin.shared_state.is_running:
             return
         
-        if event.extra_data:
-            pass
+
         
         if not event.is_axis:
             return
@@ -2482,7 +2480,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(bool)
     def _step_direction_changed(self, checked):
         self.action_data.target_step_direction = -1 if checked else 1
-        pass
+        
 
     @QtCore.Slot(bool)
     def _step_latched_changed(self, checked):
@@ -3784,7 +3782,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         vjoy_id = self.action_data.vjoy_id
 
         used_list = self.usage_state.used_button_list(vjoy_id)
-        pass
+        
         for cb in self.button_group.buttons():
             button_id = self.button_group.id(cb)
             self._grid_widgets[button_id] = cb
@@ -4898,7 +4896,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                                 device.data[key] = index
                                 if verbose: syslog.info(f"STEPPED AXIS: start index: {start_index} new index: {index} step value: {value:0.3f}")
-                                pass
+                                
                 else:
                     # wrong input
                     result = False

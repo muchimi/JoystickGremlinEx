@@ -789,7 +789,7 @@ For more advanced axis splitting capability, look at the Gated Axis action.
             
         except:
             pass
-        pass
+        
 
     def _generate_xml(self):
         

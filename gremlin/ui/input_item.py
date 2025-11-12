@@ -200,8 +200,6 @@ class InputItemListModel(ui_common.AbstractModel):
     def show_used(self, value : bool):
         if self._show_used_only != value:
             self._show_used_only = value
-            if not value:
-                pass
             self._update_data()
     
 
@@ -653,7 +651,7 @@ class InputItemListView(ui_common.AbstractView):
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.scroll_area = QtWidgets.QScrollArea()
-        
+        self.scroll_area.setWidgetResizable(True)
 
         self.scroll_widget, self.scroll_layout = gremlin.ui.ui_common.getVContainer()
         self.scroll_widget.setContentsMargins(2,2,2,2)
@@ -682,8 +680,31 @@ class InputItemListView(ui_common.AbstractView):
         if self.model.hasInputItem(input_item):
             index = self.model.indexOfInputItem(input_item)
             self.scrollToIndex(index)
+            widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout)]
+            # shenanigans to have the selectred input visible in the scroll area of inputs
+            # the size() on the widget returns the wrong size so each widget has an "actual size" function trapping the event 
+            # so we get the correct height as rendered
+            # then we compute the pixel offset and tell the scroll area to scroll to that pixel height
+            if widgets and widgets[0].widget_height is not None:
+                h = 0
+                for i, widget in enumerate(widgets):
+                    h += widget.widget_height
+                    if i == index:
+                        break
+                self.scroll_area.ensureVisible(0,h)
+                
+            # target_widget = widgets[index]
+            # self.scroll_area.ensureWidgetVisible(target_widget)
             
-        
+    def scrollToInput(self, input_item):
+        self._sync_input(input_item)
+
+    def scrollToWidget(self, widget):
+        ''' scrolls the list view to the specified widget '''
+        widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout)]
+        if widget in widgets:
+            self.scroll_area.ensureWidgetVisible(widget)
+
 
     @property
     def current_index(self):
@@ -754,6 +775,15 @@ class InputItemListView(ui_common.AbstractView):
             return widget[0]
         # if index < len(widgets):
         #     return widgets[index]
+        return None
+    
+    def getWidgetForInputItem(self, input_item):
+        ''' gets the corresponding widget for the given input item '''
+        index = self.model.indexOfInputItem(input_item)
+        if index != -1:
+            widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout)]
+            if index < len(widgets):
+                return widgets[index]
         return None
     
     def scrollToIndex(self, index):
@@ -1119,23 +1149,35 @@ class InputItemListView(ui_common.AbstractView):
 
         self._current_index = index
 
+        widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout)]
         widget = self.itemAt(index)
+        if widgets:
+            widgets.remove(widget)
+            for w in widgets:
+                w.setSelected(False, emit = False)
+
         if widget:
             # select it
             with (QtCore.QSignalBlocker(widget)):
-                widget.selected = True
+                widget.setSelected(True, emit = False)
                 if verbose: 
                     data = self.model.data(index)
                     syslog.info(f"\tselected: {data.debug_display}")
 
             # if the list is long - bring the selected widget into view
-            gremlin.util.singleShot(lambda: self._scroll_to_item(widget))
+            #gremlin.util.singleShot(lambda: self._scroll_to_item(widget))
 
         if emit and index != -1:
             self.item_selected.emit(index, force_update) # load the mapped content for the given index
 
         # return the currently selected widget
         return widget
+    
+    def clearSelection(self, emit = True):
+        widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout)]
+        for w in widgets:
+            w.setSelected(False, emit = emit)
+
     
     def _create_scroll_callback(self, widget):
         return lambda : self._scroll_to_item(widget)
@@ -1636,6 +1678,9 @@ class InputItemWidget(QBoxFrame):
         super().__init__(parent)
 
         self.parent = parent
+        self.widget_width = None # actual width in pixels
+        self.widget_height = None # actual height in pixels
+
         self._ui_loaded = False
         self.data = data
         self._selected = False
@@ -1916,6 +1961,13 @@ class InputItemWidget(QBoxFrame):
         self._update_repeater() # create the correct repeater widget
         self._update_selected_ui()
         self._update_display_ui()
+
+    
+    def resizeEvent(self, event):
+        size = self.size()
+        self.widget_width = size.width()
+        self.widget_height = size.height()
+        return super().resizeEvent(event)
 
     @property
     def input_item(self):
@@ -2468,18 +2520,26 @@ class InputItemWidget(QBoxFrame):
 
     @property
     def selected(self) -> bool:
+        ''' True if the item is currently selected '''
         return self._selected
 
     @selected.setter
-    def selected(self, value):
-        import gremlin.ui.ui_common
+    def selected(self, value : bool):
+        self.setSelected(value)
+
+    def setSelected(self, value : bool, emit = True):
         if value != self._selected:
             self._selected = value
-            if not value:
-                self.unselected.emit(self)
+            if emit:
+                if not value:
+                    self.unselected.emit(self)
 
             self._update_selected() # uptate widget style
-            self.selected_changed.emit(self)
+            if emit:
+                self.selected_changed.emit(self)
+
+        
+        
 
     def _update_selected(self):
         ''' updates the widget style based on selection '''

@@ -108,7 +108,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.device_name = device.name
         self._debug_widget = None
         
-        self._last_selected_index = -1 # last selected index in the list
+        self._last_selected_index = 0 # last selected index in the list
         
 
         # List of inputs
@@ -234,6 +234,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
+        el.jump_to_mapped_input.connect(self._handle_jump_to_mapped_input)
 
 
         self.updating = False
@@ -253,6 +254,20 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def inputWidgetCount(self) -> int:
         ''' number of input widgets currently in the device '''
         return self.input_item_list_view.count()        
+    
+    def _handle_jump_to_mapped_input(self):
+        gremlin.util.InvokeUiMethod(self._handle_jump_to_mapped_input_ui)
+
+    def _handle_jump_to_mapped_input_ui(self):
+        ''' jumps to the first mapped input '''
+        if Shiboken.isValid(self):
+            for input_item in self.input_item_list_model.getFilteredItems():
+                if input_item.hasContainers:
+                    index = self.input_item_list_model.indexOfInputItem(input_item)
+                    self.select_item(index)
+                    self.input_item_list_view.select_item(index, emit = False)
+                    break
+                  
     
     def _handle_lock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
@@ -514,21 +529,21 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             if index == -1:
                 if self.input_item_list_model.rows() > 0:
-                    item_data = self.input_item_list_model.data(0)
+                    input_item = self.input_item_list_model.data(0)
                     index = 0
                 else:
                     self._blank_input()
                     return
             else:
-                item_data = self.input_item_list_model.data(index)
+                input_item = self.input_item_list_model.data(index)
             
-            if not item_data:
+            if not input_item:
                 syslog.warning(f"JoystickDevice: Device [{device_name}] has no inputs for mode {current_mode} - this is not normal.")
 
             if verbose:
                 device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
-                if item_data:
-                    syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: {item_data.debug_display}")
+                if input_item:
+                    syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: {input_item.debug_display}")
                 else:
                     syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: Empty content")
 
@@ -538,12 +553,18 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             
 
-            if item_data is not None:
+            if input_item is not None:
+
+                # # ensure the LEFT panel widget is selected
+                # self.input_item_list_view.clearSelection(emit = False)
+                # widget = self.input_item_list_view.getWidgetForInputItem(input_item)
+                # widget.setSelected(True, emit = False)
+
     
-                #self.clearRightPanel()
+                # select the RIGHT panel item
                 device_guid = self.device_guid
-                input_type = item_data.input_type
-                input_id = item_data.input_id
+                input_type = input_item.input_type
+                input_id = input_item.input_id
 
                 key = self.getWidgetKey(input_type, input_id)
                 widget = self.getRegisteredWidget(key)
@@ -551,7 +572,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     
                     # not in cache, create it and add to cache for this device/input combination
                     if verbose: syslog.info(f"create and store in cache content widget for index: {index}  device: {self.device_guid}")
-                    widget = InputItemMappingWidget(item_data, object_name = f"Joystick [{item_data.display_name}]")
+                    widget = InputItemMappingWidget(input_item, object_name = f"Joystick [{input_item.display_name}]")
                     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
                     widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
                     widget.action_model.data_changed.connect(self._create_change_cb(index))
@@ -570,21 +591,25 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
                 if force_update:
                     # update the container to reflect the data change
-                    widget.setItemData(item_data)
+                    widget.setItemData(input_item)
 
                 # make the widget visible
                 self.selectRegisteredWidget(key)
-                #self.input_item_list_view.select_item(index, False)
                 
 
                 if verbose:
-                    syslog.info(f"Show widget:  {widget.id} {item_data.debug_display}")
+                    syslog.info(f"Show widget:  {widget.id} {input_item.debug_display}")
                 
                 if config.debug_ui:
-                    self._debug_widget.setText(f"Contents for : {item_data.debug_display}")
+                    self._debug_widget.setText(f"Contents for : {input_item.debug_display}")
+
 
 
             self.last_selected_index = index
+
+            # # ensure input is visible 
+            # self.input_item_list_view.scrollToInput(item_data)
+
             if emit:
                 el = gremlin.event_handler.EventListener()
                 el.input_selection_changed.emit(device_guid, input_type, input_id)

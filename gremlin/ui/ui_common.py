@@ -4090,6 +4090,10 @@ class QDataRadioButton(QtWidgets.QRadioButton):
         self._data = value
 
 class QDataPushButton(QtWidgets.QPushButton):
+    ''' custom push button with data field and right click context events '''
+
+    rightClicked = QtCore.Signal() # fires when the button is right clicked
+
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
     def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None):
         super().__init__(text, parent)
@@ -4098,6 +4102,18 @@ class QDataPushButton(QtWidgets.QPushButton):
             self.setToolTip(tooltip)
         if callback:
             self.clicked.connect(callback)
+
+        self.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.MouseButtonPress:
+            button = event.buttons()
+            if button == QtCore.Qt.RightButton:
+                self.rightClicked.emit()
+                return True # handled
+
+        return super().eventFilter(watched, event)
 
 
     @property
@@ -8217,7 +8233,7 @@ class QSplitTabWidget(QDataWidget):
         self.setObjectName(object_name)
 
         self._id = gremlin.util.get_guid() # unique ID
-        self._blank_input_id = "c9a484aedbab4f518e5bab7ec402df65"  # input ID to use for the blank pages
+        self._blank_input_id = "blank_c9a484aedbab4f518e5bab7ec402df65"  # input ID to use for the blank pages
         self._device_guid = device_guid
         self._device_id = gremlin.util.normalize_guid(device_guid)
         self._filtered = False # filter state for inputs
@@ -8374,6 +8390,7 @@ class QSplitTabWidget(QDataWidget):
         widget = self.getRegisteredWidget(key)
         assert widget is not None,f"Logic error - widget not found for key [{key}]"
         self._config_widget.setCurrentWidget(widget)
+        
         return widget
 
 
@@ -8548,9 +8565,9 @@ class QSplitTabWidget(QDataWidget):
         else:
             self._select_item_cb(index)
             # select the corresponding widget
-            if index in self._widget_config_device_map:
-                key = self._widget_config_device_map[index]
-                self.selectRegisteredWidget(key)
+            # if index in self._widget_config_device_map:
+            #     key = self._widget_config_device_map[index]
+            #     self.selectRegisteredWidget(key)
 
 
 
@@ -11202,10 +11219,11 @@ class QInputLockWidget(QtWidgets.QWidget):
 
         if filter_enabled:
 
-            self._filter_widget = QtWidgets.QPushButton()
+            self._filter_widget = QDataPushButton()
             self._filter_widget.setIcon(Icons.filterIcon() if filter else Icons.noFilterIcon())
             self._filter_widget.setToolTip(self._get_filter_tooltip(filter))
             self._filter_widget.clicked.connect(self._handle_used)
+            self._filter_widget.rightClicked.connect(self._handle_context)
             widgets.insert(0, self._filter_widget)
         else:
             self._filter_widget = None
@@ -11233,6 +11251,12 @@ class QInputLockWidget(QtWidgets.QWidget):
     def _handle_used(self):
         # toggle filter
         self.filter = not self.filter
+
+    def _handle_context(self):
+        ''' right click of filter button '''
+        import gremlin.event_handler
+        el = gremlin.event_handler.EventListener()
+        el.jump_to_mapped_input.emit() # request jump to first mapped input 
 
     def _handle_lock(self):
         import gremlin.event_handler

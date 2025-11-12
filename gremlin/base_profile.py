@@ -5096,7 +5096,7 @@ class PluginInstance:
             if verbose:
                 log = syslog
                 log.info(str(variable))
-        pass
+        
             
 
     def to_xml(self):

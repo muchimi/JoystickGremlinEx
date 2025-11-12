@@ -1189,8 +1189,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 import_item.device_type = item.device_type
                 import_item.input_id = input_id
                 import_item.input_type = input_type
-                if description:
-                    pass
+                
                 import_item.description = description
                 import_item.input_description = input_description
                 self._import_map[item.device_guid] = import_item

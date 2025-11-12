@@ -4365,9 +4365,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 # use the trigger value
                 gate_trigger : gremlin.gated_handler.TriggerData = extra_data["trigger"]
                 if verbose_details: comment += " Using Trigger:  Range description: " + gate_trigger.range.description
-            else:
-                pass
-        
+
 
 
         trigger = self.action_data.trigger_on_press and event.is_pressed or self.action_data.trigger_on_release and not event.is_pressed

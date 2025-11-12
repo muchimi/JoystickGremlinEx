@@ -1837,8 +1837,8 @@ class ExecutionContext():
                 functor_list = node.getActionFunctors()
                 if functor_list:
                     for functor in functor_list:
-                        if functor.__class__.__name__ == "GatedAxisFunctor":
-                            pass
+                        # if functor.__class__.__name__ == "GatedAxisFunctor":
+                        #     pass
                         action_result =  self.process_functor(functor, event, value, extra_data, manual)
                         description = str(functor.action_data)
                         if verbose_exec: 

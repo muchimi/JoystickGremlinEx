@@ -664,6 +664,7 @@ class EventListener:
 
 	lock_inputs = Signal(object) # fires when all inputs should be locked, object = device_guid of the device to lock
 	unlock_inputs = Signal(object) # fires when all inputs should be unlocked, object = device_guid of the device to unlock
+	jump_to_mapped_input = Signal() # fires when the input list should select the first mapped input
 
 	collapse_all_containers = Signal() # collapse all containers
 	expand_all_containers = Signal() # expand all containers
