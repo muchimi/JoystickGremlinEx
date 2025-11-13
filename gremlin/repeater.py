@@ -264,7 +264,8 @@ class PulseWorker():
             
             self._keep_running = False # tell the worker to stop whatever it's doing
             # wait for the thread to terminate
-            self._thread.join()
+            if self._thread.is_alive():
+                self._thread.join()
             self._thread = None
             self._is_pulse = False # true if we're pulsing
             self._is_interval = False # true if we're waiting for the next pulse

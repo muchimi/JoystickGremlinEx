@@ -5349,6 +5349,9 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         if verbose:
             device = gremlin.joystick_handling.device_info_from_guid(self.hardware_device_guid)
+            if not device:
+                syslog.warning(f"Unable to find device: [{gremlin.util.normalize_guid(self.hardware_device_guid)}]")
+                return None
             device_stub = f"[{device.name}/{device.get_axis_name(self.hardware_input_id)}]"
             
 
@@ -5360,7 +5363,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             # get the calibrated, curved input (if input is curved and calibrated)
             axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             if axis_value is None:
-                # not an axis type 
+                # not an axis type or device not found
                 return None
         
         if isinstance(axis_value, list) and axis_value:

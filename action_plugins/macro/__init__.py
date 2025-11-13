@@ -672,7 +672,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
             self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
 
-
+            
             self.ui_elements["vjoy_selector"].set_selection(
                 action.input_type,
                 action.vjoy_id,

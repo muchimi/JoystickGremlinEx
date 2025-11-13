@@ -2409,9 +2409,14 @@ class AbstractInputSelector(QtWidgets.QWidget):
         }
 
     def set_selection(self, input_type, device_id, input_id, emit = False):
-        device_id = gremlin.util.parse_guid(device_id) # ensure a GUID
+        if isinstance(device_id, str):
+            device_id = gremlin.util.parse_guid(device_id) # ensure a GUID
         if device_id not in self._device_id_registry:
             syslog.error(f"INPUT SELECTOR: device not found: {device_id}")
+            syslog.info("Valid values are:")
+            for value in self._device_id_registry:
+                syslog.info(f"\t{value}")
+
             return
 
         # Get the index of the combo box associated with this device

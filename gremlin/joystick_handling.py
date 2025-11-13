@@ -271,17 +271,25 @@ def get_axis_curve_data(guid, identifier):
     ''' gets the curve data for an axis '''   
 
 
-def get_curved_axis(guid, axis_id):
+def get_curved_axis(device_guid, axis_id):
     ''' returns curved/calibrated data same as the event handler '''
     import gremlin.ui.osc_device
     import gremlin.ui.midi_device
     import gremlin.config
-    if isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
+    import gremlin.util
+    if isinstance(device_guid, str):
+        guid = gremlin.util.parse_guid(device_guid)
+    else:
+        guid = device_guid
+    
 
     verbose = gremlin.config.Configuration().verbose_mode_curve
 
     device = get_device(guid)
+    if not device:
+        if verbose:
+            syslog.warning(f"APPLY CURVE: device not found: id [{device_guid}]")
+        return None
     if not device.is_special:
         eh = gremlin.event_handler.EventListener()
         value = dinput.DILL.get_axis(guid, axis_id)
@@ -578,13 +586,24 @@ def getDevice(device_guid):
     ''' gets a device summary '''
     return device_info_from_guid(device_guid)
 
+def getVjoyDeviceGuid(vjoy_id):
+    dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vjoy_id), None)
+    if dev:
+        return dev.device_guid
+    return None # not found
+    
+
 def device_info_from_guid(device_guid): # -> DeviceSummary:
     ''' gets physical device information '''
     assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
+    if isinstance(device_guid, int):
+        # vjoy ID sent ?
+        device_guid = getVjoyDeviceGuid(device_guid)
     if isinstance(device_guid, str):
         device_guid = gremlin.util.parse_guid(device_guid)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
+    # update for "live" disconnects/reconnects if any
     joystick_devices_update()
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]

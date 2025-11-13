@@ -18,6 +18,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T104C)
+- Change: Sequence runner can now resume at the last step is the option is selected.
+- Change: Sequence container will keep running while the input is pressed and stop at the step.
+- Fix: invalid selection from macro drop down selector for some vjoy devices
+- Fix: pulse thread error on pulsed steps if it never started
+- Fix: map to vjoy: incorrect handling of bad IDs for filtered axis value
+
 ### (m76T104A)
 - Fix: added a supplemental check on ui sync call for QT desync
 - Changed: re-added missing repeat mode on macros.
