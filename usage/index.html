@@ -2415,6 +2415,24 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#run-once-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run once mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-loop-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Toggle (loop) mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#wiggle-mode" class="md-nav__link">
     <span class="md-ellipsis">
       Wiggle mode
@@ -4794,6 +4812,24 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#run-once-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run once mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-loop-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Toggle (loop) mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#wiggle-mode" class="md-nav__link">
     <span class="md-ellipsis">
       Wiggle mode
@@ -7106,6 +7142,10 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 <li>wiggle mode can be used to randomize the execution of the container</li>
 <li>each step can contain more than one action.</li>
 </ul>
+<h3 id="run-once-mode">Run once mode<a class="headerlink" href="#run-once-mode" title="Permanent link">&para;</a></h3>
+<p>In this mode, the sequence is executed once when the input is triggered as determined by the "exec on release" or "exec on press" options.  The sequence will run in the order of the steps.  The sequence cannot be stopped in this mode.  If a retrigger occurs while the sequence is still running, the trigger is ignored.</p>
+<h3 id="toggle-loop-mode">Toggle (loop) mode<a class="headerlink" href="#toggle-loop-mode" title="Permanent link">&para;</a></h3>
+<p>In this mode, the sequence runs as a loop.  The first trigger, as determined by the "exec on release" or "exec on press" options, enables the loop.  The second trigger stops the loop.  If the "resume at last step" option is enabled, the sequence will start the next loop where it was last stopped.  By default the loop starts at the first step.</p>
 <h3 id="wiggle-mode">Wiggle mode<a class="headerlink" href="#wiggle-mode" title="Permanent link">&para;</a></h3>
 <p>When Wiggle mode is enabled, this container can randomize the execution of actions it contains. </p>
 <p>In wiggle mode, the container will continue executing actions while the input is pressed, and stop when the input is released.  This makes it particularly suitable to usage by a state, or when mapped to a physical toggle switch on a hardware input.</p>
