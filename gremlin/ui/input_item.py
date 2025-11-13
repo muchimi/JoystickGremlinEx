@@ -3622,9 +3622,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     def _create_action_set_widget(self, action_set_data, label, view_type, icon = None, icon_size = 24):
         """Adds an action widget to the container.
 
-        :param action_set_data data of the actions which form the action set
-        :param label the label to show in the title
+        :param action_set_data: data of the actions which form the action set
+        :param label the label:  to show in the title
         :param view_type visualization type
+        :
         :return wrapped widget
         """
         action_set_model = ActionSetModel(action_set_data)

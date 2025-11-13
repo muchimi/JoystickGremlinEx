@@ -18,6 +18,16 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T105)
+- New: Sequence container gains two new modes.  Mode summary:
+
+	- normal : the sequence will run once
+	- toggle: the sequence runs in a loop, and each input trigger toggles the state on/off.
+	- loop: the sequence runs in a loop while the input is triggered.  It stops when the input is released.
+	- wiggle: the sequence runs in a loop while the input is triggered. Step sequence, step runtime and step spacing timings can all be randomized.
+	
+
+
 ### (m76T104C)
 - Change: Sequence runner can now resume at the last step is the option is selected.
 - Change: Sequence container will keep running while the input is pressed and stop at the step.

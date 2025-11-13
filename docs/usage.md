@@ -2332,6 +2332,14 @@ This container has several features not found in a macro:
 - wiggle mode can be used to randomize the execution of the container
 - each step can contain more than one action.
 
+### Run once mode
+
+In this mode, the sequence is executed once when the input is triggered as determined by the "exec on release" or "exec on press" options.  The sequence will run in the order of the steps.  The sequence cannot be stopped in this mode.  If a retrigger occurs while the sequence is still running, the trigger is ignored.
+
+### Toggle (loop) mode
+
+In this mode, the sequence runs as a loop.  The first trigger, as determined by the "exec on release" or "exec on press" options, enables the loop.  The second trigger stops the loop.  If the "resume at last step" option is enabled, the sequence will start the next loop where it was last stopped.  By default the loop starts at the first step.
+
 ### Wiggle mode
 
 When Wiggle mode is enabled, this container can randomize the execution of actions it contains. 

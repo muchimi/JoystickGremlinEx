@@ -9096,14 +9096,21 @@ def getHContainer(widget_or_list = None,
                   use_vcontainers = False,
                   font = None,
                   left_margin = 0,
-                  right_margin = 0):
+                  right_margin = 0,
+                  widget_only = False):
     ''' gets a qt H container widget 
     
     :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically, use "|" for separator, "||" to insert a stretch
     :param label: label to add to the container (appears first if provided)
     :param parent: parent widget if any
     :param left_stretch: adds the stretch at the start of the container to right align it on the row
-    :param use_vcontainers = individual items are wrapped in a vertical container to align top
+    :param use_vcontainers: individual items are wrapped in a vertical container to align top
+    :param widget_only: returns just the widget, instead of a (widget, layout) tuple
+    :param font: the font to use (optional)
+    :param use_vcontainers: flag to place the horizontal container inside a vertical container (for vertical alignment)
+    :param min_height: min height in pixels (optional)
+    :param alignment: alignment 
+    :param set_alignment: if set, forces the alignment set with the alignment parameter
     
     '''
     widget = QtWidgets.QWidget(parent=parent)
@@ -9161,7 +9168,9 @@ def getHContainer(widget_or_list = None,
             if right_stretch:
                 layout.addStretch()
 
-
+    if widget_only:
+        return widget
+    
     return (widget, layout)
     
 

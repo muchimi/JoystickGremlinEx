@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 from PySide6 import QtWidgets
+import enum
 
 import logging
 import time
@@ -84,10 +85,10 @@ class SequenceContainerWidget(AbstractContainerWidget):
                                                                    release_callback = self._execute_on_release_changed,
                                                                    )
 
-        self._wiggle_mode_widget = QtWidgets.QCheckBox("Enabled")
-        self._wiggle_mode_widget.setToolTip("When enabled, the sequence repeats while the input is triggered, optionally using random pauses between actions.")
-        self._wiggle_mode_widget.setChecked(self.profile_data.wiggle_mode)
-        self._wiggle_mode_widget.clicked.connect(self._handle_wiggle_mode_change)
+        # self._wiggle_mode_widget = QtWidgets.QCheckBox("Enabled")
+        # self._wiggle_mode_widget.setToolTip("When enabled, the sequence repeats while the input is triggered, optionally using random pauses between actions.")
+        # self._wiggle_mode_widget.setChecked(self.profile_data.wiggle_mode)
+        # self._wiggle_mode_widget.clicked.connect(self._handle_wiggle_mode_change)
 
         self._wiggle_min_delay_widget = gremlin.ui.ui_common.QDelayWidget(5000,
                                                                           label = "Min Delay:",
@@ -117,19 +118,30 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._wiggle_max_delay_widget.setValue(self.profile_data.wiggle_max_delay, False)
         
 
+        modes = [
+            ("Run Once","normal"), # normal execution
+            ("Toggle","toggle"), # toggle execution
+            ("Loop (while pressed)","loop"), # loop mode - runs while the input is triggered
+            ("Wiggle","wiggle"), # wiggle execution
+        ]
 
+        widgets = []
+        for mode, data in modes:
+            rb = gremlin.ui.ui_common.QDataRadioButton(label=mode, data = data, value = self.profile_data.mode == data, callback = self._handle_mode_changed)
+            widgets.append(rb)
+
+        widget = gremlin.ui.ui_common.getHContainer(widgets,"Execution mode:",widget_only=True)
+        self.action_layout.addWidget(widget)
+            
 
 
         widgets = [
-            self._wiggle_mode_widget,
             self._wiggle_random_widget,
             self._wiggle_steps_widget
         ]
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Wiggle mode:")
-        self.action_layout.addWidget(widget)
-
-        
+        self.container_wiggle_options_widget = gremlin.ui.ui_common.getHContainer(widgets,"Wiggle mode:", widget_only=True)
+        self.action_layout.addWidget(self.container_wiggle_options_widget)
 
         self._wiggle_exec_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self.profile_data.wiggle_exec_delay,
                                                                            label = "Autorelease delay:",
@@ -150,6 +162,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
                                                   tooltip = "If enabled, the sequence will resume at the last step it stopped at.",
                                                   callback = self._handle_resume_mode_change)
         
+        
         self.normal_exec_delay = gremlin.ui.ui_common.QDelayWidget(value = self.profile_data.normal_exec_delay,
                                                             label = "Step delay:",
                                                             tooltip="Time (ms) between executed steps",
@@ -163,11 +176,16 @@ class SequenceContainerWidget(AbstractContainerWidget):
         )
         
 
+        self.info_widget = gremlin.ui.ui_common.QInfoBox()
         
         self.action_layout.addWidget(self.normal_exec_delay)
         self.action_layout.addWidget(self.normal_step_delay)
-        self.action_layout.addWidget(self.resume_widget)
 
+        widget = gremlin.ui.ui_common.getHContainer([self.resume_widget], widget_only = True)
+        self.action_layout.addWidget(widget)
+
+        
+        self.action_layout.addWidget(self.info_widget)
 
         self.action_layout.addWidget(self._warning_widget)
         self.action_layout.addWidget(self._trigger_widget)
@@ -235,6 +253,14 @@ class SequenceContainerWidget(AbstractContainerWidget):
             return False
 
         return True # valid
+    
+
+    @QtCore.Slot()
+    def _handle_mode_changed(self):
+        widget = self.sender()
+        mode = widget.data
+        self.profile_data.mode = mode
+        self._update_widgets()
         
 
     @QtCore.Slot(int)
@@ -275,13 +301,14 @@ class SequenceContainerWidget(AbstractContainerWidget):
     def _handle_autorelease_delay_change(self, value):
         self.profile_data.normal_autorelease_delay = value        
 
-        
-        
+       
 
 
     def _update_widgets(self):
-        wiggle_enabled = self.profile_data.wiggle_mode
+        mode = self.profile_data.mode
+        wiggle_enabled = mode == "wiggle"
         normal_enabled = not wiggle_enabled
+        resume_enabled = mode != "normal"
         self._wiggle_min_delay_widget.setVisible(wiggle_enabled)
 
         max_enabled = wiggle_enabled and self.profile_data.wiggle_random
@@ -293,9 +320,31 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self.normal_exec_delay.setVisible(normal_enabled)
         self.normal_step_delay.setVisible(normal_enabled)
+        self.resume_widget.setVisible(resume_enabled) # resume can only be used in a loop mode - so wiggle or toggle
 
         visible = bool(self._warning_widget.text())
         self._warning_widget.setVisible(visible)
+
+        # info box based on modes
+        match self.profile_data.mode:
+            case "wiggle":
+                msg = """The sequence will randomly loop while the input is triggered.
+<br>In wiggle mode, the timing between steps, how long each step runs and the order of the steps can be randomly generated based on the options selected."""            
+            case "toggle":
+                msg = "The sequence will loop.  The first trigger with enable the sequence.  It will run continuously in a loop until the second trigger is received."
+            case "loop":
+                msg = "The sequence will loop while the input is triggered."
+            case "normal":
+                msg = "The sequence will run once when the input is triggered.  If the sequence is triggered while it's still running, the trigger is ignored."
+
+        if resume_enabled and self.profile_data.resume_mode:
+            if msg:
+                msg += "<br>"
+            msg += "Resume mode is enabled: the next sequence activation will continue at the step where it last stopped."
+
+        self.info_widget.setText(msg)
+
+
 
     def setWarning(self, text = None):
         ''' sets warning display - send None to clear / hide'''
@@ -453,7 +502,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         if self._is_running:
             syslog.info(f"SEQUENCE: stop sequence runner")
             self._is_running = False
-            self._thread.join()
+            if self._thread.is_alive():
+                self._thread.join()
             self._thread = None            
 
 
@@ -473,29 +523,47 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             is_pressed = value.is_pressed
 
         is_pressed = event.is_pressed
+        mode = self.action_data.mode
+
         trigger = (is_pressed and self.container.exec_on_press) or \
                     (not is_pressed and self.container.exec_on_release) 
         
         is_pressed = trigger
             
-        if self.container.wiggle_mode:
-            # wiggle mode runner
-            if is_pressed and not self._is_running:
-                # run sequence in wiggle mode
-                self.start_wiggle()
+        match mode:
+            case "wiggle":
+                # wiggle mode runner
+                if is_pressed and not self._is_running:
+                    # run sequence in wiggle mode
+                    self.start_wiggle()
 
-            elif not is_pressed and self._is_running:
-                # stop wiggle mode
-                self.stop_wiggle()
-        else:
-            # normal mode runner
-            if is_pressed and not self._is_running:
-                # run sequence in wiggle mode
-                self.start_normal()
+                elif not is_pressed and self._is_running:
+                    # stop wiggle mode
+                    self.stop_wiggle()
+            case "toggle":
+                # toggle mode acts as a switch on the input trigger - first press = turn on, second press = turn off
+                if is_pressed:
+                    if self._is_running:
+                        # stop loop
+                        self.stop_normal()
+                    else:
+                        # start loop
+                        self.start_normal()
+            case "loop":
+                # loop mode is on while the input is pressed, off when released
+                if is_pressed and not self._is_running:
+                    # run sequence in wiggle mode
+                    self.start_normal()
 
-            elif not is_pressed and self._is_running:
-                # stop wiggle mode
-                self.stop_normal()
+                elif not is_pressed and self._is_running:
+                    # stop wiggle mode
+                    self.stop_normal()
+                
+            case "normal":
+                # regular mode - run while pressed
+                if is_pressed and not self._is_running:
+                    # start sequence
+                    self.start_normal()
 
 
         return True 
@@ -512,13 +580,16 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         verbose = self._verbose
         verbose_extra = self._verbose_extra
 
+        # no resume mode if running once
+        resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
+
         if not nodes:
             # nothing to run
             self._is_running = False
             if verbose: syslog.info(f"SEQUENCE WIGGLE: Trigger Functor: nothing to wiggle")
             return
         index = None
-        if self.action_data.resume_mode:
+        if resume:
             if verbose: syslog.info(f"Resume at step: {self.action_data.last_step}")
             index = self.action_data.last_step
         
@@ -545,11 +616,16 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             # next node to run
             index += 1
             if index == count:
+                if self.action_data.mode == "normal":
+                    self._is_running = False
+                    break # only run once
                 # loop
                 index = 0
             self.action_data.last_step = index
             if exec_delay > 0:
                 self._wait(exec_delay)
+
+        
 
     
     def _wiggle_runner(self):
@@ -673,7 +749,7 @@ Unlike a macro, any action suitable for the input can be used.'''
         super().__init__(parent, node)
         self.exec_on_release = False # true if the sequence triggers on input release 
         self.exec_on_press = True # true if the sequence triggers on input press 
-        self.wiggle_mode = False # wiggle mode off by default
+        
         self.wiggle_min_delay = 250 # minimum delay for wiggle mode, or default delay if not randomized
         self.wiggle_max_delay = 5000 # maximum delay for wiggle mode, if in random mode
         self.wiggle_random = True # wiggle random mode
@@ -683,6 +759,8 @@ Unlike a macro, any action suitable for the input can be used.'''
         self.last_step = None # stores the last step
         self.normal_exec_delay = 0 # wait time between steps when running normally
         self.normal_autorelease_delay = 250 # wait time between autoreleases of each step when running normally
+        
+        self.mode = "normal" # run mode
 
     def _parse_xml(self, node, data = None, extra_data = None):
         """Populates the container with the XML node's contents.
@@ -699,7 +777,7 @@ Unlike a macro, any action suitable for the input can be used.'''
             
         self.exec_on_release = safe_read(node,"trigger-on-release",bool,False)
 
-        self.wiggle_mode = safe_read(node,"wiggle-mode", bool, False)
+        
         self.wiggle_min_delay = safe_read(node,"wiggle-min", int, 250)
         self.wiggle_max_delay = safe_read(node,"wiggle-max", int, 5000)
         self.wiggle_exec_delay = safe_read(node,"wiggle-exec", int, 5000)
@@ -708,8 +786,18 @@ Unlike a macro, any action suitable for the input can be used.'''
         self.resume_mode = safe_read(node,"resume-mode", bool, False)
         self.normal_autorelease_delay = safe_read(node,"autorelease-exec", int, 250)
         self.normal_exec_delay = safe_read(node,"normal-exec", int, 0)
-
-
+        if not "mode" in node.attrib:
+            # legacy read
+            if "wiggle-mode" in node.attrib:
+                wiggle_mode = safe_read(node,"wiggle-mode", bool, False)
+                if wiggle_mode:
+                    self.mode = "wiggle"
+            if "toggle-mode" in node.attrib:
+                toggle_mode = safe_read(node,"toggle-mode", bool, False)
+                if toggle_mode:
+                    self.mode = "toggle"
+        else:
+            self.mode = safe_read(node,"mode",str,"normal")
         
 
     def _generate_xml(self):
@@ -721,7 +809,7 @@ Unlike a macro, any action suitable for the input can be used.'''
         node.set("type", SequenceContainer.tag)
         node.set("trigger-on-press",safe_format(self.exec_on_press,bool))
         node.set("trigger-on-release",safe_format(self.exec_on_release,bool))
-        node.set("wiggle-mode", safe_format(self.wiggle_mode, bool))
+        
         node.set("wiggle-min", safe_format(self.wiggle_min_delay, int))
         node.set("wiggle-max", safe_format(self.wiggle_max_delay, int))
         node.set("wiggle-exec", safe_format(self.wiggle_exec_delay, int))
@@ -730,6 +818,8 @@ Unlike a macro, any action suitable for the input can be used.'''
         node.set("resume-mode", safe_format(self.resume_mode, bool))
         node.set("normal-exec", safe_format(self.normal_exec_delay, int))
         node.set("autorelease-exec", safe_format(self.normal_autorelease_delay, int))
+        
+        node.set("mode", self.mode)
 
 
         for actions in self.action_sets:
