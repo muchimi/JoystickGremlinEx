@@ -18,6 +18,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T105A)
+- additional instrumentation around sequence container actions.
+
 ### (m76T105)
 - New: Sequence container gains two new modes.  Mode summary:
 

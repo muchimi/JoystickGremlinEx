@@ -144,7 +144,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self.container_wiggle_options_widget)
 
         self._wiggle_exec_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self.profile_data.wiggle_exec_delay,
-                                                                           label = "Autorelease delay:",
+                                                                           label = "Step Autorelease delay:",
                                                                            tooltip="Time (ms) between a press and release event sent to individual wiggle steps",
                                                                            callback=self._handle_wiggle_exec_delay_change
         )
@@ -164,13 +164,13 @@ class SequenceContainerWidget(AbstractContainerWidget):
         
         
         self.normal_exec_delay = gremlin.ui.ui_common.QDelayWidget(value = self.profile_data.normal_exec_delay,
-                                                            label = "Step delay:",
+                                                            label = "Step Interval delay:",
                                                             tooltip="Time (ms) between executed steps",
                                                             callback=self._handle_normal_exec_delay_change
         )
 
         self.normal_step_delay = gremlin.ui.ui_common.QDelayWidget(value = self.profile_data.normal_autorelease_delay,
-                                                            label = "Autorelease delay:",
+                                                            label = "Step Autorelease delay:",
                                                             tooltip="Time (ms) between a press and release event sent to individual steps",
                                                             callback=self._handle_autorelease_delay_change
         )
@@ -461,6 +461,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
     def profile_start(self):
         self._is_running = False
+        
 
 
     def profile_stop(self):
@@ -524,6 +525,12 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
         is_pressed = event.is_pressed
         mode = self.action_data.mode
+        
+        if verbose:
+            profile_mode = gremlin.shared_state.current_mode
+            if self.action_data.comment:
+                syslog.info(f"SEQUENCE EVENT: sequence {self.action_data.comment}") 
+        
 
         trigger = (is_pressed and self.container.exec_on_press) or \
                     (not is_pressed and self.container.exec_on_release) 
@@ -535,35 +542,46 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 # wiggle mode runner
                 if is_pressed and not self._is_running:
                     # run sequence in wiggle mode
+                    if verbose: syslog.info(f"SEQUENCE EVENT: wiggle mode: start - profile mode: {profile_mode}")
                     self.start_wiggle()
 
                 elif not is_pressed and self._is_running:
                     # stop wiggle mode
+                    if verbose: syslog.info(f"SEQUENCE EVENT: wiggle mode: stop - profile mode: {profile_mode}")
                     self.stop_wiggle()
             case "toggle":
                 # toggle mode acts as a switch on the input trigger - first press = turn on, second press = turn off
                 if is_pressed:
                     if self._is_running:
                         # stop loop
+                        if verbose: syslog.info(f"SEQUENCE EVENT: toggle mode: stop - profile mode: {profile_mode}")
                         self.stop_normal()
                     else:
                         # start loop
+                        if verbose: syslog.info(f"SEQUENCE EVENT: toggle mode: start - profile mode: {profile_mode}")
                         self.start_normal()
             case "loop":
                 # loop mode is on while the input is pressed, off when released
                 if is_pressed and not self._is_running:
                     # run sequence in wiggle mode
+                    if verbose: syslog.info(f"SEQUENCE EVENT: loop mode: start - profile mode: {profile_mode}")
                     self.start_normal()
 
                 elif not is_pressed and self._is_running:
                     # stop wiggle mode
+                    if verbose: syslog.info(f"SEQUENCE EVENT: loop mode: stop - profile mode: {profile_mode}")
                     self.stop_normal()
                 
             case "normal":
                 # regular mode - run while pressed
-                if is_pressed and not self._is_running:
-                    # start sequence
-                    self.start_normal()
+                if is_pressed:
+                    if not self._is_running:
+                        # start sequence
+                        if verbose: syslog.info(f"SEQUENCE EVENT: normal mode: start - profile mode: {profile_mode}")
+                        self.start_normal()
+                    else:
+                        if verbose: syslog.info(f"SEQUENCE EVENT: normal mode: start ignored because prior sequence is still running  - profile mode: {profile_mode}")
+                
 
 
         return True 
@@ -580,8 +598,11 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         verbose = self._verbose
         verbose_extra = self._verbose_extra
 
+
         # no resume mode if running once
         resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
+
+        if verbose: syslog.info(f"SEQUENCE RUNNER: {self.action_data.mode} mode - runner start - resume mode: {resume}")
 
         if not nodes:
             # nothing to run
@@ -621,9 +642,13 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                     break # only run once
                 # loop
                 index = 0
+                if verbose_extra: syslog.info("SEQUENCE RUNNER: looping sequence")
+
             self.action_data.last_step = index
             if exec_delay > 0:
                 self._wait(exec_delay)
+
+        if verbose: syslog.info("SEQUENCE RUNNER: sequence completed - exiting runner")
 
         
 
@@ -663,12 +688,12 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         wiggle_random = self.container.wiggle_random and min_delay != max_delay
         wiggle_steps = self.container.wiggle_randomize_steps
         exec_delay = self.container.wiggle_exec_delay / 1000
-        if verbose: syslog.info(f"SEQUENCE WIGGLE: starting wiggle with  min delay: [{min_delay}] max delay: [{max_delay}] random mode: [{wiggle_random}]")
+        if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) starting wiggle with  min delay: [{min_delay}] max delay: [{max_delay}] random mode: [{wiggle_random}]")
 
         while self._is_running:
             node = nodes[index]
             
-            if verbose: syslog.info(f"SEQUENCE WIGGLE: Trigger Functor: execute node ID: sequence [{index}] [{node.id}]")
+            if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: execute node ID: sequence [{index}] [{node.id}]")
             self._ec.execute_node(node, event_press, True, None) # issue press
             # time between executions
             if exec_delay > 0:
@@ -693,9 +718,10 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 if index == count:
                     # loop
                     index = 0
+                    if verbose: syslog.info("SEQUENCE RUNNER: (wiggle) looping sequence")
             self.action_data.last_step = index
 
-
+        if verbose: syslog.info("SEQUENCE RUNNER: (wiggle) sequence completed - exiting runner")
             
     def _wait(self, delay : float):
         ''' interruptible delay 
