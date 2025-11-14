@@ -5311,11 +5311,14 @@ if __name__ == "__main__":
     system_log_path = os.path.join(app_path, "system.log")
     user_log_path = os.path.join(app_path, "user.log")
 
-    fault_log_path = os.path.join(app_path,"fault.log")
-    if os.path.isfile(fault_log_path):
-        os.unlink(fault_log_path)
-    fl = open(fault_log_path,"w")
-    faulthandler.enable(file=fl)
+    try:
+        fault_log_path = os.path.join(app_path,"fault.log")
+        if os.path.isfile(fault_log_path):
+            os.unlink(fault_log_path)
+        fl = open(fault_log_path,"w")
+        faulthandler.enable(file=fl)
+    except:
+        pass
 
     gremlin.shared_state.app_path = app_path
     gremlin.shared_state.system_log = system_log_path

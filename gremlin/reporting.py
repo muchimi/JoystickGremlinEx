@@ -660,9 +660,7 @@ class ReportEngine():
         cluster_index = 0 # cluster number - one cluster per device 
         current_cluster = 0
        
-
-        dot_file = gremlin.util.getTemporaryFile("dot")
-
+        
         #report_root = self._duplicate_tree(root)
         if root:
             # self._convert_tree(root)
@@ -734,8 +732,12 @@ class ReportEngine():
                     edge_entries[current_cluster].append(edge_entry)
             
 
+        #raw_file = gremlin.util.getTemporaryFile("raw")
+        dot_file = gremlin.util.getTemporaryFile("dot")
+
+
         # create the DOT file
-        with open(dot_file,"w") as f:
+        with open(dot_file,"w",encoding = 'utf-8',errors="replace") as f:
             # DOT header
             f.write("digraph G {\n")
             f.write(f'graph [ label = "Profile Mappings for {profile.name}"\n')
@@ -767,6 +769,15 @@ class ReportEngine():
 
             f.flush()
             f.close()  
+
+        # # filter out any offending character as the DOT file has to be in UTF-8 format
+        # with open(raw_file,'r', encoding='utf-8', errors='xmlcharrefreplace') as fin:
+        #     content = fin.read()
+        # with open(dot_file, 'w', encoding='utf-8') as fout:
+        #     fout.write(content)
+        #     fout.flush()
+        #     fout.close()
+        # os.unlink(raw_file)
 
 
         # g.write_dot(dot_file)

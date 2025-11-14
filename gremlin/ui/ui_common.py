@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+import sys
 import enum
 import time
 import threading
@@ -313,6 +314,9 @@ class Color():
     def infoColor(): # color used for information boxes
         return "#92882b"  if gremlin.shared_state.is_dark_theme else "#dbd496"
     @staticmethod
+    def frameColor(): # color used for frame boxes
+        return "#8a8a8a"  if gremlin.shared_state.is_dark_theme else "#dddddd"
+    @staticmethod
     def inputTitleColor(): # color for the input title bar
         return "#5A725A" if gremlin.shared_state.is_dark_theme else "#678867"
     @staticmethod
@@ -387,6 +391,21 @@ class Color():
         css = f'''
             QFrame {{
                 border: 0px solid {border_color};
+                background: {background_color};
+            }}
+            QLabel {{
+                border: none;
+            }}
+            '''
+        return css
+    
+    @staticmethod
+    def cssFrameBox(): 
+        border_color = Color.borderColor()
+        background_color = Color.frameColor()
+        css = f'''
+            QFrame {{
+                border: 2px solid {border_color};
                 background: {background_color};
             }}
             QLabel {{
@@ -2082,17 +2101,17 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     '''
 
-    valueChanged = QtCore.Signal(float) # fires when the value changes
+    valueChanged = QtCore.Signal(int) # fires when the value changes
     doubleClick = QtCore.Signal() # fires when the input is double clicked
     invalid = QtCore.Signal() # fires when there is an invalid value entered
 
-    def __init__(self, data = None, min_range = None, max_range = None, step = 1, value = 0, chars = 8, parent = None):
+    def __init__(self, data = None, min_range = None, max_range = None, step = 1, value = 0, chars = 8, callback = None, tooltip = None, parent = None):
         super().__init__(parent)
         if min_range is not None and max_range is not None:
             if min_range > max_range:
                 max_range, min_range = min_range, max_range
-        self._min_range = min_range
-        self._max_range = max_range
+        self._min_range = min_range 
+        self._max_range = max_range 
         self._step = step
 
         self._supressed = False # true if events are suppressed
@@ -2110,6 +2129,12 @@ class QIntLineEdit(QtWidgets.QLineEdit):
             self._update_width(chars)
         else:
             self.chars = 0
+
+        if tooltip:
+            self.setToolTip(tooltip)
+
+        if callback:
+            self.valueChanged.connect(callback)
 
     def setSuppressed(self, value : bool):
         self._supressed = value
@@ -4306,7 +4331,17 @@ class QDataIPLineEdit(QDataLineEdit):
 
 class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
-    def __init__(self, data = None, callback = None, parent = None, wheel_enabled = True, auto_adjust = False):
+    def __init__(self, data = None, callback = None, parent = None, wheel_enabled = True, auto_adjust = False, source = None, value = None):
+        ''' creates a combo box 
+        
+        :param data: data object the widget carries
+        :callback: callback handler when the index changes (optional)
+        :wheel_enabled: true if mouse wheel is enabled on the combo box 
+        :auto_adjust: true if the combo box autosizes to contents
+        :source: optional, list of tuples (display, data) to populate the combo box with
+        :value: optional, if source is provided, the default display value to select
+        
+        '''
         super().__init__(parent)
         self._data = data
         self._wheel_enabled = wheel_enabled
@@ -4314,6 +4349,17 @@ class QDataComboBox(QComboBox):
         if auto_adjust:
             self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self._callback = callback
+
+        if source:
+            # source is expected to be a list of tuples of display/data
+            for display, item in source:
+                self.addItem(display, item)
+
+            if value is not None:
+                index = self.findData(value)
+                if index != -1:
+                    self.setCurrentIndex(index)
+
         if self._callback:
             self.currentIndexChanged.connect(self._handle_callback)
 
@@ -7341,7 +7387,7 @@ class QDelayWidget(QtWidgets.QWidget):
         self._max_value = max_value_seconds * 1000 # max value possible
 
         width = gremlin.ui.ui_common.get_char_width(8)
-        delay_label = QtWidgets.QLabel(label if label else "Delay (ms)")
+        self.delay_label = QtWidgets.QLabel(label if label else "Delay (ms)")
         self._delay_widget = QIntLineEdit()
         self._delay_widget.invalid.connect(self._handle_invalid_input)
         # self._delay_widget.setRange(0, self._max_value) 
@@ -7350,7 +7396,7 @@ class QDelayWidget(QtWidgets.QWidget):
         self._delay_widget.setValue(value) # default
         self._delay_widget.valueChanged.connect(self._value_changed)
 
-        widgets = [delay_label, self._delay_widget]
+        widgets = [self.delay_label, self._delay_widget]
 
         if show_shortcuts:
 
@@ -7417,6 +7463,8 @@ class QDelayWidget(QtWidgets.QWidget):
                 self.valueChanged.emit(milliseconds)
 
     
+    def setLabel(self, text : str):
+        self.delay_label.setText(text)
 
     @QtCore.Slot()
     def _value_changed(self):
@@ -9123,7 +9171,7 @@ def getHContainer(widget_or_list = None,
         widget.setMinimumHeight(min_height)
 
     if alignment is None and set_alignment:
-        alignment = QtCore.Qt.AlignmentFlag.AlignCenter
+        alignment = QtCore.Qt.AlignmentFlag.AlignVCenter
 
     if label:
         layout.addWidget(QtWidgets.QLabel(label))
@@ -9143,6 +9191,7 @@ def getHContainer(widget_or_list = None,
                         if font:
                             item.setFont(font)
                 if use_vcontainers:
+
                     item, _ = getVContainer(item)
                     
                 if alignment:
@@ -9177,7 +9226,7 @@ def getHContainer(widget_or_list = None,
 
 
 
-def getVContainer(widget_or_list = None, label = None, alignment = None, font = None,  parent = None, no_stretch = False, bottom_stretch = False, top_stretch = False, left_margin = 0):
+def getVContainer(widget_or_list = None, label = None, alignment = None, font = None,  parent = None, no_stretch = False, bottom_stretch = False, top_stretch = False, left_margin = 0, widget_only = False):
     ''' gets a qt H container widget '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QVBoxLayout(widget)
@@ -9216,6 +9265,8 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, font = 
     if (not no_stretch and stretch) or bottom_stretch:
         layout.addStretch()
     
+    if widget_only:
+        return widget
     return (widget, layout)
 
 
@@ -10849,6 +10900,25 @@ class QAutoResizingTextEdit(QtWidgets.QTextEdit):
             widget_margins.bottom()
         )
 
+class QFrameBox(QtWidgets.QFrame):
+    ''' widget for information text '''
+    def __init__(self, text = None, wrap = False, parent = None):
+        super().__init__(parent = parent)
+        self._label_widget = QtWidgets.QLabel(text)
+        layout = QtWidgets.QVBoxLayout(self)
+        
+        layout.addWidget(self._label_widget)
+        self.setStyleSheet(Color.cssFrameBox())
+
+        # size to the text
+        # width = get_text_width(text)
+        # margins = 8
+        # self.setFixedWidth(width + margins * 2)
+
+    def setText(self, text):
+        if not Shiboken.isValid(self):
+            return
+        self._label_widget.setHtml(text)
 
 
 class QInfoBox(QtWidgets.QFrame):

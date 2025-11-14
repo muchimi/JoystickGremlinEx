@@ -1305,7 +1305,7 @@ class ActionSetView(ui_common.AbstractView):
     def __init__(
             self,
             profile_data,
-            label,
+            label = None,
             view_type=ui_common.ContainerViewTypes.Action,
             icon = None,
             icon_size = 24,
@@ -1361,8 +1361,7 @@ class ActionSetView(ui_common.AbstractView):
         self.main_layout.addWidget(content_widget)
 
         
-
-        self.setObjectName(f"ActionSetView: {label}")
+        self.setObjectName(f"ActionSetView: {'n/a' if label is None else label}")
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
         if verbose_ui: syslog.info(f"ActionSetView: create: {self.objectName()}")
@@ -3619,7 +3618,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                 index = i
         return index
 
-    def _create_action_set_widget(self, action_set_data, label, view_type, icon = None, icon_size = 24):
+    def _create_action_set_widget(self, action_set_data, label = None, view_type= ui_common.ContainerViewTypes.Action, icon = None, icon_size = 24):
         """Adds an action widget to the container.
 
         :param action_set_data: data of the actions which form the action set

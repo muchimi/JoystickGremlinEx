@@ -1100,6 +1100,7 @@ class AbstractAction(ProfileData):
         self.data = None # additional data for runtime purposes, context dependent used to tag actions at runtime for some purpose like action grouping
         self.data_ex = None # additional data for 
         self.condition_view = None # holds the condition view object for this action
+        
 
         el = gremlin.event_handler.EventListener()
         el.action_created.emit(self)

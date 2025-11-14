@@ -43,6 +43,274 @@ from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
+class StepOptions():
+    ''' step options for each step '''
+    def __init__(self):
+        self.index = -1 # step index 
+        self.repeat_count = 2 # number of times the step should repeat
+        self.mode = "normal" # repeate mode
+        self.repeat_min_delay = 250 # delay between repeat steps in ms
+        self.repeat_max_delay = 250 # delay between repeat steps in ms
+        self.autorelease_max_delay = 250 # delay for autorelease of each pulse in ms
+        self.autorelease_min_delay = 250
+        self.randomize_delay = False # true if the interval between repeats is randomized
+        self.randomize_autorelease_delay = False # true if the autorelease delay is randomized
+        
+        
+
+    def getCount(self) -> int:
+        ''' gets the repeat count '''
+        if self.mode == "random":
+            return random.randint(0,self.repeat_count)
+        elif self.mode == "normal":
+            return 1
+        return self.repeat_count
+    
+    def getDelay(self, default_delay_ms : int = 0) -> float: 
+        ''' gets the autorelease delay in seconds '''
+        if self.mode == "normal":
+            return default_delay_ms / 1000
+        
+        if self.randomize_delay:
+            return random.randint(self.repeat_min_delay, self.repeat_max_delay) / 1000
+        return self.repeat_min_delay/1000    
+    
+    def getAutoreleaseDelay(self, default_delay_ms : int = 0) -> float: 
+        ''' gets the autorelease delay in seconds '''
+        if self.mode == "normal":
+            return default_delay_ms / 1000
+        
+        if self.randomize_autorelease_delay:
+            return random.randint(self.autorelease_min_delay, self.autorelease_max_delay) / 1000
+        return self.autorelease_max_delay/1000
+        
+
+    def to_xml(self):
+        ''' saves to xml '''
+        node = ElementTree.Element("step-option")
+        node.set("index", safe_format(self.index, int))
+        node.set("repeat-count", safe_format(self.repeat_count, int))
+        node.set("mode",self.mode)
+        node.set("repeat-min", safe_format(self.repeat_min_delay, int))
+        node.set("repeat-max", safe_format(self.repeat_max_delay, int))
+        node.set("autorelease-min", safe_format(self.autorelease_min_delay, int))
+        node.set("autorelease-max", safe_format(self.autorelease_max_delay, int))
+        node.set("randomize-delay", safe_format(self.randomize_delay, bool))
+        node.set("randomize-autorelease", safe_format(self.randomize_autorelease_delay, bool))
+
+        return node
+    
+    def from_xml(self, node):
+        ''' reads xml'''
+        if node.tag == "step-option":
+            self.index = safe_read(node,"index",int, -1)
+            self.repeat_count = safe_read(node,"repeat-count", int, 1)
+            self.mode = safe_read(node, "mode", str,"normal")
+            self.repeat_min_delay = safe_read(node, "repeat-min", int, 250)
+            self.repeat_max_delay = safe_read(node, "repeat-min", int, 250)
+            self.autorelease_max_delay = safe_read(node, "autorelease-min", int, 250)
+            self.autorelease_max_delay = safe_read(node, "autorelease-max", int, 250)
+            self.randomize_delay = safe_read(node,"randomize-delay", bool, False)
+            self.randomize_autorelease_delay = safe_read(node,"randomize-autorelease", bool, False)
+        
+    
+
+class StepOptionsWidget(QtWidgets.QWidget):
+    ''' widget to manage step options '''
+    def __init__(self, action_data : SequenceContainer, options : StepOptions, parent=None):
+        super().__init__(parent)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        
+        self.options = options
+        self.action_data = action_data
+
+        modes = [
+            ("No Repeat","normal"), # no repeat (default)
+            ("Repeat (fixed)","repeat"), # repeat fixed count
+            ("Repeat (random)","random") # random repeat
+                 ]
+        
+        margin = 0
+
+        self.repeat_mode_widget = gremlin.ui.ui_common.QDataComboBox(
+            source = modes, 
+            value = options.mode,
+            auto_adjust = True,
+            callback = self._handle_mode_changed)
+
+        self.repeat_count_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value = options.repeat_count,
+            min_range = 2,
+            callback = self._handle_repeat_count_changed,
+            )
+
+        self.container_repeat_widget = gremlin.ui.ui_common.getHContainer(
+            self.repeat_count_widget,"Count:",
+            widget_only=True)
+        
+        
+        self.repeat_delay_min_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = options.repeat_min_delay,
+            callback = self._handle_repeat_delay_min_changed,
+            show_shortcuts=False,
+            label= "Repeat delay (ms) Min:",
+            tooltip= "Minimum time between repetitions in milliseconds"
+        )
+        self.repeat_delay_max_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = options.repeat_min_delay,
+            callback = self._handle_repeat_delay_max_changed,
+            show_shortcuts=False,
+            label= "Max:",
+            tooltip="Maximum time between repetitions in milliseconds"
+        )
+
+
+        self.autorelease_delay_min_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = options.autorelease_min_delay,
+            callback = self._handle_autorelease_delay_min_changed,
+            show_shortcuts=False,
+            label= "Autorelease delay (ms) Min:",
+            tooltip = "Minimum time betweeen a press and release for each repeat in milliseconds"
+        )
+        self.autorelease_delay_max_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = options.autorelease_max_delay,
+            callback = self._handle_autorelease_delay_max_changed,
+            show_shortcuts=False,
+            label= "Max:",
+            tooltip = "Maximum time betweeen a press and release for each repeat in milliseconds"
+        )
+
+        self.randomize_delay_widget = gremlin.ui.ui_common.QDataCheckbox(
+            value = self.options.randomize_delay,
+            label= "Randomize",
+            callback= self._handle_randomize_delay_changed
+        )
+
+        self.randomize_autorelease_delay_widget = gremlin.ui.ui_common.QDataCheckbox(
+            value = self.options.randomize_autorelease_delay,
+            label= "Randomize",
+            callback= self._handle_randomize_autorelease_delay_changed
+        )
+        
+
+        self.container_delay_widget = gremlin.ui.ui_common.getHContainer(
+            [
+            self.randomize_delay_widget,
+            "|",
+            self.repeat_delay_min_widget,
+            self.repeat_delay_max_widget,
+            
+            ],
+            widget_only=True,
+            left_margin=margin
+        )
+
+        self.container_autorelease_delay_widget = gremlin.ui.ui_common.getHContainer(
+            [
+            self.randomize_autorelease_delay_widget,
+            "|",
+            self.autorelease_delay_min_widget,
+            self.autorelease_delay_max_widget,
+            
+            ],
+            widget_only=True, 
+            left_margin=margin,
+        )
+
+        widgets = [
+            "Repeat Mode:",
+            self.repeat_mode_widget,
+            self.container_repeat_widget,
+        ]
+
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+        self.main_layout.addWidget(widget)
+
+        self.main_layout.addWidget(self.container_delay_widget)
+        self.main_layout.addWidget(self.container_autorelease_delay_widget)
+
+        
+
+        self._update_widgets()
+
+    def _update_widgets(self):
+        ''' updates widget setup based on options selected '''
+        repeat_visible = False
+        delay_visible = False
+        repeat_max_visible = False
+        auto_max_visible = False
+        
+        match self.options.mode:
+            case "normal":
+                pass
+            case "repeat":
+                repeat_visible = True
+                delay_visible = True
+            case "random":
+                repeat_visible = True
+                delay_visible = True
+
+        self.container_repeat_widget.setVisible(repeat_visible)
+        
+        if self.options.randomize_delay:
+            self.repeat_delay_min_widget.setLabel("Repeat delay (ms) Min:")
+            repeat_max_visible = True
+        else:
+            self.repeat_delay_min_widget.setLabel("Repeat delay (ms):")
+
+        if self.options.randomize_autorelease_delay:
+            self.autorelease_delay_min_widget.setLabel("Autorelease delay (ms) Min:")
+            auto_max_visible = True
+        else:
+            self.autorelease_delay_min_widget.setLabel("Autorelease delay (ms):")
+
+
+        
+        self.container_delay_widget.setVisible(delay_visible)
+        self.container_autorelease_delay_widget.setVisible(delay_visible)
+        self.repeat_delay_max_widget.setVisible(repeat_max_visible)
+        self.autorelease_delay_max_widget.setVisible(auto_max_visible)
+        
+
+    @QtCore.Slot(int)
+    def _handle_repeat_count_changed(self, value : int):
+       self.options.repeat_count = value
+
+    @QtCore.Slot()
+    def _handle_mode_changed(self, data):
+        self.options.mode = data
+        self._update_widgets()
+
+    @QtCore.Slot(float)
+    def _handle_repeat_delay_min_changed(self, value):
+        self.options.repeat_min_delay = value
+
+    @QtCore.Slot(float)
+    def _handle_repeat_delay_max_changed(self, value):
+        self.options.repeat_max_delay = value        
+
+    @QtCore.Slot(float)
+    def _handle_autorelease_delay_min_changed(self, value):
+        self.options.repeat_min_delay = value
+
+    @QtCore.Slot(float)
+    def _handle_autorelease_delay_max_changed(self, value):
+        self.options.repeat_max_delay = value        
+
+    @QtCore.Slot(bool)
+    def _handle_randomize_delay_changed(self, checked : bool):
+        self.options.randomize_delay = checked
+        self._update_widgets()
+
+    @QtCore.Slot(bool)
+    def _handle_randomize_autorelease_delay_changed(self, checked : bool):
+        self.options.randomize_autorelease_delay = checked
+        self._update_widgets()
+
+    
+
+
 class SequenceContainerWidget(AbstractContainerWidget):
 
     """Container which holds a sequence of actions."""
@@ -85,10 +353,6 @@ class SequenceContainerWidget(AbstractContainerWidget):
                                                                    release_callback = self._execute_on_release_changed,
                                                                    )
 
-        # self._wiggle_mode_widget = QtWidgets.QCheckBox("Enabled")
-        # self._wiggle_mode_widget.setToolTip("When enabled, the sequence repeats while the input is triggered, optionally using random pauses between actions.")
-        # self._wiggle_mode_widget.setChecked(self.profile_data.wiggle_mode)
-        # self._wiggle_mode_widget.clicked.connect(self._handle_wiggle_mode_change)
 
         self._wiggle_min_delay_widget = gremlin.ui.ui_common.QDelayWidget(5000,
                                                                           label = "Min Delay:",
@@ -144,7 +408,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self.container_wiggle_options_widget)
 
         self._wiggle_exec_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self.profile_data.wiggle_exec_delay,
-                                                                           label = "Step Autorelease delay:",
+                                                                           label = "Step Autorelease Delay (ms):",
                                                                            tooltip="Time (ms) between a press and release event sent to individual wiggle steps",
                                                                            callback=self._handle_wiggle_exec_delay_change
         )
@@ -196,10 +460,34 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
 
         # Insert action widgets
-        for i, action in enumerate(self.profile_data.action_sets):
+        for index, action in enumerate(self.profile_data.action_sets):
+            # options widget
+            
+            options : StepOptions = self.container.getOptions(index)
+            options_widget = StepOptionsWidget(self.profile_data, options)
+            step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>Step {index + 1}</b>")
+            step_container  = gremlin.ui.ui_common.getVContainer([step_widget, QtWidgets.QLabel(" ")], widget_only=True)
+            widgets = [
+                step_container,
+                options_widget,
+            ]
+
+            options_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True, alignment = QtCore.Qt.AlignmentFlag.AlignTop)
+            
+
+
+            widgets = [
+                gremlin.ui.ui_common.QHorizontalLine(),
+                options_container,
+            ]
+
+
+            container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only= True)
+            self.action_layout.addWidget(container_widget)
+
             widget = self._create_action_set_widget(
-                self.profile_data.action_sets[i],
-                f"Step {i + 1}",
+                self.profile_data.action_sets[index],
+                "Step",
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.action_layout.addWidget(widget)
@@ -209,6 +497,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         
         self._update_widgets()
+
+
 
 
     @QtCore.Slot(bool)
@@ -620,19 +910,40 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         count = len(nodes)
 
         
-        exec_delay = self.container.normal_exec_delay / 1000
-        autorelease_delay = self.container.normal_autorelease_delay / 1000
+        exec_delay_ms = self.container.normal_exec_delay
+        exec_delay_s = exec_delay_ms/1000
+        autorelease_delay_ms = self.container.normal_autorelease_delay
         if verbose: syslog.info(f"SEQUENCE: starting sequence")
 
         while self._is_running:
             node = nodes[index]
-            
-            if verbose: syslog.info(f"SEQUENCE: Trigger Functor: execute node ID: sequence [{index}] [{node.id}]")
-            self._ec.execute_node(node, event_press, True, None) # issue press
-            # time between executions
-            if autorelease_delay > 0:
-                self._wait(autorelease_delay)
-            self._ec.execute_node(node, event_release, False, None) # issue release
+            options : StepOptions = self.action_data.getOptions(index) # execution options for the step
+
+            repeat_count = options.getCount() # number of times to repeate
+            if verbose: syslog.info(f"\tstep [{index}] exec start - repeat count: {repeat_count}")
+
+
+            for repeat_index in range(repeat_count):
+                if verbose: syslog.info(f"\t\tTrigger press {index}/{repeat_index}")
+                self._ec.execute_node(node, event_press, True, None) # issue press
+                # autorelease delay computation
+                delay = options.getAutoreleaseDelay(autorelease_delay_ms)
+                if delay > 0:
+                    if verbose: syslog.info(f"\t\tstep autorelease delay: {delay:03f}") 
+                    self._wait(delay)
+                    
+                if verbose: syslog.info(f"\t\tTrigger release {index}/{repeat_index}")                    
+                self._ec.execute_node(node, event_release, False, None) # issue release
+
+                if not self._is_running: break
+                if repeat_index < repeat_count - 1:
+                    # interval between repeat delay computation
+                    delay = options.getDelay(exec_delay_ms)
+                    if delay > 0:
+                        if verbose: syslog.info(f"\t\tstep repeat interval delay: {delay:03f}")
+                        self._wait(delay)
+                        if not self._is_running: break
+
             
             # next node to run
             index += 1
@@ -642,11 +953,12 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                     break # only run once
                 # loop
                 index = 0
-                if verbose_extra: syslog.info("SEQUENCE RUNNER: looping sequence")
+                if verbose_extra: syslog.info("\tlooping sequence")
 
             self.action_data.last_step = index
-            if exec_delay > 0:
-                self._wait(exec_delay)
+            if exec_delay_ms > 0:
+                if verbose: syslog.info(f"\tstep interval delay: {exec_delay_s:03f}")
+                self._wait(exec_delay_s)
 
         if verbose: syslog.info("SEQUENCE RUNNER: sequence completed - exiting runner")
 
@@ -687,29 +999,49 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         
         wiggle_random = self.container.wiggle_random and min_delay != max_delay
         wiggle_steps = self.container.wiggle_randomize_steps
-        exec_delay = self.container.wiggle_exec_delay / 1000
+        exec_delay_ms = self.container.wiggle_exec_delay 
+        exec_delay_s = exec_delay_ms / 1000
         if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) starting wiggle with  min delay: [{min_delay}] max delay: [{max_delay}] random mode: [{wiggle_random}]")
 
         while self._is_running:
             node = nodes[index]
-            
-            if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: execute node ID: sequence [{index}] [{node.id}]")
-            self._ec.execute_node(node, event_press, True, None) # issue press
-            # time between executions
-            if exec_delay > 0:
-                self._wait(exec_delay)
-            self._ec.execute_node(node, event_release, False, None) # issue release
-            # delay between steps
-            if self._is_running:
-                if wiggle_random:
-                    # random delay
-                    delay = random.randrange(min_delay, max_delay) / 1000 # to seconds
-                else:
-                    # fixed delay
-                    delay = min_delay/1000 # to seconds
-                if verbose_extra: syslog.info(f"\twait random [{delay}]")
+            options : StepOptions = self.action_data.getOptions(index) # execution options for the step
+            repeat_count = options.getCount() # number of times to repeate
+
+            for repeat_index in range(repeat_count):
+                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: execute node ID: sequence [{index}] [{node.id}]")
+                self._ec.execute_node(node, event_press, True, None) # issue press
+                # autorelease delay 
+                delay = options.getAutoreleaseDelay(exec_delay_ms)
                 if delay > 0:
                     self._wait(delay)
+                self._ec.execute_node(node, event_release, False, None) # issue release
+
+                # delay between steps
+                if not self._is_running: break
+                if wiggle_random:
+                    # random wiggle delay
+                    delay = random.randrange(min_delay, max_delay) / 1000 # to seconds
+                else:
+                    # step delay
+                    if repeat_index < repeat_count - 1:
+                        delay = options.getDelay(exec_delay_ms)
+                        if verbose_extra: syslog.info(f"\step repeat interval delay [{delay}]")
+                        if delay > 0:
+                            self._wait(delay)
+                            if not self._is_running: break
+
+            if not self._is_running: break
+
+            # delay between steps
+            delay = exec_delay_s
+            
+            if delay > 0:
+                if verbose_extra: syslog.info(f"\step repeat interval delay [{delay}]")
+                self._wait(delay)
+                if not self._is_running: break
+
+
             # next node to run
             if wiggle_steps:
                 index = random.randrange(0, count) # pick the next random step
@@ -734,7 +1066,6 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
 
         
-
 
 
 
@@ -785,8 +1116,21 @@ Unlike a macro, any action suitable for the input can be used.'''
         self.last_step = None # stores the last step
         self.normal_exec_delay = 0 # wait time between steps when running normally
         self.normal_autorelease_delay = 250 # wait time between autoreleases of each step when running normally
-        
+        self.step_options = {} # map of step options indexed by step number 
+
         self.mode = "normal" # run mode
+
+
+    def getOptions(self, index):
+        ''' gets the option object for the particular step index '''
+        if not index in self.step_options:
+            options = StepOptions()
+            options.index = index
+            self.step_options[index] = options
+        return self.step_options[index]
+    
+
+            
 
     def _parse_xml(self, node, data = None, extra_data = None):
         """Populates the container with the XML node's contents.
@@ -824,6 +1168,16 @@ Unlike a macro, any action suitable for the input can be used.'''
                     self.mode = "toggle"
         else:
             self.mode = safe_read(node,"mode",str,"normal")
+
+        # load step options
+        self.step_options.clear()
+        option_nodes = node.xpath(".//step-option")
+        for o_node in option_nodes:
+            option = StepOptions()
+            option.from_xml(o_node)
+            self.step_options[option.index] = option
+
+
         
 
     def _generate_xml(self):
@@ -847,12 +1201,22 @@ Unlike a macro, any action suitable for the input can be used.'''
         
         node.set("mode", self.mode)
 
+        # save step options
+        if self.step_options:
+            for option in self.step_options.values():
+                o_node = option.to_xml()
+                node.append(o_node)
+                
+
 
         for actions in self.action_sets:
             as_node = ElementTree.Element("action-set")
             for action in actions:
                 as_node.append(action.to_xml())
             node.append(as_node)
+
+
+        
         return node
 
     def _is_container_valid(self):
