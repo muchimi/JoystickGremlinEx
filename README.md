@@ -18,6 +18,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T107)
+- New: Added a conversion tool to the tools menu. This will convert all legacy remap and keyboard actions in the current profile to the GEX equivalents (vjoy remap and map to keyboard ex).  The conversion tool will create a (numbered) backup file in the same folder as the profile being converted.  The profile gets automatically reloaded if a conversion occurs.  The log file will include stats.
+
+If the current profile does not have any of these legacy actions, nothing happens.
+
 ### (m76T106)
 - New: Sequence container gains step repeat options. Each step can be repeated, the number of repeats can be randomized, and delay between step repeats and autorelease foe each repeat can also be set or randomized.
 
@@ -27,7 +32,7 @@ New Sequence Step options:
 - Repeat (fixed) - execute the step the specified number of times.  Each step is a press/release cycle using the timings specified.
 - Repeat (random) - execute the step up to the specified number of times, which includes no execution at all.  Each step is a press/release cycle using the timings specified.
 
-- Fix: enforcing UTF-8 text encoding for the reporting (GraphViz) output to handle non UTF-8 character sets in names, descriptions and comments. GraphViz is not able to handle non UTF-8 or latin character sets
+- Fix: enforcing UTF-8 text encoding for the reporting (GraphViz) output to handle non UTF-8 character sets in names, descriptions and comments. GraphViz is not able to handle non UTF-8.  This may require additional work.
 
 ### (m76T105A)
 - additional instrumentation around sequence container actions.

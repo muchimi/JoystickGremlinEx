@@ -185,6 +185,13 @@ class Ui_Gremlin(object):
         self.actionInputViewer.setObjectName("actionInputViewer")
 
 
+        self.actionConvertLegacy = QtGui.QAction(main_window)
+        self.actionConvertLegacy.setText("Convert legacy actions")
+        self.actionConvertLegacy.setToolTip("Converts remap and keyboard actions to their current equivalents in GremlinEx")
+        self.actionConvertLegacy.triggered.connect(self._handle_convert_legacy)
+        
+        
+
         
 
         self.menuRecent.addAction(self.actionEmpty)
@@ -214,6 +221,10 @@ class Ui_Gremlin(object):
         self.menuTools.addSeparator()
         self.menuTools.addAction(self.actionViewInput)
         self.menuTools.addAction(self.actionCheatsheet)
+        self.menuTools.addAction(self.actionConvertLegacy)
+        
+        
+
         self.menuTools.addSeparator()
         self.menuTools.addAction(self.actionOptions)
         self.menuTools.addAction(self.actionLogDisplay)
@@ -267,6 +278,19 @@ class Ui_Gremlin(object):
         self.retranslateUi(main_window)
         self.devices.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(main_window)
+
+    def _handle_convert_legacy(self):
+        import gremlin.profile
+        import gremlin.event_handler
+        profile_converter = gremlin.profile.ProfileConverter()
+        profile = gremlin.shared_state.current_profile
+        if profile_converter.convert_legacy(profile.profile_file):
+            el = gremlin.event_handler.EventListener()
+            el.request_reload.emit()
+
+
+
+
 
     def update_toolbar(self):
         ''' sets / resets the toolbar based on options '''

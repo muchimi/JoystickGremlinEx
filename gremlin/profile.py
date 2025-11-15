@@ -1073,6 +1073,128 @@ class ProfileConverter:
             break
 
         return node
+    
+
+    def convert_legacy(self, fname, convert_keyboard = True, convert_remap = True):
+        ''' converts legacy actions 
+        
+        remap -> vjoy remap
+        keyboard -> keyboard ex
+        '''
+        import gremlin.util
+        import gremlin.ui.ui_common
+
+        # backup
+        legacy_fname = gremlin.util.swap_ext(fname,".xml",suffix = "_legacy")
+        index = 1
+        while os.path.isfile(legacy_fname):
+            legacy_fname = gremlin.util.swap_ext(fname,".xml",suffix = f"_legacy_{index}")
+            index += 1
+        try:
+            shutil.copyfile(fname, legacy_fname)
+        except Exception as err:
+            syslog.error(f"Unable to write converted file: {fname}")
+            syslog.error(err)
+            return False
+
+
+
+        tree = etree.parse(fname)
+        root = tree.getroot()
+        converted = False # true if something was converted
+        keyboard_count = 0
+        remap_count = 0
+
+        if convert_keyboard:
+            # convert legacy keyboard entries 
+            nodes = root.xpath("//map-to-keyboard")
+            for node in nodes:
+                converted = True
+                keyboard_count += 1
+                node.tag = "map-to-keyboard-ex"
+                key_nodes = node.xpath(".//key")
+                for key_node in key_nodes:
+                    scan_code = safe_read(key_node,"scan-code", int, 0)
+                    is_extended = safe_read(key_node,"extended", bool, False)
+
+                    # get virtual code 
+                    key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+                    virtual_code = key.virtual_code
+
+                    key_node.set("virtual-code", safe_format(virtual_code,int))
+                    key_node.set("description", key.name)
+                    comment = f"virtual: 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
+                
+                    node_comment = etree.Comment(comment)
+                    key_node.append(node_comment)
+                
+        
+        if convert_remap:
+            # convert legacy remap entries
+            nodes = root.xpath("//remap")
+
+            for node in nodes:
+                
+                remap_count += 1
+                node.tag = "vjoyremap"
+                
+                if "axis" in node.attrib:
+                    # axis convert
+                    # <remap vjoy="1" axis="1" axis-type="absolute" axis-scaling="1.00000000" action_id="e63977277fdc4197b2d18b22297b6822" priority="9"/>
+                    # <vjoyremap vjoy="1" axis="1" mode="VJoyAxis" exec_on_press="True" exec_on_release="False" sync-mode="0" axis-type="absolute" axis-scaling="1.00000000" axis_start_value="0.00000000" range_low="-1.00000000" range_high="1.00000000" output_range_low="-1.00000000" output_range_high="1.00000000" reverse="False" auto_release="False" ignore-release="False" target_value="0.00000000" target_relative="False" relative_value="0.20000000" use_relative_value="False" relative_pulse_delay="100" start_pressed="False" paired="False" grid_visible="False" input="1" action_id="3c52184dea784c49bfea9725a3e13501" priority="9"/>
+                    node.set("mode","vjoyaxis")
+
+                elif "button" in node.attrib:
+                    # button convert 
+                    # <remap vjoy="1" button="1" action_id="880ef1913b484f9f966231e8807628fe" priority="9"/>
+                    # <vjoyremap vjoy="1" button="1" mode="VJoyButton" exec_on_press="True" exec_on_release="False" sync-mode="0" auto_release="False" ignore-release="False" target_value="0.00000000" target_relative="False" relative_value="0.20000000" use_relative_value="False" relative_pulse_delay="100" start_pressed="False" paired="False" grid_visible="False" input="1" action_id="0dc0634806884999aa01f7a81b5239d6" priority="9"/>
+                    node.set("mode","vjoybutton")
+
+
+                node.set("exec_on_press","True")
+                node.set("exec_on_release","False")
+                
+
+        converted = keyboard_count + remap_count > 0
+
+        
+        if not converted:
+            # nothing converted, blitz the backup file
+            try:
+                os.unlink(legacy_fname)
+            except Exception as err:
+                syslog.error(f"Unable to remove backup file: {legacy_fname}")
+                syslog.error(err)
+                
+            syslog.info("CONVERT: did not find any actions to convert")
+            gremlin.ui.ui_common.MessageBox(title = "Conversion Results",
+                prompt = "No actions converted.")
+
+        else:
+            # save
+            try:
+                tree = etree.ElementTree(root)
+                tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            except Exception as err:
+                syslog.error(f"Unable to write converted file: {fname}")
+                syslog.error(err)
+                return False
+            syslog.info(f"CONVERT: converted {keyboard_count} keyboard actions and {remap_count} remap actions.")
+            syslog.info(f"\tSaved original profile to: {legacy_fname}")
+
+            # output a message box
+            gremlin.ui.ui_common.MessageBox(title = "Conversion Results",
+                prompt = f"Converted {keyboard_count} keyboard actions and {remap_count} remap actions.")
+            
+
+        return converted
+
+                
+
+
+              
+
+
 
 
 class ProfileModifier:
