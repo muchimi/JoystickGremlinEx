@@ -185,7 +185,7 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
             or (not event.is_pressed and self.action_data.exec_on_release)
         if trigger:
 
-            next_mode = self.action_data.mode
+            next_mode = self.action_data.mode # mode to change to
             current_mode = gremlin.shared_state.runtime_mode
             
             if self.action_data.enable_return_mode and self.action_data.return_mode is not None:

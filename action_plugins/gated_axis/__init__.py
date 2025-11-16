@@ -824,7 +824,7 @@ It is recommended to configure and finalize the general number of gates before a
 It is also possible to save existing mappings via action duplication to the same or different container, saving the mappings to templates or the clipboard before
 making changes that impact the order of gates or ranges."""
 
-        warning_widget = gremlin.ui.ui_common.QInfoBox(text = msg)
+        warning_widget = gremlin.ui.ui_common.QInfoBox(text = msg, hide_key="gated_axis")
         self.main_layout.addWidget(warning_widget)        
 
         row = 1

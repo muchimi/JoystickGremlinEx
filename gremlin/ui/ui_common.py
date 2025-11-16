@@ -6790,13 +6790,14 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _create_button_hat(self):
         """Creates display for button and hat data."""
-        self.widgets = [
-            ButtonState(self._device),
-            HatState(self._device)
-        ]
-        for widget in self.widgets:
+        self.widgets = []
+        if self._device.button_count:
+            self.widgets.append(ButtonState(self._device))
+        if self._device.hat_count:
+            self.widgets.append(HatState(self._device))
+        if self.widgets:
+            widget = getHContainer(self.widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
             self.layout().addWidget(widget)
-        self.layout().addStretch(1)
 
     def _unhook_buttons(self):
         if self._device.is_virtual:
@@ -10923,17 +10924,40 @@ class QFrameBox(QtWidgets.QFrame):
 
 class QInfoBox(QtWidgets.QFrame):
     ''' widget for information text '''
-    def __init__(self, text = None, wrap = False, parent = None):
+    def __init__(self, text = None, wrap = False, hide_key = None, parent = None):
         super().__init__(parent = parent)
+
+        
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        if hide_key:
+            
+            config = gremlin.config.Configuration()
+            hidden = config.visualHidden(hide_key)
+            if hidden:
+                return
+            
+            widget = QDataCheckbox("Do not show again", callback=self._handle_hide_visual)
+            self.main_layout.addWidget(widget)
+            self._hide_key = hide_key
+
+
         self._label_widget = QAutoResizingTextEdit()
         self._label_widget.setReadOnly(True)
-        layout = QtWidgets.QVBoxLayout(self)
         
-        layout.addWidget(self._label_widget)
+        self.main_layout.addWidget(self._label_widget)
         self.setStyleSheet(Color.cssInfoBox())
 
         if text:
             self.setText(text)
+
+    def _handle_hide_visual(self):
+        config = gremlin.config.Configuration()
+        config.setVisualHidden(self._hide_key, True)
+        self.setStyleSheet("")
+        gremlin.util.clear_layout(self.main_layout)
+
+
 
     def setText(self, text):
         if not Shiboken.isValid(self):

@@ -56,6 +56,8 @@ class QKeyWidget(QtWidgets.QPushButton):
 
         self._max_height = 30 # height in pixels
         self._min_width = 32 # min width of key in pixels
+        self._min_height = 32 # min height of key in pixels
+        self._font_size = 11
 
         self._text = text
 
@@ -68,6 +70,15 @@ class QKeyWidget(QtWidgets.QPushButton):
 
         self.installEventFilter(self)
         self._update_style()
+
+    def setSizeMode(self, scale):
+        self._max_height = 30 * scale # height in pixels
+        self._min_width = 32 * scale # min width of key in pixels
+        self._min_height = 32 * scale # min height of key in pixels
+        self._font_size = 11 * scale # font size
+        self._update_style()
+    
+
 
     def setBorderRadius(self, radius: int):
         if radius < 2:
@@ -124,19 +135,22 @@ class QKeyWidget(QtWidgets.QPushButton):
 
         h = self._max_height
         w = self._min_width
+        font_size = self._font_size
+
+        self.setMinimumHeight(self._min_height)
 
         if self._auto_size:
-            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._default_style = f"QPushButton {{font-size:{font_size}px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._selected_style = f"QPushButton {{font-size:{font_size}px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border};  background-color: {hover_selected_background_color};}}"    
+            self._x2_default_style = f"QPushButton {{font-size:{font_size}px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._x2_selected_style = f"QPushButton {{font-size:{font_size}px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border};  background-color: {hover_selected_background_color};}}"    
         else:
-            self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._default_style = f"QPushButton {{font-size:{font_size}px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._selected_style = f"QPushButton {{font-size:{font_size}px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w}px; min-width: {w}px; max-height: {h}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
-            self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
-            self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
+            self._x2_default_style = f"QPushButton {{font-size:{font_size}px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_background_color};}}"
+            self._x2_selected_style = f"QPushButton {{font-size:{font_size}px; border: 2px solid {border}; border-radius: {radius}px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: {w*2}px; max-height: {h*2}px;}} QPushButton:hover {{border: 2px solid {hover_border}; background-color: {hover_selected_background_color};}}"
 
         if self._key_size == 1:
             default_style = self._default_style
@@ -796,19 +810,19 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(label="Listen (multi)", callback = self._listen_cb)
         
+        self._size_map = {
+            "Small": 1.0,
+            "Medium": 1.5,
+            "Large": 2.0
+        }
 
-        widgets = [gremlin.ui.ui_common.QDataRadioButton("Small",1),
-                   gremlin.ui.ui_common.QDataRadioButton("Large",2)
-        ]
+
+        widgets = [gremlin.ui.ui_common.QDataRadioButton(display, value) for display, value in self._size_map.items()]
 
         current  = gremlin.config.Configuration().keySize
-        if current > len(widgets):
-            current = 1
-            gremlin.config.Configuration().keySize = 1
-
-        widgets[current-1].setChecked(True)
-        for widget in self._key_widget_map.values():
-            widget.keySize = current
+        index = next((index for index, value in enumerate(self._size_map.values()) if value == current), 0)
+        widgets[index].setChecked(True)
+        scale = widgets[index].data
 
         for w in widgets:
             w.clicked.connect(self._size_changed)
@@ -848,7 +862,9 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self.setLayout(main_layout)
 
-        self._set_keyboard_state(sequence)      
+        self._set_keyboard_state(sequence)    
+
+        self.setScale(scale) # set initial size
 
     @property
     def latched_key(self):
@@ -964,11 +980,16 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     def _size_changed(self):
         widget = self.sender()
         data = widget.data
-        gremlin.config.Configuration().keySize = data
+        self.setScale(data)
+        
+
+    def setScale(self, value):
+        gremlin.config.Configuration().keySize = value
         for w in self._key_widget_map.values():
-            w.keySize = data
+            w.setSizeMode(value)
         # resize window to fit the new size
         QtCore.QTimer.singleShot(0, self.adjustSize)
+
         
     def _add_keyboard_listener_key_cb(self, data):
         gremlin.util.InvokeUiMethod(self._add_keyboard_listener_key_ui, data)

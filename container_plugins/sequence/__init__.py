@@ -440,7 +440,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         )
         
 
-        self.info_widget = gremlin.ui.ui_common.QInfoBox()
+        self.info_widget = gremlin.ui.ui_common.QInfoBox(hide_key = "sequence_container")
         
         self.action_layout.addWidget(self.normal_exec_delay)
         self.action_layout.addWidget(self.normal_step_delay)

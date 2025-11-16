@@ -70,6 +70,7 @@ class Configuration(QtCore.QObject):
         self._profile_config_fname = None # config file specific to the profile
         self._app_path = None # path where data is stored
         self._profile_path = os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex") # default user profile
+        self._visuals_hidden_map = None
 
         self._midi_enabled = None
         self._osc_enabled = None
@@ -2749,3 +2750,33 @@ class Configuration(QtCore.QObject):
     @trigger_last_input_id.setter
     def trigger_last_input_id(self, id):
         self._set_data("trigger_last_input_id", id)
+
+
+    def _ensure_visual_hidden_map(self):
+        if self._visuals_hidden_map is None:
+            visuals = self._get_data("visuals_hide_map", None)
+            if visuals is None:
+                self._set_data("visuals_hide_map", {})
+                visuals = {}
+            self._visuals_hidden_map = visuals
+    
+    def visualHidden(self, key : str) -> bool:
+        ''' true if the visual is marked hidden '''
+        self._ensure_visual_hidden_map()
+        if key in self._visuals_hidden_map:
+            return self._visuals_hidden_map[key]
+        return False
+    
+    def visualVisible(self, key: str) -> bool:
+        ''' true if the visual is marked visible'''
+        return not self.visualHidden(key)
+    
+    def setVisualHidden(self, key : str, value : bool):
+        self._ensure_visual_hidden_map()
+        self._visuals_hidden_map[key] = value
+        self._set_data("visuals_hide_map", self._visuals_hidden_map)
+    
+    def resetVisualHidden(self):
+        ''' resets all hidden visuals to visible '''
+        self._set_data("visuals_hide_map", {})
+        self._visuals_hidden_map = {}

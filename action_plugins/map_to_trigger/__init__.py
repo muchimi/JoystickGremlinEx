@@ -126,7 +126,7 @@ class MapToTriggerWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.warning_widget = gremlin.ui.ui_common.QWarningWidget()
         self.main_layout.addWidget(self.warning_widget)
 
-        info_widget = gremlin.ui.ui_common.QInfoBox("This action will trigger a virtual event as if the input was triggered.")
+        info_widget = gremlin.ui.ui_common.QInfoBox("This action will trigger a virtual event as if the input was triggered.", hide_key = "trigger_action")
         self.main_layout.addWidget(info_widget)
 
         

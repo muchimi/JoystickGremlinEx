@@ -218,35 +218,46 @@ class VisualizationSelector(QtWidgets.QWidget):
         for dev in devices:
             
             box = QtWidgets.QGroupBox(dev.name)
-
-            at_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Temporal", data = (VisualizationType.AxisTemporal, dev))
-            at_cb.setIgnoreKeyboard(True)
-            callback = self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
-            at_cb.clicked.connect(callback)
-            self._selector_callbacks[at_cb] = callback
-
-            ac_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Current",  data = (VisualizationType.AxisCurrent, dev))
-            ac_cb.setIgnoreKeyboard(True)
-            callback = self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
-            ac_cb.clicked.connect(callback)
-            self._selector_callbacks[ac_cb] = callback
-
-            bh_cb = gremlin.ui.ui_common.QDataCheckbox("Buttons + Hats",  data = (VisualizationType.ButtonHat, dev))
-            bh_cb.setIgnoreKeyboard(True)
-            callback = self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
-            bh_cb.clicked.connect(callback)
-            self._selector_callbacks[bh_cb] = callback
-
-
-
             layout = QtWidgets.QVBoxLayout()
-            layout.addWidget(at_cb)
-            layout.addWidget(ac_cb)
-            layout.addWidget(bh_cb)
 
-            self._selector_widgets.append(at_cb)
-            self._selector_widgets.append(ac_cb)
-            self._selector_widgets.append(bh_cb)
+            if dev.axis_count:
+
+                at_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Temporal", data = (VisualizationType.AxisTemporal, dev))
+                at_cb.setIgnoreKeyboard(True)
+                callback = self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
+                at_cb.clicked.connect(callback)
+                self._selector_callbacks[at_cb] = callback
+                layout.addWidget(at_cb)
+                self._selector_widgets.append(at_cb)
+
+                ac_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Current",  data = (VisualizationType.AxisCurrent, dev))
+                ac_cb.setIgnoreKeyboard(True)
+                callback = self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
+                ac_cb.clicked.connect(callback)
+                self._selector_callbacks[ac_cb] = callback
+                layout.addWidget(ac_cb)
+                self._selector_widgets.append(ac_cb)
+
+            has_buttons = dev.button_count > 0
+            has_hats = dev.hat_count > 0
+            stub = ""
+            if has_buttons:
+                stub = "Buttons"
+            if has_hats:
+                if stub:
+                    stub += " + "
+                stub+= "Hats"
+
+            if stub:
+                # has button or hats
+                bh_cb = gremlin.ui.ui_common.QDataCheckbox(stub,  data = (VisualizationType.ButtonHat, dev))
+                bh_cb.setIgnoreKeyboard(True)
+                callback = self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
+                bh_cb.clicked.connect(callback)
+                self._selector_callbacks[bh_cb] = callback
+                layout.addWidget(bh_cb)
+                self._selector_widgets.append(bh_cb)
+
 
             box.setLayout(layout)
 
@@ -482,7 +493,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
 """
 
-        info_box = gremlin.ui.ui_common.QInfoBox(msg, wrap = True)
+        info_box = gremlin.ui.ui_common.QInfoBox(msg, wrap = True, hide_key = "input_viewer")
         self._right_panel_layout.addWidget(info_box)
         #self._right_panel_layout.addStretch(1)
         
@@ -674,13 +685,21 @@ States can be toggled by clicking on the state button.  Expression states will u
         assert gremlin.util.is_ui_thread()
         if not self._keyboard_visualizer_widget:
             
-            self._keyboard_visualizer_widget =  QtWidgets.QGroupBox("Keyboard")
-            self.keyboard_visualizer_layout = QtWidgets.QVBoxLayout(self._keyboard_visualizer_widget)
+            group_widget =  QtWidgets.QGroupBox("Keyboard")
+            layout = QtWidgets.QVBoxLayout(self._keyboard_visualizer_widget)
+            group_widget.setLayout(layout)
+            
             self.keyboard_widget = gremlin.ui.virtual_keyboard.QKeyboardWidget(release_wheel = True)
+            self.keyboard_widget.setSizePolicy(QtWidgets.QSizePolicy.Fixed,QtWidgets.QSizePolicy.Fixed)
             self.keyboard_widget.setReadonly(True)
-            self.keyboard_visualizer_layout.addWidget(self.keyboard_widget)
+            layout.addWidget(self.keyboard_widget)
+
             self.keyboard_widget.hook()
+            self._keyboard_visualizer_widget = gremlin.ui.ui_common.getHContainer(group_widget, widget_only=True)
             self._keyboard_visible = True
+
+            
+
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(True)
 

@@ -18,6 +18,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T108)
+
+- New: Some information boxes can be hidden if you find them disruptive. Once hidden the information boxes can be visible again via the "reset hidden visuals" button in the global UI options.  Not all information boxes can be hidden.
+- Changed: Input Viewer: button/hat displays will only show if there are buttons/hats to display for the corresponding device.
+- Changed: Input Viewer: display selector will only show display options based on device features.  Axis options won't show if the device has no axes for example.
+- Changed: Input Viewer: Forced a minimum height on keyboard visual keys to prevent automatic  resizing in some UI configurations.  This will prevent the visuals from being squished/stretched.
+- Changed: Keyboard Ex - added new "medium" display scale.
+- Fix: invalid call on repeater update in Simconnect module
+
 ### (m76T107)
 - New: Added a conversion tool to the tools menu. This will convert all legacy remap and keyboard actions in the current profile to the GEX equivalents (vjoy remap and map to keyboard ex).  The conversion tool will create a (numbered) backup file in the same folder as the profile being converted.  The profile gets automatically reloaded if a conversion occurs.  The log file will include stats.
 

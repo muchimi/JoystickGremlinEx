@@ -964,16 +964,6 @@ class OptionsUi(ui_common.BaseDialogUi):
         box.addWidget(self.highlight_input_buttons)
         col1_layout.addWidget(box)
 
-        # enable ui at runtime
-        # self.enable_ui_runtime = QtWidgets.QCheckBox("Keep UI enabled when profile is active")
-        # self.enable_ui_runtime.setToolTip("When enabled, the UI will remain interactable while a profile is running.<br>This can create conflicts if the profile or mode is changed while a profile is running,<b>use caution.</b>")
-        # self.enable_ui_runtime.setChecked(self.config.runtime_ui_active)
-        # self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
-        # box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Runtime Behavior", transparent = True)
-        # box.addWidget(self.enable_ui_runtime)
-        # col1_layout.addWidget(box)
-
-
         # show live repeaters
         self.show_joystick_input_widget = QtWidgets.QCheckBox("Show live joystick inputs (restart required)")
         self.show_joystick_input_widget.setToolTip("When enabled, current state of hardware inputs will be displayed in the UI.\bGremlinEx must be restarted for this to take full effect when enabled.")
@@ -1049,6 +1039,8 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         col2_layout.addWidget(box)
 
+        
+        
 
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Options", transparent = True)
         hide_default_mode_widget = QtWidgets.QCheckBox("Hide default mode")
@@ -1057,11 +1049,20 @@ class OptionsUi(ui_common.BaseDialogUi):
         hide_default_mode_widget.clicked.connect(self._hide_default_mode_changed)
         box.addWidget(hide_default_mode_widget)
 
+        # reset hidden info boxes
+        widget = gremlin.ui.ui_common.QDataPushButton("Reset hidden UI elements", 
+                                                      callback = self._handle_reset_hidden,
+                                                      tooltip="Reset previously hidden UI elements like information boxes")
+        container = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
+        box.addWidget(container)
+
+
         col1_layout.addWidget(box)
 
         widget, layout = gremlin.ui.ui_common.getVContainer()
         layout.addWidget(page_widget)
         layout.addStretch()
+
 
         col1_layout.addStretch(1)
         col2_layout.addStretch(1)
@@ -1153,6 +1154,9 @@ There should only be one GremlinEx master server on the subnet.
 
         self.remote_control_select_ip_widget.setEnabled(enabled)
         self.remote_control_server_widget.setEnabled(enabled)
+
+    def _handle_reset_hidden(self):
+        gremlin.config.Configuration().resetVisualHidden()
 
     def _create_reporting_page(self):
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()

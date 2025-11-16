@@ -3726,7 +3726,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             else:
                 self._axis_repeater_widget.show_curved = False
 
-            self._axis_repeater_widget.setValue(normalized, percent_value=percent)
+            self._axis_repeater_widget.setValue(normalized)
             self._current_value = normalized
 
             if self.action_data.command_mode == SimConnectCommandMode.Simvar:
