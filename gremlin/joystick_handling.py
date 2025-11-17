@@ -85,12 +85,12 @@ class VJoyProxy:
         :return the corresponding vjoy device
         """
         # device IDs are 1 min to 16 max
-        assert vid > 0 and vid < 17, "Invalid VJOY device ID provided"
+        assert vid > 0 and vid < 17, f"Invalid VJOY device ID provided: {vid}"
         if vid in VJoyProxy.vjoy_devices:
             return VJoyProxy.vjoy_devices[vid]
         else:
             if not isinstance(vid, int):
-                raise error.GremlinError("Integer ID for vjoy device ID expected")
+                raise error.GremlinError(f"Integer ID for vjoy device ID expected: got {vid}")
 
             try:
                 # ok for output

@@ -18,6 +18,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T109A)
+- Change: Input Viewer: use flow layout for buttons and hats.
+- Fix: Gated Axis: incorrect handling of garbage collected gates in range computation.
+
 ### (m76T109)
 - New: Input Viewer: option to have buttons and hats show separately.
 - New: Input Viewer: buttons track usage for both input devices and for VJOY buttons if mapped via one of the remap actions.  Only tracks buttons.  A green marker indicates used, a gray marker indicates not used.

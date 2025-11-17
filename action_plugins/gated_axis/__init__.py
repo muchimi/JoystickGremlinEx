@@ -1375,24 +1375,24 @@ making changes that impact the order of gates or ranges."""
         
     def _update_range(self, gate):
         ''' updates the allowed range for a given gate, and that of its sibblings so movement of the gates is bound by the next gate over'''
-        g1, g2 = self.gate_data.getGateSiblings(gate)
-        offset = 0.001
-
-        w = self.get_gate_widget(gate)
-        v = gate.value
-
-        if g1:
-            w1 = self.get_gate_widget(g1)
-            w1.setMaximum(v-offset)
-            v1 = g1.value + offset
-            w.setMinimum(v1)
-            
         
-        if g2:
-            w2 = self.get_gate_widget(g2)
-            w2.setMinimum(v+offset)
-            v2 = g2.value - offset
-            w.setMaximum(v2)
+        w = self.get_gate_widget(gate)
+        if w:
+            g1, g2 = self.gate_data.getGateSiblings(gate)
+            offset = 0.001
+            v = gate.value
+
+            if g1:
+                w1 = self.get_gate_widget(g1)
+                w1.setMaximum(v-offset)
+                v1 = g1.value + offset
+                w.setMinimum(v1)
+            
+            if g2:
+                w2 = self.get_gate_widget(g2)
+                w2.setMinimum(v+offset)
+                v2 = g2.value - offset
+                w.setMaximum(v2)
 
 
 

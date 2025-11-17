@@ -6378,13 +6378,13 @@ class HatState(QtWidgets.QGroupBox):
             self.setTitle(f"{device.name} - Hats")
 
         self.hats = [None]
-        hat_layout = QtWidgets.QGridLayout()
+        hat_layout = QFlowLayout()
         for i in range(device.hat_count):
             hat = HatWidget(data = i+1) # data is the hat #
             if device.is_virtual:
                 hat.clicked.connect(self._hat_clicked)
             self.hats.append(hat)
-            hat_layout.addWidget(hat, int(i / 2), int(i % 2))
+            hat_layout.addWidget(hat)
 
         self.setLayout(hat_layout)
 
@@ -6801,33 +6801,32 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _create_button_hat(self):
         """Creates display for button and hat data."""
-        self.widgets = []
+        widgets = []
         if self._device.button_count:
-            self.widgets.append(ButtonState(self._device))
+            widgets.append(ButtonState(self._device))
         if self._device.hat_count:
-            self.widgets.append(HatState(self._device))
-        if self.widgets:
-            widget = getHContainer(self.widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
-            self.layout().addWidget(widget)
-
+            widgets.append(HatState(self._device))
+        if widgets:
+            if len(widgets) > 1:
+                widget = getHContainer(widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop,right_stretch=False)
+                self.layout().addWidget(widget)
+            else:
+                self.layout().addWidget(widgets[0])
 
     def _create_hat(self):
         """Creates display for button and hat data."""
-        self.widgets = []
+        widgets = []
         if self._device.hat_count:
-            self.widgets.append(HatState(self._device))
-        if self.widgets:
-            widget = getHContainer(self.widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
+            widgets.append(HatState(self._device))
+        if widgets:
+            widget = getHContainer(widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
             self.layout().addWidget(widget)
 
     def _create_button(self):
         """Creates display for button and hat data."""
-        self.widgets = []
         if self._device.button_count:
-            self.widgets.append(ButtonState(self._device))
-        if self.widgets:
-            widget = getHContainer(self.widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
-            self.layout().addWidget(widget)                        
+            widget = ButtonState(self._device)
+            self.layout().addWidget(widget)
 
     def _unhook_buttons(self):
         if self._device.is_virtual:
@@ -6837,14 +6836,14 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _create_current_axis(self):
         """Creates display for current axes data."""
-        self.widgets = [AxesCurrentState(self._device)]
-        for widget in self.widgets:
+        widgets = [AxesCurrentState(self._device)]
+        for widget in widgets:
             self.layout().addWidget(widget)
 
     def _create_temporal_axis(self):
         """Creates display for temporal axes data."""
-        self.widgets = [AxesTimeline(self._device)]
-        for widget in self.widgets:
+        widgets = [AxesTimeline(self._device)]
+        for widget in widgets:
             self.layout().addWidget(widget)
 
 
@@ -7097,7 +7096,8 @@ class ButtonState(QtWidgets.QGroupBox):
 
         css = Color.cssButtonState()
         self.buttons = [None]
-        button_layout = QtWidgets.QGridLayout()
+        flow_layout = QFlowLayout()
+        #button_layout = QtWidgets.QGridLayout()
         profile = gremlin.shared_state.current_profile
         for i in range(device.button_count):
             input_id = i+1
@@ -7130,9 +7130,11 @@ class ButtonState(QtWidgets.QGroupBox):
             is_pressed = gremlin.joystick_handling.get_button(device.device_guid, input_id)
             btn.setDown(is_pressed)
             self.buttons.append(btn)
-            button_layout.addWidget(btn, int(i / 10), int(i % 10))
-        button_layout.setColumnStretch(10, 1)
-        self.setLayout(button_layout)
+            #button_layout.addWidget(btn, int(i / 10), int(i % 10))
+            flow_layout.addWidget(btn)
+        #button_layout.setColumnStretch(10, 1)
+        #self.setLayout(button_layout)
+        self.setLayout(flow_layout)
 
 
 
