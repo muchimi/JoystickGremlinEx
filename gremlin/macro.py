@@ -1239,15 +1239,28 @@ class VJoyMacroAction(MacroAbstractAction):
         :param value the value of the generated input
         :param axis_type if an axis is used, how to interpret the value
         """
-        import gremlin.joystick_handling
+        # import gremlin.joystick_handling
         super().__init__()
-        dev = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
-        self.device_guid = dev.device_id
+        # update T109 - no need for device_guid in this action
+        # dev = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
+        # if not dev:
+        #     syslog.warning("VJOY device not detected.")
+        # self._device_guid = dev.device_id if dev else None
         self.vjoy_id = vjoy_id
         self.input_type = input_type
         self.input_id = input_id
         self.value = value
         self.axis_type = axis_type
+
+
+    # @property
+    # def device_guid(self):
+    #     if self._device_guid is None:
+    #         dev = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self._vjoy_id)
+    #         if dev:
+    #             self._device_guid = dev.device_guid
+    #     return self._device_guid
+
 
     @property
     def value(self):
@@ -1277,12 +1290,10 @@ class VJoyMacroAction(MacroAbstractAction):
         else:
             self._value = new_value
         
-
-        
     def __getstate__(self):
         ''' serialize '''
         state = super().__getstate__()
-        state['device_guid'] = self.device_guid
+        # state['device_guid'] = self.device_guid
         state['vjoy_id'] = self.vjoy_id
         state['input_type'] = self.input_type
         state['input_id'] = self.input_id
@@ -1293,7 +1304,7 @@ class VJoyMacroAction(MacroAbstractAction):
     def __setstate__(self, state):
         ''' deserialize '''
         super().__setstate__(state)
-        self.device_guid = state["device_guid"]
+        # self.device_guid = state["device_guid"]
         self.vjoy_id = state['vjoy_id']
         self.input_type = state['input_type']
         self.input_id = state['input_id']

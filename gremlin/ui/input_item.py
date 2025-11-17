@@ -1240,6 +1240,11 @@ class ActionSetModel(ui_common.AbstractModel):
                 input_item = action.get_input_item()
                 container : gremlin.base_profile.AbstractContainer = action.get_container()
                 del self._action_set[self._action_set.index(action)]
+
+                # run action delete if the action supports it
+                if hasattr(action,"actionDeleted"):
+                    action.actionDeleted()
+
                 el = gremlin.event_handler.EventListener()
                 el.action_delete.emit(input_item, container, action) # tell the UI the action is being deleted
                 if hasattr(action,"_cleanup"):
@@ -5076,6 +5081,8 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
             for action_set in container.action_sets:
                 if action_set:
                     for action in action_set:
+                        if hasattr(action,"actionDeleted"):
+                            action.actionDeleted()
                         el.action_delete.emit(self._item_data, container, action)
 
 

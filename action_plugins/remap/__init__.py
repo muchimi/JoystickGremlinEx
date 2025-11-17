@@ -436,13 +436,49 @@ Use Vjoy Remap instead.'''
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
         self.parent = parent
-        self.vjoy_id = 1
-        self.vjoy_input_id = None
+        self._vjoy_id = 1
+        self._vjoy_input_id = None
         input_type = self.get_input_type()
         self._input_type = input_type
         
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
+
+    def actionDeleted(self):
+        ''' called if the action is being deleted '''
+        if self._input_type == InputType.JoystickButton:
+            el = gremlin.event_handler.EventListener()
+            el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, False, self.id)
+
+
+    @property
+    def vjoy_input_id(self) -> int:
+        return self._vjoy_input_id
+    @vjoy_input_id.setter
+    def vjoy_input_id(self, value : int):
+        if value != self._vjoy_input_id:
+            if self._input_type == InputType.JoystickButton:
+                el = gremlin.event_handler.EventListener()
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, False, self.id)
+                self._vjoy_input_id = value
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, False, self.id)
+            else:
+                self._vjoy_input_id = value
+
+    @property
+    def vjoy_id(self) -> int:
+        return self._vjoy_id
+    @vjoy_id.setter
+    def vjoy_id(self, value : int):
+        if value != self._vjoy_id:
+            if self._input_type == InputType.JoystickButton:
+                el = gremlin.event_handler.EventListener()
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, False, self.id)
+                self._vjoy_id = value
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, True, self.id)
+            else:
+                self._vjoy_id = value
+
 
     @property
     def is_axis(self):
@@ -453,7 +489,17 @@ Use Vjoy Remap instead.'''
         return self._input_type
     @input_type.setter
     def input_type(self, value : InputType):
-        self._input_type = value
+        if self._input_type != value:
+            if self._input_type == InputType.JoystickButton:
+                el = gremlin.event_handler.EventListener()
+                el.vjoy_button_usage.emit(self.vjoy_id,  self._vjoy_input_id, False, self.id)
+
+            self._input_type = value
+
+            if self._input_type == InputType.JoystickButton:
+                el = gremlin.event_handler.EventListener()
+                el.vjoy_button_usage.emit(self.vjoy_id,  self._vjoy_input_id, True, self.id)
+            
 
     def display_name(self):
         ''' returns a display string for the current configuration '''

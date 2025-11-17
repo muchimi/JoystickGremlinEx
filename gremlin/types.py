@@ -38,6 +38,9 @@ class VisualizationType(IntEnum):
     ButtonHat = 3
     Keyboard = 4 
     State = 5
+    Button = 6
+    Hat = 7
+
 
 class KeyboardOutputMode(Enum): # order is that of the display order for keyboard mapper options
     Pulse = 0 # keyboard make and break (press/release) (pulse mode)

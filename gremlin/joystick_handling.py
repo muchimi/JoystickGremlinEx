@@ -85,7 +85,7 @@ class VJoyProxy:
         :return the corresponding vjoy device
         """
         # device IDs are 1 min to 16 max
-        assert vid is not None and vid > 0 and vid < 17,"Invalid VJOY device ID provided"
+        assert vid > 0 and vid < 17, "Invalid VJOY device ID provided"
         if vid in VJoyProxy.vjoy_devices:
             return VJoyProxy.vjoy_devices[vid]
         else:
@@ -560,7 +560,7 @@ def device_name_from_guid(device_guid) -> str:
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
     # not found - check for any updated devices
-    joystick_devices_update()
+    refresh_devices()
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
 
@@ -590,7 +590,22 @@ def getVjoyDeviceGuid(vjoy_id):
     dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vjoy_id), None)
     if dev:
         return dev.device_guid
+    
+    refresh_devices() # do a device reload if the GUID is not found 
+    dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vjoy_id), None)
+    if dev:
+        return dev.device_guid
+  
+
     return None # not found
+
+
+    
+
+def getVjoyDeviceMap()->dict:
+    ''' gets a map of vjoy devices keyed by the vjoy id, holds a DeviceSummary'''
+    return dinput.DILL.getVjoyDeviceMap()
+
     
 
 def device_info_from_guid(device_guid): # -> DeviceSummary:
@@ -599,16 +614,20 @@ def device_info_from_guid(device_guid): # -> DeviceSummary:
     if isinstance(device_guid, int):
         # vjoy ID sent ?
         device_guid = getVjoyDeviceGuid(device_guid)
+        if not device_guid:
+            return None
     if isinstance(device_guid, str):
         device_guid = gremlin.util.parse_guid(device_guid)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
     # update for "live" disconnects/reconnects if any
-    joystick_devices_update()
+    refresh_devices()
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
 
     return None
+
+
 
 def vjoy_info_from_vjoy_id(vjoy_id : int, connected_only = True): # -> DeviceSummary:
     ''' gets physical device info for a vjoy device
@@ -621,9 +640,17 @@ def vjoy_info_from_vjoy_id(vjoy_id : int, connected_only = True): # -> DeviceSum
     if connected_only:
         if vjoy_id in _vjoy_devices_map:
             return _vjoy_devices_map[vjoy_id]
+        # refresh devices if not found to make sure the device didn't shou up
+        refresh_devices()
+        if vjoy_id in _vjoy_devices_map:
+            return _vjoy_devices_map[vjoy_id]
         return None
 
     # include disconnected    
+    if vjoy_id in _all_vjoy_devices_map:
+        return _all_vjoy_devices_map[vjoy_id]
+    # not found - ask for a device update
+    refresh_devices()
     if vjoy_id in _all_vjoy_devices_map:
         return _all_vjoy_devices_map[vjoy_id]
     return None
@@ -1108,19 +1135,41 @@ def joystick_initialized():
     return _joystick_initialized
 
 
-def joystick_devices_update():
-    ''' updates any missing dynamic devices like VIGEM '''
-    device_count = dinput.DILL.get_device_count()
-    if device_count > len( _joystick_devices):
-        # add missing items
-        for device_index in range(device_count):
-            dev = dinput.DILL.get_device_information_by_index(device_index)
-            if not dev.device_guid in _joystick_device_guid_map:
-                if dev.connected:
-                    _joystick_devices.append(dev)
-                _all_joystick_devices.append(dev)
-                _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
-                _joystick_device_guid_map[dev.device_id] = dev # key by string ID
+def refresh_devices():
+    ''' updates any missing dynamic devices like VIGEM or VJOY from directInput '''
+    joystick_devices_initialization()
+
+    # global _joystick_device_guid_map, _all_vjoy_devices_map, _joystick_devices, _all_joystick_devices, dinput_vjoy_device_map
+    # device_count = dinput.DILL.get_device_count()
+    # dinput_vjoy_device_map = {}
+    
+    # # add any missing items
+    # for device_index in range(device_count):
+    #     dev : dinput.DeviceSummary = dinput.DILL.get_device_information_by_index(device_index)
+    #     dinput_key = (dev.axis_count, dev.button_count, dev.hat_count)
+    #     dinput_vjoy_device_map
+    
+
+    #     if dev.is_virtual and dev.vjoy_id == -1:
+    #         # set vjoy data 
+            
+
+
+
+    #     if not dev.device_guid in _all_vjoy_devices_map:
+    #         _joystick_device_guid_map[dev.device_guid] = dev
+    #         _joystick_device_guid_map[dev.device_id] = dev # key by string ID
+    #         if dev.is_virtual and dev.vjoy_id >= 0:
+    #             _all_vjoy_devices_map[dev.vjoy_id] = dev
+        
+    #     d1 = next((d for d in _joystick_devices if d.device_guid == dev.device_guid), None)
+    #     if not d1 and dev.connected:
+    #         _joystick_devices.append(dev)
+
+    #     d1 = next((d for d in _all_joystick_devices if d.device_guid == dev.device_guid), None)
+    #     if not d1:
+    #         _all_joystick_devices.append(dev)
+
 
 
 MAX_VJOY_DEVICE = 16 # number of devices 1..16 supported by VJOY - this includes devices that may not be configured
@@ -1203,37 +1252,10 @@ class VJoyUsageState():
         self.ensure_vjoy()
 
         
-        # self._keep_alive_delay =  KEEP_ALIVE_DELAY
-        # self._keep_alive_thread = gremlin.threading.AbortableThread(target = self._keep_alive_runner)
-        # self._keep_alive_thread.name = "Vjoy Keepalive"
-        # self._keep_alive_thread.start()
-        
+
     def _handle_shutdown(self):
         pass
-        # if self._keep_alive_thread.is_alive():
-        #     self._keep_alive_thread.stop()
-        #     self._keep_alive_thread.join()
-        #     self._keep_alive_thread = None
-
-    # def _keep_alive_runner(self):
-    #     ''' keep alive runner for all vjoy devices '''
-    #     syslog.info("VJOY: Keepalive start")
-    #     next_pulse = time.time()
-        
-    #     while not self._keep_alive_thread.stopped():
-    #         # ping connected devices
-    #         now = time.time()
-    #         if next_pulse <= now:
-    #             verbose = gremlin.config.Configuration().verbose_mode_vjoy
-    #             if verbose: syslog.info(f"VJOY: Keepalive {now}")
-    #             for dev in vjoy_devices():
-    #                 vid = dev.vjoy_id
-    #                 vjoy.device_available(vid)
-    #                 next_pulse = now + self._keep_alive_delay
-    #         time.sleep(1) # slow tick ok for keep alive
-
-    #     syslog.info("VJOY: Keepalive shutdown")
-
+       
 
     def _handle_request_button_change(self, vjoy_id, button_id, state, key):
         ''' handles request for button changes '''
@@ -1460,6 +1482,7 @@ class VJoyUsageState():
         
             current_state = len(self._button_usage_map[vjoy_id][button_id]) > 0
             verbose = gremlin.config.Configuration().verbose_mode_vjoy
+            #verbose = True
             if verbose: syslog.info(f"Set usage state: [{vjoy_id}] [{button_id}] [{state}]  current state [{current_state}] from {key}")
             if state:
                 if not key in self._button_usage_map[vjoy_id][button_id]:
@@ -1477,6 +1500,8 @@ class VJoyUsageState():
                     el = gremlin.event_handler.EventListener()
                     el.button_usage_changed.emit(vjoy_id)
                     el.vjoy_button_usage.emit(vjoy_id, button_id, new_state)
+                    if verbose: syslog.info(f"Button used tracker: vjoy {vjoy_id} button {button_id} used: {new_state}")
+                    el.input_used_changed.emit(vjoy_id, InputType.JoystickButton, button_id, new_state)
 
 
     def get_usage_state(self, vjoy_id : int, button_id : int) -> bool:

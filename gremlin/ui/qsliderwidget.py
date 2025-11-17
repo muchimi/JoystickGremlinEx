@@ -37,13 +37,13 @@ from psygnal import Signal
 syslog = logging.getLogger("system")
 
 class QSliderWidget(QtWidgets.QWidget):
-    ''' custom slider object '''
+    ''' custom slider object --- WARNING : ALL EVENT HANDLERS NEED TO CHECK FOR UI THREAD '''
 
     handleClicked = Signal(int) # called when a handle is left clicked (handle index)
     handleRightClicked = Signal(int) # called when a handle is right clicked (handle index)
     handleDoubleClicked = Signal(int) # called when a handle is double clicked (handle index)
     handleDoubleRightClicked = Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
-    rangeClicked = Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeClicked =Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
     rangeRightClicked = Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
     rangeDoubleClicked = Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
     rangeDoubleRightClicked = Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
@@ -929,7 +929,7 @@ class QSliderWidget(QtWidgets.QWidget):
         # print ("double click")
         self._double_clicked = True
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose:
             syslog = logging.getLogger("system")
         
@@ -942,6 +942,7 @@ class QSliderWidget(QtWidgets.QWidget):
                     if verbose:
                         syslog.info(f"handle {index} left double clicked")
                     self.handleDoubleClicked.emit(index)
+
                 elif button == Qt.MouseButton.RightButton:
                     if verbose:
                         syslog.info(f"handle {index} right rouble clicked")

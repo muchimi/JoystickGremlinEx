@@ -18,6 +18,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T109)
+- New: Input Viewer: option to have buttons and hats show separately.
+- New: Input Viewer: buttons track usage for both input devices and for VJOY buttons if mapped via one of the remap actions.  Only tracks buttons.  A green marker indicates used, a gray marker indicates not used.
+- Fix: passed parameters to UI thread invoker could be garbage collected before the execution using these parameters executes causing a fatal error.
+- Fix: Gated Axis: gate not found error in some situations.
+- Fix: Gated Axis: edge gates unable to move in some situations.
+
 ### (m76T108)
 
 - New: Some information boxes can be hidden if you find them disruptive. Once hidden the information boxes can be visible again via the "reset hidden visuals" button in the global UI options.  Not all information boxes can be hidden.

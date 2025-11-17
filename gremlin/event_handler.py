@@ -593,7 +593,7 @@ class EventListener:
 
 	# occurs when input enabled state changes
 	input_enabled_changed = Signal(object) # param - InputItem
-
+	input_used_changed = Signal(object, object, object, bool) # when input usage is changed, fires this (device_guid, input_type, input_id, used : bool)
 	
 
 	# occurs when a macro step completes
@@ -796,14 +796,14 @@ class EventListener:
 		''' queues a single joystick event '''
 		verbose = gremlin.config.Configuration().verbose
 		if verbose: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")		
-		self._event_queue.put_nowait(event)
+		self._event_queue.put(event)
 
 	def queueJoystickEventList(self, event_list):
 		''' queues a list of joystick events '''
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
 		for event in event_list:
 			if verbose: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")
-			self._event_queue.put_nowait(event)
+			self._event_queue.put(event)
 
 	def _event_runner(self):
 		''' runner for inbound joystick events '''
@@ -812,6 +812,7 @@ class EventListener:
 			if self._event_queue.empty():
 				time.sleep(0.01)
 				continue
+			
 			event = self._event_queue.get()
 			if verbose: syslog.info(f"EVENTLISTEN: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")		
 			self.joystick_event.emit(event)	

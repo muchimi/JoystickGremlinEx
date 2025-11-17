@@ -2780,3 +2780,12 @@ class Configuration(QtCore.QObject):
         ''' resets all hidden visuals to visible '''
         self._set_data("visuals_hide_map", {})
         self._visuals_hidden_map = {}
+
+
+    @property
+    def input_viewer_combine_buttonhats(self) -> bool:
+        # option to combine buttons and hats in the input viewer
+        return self._get_data("input_viewer_combine_buttonhats", True)
+    @input_viewer_combine_buttonhats.setter
+    def input_viewer_combine_buttonhats(self, value : bool):
+        self._set_data("input_viewer_combine_buttonhats", value)

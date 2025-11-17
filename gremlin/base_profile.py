@@ -1012,6 +1012,8 @@ class Device:
                 
 
         return mode
+    
+ 
 
     def from_xml(self, node, data = None, extra_data = None):
         """Populates this device based on the xml data.
@@ -2094,8 +2096,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         # tell the UI about the change
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.emit(self)
+        el.input_used_changed.emit(self._device_guid, self._input_type, self._input_id, True)
 
     def remove_container(self, container):
+        
         if not container in self._containers:
             id = container.id
             for c in self._containers:
@@ -2103,12 +2107,28 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     self._containers.remove(c)
                     break
             return
-                
+
+
+        # notify every action in the container it's being removed in case some update needs to happen
+        for action_set in container.action_sets:
+            for action in action_set:
+                if hasattr(action,"actionDeleted"):
+                    action.actionDeleted()
+                    
+
+        
         self._containers.remove(container)
+        
+
+
 
         # tell the UI about the change
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.emit(self)
+
+        if not len(self._containers):
+            # only fire the update is the container list is empty
+            el.input_used_changed.emit(self._device_guid, self._input_type, self._input_id, False)
 
     def get_containers(self):
         return self._containers
@@ -3403,7 +3423,8 @@ class Profile():
             eh = gremlin.event_handler.EventListener()
             eh.edit_mode_changed.emit(name)
         return True
-    
+
+        
 
     def set_mode_parent(self, name, inherited_name, emit = True) -> bool:
         ''' sets the parent of a current mode'''
@@ -3684,6 +3705,20 @@ class Profile():
                         if input_item.containers:
                             return True
         return False
+    
+        
+    def isInputMapped(self, device_guid, input_type, input_id) -> bool:
+        ''' scans the profile to see if the specified input is mapped somewhere '''
+        if device_guid in self.devices:
+            device = self.devices[device_guid]
+            if device_guid == device.device_guid:
+                for mode_object in device.modes.values():
+                    if input_type in mode_object.config.keys():
+                        input_item = next((item for item in mode_object.config[input_type].values() if input_id == item.input_id), None)
+                        if input_item and input_item.containers:
+                            return True
+        return False
+            
 
     def get_selectable_modes(self):
         ''' gets the list of all selectable modes in the profile'''

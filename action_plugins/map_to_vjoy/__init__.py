@@ -3039,6 +3039,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         el.icon_changed.emit(event)
 
 
+
     def _update_vjoy_device_input_list(self):
         ''' loads a list of valid outputs for the current vjoy device based on the mode '''
         with QtCore.QSignalBlocker(self.cb_vjoy_input_selector):
@@ -5129,9 +5130,9 @@ Supports axis merging, curved output, command, hat and button mappings.
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
 
-        self.input_type : InputType = self.get_input_type()
-        if self.input_type in (InputType.ModeControl, InputType.VirtualButton):
-            self.input_type = InputType.JoystickButton
+        self._input_type : InputType = self.get_input_type()
+        if self._input_type in (InputType.ModeControl, InputType.VirtualButton):
+            self._input_type = InputType.JoystickButton
 
         # default hat map table setup and default mapping for new hats
         self.hat_map = {} # map of button id keyed by hat position tuple
@@ -5152,7 +5153,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._vjoy_id : int = 1
         self._vjoy_input_id : int  = 1
         self.vjoy_axis_id = 1
-        self.vjoy_button_id = 1
+        self._vjoy_button_id = 1
         self.vjoy_hat_id = 1
         self.vjoy_device_guid = None
         
@@ -5245,6 +5246,12 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
         self.refresh_vjoy()
 
+    def actionDeleted(self):
+        ''' called if the action is being deleted '''
+        if self._input_type == InputType.JoystickButton:
+            el = gremlin.event_handler.EventListener()
+            el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, False, self.id)
+
     @property
     def vjoy_id(self):
         ''' vjoy device number '''
@@ -5252,12 +5259,53 @@ Supports axis merging, curved output, command, hat and button mappings.
     
     @vjoy_id.setter
     def vjoy_id(self, value : int):
-        self._vjoy_id = value
+        if value != self._vjoy_id:
+            if self.input_type == InputType.JoystickButton:
+                # notify of button usage change for the tracking
+                el = gremlin.event_handler.EventListener()
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, False, self.id)
+                self._vjoy_id = value
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, True, self.id)
+            else:
+                self._vjoy_id = value
+
 
     @property
     def vjoy_device_id(self):
         # legacy API same as vjoy_id
         return self._vjoy_id
+    
+    @property
+    def input_type(self) -> InputType:
+        return self._input_type
+    @input_type.setter
+    def input_type(self, value : InputType):
+        if self._input_type != value:
+            if self._input_type == InputType.JoystickButton:
+                # notify of button usage change for the tracking
+                el = gremlin.event_handler.EventListener()
+                el.vjoy_button_usage.emit(self.vjoy_id,  self._vjoy_input_id, False, self.id)
+
+            self._input_type = value
+
+            if self._input_type == InputType.JoystickButton:
+                el = gremlin.event_handler.EventListener()
+                el.vjoy_button_usage.emit(self.vjoy_id, self._vjoy_input_id, True, self.id)    
+
+    @property
+    def vjoy_button_id(self) -> int:
+        return self._vjoy_button_id
+    @vjoy_button_id.setter
+    def vjoy_button_id(self, value : int):
+        if value != self._vjoy_button_id:
+            if self._vjoy_button_id == InputType.JoystickButton:
+                # notify of button usage change for the tracking
+                el = gremlin.event_handler.EventListener()
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_button_id, False, self.id)
+                self._vjoy_button_id = value
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_button_id, True, self.id)
+            else:
+                self._vjoy_button_id = value                
 
     @property
     def axis_start_value_enabled(self) -> bool:
@@ -5823,12 +5871,20 @@ Supports axis merging, curved output, command, hat and button mappings.
             return True
 
     def set_input_id(self, index):
+        el = gremlin.event_handler.EventListener()
         if self.action_mode in (VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoySetAxis):
+            if self.vjoy_axis_id != index:
                 self.vjoy_axis_id = index
         elif self.action_mode == VjoyAction.VJoyHat:
-            self.vjoy_hat_id = index
+            if self.vjoy_hat_id != index:
+                self.vjoy_hat_id = index
         else:
-            self.vjoy_button_id = index
+            # button
+            if self.vjoy_button_id != index:
+                # notify of button usage change for the tracking
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self.vjoy_button_id, False, self.id)
+                self.vjoy_button_id = index
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self.vjoy_button_id, True, self.id)
         self.vjoy_input_id = index
 
     def get_input_id(self):
@@ -6416,45 +6472,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             case _:
                 content += f"{self.action_mode.name}"
                 
-            # case VjoyAction.VJoyAxisToButton:
-            #     rows +=(f"Button (axis to button): {self.vjoy_button_id}")
-            #     rows +=(f"Range: [{self.button_range_min:0.3f},{self.button_range_max:0.3f}]")
-            #     rows +=(f"Mode: {self.button_mode.name}")
-            # case VjoyAction.VJoyPulse:
-            #     rows += (f"Button (pulse): {self.vjoy_button_id}", 
-            #              f"Pulse: {self.pulse_delay}ms")
-            #     if self.pulse_repeat:
-            #         rows += (
-            #             f"Repeat: {"yes" if self.pulse_repeat else "no"}",
-            #             f"Repeat Delay: {self.pulse_repeat_delay}ms"                        
-            #             )
-            # case VjoyAction.VJoyInvertAxis:
-            #     rows += ("Invert Axis")
-            # case VjoyAction.VJoySetAxis:
-            #     if self.use_relative_value:
-            #         rows += (f"Set axis relative: {self.target_value:0.3f}")    
-            #     else:
-            #         rows += (f"Set axis: {self.target_value:0.3f}")
-            # case VjoyAction.VJoyDisableLocal:
-            #     rows += ("Disable local control")
-            # case VjoyAction.VJoyDisablePairedRemote:
-            #     rows += ("Disable paired remote")
-            # case VjoyAction.VJoyEnableLocal:
-            #     rows += ("Enable local control")                
-            # case VjoyAction.VJoyEnableLocalAndRemote:
-            #     rows += ("Enable local and remote control")
-            # case VjoyAction.VJoyEnableRemote:
-            #     rows += ("Disable remote control")
-            # case VjoyAction.VJoyHat:
-            #     rows += ("Set hat position")
-            # case VjoyAction.VJoyHatToButton:
-            #     for position in self.hat_map:
-            #         input_id = self.action_data.hat_map[position]
-            #         rows += (f"{vjoy.vjoy.Hat.direction_to_name(position)}: {input_id}")
-            # case VjoyAction.VJoySetAxisStepped:
-            #     rows += ("Set stepped axis")
-            # case _:
-            #     rows += self.action_mode.name
+           
                 
         if content:
             label += f"| {{{content}}}"

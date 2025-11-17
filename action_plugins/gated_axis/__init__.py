@@ -779,13 +779,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.container_gate_ui_widget, self.container_gate_ui_layout = gremlin.ui.ui_common.getVContainer()
         self.container_gate_ui_widget.setContentsMargins(8,0,0,0)
         
-        # css_table = "QTableWidget {border: none;}"
-
         self.container_gate_widget, self.container_gate_layout = gremlin.ui.ui_common.getVContainer()
-
-        # table = QtWidgets.QTableWidget()
-        # table.setStyleSheet(css_table)
-        # self.gate_table_widget = table
 
         
 
@@ -800,10 +794,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         self.range_flow_widget, self.range_flow_layout = gremlin.ui.ui_common.getFlowContainer()
         self.container_range_widget, self.container_range_layout = gremlin.ui.ui_common.getVContainer()
-        # table = QtWidgets.QTableWidget()
-        # table.setStyleSheet(css_table)
-        # self.range_table_widget = table
-        
+
 
         self.range_count_widget = QtWidgets.QLabel()
         self.container_range_layout.addWidget(self.range_count_widget)
@@ -883,8 +874,21 @@ making changes that impact the order of gates or ranges."""
 
 
         # keyboard hook for undo key
-        eh = gremlin.event_handler.EventListener()
-        eh.keyboard_event.connect(self._keyboard_handler)
+        el = gremlin.event_handler.EventListener()
+        el.keyboard_event.connect(self._keyboard_handler)
+        # el.joystick_event.connect(self._handle_joystick_event)
+
+    # def _handle_joystick_event(self, event):
+    #     if gremlin.shared_state.is_running:
+    #         return
+    #     if not event.is_axis:
+    #         return
+    #     if event.device_id != self.action_data.hardware_device_id:
+    #         return
+    #     if event.identifier != self.action_data.hardware_input_id:
+    #         return
+    #     value = event.curve_value
+    #     self._slider_widget.setMarker(value)        
 
     def _handle_display_mode_changed(self, display_mode):
         # update all ranges
@@ -915,6 +919,8 @@ making changes that impact the order of gates or ranges."""
 
         for rwi in self._rwi_map.values():
             rwi.update_value()
+
+
 
     def _handle_range_configuration_changed(self, range_info):
         gremlin.util.InvokeUiMethod(self._handle_range_configuration_changed_ui, range_info)
@@ -1120,11 +1126,6 @@ making changes that impact the order of gates or ranges."""
         gh.gates_changed.connect(self._gates_changed)
         # gh.use_default_range_changed.connect(self._update_range_display)
         gh.gate_configuration_changed.connect(self._handle_gate_configuration_changed)
-
-
-        
-
-
         self._hooked = True
 
     def unhook(self):
@@ -1252,15 +1253,17 @@ making changes that impact the order of gates or ranges."""
                 v1 = g1.value + offset
                 v2 = g2.value - offset
             elif index == 0:
+                # first gate
                 g1 = gate
                 g2 = gate_list[index+1]
-                v1 = g1.value
+                v1 = -1.0
                 v2 = g2.value - offset
             else:
+                # last
                 g1 = gate_list[index-1]
                 g2 = gate
                 v1 = g1.value + offset
-                v2 - g2.value
+                v2 = 1.0
 
             if v1 > v2:
                 v1,v2 = v2, v1
@@ -1465,8 +1468,12 @@ making changes that impact the order of gates or ranges."""
                 self._add_gate(value)
                 self._update_ui()
 
-    @QtCore.Slot(float)
+
+
     def _slider_range_configure_cb(self, value):
+        gremlin.util.InvokeUiMethod(self._slider_range_configure_cb_ui, value)
+    
+    def _slider_range_configure_cb_ui(self, value):
         ''' fired when the user clicked on the groove - adds a gate at that location '''
         if Shiboken.isValid(self):
             rng = self._gate_data.findRangeByValue(value)
@@ -1726,10 +1733,14 @@ making changes that impact the order of gates or ranges."""
         handle_index = action.data()
         self._slider_gate_configure_cb(handle_index)
 
-
     
     def _slider_gate_configure_cb(self, handle_index):
+        gremlin.util.InvokeUiMethod(self._slider_gate_configure_cb_ui, handle_index)
+
+    def _slider_gate_configure_cb_ui(self, handle_index):
         ''' handle right clicked - pass event along '''
+        if not Shiboken.isValid(self):
+            return
         connected = gremlin.util.isSignalConnected(self, "configure_gate_requested")
         if connected:
             # event is connected

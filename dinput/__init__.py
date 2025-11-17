@@ -916,6 +916,21 @@ class DILL:
             syslog.info(f"\tIndex: [{index}] {str(dev)}")
         syslog.info("DILL: end device detection summary")
 
+    @staticmethod
+    def getVjoyDeviceMap() -> dict:
+        ''' does a re-read of vjoy devices from the DINPUT api 
+        returns a dictionary keyed by vjoyid holding the vjoy device detected
+        '''
+        device_count = DILL.get_device_count()
+        vjoy_map = {}
+        for index in range(device_count):
+            dev = DILL.get_device_information_by_index(index)
+            if dev.is_virtual and dev.vjoy_id >= 0:
+                vjoy_map[dev.vjoy_id] = dev
+
+        return vjoy_map
+
+
 
     @staticmethod
     def set_input_event_callback(callback):

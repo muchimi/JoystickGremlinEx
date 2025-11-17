@@ -1145,6 +1145,7 @@ class GateEventHandler(QtCore.QObject):
         self._value_changed_callbacks = {} # tracks value change callbacks
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_gate and config.verbose_mode_extra
+        verbose = True
         if self.verbose: syslog.info("GATEHANDLER: listen start")
         self._event_queue = queue.Queue() # holds the queue of events to process
         
@@ -1417,10 +1418,8 @@ class GateData():
                 verbose = gremlin.config.Configuration().verbose_mode_gate
                 if verbose: syslog.info("GATE: hook disabled")
 
-                gh = GateEventHandler()
-                gh.unregisterJoystickCallback(self.id)
-
-                
+                # gh = GateEventHandler()
+                # gh.unregisterJoystickCallback(self.id)
 
                 el = gremlin.event_handler.EventListener()
                 el.joystick_event.disconnect(self._joystick_event_handler)
@@ -1599,6 +1598,7 @@ class GateData():
         
         '''
         import gremlin.execution_graph
+        
 
         self._lock.acquire()
 
@@ -2350,8 +2350,8 @@ class GateData():
     def getGates(self, used_only = True):
         ''' gets all used gates - returns them in sorted order by value  '''
         source = self._gates
-        if used_only:
-            source = [gate for gate in source if gate.used]
+        # if used_only:
+        #     source = [gate for gate in source if gate.used]
         
         # sort by value 
         source.sort(key = lambda x: x.value)
@@ -2380,11 +2380,13 @@ class GateData():
         ''' for a given gate, returns the adjoining gates'''
         gate_list = self.getGates()
         gate_count = len(gate_list)
-        index = gate_list.index(gate)
-        
-        g1 = gate_list[index-1] if index > 0 else None
-        g2 = gate_list[index+1] if index + 1 != gate_count else None
-        return g1,g2
+        if gate in gate_list:
+            index = gate_list.index(gate)
+            
+            g1 = gate_list[index-1] if index > 0 else None
+            g2 = gate_list[index+1] if index + 1 != gate_count else None
+            return g1,g2
+        return None, None
     
     def getGateRange(self, gate):
         ''' gets gate valid ranges based on siblings '''

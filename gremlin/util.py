@@ -1814,6 +1814,16 @@ class InvokeUiMethod(QtCore.QObject):
 
         assert method is not None,"Method not provided"
         current_thread = QtCore.QThread.currentThread()
+        # keep an object reference to the parameters so they don't get garbage collected before the execution is scheduled
+        self._p0 = p0
+        self._p1 = p1
+        self._p2 = p2
+        self._p3 = p3
+        self._p4 = p4
+        self._p5 = p5
+        self._p6 = p6
+        self._p7 = p7
+        
         ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
         
         if current_thread != ui_thread:
@@ -1822,29 +1832,14 @@ class InvokeUiMethod(QtCore.QObject):
             self.setParent(QtWidgets.QApplication.instance())
             self._called.connect(self._execute)
             self.method = method           
-            self._called.emit(p0, p1, p2, p3, p4, p5, p6, p7)     
+            self._called.emit(self._p0, self._p1, self._p2, self._p3, self._p4, self._p5, self._p6, self._p7)     
         else:   
-            self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
+            self._exec(method, self._p0, self._p1, self._p2, self._p3, self._p4, self._p5, self._p6, self._p7)
 
 
     def _exec(self, method, p0, p1, p2, p3, p4, p5, p6, p7):
         sig = inspect.signature(method)
         pcount = len(sig.parameters)
-
-
-        # pcount = 0
-        # if p5 is not None:
-        #     pcount +=1
-        # if p4 is not None:
-        #     pcount +=1
-        # if p3 is not None:
-        #     pcount +=1
-        # if p2 is not None:
-        #     pcount +=1
-        # if p1 is not None:
-        #     pcount +=1
-        # if p0 is not None:
-        #     pcount +=1
 
         match pcount:
             case 0:
