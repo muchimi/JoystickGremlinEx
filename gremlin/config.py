@@ -2196,6 +2196,8 @@ class Configuration(QtCore.QObject):
         return self._get_data("show_input_enable",False)
     @show_input_enable.setter
     def show_input_enable(self, value: bool):
+        # override as this is not implemented yet
+        return False
         self._data["show_input_enable"] = value
         self.save()
 

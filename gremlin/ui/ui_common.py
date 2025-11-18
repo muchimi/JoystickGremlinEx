@@ -6801,29 +6801,35 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _create_button_hat(self):
         """Creates display for button and hat data."""
-        widgets = []
+        self.widgets = []
         if self._device.button_count:
-            widgets.append(ButtonState(self._device))
+            widget = ButtonState(self._device)
+            self.widgets.append(widget)
         if self._device.hat_count:
-            widgets.append(HatState(self._device))
-        if widgets:
-            if len(widgets) > 1:
-                widget = getHContainer(widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop,right_stretch=False)
+            self.widgets.append(HatState(self._device))
+        if self.widgets:
+            if len(self.widgets) > 1:
+                widget = getHContainer(self.widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop,right_stretch=False)
                 self.layout().addWidget(widget)
             else:
-                self.layout().addWidget(widgets[0])
+                self.layout().addWidget(self.widgets[0])
 
     def _create_hat(self):
         """Creates display for button and hat data."""
+        self.widgets = []
         if self._device.hat_count:
             widget = HatState(self._device)
             self.layout().addWidget(widget)
+            self.widgets = [widget]
 
     def _create_button(self):
         """Creates display for button and hat data."""
+        self.widgets = []
         if self._device.button_count:
             widget = ButtonState(self._device)
             self.layout().addWidget(widget)
+            self.widgets = [widget]
+            
 
     def _unhook_buttons(self):
         if self._device.is_virtual:

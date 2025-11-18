@@ -937,7 +937,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 i+=1
             
         else:
-            layout.addWidget(QtWidgets.QLabel("No states found."),0,0,1,-1)
+            layout.addWidget(QtWidgets.QLabel("No states found."))
 
     def showState(self):
         ''' state device '''
@@ -1001,7 +1001,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     def refreshState(self):
         if self._state_visualizer_widget:
-            self.populateState(self._state_button_layout)
+            self.populateState()
     
     def _state_changed(self, state):
         # state changed received - ensure on UI thread

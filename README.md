@@ -18,6 +18,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T109C)
+- Fix: Input Viewer: state size change causes an exception due to refactor call missed.
+- Fix: Enable input disable option turned off for the time being as it's not implemented.
+- Fix: Input Viewer: button inputs functional again.
+
 ### (m76T109B)
 - Change: Input Viewer: use flow layout for states.
 - Fix: Macro: device ID lookup for vjoy macro actions.

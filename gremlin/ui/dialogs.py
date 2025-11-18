@@ -699,6 +699,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_input_enable.setToolTip("When enabled, displays a toggle button for each input to enable or disable it in the profile")
         self.show_input_enable.setChecked(self.config.show_input_enable)
         self.show_input_enable.clicked.connect(self._show_input_enable)
+        self.show_input_enable.setDisabled(True)
 
         self.start_on_f5 = QtWidgets.QCheckBox("Start profile on F5")
         self.start_on_f5.setToolTip("When enabled, profiles can be started using the F5 key")
