@@ -18,6 +18,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T109B)
+- Change: Input Viewer: use flow layout for states
+- Fix: Macro: device ID lookup for vjoy macro actions.
+
+
+
 ### (m76T109A)
 - Change: Input Viewer: use flow layout for buttons and hats.
 - Fix: Gated Axis: incorrect handling of garbage collected gates in range computation.

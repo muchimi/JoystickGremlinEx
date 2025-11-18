@@ -848,25 +848,17 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._update_view()
 
 
-    def populateState(self, layout):
+    def populateState(self):
         ''' execute on UI thread '''
-        gremlin.util.InvokeUiMethod(self._populateState_ui, layout)
+        gremlin.util.InvokeUiMethod(self._populateState_ui)
 
 
     def _populateState_ui(self, layout):
         if self._state_visualizer_widget:
-            gremlin.util.clear_layout(layout)
             self._state_buttons.clear()
-
-        self._state_container_widget, self._state_container_layout = gremlin.ui.ui_common.getGridContainer() # holds state data
-        layout.addWidget(self._state_container_widget)
     
         self._reload_states()
 
-
-       
-
-        layout.setColumnStretch(10,1)
 
     def _filter_data(self, state) -> bool:
         ''' custom filter handler - true if the data is included in the filter, false otherwise '''
@@ -889,12 +881,12 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     def _reload_states_ui(self):
         ''' loads or reloads states '''
+        layout = self._state_button_layout
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_state        
         i = 0
         sd = gremlin.ui.state_device.StateData()
         items = sd.getStates().items()
-        layout = self._state_container_layout
         gremlin.util.clear_layout(layout)
         cm = gremlin.ui.state_device.StateCategories()
         default_category = cm.default()
@@ -938,7 +930,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if verbose: syslog.info(f"viewer state: {key}  value: {state.value}")
                 btn.clicked.connect(self._state_toggle)
                 
-                layout.addWidget(btn, int(i / 10), int(i % 10))
+                layout.addWidget(btn)
 
                 state.changed.connect(lambda x: self._state_changed(x))
                 self._state_buttons[state.key] = btn
@@ -979,8 +971,8 @@ States can be toggled by clicking on the state button.  Expression states will u
             layout.addWidget(widget)
 
 
-            self._state_button_layout = QtWidgets.QGridLayout()
-            self.populateState(self._state_button_layout)
+            self._state_button_layout = gremlin.ui.ui_common.QFlowLayout()
+            self.populateState()
 
             layout.addLayout(self._state_button_layout)
 

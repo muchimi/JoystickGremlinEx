@@ -6815,11 +6815,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _create_hat(self):
         """Creates display for button and hat data."""
-        widgets = []
         if self._device.hat_count:
-            widgets.append(HatState(self._device))
-        if widgets:
-            widget = getHContainer(widgets, widget_only=True, alignment= QtCore.Qt.AlignmentFlag.AlignTop)
+            widget = HatState(self._device)
             self.layout().addWidget(widget)
 
     def _create_button(self):
