@@ -5534,7 +5534,11 @@ This container was specifically created for output needs that have "gates", such
 <p>This action lets you send complex sequences of outputs (joystick, keyboard, mouse) complete with timing and delay controls and separate make/break actions for buttons.</p>
 <h3 id="play-sound">Play Sound<a class="headerlink" href="#play-sound" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_play_sound.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="play sound" src="../assets/action_play_sound.png" /></a></p>
-<p>This action lets you play a sound file located on disk.</p>
+<p>This action lets you play a sound file located on disk.  As of m76T110, the playback device can be selected.  Clicking the default button will select the default Windows device.</p>
+<p>If control-click is used, the device is set for all instances of Play Sound in the profile.</p>
+<p>The default playback device is the Windows default playback device at the time the action is created.</p>
+<p>Volume can be adjusted from 0 to 100 percent.  The play button will play the audio with the currently selected options.</p>
+<p>The action supports .WAV files, and .MP3 files.  Note that playback of .MP3 may not work on all systems due to the need for CODECs to be installed.  .WAV format is recommended.</p>
 <h3 id="trigger-joystick">Trigger (Joystick)<a class="headerlink" href="#trigger-joystick" title="Permanent link">&para;</a></h3>
 <p>(requires m76T103 or later)</p>
 <p><a class="glightbox" href="../assets/trigger_map.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="trigger map" src="../assets/trigger_map.png" /></a></p>

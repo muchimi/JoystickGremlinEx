@@ -998,7 +998,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
             layout.addLayout(self._state_button_layout)
 
-        self.views.add_widget(self._state_visualizer_widget)
+            self.views.add_widget(self._state_visualizer_widget)
 
 
 
@@ -1008,21 +1008,20 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._reload_states()
 
 
-
-
     def hideState(self):
         ''' hides the state device '''
-        if self._state_visualizer_widget:
-            self.views.remove_widget(self._state_visualizer_widget)
-            self._state_visualizer_widget.setParent(None)
-            self._state_visualizer_widget = None
-            device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
-            if device in self._joystick_widgets:
-                del self._joystick_widgets[device]
+        if Shiboken.isValid(self._state_visualizer_widget):
+            if self._state_visualizer_widget:
+                self.views.remove_widget(self._state_visualizer_widget)
+                self._state_visualizer_widget.setParent(None)
+                self._state_visualizer_widget = None
+                device = gremlin.joystick_handling.get_device(gremlin.shared_state.state_tab_guid)
+                if device in self._joystick_widgets:
+                    del self._joystick_widgets[device]
     
 
     def refreshState(self):
-        if self._state_visualizer_widget:
+        if self._state_visualizer_widget and Shiboken.isValid(self._state_visualizer_widget):
             self.populateState()
     
     def _state_changed(self, state):

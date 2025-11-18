@@ -742,16 +742,17 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self.keyEvent.emit()
 
     def _update_repeater(self):
-        text = ''.join(line + "\n" for line in self._repeater_list)
-        self.repeater_widget.setPlainText(text)
-        cursor = self.repeater_widget.textCursor()
-        
-        if self._invert_display:
-            # move cursor to top
-            cursor.movePosition(QtGui.QTextCursor.MoveOperation.Start, QtGui.QTextCursor.MoveMode.MoveAnchor)
-        else:
-            cursor.movePosition(QtGui.QTextCursor.MoveOperation.End, QtGui.QTextCursor.MoveMode.MoveAnchor)
-        self.repeater_widget.setTextCursor(cursor)
+        if Shiboken.isValid(self.repeater_widget):
+            text = ''.join(line + "\n" for line in self._repeater_list)
+            self.repeater_widget.setPlainText(text)
+            cursor = self.repeater_widget.textCursor()
+            
+            if self._invert_display:
+                # move cursor to top
+                cursor.movePosition(QtGui.QTextCursor.MoveOperation.Start, QtGui.QTextCursor.MoveMode.MoveAnchor)
+            else:
+                cursor.movePosition(QtGui.QTextCursor.MoveOperation.End, QtGui.QTextCursor.MoveMode.MoveAnchor)
+            self.repeater_widget.setTextCursor(cursor)
 
 
 
