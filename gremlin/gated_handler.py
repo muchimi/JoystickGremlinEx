@@ -636,13 +636,17 @@ class RangeInfo():
     
 
 
-    def __init__(self, min_gate, max_gate,  mode = GateRangeOutputMode.Normal, parent = None,  used = False):
+    def __init__(self,
+                 min_gate,
+                 max_gate,
+                 mode = GateRangeOutputMode.Normal,
+                 parent = None,
+                 used = False):
 
         assert parent is not None, "Ranges must be parented to a GateData object " # = must provide this parameter
         #assert min_gate is not None and max_gate is not None, "Gates must be provided on range object"
         self.parent : GateData = parent
         self._id = gremlin.util.get_guid()
-        # print (f"Range: create new range id: {id}")
 
         self._output_mode = None
         self._output_range_min = None
@@ -683,7 +687,6 @@ class RangeInfo():
         self._fixed_value = None # fixed value to output for this range if the condition is Fixed
         self._swap_gates() # flip the gates so the values are always increasing 
 
-        # print (f"RangeInfo: create {self.range_display()} {self.range_gate_display()}")
     
     @property
     def description(self) -> str:
@@ -1112,32 +1115,29 @@ _trigger_tracking = TriggerTracking() # main instance
 @gremlin.singleton_decorator.SingletonDecorator
 class GateEventHandler(QtCore.QObject):
     ''' handler class for gate axis events '''
+
+ 
+    display_mode_changed = Signal(DisplayMode) # fires then the display mode changes
+    gate_configuration_changed = Signal(GateInfo) # fires when a gate changes its configuration data
+    gate_display_changed = Signal(GateInfo) # fires when range display should be updated (sends the gate that was changed)
+    gate_index_changed = Signal(GateInfo) # fires when the gate slider index changes
+    gate_order_changed = Signal() # fires when the gate order should be updated 
+    gate_request_delete = Signal(GateInfo) # fires when a gate delete request is made
+    gate_trigger_display = Signal() # adds a gate trigger line to the gate output display
+    gate_used_changed = Signal(GateInfo) # fires when the use flag changes on gates
+    gate_value_changed = Signal(GateInfo) # fires when a gate value changes (GateInfo)
     gatedata_stepsChanged = Signal(object) # signals that steps (gate counts) have changed  (gatedata)
     gatedata_valueChanged = Signal(object) # signals when the gate data changes (gatedata)
-    slider_update_event = Signal(object) # signals a slider to update passes a joystick (event)
-
-    gate_value_changed = Signal(GateInfo) # fires when a gate value changes (GateInfo)
     gates_changed = Signal() # fires when all gates changed
-    gate_configuration_changed = Signal(GateInfo) # fires when a gate changes its configuration data
-    gate_index_changed = Signal(GateInfo) # fires when the gate slider index changes
-
-    gate_display_changed = Signal(GateInfo) # fires when range display should be updated (sends the gate that was changed)
-    range_value_changed = Signal(RangeInfo) # fires when either of the gate values change
     range_configuration_changed = Signal(RangeInfo) # fires when a range configuration changes
-
-    display_mode_changed = Signal(DisplayMode) # fires then the display mode changes
-    gate_used_changed = Signal(GateInfo) # fires when the use flag changes on gates
+    range_trigger_display = Signal() # adds a range trigger line to the range output display
     range_used_changed = Signal(RangeInfo) # fires when the use flag changes on ranges
-    gate_order_changed = Signal() # fires when the gate order should be updated 
+    range_value_changed = Signal(RangeInfo) # fires when either of the gate values change
+    slider_update_event = Signal(object) # signals a slider to update passes a joystick (event)
+    unhook_gate = Signal(object) # fires when the gate is unhooked, object = the gate data object
     visibility_changed = Signal(object, bool) # fires when visibility changes
 
-    unhook_gate = Signal(object) # fires when the gate is unhooked, object = the gate data object
-
-    range_trigger_display = Signal() # adds a range trigger line to the range output display
-    gate_trigger_display = Signal() # adds a gate trigger line to the gate output display
-
-
-
+    
     
 
     def __init__(self):
@@ -3652,28 +3652,33 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
     ''' holds the data for a single gate '''
 
     valueChanged = QtCore.Signal(object) # fires when a gate value is changed - sends the gate
-    requestConfigure = QtCore.Signal(object) # fires when the user clicks on the configuration icon - sends the gate 
+    # requestConfigure = QtCore.Signal(object) # fires when the user clicks on the configuration icon - sends the gate 
     deleteConfirm = QtCore.Signal(object) # fires the delete confirm event - sends the gate
     requestGrab =  QtCore.Signal(object) # fires the grab request confirm event - sends the gate
 
-    def __init__(self, gate : GateInfo, 
+    def __init__(self,
+                 gate : GateInfo, 
+                 configure_callback,
+                 delete_callback,
                  delete_enabled = True,
                  is_container = True,
                  parent = None,
+
                  ):
         
         super().__init__(parent = parent)
-        self.gate : GateInfo = gate
+        assert isinstance(gate,GateInfo)
+        self.gate = gate
+        
         self.setup_icon = None
+        self.delete_callback = delete_callback
+        self.configure_handler = configure_callback
         self.display_index = 0 # display index for ordering
         self.warning_visible = False # flag for warning label/icon
         self._lock = False
         self._set_value_lock = False
 
         self._create_widget(gate, 
-                            self._handle_configure,
-                            self._handle_delete_confirm,
-                            self._handle_grab,
                             delete_enabled,
                             parent = self
                             )
@@ -3683,14 +3688,13 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.update_icon()
         self._update_tooltip()
 
-    def _handle_configure(self):
-        self.requestConfigure.emit(self.gate)
 
     def _handle_delete_confirm(self):
-        self.deleteConfirm.emit(self.gate)
+        self.delete_callback()
 
     def _handle_grab(self):
         self.requestGrab.emit(self.gate)
+
 
 
 
@@ -3731,21 +3735,6 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
     def cleanup(self):
         self.value_widget.valueChanged.disconnect(self._value_changed_cb) # hook manual changes made to the widget
-        # gh = GateEventHandler()
-        # gh.gate_used_changed.disconnect(self._gate_used_changed)
-        # gh.gate_value_changed.disconnect(self._gate_value_changed)
-        # gh.gate_configuration_changed.disconnect(self._gate_configuration_changed)
-        # gh.display_mode_changed.disconnect(self._display_mode_changed)
-        # gh.gate_index_changed.disconnect(self._gate_index_changed)
-
-    # def _gate_used_changed(self, gate):
-    #     ''' called when the usage flag changes '''
-    #     gremlin.util.InvokeUiMethod(self._gate_used_changed_ui, gate)
-
-    # def _gate_used_changed_ui(self, gate):
-    #     ''' called when the usage flag changes '''
-    #     if Shiboken.isValid(self) and gate.id == self.gate.id:
-    #         self.setVisible(gate.used)
 
     
     def _gate_value_changed(self, gate):
@@ -3819,16 +3808,13 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         if Shiboken.isValid(self):
             self.label_widget.setText(f"Gate {self.gate.slider_index + 1}:") # the slider index is the ordered gate number
 
-    def _create_widget(self, gate : GateInfo,
-                       configure_handler,
-                       delete_confirm_handler,
-                       grab_handler,
+    def _create_widget(self,
+                       gate : GateInfo,
                        delete_enabled,
                        parent = None):
         ''' creates a gate widget '''
         range_min = -1.0
         range_max = 1.0
-    
 
         self.setContentsMargins(0,0,0,0)
         main_layout = QtWidgets.QHBoxLayout(self)
@@ -3853,14 +3839,14 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.grab_widget = gremlin.ui.ui_common.QDataPushButton()
         self.grab_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
         self.grab_widget.setMaximumWidth(20)
-        self.grab_widget.clicked.connect(grab_handler)
+        self.grab_widget.clicked.connect(self._handle_grab)
         self.grab_widget.setToolTip("Grab axis value")
         self.grab_widget.data = (gate, self.value_widget)
         
 
         self.setup_widget = gremlin.ui.ui_common.QDataPushButton()
         self.setup_widget.setMaximumWidth(20)
-        self.setup_widget.clicked.connect(configure_handler)
+        self.setup_widget.clicked.connect(self.configure_handler)
         self.setup_widget.setToolTip(f"Setup actions for gate {gate.gate_display()}")
         self.setup_widget.data = gate
         
@@ -3870,7 +3856,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.clear_widget.setMaximumWidth(20)
 
         
-        self.clear_widget.clicked.connect(delete_confirm_handler)
+        self.clear_widget.clicked.connect(self.delete_callback)
         self.clear_widget.setToolTip("Removes this gate")
         self.clear_widget.setEnabled(delete_enabled)
         self.clear_widget.data = gate
@@ -3882,6 +3868,9 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         main_layout.addWidget(self.setup_widget)
         main_layout.addWidget(self.clear_widget)
         main_layout.addStretch()
+
+    # def _handle_configure_request(self):
+    #     self.configure_handler()
 
 
     def update_warning(self):
@@ -3913,6 +3902,8 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         #value = gremlin.util.scale_to_range(value, self.value_widget.minimum(), self.value_widget.maximum(), -1.0, 1.0)
         # syslog.info(f"value: {value:0.3f} min: {self.value_widget.minimum():0.3f} max: {self.value_widget.maximum():0.3f}")
         self.gate.setValue(value, emit=False)
+        gh = GateEventHandler()
+        gh.gate_value_changed.emit(self.gate)
         self.valueChanged.emit(self.gate)
         
         
@@ -3937,11 +3928,12 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         
 class RangeWidgetInfo(QtWidgets.QWidget):
     ''' range widget '''
-    requestConfigure = QtCore.Signal(object) # fires when the user clicks on the configuration icon - sends the range 
+    # requestConfigure = QtCore.Signal(object) # fires when the user clicks on the configuration icon - sends the range 
 
-    def __init__(self, display_index, rng : RangeInfo, decimals, parent = None):
+    def __init__(self, display_index, rng : RangeInfo, decimals, configure_handler, parent = None):
         super().__init__(parent = parent)
         
+        self.configure_handler = configure_handler
         self._range : RangeInfo = rng
         self.decimals : int = decimals
         #id : str = rng.id
@@ -3988,9 +3980,10 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         self.update_value()
         self.update_icon()
 
-
+    @QtCore.Slot()
     def _handle_configure(self):
-        self.requestConfigure.emit(self._range)
+        self.configure_handler(self._range)
+
 
     def update_icon(self):
         has_containers = self._range.hasAnyContainers()

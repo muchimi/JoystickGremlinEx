@@ -516,6 +516,12 @@ class InputViewerUi(ui_common.BaseDialogUi):
                                                                  value = config.input_viewer_combine_buttonhats,
                                                                  tooltip="Uncheck to list buttons and hats as separate visuals")
         self.combine_widget.setIgnoreKeyboard(True)
+
+        # self.flow_widget = gremlin.ui.ui_common.QDataCheckbox("Flow Layout",
+        #                                                          callback=self._toggle_flow_layout,
+        #                                                          value = config.input_viewer_flow_layout,
+        #                                                          tooltip="Change visuals layout to vertical or free-flow")
+        # self.flow_widget.setIgnoreKeyboard(True)
  
 
 
@@ -527,6 +533,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         options_widget = QtWidgets.QGroupBox("Options")
         options_layout = QtWidgets.QVBoxLayout(options_widget)
         options_layout.addWidget(self.combine_widget)
+       # options_layout.addWidget(self.flow_widget)
         options_layout.addStretch()
 
 
@@ -579,6 +586,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         self._left_panel_widget, self._left_panel_layout = gremlin.ui.ui_common.getVContainer()
         self._left_panel_widget.setMinimumWidth(150)
+        self._left_panel_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Expanding)
 
         self._right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer()
         
@@ -586,7 +594,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._splitter.addWidget(self._left_panel_widget)
         self._splitter.addWidget(self._right_panel_widget)
         self._splitter.setStretchFactor(0,1)
-        self._splitter.setStretchFactor(1,2)
+        self._splitter.setStretchFactor(1,3)
 
 
         self._left_panel_layout.addWidget(self.scroll_selector_area)
@@ -618,10 +626,18 @@ States can be toggled by clicking on the state button.  Expression states will u
         
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_handler)
+        el.shutdown.connect(self._handle_shutdown)
+
 
         self._event_data = {}
 
         self._update_view()
+
+    def _handle_shutdown(self):
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.disconnect(self._joystick_event_handler)
+        self.views.clear()
+
 
     def _clear_all(self):
         ''' clears all items '''
@@ -756,6 +772,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         assert gremlin.util.is_ui_thread()
         if not Shiboken.isValid(self):
             return
+        if not Shiboken.isValid(self.views):
+            return
+    
         key = (device.device_id, visualization)
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui
@@ -782,6 +801,8 @@ States can be toggled by clicking on the state button.  Expression states will u
                 self._joystick_widgets[key] = widget
                 self._lock.release()
                 widget.hook()
+                if visualization in (gremlin.types.VisualizationType.AxisCurrent, gremlin.types.VisualizationType.AxisTemporal):
+                    widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Preferred)
                
                 if verbose: syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
             else:
@@ -854,6 +875,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
 
     def _populateState_ui(self, layout):
+        
         if self._state_visualizer_widget:
             self._state_buttons.clear()
     
@@ -1069,7 +1091,11 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.vis_selector.updateSelector()
         self._update_view()
 
-
+    @QtCore.Slot(bool)
+    def _toggle_flow_layout(self, checked):
+        config = gremlin.config.Configuration()
+        config.input_viewer_flow_layout = checked
+        self.views.updateLayout()
 
            
     def _update_view(self):    
@@ -1114,13 +1140,27 @@ class InputViewerArea(QtWidgets.QScrollArea):
         self.setWidgetResizable(True)
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
-        self.scroll_layout.addStretch()
+        
         self.scroll_widget.setLayout(self.scroll_layout)
+        self._is_flow = False # true if using the flow layout
+        self.container_widget, self.container_layout = gremlin.ui.ui_common.getVContainer()
+        #self.container_layout = gremlin.ui.ui_common.QFlowLayout(self.container_widget)
 
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         self.setWidget(self.scroll_widget)
+        self.scroll_layout.addWidget(self.container_widget)
+        self.scroll_layout.addStretch()
+
+
+
+        def updateLayout(self):
+            pass
+
+    def sizeHint(self):
+        return QtCore.QSize(200,200)
+
 
     def add_widget(self, widget):
         """Adds the specified widget to the visualization area.
@@ -1128,8 +1168,12 @@ class InputViewerArea(QtWidgets.QScrollArea):
         :param widget the widget to add
         """
         assert gremlin.util.is_ui_thread()
+        if not Shiboken.isValid(self) or not Shiboken.isValid(widget):
+            return
+
         self.widgets.append(widget)
-        self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, widget)
+        self.container_layout.addWidget(widget)
+        widget.setParent(self.container_widget)
         widget.show()
 
         width = 0
@@ -1148,9 +1192,11 @@ class InputViewerArea(QtWidgets.QScrollArea):
         :param widget the widget to remove
         """
         assert gremlin.util.is_ui_thread()
+        if not Shiboken.isValid(self) or not Shiboken.isValid(widget):
+            return
         if hasattr(widget,"unhook"):
             widget.unhook()
-        self.scroll_layout.removeWidget(widget)
+        self.container_layout.removeWidget(widget)
         if widget is self.widgets:
             index = self.widgets.index(widget)
             del self.widgets[index]
@@ -1159,11 +1205,13 @@ class InputViewerArea(QtWidgets.QScrollArea):
     def clear(self):
         ''' clears all widgets '''
         assert gremlin.util.is_ui_thread()
+        if not Shiboken.isValid(self):
+            return
         for widget in self.widgets:
             if hasattr(widget,"unhook"):
                 widget.unhook()
             widget.setVisible(False)
-            self.scroll_layout.removeWidget(widget)    
+            self.container_layout.removeWidget(widget)    
             del self.widgets[self.widgets.index(widget)]
             widget.deleteLater()
         self.widgets.clear()

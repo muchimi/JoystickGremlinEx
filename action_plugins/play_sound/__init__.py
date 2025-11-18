@@ -20,6 +20,8 @@ import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from lxml import etree as ElementTree
 import qtawesome as qta
+import gremlin.util
+import gremlin.event_handler
 
 import gremlin.base_profile
 import gremlin.config
@@ -51,12 +53,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, PlaySound)
 
     def _create_ui(self):
-        if not Shiboken.isValid(self):
-            return
-        content_widget = QtWidgets.QWidget()
-        content_widget.setContentsMargins(0,0,0,0)
-        content_layout = QtWidgets.QHBoxLayout(content_widget)
-        content_layout.setContentsMargins(0,0,0,0)
+        
         self.icon_widget = QtWidgets.QLabel()
         self.file_path_widget = QtWidgets.QLineEdit()
         self.file_path_widget.installEventFilter(self)
@@ -71,26 +68,78 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.play_widget = QtWidgets.QPushButton("Play")
         self.play_widget.setIcon(load_icon("ei.play", qta_color = gremlin.ui.ui_common.Color.activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
-        self.play_widget.clicked.connect(self._play_cb)
+        self.play_widget.clicked.connect(self._handle_play)
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
+        verbose = gremlin.config.Configuration().verbose_mode_sound
+        
+        device_index = self.action_data.getAudioDeviceIndex()
+        
+        source = [(d.description(), index) for index, d in self.action_data.device_map.items()]
+
+        self.audio_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_audio_change, source=source, value = device_index)
+        self.default_widget = gremlin.ui.ui_common.QDataPushButton("Default",
+                                                                   callback = self._handle_select_default,
+                                                                   ctrl_callback = self._handle_select_default_all,
+                                                                   tooltip = "Select system default")
+
+        widgets = [
+            "Playback device:",
+            self.audio_widget,
+            self.default_widget
+        ]
+
+        audio_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+
+        widgets = [
+            self.icon_widget,
+            self.file_path_widget,
+            self.edit_path_widget
+        ]
 
 
-        content_layout.addWidget(self.icon_widget)
-        content_layout.addWidget(self.file_path_widget)
-        content_layout.addWidget(self.edit_path_widget)
-        content_layout.addWidget(QtWidgets.QLabel("Volume"))
-        content_layout.addWidget(self.volume_widget)
-        content_layout.addWidget(self.play_widget)
+        file_container =  gremlin.ui.ui_common.getHContainer(widgets,"Sound file:", widget_only=True)
 
+        widgets = [
+            "Volume:",
+            self.volume_widget, 
+            self.play_widget
+        ]
+
+        content_widget =  gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        
+        self.main_layout.addWidget(audio_container)
+        self.main_layout.addWidget(file_container)
         self.main_layout.addWidget(content_widget)
         self.main_layout.addWidget(self._execute_widget)
+    
+    def _handle_audio_change(self, value):
+        device = self.action_data.findDevice(value)
+        self.action_data.audio_device = device.description()
 
-        self.player.setAudioOutput(self.audio)
+    @QtCore.Slot()
+    def _handle_select_default(self):
+        ''' selects the default playback device '''
+        default_index = self.action_data.getDefaultAudioDeviceIndex()
+        index = self.audio_widget.findData(default_index)
+        if index != -1:
+            self.audio_widget.setCurrentIndex(index)
+
+    @QtCore.Slot()
+    def _handle_select_default_all(self):
+        ''' on control click the default button, change all devices '''
+        self._handle_select_default() # update ours
+        # update the rest of the profile
+        default_device = self.action_data.getDefaultAudioDevice()
+        name = default_device.description()
+        profile = gremlin.shared_state.current_profile
+        profile.setDefaultAudioDevice(name)
         
+
+
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
         self.action_data.exec_on_press = checked
@@ -162,7 +211,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             None,
             "Path to sound file",
             dir,
-            "All Files (*)"
+            "Audio files (*.wav *.mp3)"
         )
         if os.path.isfile(fname):
             self.action_data.sound_file = fname
@@ -172,46 +221,37 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._populate_ui()
 
     @QtCore.Slot()
-    def _play_cb(self):
-        if os.path.isfile(self.action_data.sound_file):
-            media = QtCore.QUrl(self.action_data.sound_file)
-            self.player.setSource(media)
-            volume = self.action_data.volume/100.0  # 0.0 to 1.0
-            self.audio.setVolume(volume) 
-            self.player.play()
-
+    def _handle_play(self):
+        self.action_data.play()
 class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
     ''' fixed for QT6 media player changes '''
-
-    player = QtMultimedia.QMediaPlayer()
-    audio = QtMultimedia.QAudioOutput()
-
+    
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
         self.sound_file = action.sound_file
         self.volume = action.volume
-        PlaySoundFunctor.player.setAudioOutput(PlaySoundFunctor.audio)
+      
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_output or config.verbose_mode_exec
+  
 
 
     def process_event(self, event, value, extra_data = None):
-
-        
         verbose = self.verbose
 
-        is_pressed = event.is_pressed
-        trigger = (is_pressed and self.action_data.exec_on_press) or \
-                    (not is_pressed and self.action_data.exec_on_release) 
         
-        if verbose: syslog.info(f"PLAY: trigger [{trigger}] on input state: [{is_pressed}]")
+        if self.device:
 
-        if trigger and os.path.isfile(self.sound_file):
-            if verbose: syslog.info(f"\texecute play soundfile: {self.sound_file}")
-            media = QtCore.QUrl(self.sound_file)
-            PlaySoundFunctor.player.setSource(media)
-            PlaySoundFunctor.audio.setVolume(self.volume/100) # 0 to 1
-            PlaySoundFunctor.player.play()
+            is_pressed = event.is_pressed
+            trigger = (is_pressed and self.action_data.exec_on_press) or \
+                        (not is_pressed and self.action_data.exec_on_release) 
+            
+            if verbose: syslog.info(f"PLAY: trigger [{trigger}] on input state: [{is_pressed}]")
+
+
+            if trigger and os.path.isfile(self.sound_file):
+                if verbose: syslog.info(f"\texecute play soundfile: {self.sound_file}")
+                self.action_data.play()
         return True
 
 
@@ -241,6 +281,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     functor = PlaySoundFunctor
     widget = PlaySoundWidget
+    player = QtMultimedia.QMediaPlayer() # needs to be a singleton or it blows up
 
     def icon(self):
         return "ei.speaker"
@@ -253,6 +294,38 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.volume = 50
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
+        
+        devices = QtMultimedia.QMediaDevices.audioOutputs()
+        self.device_map = {}
+        for index, device in enumerate(devices):
+            self.device_map[index] = device
+        default_audio_device = QtMultimedia.QAudioDevice()
+        self._audio_device = default_audio_device.description()
+        self.device = self.getAudioDevice()
+        self.player = QtMultimedia.QMediaPlayer()
+        self.audio = QtMultimedia.QAudioOutput()
+        
+
+    @property
+    def audio_device(self) -> str:
+        return self._audio_device
+    @audio_device.setter
+    def audio_device(self, name : str):
+        index = self.findDeviceIndex(name)
+        if index is None:
+            # no longer valid, switch to the new default device
+            self.device = self.getDefaultAudioDevice()
+            if self.device:
+                name = self.device.description()
+            else:
+                name = None
+            self._audio_device = name
+
+        else:
+            self.device = self.device_map[index]
+            self._audio_device = name
+
+
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -263,13 +336,76 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             InputType.JoystickAxis,
             InputType.JoystickHat
         ]
+    
+    def play(self):
+        ''' plays the sound '''
+        if self.sound_file and os.path.isfile(self.sound_file):
+            verbose = gremlin.config.Configuration().verbose_mode_sound
+            audio = QtMultimedia.QAudioOutput(self.device)
+            PlaySound.player.setAudioOutput(audio)
+            media = QtCore.QUrl.fromLocalFile(self.sound_file)
+            PlaySound.player.setSource(media)
+            audio.setVolume(self.volume/100) # 0 to 1
+            if verbose: syslog.info(f"play start: {self.sound_file}")
+            PlaySound.player.play()
+            while PlaySound.player.isPlaying():
+                QtWidgets.QApplication.processEvents()
+            PlaySound.player.stop()
+            if verbose: syslog.info("play done")
+            
+        else:
+            syslog.error(f"PLAY: don't know how to play: {self.sound_file}")
+
+    
+    def findDevice(self, index : int):
+        if index in self.device_map:
+            return self.device_map[index]
+        
+    def findDeviceByDescription(self, description : str):
+        ''' gets a device by description (name)'''
+        device = next((d for d in self.device_map.values() if d.description() == description),None) 
+        return device
+    
+    def findDeviceIndex(self, description : str):
+        ''' gets the device index for a specific device description (name) '''
+        index = next((i for i, d in self.device_map.items() if d.description() == description),None) 
+        return index
+
+    def getAudioDevice(self):
+        ''' gets the audio device to play from '''
+        
+        default_audio_device = self.getDefaultAudioDevice()
+        
+        if self.audio_device:
+            device = next((d for d in self.device_map.values() if d.description() == self.audio_device), default_audio_device) 
+        else:
+            device = default_audio_device
+        return device
+    
+    def getDefaultAudioDevice(self):
+        return  QtMultimedia.QMediaDevices.defaultAudioOutput()
+    
+    def getDefaultAudioDeviceIndex(self):
+        index = next((i for i, d in self.device_map.items() if d.isDefault()),None) 
+        return index
+
+    
+    def getAudioDeviceIndex(self):
+        ''' gets the index of the selected device '''
+        if not self.audio_device:
+            device = self.getDefaultAudioDevice()
+            self.audio_device = device.description()
+        index = next((i for i, d in self.device_map.items() if d.description() == self.audio_device),None) 
+        return index
+
 
     def _parse_xml(self, node, data = None, extra_data = None):
         self.sound_file = node.get("file")
         self.volume = int(node.get("volume", 50))
         self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
         self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
-
+        self.audio_device = safe_read(node,"audio-device",str, None)
+       
 
     def _generate_xml(self):
         node = ElementTree.Element("play-sound")
@@ -279,6 +415,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         node.set("volume", str(self.volume))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))        
+        if self.audio_device:
+            node.set("audio-device", self.audio_device)
         return node
 
     def _is_valid(self):

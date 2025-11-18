@@ -1461,7 +1461,11 @@ class Configuration(QtCore.QObject):
         ''' true if verbose mode is in TTS mode '''
         return self.verbose and VerboseMode.TTS in self.verbose_mode
         
-    
+    @property
+    def verbose_mode_sound(self):
+        ''' true if verbose mode is in TTS mode '''
+        return self.verbose and VerboseMode.Sound in self.verbose_mode
+        
     
     @property
     def midi_enabled(self):
@@ -2786,8 +2790,16 @@ class Configuration(QtCore.QObject):
 
     @property
     def input_viewer_combine_buttonhats(self) -> bool:
-        # option to combine buttons and hats in the input viewer
+        ''' option to combine buttons and hats in the input viewer '''
         return self._get_data("input_viewer_combine_buttonhats", True)
     @input_viewer_combine_buttonhats.setter
     def input_viewer_combine_buttonhats(self, value : bool):
         self._set_data("input_viewer_combine_buttonhats", value)
+
+    @property
+    def input_viewer_flow_layout(self) -> bool:
+        ''' option for the input viewer to show as a flow layout '''
+        return self._get_data("input_viewer_flow_layout", False)
+    @input_viewer_flow_layout.setter
+    def input_viewer_flow_layout(self, value: bool):
+        self._set_data("input_viewer_flow_layout", value)

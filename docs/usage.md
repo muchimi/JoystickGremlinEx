@@ -655,7 +655,15 @@ This action lets you send complex sequences of outputs (joystick, keyboard, mous
 
 ![play sound](assets/action_play_sound.png)
 
-This action lets you play a sound file located on disk.
+This action lets you play a sound file located on disk.  As of m76T110, the playback device can be selected.  Clicking the default button will select the default Windows device.
+
+If control-click is used, the device is set for all instances of Play Sound in the profile.
+
+The default playback device is the Windows default playback device at the time the action is created.
+
+Volume can be adjusted from 0 to 100 percent.  The play button will play the audio with the currently selected options.
+
+The action supports .WAV files, and .MP3 files.  Note that playback of .MP3 may not work on all systems due to the need for CODECs to be installed.  .WAV format is recommended.
 
 ### Trigger (Joystick)
 

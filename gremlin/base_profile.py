@@ -2960,6 +2960,17 @@ class Profile():
             device = gremlin.joystick_handling.get_device(device_id)
             syslog.info(f"Default axis value enabled SET: vjoy: {device.vjoy_id} axis: {id} value: {enabled}")
         self._start_state[device_id]["enabled"][id] = enabled
+
+    def setDefaultAudioDevice(self, name):
+        ''' sets the default audio device for all play actions '''
+
+        def _apply_default_sound(action, extra_data : dict = None):
+            action.audio_device = name
+
+        self.filter_actions("play-sound", _apply_default_sound)
+        
+
+
     
 
     def setSimconnectMode(self, key, mode):

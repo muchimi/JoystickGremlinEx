@@ -860,6 +860,9 @@ class QSliderWidget(QtWidgets.QWidget):
 
 
     def _show_tooltip(self, message : str):
+        gremlin.util.InvokeUiMethod(self._show_tooltip_ui, message)
+
+    def _show_tooltip_ui(self, message : str):
         if self._tooltip_timer is not None:
             self._tooltip_timer.stop()
         self._tooltip_timer = QTimer(self)   

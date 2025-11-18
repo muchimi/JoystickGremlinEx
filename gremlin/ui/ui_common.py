@@ -4126,15 +4126,31 @@ class QDataPushButton(QtWidgets.QPushButton):
     ''' custom push button with data field and right click context events '''
 
     rightClicked = QtCore.Signal() # fires when the button is right clicked
+    ctrlClicked = QtCore.Signal() # fires on control click
 
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None):
+    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, ctrl_callback = None, right_callback = None):
+        ''' custom push button 
+        
+        :param text: label for the button (optiona)
+        :param data: data object tracked with the button (optional)
+        :param parent: parent widget (optional)
+        :param tooltip: tooltip (optional)
+        :param callback: click callback (optional)
+        :param ctrl_callback: control click callback (optional)
+
+        
+        '''
         super().__init__(text, parent)
         self._data = data
         if tooltip:
             self.setToolTip(tooltip)
         if callback:
             self.clicked.connect(callback)
+        if ctrl_callback:
+            self.ctrlClicked.connect(ctrl_callback)
+        if right_callback:
+            self.rightClicked.connect(right_callback)
 
         self.installEventFilter(self)
 
@@ -4142,10 +4158,15 @@ class QDataPushButton(QtWidgets.QPushButton):
         t = event.type()
         if t == QtCore.QEvent.Type.MouseButtonPress:
             button = event.buttons()
+            # Check if Control modifier is active
+            is_ctrl = event.modifiers() & Qt.ControlModifier
             if button == QtCore.Qt.RightButton:
                 self.rightClicked.emit()
                 return True # handled
-
+            elif button == QtCore.Qt.LeftButton:
+                if is_ctrl:
+                    self.ctrlClicked.emit()
+                    return True # handled
         return super().eventFilter(watched, event)
 
 
@@ -6647,7 +6668,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     """ joystick visualization widget in the input viewer """
 
-    def __init__(self, device : DeviceSummary, vis_type, parent=None):
+    def __init__(self, device : DeviceSummary, vis_type : gremlin.types.VisualizationType, parent=None):
         """Creates a new instance.
 
         :param device_data information about the device itself
@@ -6669,7 +6690,12 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self.show_raw = True # true if raw value is displayed
         self._as = gremlin.event_handler.AxisState()
 
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self._handle_shutdown)
         
+
+    def _handle_shutdown(self):
+        self.unhook()
 
     @property
     def device_id(self):
@@ -6839,14 +6865,14 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _create_current_axis(self):
         """Creates display for current axes data."""
-        widgets = [AxesCurrentState(self._device)]
-        for widget in widgets:
+        self.widgets = [AxesCurrentState(self._device)]
+        for widget in self.widgets:
             self.layout().addWidget(widget)
 
     def _create_temporal_axis(self):
         """Creates display for temporal axes data."""
-        widgets = [AxesTimeline(self._device)]
-        for widget in widgets:
+        self.widgets = [AxesTimeline(self._device)]
+        for widget in self.widgets:
             self.layout().addWidget(widget)
 
 
@@ -12468,6 +12494,7 @@ class QFlowLayout(QtWidgets.QLayout):
             return self._item_list.pop(index)
 
         return None
+    
 
     def expandingDirections(self):
         return Qt.Orientation(0)

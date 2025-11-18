@@ -1125,7 +1125,7 @@ def safe_read(node, key, type_cast, default_value):
     # in case reading fails
     syslog = logging.getLogger("system")
     value = default_value
-    if not key in node.keys():
+    if not key in node.attrib:
         if default_value is None:
             match type_cast:
                 case str():
@@ -1138,10 +1138,8 @@ def safe_read(node, key, type_cast, default_value):
                     default_value = False
                 case _:
                     pass
-        if default_value is None:
-            msg = f"Attempted to read attribute '{key}' which does not exist and no default value is provided."
-            syslog.error(msg)
-            raise error.ProfileError(msg)
+
+        return default_value
     else:
         value = node.get(key)
         

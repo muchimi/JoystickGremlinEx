@@ -853,18 +853,23 @@ making changes that impact the order of gates or ranges."""
             syslog.info(f"gate axis widget: init {self.id} {self.action_data.input_display_name}")
 
         self.hook()
+
         gh = GateEventHandler()
-        gh.slider_update_event.connect(self._handle_slider_update)
-        gh.range_trigger_display.connect(self._handle_range_trigger_display)
+        gh.display_mode_changed.connect(self._handle_display_mode_changed)
+        gh.gate_configuration_changed.connect(self._handle_gate_configuration_changed)
+        gh.gate_display_changed.connect(self._gate_value_changed)
+        gh.gate_index_changed.connect(self._handle_gate_index_changed)
+        gh.gate_order_changed.connect(self._gate_order_changed_cb)
+        gh.gate_request_delete.connect(self._handle_gate_request_delete)
         gh.gate_trigger_display.connect(self._handle_gate_trigger_display)
         gh.gate_value_changed.connect(self._handle_gate_value_changed)
-        gh.display_mode_changed.connect(self._handle_display_mode_changed)
+        gh.gatedata_stepsChanged.connect(self._update_steps_cb)
+        gh.gatedata_valueChanged.connect(self._update_values_cb)
+        gh.gates_changed.connect(self._gates_changed)
         gh.range_configuration_changed.connect(self._handle_range_configuration_changed) # called when range data changes
-        gh.gate_display_changed.connect(self._handle_gate_value_changed)
-
-
-        gh.gate_configuration_changed.connect(self._handle_gate_configuration_changed)
-        gh.gate_index_changed.connect(self._handle_gate_index_changed)
+        
+        gh.range_trigger_display.connect(self._handle_range_trigger_display)
+        gh.slider_update_event.connect(self._handle_slider_update)
 
 
         # create range data 
@@ -876,19 +881,7 @@ making changes that impact the order of gates or ranges."""
         # keyboard hook for undo key
         el = gremlin.event_handler.EventListener()
         el.keyboard_event.connect(self._keyboard_handler)
-        # el.joystick_event.connect(self._handle_joystick_event)
-
-    # def _handle_joystick_event(self, event):
-    #     if gremlin.shared_state.is_running:
-    #         return
-    #     if not event.is_axis:
-    #         return
-    #     if event.device_id != self.action_data.hardware_device_id:
-    #         return
-    #     if event.identifier != self.action_data.hardware_input_id:
-    #         return
-    #     value = event.curve_value
-    #     self._slider_widget.setMarker(value)        
+ 
 
     def _handle_display_mode_changed(self, display_mode):
         # update all ranges
@@ -962,9 +955,20 @@ making changes that impact the order of gates or ranges."""
                 # remove defunct widget
                 del self._gwi_map[gate]
 
+
+    def _handle_gate_request_delete(self, gate : GateInfo):
+        gremlin.util.InvokeUiMethod(self._remove_gate_ui, gate)
+
+    def _handle_gate_configuration_request(self, gate : GateInfo):
+        ''' gate configuration request '''
+        gremlin.util.InvokeUiMethod(self._configure_gate_cb_ui, gate)
+
+    def _handle_range_configuration_request(self, range : RangeInfo):
+        ''' range configuration request '''
+        gremlin.util.InvokeUiMethod(self._configure_range_cb_ui, range)
+ 
     def _handle_gate_configuration_changed(self, gate : GateInfo):
-        ''' called when the gate configuration changes '''
-        self._handle_gate_configuration_changed_ui(gate)
+        gremlin.util.InvokeUiMethod(self._handle_gate_configuration_changed_ui, gate)
 
     def _handle_gate_configuration_changed_ui(self, gate : GateInfo):
         ''' called when the gate configuration changes'''
@@ -1009,16 +1013,6 @@ making changes that impact the order of gates or ranges."""
             self._gate_data.unhook()
             gremlin.util.clear_layout(self.main_layout)
             self._deleted = True
-            gh = GateEventHandler()
-            gh.slider_update_event.disconnect(self._handle_slider_update)
-            gh.range_trigger_display.disconnect(self._handle_range_trigger_display)
-            gh.gate_trigger_display.disconnect(self._handle_gate_trigger_display)
-            gh.gate_value_changed.disconnect(self._handle_gate_value_changed)
-            gh.display_mode_changed.disconnect(self._handle_display_mode_changed)
-            gh.range_configuration_changed.disconnect(self._handle_range_configuration_changed) # called when range data changes
-            gh.gate_display_changed.disconnect(self._handle_gate_value_changed)
-
-            
 
 
     def _pushState(self):
@@ -1105,9 +1099,9 @@ making changes that impact the order of gates or ranges."""
         ''' enables connections '''
         # hook the joystick input for axis input repeater
         if self._hooked:
-            # unhook first
-            self.unhook()
+            return
 
+        self._hooked = True
         verbose = gremlin.config.Configuration().verbose_mode_gate
         if verbose:
             syslog.info(f"gate axis widget: hook {self.id} {self.action_data.input_display_name}")
@@ -1116,16 +1110,8 @@ making changes that impact the order of gates or ranges."""
         self._gate_data.hook()
 
         # hook events 
-        gh = GateEventHandler()
-        gh.gatedata_stepsChanged.connect(self._update_steps_cb)
-        gh.gatedata_valueChanged.connect(self._update_values_cb)
+       
 
-        gh.gate_order_changed.connect(self._gate_order_changed_cb)
-        gh.gate_value_changed.connect(self._gate_value_changed)
-        gh.gate_display_changed.connect(self._gate_value_changed)
-        gh.gates_changed.connect(self._gates_changed)
-        # gh.use_default_range_changed.connect(self._update_range_display)
-        gh.gate_configuration_changed.connect(self._handle_gate_configuration_changed)
         self._hooked = True
 
     def unhook(self):
@@ -1137,14 +1123,23 @@ making changes that impact the order of gates or ranges."""
 
             gh = GateEventHandler()
 
+            gh.display_mode_changed.disconnect(self._handle_display_mode_changed)
+            gh.gate_configuration_changed.disconnect(self._handle_gate_configuration_changed)
+            gh.gate_display_changed.disconnect(self._gate_value_changed)
+            gh.gate_index_changed.disconnect(self._handle_gate_index_changed)
+            gh.gate_order_changed.disconnect(self._gate_order_changed_cb)
+            
+            gh.gate_request_delete.disconnect(self._handle_gate_request_delete)
+            gh.gate_trigger_display.disconnect(self._handle_gate_trigger_display)
+            gh.gate_value_changed.disconnect(self._handle_gate_value_changed)
             gh.gatedata_stepsChanged.disconnect(self._update_steps_cb)
             gh.gatedata_valueChanged.disconnect(self._update_values_cb)
-
-            gh.gate_order_changed.disconnect(self._gate_order_changed_cb)
-            gh.gate_value_changed.disconnect(self._gate_value_changed)
             gh.gates_changed.disconnect(self._gates_changed)
-            #gh.use_default_range_changed.disconnect(self._update_range_display)
-            gh.gate_configuration_changed.disconnect(self._handle_gate_configuration_changed)
+            gh.range_configuration_changed.disconnect(self._handle_range_configuration_changed) # called when range data changes
+            gh.range_request_configure.disconnect(self._handle_range_configuration_request)
+            gh.range_trigger_display.disconnect(self._handle_range_trigger_display)
+            gh.slider_update_event.disconnect(self._handle_slider_update)
+
             self._hooked = False
             
 
@@ -1217,6 +1212,7 @@ making changes that impact the order of gates or ranges."""
     
     def _sort_gate_layout_ui(self):
         ''' updates and sorts the gate container layout '''
+        gremlin.util.assert_ui_thread()
         if not Shiboken.isValid(self):
             return
 
@@ -1234,13 +1230,16 @@ making changes that impact the order of gates or ranges."""
         if verbose: syslog.info("Gate table:")
         for index, gate in enumerate(gate_list):
             # create a widget for this gate
+            assert isinstance(gate,GateInfo)
             gate.setIndex(index, False)
             widget = GateWidgetInfo(gate,
+                                    self.create_configure_callback(gate),
+                                    self.create_delete_callback(gate),
                                     is_container=gate.hasAnyContainers(),
                                     parent = self.gate_flow_widget
                                     )
-            widget.requestConfigure.connect(self._configure_gate_cb)
-            widget.deleteConfirm.connect(self._delete_gate_confirm_cb)
+            #widget.requestConfigure.connect(self._configure_gate_cb)
+            #widget.deleteConfirm.connect(self._delete_gate_confirm_cb)
             widget.requestGrab.connect(self._grab_cb)
             
             # determine min/max for this gate
@@ -1281,6 +1280,11 @@ making changes that impact the order of gates or ranges."""
         self.gate_count_widget.setText(f"Gates ({gate_count}):")
 
             
+    def create_delete_callback(self, gate : GateInfo):
+        return lambda : self._remove_gate_ui(gate)
+    
+    def create_configure_callback(self, gate : GateInfo):
+        return lambda: self._configure_gate_cb_ui(gate)
    
     def _reload_ranges(self):
         ''' when gates change, reload ranges '''
@@ -1319,12 +1323,10 @@ making changes that impact the order of gates or ranges."""
             widget = RangeWidgetInfo(index + 1, 
                                 rng,
                                 decimals,
+                                self._configure_range_cb_ui,
                                 parent = self.range_flow_widget
                                 )
-            
-            widget.requestConfigure.connect(self._handle_request_configure)
 
-            #table.setCellWidget(row, col, widget)
             self.range_flow_layout.addWidget(widget)
 
             # track the widget so we can find it
@@ -1567,18 +1569,9 @@ making changes that impact the order of gates or ranges."""
         result = message_box.exec()
         return result == QtWidgets.QMessageBox.StandardButton.Ok
 
-
-    QtCore.Slot(object, GateInfo)
-    def _delete_gate_confirm_cb(self, gate : GateInfo):
-        ''' delete requested '''
-        self._remove_gate(gate)
-
-    def _remove_gate(self, gate : GateInfo, prompt = None):
-        gremlin.util.InvokeUiMethod(self._remove_gate_ui, gate, prompt)
-
     def _remove_gate_ui(self, gate : GateInfo, prompt : bool = None):
         ''' removes a gate - if the prompt is not given - the prompt is automatically derived based on container contents '''
-
+        assert isinstance(gate,GateInfo)
         # ensure there are at least two gates left
         count = len(self._gate_data.getGates())
         if count <= 2:
@@ -1612,14 +1605,11 @@ making changes that impact the order of gates or ranges."""
         self.deleteGate(gate)
 
 
-    def _configure_range_cb(self):
-        gremlin.util.InvokeUiMethod(self._configure_range_cb_ui)    
+    def _configure_range_cb(self, rng : RangeInfo):
+        gremlin.util.InvokeUiMethod(self._configure_range_cb_ui, rng)    
         
-    @QtCore.Slot()
-    def _configure_range_cb_ui(self):
+    def _configure_range_cb_ui(self, rng : RangeInfo):
         ''' open the configuration dialog for ranges '''
-        widget = self.sender()  # the button's data field contains the widget to update
-        rng = widget.data
         self._configure_range_exec(rng)
 
 
@@ -1754,19 +1744,14 @@ making changes that impact the order of gates or ranges."""
             dialog.exec()
             
 
-    
     def _configure_gate_cb(self, gate):
+        gremlin.util.InvokeUiMethod(self._configure_gate_cb_ui, gate) # ensure on Ui thread
+    
+    def _configure_gate_cb_ui(self, gate):
         ''' gate configure button clicked '''
-        connected = gremlin.util.isSignalConnected(self,"configure_gate_requested")
-        if connected:
-            # call the handler
-            self.configure_gate_requested.emit(gate)
-        else:
-            dialog = ActionContainerUi(gate_data = self._gate_data, info_object = gate, action_data = self.action_data, input_type=InputType.JoystickButton)
-            dialog.delete_requested.connect(self._delete_gate_cb)
-            dialog.exec()
-            
-        
+        dialog = ActionContainerUi(gate_data = self._gate_data, info_object = gate, action_data = self.action_data, input_type=InputType.JoystickButton)
+        dialog.delete_requested.connect(self._delete_gate_cb)
+        dialog.exec()
 
     QtCore.Slot()
     def _delete_cb(self):

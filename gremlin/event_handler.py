@@ -684,7 +684,8 @@ class EventListener:
 	request_vjoy_axis_change = Signal(object, int, float) # request to change axis for VJOY (device, axis_id, value)
 
 	process_manual_event = Signal(object, object, object) # fires when a manual event should be processed (event, value, extra_data)
-	
+
+
 
 	def __init__(self):
 		"""Creates a new instance."""
