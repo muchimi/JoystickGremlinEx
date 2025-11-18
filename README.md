@@ -19,7 +19,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T109B)
-- Change: Input Viewer: use flow layout for states
+- Change: Input Viewer: use flow layout for states.
 - Fix: Macro: device ID lookup for vjoy macro actions.
 
 
