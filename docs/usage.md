@@ -653,11 +653,21 @@ This action lets you send complex sequences of outputs (joystick, keyboard, mous
 
 ### Play Sound
 
-![play sound](assets/action_play_sound.png)
+
 
 This action lets you play a sound file located on disk.  As of m76T110, the playback device can be selected.  Clicking the default button will select the default Windows device.
 
-If control-click is used, the device is set for all instances of Play Sound in the profile.
+As of m76T111, the action includes a number of additional features:
+
+- Ability to playback multiple sounds concurrently
+- Ability to trigger the same sound multiple times via repeated triggers
+- Playback is non-blocking (the profile continues to run)
+- Ability to change timing on how the sample is played back
+- Ability to loop the sample multiple times (default count is one)
+
+![play sound](assets/action_play_sound.png)
+
+If control-click is used on the default button, the default device is set for all instances of Play Sound in the profile.
 
 The default playback device is the Windows default playback device at the time the action is created.
 

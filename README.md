@@ -30,7 +30,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 	- fade-out time (ms): time to fade out on playback.
 	- stop previous: if set, all other (non TTS) audio will stop before playing the sample.
 	
-Note 1: if you are using multiple output sound devices, as only one can be used at a time, all audio playback will stop on other devices.  It is thus recommended to use the ctrl-click feature on the default button to synchronize all your playback actions to the same playback device to avoid inadvertent effects, unless you are ok with this behavior.  This is an unfortunate limitation of the sound engine being used as it is unable to send audio to multiple audio devices at the same time (although it can play multiple audio on the same device concurrently).  
+Note 1: if you are using multiple output sound devices, as only one can be used at a time, all audio playback will stop on other devices.  It is thus recommended to use the ctrl-click feature of the default button or the sync all button to synchronize all your playback actions to the same playback device to avoid inadvertent effects, unless you are ok with this behavior.  This is an unfortunate limitation of the sound engine being used as it is unable to send audio to multiple audio devices at the same time (although it can play multiple audio on the same device concurrently).  
   
 Note 2: At some point when TTS libraries work with current versions of Python, I plan to enhance the TTS module as well which will bring these features and voice options to GEX using a local AI model.  There are several options there, however all of them seem stuck with Python versions incompatible with GEX.
 

@@ -98,6 +98,10 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                                    ctrl_callback = self._handle_select_default_all,
                                                                    tooltip = "Select system default")
         
+        
+        self.sync_widget =gremlin.ui.ui_common.QDataPushButton("Sync All",callback = self._handle_sync_all, tooltip ="Set all Play Sound actions in the profile to this device")
+
+        
 
         msg = """Samples played with this action will play concurrently as they are triggered.  Use the stop option to terminate prior audio streams before triggering the playback.  Playback timing options with a value of zero (0) means disabled.
 """
@@ -107,7 +111,8 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         widgets = [
             "Playback device:",
             self.audio_widget,
-            self.default_widget
+            self.default_widget,
+            self.sync_widget
         ]
 
         audio_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
@@ -190,7 +195,11 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         profile = gremlin.shared_state.current_profile
         profile.setDefaultAudioDevice(name)
         
-
+    @QtCore.Slot()
+    def _handle_sync_all(self):
+        name = self.action_data.audio_device
+        profile = gremlin.shared_state.current_profile
+        profile.setDefaultAudioDevice(name)
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
