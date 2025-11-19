@@ -88,7 +88,7 @@ import gremlin.windows_event_hook # reference needed for packaging
 import gremlin.macro_handler # reference needed for packaging
 import gremlin.ui.octavi_device
 import gremlin.ui.virpil_device
-
+import gremlin.sound
 
 
 
@@ -5510,6 +5510,9 @@ if __name__ == "__main__":
 
     # report ui
     report = gremlin.reporting.ReportEngine()
+
+    # sound engine
+    sound = gremlin.sound.Sound() 
 
 
     # Run UI

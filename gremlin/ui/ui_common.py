@@ -391,14 +391,17 @@ class Color():
     def cssInfoBox(): 
         border_color = Color.borderColor()
         background_color = Color.infoColor()
+        
         css = f'''
+            background: {background_color};
             QFrame {{
                 border: 0px solid {border_color};
-                background: {background_color};
+                
             }}
             QLabel {{
                 border: none;
             }}
+            
             '''
         return css
     
@@ -11143,7 +11146,7 @@ class QInfoBox(QtWidgets.QFrame):
 
         
         self.main_layout = QtWidgets.QVBoxLayout(self)
-
+        css = Color.cssInfoBox()
         if hide_key:
             
             config = gremlin.config.Configuration()
@@ -11152,7 +11155,9 @@ class QInfoBox(QtWidgets.QFrame):
                 return
             
             widget = QDataCheckbox("Do not show again", callback=self._handle_hide_visual)
-            self.main_layout.addWidget(widget)
+            wcss = f"font-weight:bold;"
+            widget.setStyleSheet(wcss)
+            self.main_layout.addWidget(getHContainer(widget, widget_only=True))
             self._hide_key = hide_key
 
 
@@ -11160,7 +11165,7 @@ class QInfoBox(QtWidgets.QFrame):
         self._label_widget.setReadOnly(True)
         
         self.main_layout.addWidget(self._label_widget)
-        self.setStyleSheet(Color.cssInfoBox())
+        self.setStyleSheet(css)
 
         if text:
             self.setText(text)

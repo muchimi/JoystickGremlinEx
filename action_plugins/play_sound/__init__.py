@@ -36,17 +36,16 @@ from gremlin.util import safe_format, safe_read
 import logging
 import psygnal
 from psygnal import Signal
+import gremlin.sound
 
 syslog = logging.getLogger("system")
 
 
+USE_QT = False # use QT for playback 
+
 class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget for the resume action."""
-
-    # player has to be a class reference to avoid it being garbage collected and not playing a sound at all
-    player = QtMultimedia.QMediaPlayer()
-    audio = QtMultimedia.QAudioOutput()
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
@@ -61,14 +60,27 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.edit_path_widget = QtWidgets.QPushButton()
         self.edit_path_widget= gremlin.ui.ui_common.Buttons.getEditWidget()
         self.edit_path_widget.clicked.connect(self._new_sound_file)
-        self.volume_widget = QtWidgets.QSpinBox()
-        self.volume_widget.setRange(0, 100)
-        self.volume_widget.valueChanged.connect(self._volume_changed)
+        self.volume_widget =  gremlin.ui.ui_common.QIntLineEdit(min_range=0, max_range = 100, value = self.action_data.volume, callback = self._volume_changed, chars = 4,
+                                                              tooltip="Playback volume as a percentage 0 to 100.")
+        
 
         self.play_widget = QtWidgets.QPushButton("Play")
         self.play_widget.setIcon(load_icon("ei.play", qta_color = gremlin.ui.ui_common.Color.activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._handle_play)
+
+
+        self.loops_widget = gremlin.ui.ui_common.QIntLineEdit(min_range=1, max_range = 100, value = self.action_data.loops, callback = self._handle_loops_changed, chars = 4,
+                                                              tooltip="Number of time the sample will play.\n1 is the default.")
+        self.fadein_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 0, value = self.action_data.fadein_ms, callback = self._handle_fadein_changed, chars = 4,
+                                                               tooltip = "Time in ms to reach the maximum volume once the sample starts playing.\nUse 0 to disable (default).")
+        self.fadeout_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 0, value = self.action_data.fadeout_ms, callback = self._handle_fadeout_changed, chars = 4,
+                                                                tooltip = "Time in ms for the sample to fade out once it starts playing.\nUse 0 to disable (default).")
+        self.playback_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 0, value = self.action_data.playback_ms, callback = self._handle_playback_changed, chars = 4,
+                                                                 tooltip = "Maximum time in ms the sample has to play.\nThe sample will be cut short if the specified time is shorter than the normal sample play time.\nUse 0 to disable (default).")
+        
+        self.stop_widget = gremlin.ui.ui_common.QDataCheckbox("Stop previous audio",value = self.action_data.stop_previous, callback = self._handle_stop_audio_changed, 
+                                                              tooltip="If checked, any other audio playing will stop before playing this sample.")
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
@@ -85,6 +97,12 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                                    callback = self._handle_select_default,
                                                                    ctrl_callback = self._handle_select_default_all,
                                                                    tooltip = "Select system default")
+        
+
+        msg = """Samples played with this action will play concurrently as they are triggered.  Use the stop option to terminate prior audio streams before triggering the playback.  Playback timing options with a value of zero (0) means disabled.
+"""
+
+        info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key="play-sound")
 
         widgets = [
             "Playback device:",
@@ -106,20 +124,54 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         widgets = [
             "Volume:",
             self.volume_widget, 
+            "Loops:",
+            self.loops_widget,
+            self.stop_widget,
             self.play_widget
         ]
 
         content_widget =  gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+
+        widgets = [
+            "Playback (ms):",
+            self.playback_widget,
+            "Fade-in (ms):",
+            self.fadein_widget,
+            "Fade-out (ms)",
+            self.fadeout_widget
+        ]
+
+        options_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True) 
+
         
         self.main_layout.addWidget(audio_container)
         self.main_layout.addWidget(file_container)
+        self.main_layout.addWidget(options_container)
         self.main_layout.addWidget(content_widget)
+        
         self.main_layout.addWidget(self._execute_widget)
+        self.main_layout.addWidget(info_widget)
     
     def _handle_audio_change(self, value):
         device = self.action_data.findDevice(value)
         self.action_data.audio_device = device.description()
 
+    def _handle_loops_changed(self, value : int):
+        self.action_data.loops = value
+
+    def _handle_fadein_changed(self, value : int):
+        self.action_data.fadein_ms = value
+
+    def _handle_fadeout_changed(self, value : int):
+        self.action_data.fadeout_ms = value
+
+    def _handle_playback_changed(self, value : int):
+        self.action_data.playback_ms = value
+
+    def _handle_stop_audio_changed(self, checked: bool):
+        self.action_data.stop_previous = checked
+                
+        
     @QtCore.Slot()
     def _handle_select_default(self):
         ''' selects the default playback device '''
@@ -234,6 +286,10 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_output or config.verbose_mode_exec
   
+    def profile_stop(self):
+        ''' stop any active audio on profile stop '''
+        sound = self.action_data.sound
+        sound.soundStop()
 
 
     def process_event(self, event, value, extra_data = None):
@@ -245,8 +301,9 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
         if verbose: syslog.info(f"PLAY: trigger [{trigger}] on input state: [{is_pressed}]")
 
 
-        if trigger and os.path.isfile(self.sound_file):
-            if verbose: syslog.info(f"\texecute play soundfile: {self.sound_file}")
+        if trigger:
+            if verbose and os.path.isfile(self.sound_file):
+                syslog.info(f"\texecute play soundfile: {self.sound_file}")
             self.action_data.play()
         return True
 
@@ -287,19 +344,41 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         self.sound_file = None
-        self.volume = 50
+        self.volume = 100 # default volume as a percentage 0 to 100
+        self.key = None # sound key for the sound file
+        self.loops = 1 # number of times the sample is played back
+        self.playback_ms = 0 # playback milliseconds, 0 means play normally
+        self.fadein_ms = 0 # time to fade in in milliseconds, 0 disabled
+        self.fadeout_ms = 0 # time to fade out in milliseconds, 0 disabled
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
-        
+        self.stop_previous = False # true if the action should stop any prior sounds playing
+
+        default_audio_device = QtMultimedia.QAudioDevice()
+        self._audio_device = default_audio_device.description()
+
         devices = QtMultimedia.QMediaDevices.audioOutputs()
         self.device_map = {}
         for index, device in enumerate(devices):
-            self.device_map[index] = device
-        default_audio_device = QtMultimedia.QAudioDevice()
-        self._audio_device = default_audio_device.description()
-        self.device = self.getAudioDevice()
-        self.player = QtMultimedia.QMediaPlayer()
-        self.audio = QtMultimedia.QAudioOutput()
+            self.device_map[index] = device        
+
+        # if USE_QT:
+        
+            
+          
+        #     self.device = self.getAudioDevice()
+        #     self.player = QtMultimedia.QMediaPlayer()
+        #     self.audio = QtMultimedia.QAudioOutput()
+
+        # else:
+        self.sound = gremlin.sound.Sound()
+
+
+
+
+
+
+        self._sound = None # holds the sound object 
         
 
     @property
@@ -308,6 +387,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
     @audio_device.setter
     def audio_device(self, name : str):
         index = self.findDeviceIndex(name)
+        init_mixer = False
         if index is None:
             # no longer valid, switch to the new default device
             self.device = self.getDefaultAudioDevice()
@@ -316,12 +396,23 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             else:
                 name = None
             self._audio_device = name
-
+            init_mixer = True
         else:
-            self.device = self.device_map[index]
-            self._audio_device = name
+            if self._audio_device != name:
+                # changed ? 
+                self.device = self.device_map[index]
+                self._audio_device = name
+                init_mixer = True
+
+        if init_mixer:
+            if USE_QT:
+                pass
+            else:
+                self.sound.queueAction(gremlin.sound.SoundEvent.ChangeDeviceAction(name))
 
 
+
+  
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -336,21 +427,51 @@ class PlaySound(gremlin.base_profile.AbstractAction):
     def play(self):
         ''' plays the sound '''
         if self.sound_file and os.path.isfile(self.sound_file):
-            verbose = gremlin.config.Configuration().verbose_mode_sound
-            audio = QtMultimedia.QAudioOutput(self.device)
-            PlaySound.player.setAudioOutput(audio)
-            media = QtCore.QUrl.fromLocalFile(self.sound_file)
-            PlaySound.player.setSource(media)
-            audio.setVolume(self.volume/100) # 0 to 1
-            if verbose: syslog.info(f"play start: {self.sound_file}")
-            PlaySound.player.play()
-            while PlaySound.player.isPlaying():
-                QtWidgets.QApplication.processEvents()
-            PlaySound.player.stop()
-            if verbose: syslog.info("play done")
+            # verbose = gremlin.config.Configuration().verbose_mode_sound
+
+            # if USE_QT:
+            #     audio = QtMultimedia.QAudioOutput(self.device)
+            #     PlaySound.player.setAudioOutput(audio)
+            #     media = QtCore.QUrl.fromLocalFile(self.sound_file)
+            #     PlaySound.player.setSource(media)
+            #     audio.setVolume(self.volume/100) # 0 to 1
+            #     if verbose: syslog.info(f"play start: {self.sound_file}")
+            #     PlaySound.player.play()
+            #     while PlaySound.player.isPlaying():
+            #         QtWidgets.QApplication.processEvents()
+            #     PlaySound.player.stop()
+            #     if verbose: syslog.info("play done")
+            # else:
+            # sound interface 
+            if not self.key:
+                self.key = self.sound.getSoundKey(self.sound_file)
+                action = gremlin.sound.SoundEvent.SetVolumeAction(self.key, self.volume)
+                self.sound.queueAction(action)
+
+            
+                
+            actions = [
+                gremlin.sound.SoundEvent.ChangeDeviceAction(self.audio_device),
+                gremlin.sound.SoundEvent.PlayAction(self.key,
+                                                    self.loops,
+                                                    self.volume,
+                                                    self.playback_ms,
+                                                    self.fadein_ms,
+                                                    self.fadeout_ms,
+                                                    self.stop_previous
+                                                    )
+                ]
+
+            self.sound.queueActions(actions)
             
         else:
-            syslog.error(f"PLAY: don't know how to play: {self.sound_file}")
+            # if the stop is requested, allow no sound file
+            if self.stop_previous:
+                action = gremlin.sound.SoundEvent.StopAction()
+                self.sound.queueAction(action)
+            else:
+                syslog.error(f"PLAY: don't know how to play: {self.sound_file}")
+
 
     
     def findDevice(self, index : int):
@@ -401,7 +522,12 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
         self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
         self.audio_device = safe_read(node,"audio-device",str, None)
-       
+        self.loops = safe_read(node,"loops",int, 1)
+        self.playback_ms = safe_read(node,"playback-ms",int, 0)
+        self.fadein_ms = safe_read(node,"fadein-ms",int, 0)
+        self.fadeout_ms = safe_read(node,"fadeout-ms",int, 0)        
+        self.stop_previous = safe_read(node,"stop-previous",bool, False)
+        
 
     def _generate_xml(self):
         node = ElementTree.Element("play-sound")
@@ -410,13 +536,19 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         node.set("file", self.sound_file)
         node.set("volume", str(self.volume))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
-        node.set("exec_on_release", safe_format(self.exec_on_release, bool))        
+        node.set("exec_on_release", safe_format(self.exec_on_release, bool))  
+        node.set("loops", safe_format(self.loops,int))      
+        node.set("playback-ms", safe_format(self.playback_ms, int))
+        node.set("fadein-ms", safe_format(self.fadein_ms, int))
+        node.set("fadeout-ms", safe_format(self.fadeout_ms, int))
+        node.set("stop-previous", safe_format(self.stop_previous, bool))
         if self.audio_device:
             node.set("audio-device", self.audio_device)
         return node
 
     def _is_valid(self):
-        return self.sound_file is not None and os.path.isfile(self.sound_file) # and len(self.sound_file) > 0
+        return True
+        # return self.sound_file is not None and os.path.isfile(self.sound_file) # and len(self.sound_file) > 0
 
 
     def to_html(self) -> str:
@@ -439,3 +571,4 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 version = 1
 name = "play-sound"
 create = PlaySound
+

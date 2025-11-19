@@ -54,13 +54,14 @@ a = Analysis(
     pathex=['C:/JoystickGremlin-develop'],
     binaries=added_binaries,
     datas=added_files,
-    hiddenimports=['mido.backends.rtmidi','lxml','pyttsx3','hid',"windows_event_hook","psygnal","graphviz"],
+    hiddenimports=['mido.backends.rtmidi','lxml','pyttsx3','hid',"windows_event_hook","psygnal","graphviz","pygame"],
     hookspath=None,
     runtime_hooks=None,
     excludes=None,
     win_no_prefer_redirects=None,
     win_private_assemblies=None,
-    cipher=block_cipher
+    cipher=block_cipher,
+    optimize=1,
 )
 
 pyz = PYZ(
@@ -90,3 +91,4 @@ coll = COLLECT(
     upx=True,
     name="gremlinEx"
 )
+
