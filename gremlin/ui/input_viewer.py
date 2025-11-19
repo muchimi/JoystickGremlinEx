@@ -963,42 +963,43 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     def showState(self):
         ''' state device '''
-        if not self._state_visualizer_widget:
-            self._state_visualizer_widget = QtWidgets.QGroupBox("States")
+    
+    
+        self._state_visualizer_widget = QtWidgets.QGroupBox("States")
 
-            layout = QtWidgets.QVBoxLayout(self._state_visualizer_widget)
-            self._state_visualizer_widget.setLayout(layout)
-            self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv = True)
-            self._state_filter_widget.apply.connect(self._reload_states)
-            self._state_filter_widget.changed.connect(self._category_filter_changed)
-            self._state_filter_widget.enabledChanged.connect(self._reload_states)
-            layout.addWidget(self._state_filter_widget)
-            layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        layout = QtWidgets.QVBoxLayout(self._state_visualizer_widget)
+        self._state_visualizer_widget.setLayout(layout)
+        self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv = True)
+        self._state_filter_widget.apply.connect(self._reload_states)
+        self._state_filter_widget.changed.connect(self._category_filter_changed)
+        self._state_filter_widget.enabledChanged.connect(self._reload_states)
+        layout.addWidget(self._state_filter_widget)
+        layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
-            config = gremlin.config.Configuration()
-            config.changed.connect(self._config_changed)
-            current_size = config.input_viewer_button_size
-            font_sizes = (("small", 12),
-                          ("medium", 16),
-                           ("large", 20))
-            widgets = []
-            for label, size in font_sizes:
-                rb = gremlin.ui.ui_common.QDataRadioButton(label, size)
-                if current_size == size:
-                    rb.setChecked(True)
-                rb.clicked.connect(self._font_size_cb)
-                widgets.append(rb)
+        config = gremlin.config.Configuration()
+        config.changed.connect(self._config_changed)
+        current_size = config.input_viewer_button_size
+        font_sizes = (("small", 12),
+                        ("medium", 16),
+                        ("large", 20))
+        widgets = []
+        for label, size in font_sizes:
+            rb = gremlin.ui.ui_common.QDataRadioButton(label, size)
+            if current_size == size:
+                rb.setChecked(True)
+            rb.clicked.connect(self._font_size_cb)
+            widgets.append(rb)
 
-            widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Button size:")
-            layout.addWidget(widget)
+        widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Button size:")
+        layout.addWidget(widget)
 
 
-            self._state_button_layout = gremlin.ui.ui_common.QFlowLayout()
-            self.populateState()
+        self._state_button_layout = gremlin.ui.ui_common.QFlowLayout()
+        self.populateState()
 
-            layout.addLayout(self._state_button_layout)
+        layout.addLayout(self._state_button_layout)
 
-            self.views.add_widget(self._state_visualizer_widget)
+        self.views.add_widget(self._state_visualizer_widget)
 
 
 

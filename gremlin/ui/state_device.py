@@ -2400,10 +2400,8 @@ class  StateFilterWidget(QtWidgets.QWidget):
         self._category_filter_widget.setEnabled(is_filter)
         self._category_filter_widget.setEditable(False) # don't allow editing of categories for the main filter
 
-
         current_filter = self._config.iv_state_filter if is_iv else self._config.state_filter
         self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text = current_filter)
-
         
         self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback = self._find_entry)
         self._apply_widget = QtWidgets.QPushButton("Apply")
@@ -2414,7 +2412,7 @@ class  StateFilterWidget(QtWidgets.QWidget):
         self._clear_filter_widget.setMaximumWidth(24)
 
         # text filter
-        widget, _ = gremlin.ui.ui_common.getHContainer([self._find_widget,
+        widget = gremlin.ui.ui_common.getHContainer([self._find_widget,
                                                              "||",
                                                              #self._filter_enabled_widget,
                                                              QtWidgets.QLabel(" Filter:"),
@@ -2422,7 +2420,9 @@ class  StateFilterWidget(QtWidgets.QWidget):
                                                              "||",
                                                              self._apply_widget,
                                                              self._clear_filter_widget,
-                                                             ])
+                                                             ],
+                                                             widget_only = True
+                                                             )
         self.main_layout.addWidget(widget)
 
         # category filter

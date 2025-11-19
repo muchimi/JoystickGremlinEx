@@ -16,7 +16,15 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
-# Change log
+# Change log  
+
+### (m76T110B)
+- Fix: Input Viewer: State list disappears.
+- Fix: Play Sound: device reference.
+
+### (m76T110A)
+- Fix: Input Viewer: QT reference checks.
+
 ### (m76T110)
 - New: Play Sound: ability to select the playback device (defaults to the Windows default device) (feature request)
 - New: Play Sound: ctrl-click on the "default" button will reset all audio output devices on all play sound actions in the profile.

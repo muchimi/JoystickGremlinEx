@@ -238,20 +238,16 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value, extra_data = None):
         verbose = self.verbose
-
+        is_pressed = event.is_pressed
+        trigger = (is_pressed and self.action_data.exec_on_press) or \
+                    (not is_pressed and self.action_data.exec_on_release) 
         
-        if self.device:
-
-            is_pressed = event.is_pressed
-            trigger = (is_pressed and self.action_data.exec_on_press) or \
-                        (not is_pressed and self.action_data.exec_on_release) 
-            
-            if verbose: syslog.info(f"PLAY: trigger [{trigger}] on input state: [{is_pressed}]")
+        if verbose: syslog.info(f"PLAY: trigger [{trigger}] on input state: [{is_pressed}]")
 
 
-            if trigger and os.path.isfile(self.sound_file):
-                if verbose: syslog.info(f"\texecute play soundfile: {self.sound_file}")
-                self.action_data.play()
+        if trigger and os.path.isfile(self.sound_file):
+            if verbose: syslog.info(f"\texecute play soundfile: {self.sound_file}")
+            self.action_data.play()
         return True
 
 
