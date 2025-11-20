@@ -741,7 +741,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
             if self.dtap_index < node_count:
                 ec = gremlin.execution_graph.ExecutionContext()
                 node = self.dtap_nodes[self.dtap_index]
-                ec.execute_node(node, event, value, extra_data)
+                ec.execute_node(node, event, value, extra_data, visited = [])
 
             # index
             if self.chain_double and (self.switch_on_press and is_pressed) or not is_pressed:
@@ -776,7 +776,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                 # syslog.info(f"execute short press {self.short_index}")
                 ec = gremlin.execution_graph.ExecutionContext()
                 node = self.short_nodes[self.short_index]
-                ec.execute_node(node, event, value, extra_data)
+                ec.execute_node(node, event, value, extra_data, visited = [])
 
             if self.chain_short and (self.switch_on_press and is_pressed) or not is_pressed:
                 # bump short index if chaining
@@ -817,7 +817,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
             # syslog.info(f"execute long press {self.long_index}")
             ec = gremlin.execution_graph.ExecutionContext()
             node = self.long_nodes[self.long_index]
-            ec.execute_node(node, event, value, extra_data)
+            ec.execute_node(node, event, value, extra_data, visited = [])
             #self.long_set[self.long_index].process_event(event, value)
 
         node_count = len(self.long_nodes)

@@ -437,21 +437,6 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         ''' plays the sound '''
         if self.sound_file and os.path.isfile(self.sound_file):
             # verbose = gremlin.config.Configuration().verbose_mode_sound
-
-            # if USE_QT:
-            #     audio = QtMultimedia.QAudioOutput(self.device)
-            #     PlaySound.player.setAudioOutput(audio)
-            #     media = QtCore.QUrl.fromLocalFile(self.sound_file)
-            #     PlaySound.player.setSource(media)
-            #     audio.setVolume(self.volume/100) # 0 to 1
-            #     if verbose: syslog.info(f"play start: {self.sound_file}")
-            #     PlaySound.player.play()
-            #     while PlaySound.player.isPlaying():
-            #         QtWidgets.QApplication.processEvents()
-            #     PlaySound.player.stop()
-            #     if verbose: syslog.info("play done")
-            # else:
-            # sound interface 
             if not self.key:
                 self.key = self.sound.getSoundKey(self.sound_file)
                 action = gremlin.sound.SoundEvent.SetVolumeAction(self.key, self.volume)

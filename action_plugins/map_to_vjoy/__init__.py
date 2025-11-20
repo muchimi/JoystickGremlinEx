@@ -2237,23 +2237,34 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         box.addStretch()
 
         # button to axis value widget
-        self.target_value_container_widget = QtWidgets.QWidget()
-        self.target_value_container_layout = QtWidgets.QHBoxLayout(self.target_value_container_widget)
-        self.button_to_axis_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        self.button_to_axis_value_widget.setValue(self.action_data.target_value)
-        self.button_to_axis_value_widget.valueChanged.connect(self._button_to_axis_value_changed)
-
         
-        self.target_is_relative = QtWidgets.QCheckBox("Relative")
-        self.target_is_relative.setToolTip("When enabled, the value is added to the current axis (relative value)")
-        self.target_is_relative.setChecked(self.action_data.target_is_relative)
-        self.target_is_relative.clicked.connect(self._target_relative_changed)
+        self.button_to_axis_value_widget = gremlin.ui.ui_common.QFloatLineEdit(
+            value=self.action_data.target_value,
+            callback = self._button_to_axis_value_changed
+        )
 
+        self.target_is_relative = gremlin.ui.ui_common.QDataCheckbox(
+            "Is Relative",
+            value = self.action_data.target_is_relative,
+            tooltip = "When enabled, the value is added to the current axis (relative value)",
+            callback= self._target_relative_changed
+            )
 
-        self.target_value_container_layout.addWidget(QtWidgets.QLabel("Set Value:"))
-        self.target_value_container_layout.addWidget(self.button_to_axis_value_widget)
-        self.target_value_container_layout.addWidget(self.target_is_relative)
-        self.target_value_container_layout.addStretch()
+        self.target_use_last = gremlin.ui.ui_common.QDataCheckbox(
+            "Use last",
+            value = self.action_data.target_use_last,
+            callback = self._handle_target_use_last_changed,
+            tooltip = "When enabled, sends a wiggle axis to force the target application to re-read the input axis to the last axis value."
+        )
+
+        widgets = [
+            "Set Value:",
+            self.button_to_axis_value_widget,
+            self.target_use_last,
+            self.target_is_relative,
+        ]
+
+        self.target_value_container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         self.main_layout.addWidget(self.selector_widget)
         self.main_layout.addWidget(self.show_disconnected_widget)
@@ -3106,6 +3117,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _target_relative_changed(self, checked):
         self.action_data.target_is_relative = checked
 
+    @QtCore.Slot(bool)
+    def _handle_target_use_last_changed(self, checked):
+        self.action_data.target_use_last = checked
+        self._update_ui()
+
     def _update_ui(self):
         ''' updates ui based on the current action requested to show/hide needed components '''
         if not Shiboken.isValid(self):
@@ -3146,7 +3162,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         stepped_visible = False
         reverse_visible = False
 
-                
+        set_target_visible = False
         relative_target_visible = False
         default_target_visible = False
         repeater_visible = False
@@ -3221,13 +3237,15 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 output_range_visible = False
                 relative_visible = True
                 output_mode_visible = True
+                set_target_visible = not self.action_data.target_use_last
+                
             case VjoyAction.VJoySetAxisStepped:
                 output_range_visible
                 grid_visible = False
                 stepped_visible = True
             case VjoyAction.VJoyAxisToButton:
                 output_range_visible = False
-                start_visible = True
+                
                 grid_visible = True
                 
             case VjoyAction.VJoyPulse:
@@ -3290,10 +3308,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         #self.sb_start_value.setEnabled(start_value_enabled)
 
+        self.button_to_axis_value_widget.setEnabled(set_target_visible)
+
         self.container_axis_to_button_range_widget.setVisible(button_range_visible)
         self.container_button_mode_widget.setVisible(button_range_visible)
-        #self.container_absolute_widget.setVisible(absolute_visible)
-        #self.container_start_value_widget.setVisible(axis_visible)
         self.container_relative_widget.setVisible(relative_visible)
         self.container_output_range_widget.setVisible(output_range_visible)
         self.container_output_curve_widget.setVisible(output_curve_visible)
@@ -3996,7 +4014,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         # setup initial state
         
         config =  gremlin.config.Configuration()
-        verbose = config.verbose_mode_outputs or config.verbose_mode_vjoy
+        verbose = self.verbose or config.verbose_mode_outputs or config.verbose_mode_vjoy
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
         raw_input_type = self.action_data.hardware_raw_input_type
@@ -4059,29 +4077,29 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     match self.action_data.sync_mode:
                         case SyncMode.Default:
                             trigger = True
-                            if self.verbose: syslog.info(f"{vjoy_stub} default : {self.action_data.state.default_value}")
+                            if verbose: syslog.info(f"{vjoy_stub} default : {self.action_data.state.default_value}")
                             value = self.action_data.axis_start_value
                         case SyncMode.Input:
                             trigger = True
-                            if self.verbose: syslog.info(f"VJOY REMAP SYNC: {device_stub} {vjoy_stub} input : {value:0.3f}")
+                            if verbose: syslog.info(f"VJOY REMAP SYNC: {device_stub} {vjoy_stub} input : {value:0.3f}")
                             value = value
                         case SyncMode.LastOrInput:
                             trigger = True
                             last = self.action_data.axis_last_value
                             if last is None:
-                                if self.verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use input value : {value:0.3f}")
+                                if verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use input value : {value:0.3f}")
                             else:
-                                if self.verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use last value : {last:0.3f}")
+                                if verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use last value : {last:0.3f}")
                                 value = last
                         case SyncMode.LastOrDefault:
                             trigger = True
                             last = self.action_data.button_last_value
                             if last is None:
                                 value = self.action_data.state.default_value
-                                if self.verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use default value : {value}")
+                                if verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use default value : {value}")
                                 
                             else:
-                                if self.verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or default: use last value : {last}")
+                                if verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or default: use last value : {last}")
                                 value = last
                         case SyncMode.Ignore:
                             pass # do nothing
@@ -4131,7 +4149,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
         elif self.input_type == InputType.JoystickButton:
             # button presses
-            if self.verbose: vjoy_stub = f"VJOY REMAP: sync mode: [{self.action_data.sync_mode.name}] set button start value:"
+            if verbose: vjoy_stub = f"VJOY REMAP: sync mode: [{self.action_data.sync_mode.name}] set button start value:"
             
             # assume we are setting the start state
             trigger = True
@@ -4174,51 +4192,36 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             match self.action_data.sync_mode:
                 case SyncMode.Default:
                     value = self.action_data.button_start_value
-                    if self.verbose: syslog.info(f"{vjoy_stub} default : {value}")
+                    if verbose: syslog.info(f"{vjoy_stub} default : {value}")
                     
                 case SyncMode.Input:
-                    if self.verbose: syslog.info(f"{vjoy_stub} input : {is_pressed}")
+                    if verbose: syslog.info(f"{vjoy_stub} input : {is_pressed}")
                     value = is_pressed
                 case SyncMode.LastOrInput:
                     last = self.action_data.button_last_value
                     if last is None:
-                        if self.verbose: syslog.info(f"{vjoy_stub} last or input : use input value : {is_pressed}")
+                        if verbose: syslog.info(f"{vjoy_stub} last or input : use input value : {is_pressed}")
                         value = is_pressed
                     else:
-                        if self.verbose: syslog.info(f"{vjoy_stub} last or input : use last value : {last:0.3f}")
+                        if verbose: syslog.info(f"{vjoy_stub} last or input : use last value : {last:0.3f}")
                         value = last
                 case SyncMode.LastOrDefault:
                     last = self.action_data.button_last_value
                     if last is None:
                         value = self.action_data.button_start_value
-                        if self.verbose: syslog.info(f"{vjoy_stub} last or input : use default value : {value}")
+                        if verbose: syslog.info(f"{vjoy_stub} last or input : use default value : {value}")
                         
                     else:
-                        if self.verbose: syslog.info(f"{vjoy_stub} last or default: use last value : {last}")
+                        if verbose: syslog.info(f"{vjoy_stub} last or default: use last value : {last}")
                         value = last
                 case SyncMode.Ignore:
                     trigger = False # do nothing
-                    
-
-        
-
 
             if trigger:
                 vs.setStartState(self.vjoy_id, self.vjoy_input_id, value)
                 self.action_data.button_last_value = value                
 
-            # input is a virtual stick (MIDI or OSC or MODE)
-            
-         
-
-            # if self.action_data.sync_on_start and start_mode == mode:
-            #     # register the start value
-            #     vs.setStartState(self.vjoy_id, self.vjoy_input_id, is_pressed)
-            #     self.action_data.button_last_value = value
-
-
-            
-
+   
         if self.action_mode == VjoyAction.VJoySetAxisStepped:
             # initial stepped axis value
 
@@ -4264,21 +4267,22 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def pulse_start(self, device_id : int, input_id : int, duration : float, interval : float, is_local : bool = True, is_remote : bool = False, force_remote : bool = False):
         ''' pulse setup '''
-        if self.verbose: syslog.info(f"Pulse START vjoy {device_id} button {input_id} duration: {duration:0.3f} interval: {interval:0.3f}")
+        verbose = self.verbose
+        if verbose: syslog.info(f"Pulse START vjoy {device_id} button {input_id} duration: {duration:0.3f} interval: {interval:0.3f}")
         key = (device_id, input_id)
         worker : gremlin.repeater.PulseWorker 
         if key in self.pulse_worker_map:
             worker = self.pulse_worker_map[key]
             if worker.is_running:
                 # worker already running - ignore pulse request
-                if self.verbose: syslog.info(f"\talready pulsing - ignored")
+                if verbose: syslog.info(f"\talready pulsing - ignored")
                 return
         else:
             args = (device_id, input_id, is_local, is_remote, force_remote)
             worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = args)
             self.pulse_worker_map[key] = worker
 
-        if self.verbose: syslog.info(f"\activate")
+        if verbose: syslog.info(f"\activate")
         worker.start()
 
     def pulse_stop(self, device_id : int, input_id : int):
@@ -4317,7 +4321,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if is_local:
                     joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
                 if is_remote:
-                    self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, self.target_value)
+                    self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, value)
+                # remember the last value
+                self.action_data.axis_last_value = value
+
             finally:
                 self.lock.release()
 
@@ -4524,7 +4531,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             return True
 
                     if is_pressed is not None:
-                        if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: {is_pressed}")
+                        if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: {is_pressed}")
                         self.action_data.button_last_value = is_pressed
                         if is_local:
                             if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
@@ -4539,7 +4546,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                         if verbose: syslog.info(f"AXIS ABSOLUTE: send vjoy {self.vjoy_id} axis {self.vjoy_input_id} range: [{self.range_low:0.3f},{self.range_high:0.3f}] scale: {self.axis_scaling:0.3f} value: {value:0.3f}")
 
-                        if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
+                        if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
 
                         self.action_data.axis_last_value = value
 
@@ -4549,6 +4556,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                                 
                         if is_remote:
                             self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, value)
+
+                        # remember the last value
+                        self.action_data.axis_last_value = value
+
                     elif axis_mode == "relative":
                         # relative mode
 
@@ -4670,7 +4681,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 for pressed_position in pressed_positions:
                     input_id = self.pressed_hat_buttons[pressed_position]
                     if input_id > 0:
-                        if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: False")
+                        if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: False")
                         if is_local:
                             if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                                 joystick_handling.VJoyProxy()[self.vjoy_id].button(input_id).is_pressed = False
@@ -4707,7 +4718,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if self.action_data.exec_on_release and not is_pressed:
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]")
+                            if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]")
                             joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = True
                     if is_remote or is_paired:
                         self.remote_client.send_button(self.vjoy_id, self.vjoy_input_id, True, force_remote = force_remote )
@@ -4759,7 +4770,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             elif self.action_mode == VjoyAction.VJoyButtonPress:
                 # press button (no auto release)
-                if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: True")
+                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: True")
 
                 if fire_event:
                     self.action_data.button_last_value = True
@@ -4772,7 +4783,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             elif self.action_mode == VjoyAction.VJoyButtonRelease:
                 # release button (no auto release)
-                if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: False")
+                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: False")
                 if fire_event:
                     self.action_data.button_last_value = False
                     if is_local:
@@ -4795,7 +4806,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                 button = joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id)
                                 button.is_pressed = not button.is_pressed
                                 self.action_data.button_last_value = button.is_pressed
-                                if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: {button.is_pressed}")
+                                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: {button.is_pressed}")
                         if is_remote:
                             self.remote_client.toggle_button(self.vjoy_id, self.vjoy_input_id)
 
@@ -4822,7 +4833,41 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # set the value on the specified axis
                 if fire_event:
                     if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+
+                        if self.action_data.target_use_last:
+                            # set the output to the current value, but wiggle it so the target app detects a change
+                            # this is to "reset" an axis to a known value if the target environment changed the input outside of the control data being setn
+                            # the wiggle value is a small offet to trigger the target game to cause it to retrigger - there has to be a change of the game would not pick it up
+                            offset = 0.01
+                            # read the current output value
+                            value = self.action_data.axis_last_value
+                            if value is None:
+                                # read the last value
+                                value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+                                if verbose: syslog.info(f"reading axis value: {value:0.3f}")
+                            else:
+                                if verbose: syslog.info(f"using last axis value: {value:0.3f}")
+                            
+                            wiggle_value = value - offset
+                            if wiggle_value < -1.0:
+                                wiggle_value = value + offset
+
+                            self.target_value = value # value to restore after wiggle
+                            
+                            if verbose: syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
+                            if is_local:
+                                joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = wiggle_value
+                            if is_remote:
+                                self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, wiggle_value)
+                            timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
+                            timer.start()
+                    
+                            return True
+
+
                         target_value_valid = self.target_value_valid or self.action_data.use_relative_value
+                        
+
                         if target_value_valid and fire_event:
                             target_value = self.target_value
 
@@ -4835,13 +4880,15 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                 value = target_value
                             
                             value = gremlin.util.clamp(value)
-                            if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
-                            self.action_data.axis_last_value = value
+                            if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
+                            
                             if is_local:
                                 joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
                             if is_remote:
-                                self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, self.target_value)
-
+                                self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, value)
+                            # remember the last value
+                            syslog.info(f"set setaxis last value: {value:0.3f}")
+                            self.action_data.axis_last_value = value
 
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
                 # changes the output range on the target device / axis
@@ -4854,6 +4901,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     remote_state.mode = self.action_mode
 
             elif self.action_mode == VjoyAction.VJoySetAxisStepped:
+                # process stepped axis request
                 if fire_event:
                     latched = self.action_data._stepped_latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id
                     primary = event.device_guid == self.hardware_device_guid and event.identifier == self.hardware_input_id
@@ -4867,8 +4915,30 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
                             if not key in device.data:
                                 device.data[key] = self.action_data.target_step_start_index
+
                             start_index = device.data[key]
+                            count = len(self.action_data.target_step_list)
                             index = start_index
+
+                            value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+                            if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
+                                # sync the current index with the current axis value
+                                v1 = v2 = None
+                                # syslog.info(f"Sync mode: {value:0.3f}")
+                                for i in range(count):
+                                    v2 = self.action_data.target_step_list[i]
+                                    if v1 is not None:
+                                        if value >= v1 and value <= v2:
+                                            index = i
+                                            # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f} match value: {value:0.3f}")
+                                            break
+                                        
+                                        # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f}")
+                                    v1 = v2
+                                
+
+
+                            
                             direction = self.action_data.target_step_direction
                         
                             if primary:
@@ -4884,11 +4954,13 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                             if trigger:
                                 
-                                count = len(self.action_data.target_step_list)
+                                
                                 index = gremlin.util.clamp(index, 0, count-1)
+                                    
+                                
                                 value = self.action_data.target_step_list[index]
-                                if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis {self.vjoy_input_id} value: {value:0.3f}")
-                                self.action_data.axis_last_value = value
+                                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis {self.vjoy_input_id} value: {value:0.3f}")
+                                
                                 if is_local:
                                     if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                                         joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
@@ -4898,6 +4970,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                 device.data[key] = index
                                 if verbose: syslog.info(f"STEPPED AXIS: start index: {start_index} new index: {index} step value: {value:0.3f}")
                                 
+                                # remember the last value
+                                syslog.info(f"set step last value: {value:0.3f}")
+                                self.action_data.axis_last_value = value
                 else:
                     # wrong input
                     result = False
@@ -4905,7 +4980,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             else:
                 # basic handling of the button
-                if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}")
+                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}")
                 if fire_event:
                     self.action_data.button_last_value = is_pressed
                     if is_local:
@@ -4918,7 +4993,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
         elif input_type == InputType.JoystickHat:
             
-            if self.verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} direction: {action_value.current}")
+            if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} direction: {action_value.current}")
             if is_local:
                 if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                     joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = action_value.current
@@ -4929,6 +5004,16 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if auto_complete:
             self.functor_complete.emit() # indicate completed
         return result
+    
+    def _handle_set_axis_wiggle(self):
+        value = self.target_value
+        is_local, is_remote = input_devices.remote_state.state
+        if is_local:
+            joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
+        if is_remote:
+            self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, value)
+        
+
 
     def relative_axis_thread(self):
         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
@@ -4951,15 +5036,20 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         min(1.0, self.axis_value + self.axis_delta_value)
                     )
 
+                    value = self.axis_value
+
                     if is_local:
-                        vjoy_dev.axis(self.vjoy_input_id).value = self.axis_value
+                        vjoy_dev.axis(self.vjoy_input_id).value = value
                     if is_remote:
-                        self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, self.axis_value)
+                        self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, value)
+                    # remember the last value
+                    self.action_data.axis_last_value = value
 
                     if self.should_stop_thread and \
                             self.thread_last_update + 1.0 < time.time():
                         self.thread_running = False
                     time.sleep(0.01)
+
                 except gremlin.error.VJoyError:
                     self.thread_running = False
         else:
@@ -5229,6 +5319,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._stepped_latched = True # true if the step down latching is enabled
         self.target_value_valid = True
         self.target_is_relative = False # true if the set value axis is a relative value (+ or -)
+        self.target_use_last = False # true if the last sent axis value is sent again
         self.relative_value = 0.2 # relative value to add or remove
         self.relative_pulse_delay = 100 # relative pulse delay in miliseconds
         self.use_relative_value = False # true if set value should use relative value
@@ -5245,6 +5336,15 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
         self.refresh_vjoy()
+
+    # @property
+    # def axis_last_value(self):
+    #     return self._axis_last_value
+    
+    # @axis_last_value.setter
+    # def axis_last_value(self, value : float):
+    #     self._axis_last_value = value
+    
 
     def actionDeleted(self):
         ''' called if the action is being deleted '''
@@ -5989,6 +6089,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.target_value  = safe_read(node,"target_value", float, 0.0)
                 self.target_value_valid = True
 
+            if "target-use-last" in node.attrib:
+                self.target_use_last = safe_read(node,"target-use-last", bool, False)
+
             if "target_relative" in node.attrib:
                 self.target_is_relative = safe_read(node,"target_relative", bool, False)
 
@@ -6232,14 +6335,10 @@ Supports axis merging, curved output, command, hat and button mappings.
                 node.set("paired", safe_format(self.paired, bool))
 
             case VjoyAction.VJoySetAxis:
-                pass
+                node.set("target-use-last", safe_format(self.target_use_last, bool))
+                
 
             case VjoyAction.VJoyMergeAxis:
-                # node.set("merge_mode", MergeOperationType.to_string(self.merge_mode))
-                # if self.merge_device_id:
-                #     node.set("merge_device_id", self.merge_device_id)
-                # if self.merge_input_id:
-                #     node.set("merge_input_id", str(self.merge_input_id))
 
                 if self._merge_data:
                     child = ElementTree.SubElement(node,"merge-axis")

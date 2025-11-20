@@ -18,6 +18,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log  
 
+### (m76T112)
+- Change: Joystick module: eliminated redundant assertions, consolidated device ID conversions.
+- New: Map to VJoy: set axis mode gains a "last value" mode.  This will cause GEX to wiggle that axis output to force the target application to re-read the data.  Some games can reset inputs internally and ignore the prior data sent, this is to quickly reset that to synchronize the output without physically moving the axis, which is the other way of forcing a re-read by the target environment.  The delay between wiggle is 250ms to allow sufficient time.
+- New: Map to VJoy: in stepped axis mode and the axis input is set to sync, if the axis is set via another means, it will also synchronize the step index to the nearest current value.  This allows one mapping to "set" the axis to a value, and another mapping using stepped mode to be synchronized.
+- Fix: Hardened button, hat and axis get/set code in case the device can no longer be located at profile runtime (this can happen if another process "grabs" the device or if the device somehow disconnects and stops responding to DINPUT).
+- Fix: Sound module: ensure mixer default state is initialized in all situations.
 
 ### (m76T111)
 - New: New playback sound engine.  This engine allows multiple concurrent, non blocking, sound streams.  Translated, it means that multiple sounds can play at once, and playback does not block profile execution.
@@ -28,7 +34,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 	- playback time (ms): the sample will stop playing after the specified time has lapsed.  This time includes the loop count.
 	- fade-in time (ms): time to full volume on playback.
 	- fade-out time (ms): time to fade out on playback.
-	- stop previous: if set, all other (non TTS) audio will stop before playing the sample.
+	- stop previous: if set, all other (non TTS) audio will stop before playing the sample.  
+	
+[Link to docs](https://muchimi.github.io/JoystickGremlinEx/usage/#play-sound)
 	
 Note 1: if you are using multiple output sound devices, as only one can be used at a time, all audio playback will stop on other devices.  It is thus recommended to use the ctrl-click feature of the default button or the sync all button to synchronize all your playback actions to the same playback device to avoid inadvertent effects, unless you are ok with this behavior.  This is an unfortunate limitation of the sound engine being used as it is unable to send audio to multiple audio devices at the same time (although it can play multiple audio on the same device concurrently).  
   

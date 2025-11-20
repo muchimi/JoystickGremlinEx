@@ -201,17 +201,6 @@ def vjoy_devices(connected_only = True): # -> list[DeviceSummary]:
     
     return device_list
 
-def get_device(guid): # -> DeviceSummary:
-    ''' gets a device from its guid - for vjoy devices - this will only return connected vjoy devices '''
-    if isinstance(guid, int):
-        # vjoy ID given
-        return vjoy_info_from_vjoy_id(guid)
-    if isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
-    if guid in _joystick_device_guid_map:
-        return _joystick_device_guid_map[guid]
-    return None
-
 
 def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
     ''' scales a value on one range to the new range
@@ -277,20 +266,17 @@ def get_curved_axis(device_guid, axis_id):
     import gremlin.ui.midi_device
     import gremlin.config
     import gremlin.util
-    if isinstance(device_guid, str):
-        guid = gremlin.util.parse_guid(device_guid)
-    else:
-        guid = device_guid
     
-
     verbose = gremlin.config.Configuration().verbose_mode_curve
 
-    device = get_device(guid)
+    device = get_device(device_guid)
     if not device:
         if verbose:
             syslog.warning(f"APPLY CURVE: device not found: id [{device_guid}]")
         return None
+    
     if not device.is_special:
+        guid = device.device_guid
         eh = gremlin.event_handler.EventListener()
         value = dinput.DILL.get_axis(guid, axis_id)
         curved = eh.apply_transforms(guid, axis_id, value)
@@ -309,6 +295,26 @@ def get_curved_axis(device_guid, axis_id):
         
     return None
             
+def get_device(guid : int | str | dinput.GUID, show_error = True) -> dinput.DeviceSummary:
+    ''' gets the device for the given ID - issues error message if not found '''
+    if isinstance(guid, int):
+        # vjoy ID 
+        guid = vjoy_guid_from_id(guid)
+    elif isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
+    elif isinstance(guid, dinput.GUID):
+        pass
+    elif guid is None:
+        if show_error: syslog.error(f"JOY: GET DEVICE: identifier is not specified")
+        return None
+    else:
+        return None
+    
+    dev : dinput.DeviceSummary = device_info_from_guid(guid)
+    if not dev:
+        if show_error: syslog.error(f"JOY: GET DEVICE: Device not found: [{guid}]")
+    return dev
+                     
 
 def get_axis(guid, index, normalized = True, linear = False):
     ''' gets the value of the specified axis
@@ -316,23 +322,22 @@ def get_axis(guid, index, normalized = True, linear = False):
     :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
        
     '''
-    if isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
-    dev : dinput.DeviceSummary = device_info_from_guid(guid)
+    dev : dinput.DeviceSummary = get_device(guid)
     if dev and dev.axis_count:
         axis_id = dev.linear_id_map[index] if linear else index
         value = dinput.DILL.get_axis(guid, axis_id)
         if normalized:
             value = gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
         return value
+    
     return 0.0
 
 def get_hat(guid, index) -> int:
     ''' gets the current hat value '''
-    if isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
-    device = get_device(guid)
-    return device.get_hat(index)
+    dev : dinput.DeviceSummary = get_device(guid)
+    if dev and dev.hat_count:
+        return dev.get_hat(index)
+    return -1 # center
 
 def get_hat_position(guid, index) -> tuple:
     ''' gets the hat position as a position tuple '''
@@ -343,11 +348,12 @@ def get_hat_position(guid, index) -> tuple:
 
 def get_button(guid, index) -> bool:
     ''' gets the button pressed state '''
-    
-    if isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
-    device = get_device(guid)
-    return device.get_button(index)
+    dev : dinput.DeviceSummary = get_device(guid)
+    if dev and dev.button_count:
+        return dev.get_button(index)
+    else:
+        syslog.error(f"JOYSTICK: unable to get button state for device for id [{guid}] index [{index}]")
+    return False
        
 
 
@@ -363,10 +369,7 @@ def set_button(guid, index : int, is_pressed : bool, update_remote : bool = Fals
     import gremlin.event_handler
     import gremlin.input_devices
     sd = gremlin.event_handler.JoystickState()
-    if isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
-
-    device = get_device(guid)        
+    device = get_device(guid)
     if not device:
         syslog.error(f"VJOY SET BUTTON: Don't know device [{guid}]")
         return 
@@ -422,13 +425,12 @@ def set_axis(guid, index : int, value : float, update_remote : bool = False):
 
 
 def set_hat(guid, index : int, direction : tuple):
-    if isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
-    proxy = gremlin.joystick_handling.VJoyProxy()
+    ''' sets the device hat '''
     device = get_device(guid)
     if device and device.is_virtual:
         vjoy_id = device.vjoy_id
         if 0 < index < device.hat_count:
+            proxy = gremlin.joystick_handling.VJoyProxy()
             proxy[vjoy_id].hat(index).direction = direction
 
 
@@ -530,8 +532,6 @@ def vjoy_guid_from_id(vid: int):
 
 def registerSpecialDevice(dev):
     ''' adds a special device to the tracking list '''
-
-    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
     device_guid = dev.device_guid
     if not device_guid in _joystick_device_guid_map:
         _joystick_device_guid_map[device_guid] = dev
@@ -554,16 +554,14 @@ def removeDevice(dev : dinput.DeviceSummary):
 
 def device_name_from_guid(device_guid) -> str:
     ''' gets device name from GUID '''
-    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
-    if isinstance(device_guid, str):
-        device_guid = gremlin.util.parse_guid(device_guid) # GUID expected
-    if device_guid in _joystick_device_guid_map:
-        return _joystick_device_guid_map[device_guid].name
-    # not found - check for any updated devices
-    refresh_devices()
-    if device_guid in _joystick_device_guid_map:
-        return _joystick_device_guid_map[device_guid].name
-
+    
+    dev = get_device(device_guid, False)
+    if not dev:
+        # not found - check for any updated devices
+        refresh_devices()
+        dev = get_device(device_guid)
+    if dev:
+        return dev.name
     return ""
     
 def known_devices() -> list:
@@ -584,15 +582,16 @@ def getPhysicalDevices() -> list[dinput.DeviceSummary]:
 
 def getDevice(device_guid):
     ''' gets a device summary '''
-    return device_info_from_guid(device_guid)
+    return get_device(device_guid)
 
-def getVjoyDeviceGuid(vjoy_id):
-    dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vjoy_id), None)
+def getVjoyDeviceGuid(vid):
+    ''' gets the vjoy device by the given vjoy id'''
+    dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vid), None)
     if dev:
         return dev.device_guid
     
     refresh_devices() # do a device reload if the GUID is not found 
-    dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vjoy_id), None)
+    dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vid), None)
     if dev:
         return dev.device_guid
   
@@ -610,7 +609,7 @@ def getVjoyDeviceMap()->dict:
 
 def device_info_from_guid(device_guid): # -> DeviceSummary:
     ''' gets physical device information '''
-    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
+    
     if isinstance(device_guid, int):
         # vjoy ID sent ?
         device_guid = getVjoyDeviceGuid(device_guid)
@@ -635,7 +634,7 @@ def vjoy_info_from_vjoy_id(vjoy_id : int, connected_only = True): # -> DeviceSum
     :param vjoy_id: id of vjoy device 1 to 16
     :param connected_only: true to filter by connected vjoys only
     '''
-    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
+    
     global _all_vjoy_devices_map, _vjoy_devices_map
     if connected_only:
         if vjoy_id in _vjoy_devices_map:
@@ -664,7 +663,7 @@ def vjoy_device_map() -> dict:
 
 def is_device_connected(device_guid) -> bool:
     ''' true if the device is connected (reported in) '''
-    assert joystick_initialized(), "CRITICAL: Joysticks not initialized"
+    
     if device_guid in _joystick_device_guid_map:
         device : dinput.DeviceSummary = _joystick_device_guid_map[device_guid]
         return device.connected

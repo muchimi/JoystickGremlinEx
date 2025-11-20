@@ -1692,11 +1692,22 @@ class ExecutionContext():
             node = self.graph_input_map[key]
 
 
-    def execute_node(self, node : ExecutionGraphNode, event, value, extra_data : dict = None,  manual = False) -> bool:
-        ''' executes a single node '''
+    def execute_node(self, node : ExecutionGraphNode, event, value, extra_data : dict = None,  manual = False, visited = []) -> bool:
+        ''' executes a single node 
+        
+        :param node: the graph node to execute
+        :param event: the event to pass to the node functor
+        :param value: value to pass to the node functor
+        :param extra_data: extra data (dict) to pass to the node functor
+        :param manual: bool, indicates if the execution is in manual mode or automatic
+        :param visited: list, list of node IDs visited in this sequence - this checks for loops
+
+        '''
 
         if not node.has_actions:
             return True # nodes with no actions return PASS
+        
+    
 
         verbose_exec = self._verbose_exec
         verbose_detailed = self._verbose_detailed
@@ -1705,6 +1716,12 @@ class ExecutionContext():
         try:
             gremlin.shared_state.pushLog()
             logTabs = gremlin.shared_state.logTabs()
+
+            if node.id in visited:
+                syslog.error(f"{logTabs}EXEC: LOOP DETECTED [{node.id}] [{node.nodeType.name}] {node.description}) - this node has already been executed as part of this sequence indicating a logical loop")
+                return False
+            
+            visited.append(node.id)
                 
             # abort if the mode changed and the event was fired in a different mode
             if event.mode and event.mode != gremlin.shared_state.runtime_mode:
@@ -1749,7 +1766,7 @@ class ExecutionContext():
             if node.nodeType in (ExecutionGraphNodeType.Group,ExecutionGraphNodeType.Gate, ExecutionGraphNodeType.Range):
                 # group type nodes: every subnode is executed regardless of the return value
                 for child in node.children:
-                    result = self.execute_node(child, event, value, extra_data, manual)
+                    result = self.execute_node(child, event, value, extra_data, manual, visited)
                     # dont care if result fails for individual groups
                 return True # groups always pass 
 
@@ -1784,7 +1801,7 @@ class ExecutionContext():
 
                 for child in node.children:
                     
-                    result = self.execute_node(child, event, value, extra_data, manual)
+                    result = self.execute_node(child, event, value, extra_data, manual, visited)
                     if result:
                         # pass the whole group on first group that doesn't fail
                         return True
@@ -1850,7 +1867,7 @@ class ExecutionContext():
                 for child in node.children:
                     # if child.nodeType == ExecutionGraphNodeType.ActionSet:
                     #     continue # skip activation sets as the actions are in the container node already
-                    result = self.execute_node(child, event, value, extra_data, manual)
+                    result = self.execute_node(child, event, value, extra_data, manual, visited)
                     if not result:
                         break # FAIL
 
@@ -2014,7 +2031,7 @@ class ContainerCallback:
                     extra_data = event.extra_data
                 else:
                     extra_data.update(event.extra_data)
-                ec.execute_node(node, event, shared_value, extra_data)
+                ec.execute_node(node, event, shared_value, extra_data, visited = [])
 
 
 class VirtualButtonCallback(ContainerCallback):

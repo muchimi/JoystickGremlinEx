@@ -122,6 +122,7 @@ class Sound():
         self._next_key = 0 # next key to use for each registered sound
 
         pygame.init()
+        pygame.mixer.init()
 
     def start(self):
         ''' starts the sound queue '''
@@ -221,12 +222,14 @@ class Sound():
     def setPlaybackDevice(self, name : str):
         ''' changes the playback device '''
         if self._playback_device_name != name:
-            active = pygame.mixer.get_init()
-            self.soundStop()
+            if pygame.mixer.get_init():
+                # stop the mixer so we can change the device
+                pygame.mixer.stop()
+                pygame.mixer.quit()
+            
             pygame.mixer.pre_init(devicename = name)
             self._playback_device_name = name 
-            if active:
-                pygame.mixer.init()
+            pygame.mixer.init()
 
     def playbackDevice(self) -> str:
         return self._playback_device_name
@@ -239,7 +242,8 @@ class Sound():
     def soundStart(self):
         # reset the mixer
         self.soundStop()
-        pygame.mixer.init()
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
 
 
 
@@ -307,11 +311,13 @@ class Sound():
 
             event : SoundEvent = self._event_queue.get()
             if verbose: syslog.info(f"SOUNDLISTEN: DEQUEUE event {event.action.name}  QUEUE size: {self._event_queue.qsize():,}")		
+            if pygame.mixer.get_init() is None:
+                if self._playback_device_name:
+                    pygame.mixer.pre_init(self._playback_device_name)
+                pygame.mixer.init()
             match event.action:
                 case SoundAction.Play:
                     # play item
-                    if pygame.mixer.get_init() is None:
-                        pygame.mixer.init()
                     key = event.key
                     if verbose: syslog.info(f"\tplay [{key}]")
                     data : PlaybackOptions = event.data
@@ -344,6 +350,7 @@ class Sound():
                         if verbose: syslog.info(f"\tchange device [{device_name}]")
                         self.setPlaybackDevice(device_name)
                         current_device_name = device_name
+                        self._playback_device_name = device_name
                         self._event_queue.task_done()
 
                 case SoundAction.Stop:
