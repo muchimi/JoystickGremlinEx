@@ -18,6 +18,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log  
 
+### (m76T112B) hotfix
+- Fix: Input Viewer: moved to manual handling of UI elements to address lifecycle and memory. Note: it is published and normal for QT to not release all memory so as you keep on opening windows and closing them - there is no expectation QT releases the resources.  This is a known behavior of QT and is unrelated to GEX.
+- Fix: Input Viewer: VJOY quick views hiding keyboard/state.
+
 
 ### (m76T112A) hotfix
 - Fix: Execution Graph - functor loop trap on some triggers causes a fault when no loop should exist.
