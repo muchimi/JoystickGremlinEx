@@ -18,6 +18,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log  
 
+
+### (m76T112A) hotfix
+- Fix: Execution Graph - functor loop trap on some triggers.
+
 ### (m76T112)
 - Change: Joystick module: eliminated redundant assertions, consolidated device ID conversions.
 - New: Map to VJoy: set axis mode gains a "last value" mode.  This will cause GEX to wiggle that axis output to force the target application to re-read the data.  Some games can reset inputs internally and ignore the prior data sent, this is to quickly reset that to synchronize the output without physically moving the axis, which is the other way of forcing a re-read by the target environment.  The delay between wiggle is 250ms to allow sufficient time.

@@ -1922,7 +1922,7 @@ class ExecutionContext():
         if id in functor_map:
             # cache hit
             root = self._exec_map[id]
-            result = self.execute_node(root, event, value, extra_data, manual)
+            result = self.execute_node(root, event, value, extra_data, manual, visited=[])
         return result
     
     def isConditionNode(self, node : ExecutionGraphNode):
