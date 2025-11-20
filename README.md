@@ -20,7 +20,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 
 ### (m76T112A) hotfix
-- Fix: Execution Graph - functor loop trap on some triggers.
+- Fix: Execution Graph - functor loop trap on some triggers causes a fault when no loop should exist.
 
 ### (m76T112)
 - Change: Joystick module: eliminated redundant assertions, consolidated device ID conversions.
