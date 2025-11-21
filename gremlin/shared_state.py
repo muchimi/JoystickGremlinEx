@@ -426,7 +426,7 @@ def last_input_id(device_guid):
     ''' retrieves the last input id for a given input guid (input_type, input_id) of the last selection for this device '''
     import gremlin.config
     if device_guid:
-        device_guid, input_type, input_id, _ = gremlin.config.Configuration().get_last_input(device_guid)
+        device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid, widget_only = True)
         return (input_type, input_id)
     return (None, None)
 

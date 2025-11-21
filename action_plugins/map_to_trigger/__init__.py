@@ -72,7 +72,7 @@ class MapToTriggerWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         widgets = [ self.device_selector_widget, listen_widget]
 
-        self.container_selector_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.container_selector_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
         # button press widget
         self.button_release_widget = gremlin.ui.ui_common.QDataRadioButton("Released",
@@ -86,7 +86,7 @@ class MapToTriggerWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                                         )
         # set button widgets
         widgets = [self.button_press_widget, self.button_release_widget]
-        self.container_button_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Set Button:", left_margin = margin)
+        self.container_button_widget = gremlin.ui.ui_common.getHContainer(widgets,"Set Button:", left_margin = margin, widget_only = True)
 
         self.use_actual_widget =gremlin.ui.ui_common.QDataCheckbox("Use actual value",
                                                                    value = self.action_data.use_actual,
@@ -98,14 +98,14 @@ class MapToTriggerWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         # set axis widgets
         self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self.action_data.value, callback=self._handle_value_changed)
-        self.container_value_widget, _  = gremlin.ui.ui_common.getHContainer(self.value_widget,"Set Axis:", left_margin = margin)
+        self.container_value_widget = gremlin.ui.ui_common.getHContainer(self.value_widget,"Set Axis:", left_margin = margin, widget_only = True)
         
 
         # set hat direction widgets
         self.direction_widget = gremlin.ui.ui_common.QHatSelectorComboBox(value = self.action_data.direction,
                                                                            callback = self._handle_direction_changed)
         
-        self.container_direction_widget, _ = gremlin.ui.ui_common.getHContainer(self.direction_widget,"Set Position:", left_margin = margin)
+        self.container_direction_widget = gremlin.ui.ui_common.getHContainer(self.direction_widget,"Set Position:", left_margin = margin, widget_only = True)
 
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)

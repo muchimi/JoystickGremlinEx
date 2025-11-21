@@ -818,7 +818,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
             self._calibrated_max_widget
         ]
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
 
         self._raw_container_repeater_layout.addWidget(QtWidgets.QLabel("Input:"))

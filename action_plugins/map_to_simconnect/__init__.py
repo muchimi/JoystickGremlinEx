@@ -1597,7 +1597,7 @@ class SimconnectModeSelectDialog(gremlin.ui.ui_common.QRememberDialog):
         self.current_aircraft_widget.setMinimumWidth(line_entry_width)
         self.current_aircraft_widget.setText(current_aircraft)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.current_aircraft_widget,"Aircraft:")
+        widget = gremlin.ui.ui_common.getHContainer(self.current_aircraft_widget,"Aircraft:", widget_only = True)
         main_layout.addWidget(widget)
 
         mode = self._monitor.getStartupMode(current_aircraft)
@@ -1607,7 +1607,7 @@ class SimconnectModeSelectDialog(gremlin.ui.ui_common.QRememberDialog):
         self._mode_selector_widget.setMode(mode)
         self._mode_selector_widget.modeChanged.connect(self._handle_mode_changed)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(self._mode_selector_widget,"Profile Mode:")
+        widget = gremlin.ui.ui_common.getHContainer(self._mode_selector_widget,"Profile Mode:", widget_only = True)
         main_layout.addWidget(widget)
 
         msg = '''
@@ -1625,7 +1625,7 @@ Please select the mode for this aicraft:
         ok_button_widget = QtWidgets.QPushButton("Ok")
         ok_button_widget.clicked.connect(self._ok_cb)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only = True)
         main_layout.addWidget(widget)
 
 
@@ -1840,17 +1840,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                        self.refresh_current_aircraft_widget,
         ]
 
-        widget, _ = gremlin.ui.ui_common.getGridContainer(row_widgets)
+        widget = gremlin.ui.ui_common.getGridContainer(row_widgets, widget_only = True)
         self.main_layout.addWidget(widget)
-
-        # row_widgets = [self.add_current_aircraft_widget,
-        #                self.refresh_current_aircraft_widget,
-                       
-        # ]
-
-        # widget, _ = gremlin.ui.ui_common.getGridContainer(row_widgets)
-        # self.main_layout.addWidget(widget)
-
+        
         self.filter_widget = QtWidgets.QLineEdit()
         self.filter_widget.returnPressed.connect(self._handle_search) # on enter, do the search
         self.filter_widget.setMinimumWidth(line_entry_width)
@@ -1993,7 +1985,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         ]
 
         
-        self._containers_widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
+        self._containers_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
         self.main_layout.addWidget(self._containers_widget)
 
         self.main_layout.addWidget(warning_container)
@@ -2435,9 +2427,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 # mode_sort_down_widget.setStyleSheet("border: none;")
 
                 
-                aircraft_display_widget, _ = gremlin.ui.ui_common.getHContainer(["||", display_sort_up_widget, display_sort_down_widget],"Aircraft:")
-                #aircraft_model_widget, _ = gremlin.ui.ui_common.getHContainer(["||", model_sort_up_widget, model_sort_down_widget],"Model:")
-                mode_header_widget, _ = gremlin.ui.ui_common.getHContainer(["||", mode_sort_up_widget],"Mode:")
+                aircraft_display_widget = gremlin.ui.ui_common.getHContainer(["||", display_sort_up_widget, display_sort_down_widget],"Aircraft:", widget_only = True)
+                
+                mode_header_widget = gremlin.ui.ui_common.getHContainer(["||", mode_sort_up_widget],"Mode:", widget_only = True)
      
                 row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
                 row_selector.setSelectable(False)
@@ -3016,12 +3008,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         data = [("Block",SimConnectCommandType.SimVar),
                 ("LVAR",SimConnectCommandType.LVar)]
-        self._simvar_mode_container_widget, _ = gremlin.ui.ui_common.getRadioContainer(data, self._command_type_changed, default = self.action_data.command_type,label="Simvar mode:" )
+        self._simvar_mode_container_widget = gremlin.ui.ui_common.getRadioContainer(data, self._command_type_changed, default = self.action_data.command_type,label="Simvar mode:" , widget_only = True)
         
         self._lvar_command_widget = QtWidgets.QLineEdit()
         self._lvar_command_widget.setText(self.action_data.command)
         self._lvar_command_widget.textChanged.connect(self._lvar_changed_cb)
-        self._lvar_container_widget, _ = gremlin.ui.ui_common.getHContainer(self._lvar_command_widget,"Set LVAR:")
+        self._lvar_container_widget = gremlin.ui.ui_common.getHContainer(self._lvar_command_widget,"Set LVAR:", widget_only = True)
 
         self._command_container_layout.addWidget(self._simvar_mode_container_widget)
         self._command_container_layout.addWidget(self._action_selector_widget)

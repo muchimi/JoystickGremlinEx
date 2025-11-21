@@ -1360,7 +1360,7 @@ class ActionSetView(ui_common.AbstractView):
         add_action_container, add_action_layout = gremlin.ui.ui_common.getVContainer()
         
         widgets = [action_container, add_action_container]
-        content_widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
+        content_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
 
         #self.collapsible_container.setContent(content_widget)
         self.main_layout.addWidget(content_widget)
@@ -1409,7 +1409,7 @@ class ActionSetView(ui_common.AbstractView):
             self.action_selector.inputItem = profile_data.input_item
             self.action_selector.action_added.connect(self._add_action)
             self.action_selector.action_paste.connect(self._paste_action)
-            widget,_ = gremlin.ui.ui_common.getHContainer(self.action_selector)
+            widget = gremlin.ui.ui_common.getHContainer(self.action_selector, widget_only = True)
             add_action_layout.addWidget(widget)
             
 
@@ -1768,10 +1768,10 @@ class InputItemWidget(QBoxFrame):
         self._title_text_widget.setObjectName("title")
 
         
-        self._title_text_container_widget, _ = gremlin.ui.ui_common.getHContainer([
+        self._title_text_container_widget = gremlin.ui.ui_common.getHContainer([
                                                                             self._lock_widget,
                                                                             self._title_text_widget    
-                                                                        ])
+                                                                        ], widget_only = True)
 
 
         # title bar right side - holds the icons
@@ -2058,7 +2058,7 @@ class InputItemWidget(QBoxFrame):
                 line_edit.setMinimumWidth(width)
                 line_edit.setText(gremlin.util.idString(self.data.id))
                 line_edit.setReadOnly(True)
-                widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, f"Input ID:")
+                widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Input ID:", widget_only = True)
                 self._container_id_layout.addWidget(widget)
                 grids.append(widget)
 
@@ -2069,7 +2069,7 @@ class InputItemWidget(QBoxFrame):
                         line_edit.setMinimumWidth(width)
                         line_edit.setText(container.id)
                         line_edit.setReadOnly(True)
-                        widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, f"[{index}] {container.name}")
+                        widget = gremlin.ui.ui_common.getGridContainer(line_edit, f"[{index}] {container.name}", widget_only = True)
                         self._container_id_layout.addWidget(widget)
                         grids.append(widget)
                 else:
@@ -2078,7 +2078,7 @@ class InputItemWidget(QBoxFrame):
                     line_edit.setMinimumWidth(width)
                     line_edit.setText("No container found")
                     line_edit.setReadOnly(True)
-                    widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Mapping:")
+                    widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Mapping:", widget_only = True)
                     self._container_id_layout.addWidget(widget)
                     grids.append(widget)
                     
@@ -4048,7 +4048,7 @@ class TitleBar(QtWidgets.QFrame):
             self.priority_widget = gremlin.ui.ui_common.QIntLineEdit(data,min_range=0, max_range=1000,value = data.priority)
             self.priority_widget.setToolTip("Execution priority.  Lower priority runs first.")
             self.priority_widget.valueChanged.connect(self._priority_changed)
-            self.priority_container, _ = gremlin.ui.ui_common.getHContainer(self.priority_widget,"Priority")
+            self.priority_container = gremlin.ui.ui_common.getHContainer(self.priority_widget,"Priority", widget_only = True)
         else:
             self.priority_widget = None
             self.priority_container = None
@@ -4384,11 +4384,10 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                     line_edit.setMinimumWidth(width)
                     line_edit.setText(str(input_id) if isinstance(input_id, int) else gremlin.util.normalize_guid(input_id.id))
                     line_edit.setReadOnly(True)
-                    widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Input Id:")
+                    widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Input Id:", widget_only = True)
                     widgets.append(widget)
                 
-                widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
-
+                widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
                 name = self.objectName()
                 css = "background: green;"
@@ -5226,7 +5225,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                     # input_type = self.model.input_type # InputType.JoystickAxis
                     label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}") # ({InputType.to_display_name(input_type)})")
                     
-                    widget, _ = gremlin.ui.ui_common.getVContainer(label)
+                    widget = gremlin.ui.ui_common.getVContainer(label, widget_only = True)
                     widget.setContentsMargins(4,4,4,4)
                     #widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
                     self.scroll_layout.addWidget(widget)

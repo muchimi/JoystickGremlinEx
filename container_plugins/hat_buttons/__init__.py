@@ -115,7 +115,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
             self.sticky_widget
                    ]
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.action_layout.addWidget(widget)
         action_sets = self.profile_data.getActionSets()
         for action_set in action_sets:

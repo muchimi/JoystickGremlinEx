@@ -16,7 +16,16 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
-# Change log  
+# Change log
+
+
+### (m76T113)
+- Change: temporarily disabled profile loop checks as the "simple" approach is not yielding the desired result and more research is needed to work in all situations and avoid an impact in performance. The guardrail is off again, so if your profile locks up at runtime, it is most likely because you have a logic loop with the options selected unless there are errors in the log file.  The symptom is an unresponsive UI and need to hard terminate GEX.
+
+- Change: Additional optimizations for UI containers.
+- Change: Additional C++ garbage collection hardening and manual handling of UI object lifetimes due to persistent desync of QT C++ objects with Python references.
+- Change: Additional call history in the log file if an execution loop is detected in the execution graph. Note: this is a very simple detection to ensure the execution graph does not execute the same node twice for a given trigger. This is very simple to avoid having any impact to profile runtime performance.
+
 
 ### (m76T112D)
 - Fix: Map to VJoy: inversion flag on vjoy is functional again if the output value should be inverted using the Invert Axis command.

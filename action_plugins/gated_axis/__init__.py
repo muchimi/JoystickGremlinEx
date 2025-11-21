@@ -772,7 +772,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         ]
 
 
-        self.container_options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, left_margin=12)
+        self.container_options_widget = gremlin.ui.ui_common.getHContainer(widgets, left_margin=12, widget_only = True)
 
 
         # holds gateinfo widgets
@@ -827,7 +827,7 @@ making changes that impact the order of gates or ranges."""
         row+=1
         # spacer
         widgets = [QtWidgets.QLabel(" "), gremlin.ui.ui_common.QHorizontalLine()]
-        widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
+        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget,row,0,1,-1)
         
         row+=1
@@ -1634,8 +1634,8 @@ making changes that impact the order of gates or ranges."""
         line = gremlin.ui.ui_common.QHLine()
         color = gremlin.ui.ui_common.Color.menuSeparatorColor()
         line.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color};}} ")
-        widget,_ = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg),
-                                                       line])
+        widget = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg),
+                                                       line], widget_only = True)
 
         action_range_info = QtWidgets.QWidgetAction(menu)
         action_range_info.setDefaultWidget(widget)
@@ -1671,8 +1671,8 @@ making changes that impact the order of gates or ranges."""
         line = gremlin.ui.ui_common.QHLine()
         color = gremlin.ui.ui_common.Color.menuSeparatorColor()
         line.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color};}} ")
-        widget,_ = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg),
-                                                       line])
+        widget = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg),
+                                                       line], widget_only = True)
 
         action_gate_info = QtWidgets.QWidgetAction(menu)
         action_gate_info.setDefaultWidget(widget)

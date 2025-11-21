@@ -277,7 +277,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
         self.target_device = self.device_selector.currentData()
         self.device_selector.currentIndexChanged.connect(self._device_changed)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(["Target Device:", self.device_selector])
+        widget = gremlin.ui.ui_common.getHContainer(["Target Device:", self.device_selector], widget_only = True)
         self.main_layout.addWidget(widget)
 
         self.main_layout.addWidget(QtWidgets.QWidget()) # separator
@@ -285,7 +285,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
         ok_button_widget.clicked.connect(self._execute_cb)
         cancel_button_widget = QtWidgets.QPushButton("Cancel")
         cancel_button_widget.clicked.connect(self._close_cb)
-        button_container_widget, _ = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True)
+        button_container_widget = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only = True)
         
         self.main_layout.addWidget(button_container_widget)
 

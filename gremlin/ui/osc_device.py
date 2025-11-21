@@ -2944,7 +2944,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._trigger_on_message_widget.setToolTip("When enabled, receiving a message regardless of parameter will trigger the action with an autorelease.<br>Use this option when the OSC source message does not send >0 for press, 0 for release.")
         self._trigger_on_message_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self._pulse_delay, callback = self._pulse_value_changed)
         
-        self._container_trigger_widget, _ = gremlin.ui.ui_common.getHContainer([self._trigger_on_message_widget, self._trigger_on_message_delay_widget])
+        self._container_trigger_widget = gremlin.ui.ui_common.getHContainer([self._trigger_on_message_widget, self._trigger_on_message_delay_widget], widget_only = True)
 
 
         self._container_mode_radio_layout.addWidget(QtWidgets.QLabel("Action mode:"))
@@ -3470,7 +3470,7 @@ class  OscFilterWidget(QtWidgets.QWidget):
         self._clear_filter_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback = self._clear_filter,label=None)
         self._clear_filter_widget.setMaximumWidth(24)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([self._find_widget,
+        widget = gremlin.ui.ui_common.getHContainer([self._find_widget,
                                                              "||",
                                                              #self._filter_enabled_widget,
                                                              QtWidgets.QLabel(" Filter:"),
@@ -3478,14 +3478,13 @@ class  OscFilterWidget(QtWidgets.QWidget):
                                                              "||",
                                                              self._apply_widget,
                                                              self._clear_filter_widget,
-
-                                                             ])
+                                                             ], widget_only = True)
         
         self.main_layout.addWidget(widget)
 
         # count row
         self._count_widget = QtWidgets.QLabel()
-        widget, _ = gremlin.ui.ui_common.getHContainer(self._count_widget)
+        widget = gremlin.ui.ui_common.getHContainer(self._count_widget, widget_only = True)
 
 
         self.main_layout.addWidget(widget)
@@ -3650,7 +3649,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
-        widget, _ = gremlin.ui.ui_common.getHContainer(["OSC Inputs", "||", lock_widget])
+        widget = gremlin.ui.ui_common.getHContainer(["OSC Inputs", "||", lock_widget], widget_only = True)
         self.addLeftPanelWidget(widget)
 
         
@@ -3661,7 +3660,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only = True)
             self.addLeftPanelWidget(widget)
             w1 = widget
 
@@ -3669,7 +3668,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only = True)
             self.addLeftPanelWidget(widget)
             w2 = widget
 

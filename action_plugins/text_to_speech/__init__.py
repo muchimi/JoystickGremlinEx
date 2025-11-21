@@ -107,7 +107,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         widgets = [self.abort_off_widget, self.abort_on_widget, self.clear_queue_widget, self._execute_widget]
         
-        self.container_mode_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.container_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
         self.main_layout.addWidget(self.container_mode_widget)
         self.main_layout.addWidget(self.container_options_widget)

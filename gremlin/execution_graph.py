@@ -103,11 +103,11 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
     def __init__(self, node_type : ExecutionGraphNodeType):
         import gremlin.util
         super().__init__()
-        self.id = gremlin.util.get_guid() # unique node id, will be the container ID or the action ID for container or action nodes
+        self._id = gremlin.util.get_guid() # unique node id, will be the container ID or the action ID for container or action nodes
+        self.ref = None # reference ID
         self.functors = [] # list of functors
         self.sequence = [] # list of sequence codes (action, condition) for the functor by index
-       
-        
+                
         self.priority : int = 0 # execution priority of nodes at the same tree level
         self.nodeType : ExecutionGraphNodeType = node_type
         self.latched_conditions = None # additional conditions to execute on this node before it can execute
@@ -120,6 +120,11 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
         self.link = None # link to another node
         self.device_link = None # link to the device node
         self.comment = None # comment asociated with this node
+        self.data = None # accessory data
+
+    @property
+    def id(self):
+        return self._id
 
     def node_string(self):
          return f"{self.nodeType.name}: (node {self.id}) {self.description} has actions: {self.has_actions}"
@@ -643,7 +648,7 @@ class ExecutionContext():
 
 
         
-    def getNode(self, id):
+    def getNode(self, id) -> ExecutionGraphNode:
         ''' gets the node matching the corresponding id - nodes that have an ID are container and action nodes '''
         node = next((node for node in anytree.PreOrderIter(self.graph) if node.id == id), None)
         return node
@@ -1223,7 +1228,7 @@ class ExecutionContext():
 
  
             container_node = ExecutionGraphContainerNode(container)
-            container_node.id = container.id
+            container_node.ref = container.id
             container_node.mode = mode_name
             container_node.description = f"Container type: [{container.__class__.__name__}] ID: [{container.id}]"
 
@@ -1304,7 +1309,7 @@ class ExecutionContext():
 
                     # action node
                     action_node = ExecutionGraphActionNode(action)
-                    action_node.id = action.id
+                    action_node.ref = action.id
                     
                     action_node.mode = mode_name
                     action_node.comment = action.comment
@@ -1318,7 +1323,7 @@ class ExecutionContext():
                         action_node.parent = action_condition_node # action node is owned by its condition node
 
                     m_action_node = ExecutionGraphActionNode(action)
-                    m_action_node.id = action.id
+                    m_action_node.ref = action.id
                     m_action_node.parent = m_input_node # action node is owned by its condition node
                     m_action_node.mode = mode_name
                     m_action_node.link = action_node # link the input tree action node to the execution tree action node
@@ -1692,7 +1697,7 @@ class ExecutionContext():
             node = self.graph_input_map[key]
 
 
-    def execute_node(self, node : ExecutionGraphNode, event, value, extra_data : dict = None,  manual = False, visited = []) -> bool:
+    def execute_node(self, node : ExecutionGraphNode, event, value, extra_data : dict = None,  manual = False, visited = None) -> bool:
         ''' executes a single node 
         
         :param node: the graph node to execute
@@ -1713,15 +1718,26 @@ class ExecutionContext():
         verbose_detailed = self._verbose_detailed
         verbose_condition = self._verbose_condition
         result = False # assume fails
+        node.data = event # last event
         try:
             gremlin.shared_state.pushLog()
             logTabs = gremlin.shared_state.logTabs()
 
-            if node.id in visited:
-                syslog.error(f"{logTabs}EXEC: LOOP DETECTED [{node.id}] [{node.nodeType.name}] {node.description}) - this node has already been executed as part of this sequence indicating a logical loop")
-                return False
-            
-            visited.append(node.id)
+            # #if not node.nodeType in (ExecutionGraphNodeType.ActionSet, ExecutionGraphNodeType.Group):
+            # if node.id in visited:
+            #     if  event.callbackKey in visited[node.id]:
+            #         syslog.error(f"{logTabs}EXEC: LOOP DETECTED [{node.id}] [{node.nodeType.name}] {node.description}) - this node has already been executed as part of this sequence indicating a logical loop")
+            #         ntabs = " "
+            #         syslog.error(f"{logTabs}{ntabs}Execution history:")
+            #         for id in visited:
+            #             n : ExecutionGraphNode = self.getNode(id)
+            #             syslog.error(f"{logTabs}{ntabs}{n.to_string()} EVENT: {str(event)}")
+            #             ntabs += " "
+            #         return False
+            # else:
+            #     visited[node.id] = []
+
+            # visited[node.id].append(event.callbackKey)
                 
             # abort if the mode changed and the event was fired in a different mode
             if event.mode and event.mode != gremlin.shared_state.runtime_mode:
@@ -1921,8 +1937,8 @@ class ExecutionContext():
 
         if id in functor_map:
             # cache hit
-            root = self._exec_map[id]
-            result = self.execute_node(root, event, value, extra_data, manual, visited=[])
+            root : ExecutionGraphNode = self._exec_map[id]
+            result = self.execute_node(root, event, value, extra_data, manual)
         return result
     
     def isConditionNode(self, node : ExecutionGraphNode):
@@ -2031,7 +2047,7 @@ class ContainerCallback:
                     extra_data = event.extra_data
                 else:
                     extra_data.update(event.extra_data)
-                ec.execute_node(node, event, shared_value, extra_data, visited = [])
+                ec.execute_node(node, event, shared_value, extra_data)
 
 
 class VirtualButtonCallback(ContainerCallback):

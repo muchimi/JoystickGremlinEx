@@ -325,7 +325,7 @@ def get_axis(guid, index, normalized = True, linear = False):
     dev : dinput.DeviceSummary = get_device(guid)
     if dev and dev.axis_count:
         axis_id = dev.linear_id_map[index] if linear else index
-        value = dinput.DILL.get_axis(guid, axis_id)
+        value = dinput.DILL.get_axis(dev.device_guid, axis_id)
         if normalized:
             value = gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
         return value

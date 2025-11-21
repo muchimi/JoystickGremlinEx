@@ -795,9 +795,6 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.mouse_widget = self._get_mouse_widget()
         self.media_widget = self._get_media_widget()
         
-
-        #self.container_extra, _ = gremlin.ui.ui_common.getHContainer([self.mouse_widget, "||", self.media_widget])
-
         self._keys = None # return data
         self._display_shifted = False # true if displayed shifted
 
@@ -829,7 +826,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             w.clicked.connect(self._size_changed)
 
 
-        self.size_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.size_container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
 
         self.numlock_widget = QtWidgets.QCheckBox("Force numlock Off")
@@ -1126,7 +1123,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             self._key_map[(key.scan_code, key.is_extended)] = key.lookup_name
             self._key_widget_map[key.lookup_name] = widget
                         
-        container, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        container = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         return container            
 
     def _get_media_widget(self, parent = None):

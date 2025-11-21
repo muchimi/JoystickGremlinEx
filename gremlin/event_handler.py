@@ -204,18 +204,6 @@ class Event:
 			return self.override_input_type
 		return self.event_type
 	
-	# @property
-	# def event_type(self):
-	# 	if self.override_input_type:
-	# 		return self.override_input_type
-	# 	return self._event_type
-	
-	# @event_type.setter
-	# def event_type(self, value):
-	# 	self._event_type = value
-
-
-
 	def fake_button(self, is_pressed = True, clone = False):
 		''' converts the event to a fake button '''
 		e = self.clone() if clone else self
@@ -340,6 +328,9 @@ class Event:
 			return f"Event: {self._id} Midi : {self.identifier} value: {self.value}"
 		elif self.event_type == InputType.OpenSoundControl:
 			return f"Event: {self._id} OSC : {self.identifier} value: {self.value}"
+		elif self.event_type == InputType.State:
+			return f"Event: {self._id} STATE : {str(self.identifier)} value: {self.value}"
+		
 		
 		return f"Event: {self._id} {self.event_type} identifier {self.identifier}"
 	
@@ -2229,7 +2220,7 @@ class EventHandler(QtCore.QObject):
 					virtual_code = key.virtual_code
 					keyid_source = key.index_tuple() # use the scan code for now
 					#index = virtual_code if virtual_code > 0 else keyid
-					keyid, _ = gremlin.keyboard.KeyMap.translate(keyid_source)
+					keyid = gremlin.keyboard.KeyMap.translate(keyid_source, widget_only = True)
 						
 					if device_guid not in self.latched_events.keys():
 						self.latched_events[device_guid] = {}
@@ -3215,13 +3206,21 @@ class AxisValues(NamedTuple):
 class AxisData():
 	''' holds axis data '''
 	def __init__(self, device_guid, input_id):
-		if not isinstance(device_guid, str):
-			self.device_id = gremlin.util.normalize_guid(device_guid)
-			self.device_guid = device_guid
-		else:
-			self.device_id = gremlin.util.normalize_guid(device_guid)
-			self.device_guid = gremlin.util.parse_guid(device_guid)
+		import gremlin.joystick_handling
 
+		
+		self.device_id = None
+		self.device_guid = None
+		self._device = None
+		self.device_type = None
+
+		device = gremlin.joystick_handling.getDevice(device_guid)
+		if device:
+			self.device_id = device.device_guid
+			self.device_guid = device.device_id
+			self._device = device
+			self.device_type = device.device_type
+		
 		self.input_id = input_id
 		self.actual_value = None # computed value from last query
 		self.raw_value = None
@@ -3231,8 +3230,7 @@ class AxisData():
 
 	@property
 	def device(self) -> dinput.DeviceSummary:
-		import gremlin.joystick_handling
-		return gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+		return self._device
 
 
 	@property
@@ -3266,8 +3264,16 @@ class AxisData():
 		    '''
 		import gremlin.ui.axis_calibration
 		
+
+
 		device_guid = self.device_guid
 		input_id = self.input_id
+
+		if not device_guid:
+			return None
+
+		# OSC input data
+
 
 		# input value (raw value from stick)
 		raw_value = value if value is not None else gremlin.joystick_handling.get_axis(device_guid, input_id)
@@ -3372,6 +3378,7 @@ class AxisState():
 		for device in gremlin.joystick_handling.getDevices():
 			if device.connected:
 				self.registerDevice(device)
+
 		config = gremlin.config.Configuration()
 		verbose = config.verbose_mode_inputs or config.verbose_mode_joystick
 		if verbose:

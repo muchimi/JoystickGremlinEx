@@ -3420,7 +3420,7 @@ class InputListenerWidget(QBoxFrame):
             
             self.cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel)
             self.ok_widget = gremlin.ui.ui_common.Buttons.getOkWidget(callback = self._accept)
-            widget, _ = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget])
+            widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], widget_only = True)
             self.main_layout.addWidget(widget, alignment= QtCore.Qt.AlignmentFlag.AlignHCenter)
             msg = f"""<center>Press Ok to accept, Cancel to quit.</center>"""
         else:
@@ -9523,7 +9523,7 @@ def getFlowContainer(widget_or_list = None, label = None):
     return (widget, layout)
 
 
-def getGridContainer(widget_or_list = None, label = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None ):
+def getGridContainer(widget_or_list = None, label = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None, widget_only = False):
     ''' gets a qt grid container widget
      
     :param widget_or_list: the widget or widgets to add to the next row - if the item is a string, it's converted to a label, use "|" for a separator
@@ -9584,6 +9584,8 @@ def getGridContainer(widget_or_list = None, label = None, alignment = QtCore.Qt.
             col = layout.columnCount()
         layout.addWidget(QtWidgets.QWidget(), 0, col)
         layout.setColumnStretch(col, 2)
+    if widget_only:
+        return widget
     return (widget, layout)
 
 
@@ -11472,7 +11474,7 @@ class QInputDialog(QRememberDialog):
 
         self.cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel)
         self.ok_widget = gremlin.ui.ui_common.Buttons.getOkWidget(callback = self._accept)
-        widget, _ = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget])
+        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], widget_only = True)
         self.main_layout.addWidget(widget, alignment= QtCore.Qt.AlignmentFlag.AlignHCenter)
 
     def text(self) -> str:

@@ -357,7 +357,7 @@ class VJoyButtonsDefaultsWidget(QtWidgets.QWidget):
         off_widget.setToolTip("Sets all buttons to off")
         off_widget.clicked.connect(self._all_off)
         
-        button_container_widget, _ = gremlin.ui.ui_common.getHContainer([on_widget, off_widget], left_stretch=True)
+        button_container_widget = gremlin.ui.ui_common.getHContainer([on_widget, off_widget], left_stretch=True, widget_only = True)
         self.main_layout.addWidget(button_container_widget)
         
 
@@ -448,7 +448,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
                    zero_widget,
                    max_widget]  
 
-        button_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True)
+        button_container_widget = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True, widget_only = True)
         self.main_layout.addWidget(button_container_widget)
 
     def _all_enabled(self):

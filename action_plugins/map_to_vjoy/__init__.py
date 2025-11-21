@@ -255,7 +255,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
                 self.option_widget.addButton(rb, id = id)
                 id+=1
 
-            widget,_ = gremlin.ui.ui_common.getHContainer(widgets)
+            widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
             row_widgets.append(widget)
 
 
@@ -265,9 +265,9 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         row_widgets.append(self.merge_invert_widget)
 
 
-        self.container_merge_options_widget, _ = gremlin.ui.ui_common.getVContainer(row_widgets)
+        self.container_merge_options_widget = gremlin.ui.ui_common.getVContainer(row_widgets, widget_only = True)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.merge_description_widget,"Merge Operation:")
+        widget = gremlin.ui.ui_common.getHContainer(self.merge_description_widget,"Merge Operation:", widget_only = True)
         
         self.container_merge_layout.addWidget(widget)
         self.container_merge_layout.addWidget(self.container_merge_options_widget)
@@ -283,7 +283,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         else:
             self.merge_axis_repeater_widget = None
         
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Merge curve:")
+        widget = gremlin.ui.ui_common.getHContainer(widgets,"Merge curve:", widget_only = True)
         self.container_merge_layout.addWidget(widget)
         
         self.main_layout.addWidget(self.container_merge_widget)
@@ -1396,7 +1396,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                             )
         self._sync_widget.valueChanged.connect(self._default_value_changed)
         widgets = [self._sync_widget]
-        self.sync_on_start_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.sync_on_start_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.sync_on_start_widget.setContentsMargins(0,8,0,8)
         self.main_layout.addWidget(self.sync_on_start_widget)
 
@@ -1455,7 +1455,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.relative_scaling_widget.setMaximum(1000.0)
         self.relative_scaling_widget.setDecimals(3)
 
-        self.container_reverse_widget, _ = gremlin.ui.ui_common.getHContainer(self.reverse_checkbox, min_height = self.container_height)
+        self.container_reverse_widget = gremlin.ui.ui_common.getHContainer(self.reverse_checkbox, min_height = self.container_height, widget_only = True)
         self.main_layout.addWidget(self.container_reverse_widget)
 
         widgets = [
@@ -1463,7 +1463,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.relative_checkbox,
             self._use_relative_value_widget,
         ]
-        self.container_output_mode_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Output mode:", min_height = self.container_height)
+        self.container_output_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, "Output mode:", min_height = self.container_height, widget_only = True)
         self.main_layout.addWidget(self.container_output_mode_widget)
 
      
@@ -1479,7 +1479,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.relative_scaling_widget
         ]
 
-        self.container_relative_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Relative mode options:", min_height = self.container_height)
+        self.container_relative_widget = gremlin.ui.ui_common.getHContainer(widgets, "Relative mode options:", min_height = self.container_height, widget_only = True)
 
         widgets = [
             "Relative Value:",
@@ -1487,7 +1487,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._relative_pulse_widget,
         ]
 
-        self.container_target_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height)
+        self.container_target_widget = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height, widget_only = True)
         
         self.main_layout.addWidget(self.container_relative_widget)
         self.main_layout.addWidget(self.container_target_widget)
@@ -1557,7 +1557,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.curve_clear_widget,
         ]
         
-        self.container_output_curve_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Output Curve Options", min_height = self.container_height)
+        self.container_output_curve_widget = gremlin.ui.ui_common.getHContainer(widgets,"Output Curve Options", min_height = self.container_height, widget_only = True)
         self.main_layout.addWidget(self.container_output_curve_widget)
 
         widgets = [
@@ -1631,7 +1631,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         widgets = [merge_add_widget,
                    self.merge_clear_widget
                    ]
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.container_merge_layout.addWidget(widget)
 
         self.action_data.queueAxisEvent() # fire a joystick update to update the ui
@@ -2079,7 +2079,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ]
 
 
-        self.container_button_mode_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Output Mode:", min_height = self.container_height)
+        self.container_button_mode_widget = gremlin.ui.ui_common.getHContainer(widgets,"Output Mode:", min_height = self.container_height, widget_only = True)
 
         widgets = [
             self.button_pulse_widget,
@@ -2087,7 +2087,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.button_pulse_repeat_widget,
         ]
 
-        self.container_pulse_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Pulse Options:", min_height = self.container_height)
+        self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets,"Pulse Options:", min_height = self.container_height, widget_only = True)
 
 
         self.button_rb_hold.clicked.connect(self._button_mode_changed)
@@ -2152,7 +2152,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         #self.warning_widget = gremlin.ui.ui_common.QWarningWidget()
         warning_color = gremlin.ui.ui_common.Color.warningColor()
         self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="", use_wrap=False)
-        self.container_warning_widget,_ = gremlin.ui.ui_common.getHContainer(self.warning_widget, min_height = self.container_height)
+        self.container_warning_widget = gremlin.ui.ui_common.getHContainer(self.warning_widget, min_height = self.container_height, widget_only = True)
 
         self.show_disconnected_widget = QtWidgets.QCheckBox("Show disconnected")
         self.show_disconnected_widget.setChecked(config.vjoy_show_disconnected)
@@ -2197,7 +2197,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             ]   
 
-        self.container_options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height)
+        self.container_options_widget = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height, widget_only = True)
 
         
 
@@ -2599,10 +2599,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self_step_direction_down_widget.clicked.connect(self._step_direction_changed)
         
 
-        self.step_direction_widget, _ = gremlin.ui.ui_common.getHContainer([
+        self.step_direction_widget = gremlin.ui.ui_common.getHContainer([
             self_step_direction_up_widget,
             self_step_direction_down_widget
-        ],"Step direction:", min_height = self.container_height)
+        ],"Step direction:", min_height = self.container_height, widget_only = True)
 
         self.step_start_index_widget.setRange(1,100)
         self.step_start_index_widget.valueChanged.connect(self._step_start_index_changed)

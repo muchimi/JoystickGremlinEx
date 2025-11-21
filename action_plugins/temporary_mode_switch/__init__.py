@@ -67,10 +67,10 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.return_mode_selector_widget =  gremlin.ui.ui_common.QComboBox()
         self.return_mode_selector_widget.currentIndexChanged.connect(self._return_mode_selected_changed)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget,"Mode:")
+        widget = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget,"Mode:", widget_only = True)
         self.main_layout.addWidget(widget)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([self.return_mode_widget, self.return_mode_selector_widget])
+        widget = gremlin.ui.ui_common.getHContainer([self.return_mode_widget, self.return_mode_selector_widget], widget_only = True)
         self.main_layout.addWidget(widget)
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)

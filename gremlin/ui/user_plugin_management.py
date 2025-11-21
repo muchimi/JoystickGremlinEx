@@ -365,7 +365,7 @@ class ModuleManagementViewWidget(QtWidgets.QSplitter):
         self.add_widget = gremlin.ui.ui_common.Buttons.getAddWidget("Add Plugin",
                                                   tooltip = "Adds a Python user plugin to the profile",
                                                   callback=self._handle_add_module)
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.add_widget, left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer(self.add_widget, left_stretch=True, widget_only = True)
 
 
 

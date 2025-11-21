@@ -494,9 +494,9 @@ class OscValueWidget(QtWidgets.QWidget):
         self._sync_widget.clicked.connect(self._sync_input)
         self._sync_widget.setEnabled(self._action_data is not None)
 
-        self._axis_widget, _ = gremlin.ui.ui_common.getHContainer([self._selector_widget, self._sync_widget])
+        self._axis_widget = gremlin.ui.ui_common.getHContainer([self._selector_widget, self._sync_widget], widget_only = True)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(self._source_widget, "Source:")
+        widget = gremlin.ui.ui_common.getHContainer(self._source_widget, "Source:", widget_only = True)
         self.main_layout.addWidget(widget)
 
         self._auto_widget = QtWidgets.QLabel("Auto (scaled axis value 0..1)" if self._is_axis else "Auto (1 for press, 0 for release)")
@@ -512,12 +512,12 @@ class OscValueWidget(QtWidgets.QWidget):
                    self._string_widget
         ]
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Output:")
+        widget = gremlin.ui.ui_common.getHContainer(widgets, "Output:", widget_only = True)
         self.main_layout.addWidget(widget)
 
         self.main_layout.addWidget(self._scale_widget)
 
-        self._send_widget, _ = gremlin.ui.ui_common.getHContainer([self._send_on_press_widget, self._send_on_release_widget])
+        self._send_widget = gremlin.ui.ui_common.getHContainer([self._send_on_press_widget, self._send_on_release_widget], widget_only = True)
         self.main_layout.addWidget(self._send_widget)
         
 
@@ -780,10 +780,10 @@ class OscInputWidget(QtWidgets.QWidget):
         toolbar = gremlin.ui.ui_common.QReorderToolbar(index = arg.index, count = arg_count, hide = True)
         toolbar.moveRequested.connect(self._move_requested)
        
-        widget, _ = gremlin.ui.ui_common.getHContainer([
+        widget = gremlin.ui.ui_common.getHContainer([
             toolbar,
             delete_widget
-        ])
+        ], widget_only = True)
 
         right_content_layout.addWidget(widget)
 
@@ -1051,7 +1051,7 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self._container_layout.addWidget(self._osc_container_widget)
 
-        self._button_widget, _ = gremlin.ui.ui_common.getHContainer([self.add_arg_widget, self.clear_args_widget], left_stretch=True)
+        self._button_widget = gremlin.ui.ui_common.getHContainer([self.add_arg_widget, self.clear_args_widget], left_stretch=True, widget_only = True)
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
         self._warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="", use_wrap=False)
@@ -1087,7 +1087,7 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
                    self._execute_on_stop_widget
                    ]
         
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget)
 
 

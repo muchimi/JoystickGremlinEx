@@ -163,18 +163,18 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         lock_widget.filterChanged.connect(self._handle_filter_changed)
 
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([label_axis,
+        widget = gremlin.ui.ui_common.getHContainer([label_axis,
                                                         label_button,
                                                         label_hat,
                                                         "||",
-                                                        lock_widget])
+                                                        lock_widget], widget_only = True)
         self.addLeftPanelWidget(widget)
 
         width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
 
         grids = []
 
-        widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Label:")
+        widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Label:", widget_only = True)
         line_edit.setMinimumWidth(width)
         self.addLeftPanelWidget(widget)
 
@@ -186,7 +186,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only = True)
             self.addLeftPanelWidget(widget)
             grids.append(widget)
 
@@ -194,7 +194,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only = True)
             self.addLeftPanelWidget(widget)
             grids.append(widget)
 

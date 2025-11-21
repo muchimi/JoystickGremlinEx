@@ -83,7 +83,7 @@ class MapToOctaviIfr1Widget(gremlin.ui.input_item.AbstractActionWidget):
 
         widget.currentIndexChanged.connect(self._button_changed)
 
-        container, _ = gremlin.ui.ui_common.getHContainer(widget,"LED selection:")
+        container = gremlin.ui.ui_common.getHContainer(widget,"LED selection:", widget_only = True)
         self.main_layout.addWidget(container)
 
         widgets = []
@@ -111,7 +111,7 @@ class MapToOctaviIfr1Widget(gremlin.ui.input_item.AbstractActionWidget):
         widget.clicked.connect(self._action_changed)
         widgets.append(widget)
 
-        container, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        container = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.main_layout.addWidget(container)
 
     def _populate_ui(self):

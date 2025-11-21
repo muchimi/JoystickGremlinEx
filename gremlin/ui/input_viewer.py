@@ -576,7 +576,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
        
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
 
-        options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        options_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         options_widget.setMaximumHeight(32)
 
         self.main_layout.addWidget(options_widget)

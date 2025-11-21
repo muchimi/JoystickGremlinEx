@@ -110,7 +110,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self.start_mode_selector,
         ]
         
-        self.container_start_mode_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Start Mode:")
+        self.container_start_mode_widget = gremlin.ui.ui_common.getHContainer(widgets,"Start Mode:", widget_only = True)
 
         # Restore last mode on profile activate
         self.activate_restore_mode = QtWidgets.QCheckBox("Restore last mode on start")
@@ -265,7 +265,7 @@ class HostIpDialog(ui_common.BaseDialogUi):
         cancel_widget = QtWidgets.QPushButton("Cancel")
         cancel_widget.clicked.connect(self._cancel_cb)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([ok_widget, cancel_widget],left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer([ok_widget, cancel_widget],left_stretch=True, widget_only = True)
         self.main_layout.addWidget(widget)
 
         self._update_ip()
@@ -361,7 +361,7 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
             widget = gremlin.ui.ui_common.QDataCheckbox(device.name, data = device, value = not device.device_id in removed_map)
             self.device_widgets.append(widget)
 
-        widget, _ = gremlin.ui.ui_common.getVContainer(self.device_widgets)
+        widget = gremlin.ui.ui_common.getVContainer(self.device_widgets, widget_only = True)
         
         self.scroll_layout.addWidget(widget)
         self.scroll_layout.addStretch()
@@ -385,7 +385,7 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
         ok_button_widget = QtWidgets.QPushButton("Ok")
         ok_button_widget.clicked.connect(self._ok_cb)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(
+        widget = gremlin.ui.ui_common.getHContainer(
             [
                 all_widget,
                 none_widget,
@@ -393,7 +393,7 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
                 "||",
                 ok_button_widget,
                 cancel_button_widget
-            ]
+            ], widget_only = True
             )
         button_container_widget = widget
         
@@ -590,7 +590,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         col3_widget, col3_layout = gremlin.ui.ui_common.getVContainer()
 
 
-        bottom_widget, _ = gremlin.ui.ui_common.getVContainer()
+        bottom_widget = gremlin.ui.ui_common.getVContainer(widget_only = True)
 
         grid_layout.addWidget(col1_widget, 0,0)
         grid_layout.addWidget(col2_widget, 0,1)
@@ -826,7 +826,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.filter_axis_threshold_widget.setValue(self.config.filter_axis_threshold)
         self.filter_axis_threshold_widget.valueChanged.connect(self._filter_axis_threshold_update)
 
-        filter_widget, _ = gremlin.ui.ui_common.getHContainer([self.filter_axis_widget, QtWidgets.QLabel("Threshold:"), self.filter_axis_threshold_widget])
+        filter_widget = gremlin.ui.ui_common.getHContainer([self.filter_axis_widget, QtWidgets.QLabel("Threshold:"), self.filter_axis_threshold_widget], widget_only = True)
 
 
         column_widget = QtWidgets.QWidget()
@@ -869,7 +869,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         widget, layout = gremlin.ui.ui_common.getHContainer(self.mouse_wheel_delay_widget, "Mouse Wheel Release delay (ms):")
         bottom_layout.addWidget(widget)
 
-        widget,_ = gremlin.ui.ui_common.getHContainer(self.range_precision_widget,"Range comparison decimals:")
+        widget = gremlin.ui.ui_common.getHContainer(self.range_precision_widget,"Range comparison decimals:", widget_only = True)
         bottom_layout.addWidget(widget)
 
         
@@ -914,7 +914,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         widgets.append("(Restart Required)")
 
-        self.theme_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.theme_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.theme_widget.setToolTip("Theme changes take effect at the next start.")
 
 
@@ -3068,7 +3068,7 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
         ok_button_widget = QtWidgets.QPushButton("Ok")
         ok_button_widget.clicked.connect(self._close_cb)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only = True)
         button_container_widget = widget
         
         self.main_layout.addWidget(button_container_widget)
@@ -3605,7 +3605,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             self.close_button
             ]
         
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget)
 
 
@@ -4163,7 +4163,7 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
             self.show_files_widget,
             gremlin.ui.ui_common.QHorizontalLine()
         ]
-        widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
+        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
         widget.setContentsMargins(4,0,0,0)
         self.main_layout.addWidget(widget)
 

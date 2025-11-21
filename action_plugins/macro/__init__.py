@@ -266,12 +266,6 @@ class MacroActionEditor(QtWidgets.QWidget):
         
         self.main_layout.addWidget(QtWidgets.QLabel("Action Settings"))
         self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-
-        # self.group_box = gremlin.ui.ui_common.QGroupBox("Action Settings")
-        # self.group_layout = QtWidgets.QVBoxLayout(self.group_box)
-
-        #widget, _ = gremlin.ui.ui_common.getHContainer(self.group_box)
-
         self.group_box, self.group_layout = gremlin.ui.ui_common.getVContainer()
 
         
@@ -308,7 +302,7 @@ class MacroActionEditor(QtWidgets.QWidget):
                 self.action_selector.addItem(action_name)
             self.action_selector.currentTextChanged.connect(self._change_action)
 
-            widget, _ = gremlin.ui.ui_common.getHContainer(self.action_selector, "Step Action:")
+            widget = gremlin.ui.ui_common.getHContainer(self.action_selector, "Step Action:", widget_only = True)
             self.group_layout.addWidget(widget)
             self.group_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
@@ -434,7 +428,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         self._create_joystick_inputs_ui(action)
 
         self.action_layout.addWidget(self.ui_elements["input_label"])
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.ui_elements["input_button"])
+        widget = gremlin.ui.ui_common.getHContainer(self.ui_elements["input_button"], widget_only = True)
         self.action_layout.addWidget(widget)
 
     def _keyboard_ui(self):
@@ -475,7 +469,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         add_widget = gremlin.ui.ui_common.QDataPushButton("Add Press/Delay/Release", data = action)
         add_widget.clicked.connect(self._add_key_full)
         
-        container, _ = gremlin.ui.ui_common.getHContainer((delay_widget, add_widget),"Delay (ms):")
+        container = gremlin.ui.ui_common.getHContainer((delay_widget, add_widget),"Delay (ms):", widget_only = True)
 
         self.ui_elements["key_container"] = container
         self.ui_elements["key_delay"] = delay_widget
@@ -485,7 +479,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.action_layout.addWidget(self.ui_elements["key_press"])
         self.action_layout.addWidget(self.ui_elements["key_release"])
 
-        widget,_ = gremlin.ui.ui_common.getHContainer((self.ui_elements["key_add_press"], self.ui_elements["key_add_release"]))
+        widget = gremlin.ui.ui_common.getHContainer((self.ui_elements["key_add_press"], self.ui_elements["key_add_release"]), widget_only = True)
         self.action_layout.addWidget(widget)
         self.action_layout.addWidget(container)
 
@@ -778,7 +772,7 @@ class MacroActionEditor(QtWidgets.QWidget):
                 self.action_layout.addWidget(widget)
 
 
-                widget, _ = gremlin.ui.ui_common.getHContainer(self.ui_elements["axis_value"],"Set Value:")
+                widget = gremlin.ui.ui_common.getHContainer(self.ui_elements["axis_value"],"Set Value:", widget_only = True)
                 self.action_layout.addWidget(widget)
                 
 
@@ -1361,17 +1355,16 @@ class MacroSettingsWidget(gremlin.ui.ui_common.QContentWidget):
         self.repeat_dropdown.currentTextChanged.connect(self._update_settings)
 
         # Place UI elements
-        widget, _ = gremlin.ui.ui_common.getHContainer([self.exclusive_checkbox, self.force_remote_checkbox])
+        widget = gremlin.ui.ui_common.getHContainer([self.exclusive_checkbox, self.force_remote_checkbox], widget_only = True)
         self.group_layout.addWidget(widget)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_dropdown, "Repeat Mode:")
+        widget = gremlin.ui.ui_common.getHContainer(self.repeat_dropdown, "Repeat Mode:", widget_only = True)
         self.group_layout.addWidget(widget)
 
         self.group_layout.addWidget(self.container_repeat_widget)
         
         if self.repeat_widget is not None:
-            #widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_dropdown)
-            widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_widget)
+            widget = gremlin.ui.ui_common.getHContainer(self.repeat_widget, widget_only = True)
             self.container_repeat_layout.addWidget(widget)
 
     def _update_settings(self, value = None):
@@ -1401,7 +1394,7 @@ class MacroSettingsWidget(gremlin.ui.ui_common.QContentWidget):
             self.data.repeat = storage_type()
             self.repeat_widget = widget_type(self.data.repeat)
             gremlin.util.clear_layout(self.container_repeat_layout)
-            widget, _ = gremlin.ui.ui_common.getHContainer(self.repeat_widget)
+            widget = gremlin.ui.ui_common.getHContainer(self.repeat_widget, widget_only = True)
             self.container_repeat_layout.addWidget(widget)
 
 class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -1496,7 +1489,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
                        self.autorestart_widget,
                        self.autostop_widget
                        ]
-            self.execute_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+            self.execute_container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
             
             self.main_layout.addWidget(self.execute_container_widget)
 

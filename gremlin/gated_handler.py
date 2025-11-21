@@ -1794,6 +1794,7 @@ class GateData():
                         extra_data = {}
                         extra_data["condition_type"] = trigger.condition
                         extra_data["trigger"] = trigger
+                        extra_data["source"] = "Gate Condition"
                         if trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.InRange, GateConditionType.OutsideRange):
                         
                             if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f}")

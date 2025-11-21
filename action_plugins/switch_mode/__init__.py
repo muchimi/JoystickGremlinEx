@@ -62,7 +62,7 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._warning_widget = gremlin.ui.ui_common.QWarningWidget("Mode must not be empty and cannot be the current mode.")
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget,"Switch to mode:")
+        widget = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget,"Switch to mode:", widget_only = True)
 
 
         self.main_layout.addWidget(widget)

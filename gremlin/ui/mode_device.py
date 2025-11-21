@@ -145,7 +145,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
-        widget, _ = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True, widget_only = True)
         self.addLeftPanelWidget(widget)
 
 
@@ -157,7 +157,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only = True)
             self.addLeftPanelWidget(widget)
             w1 = widget
 
@@ -165,7 +165,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only = True)
             self.addLeftPanelWidget(widget)
             w2 = widget
 

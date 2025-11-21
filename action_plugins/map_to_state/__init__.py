@@ -74,7 +74,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         self._default_off_widget.clicked.connect(self._default_changed)    
         self._default_on_widget.clicked.connect(self._default_changed)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer(["Default:",self._default_on_widget, self._default_off_widget])
+        widget = gremlin.ui.ui_common.getHContainer(["Default:",self._default_on_widget, self._default_off_widget], widget_only = True)
         main_layout.addWidget(widget)
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
@@ -83,7 +83,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget],left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget],left_stretch=True, widget_only = True)
         main_layout.addWidget(widget)
 
 
@@ -179,7 +179,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.button_pulse_repeat_widget,
         ]
 
-        self.container_pulse_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Pulse Options:")
+        self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets,"Pulse Options:", widget_only = True)
         
 
         mode = self.action_data.mode
@@ -237,11 +237,11 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                                         )
 
         widgets = [self._execute_widget, self._reset_default_widget]
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget)
 
         widgets = [self._sync_widget]
-        widget, _ = gremlin.ui.ui_common.getHContainer(widgets, left_margin =12)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, left_margin =12, widget_only = True)
         
         self.main_layout.addWidget(widget)
 

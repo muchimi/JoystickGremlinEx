@@ -124,14 +124,14 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.delay_box.valueChanged.connect(self._delay_changed)
         self.autorepeat_delay_box.valueChanged.connect(self._autorepeat_changed)
 
-        self.container_options_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Mode:")
+        self.container_options_widget = gremlin.ui.ui_common.getHContainer(widgets, "Mode:", widget_only = True)
 
         widgets = [
             self.delay_box,
             self.autorepeat_delay_box
         ]
         
-        self.container_delay_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        self.container_delay_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
 
         widgets = [
@@ -141,7 +141,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.show_keyboard_widget
         ]
 
-        self.container_action_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, "Actions:")
+        self.container_action_widget = gremlin.ui.ui_common.getHContainer(widgets, "Actions:", widget_only = True)
 
 
         self.main_layout.addWidget(self.key_combination)

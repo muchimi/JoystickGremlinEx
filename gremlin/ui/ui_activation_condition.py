@@ -360,7 +360,7 @@ class ModeConditionWidget(AbstractConditionWidget):
             return        
         
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only = True)
         self.main_layout.addWidget(widget)
 
         self.mode_selector = gremlin.ui.ui_common.QModeSelector()
@@ -399,11 +399,11 @@ class ModeConditionWidget(AbstractConditionWidget):
             self.ignore_release_widget
         ]
 
-        widget,_ = gremlin.ui.ui_common.getHContainer(widgets)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget)
 
         self.description_widget = QtWidgets.QLabel()
-        widget,_ = gremlin.ui.ui_common.getHContainer(["Description:", self.description_widget])
+        widget = gremlin.ui.ui_common.getHContainer(["Description:", self.description_widget], widget_only = True)
         self.main_layout.addWidget(widget)
 
 
@@ -439,19 +439,19 @@ class StateConditionWidget(AbstractConditionWidget):
         if not Shiboken.isValid(self):
             return
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
-        widget, _ = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only = True)
         self.main_layout.addWidget(widget)
 
         self.state_selector = gremlin.ui.ui_common.QComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
-        widget,_ = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector])
+        widget = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector], widget_only = True)
         self.main_layout.addWidget(widget)
 
         
 
 
-        widget,_ = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
+        widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only = True)
         self.main_layout.addWidget(widget)
 
         self.comparison_dropdown = ui_common.QComboBox()

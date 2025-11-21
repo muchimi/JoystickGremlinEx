@@ -452,14 +452,12 @@ def hat_direction_to_tuple(value):
 _logtabs = ""
 _cleaned_widgets = []
 
-def clear_layout(layout):
-    """Removes all items from the given layout.
+def clear_layout(layout: QtWidgets.QLayout):
+    """Removes all widgets from the given layout.
 
-    :param layout the layout from which to remove all items
+    :param layout: the layout from which to remove all items
     """
-    # global _logtabs,_cleaned_widgets
-    
-    # _logtabs += " "
+ 
     if not Shiboken.isValid(layout):
         return
     if layout is None:
@@ -473,30 +471,24 @@ def clear_layout(layout):
             clear_layout(child.layout())
         elif child.widget():
             widget = child.widget()
+            if hasattr(widget,"unhook"):
+                widget.unhook()
             if hasattr(widget,"_cleanup_ui"):
                 widget._cleanup_ui()
-            if hasattr(widget, "layout"):
-                clear_layout(widget.layout())
-            widget.hide()
-            widget.deleteLater()
+            if Shiboken.isValid(widget):
+                if hasattr(widget, "layout"):
+                    clear_layout(widget.layout())
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
         layout.removeItem(child)
 
-
-def get_layout_horizontal_size(layout : QtWidgets.QLayout) -> QtCore.QSize:
-    ''' gets the desired size of a layout '''
-    widgets = get_layout_widgets(layout)
-    size = QtCore.QSize()
-    h = 0
-    widget : QtWidgets.QWidget
-    for widget in widgets:
-        w_size = widget.sizeHint()
-        wh = w_size.height()
-        if wh > h:
-            h = wh
-        w_size.setHeight(0)
-        size += w_size
-    size.setHeight(h)
-    return size
+def delete_widget(widget : QtWidgets.QWidget):
+    ''' removes a widget from memory '''
+    if widget and Shiboken.isValid(widget):
+        widget.hide() # hide the widget from the UI
+        widget.setParent(None) # removes the widget from the containing layout
+        widget.deleteLater() # tell QT to free the widget from memory
 
 def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
     ''' returns a list of layout widgets '''
@@ -534,7 +526,21 @@ def dumpWidgets(widget, title = None):
             else:
                 syslog.info("\tNo widgets.")
             
-
+def get_layout_horizontal_size(layout : QtWidgets.QLayout) -> QtCore.QSize:
+    ''' gets the desired size of a layout '''
+    widgets = get_layout_widgets(layout)
+    size = QtCore.QSize()
+    h = 0
+    widget : QtWidgets.QWidget
+    for widget in widgets:
+        w_size = widget.sizeHint()
+        wh = w_size.height()
+        if wh > h:
+            h = wh
+        w_size.setHeight(0)
+        size += w_size
+    size.setHeight(h)
+    return size
 
 def layout_contains(layout, widget):
     ''' true if widget is contained in the given layout '''

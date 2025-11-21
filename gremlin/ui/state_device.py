@@ -1209,7 +1209,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
 
     def __str__(self):
-        return f"State: [{self._key}] id: [{self._id}]"
+        return f"State: [{self._key}] id: [{self._id}] Current value: [{self._value}]"
     
     def __eq__(self, other):
         if other is None:
@@ -2070,21 +2070,21 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             self._autorelease_delay_widget,
         ]
 
-        r1_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+        r1_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
         widgets = [
             "Set Value:",
             self._autorelease_mode_widget,
         ]
 
-        r2_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)        
+        r2_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)        
 
         widgets = [
             "Trigger on:",
             self._autorelease_trigger_mode_widget
         ]
 
-        r3_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)        
+        r3_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)        
 
 
         widgets = [
@@ -2093,14 +2093,14 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             r3_widget
             ]
         
-        self._autorelease_options_container_widget, _ = gremlin.ui.ui_common.getVContainer(widgets, left_margin=12)
+        self._autorelease_options_container_widget = gremlin.ui.ui_common.getVContainer(widgets, left_margin=12, widget_only = True)
 
         widgets = [
             self._autorelease_widget,
             self._autorelease_options_container_widget
         ]
 
-        self._autorelease_container_widget, _ = gremlin.ui.ui_common.getVContainer(widgets)
+        self._autorelease_container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
 
         self._status_widget = gremlin.ui.ui_common.QWarningWidget()
 
@@ -2129,7 +2129,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._category_config_widget.clicked.connect(self._category_config_cb)
         self._category_config_widget.setToolTip("Edit categories")
 
-        category_widget, _ = gremlin.ui.ui_common.getHContainer([self._category_selector_widget, self._category_config_widget])
+        category_widget = gremlin.ui.ui_common.getHContainer([self._category_selector_widget, self._category_config_widget], widget_only = True)
 
         row = 0
         col = 0
@@ -2148,7 +2148,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._config_layout.addWidget( self._is_expression_widget , row, col, 1, -1)
 
         row += 1
-        self._expression_container_widget, _ = gremlin.ui.ui_common.getHContainer([self._expression_widget, self._test_widget],"Expression:")
+        self._expression_container_widget = gremlin.ui.ui_common.getHContainer([self._expression_widget, self._test_widget],"Expression:", widget_only = True)
         self._config_layout.addWidget(self._expression_container_widget, row, col, 1, -1)
 
         row += 1
@@ -2167,7 +2167,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._default_off_widget.clicked.connect(self._default_changed)    
         self._default_on_widget.clicked.connect(self._default_changed)
 
-        self._default_container_widget, _ = gremlin.ui.ui_common.getHContainer([self._default_on_widget, self._default_off_widget],"Default State:")
+        self._default_container_widget = gremlin.ui.ui_common.getHContainer([self._default_on_widget, self._default_off_widget],"Default State:", widget_only = True)
         self._config_layout.addWidget(self._default_container_widget, row, col, 1, -1)
 
         main_layout.addWidget(self._config_widget)
@@ -2180,7 +2180,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
+        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only = True)
         
         main_layout.addWidget(widget)
         self._update_ui()
@@ -2426,16 +2426,16 @@ class  StateFilterWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(widget)
 
         # category filter
-        widget, _ = gremlin.ui.ui_common.getHContainer([self.filter_enabled_widget, 
+        widget = gremlin.ui.ui_common.getHContainer([self.filter_enabled_widget, 
                                                         "||",
                                                         QtWidgets.QLabel(" Category:"), 
-                                                        self._category_filter_widget])
+                                                        self._category_filter_widget], widget_only = True)
         self.main_layout.addWidget(widget)
 
 
         # count row
         self._count_widget = QtWidgets.QLabel()
-        widget, _ = gremlin.ui.ui_common.getHContainer(self._count_widget)
+        widget = gremlin.ui.ui_common.getHContainer(self._count_widget, widget_only = True)
         self.main_layout.addWidget(widget)
         self.main_layout.setSpacing(2)
         self._update_count()        
@@ -2583,7 +2583,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
-        widget, _ = gremlin.ui.ui_common.getHContainer(["State Inputs", "||", lock_widget])
+        widget = gremlin.ui.ui_common.getHContainer(["State Inputs", "||", lock_widget], widget_only = True)
         self.addLeftPanelWidget(widget)
 
 
@@ -2594,7 +2594,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:")
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only = True)
             self.addLeftPanelWidget(widget)
             w1 = widget
 
@@ -2602,7 +2602,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget, _ = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:")
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only = True)
             self.addLeftPanelWidget(widget)
             w2 = widget
 

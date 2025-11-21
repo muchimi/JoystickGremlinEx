@@ -70,7 +70,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         self.delay_widget.setValue(self.profile_data.autorelease_delay)
         self.delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
 
-        widget, _ = gremlin.ui.ui_common.getHContainer([self.autorelease_widget, self.delay_widget],"Options")
+        widget = gremlin.ui.ui_common.getHContainer([self.autorelease_widget, self.delay_widget],"Options", widget_only = True)
 
         self.action_layout.addWidget(widget)
 
