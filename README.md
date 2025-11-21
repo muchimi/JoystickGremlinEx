@@ -18,6 +18,8 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T113A)
+- Fix: General UI: Missing widget reference when info box is hidden (due to changes in T113 and reference )
 
 ### (m76T113)
 - Change: temporarily disabled profile loop checks as the "simple" approach is not yielding the desired result and more research is needed to work in all situations and avoid an impact in performance. The guardrail is off again, so if your profile locks up at runtime, it is most likely because you have a logic loop with the options selected unless there are errors in the log file.  The symptom is an unresponsive UI and need to hard terminate GEX.

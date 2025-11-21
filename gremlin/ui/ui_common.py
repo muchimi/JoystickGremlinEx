@@ -11177,13 +11177,16 @@ class QInfoBox(QtWidgets.QFrame):
         config.setVisualHidden(self._hide_key, True)
         self.setStyleSheet("")
         gremlin.util.clear_layout(self.main_layout)
+        self._label_widget = None
+
 
 
 
     def setText(self, text):
         if not Shiboken.isValid(self):
             return
-        self._label_widget.setHtml(text)
+        if self._label_widget:
+            self._label_widget.setHtml(text)
         
         
 
