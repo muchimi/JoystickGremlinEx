@@ -867,7 +867,6 @@ making changes that impact the order of gates or ranges."""
         gh.gatedata_valueChanged.connect(self._update_values_cb)
         gh.gates_changed.connect(self._gates_changed)
         gh.range_configuration_changed.connect(self._handle_range_configuration_changed) # called when range data changes
-        
         gh.range_trigger_display.connect(self._handle_range_trigger_display)
         gh.slider_update_event.connect(self._handle_slider_update)
 
@@ -1122,13 +1121,11 @@ making changes that impact the order of gates or ranges."""
                 syslog.info(f"gate axis widget: unhook {self.id} {self.action_data.input_display_name}")
 
             gh = GateEventHandler()
-
             gh.display_mode_changed.disconnect(self._handle_display_mode_changed)
             gh.gate_configuration_changed.disconnect(self._handle_gate_configuration_changed)
             gh.gate_display_changed.disconnect(self._gate_value_changed)
             gh.gate_index_changed.disconnect(self._handle_gate_index_changed)
             gh.gate_order_changed.disconnect(self._gate_order_changed_cb)
-            
             gh.gate_request_delete.disconnect(self._handle_gate_request_delete)
             gh.gate_trigger_display.disconnect(self._handle_gate_trigger_display)
             gh.gate_value_changed.disconnect(self._handle_gate_value_changed)
@@ -1136,7 +1133,6 @@ making changes that impact the order of gates or ranges."""
             gh.gatedata_valueChanged.disconnect(self._update_values_cb)
             gh.gates_changed.disconnect(self._gates_changed)
             gh.range_configuration_changed.disconnect(self._handle_range_configuration_changed) # called when range data changes
-            gh.range_request_configure.disconnect(self._handle_range_configuration_request)
             gh.range_trigger_display.disconnect(self._handle_range_trigger_display)
             gh.slider_update_event.disconnect(self._handle_slider_update)
 

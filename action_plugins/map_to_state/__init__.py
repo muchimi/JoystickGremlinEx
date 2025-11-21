@@ -882,11 +882,15 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value, extra_data = None):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
 
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}] input type: [{input_type.name}] mode: [{mode}]")
+    
         if not self._started:
             # trap events kicked off while profile start is going on
-            return
+            if verbose: syslog.info(f"\tProfile not running - skipping")
+            return False
 
-        verbose = gremlin.config.Configuration().verbose_mode_state
+        
 
         key = self.action_data.key
         mode = self.action_data.mode
@@ -900,7 +904,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         input_type = event.getInputType()
         
 
-        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}] input type: [{input_type.name}] mode: [{mode}]")
+  
 
 
         if trigger:
