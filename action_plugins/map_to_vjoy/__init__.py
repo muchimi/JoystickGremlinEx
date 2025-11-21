@@ -3851,6 +3851,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.step_index = action_data.target_step_start_index
         v1 = action_data.button_range_min
         v2 = action_data.button_range_max
+        self.usage_data = gremlin.joystick_handling.VJoyUsageState()
         
         if v1 > v2:
                 # swap range so v1 < v2
@@ -3986,15 +3987,14 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
     @property
     def reverse(self):
         # axis reversed state
-        usage_data = gremlin.joystick_handling.VJoyUsageState()
-        return usage_data.is_inverted(self.vjoy_id, self.vjoy_input_id)
+        return self.usage_data.is_inverted(self.vjoy_id, self.vjoy_input_id)
 
     def toggle_reverse(self):
         # toggles reverse mode for the axis
-        usage_data = gremlin.joystick_handling.VJoyUsageState()
-        value = usage_data.is_inverted(self.vjoy_id, self.vjoy_input_id)
-        usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, not value)
-        log_sys(f"toggle reverse: {self.vjoy_id} {self.vjoy_input_id} new state: {self.reverse}")
+        inverted = self.usage_data.is_inverted(self.vjoy_id, self.vjoy_input_id)
+        self.usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, not inverted)
+        verbose = gremlin.config.Configuration().verbose_mode_vjoy
+        if verbose: syslog.info(f"toggle reverse: {self.vjoy_id} {self.vjoy_input_id} new state: {self.reverse}")
 
     def latch_extra_inputs(self):
         ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
@@ -4035,9 +4035,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 joystick_handling.VJoyProxy()[self.action_data.vjoy_id].button(self.action_data.vjoy_button_id).is_pressed = self.action_data.button_start_value
         if self.input_type == InputType.JoystickAxis:
             # send initial axis values to the output
-
-            usage_data = gremlin.joystick_handling.VJoyUsageState()
-            usage_data.set_range(self.vjoy_id, self.vjoy_input_id, self.range_low, self.range_high)
+            
+            self.usage_data.set_range(self.vjoy_id, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
 
             match self.action_mode:
@@ -4431,7 +4430,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
     def _process_event(self, event : gremlin.event_handler.Event, action_value : gremlin.actions.Value, extra_data):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
-        usage_data = gremlin.joystick_handling.VJoyUsageState()
+        
         verbose = self.verbose
         verbose_extra = self.verbose_extra
         verbose_extra = verbose
@@ -4549,13 +4548,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
 
                         self.action_data.axis_last_value = value
-
-                        if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                                joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
-                                                
-                        if is_remote:
-                            self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, value)
+                        self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
                         # remember the last value
                         self.action_data.axis_last_value = value
@@ -4843,7 +4836,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             value = self.action_data.axis_last_value
                             if value is None:
                                 # read the last value
-                                value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+                                value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
                                 if verbose: syslog.info(f"reading axis value: {value:0.3f}")
                             else:
                                 if verbose: syslog.info(f"using last axis value: {value:0.3f}")
@@ -4855,10 +4848,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             self.target_value = value # value to restore after wiggle
                             
                             if verbose: syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
-                            if is_local:
-                                joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = wiggle_value
-                            if is_remote:
-                                self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, wiggle_value)
+                            self._set_axis(self.vjoy_id, self.vjoy_input_id, wiggle_value)
                             timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
                             timer.start()
                     
@@ -4881,11 +4871,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             
                             value = gremlin.util.clamp(value)
                             if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
-                            
-                            if is_local:
-                                joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
-                            if is_remote:
-                                self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, value)
+                            self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+
                             # remember the last value
                             syslog.info(f"set setaxis last value: {value:0.3f}")
                             self.action_data.axis_last_value = value
@@ -4893,7 +4880,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
                 # changes the output range on the target device / axis
                 if fire_event:
-                    usage_data.set_range(self.vjoy_id, self.vjoy_input_id, self.range_low, self.range_high)
+                    self.usage_data.set_range(self.vjoy_id, self.vjoy_input_id, self.range_low, self.range_high)
 
             elif VjoyAction.is_command(self.action_mode):
                 # update remote control mode
@@ -4920,7 +4907,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             count = len(self.action_data.target_step_list)
                             index = start_index
 
-                            value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+                            value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
                             if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
                                 # sync the current index with the current axis value
                                 v1 = v2 = None
@@ -4953,19 +4940,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                 trigger = True
 
                             if trigger:
-                                
-                                
                                 index = gremlin.util.clamp(index, 0, count-1)
-                                    
-                                
                                 value = self.action_data.target_step_list[index]
                                 if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis {self.vjoy_input_id} value: {value:0.3f}")
-                                
-                                if is_local:
-                                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                                        joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
-                                if is_remote:
-                                    self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, value)
+                                self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
                                 device.data[key] = index
                                 if verbose: syslog.info(f"STEPPED AXIS: start index: {start_index} new index: {index} step value: {value:0.3f}")
@@ -5005,13 +4983,33 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             self.functor_complete.emit() # indicate completed
         return result
     
-    def _handle_set_axis_wiggle(self):
-        value = self.target_value
+    def _set_axis(self, vid : int, axis_id : int , value : float):
+        ''' sets the axis value using the inversion factor '''
+        
+        inverted = self.usage_data.is_inverted(vid, axis_id)
+        if inverted:
+            # invert the value
+            value = -value
+
         is_local, is_remote = input_devices.remote_state.state
         if is_local:
             joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
         if is_remote:
             self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, value)
+
+    def _get_axis(self, vid : int, axis_id : int) -> float:
+        ''' gets the axis value using the inversion factor '''
+        value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+        inverted = self.usage_data.is_inverted(vid, axis_id)
+        if inverted:
+            value =- value
+        return value
+    
+
+    def _handle_set_axis_wiggle(self):
+        ''' handles the axis set value after a wiggle value send '''
+        value = self.target_value
+        self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
         
 
 
@@ -5220,6 +5218,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
 
+        self.usage_data = gremlin.joystick_handling.VJoyUsageState()
         self._input_type : InputType = self.get_input_type()
         if self._input_type in (InputType.ModeControl, InputType.VirtualButton):
             self._input_type = InputType.JoystickButton
@@ -5272,14 +5271,9 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.auto_release = False # true if we should do an auto-release (only means anything on momentary inputs)
         self.ignore_release = False # true if the button release should be ignored
 
-        # self._merge_device_id : str = None # input guid (str) of the merged device
-        # self._merge_device_guid : dinput.GUID = None # input guid for the merge device
+        
         self._merge_data = [] # list of merged axes
-
-        # self.merge_input_id : int = None # input id of the merged input
-        # self.merge_input_type : gremlin.input_types.InputType =  gremlin.input_types.InputType.JoystickAxis # only merging axes at this point
-        # self._merge_mode : MergeOperationType = MergeOperationType.Center # default merge method
-
+        
         self.output_range_min : float = -1.0 # min for merged output
         self.output_range_max : float = 1.0 # max for merged output
         self.merge_invert : bool = False # inversion flag for merged output
@@ -5600,7 +5594,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                             device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
                             v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
                             syslog.warning(f"Unable to get value for hardware device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}")
-                        
+
                         
                 elif gremlin.joystick_handling.is_vjoy_device(merge_device_guid):
                     values = sd.getAxisValues(merge_device_guid, merge_input_id)
@@ -5854,8 +5848,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @reverse.setter
     def reverse(self,value):
-        usage_data = gremlin.joystick_handling.VJoyUsageState()
-        usage_data.set_inverted(self.vjoy_id, self.vjoy_axis_id, value)
+        self.usage_data.set_inverted(self.vjoy_id, self.vjoy_axis_id, value)
         self._reverse = value
 
     def toggle_reverse(self):

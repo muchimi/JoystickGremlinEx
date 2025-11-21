@@ -3343,6 +3343,7 @@ class AxisState():
 		self._last_axis_time = {} # time when last modified
 		self._delay = 0 # delay in seconds for filter - 0 = disabled
 		self._registered_devices = [] # guid of registered devices
+		self.usage_data = gremlin.joystick_handling.VJoyUsageState()
 	
 
 		el = EventListener()

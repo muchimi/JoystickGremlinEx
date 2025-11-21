@@ -681,7 +681,7 @@ class InputItemListView(ui_common.AbstractView):
         if self.model.hasInputItem(input_item):
             index = self.model.indexOfInputItem(input_item)
             self.scrollToIndex(index)
-            widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout) if Shiboken.isValid(w)]
+            widgets = gremlin.util.get_layout_widgets(self.scroll_layout)
             # shenanigans to have the selected input visible in the scroll area of inputs
             # the size() on the widget returns the wrong size so each widget has an "actual size" function trapping the event 
             # so we get the correct height as rendered

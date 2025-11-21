@@ -18,6 +18,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log  
 
+### (m76T112D)
+- Fix: Map to VJoy: inversion flag on vjoy is functional again if the output value should be inverted using the Invert Axis command.
+- Fix: C++ garbage collection check for sync inputs.
 
 ### (m76T112C)
 - Fix: State functor will return a FAIL if the profile has not started and events get triggered.  A message in the log file will be issued when this happens.

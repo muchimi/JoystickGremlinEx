@@ -501,15 +501,17 @@ def get_layout_horizontal_size(layout : QtWidgets.QLayout) -> QtCore.QSize:
 def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
     ''' returns a list of layout widgets '''
     widgets = []
-    if layout:
+    if layout and Shiboken.isValid(layout):
         index = layout.count()
         while index >= 0:
             child = layout.itemAt(index)
-            if child is not None:
+            if child is not None and Shiboken.isValid(child):
                 if child.layout():
                     widgets.extend(get_layout_widgets(child.layout()))
                 elif child.widget():
-                    widgets.append(child.widget())
+                    widget = child.widget()
+                    if Shiboken.isValid(widget):
+                        widgets.append(widget)
             index -= 1
 
     return widgets
