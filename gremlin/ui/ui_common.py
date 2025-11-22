@@ -11148,6 +11148,8 @@ class QInfoBox(QtWidgets.QFrame):
 
         
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self._label_widget = QAutoResizingTextEdit()
+        self._label_widget.setReadOnly(True)
         css = Color.cssInfoBox()
         if hide_key:
             
@@ -11161,11 +11163,7 @@ class QInfoBox(QtWidgets.QFrame):
             widget.setStyleSheet(wcss)
             self.main_layout.addWidget(getHContainer(widget, widget_only=True))
             self._hide_key = hide_key
-
-
-        self._label_widget = QAutoResizingTextEdit()
-        self._label_widget.setReadOnly(True)
-        
+ 
         self.main_layout.addWidget(self._label_widget)
         self.setStyleSheet(css)
 

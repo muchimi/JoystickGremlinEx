@@ -1832,18 +1832,20 @@ def get_mode_object(node, extra_data = None):
         assert len(mode) > 0, "XML hierarchy error - parent mode not found"
 
         nodes = node.xpath("ancestor::device")
-        device_node = nodes.pop()
-        device_id = safe_read(device_node, "device-guid", str, "")
-        assert device_id, "XML hierarchy error - parent device not found"
-        device_guid = gremlin.util.parse_guid(device_id)
-        device_type = safe_read(device_node,"type", str, "")
-        device_type = DeviceType.to_enum(device_type)
         
-        profile = gremlin.shared_state.current_profile
-        device_modes = profile.get_device_modes(device_guid,device_type,DeviceType.to_string(device_type))
-        mode_object = device_modes.ensure_mode_exists(mode)    
+        if nodes:
+            device_node = nodes.pop()
+            device_id = safe_read(device_node, "device-guid", str, "")
+            assert device_id, "XML hierarchy error - parent device not found"
+            device_guid = gremlin.util.parse_guid(device_id)
+            device_type = safe_read(device_node,"type", str, "")
+            device_type = DeviceType.to_enum(device_type)
+            
+            profile = gremlin.shared_state.current_profile
+            device_modes = profile.get_device_modes(device_guid,device_type,DeviceType.to_string(device_type))
+            mode_object = device_modes.ensure_mode_exists(mode)    
 
-        return mode_object
+            return mode_object
     
     return None
 
@@ -2368,8 +2370,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             self._description = safe_read(node, "description", str, "")
             self.always_execute = read_bool(node, "always-execute", False)
 
-            mode_object = get_mode_object(node, extra_data)
-            assert mode_object is not None,"Unable to derive mode object"
+            if extra_data and "mode_object" in extra_data:
+                mode_object = extra_data["mode_object"]
+            else:
+                mode_object = get_mode_object(node, extra_data)
+                assert mode_object is not None,"Unable to derive mode object"
             
             if "locked" in node.attrib:
                 self._locked = safe_read(node,"locked", bool, False)
@@ -4116,6 +4121,9 @@ class Profile():
 
 
         # Parse each vjoy device into separate DeviceConfiguration objects
+        if not extra_data:
+            extra_data = {}
+        extra_data["mode_object"] = Mode(None)
         for child in root.iter("vjoy-device"):
             device = Device(self)
             device.from_xml(child, data, extra_data)

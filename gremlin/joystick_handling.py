@@ -619,10 +619,10 @@ def device_info_from_guid(device_guid): # -> DeviceSummary:
         device_guid = gremlin.util.parse_guid(device_guid)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
-    # update for "live" disconnects/reconnects if any
-    refresh_devices()
-    if device_guid in _joystick_device_guid_map:
-        return _joystick_device_guid_map[device_guid]
+    # # update for "live" disconnects/reconnects if any
+    # refresh_devices()
+    # if device_guid in _joystick_device_guid_map:
+    #     return _joystick_device_guid_map[device_guid]
 
     return None
 
