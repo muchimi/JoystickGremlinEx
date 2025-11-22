@@ -104,7 +104,7 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
         import gremlin.util
         super().__init__()
         self._id = gremlin.util.get_guid() # unique node id, will be the container ID or the action ID for container or action nodes
-        self.ref = None # reference ID
+        self.ref = None # reference ID for the container or action
         self.functors = [] # list of functors
         self.sequence = [] # list of sequence codes (action, condition) for the functor by index
                 
@@ -1649,7 +1649,10 @@ class ExecutionContext():
         ''' registers functors for a given node '''
         functors = self._get_node_functors(node)
         assert isinstance(functors, list),"Functors have to be a list"
+        # match either node ID or reference ID
         self.functor_map[node.id] = functors
+        if node.ref:
+            self.functor_map[node.ref] = functors
 
         if node.nodeType == ExecutionGraphNodeType.Container:
             root = node
@@ -1658,10 +1661,16 @@ class ExecutionContext():
                 root = node_parent
                 node_parent = node_parent.parent
             self._exec_map[node.id] = root
+            if node.ref:
+                self._exec_map[node.ref] = root
         else:
             self._exec_map[node.id] = node    
+            if node.ref:
+                self._exec_map[node.ref] = node
         
         self._node_map[node.id] = node    
+        if node.ref:
+            self._node_map[node.ref] = node
         if self._verbose_detailed: 
             logtabs = gremlin.shared_state.logTabs()
             syslog.info(f"{logtabs}Register container node functors node id {node.id} {node.description} : {len(functors)} functors")

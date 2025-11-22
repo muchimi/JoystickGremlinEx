@@ -4005,6 +4005,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose: syslog.info(f"toggle reverse: {self.vjoy_id} {self.vjoy_input_id} new state: {self.reverse}")
 
+    def setReverse(self, value : bool):
+        ''' sets the axis' reverse state '''
+        self.usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, value)
+
     def latch_extra_inputs(self):
         ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
@@ -4158,16 +4162,18 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         elif self.input_type == InputType.JoystickButton:
             # button presses
             if verbose: vjoy_stub = f"VJOY REMAP: sync mode: [{self.action_data.sync_mode.name}] set button start value:"
-            
+                 
             # assume we are setting the start state
             trigger = True
+            trigger_reverse = False
+            trigger_setValue = False
 
             # determine pressed start state
             is_pressed = False
             
             match raw_input_type:
                 case InputType.JoystickButton:
-                    # input is a physical stick
+                    # input is momentary
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
                             is_pressed = joystick_handling.get_button(device_guid, input_id)
@@ -4175,6 +4181,16 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             is_pressed = True
                         case VjoyAction.VJoyButton.VJoyButtonRelease:
                             is_pressed = False
+                            trigger = False
+                        case VjoyAction.VJoyInvertAxis:
+                            is_pressed = joystick_handling.get_button(device_guid, input_id)
+                            trigger_reverse = self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput, SyncMode.LastOrDefault)
+                        case VjoyAction.VJoySetAxis:
+                            is_pressed = joystick_handling.get_button(device_guid, input_id)
+                            trigger_setValue = is_pressed and self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput, SyncMode.LastOrDefault)
+                            pass
+
+                        
                 case InputType.OpenSoundControl:
                     message = self.action_data.input_item.input_id.message_key
                     match self.action_mode:
@@ -4205,6 +4221,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 case SyncMode.Input:
                     if verbose: syslog.info(f"{vjoy_stub} input : {is_pressed}")
                     value = is_pressed
+                    
+
                 case SyncMode.LastOrInput:
                     last = self.action_data.button_last_value
                     if last is None:
@@ -4225,9 +4243,21 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 case SyncMode.Ignore:
                     trigger = False # do nothing
 
+
             if trigger:
+                # trigger the button output
                 vs.setStartState(self.vjoy_id, self.vjoy_input_id, value)
-                self.action_data.button_last_value = value                
+                self.action_data.button_last_value = value      
+
+            if trigger_reverse:
+                # trigger the reverse axis action
+                self.setReverse(value)
+
+            if trigger_setValue:
+                # trigger the set axis action
+                self._set_axis_value()
+
+                      
 
    
         if self.action_mode == VjoyAction.VJoySetAxisStepped:
@@ -4337,7 +4367,59 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 self.lock.release()
 
 
+    def _set_axis_value(self):
+        ''' sets the axis value '''
+        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+            verbose = self.verbose
+            if self.action_data.target_use_last:
+                # set the output to the current value, but wiggle it so the target app detects a change
+                # this is to "reset" an axis to a known value if the target environment changed the input outside of the control data being setn
+                # the wiggle value is a small offet to trigger the target game to cause it to retrigger - there has to be a change of the game would not pick it up
+                offset = 0.01
+                # read the current output value
+                value = self.action_data.axis_last_value
+                if value is None:
+                    # read the last value
+                    value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+                    if verbose: syslog.info(f"reading axis value: {value:0.3f}")
+                else:
+                    if verbose: syslog.info(f"using last axis value: {value:0.3f}")
+                
+                wiggle_value = value - offset
+                if wiggle_value < -1.0:
+                    wiggle_value = value + offset
 
+                self.target_value = value # value to restore after wiggle
+                
+                if verbose: syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
+                self._set_axis(self.vjoy_id, self.vjoy_input_id, wiggle_value)
+                timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
+                timer.start()
+        
+                return True
+
+
+            target_value_valid = self.target_value_valid or self.action_data.use_relative_value
+            
+
+            if target_value_valid:
+                target_value = self.target_value
+
+                if self.action_data.use_relative_value:
+                    # read the current output axis value
+                    value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+                    # apply the offset
+                    value += target_value
+                else:
+                    value = target_value
+                
+                value = gremlin.util.clamp(value)
+                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
+                self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+
+                # remember the last value
+                self.action_data.axis_last_value = value
+        return True
 
 
     # async routine to pulse a button
@@ -4834,57 +4916,58 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoySetAxis:
                 # set the value on the specified axis
                 if fire_event:
-                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                    return self._set_axis_value()
+                    # if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
 
-                        if self.action_data.target_use_last:
-                            # set the output to the current value, but wiggle it so the target app detects a change
-                            # this is to "reset" an axis to a known value if the target environment changed the input outside of the control data being setn
-                            # the wiggle value is a small offet to trigger the target game to cause it to retrigger - there has to be a change of the game would not pick it up
-                            offset = 0.01
-                            # read the current output value
-                            value = self.action_data.axis_last_value
-                            if value is None:
-                                # read the last value
-                                value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-                                if verbose: syslog.info(f"reading axis value: {value:0.3f}")
-                            else:
-                                if verbose: syslog.info(f"using last axis value: {value:0.3f}")
+                    #     if self.action_data.target_use_last:
+                    #         # set the output to the current value, but wiggle it so the target app detects a change
+                    #         # this is to "reset" an axis to a known value if the target environment changed the input outside of the control data being setn
+                    #         # the wiggle value is a small offet to trigger the target game to cause it to retrigger - there has to be a change of the game would not pick it up
+                    #         offset = 0.01
+                    #         # read the current output value
+                    #         value = self.action_data.axis_last_value
+                    #         if value is None:
+                    #             # read the last value
+                    #             value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+                    #             if verbose: syslog.info(f"reading axis value: {value:0.3f}")
+                    #         else:
+                    #             if verbose: syslog.info(f"using last axis value: {value:0.3f}")
                             
-                            wiggle_value = value - offset
-                            if wiggle_value < -1.0:
-                                wiggle_value = value + offset
+                    #         wiggle_value = value - offset
+                    #         if wiggle_value < -1.0:
+                    #             wiggle_value = value + offset
 
-                            self.target_value = value # value to restore after wiggle
+                    #         self.target_value = value # value to restore after wiggle
                             
-                            if verbose: syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
-                            self._set_axis(self.vjoy_id, self.vjoy_input_id, wiggle_value)
-                            timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
-                            timer.start()
+                    #         if verbose: syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
+                    #         self._set_axis(self.vjoy_id, self.vjoy_input_id, wiggle_value)
+                    #         timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
+                    #         timer.start()
                     
-                            return True
+                    #         return True
 
 
-                        target_value_valid = self.target_value_valid or self.action_data.use_relative_value
+                    #     target_value_valid = self.target_value_valid or self.action_data.use_relative_value
                         
 
-                        if target_value_valid and fire_event:
-                            target_value = self.target_value
+                    #     if target_value_valid and fire_event:
+                    #         target_value = self.target_value
 
-                            if self.action_data.use_relative_value:
-                                # read the current output axis value
-                                value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
-                                # apply the offset
-                                value += target_value
-                            else:
-                                value = target_value
+                    #         if self.action_data.use_relative_value:
+                    #             # read the current output axis value
+                    #             value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+                    #             # apply the offset
+                    #             value += target_value
+                    #         else:
+                    #             value = target_value
                             
-                            value = gremlin.util.clamp(value)
-                            if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
-                            self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+                    #         value = gremlin.util.clamp(value)
+                    #         if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
+                    #         self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
-                            # remember the last value
-                            syslog.info(f"set setaxis last value: {value:0.3f}")
-                            self.action_data.axis_last_value = value
+                    #         # remember the last value
+                    #         syslog.info(f"set setaxis last value: {value:0.3f}")
+                    #         self.action_data.axis_last_value = value
 
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
                 # changes the output range on the target device / axis

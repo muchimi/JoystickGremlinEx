@@ -18,6 +18,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T114)
+- Fix: Map to Vjoy: sync on profile start for Invert Axis not synchronizing with input state.
+- Fix: Map to Vjoy: sync on profile start for Set Axis Value not synchronizing with input state.
+- Fix: Gated Axis: some triggers disabled due to loop check changes.
+
 ### (m76T113C)
 - ChangeD: Map to Vjoy : merged function: inversion will apply to the primary axis.  A new option is added to invert the merged output.
 - Fix: Profile V9 legacy load fix for V9 to V16 (vjoy device section load)
