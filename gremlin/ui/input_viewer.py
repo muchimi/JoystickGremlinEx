@@ -732,6 +732,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         
         self._state_filter_widget = None
         self._state_visualizer_widget = None
+        self._state_buttons.clear()
 
         self._delete_widget(self.keyboard_widget)
         self.keyboard_widget = None
@@ -837,10 +838,6 @@ States can be toggled by clicking on the state button.  Expression states will u
 
 
     def _populateState_ui(self, layout):
-        
-        if self._state_visualizer_widget:
-            self._state_buttons.clear()
-    
         self._reload_states()
 
 
@@ -917,6 +914,11 @@ States can be toggled by clicking on the state button.  Expression states will u
                 layout.addWidget(btn)
 
                 state.changed.connect(lambda x: self._state_changed(x))
+
+                if state.key in self._state_buttons:
+                    # remove the prior button reference
+                    gremlin.util.delete_widget(self._state_buttons[state.key]) 
+                    
                 self._state_buttons[state.key] = btn
                 i+=1
             
@@ -1040,7 +1042,8 @@ States can be toggled by clicking on the state button.  Expression states will u
         if verbose: syslog.info(f"Viewer: state {state.key} changed {state.value}")
         if state.key in self._state_buttons:
             widget = self._state_buttons[state.key]
-            widget.setChecked(state.value)
+            if Shiboken.isValid(widget):
+                widget.setChecked(state.value)
         else:
             if verbose: syslog.warning(f"Viewer: state {state.key} widget not found")
 

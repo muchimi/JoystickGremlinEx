@@ -19,7 +19,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T113C)
-- Fix: Profile V9 legacy load fix.
+- ChangeD: Map to Vjoy : merged function: inversion will apply to the primary axis.  A new option is added to invert the merged output.
+- Fix: Profile V9 legacy load fix for V9 to V16 (vjoy device section load)
+- Fix: Input Viewer: state changed button check for garbage collected button
+- Fix: Reverted vjoy device re-check for missing vjoy devices that could cause a race condition in some situations locking up the system.
 
 
 ### (m76T113A/B)

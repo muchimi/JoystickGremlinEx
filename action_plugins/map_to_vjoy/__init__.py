@@ -1612,11 +1612,16 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' populates the list of merge axes '''
         count = 1
         gremlin.util.clear_layout(self.container_merge_layout)
-
+        invert_merged_output_widget = gremlin.ui.ui_common.QDataCheckbox("Invert Merged Output",
+                                                                  value = self.action_data.invert_merged_output,
+                                                                  callback = self._handle_invert_merged_output_changed,
+                                                                  tooltip = "Invert merged output result")
         
         if not self.action_data._merge_data:
             # add at least one
             self.action_data._merge_data = [MergeData()]
+
+        self.container_merge_layout.addWidget(invert_merged_output_widget)
         
         for data in self.action_data._merge_data:
             widget = MergeWidget(data, f"Merge Axis {count}:", filter_input =self._filter_input, action_data = self.action_data)
@@ -1652,6 +1657,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' called when merge axis data changes '''
         self._update_axis_widget()
         self._update_merge_data()
+
+    @QtCore.Slot(bool)
+    def _handle_invert_merged_output_changed(self, checked : bool):
+        self.action_data.invert_merged_output = checked
 
     def _add_merge_axis(self):
         self.action_data._merge_data.append(MergeData())
@@ -5273,6 +5282,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         
         self._merge_data = [] # list of merged axes
+        self.invert_merged_output = False # true if merged axis output is inverted
         
         self.output_range_min : float = -1.0 # min for merged output
         self.output_range_max : float = 1.0 # max for merged output
@@ -5560,6 +5570,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                 v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             else:
                 v1 = self.hardware_input_id.axis_value
+
+            if self.reverse: # if the primary input should be reversed before merge
+                v1 = -v1
             
             if curves:
                 for curve_data in curves:
@@ -5713,8 +5726,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if verbose: syslog.info(f"Merge operation: {data.operation.name}: v1 {v1:0.03f} v2: {v2:0.03f} result: {value:0.03f}")
                 v1 = value
 
-            if self.reverse:
-                value = scale_to_range(value, invert = True)
+            if self.invert_merged_output:
+                # invert the final output if needed
+                value = -value
 
         if channels:
             data = gremlin.event_handler.AxisValues(actual = value, raw = raw_value, curved = curve_value, merged=merged_values)
@@ -6141,7 +6155,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "paired" in node.attrib:
                 self.paired = safe_read(node,"paired", bool, False)
 
-            
+            self.invert_merged_output = safe_read(node,"invert-merged-output", bool, False)
 
             self._merge_data = []
             if self.action_mode == VjoyAction.VJoyMergeAxis:
@@ -6332,6 +6346,8 @@ Supports axis merging, curved output, command, hat and button mappings.
                 
 
             case VjoyAction.VJoyMergeAxis:
+
+                node.set("invert-merged-output", safe_format(self.invert_merged_output, bool))
 
                 if self._merge_data:
                     child = ElementTree.SubElement(node,"merge-axis")
