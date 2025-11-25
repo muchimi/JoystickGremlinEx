@@ -2216,6 +2216,9 @@ class OscInputItem(gremlin.base_profile.InputItem):
         Message = 0 # only the command part of the message is used (data is variable)
         Data = 1 # the message and arguments are considered
 
+        def __lt__(self, other):
+            return self.value < other.value
+
 
     def __init__(self, parent = None):
         super().__init__(parent=parent) # parent is the mode object this input belongs to

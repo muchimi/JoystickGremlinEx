@@ -209,6 +209,11 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         self._update()
 
+    def unhook(self):
+        ''' called when the widget is destroyed '''
+        self.slider.valueChanged.disconnect()
+
+
     def _is_center_preset(self, preset):
         ''' true if a center preset '''
         return preset in (DeadzonePreset.center_zero, DeadzonePreset.center_two, DeadzonePreset.center_five, DeadzonePreset.center_ten)

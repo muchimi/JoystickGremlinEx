@@ -1463,9 +1463,14 @@ class Configuration(QtCore.QObject):
         
     @property
     def verbose_mode_sound(self):
-        ''' true if verbose mode is in TTS mode '''
+        ''' true if verbose mode is in sound mode '''
         return self.verbose and VerboseMode.Sound in self.verbose_mode
         
+
+    @property
+    def verbose_mode_filter(self):
+        ''' true if verbose mode is in input filter mode '''
+        return self.verbose and VerboseMode.Filter in self.verbose_mode        
     
     @property
     def midi_enabled(self):
@@ -2803,3 +2808,26 @@ class Configuration(QtCore.QObject):
     @input_viewer_flow_layout.setter
     def input_viewer_flow_layout(self, value: bool):
         self._set_data("input_viewer_flow_layout", value)
+
+
+    @property
+    def device_filter_max_axis(self) -> int:
+        return self._get_data("device_filter_max_axis", 4)
+    @device_filter_max_axis.setter
+    def device_filter_max_axis(self, value : int):
+        self._set_data("device_filter_max_axis", value)
+
+
+    @property
+    def device_filter_max_button(self) -> int:
+        return self._get_data("device_filter_max_button", 16)
+    @device_filter_max_button.setter
+    def device_filter_max_button(self, value : int):
+        self._set_data("device_filter_max_button", value)
+
+    @property
+    def device_filter_max_hat(self) -> int:
+        return self._get_data("device_filter_max_hat", 1)
+    @device_filter_max_hat.setter
+    def device_filter_max_hat(self, value : int):
+        self._set_data("device_filter_max_hat", value)

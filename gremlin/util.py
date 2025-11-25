@@ -487,6 +487,10 @@ def delete_widget(widget : QtWidgets.QWidget):
     ''' removes a widget from memory '''
     if widget and Shiboken.isValid(widget):
         widget.hide() # hide the widget from the UI
+        # clear any widget layout to release contents as well
+        layout = widget.layout()
+        if layout is not None:
+            clear_layout(layout)
         widget.setParent(None) # removes the widget from the containing layout
         widget.deleteLater() # tell QT to free the widget from memory
 

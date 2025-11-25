@@ -2148,16 +2148,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def unregisterAllWidgets(self):
         ''' clears all device widgets '''
-        while self.ui.device_widget.count():
-            widget = self.ui.device_widget.widget(0)
-            if hasattr(widget, "_cleanup_ui"):
-                # tell the widget it's being deleted
-                widget._cleanup_ui()    
-            self.ui.device_widget.removeWidget(widget)
-            widget.deleteLater()
-            
+
+        # remove python references
+
         self._widget_device_index_map.clear()
         self._widget_index_device_map.clear()
+
+        # manual QT cleanup
+        while self.ui.device_widget.count():
+            widget = self.ui.device_widget.widget(0)
+            self.ui.device_widget.removeWidget(widget)
+            gremlin.util.delete_widget(widget)
+            
+
 
     def getRegisteredWidget(self, device_guid) -> QtWidgets.QWidget:
         ''' gets the widget for the given device id, None if not found'''

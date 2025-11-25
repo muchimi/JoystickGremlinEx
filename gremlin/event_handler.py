@@ -3493,6 +3493,7 @@ class AxisState():
 		'''
 		import gremlin.types
 		import gremlin.util
+		import gremlin.ui.osc_device
 		
 		if device_guid:
 			dev : dinput.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(device_guid)
@@ -3515,6 +3516,19 @@ class AxisState():
 			else:
 				axis_id = input_id
 
+			# special handling of OSC input devices
+			if dev.device_type == gremlin.types.DeviceType.Osc:
+				osc = gremlin.ui.osc_device.InputOscClient()
+				osc.start() # ensure started
+				data = osc.getData(axis_id.message) # gets data arguments or None if no data
+				if data is None:
+					value = 0
+				else:
+					value = data
+				values = AxisValues(value, value)
+				return values
+				
+			
 			data = self.getAxisData(device_guid, axis_id)
 			if data:
 				values = data.getAxisValues(value)
@@ -3530,8 +3544,6 @@ class AxisState():
 				syslog.error(f"AXIS STATE: no axis data found for device {dev.name} ID: {input_stub} linear: {linear}")
 				known_axes = [i for (d, i) in self._data if d == dev.device_id]
 				syslog.info(f"\tknown list: {known_axes}")
-
-				return None
 		return None
 	
 	def getRawAxisValue(self, device_guid, input_id):

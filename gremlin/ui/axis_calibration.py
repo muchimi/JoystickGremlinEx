@@ -855,6 +855,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
 
     def closeEvent(self, event):
         ''' save data on dialog close '''
+        self._slider.valueChanged.disconnect()
         if not os.path.isfile(self.mgr.calibration_file):
             # never saved
             self.mgr.saveCalibration(self.action_data)

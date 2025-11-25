@@ -533,8 +533,6 @@ class MidiListener(AbortableThread):
         except Exception as err:
             syslog.error(f"MIDI: unable to open port {self.port_name} {self.port_number} - ensure another utility is not using this port.")
 
-
-
 @SingletonDecorator
 class MidiInterface(QtCore.QObject):
     ''' midi interface to gremlinex

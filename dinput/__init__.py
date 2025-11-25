@@ -626,7 +626,7 @@ class DeviceSummary:
         self.vjoy_id = vjoy_id
         self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
-    def get_axis_name(self, axis_id, is_axis_id = True):
+    def get_axis_name(self, axis_id, is_axis_id = True, short_name = False):
         ''' gets the axis name based on the input # '''
         if is_axis_id:
             input_id = axis_id
@@ -652,7 +652,10 @@ class DeviceSummary:
             axis_name = "S2"
         else:
             axis_name = f"(unknown [{input_id}])"
+        if short_name:
+            return axis_name
         return f"Axis {input_id} ({axis_name})"
+    
 
     def get_button_name(self, input_id):
         return f"Button {input_id}"
@@ -684,6 +687,14 @@ class DeviceSummary:
         return next((am.axis_index for am in self.axismap_list if am.linear_index == linear_index), None)
         
     
+    def getAxisLinearId(self, axis_id : int):
+        ''' gets the linear index for a given ID axis if the axis is skipped '''
+        if axis_id in self.axis_id_map:
+            return self.axis_id_map[axis_id]
+        return None
+        
+   
+
     def update(self):
         ''' updates device connectivity '''
         if self.is_special:

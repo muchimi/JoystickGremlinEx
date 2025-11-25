@@ -334,6 +334,8 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self._condition_pages.clear() 
             self._condition_tab.clear()
 
+
+
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.disconnect(self._mapping_changed_cb)
         
@@ -345,6 +347,9 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         self._cache.clear() # release cache objects
         self._range_info = None
         self._gate_info = None
+
+        # forcibly clear all widgets from QT
+        gremlin.util.clear_layout(self.main_layout)
 
     def _current_input_axis(self):
         ''' gets the current input axis value '''
@@ -910,7 +915,8 @@ making changes that impact the order of gates or ranges."""
                 del self._rwi_map[range_info]
 
         for rwi in self._rwi_map.values():
-            rwi.update_value()
+            if Shiboken.isValid(rwi):
+                rwi.update_value()
 
 
 
@@ -1234,8 +1240,7 @@ making changes that impact the order of gates or ranges."""
                                     is_container=gate.hasAnyContainers(),
                                     parent = self.gate_flow_widget
                                     )
-            #widget.requestConfigure.connect(self._configure_gate_cb)
-            #widget.deleteConfirm.connect(self._delete_gate_confirm_cb)
+
             widget.requestGrab.connect(self._grab_cb)
             
             # determine min/max for this gate
@@ -1288,10 +1293,15 @@ making changes that impact the order of gates or ranges."""
             return
         gremlin.util.assert_ui_thread()
 
-        self._rwi_map.clear()
+        # delete all range widgets
 
-        # table = self.range_table_widget
-        # table.clear()
+        for rng in self._rwi_map:
+            widget = self._rwi_map[rng]
+            self.range_flow_layout.removeWidget(widget)
+            self._rwi_map[rng] = None
+            gremlin.util.delete_widget(widget)
+
+        self._rwi_map.clear()
 
         gremlin.util.clear_layout(self.range_flow_layout)
         
@@ -1299,19 +1309,10 @@ making changes that impact the order of gates or ranges."""
         range_count = len(range_list)
         assert range_count > 0, "Invalid gate data - no ranges are defined "
 
-        # max_col = self._max_col if range_count > self._max_col else range_count
-        # max_row = 1 + (len(range_list) // max_col)
-        # max_col += (max_col-1) # spacer columns
-        # table.setColumnCount(max_col)
-        # table.setRowCount(max_row)
-
-
         verbose = gremlin.config.Configuration().verbose_mode_gate
         if verbose: syslog.info(f"Reload range: found {len(range_list)} used ranges")
     
         index = 0
-        row = 0
-        col = 0
         decimals = self._gate_data.decimals
         if verbose: syslog.info("Range table:")
         for index, rng in enumerate(range_list):
@@ -1434,9 +1435,7 @@ making changes that impact the order of gates or ranges."""
             widget = self._rwi_map[rng]
             if Shiboken.isValid(widget):
                 return widget
-            # row, col  = self._rwi_map[rng]
-            # widget = self.range_table_widget.cellWidget(row, col)
-            #return widget
+        
         return None
 
         
@@ -2207,10 +2206,15 @@ making changes that impact the order of gates or ranges."""
     def _delete_gate_ui(self, gate : GateInfo):
         ''' remove a gate from this widget '''
 
-        self._gate_data.deleteGate(gate)
+        self._gate_data.deleteGate(gate) # remove the gate data
         
+        # delete the gate widget
         if gate in self._gwi_map:
+            widget = self._gwi_map[gate]
+            self.gate_flow_layout.removeWidget(widget)
             del self._gwi_map[gate]
+            gremlin.util.delete_widget(widget)
+            
         
         self._reload_widgets()
         self._update_ui()

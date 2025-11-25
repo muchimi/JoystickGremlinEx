@@ -164,7 +164,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
     """Model storing a device's input item list."""
 
-    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None, show_master_mode = False, show_used_only = False):
+    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None, show_master_mode = False, show_filtered_only = False):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
@@ -176,7 +176,8 @@ class InputItemListModel(ui_common.AbstractModel):
         self._device_data = device_data
         self._mode = mode
         self._show_master_mode = show_master_mode
-        self._show_used_only = show_used_only
+        self._show_filtered_only = show_filtered_only
+        
         self._index_map = {} # map of index to input item
         self._item_map = {} # map of input_id to index
         self._source_index_map = {} # map of source states
@@ -194,12 +195,12 @@ class InputItemListModel(ui_common.AbstractModel):
         self._update_data()
 
     @property
-    def show_used(self) -> bool:
-        return self._show_used_only
-    @show_used.setter
-    def show_used(self, value : bool):
-        if self._show_used_only != value:
-            self._show_used_only = value
+    def show_filtered(self) -> bool:
+        return self._show_filtered_only
+    @show_filtered.setter
+    def show_filtered(self, value : bool):
+        if self._show_filtered_only != value:
+            self._show_filtered_only = value
             self._update_data()
     
 
@@ -260,9 +261,7 @@ class InputItemListModel(ui_common.AbstractModel):
     def getItems(self):
         ''' returns the list of unfiltered items '''
         return self._source_index_map.values()
-        
     
-
     def _update_source(self):
         ''' updates source data (unfiltered) '''
         self._source_index_map = self._index_map.copy()
@@ -270,7 +269,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
     def _update_filter(self, emit = False):
         ''' updates the filters only (does not load new data) '''
-        self._filter_data()                
+        self._filter_data()     
 
     def _next_source_index(self):
         ''' gets the next index for a source map '''
@@ -290,10 +289,10 @@ class InputItemListModel(ui_common.AbstractModel):
             index+=1
         return index
 
-
     def _update_data(self, apply_filter = True, emit_change = True):
         ''' loads into the data model all the items for the current mode and device '''
         import gremlin.base_profile
+        import gremlin.config
         # load the items for this mode
 
         if self._custom_update_handler:
@@ -306,6 +305,13 @@ class InputItemListModel(ui_common.AbstractModel):
         mode_object = self._device_data.modes[self._mode]
         index = 0
 
+        profile = gremlin.shared_state.current_profile
+
+        verbose = gremlin.config.Configuration().verbose_mode_filter
+        verbose = True
+
+        # profile.settings.dump_filter(self._device_data.device_guid)
+
         self._index_map = {} # map of index to value
         self._item_map = {}  # map of values to their index
         for input_type in self._allowed_input_types:
@@ -314,10 +320,24 @@ class InputItemListModel(ui_common.AbstractModel):
                 for data_key in sorted_keys:
                     data : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
                     # add hardware GUID reference to data block so we have an easier reference to it
-                    if self._show_used_only:
-                        if not data.hasContainers:
-                            # filter out empty items 
+                    if self._show_filtered_only:
+                        # convert axis key to linear
+                        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(data.device_guid)
+                        if data.input_type == InputType.JoystickAxis:
+                            
+                            input_id = device.getAxisLinearId(data.input_id)
+                        else:
+                            input_id = data.input_id
+                    
+
+                        # if "LEFT VPC" in device.name and data.input_type == InputType.JoystickButton and input_id == 1:
+                        #     pass
+                        # if "LEFT VPC" in device.name:
+                        #     pass
+                        filtered = profile.settings.getFiltered(data.device_guid, data.input_type, input_id)
+                        if filtered:
                             continue
+                        if verbose: syslog.info(f"Input {device.name} : {data.input_type.name} {data.input_id} visible")
                     data.device_guid = self._device_data.device_guid
                     self._index_map[index] = data
                     self._item_map[data.input_id] = index
@@ -336,7 +356,7 @@ class InputItemListModel(ui_common.AbstractModel):
                             data : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
                             # add hardware GUID reference to data block so we have an easier reference to it
 
-                            if self._show_used_only:
+                            if self._show_filtered_only:
                                 if not data.hasContainers:
                                     # filter out empty items 
                                     continue

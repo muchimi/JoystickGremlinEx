@@ -59,6 +59,36 @@ class InputType(enum.IntEnum):
         except KeyError:
             raise ValueError("Invalid type in lookup")
         
+    @staticmethod
+    def to_name(value):
+        match value:
+            case InputType.NotSet:
+                return "n/a"
+            case InputType.Keyboard | InputType.KeyboardLatched:
+                return "Kbd"
+            case InputType.JoystickAxis:
+                return "Axis"
+            case InputType.JoystickButton:
+                return "Button"
+            case InputType.JoystickHat:
+                return "Hat"
+            case InputType.Mouse:
+                return "Mouse"
+            case InputType.VirtualButton:
+                return "VButton"
+            case InputType.OpenSoundControl:
+                return "OSC"
+            case InputType.Midi:
+                return "MIDI"
+            case InputType.ModeControl:
+                return "ModeCtrl"
+            case InputType.State:
+                return "State"
+            case InputType.OctaviIfr1:
+                return "IFR1"
+            case _:
+                return f"Don't know how to handle {value}"
+        
         
     @staticmethod
     def to_list(include_notset = False, include_mouse = False, include_virtualbutton = False) -> list:

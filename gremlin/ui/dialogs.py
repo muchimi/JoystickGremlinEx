@@ -481,6 +481,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._create_general_page()
         # self._create_exec_page() disable for now
         self._create_ui_options_page()
+        self._create_filter_page()
         self._create_remote_control_page()
         self._create_tts_page()
         self._create_profile_page()
@@ -1179,6 +1180,84 @@ There should only be one GremlinEx master server on the subnet.
     def _graphviz_path_changed(self, widget, text):
         if os.path.isdir(text):
             self.config.graphviz_executable = text
+
+   # --------------------------------------------------------------------------------------------------------------------
+    def _create_filter_page(self):
+        page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
+
+        box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Joystick Input Filter Options", transparent = True)
+        margin = 12
+        
+        axis_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value = self.config.device_filter_max_axis,
+            min_range = 0,
+            max_range = 8,
+            callback = self._handle_filter_axis_changed,
+            chars = 3,
+            tooltip = "Default maximum axis count to filter when using the default filter option."
+        )
+
+        button_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value = self.config.device_filter_max_button,
+            min_range = 0,
+            max_range = 128,
+            callback = self._handle_filter_button_changed,
+            chars = 3,
+            tooltip = "Default maximum button count to filter when using the default filter option."
+        )
+
+        hat_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value = self.config.device_filter_max_hat,
+            min_range = 0,
+            max_range = 4,
+            callback = self._handle_filter_hat_changed,
+            chars = 3,
+            tooltip = "Default maximum hat count to filter when using the default filter option."
+        )
+
+        widgets = [
+            gremlin.ui.ui_common.getGridContainer(axis_widget,"Default Axis count:", widget_only=True, left_margin=margin),
+            gremlin.ui.ui_common.getGridContainer(button_widget,"Default Button count:", widget_only=True, left_margin=margin),
+            gremlin.ui.ui_common.getGridContainer(hat_widget,"Default Hat count:", widget_only=True, left_margin=margin)
+        ]
+        for widget in widgets:
+            box.addWidget(widget)
+        
+        gremlin.ui.ui_common.synchronize_grids(widgets)
+
+        page_layout.addWidget(box)
+
+        widgets = []
+        widget = gremlin.ui.ui_common.QDataPushButton("Default", callback = self._handle_filter, tooltip = "Set filter for all joystick devices to default", data = "default")
+        widgets.append(widget)
+        widget = gremlin.ui.ui_common.QDataPushButton("Mapped", callback = self._handle_filter, tooltip = "Set filter for all joystick devices to mapped (used)", data = "mapped")
+        widgets.append(widget)
+        widget = gremlin.ui.ui_common.QDataPushButton("Hide All", callback = self._handle_filter, tooltip = "Set filter for all joystick devices to mapped (used)", data = "hide_all")
+        widgets.append(widget)
+        
+        widget = gremlin.ui.ui_common.getFlowContainer(widgets, widget_only=True)
+        page_layout.addWidget(widget)
+
+
+
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Filter")
+
+    @QtCore.Slot()
+    def _handle_filter(self):
+        mode = self.sender().data
+        profile = gremlin.shared_state.current_profile
+        profile.settings.setAllFiltered(mode)
+
+
+    def _handle_filter_axis_changed(self, value):
+        self.config.device_filter_max_axis = value
+
+    def _handle_filter_button_changed(self, value):
+        self.config.device_filter_max_button = value
+
+    def _handle_filter_hat_changed(self, value):
+        self.config.device_filter_max_hat = value
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):

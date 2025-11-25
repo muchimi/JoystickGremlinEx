@@ -267,7 +267,7 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         ''' gets the hardware device attached to this action or container '''
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         device_guid = self.hardware_device_guid
-        if device_guid in profile.devices.keys():
+        if device_guid in profile.devices:
             return profile.devices[device_guid]
         return None
     
@@ -1409,7 +1409,7 @@ class AbstractContainerAction(AbstractAction):
         
         '''
         
-        if autocreate and not index in self._item_data_map.keys():
+        if autocreate and not index in self._item_data_map:
             # get the input item behind the parent action
             current = self.parent
             while current and not isinstance(current, InputItem):
@@ -1425,7 +1425,7 @@ class AbstractContainerAction(AbstractAction):
             registry = ProfileRegistry()
             registry.registerInputItem(item_data)
             
-        if index in self._item_data_map.keys():
+        if index in self._item_data_map:
             return self._item_data_map[index]
         return None
 
@@ -1529,23 +1529,130 @@ class AbstractContainerAction(AbstractAction):
             eg = gremlin.execution_graph.ContainerExecutionGraph(container, parent_node)
             self._functors.extend(eg.functors)
 
-        
+class JoystickInputStats:
+    ''' holds filtered information for device inputs '''
+    def __init__(self, device_guid: dinput.GUID | str | int, input_filter = None):
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        device_guid = device.device_guid
+        self.device_guid = device_guid
+        profile = gremlin.shared_state.current_profile
+        input_filter = profile.settings.input_filter
+        self.input_filter = input_filter if input_filter is not None else input_filter
+        self.device_counts = {} # device count [input_type] -> int
+        self.filtered_counts = {} # filtered input count [input_type] -> int
+        self.mapped_counts = {} # mapped input count [input_type] -> int
+        self.input_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat]
+        self.mapped_mode = None # mode used to filter the mappings, if None, uses all profile modes
 
+        for input_type in self.input_types:
+            self.device_counts[input_type] = 0
+            self.mapped_counts[input_type] = 0
+            self.filtered_counts[input_type] = 0
+
+        if device:
+            self.device_counts[InputType.JoystickAxis] = device.axis_count
+            self.device_counts[InputType.JoystickButton] = device.button_count
+            self.device_counts[InputType.JoystickHat] = device.hat_count
+            self.updateFilters()
+            self.updateMappings()
+
+    @property
+    def isFiltered(self) -> bool:
+        ''' true if the device is filtered '''
+        return sum(self.filtered_counts[input_type] for input_type in self.input_types) > 0
+        
+    @property
+    def isMapped(self) -> bool:
+        ''' true if the device is mapped '''
+        return sum(self.mapped_counts[input_type] for input_type in self.input_types) > 0
+    
+    def getVisibleCount(self, input_type : InputType):
+        if input_type in self.input_types:
+            return self.device_counts[input_type] - self.filtered_counts[input_type]
+        else:
+            return 0
+
+    @property
+    def visible_axis_count(self) -> int:
+        return self.getVisibleCount(InputType.JoystickAxis)
+        
+    @property
+    def visible_button_count(self) -> int:
+        return self.getVisibleCount(InputType.JoystickButton)
+    @property
+    def visible_hat_count(self) -> int:
+        return self.getVisibleCount(InputType.JoystickHat)
+
+    def updateMappings(self, mode : str = None):
+        ''' updates the mapping stats for the device 
+        :param mode: name of the mode to filter by, if None, looks at all profile modes
+        
+        '''
+        profile = gremlin.shared_state.current_profile
+        # device = gremlin.joystick_handling.getDevice(self.device_guid)
+        devices = profile.devices
+        device_guid = self.device_guid
+        for input_type in self.input_types:
+            self.mapped_counts[input_type] = 0
+        self.mapped_mode = mode
+        if device_guid in devices:
+            device = profile.devices[device_guid]
+            for mode_object in device.modes.values():
+                if mode and mode_object.name != mode:
+                    # mode filter
+                    continue
+                for input_type in mode_object.config:
+                    if input_type in self.input_types:
+                        self.mapped_counts[input_type] = sum([1 for input_item in mode_object.config[input_type] if isinstance(input_item, InputItem) and input_item.containers])
+                    
+
+    def updateFilters(self):
+        ''' updates the filters for the device '''
+        device_guid = self.device_guid
+        input_filter = self.input_filter
+        for input_type in self.input_types:
+            self.filtered_counts[input_type] = 0
+        if device_guid in input_filter:
+
+            for input_type in input_filter[device_guid]:
+                self.filtered_counts[input_type] = sum([1 for input_id in input_filter[device_guid][input_type] if input_filter[device_guid][input_type][input_id]])
+
+    def mapping_display(self):
+        stub = "Mapped: "
+        for input_type in self.input_types:
+            count = self.device_counts[input_type]
+            if count:
+                stub += f"{InputType.to_name(input_type)} {count} "
+
+        return stub
+    
+    def filtered_display(self):
+        stub = "Filtered: "
+        for input_type in self.input_types:
+            count = self.filtered_counts[input_type]
+            if count:
+                stub += f"{InputType.to_name(input_type)} {count} "
+
+        return stub
+    
+    
 
 class Settings:
 
     """Stores general profile specific settings."""
 
-    def __init__(self, parent):
+    def __init__(self, profile : Profile):
         """Creates a new instance.
 
         :param parent the parent profile
         """
-        self.parent = parent
+        self.profile = profile
         self.vjoy_as_input = {}
         self.vjoy_initial_values = {}
         self.startup_mode = None
         self.default_delay = 0.05
+        self.input_filter = {} # map of input filters for each device, [device_guid][input_type][input_id] = bool (true if visible, false if not) - no data = not visible
+        
 
     def reset(self):
         ''' resets setting '''
@@ -1592,6 +1699,32 @@ class Settings:
                 axis_node.set("enabled", safe_format(enabled, bool))
                 vjoy_node.append(axis_node)
             node.append(vjoy_node)
+
+        # mapping filters
+        if self.input_filter:
+            root_filter_node = etree.Element("input-filter")
+            node.append(root_filter_node)
+            for device_guid in self.input_filter:
+                device = gremlin.joystick_handling.getDevice(device_guid)
+                if device:
+                    device_id = device.device_id
+                    device_node = etree.Element("device")
+                    device_node.set("id", device_id)
+                    device_node.set("name", device.name)
+                    root_filter_node.append(device_node)
+                    for input_type in self.input_filter[device_guid]:
+                        for input_id in self.input_filter[device_guid][input_type]:
+                            value = self.input_filter[device_guid][input_type][input_id]
+                            if not value:
+                                # only save non filtered inputs (they are usually less than the filtered ones)
+                                filter_node = etree.Element("filter")
+                                filter_node.set("device", device_id)
+                                filter_node.set("type", InputType.to_string(input_type))
+                                filter_node.set("id", safe_format(input_id, int))
+                                filter_node.set("filter", safe_format(value, bool))
+                                root_filter_node.append(filter_node)
+
+
 
         return node
     
@@ -1652,6 +1785,29 @@ class Settings:
 
 
                 self.vjoy_initial_values[vid][aid] = (enabled, value)
+
+        self.input_filter = {}
+        # read the device list as it will tell GEX that the device was previously viewed
+        for device_node in node.xpath(".//input-filter/device"):
+            device_id = safe_read(device_node,"id", str, "")
+            device_guid = gremlin.util.parse_guid(device_id)
+            self.input_filter[device_guid] = {}
+
+        
+        for filter_node in node.xpath(".//input-filter/filter"):
+            
+            device_id = safe_read(filter_node,"device", str, "")
+            device_guid = gremlin.util.parse_guid(device_id)
+            input_type = InputType.to_enum(safe_read(filter_node,"type", str,""))
+            input_id = safe_read(filter_node, "id", int, -1)
+            value = safe_read(filter_node, "filter", bool, False)
+            self.setFiltered(device_guid, input_type, input_id, value)
+
+
+
+
+
+        
 
         # update the data from the profile
         sd.reset()
@@ -1720,6 +1876,182 @@ class Settings:
         if vid not in self.vjoy_initial_values:
             self.vjoy_initial_values[vid] = {}
         self.vjoy_initial_values[vid][aid] = value
+
+
+    def getDeviceFiltered(self, device_guid) -> bool:
+        ''' gets the current device filtering state '''
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        return device.device_type == DeviceType.Joystick # filter by default if a joystick device
+    
+        
+
+    def setFiltered(self, device_guid: dinput.GUID | str | int, input_type : InputType, input_id : int, value : bool):
+        ''' marks a joystick input as filtered or not '''
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        device_guid = device.device_guid
+        if not device_guid in self.input_filter:
+            self.input_filter[device_guid] = {}
+        if not input_type in self.input_filter[device_guid]:
+            self.input_filter[device_guid][input_type] = {}
+        self.input_filter[device_guid][input_type][input_id] = value
+
+
+    def isFiltered(self, device_guid: dinput.GUID | str | int) -> bool:
+        ''' true if the device has inputs that are currently filtered '''
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        device_guid = device.device_guid
+        if not device_guid in self.input_filter:
+            return False
+        for input_type in self.input_filter[device_guid]:
+            for input_id in self.input_filter[device_guid][input_type]:
+                if self.input_filter[device_guid][input_type][input_id]:
+                    return True
+        return False
+    
+    def getJoystickInputStats(self, device_guid: dinput.GUID | str | int) -> JoystickInputStats:
+        ''' returns a stats object holding filtered data '''
+        return JoystickInputStats(device_guid)
+    
+    def _set_default_filter_list(self, device_guid: dinput.GUID | str | int, device_count : int, input_type : InputType, max_count : int):
+        ''' gets a default list of filtered inputs based on given parameters '''
+        visible_list = []
+        map_data = [index + 1 for index in range(device_count)] # all possoble inputs
+
+
+
+        for index in range(device_count):
+            input_id = index + 1
+            mapped = self.profile.isInputMapped(device_guid, input_type, input_id)
+            if mapped:
+                self.setFiltered(device_guid, input_type, input_id, False) 
+                visible_list.append(input_id)
+                map_data.remove(input_id)
+        
+        if len(visible_list) < max_count:
+            # take the first n inputs
+            count = max_count -len(visible_list)
+            add_list = map_data[:count]
+            if add_list:
+                visible_list.extend(add_list)
+
+        # remove visible list from filtered list
+        if map_data:
+            map_data = [i for i in map_data if not i in visible_list]
+
+        # update all filters
+        for index in range(device_count):
+            input_id = index + 1
+            filtered = input_id in map_data
+            self.setFiltered(device_guid, input_type, input_id, filtered) 
+
+    def setAllFiltered(self, mode : str):
+        ''' set all joystick device filtered list based on requested mode
+        :param mode: "default","mapped","hide_all" 
+        '''
+        config = gremlin.config.Configuration()
+        
+        match mode:
+            case "default":
+                # set all joystick devices to default 
+                for device in gremlin.joystick_handling.all_joystick_devices():
+                    device_guid = device.device_guid
+                    max_count = config.device_filter_max_axis
+                    if device.axis_count:
+                        self._set_default_filter_list(device_guid, device.axis_count, InputType.JoystickAxis, max_count)
+                    max_count = config.device_filter_max_button
+                    if device.button_count:
+                        self._set_default_filter_list(device_guid, device.button_count, InputType.JoystickButton, max_count)
+                    max_count = config.device_filter_max_hat
+                    if device.hat_count:
+                        self._set_default_filter_list(device_guid, device.hat_count, InputType.JoystickHat, max_count)
+
+            case "mapped":
+                # set all joystick devices to show mapped inputs
+                for device in gremlin.joystick_handling.all_joystick_devices():
+                    device_guid = device.device_guid
+                    for index in range(device.axis_count):
+                        input_id = index + 1
+                        is_used = self.profile.isInputMapped(device_guid, InputType.JoystickAxis, input_id)
+                        self.setFiltered(device_guid, InputType.JoystickAxis, input_id, not is_used)
+                    for index in range(device.button_count):
+                        input_id = index + 1
+                        is_used = self.profile.isInputMapped(device_guid, InputType.JoystickButton, input_id)
+                        self.setFiltered(device_guid, InputType.JoystickButton, input_id, not is_used)
+                    for index in range(device.hat_count):
+                        input_id = index + 1
+                        is_used = self.profile.isInputMapped(device_guid, InputType.JoystickHat, input_id)
+                        self.setFiltered(device_guid, InputType.JoystickHat, input_id, not is_used)
+
+            case "hide_all":
+                # set all joystick devices to hidden (max performance)
+                for device in gremlin.joystick_handling.all_joystick_devices():
+                    device_guid = device.device_guid
+                    for index in range(device.axis_count):
+                        input_id = index + 1
+                        self.setFiltered(device_guid, InputType.JoystickAxis, input_id, True)
+                    for index in range(device.button_count):
+                        input_id = index + 1
+                        self.setFiltered(device_guid, InputType.JoystickButton, input_id, True)
+                    for index in range(device.hat_count):
+                        input_id = index + 1
+                        self.setFiltered(device_guid, InputType.JoystickHat, input_id, True)
+
+    def dump_filter(self, p_device_guid = None):
+        ''' dumps the current input filter to the log file '''
+        for device_guid in self.input_filter:
+            if p_device_guid and device_guid != p_device_guid:
+                continue
+            
+            syslog.info("=" * 30)
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            syslog.info(f"Input filter dump for {device.name}")
+            visible_count = 0
+            for input_type in self.input_filter[device_guid]:
+                for input_id in self.input_filter[device_guid][input_type]:
+                    filtered = self.getFiltered(device_guid, input_type, input_id)
+                    if not filtered:
+                        # syslog.info(f"\t{input_type.name} {input_id} visible")
+                        visible_count+=1
+            syslog.info(f"\tVisible count: {visible_count}")
+                             
+
+
+    def getFiltered(self, device_guid : dinput.GUID | str | int, input_type : InputType, input_id : int | object) -> bool:
+        ''' gets the joystick input filtered state '''
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        device_guid = device.device_guid
+        if not device_guid in self.input_filter:
+            config = gremlin.config.Configuration()
+
+            max_count = config.device_filter_max_axis
+            if device.axis_count > max_count:
+                self._set_default_filter_list(device_guid, device.axis_count, InputType.JoystickAxis, max_count)
+            max_count = config.device_filter_max_button
+            if device.button_count > max_count:
+                self._set_default_filter_list(device_guid, device.button_count, InputType.JoystickButton, max_count)
+            max_count = config.device_filter_max_hat
+            if device.hat_count > max_count:
+                self._set_default_filter_list(device_guid, device.hat_count, InputType.JoystickHat, max_count)
+            else:                    
+                self.input_filter[device_guid] = {}
+        
+        if not input_type in self.input_filter[device_guid]:
+            self.input_filter[device_guid][input_type] = {}
+            
+        if not input_id in self.input_filter[device_guid][input_type]:
+            self.input_filter[device_guid][input_type][input_id] = True
+            
+        return self.input_filter[device_guid][input_type][input_id]
+    
+   
+    def getFilterMap(self):
+        ''' gets the input filter'''
+        return self.input_filter
+    
+    def setFromFilterMap(self, data):
+        ''' copies the input filter list as a deep copy '''
+        self.input_filter = copy.deepcopy(data)
+
 
 
 def extract_remap_actions(action_sets):
@@ -3003,7 +3335,7 @@ class Profile():
             return key in self._simconnect_modes
         # single key mode
         key = key.casefold()
-        keys = [k.casefold() for (_, k) in self._simconnect_modes.keys()]
+        keys = [k.casefold() for (_, k) in self._simconnect_modes]
         return key in keys
 
 
@@ -3036,7 +3368,7 @@ class Profile():
         # update vjoy device list
         remove_list = []
         for device in self.vjoy_devices.values():
-            for mode in device.modes.keys():
+            for mode in device.modes:
                 if not mode in modes:
                     remove_list.append(mode)
 
@@ -3068,7 +3400,7 @@ class Profile():
             id_list = [device.device_guid for device in self.devices.values()]
         device_list = []
         for id in id_list:
-            if id in self.devices.keys():
+            if id in self.devices:
                 device_list.append(self.devices[id])
         return device_list
     
@@ -3464,7 +3796,7 @@ class Profile():
         mode_list = self.mode_list()
         if name in mode_list and (inherited_name is None or inherited_name in mode_list):
             for device in self.devices.values():
-                 if name in device.modes.keys():
+                 if name in device.modes:
                     device.modes[name].inherit = inherited_name
         if emit:
             eh = gremlin.event_handler.EventListener()
@@ -3716,26 +4048,34 @@ class Profile():
             for mode_object in device.modes.values():
                 if mode_object.name != mode_name:
                     continue
-                for input_type in mode_object.config.keys():
+                for input_type in mode_object.config:
                     for input_item in mode_object.config[input_type].values():
                         if input_item.containers:
                             return True
         return False
     
         
-    def isInputMapped(self, device_guid, input_type, input_id) -> bool:
-        ''' scans the profile to see if the specified input is mapped somewhere '''
+    def isInputMapped(self, device_guid : dinput.GUID | str | int, input_type : InputType, input_id : int | object) -> bool:
+        ''' scans the profile to see if the specified input is mapped somewhere 
+        
+        :param device_guid: device id
+        :param input_type: the type of input we're looking for
+        :param input_id: the input index or identifier
+        
+        '''
         if device_guid in self.devices:
             device = self.devices[device_guid]
-            if device_guid == device.device_guid:
-                for mode_object in device.modes.values():
-                    if input_type in mode_object.config.keys():
-                        input_item = next((item for item in mode_object.config[input_type].values() if input_id == item.input_id), None)
-                        if input_item and input_item.containers:
-                            return True
+            for mode_object in device.modes.values():
+                if input_type in mode_object.config:
+                    input_item = next((item for item in mode_object.config[input_type].values() if input_id == item.input_id), None)
+                    if input_item and input_item.containers:
+                        return True
         return False
-            
-
+    
+    def isInputFiltered(self, device_guid : dinput.GUID | str | int, input_type : InputType, input_id : int | object) -> bool:
+        ''' scans the profile to see if the specified input is mapped somewhere '''
+        return self.settings.getFiltered(device_guid, input_type, input_id)
+        
     def get_selectable_modes(self):
         ''' gets the list of all selectable modes in the profile'''
         self._ensure_mode_tree()
@@ -3903,7 +4243,7 @@ class Profile():
             dev = self.devices[dev_guid]
             for mode_name in dev.modes:
                 mode = dev.modes[mode_name]
-                for input_type in mode.config.keys():
+                for input_type in mode.config:
                     for input_item in mode.config[input_type].values():
                         if input_item.input_id == input_id:
                             return input_item
@@ -3920,7 +4260,7 @@ class Profile():
             dev = self.devices[dev_guid]
             for mode_name in dev.modes:
                 mode = dev.modes[mode_name]
-                for input_type in mode.config.keys():
+                for input_type in mode.config:
                     for input_item in mode.config[input_type].values():
                         return input_item
                         
@@ -3933,7 +4273,7 @@ class Profile():
             dev = self.devices[dev_guid]
             for mode_name in dev.modes:
                 mode_object = dev.modes[mode_name]
-                for input_type in mode_object.config.keys():
+                for input_type in mode_object.config:
                     for item in mode_object.config[input_type].values():
                         for container in item.containers:
                             for actions in [a for a in container.action_sets if a is not None]:
@@ -3968,7 +4308,7 @@ class Profile():
             dev = self.devices[dev_guid]
             for mode_name in dev.modes:
                 mode = dev.modes[mode_name]
-                for input_type in mode.config.keys():
+                for input_type in mode.config:
                     for item in mode.config[input_type].values():
                         for container in item.containers:
                             remap_actions.extend(
@@ -4820,7 +5160,7 @@ class Profile():
                 else:
                     for mode_name in dev.modes:
                         mode_object = dev.modes[mode_name]
-                        for input_type in mode_object.config.keys():
+                        for input_type in mode_object.config:
                             for item in mode_object.config[input_type].values():
                                 self._filter_actions_input_item(item, tag, callback, extra_data)
 
@@ -5648,7 +5988,7 @@ class ProfileMap():
     def get_map(self, process) -> ProfileMapItem:
         ''' returns the gremlin profile '''
         process = process.replace("\\","/").lower().strip()
-        if process in self._process_map.keys():
+        if process in self._process_map:
             return self._process_map[process]
         return None
 
