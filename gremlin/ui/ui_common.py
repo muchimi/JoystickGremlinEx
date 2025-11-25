@@ -4169,6 +4169,9 @@ class QDataPushButton(QtWidgets.QPushButton):
         if right_callback:
             self.rightClicked.connect(right_callback)
 
+        self.is_control = False
+        self.is_right = False
+
         self.installEventFilter(self)
 
     def eventFilter(self, watched, event):
@@ -4178,11 +4181,15 @@ class QDataPushButton(QtWidgets.QPushButton):
             # Check if Control modifier is active
             is_ctrl = event.modifiers() & Qt.ControlModifier
             if button == QtCore.Qt.RightButton:
+                self.is_right = True
                 self.rightClicked.emit()
+                self.is_right = False
                 return True # handled
             elif button == QtCore.Qt.LeftButton:
                 if is_ctrl:
+                    self.is_control = True
                     self.ctrlClicked.emit()
+                    self.is_control = False
                     return True # handled
         return super().eventFilter(watched, event)
 
@@ -7058,8 +7065,10 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
 class QUsedPushButton(QDataPushButton):
     ''' custom paint used button with a marker for used/unused '''
-    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, used = False, used_device_guid = None, used_input_type = None, used_input_id = None, checkable = False, checked = None):
-        super().__init__(text, data, parent, tooltip)
+    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, ctrl_callback = None, right_callback = None,
+                 used = False,
+                 used_device_guid = None, used_input_type = None, used_input_id = None, checkable = False, checked = None):
+        super().__init__(text, data, parent, tooltip, ctrl_callback=ctrl_callback, right_callback=right_callback)
         self._used = used
         self._device_guid = used_device_guid
         self._input_type= used_input_type
@@ -11619,7 +11628,7 @@ class QJoystickInputWidget(QtWidgets.QWidget):
 
 
 
-    def _update_ui(self, filtered_axis = None, filtered_button = None, filtered_hat = None):
+    def _update_ui(self, filtered_axis = None, filtered_button = None, filtered_hat = None, visible_count = None):
         widgets = []
         fcolor = Color.blueColor()
         gremlin.util.clear_layout(self.main_layout)
@@ -11661,6 +11670,14 @@ class QJoystickInputWidget(QtWidgets.QWidget):
                     label = QIconLabel(icon, f"{device.hat_count}",tooltip=tooltip)
                 widgets.append(label)
 
+            if visible_count is not None:
+                total_count = device.axis_count + device.button_count + device.hat_count
+                tooltip = f"Showing {visible_count} out of {total_count} inputs"
+                label = QtWidgets.QLabel(f"<span style='color: {fcolor}; font-weight: bold;'>{visible_count}</span>/{total_count}")
+                label.setToolTip(tooltip)
+                widgets.append(label)
+                
+
             if widgets:
                 widget = getHContainer(widgets, widget_only=True)
                 self.main_layout.addWidget(widget)
@@ -11673,7 +11690,8 @@ class QJoystickInputWidget(QtWidgets.QWidget):
         f_axis = stats.visible_axis_count
         f_button = stats.visible_button_count
         f_hat = stats.visible_hat_count
-        gremlin.util.InvokeUiMethod(self._update_ui, f_axis, f_button, f_hat)
+        f_visible = f_axis + f_button + f_hat
+        gremlin.util.InvokeUiMethod(self._update_ui, f_axis, f_button, f_hat, f_visible)
 
         
 
@@ -11738,8 +11756,7 @@ class QInputLockWidget(QtWidgets.QWidget):
 
 
     def _get_filter_tooltip(self, value : bool) -> str:
-        return "Filter used inputs: click to view all inputs." if value \
-            else "Filter used inputs: click to view mapped inputs only."
+        return "Input Filter Options"
             
 
     def _handle_used(self):

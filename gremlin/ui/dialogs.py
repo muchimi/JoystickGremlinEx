@@ -2062,6 +2062,10 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         :param event the close event
         """
         self.config.save()
+
+        # forcibly garbage collect dialog widgets
+        gremlin.util.clear_layout(self.main_layout)
+        
         super().closeEvent(event)
 
     def _update_highlight_options(self):

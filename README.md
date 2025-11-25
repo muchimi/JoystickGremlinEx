@@ -19,27 +19,30 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T115)
-- New: (experimental) Enhanced filters for joystick input devices. 
+- New: (experimental) Enhanced filters for joystick input devices (see below).
+ Fix: Added more manual QT widget life cycle management logic rather than rely on QT's internal management mechanisms prone to memory leaks and synchronization issues between the Python memory manager and the QT C++ memory manager.
+- Fix: OSC sorting key error when sorting messages with, or without data
+- Fix: axis state module now handles OSC axis inputs properly for OSC linear data
 
-GEX will now, by default, filter (limit) the number of inputs shown on each joystick device to a reasonable and manageable number.  This is for performance and convenience reasons: until now, a large number of devices and inputs could significantly impact UI performance and memory at profile design time.
+**Input Filtering**
 
-Until now, GEX would load all inputs for all devices (some delay loaded) depending on which devices are called up (device tabs).  
+GEX will now filter (limit) the number of inputs shown on each joystick device to a reasonable and more manageable number.  This is directly aimed at performance by reducing the number of entities visible at anyone time.  It is also for convenience and ease of use reasons: until now, a large number of devices and inputs could significantly impact UI performance and memory at profile design time, whether relevant or not.  These could consume thousands of entities that need to be tracked with a noticeable impact on performance and responsiveness.
 
-This could easily create over thousands of inputs and several thousands of UI elements, at some point reaching critical mass and be a strain on even high end systems.  Taking a simple example, each VJOY device can have up to 128 + 8 + 4 = 140 inputs (high mark).  Multiply this by up to 16 devices = 2,240 inputs for virtual inputs alone. Add to this axes and buttons for regular physical devices, layer on  keyboard and OSC and MIDI inputs - the number of inputs could take a toll on memory and responsiveness especially with repeaters enabled.
+Starting with this patch, each joystick device can easily hide/show inputs. Only visible inputs are tracked which significantly reduces memory and CPU usage at design time.
+
+Inputs are filtered on a per joystick device basis.  Each joystick device's inputs can be shown or hidden via the new device filter options dialog.  This dialog is accessible from the filter button above the device input list.
+
+The filter settings are per profile and persisted in the profile so the profile must be saved for these settings to persist from one session to another.
+
+A new filter option page is also available in the global options dialog to set these initial default limits. The options page also has global buttons to apply the filter on all joystick devices in the profile, although these are duplicated in the per device filter dialog via control-click on the shortcut.
  
-Starting with this patch, device inputs are filtered on a per joystick device basis.  Each joystick device's inputs can be shown or hidden via the new device filter options dialog.  This dialog is accessible from the filter button above the device input list.
+If a legacy profile is loaded with no filtering information, GEX will apply filtering to show mapped inputs only. 
 
-The filter settings are per profile.
+New profiles will used global filtering defaults as set in global options (4 axes, 8 buttons and 1 hat).
 
-A new filter option page is also available in the global options dialog to set these initial default limits. The options page also has global buttons to apply the filter on all joystick devices in the profile.
- 
-Device filtering will default to a reasonable default the first time as defined in the global options.
+"Reasonable" varies with the number of devices, inputs and hardware capabilities. Performance is directly impacted by the number of visible inputs, so it is highly recommended to keep those to a minimum. Inputs can easily be hidden or shown via the filter dialog.  Hiding an input does not delete its mappings.  Mappings however can only be seen if the input is visible.
 
-The per device filter dialog will show which inputs are mapped.  Inputs will respond to live inputs on the devices if triggered to help with the identification process.
-
-How many inputs can be "reasonably" displayed and tracked is a question of preference, system capabilities and desired responsiveness.  It is recommended that, in general, inputs be kept to a minimum and called up only if the input is being mapped.  Inputs can easily be hidden or shown via the filter dialog.
-
-Important: With this new mechanism, the input your are looking for may not be visible.  Existing profiles with hundreds of mappings may still be visible by default until changed, so may still impact performance negatively until the number of displayed inputs is reduced.
+With this new performance oriented mechanism, the input your are looking for may not be visible depending on how many devices you have mapped and default filtering applied.  Existing profiles with hundreds of mappings may still be visible by default until changed, so may still impact performance negatively until the number of displayed inputs is reduced.
 
 The filtering does not impact profile execution.  Invisible inputs will still run their mappings if the input is mapped.
 
@@ -47,9 +50,8 @@ Filters only apply to joystick devices (physical and virtual) as they usually re
 
 Please remember to save the profile to have the filters persist as the data is not saved until the profile is saved.
 
-- Fix: Added more manual QT widget life cycle management logic rather than rely on QT's internal management mechanisms prone to memory leaks and synchronization issues between the Python memory manager and the QT C++ memory manager.
-- Fix: OSC sorting key error when sorting messages with, or without data
-- Fix: axis state module now handles OSC axis inputs properly for OSC linear data
+A note on performance:  The filtering mechanism reduces the memory footprint of GEX significantly, and increases UI responsiveness significantly as well on most systems.
+
 
 
 ### (m76T114)

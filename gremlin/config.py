@@ -2820,7 +2820,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def device_filter_max_button(self) -> int:
-        return self._get_data("device_filter_max_button", 16)
+        return self._get_data("device_filter_max_button", 8)
     @device_filter_max_button.setter
     def device_filter_max_button(self, value : int):
         self._set_data("device_filter_max_button", value)

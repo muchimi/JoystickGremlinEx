@@ -1531,13 +1531,10 @@ class AbstractContainerAction(AbstractAction):
 
 class JoystickInputStats:
     ''' holds filtered information for device inputs '''
-    def __init__(self, device_guid: dinput.GUID | str | int, input_filter = None):
+    def __init__(self, device_guid: dinput.GUID | str | int, input_filter):
         device = gremlin.joystick_handling.getDevice(device_guid)
         device_guid = device.device_guid
         self.device_guid = device_guid
-        profile = gremlin.shared_state.current_profile
-        input_filter = profile.settings.input_filter
-        self.input_filter = input_filter if input_filter is not None else input_filter
         self.device_counts = {} # device count [input_type] -> int
         self.filtered_counts = {} # filtered input count [input_type] -> int
         self.mapped_counts = {} # mapped input count [input_type] -> int
@@ -1553,7 +1550,7 @@ class JoystickInputStats:
             self.device_counts[InputType.JoystickAxis] = device.axis_count
             self.device_counts[InputType.JoystickButton] = device.button_count
             self.device_counts[InputType.JoystickHat] = device.hat_count
-            self.updateFilters()
+            self.updateFilters(input_filter)
             self.updateMappings()
 
     @property
@@ -1606,16 +1603,17 @@ class JoystickInputStats:
                         self.mapped_counts[input_type] = sum([1 for input_item in mode_object.config[input_type] if isinstance(input_item, InputItem) and input_item.containers])
                     
 
-    def updateFilters(self):
+    def updateFilters(self, input_filter):
         ''' updates the filters for the device '''
+        verbose = gremlin.config.Configuration().verbose_mode_filter
         device_guid = self.device_guid
-        input_filter = self.input_filter
         for input_type in self.input_types:
             self.filtered_counts[input_type] = 0
         if device_guid in input_filter:
-
             for input_type in input_filter[device_guid]:
-                self.filtered_counts[input_type] = sum([1 for input_id in input_filter[device_guid][input_type] if input_filter[device_guid][input_type][input_id]])
+                count = sum([1 for input_id in input_filter[device_guid][input_type] if input_filter[device_guid][input_type][input_id]])
+                self.filtered_counts[input_type] = count
+                if verbose: syslog.info(f"Filtered: {input_type.name} count: {count}")
 
     def mapping_display(self):
         stub = "Mapped: "
@@ -1910,7 +1908,7 @@ class Settings:
     
     def getJoystickInputStats(self, device_guid: dinput.GUID | str | int) -> JoystickInputStats:
         ''' returns a stats object holding filtered data '''
-        return JoystickInputStats(device_guid)
+        return JoystickInputStats(device_guid, self.input_filter)
     
     def _set_default_filter_list(self, device_guid: dinput.GUID | str | int, device_count : int, input_type : InputType, max_count : int):
         ''' gets a default list of filtered inputs based on given parameters '''
