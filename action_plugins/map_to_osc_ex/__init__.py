@@ -1027,15 +1027,6 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.clear_args_widget.clicked.connect(self._clear_args)
 
-
-        
-        is_axis = self.action_data.input_is_axis()
-        # if is_axis:
-        #     # hook the input
-        #     el = gremlin.event_handler.EventListener()
-        #     el.joystick_event.connect(self._joystick_event_handler)
-
-
         self._osc_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._osc_widget.setToolTip("OSC command")
         if self.action_data.command:

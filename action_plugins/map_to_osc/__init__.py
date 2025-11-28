@@ -519,10 +519,8 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         if is_axis:
             # hook the input
             el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self._joystick_event_handler)
+            el.joystick_event_ui.connect(self._joystick_event_handler)
 
-        # # trigger is only used when the input is not an axis
-        # self._trigger_on_release_widget.setVisible(not is_axis)
 
         self._v1_widget = OscInputWidget(label = "Parameter 1:",
                                          value_press = self.action_data.v1_press, 
@@ -607,6 +605,13 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._ui_ready = True
 
+    def unhook(self):
+        is_axis = self.action_data.input_is_axis()
+        if is_axis:
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event_ui.disconnect(self._joystick_event_handler)
+
+
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -622,11 +627,11 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not self._ui_ready:
             return # not loaded yet
         
-        if gremlin.shared_state.is_running:
-            return 
+        # if gremlin.shared_state.is_running:
+        #     return 
 
-        if not event.is_axis:
-            return 
+        # if not event.is_axis:
+        #     return 
         
         value = event.value
         

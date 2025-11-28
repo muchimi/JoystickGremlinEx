@@ -48,6 +48,7 @@ class KeyboardOutputMode(Enum): # order is that of the display order for keyboar
     Press = 2 # keyboard make only
     Release = 3 # keyboard release only
     Hold = 4 # press while held (default GremlinEx behavior)
+    Toggle = 5 # toggles make / break
     
     
 

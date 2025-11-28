@@ -433,6 +433,9 @@ class EventListener:
 	# custom joystick event - this is a code based joystick event that mapping items can listen to when inside other containers
 	custom_joystick_event = Signal(Event)
 
+	# ui joystick event = event fired at edit time to edit UI based on the joystick event
+	joystick_event_ui = Signal(Event)
+
 
 	hardware_input_event = Signal(object, object, object) # called for any input event (device_guid, input_type, input_id)
 
@@ -809,6 +812,7 @@ class EventListener:
 			if verbose: syslog.info(f"EVENTLISTEN: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")		
 			self.joystick_event.emit(event)	
 			if not gremlin.shared_state.is_running:
+				self.joystick_event_ui.emit(event)
 				if event.is_axis:
 					self.axis_state_change.emit(event)
 				else:

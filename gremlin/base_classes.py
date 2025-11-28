@@ -481,14 +481,9 @@ class JoystickHook:
         self._calibrate = True # calibrate the data by default, false = do not apply calibration
         self._last_value = 0.0 # last value
         self._astate = gremlin.event_handler.AxisState()
-        self._hook_edit_only = True # only update at edit time by default
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
-
-
-    def setEditOnly(self, value : bool):
-        self._hook_edit_only = value
 
     def _config_changed(self, option, value):
         ''' called when a configuration option changes '''
@@ -551,7 +546,7 @@ class JoystickHook:
     def _hook_disable(self):
         if self._hooked and self._hook_connected:
             el = gremlin.event_handler.EventListener()
-            el.joystick_event.disconnect(self._hook_joystick_event)
+            el.joystick_event_ui.disconnect(self._hook_joystick_event)
             self._hook_connected = False
     
     @QtCore.Slot()
@@ -563,7 +558,7 @@ class JoystickHook:
         # re-attach when profile stops
         if self._hooked and not self._hook_connected:
             el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self._hook_joystick_event)
+            el.joystick_event_ui.connect(self._hook_joystick_event)
             self._hook_connected = True
             self._hook_update_value()
 
@@ -571,9 +566,6 @@ class JoystickHook:
     def _hook_joystick_event(self, event):
         if gremlin.shared_state.is_repeater_suspended():
             return
-        if self._hook_edit_only and gremlin.shared_state.is_running:
-            # skip at runtime
-            return 
         if self._hook_callback:
             if not event.is_axis:
                 return 
@@ -635,18 +627,13 @@ class JoystickHook:
                         el = gremlin.event_handler.EventListener()
                         el.axis_state_change.emit(event)
 
-    # @property
-    # def _hook_value(self):
-    #     return self.__hook_value
-    # @_hook_value.setter
-    # def _hook_value(self, value):
-    #     if value is not None and not isinstance(value, float):
-    #         pass
-    #     self.__hook_value = value
-
     def triggerUpdate(self):
         ''' triggers a hook update by forcing a data read without an event '''
         self._hook_update_value()
+
+    def unhook(self):
+        ''' called when discarded '''
+        self.unhookDevice()
 
     def unhookDevice(self):
         ''' unhooks the device '''
@@ -657,7 +644,7 @@ class JoystickHook:
             el.profile_stop.disconnect(self._hook_profile_stop)
             if self._hook_connected:
                 
-                el.joystick_event.disconnect(self._hook_joystick_event)
+                el.joystick_event_ui.disconnect(self._hook_joystick_event)
                 self._hook_connected = False
             self._hooked = False
 
@@ -684,7 +671,6 @@ class JoystickHook:
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
-        self._hook_edit_only = True 
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._hook_profile_start)
@@ -692,7 +678,7 @@ class JoystickHook:
 
         if gremlin.shared_state.ui_ready:
             # only hook after UI is loaded to prevent updates while UI is not setup yet
-            el.joystick_event.connect(self._hook_joystick_event)
+            el.joystick_event_ui.connect(self._hook_joystick_event)
             self._hook_connected = True
         
         self._hook_value = self._hook_update_value() # grab current value
@@ -702,9 +688,6 @@ class JoystickHook:
         calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self._device_guid, self._input_id)
         self._calibrate = calibration.hasData
 
-
-    def setHookEditOnly(self, value : bool):
-        self._hook_edit_only = value
 
     def setHookCallback(self, callback):
         ''' updates the callback on value change '''

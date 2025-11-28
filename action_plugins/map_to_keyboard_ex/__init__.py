@@ -343,6 +343,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
                 delay_visible = True
                 autorepeat_visible = True
                 description = "<b>AutoRepeat</b> mode will pulse the key(s) repeatedly. The delay is the time between a press/release, interval is the time between pulses."
+            case KeyboardOutputMode.Toggle:
+                description = "<b>Toggle</b> mode will toggle the key pressed/released."
 
         self.container_delay_widget.setVisible(delay_visible)
         self.description_widget.setText(description)
@@ -682,25 +684,32 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                         else:
                             # stop pulsing on release
                             self.pulse_stop()
-        
-                            # id = gremlin.macro.MacroManager().queue_macro(self.delay_press_release, is_local, is_remote)
-                            # self.is_pressed = True
-                            # self.registerMacro(id)                                
+
+                case KeyboardOutputMode.Toggle:
+                    if self.has_keys:
+                        if is_pressed:
+                            for key in self.action_data.keys:
+                                if verbose: syslog.info(f"MapToKeyboardEx: toggle")
+                                el = gremlin.event_handler.EventListener()
+                                state = el.get_key_state(key)
+                                if key.is_mouse:
+                                    gremlin.macro._send_mouse_button(key.mouse_button, not state, is_local, is_remote)
+                                else:
+                                    if state:
+                                        # key is down, send up
+                                        gremlin.keyboard.send_key_up(key)
+                                    else:
+                                        # key is up, send down
+                                        gremlin.keyboard.send_key_down(key)
+
+                               
 
                 case KeyboardOutputMode.AutoRepeat:
                     # setup autorepeat thread
                     repeat_interval =  self.action_data.autorepeat_delay/1000
                     self.pulse_start(self.action_data.keys, self.action_data.delay/1000, repeat_interval)
                                   
-                    # if verbose:
-                    #         syslog.info(f"MapToKeyboardEx: autorepeat")
-                    # if self.has_keys:
-
-                    #     if self._ar_thread is None:
-                    #         self._ar_thread = threading.Thread(target=self._ar_execute) #threading.Thread(target=self._ar_execute, daemon=False)
-                    #         self._ar_running = True
-                    #         self._ar_event.clear()
-                    #         self._ar_thread.start()
+                  
 
 
 
@@ -919,6 +928,8 @@ Can also send mouse buttons, mouse wheel events.'''
                     self.mode = KeyboardOutputMode.Hold
                 case "autorepeat":
                     self.mode = KeyboardOutputMode.AutoRepeat
+                case "toggle":
+                    self.mode = KeyboardOutputMode.Toggle
                 case _:
                     # default
                     self.mode = KeyboardOutputMode.Hold

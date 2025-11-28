@@ -13,7 +13,30 @@ Each device (non special) has a number of available inputs.  An input for a joys
 
 If you would like to define a new state in the profile, that state needs to be defined as an input in the state device.
 
-To use VJoy as input devices, that must be enabled in the settings tab and GremlinEx will make that Vjoy device available as an input device, each with its own tab.\
+To use VJoy as input devices, that must be enabled in the settings tab and GremlinEx will make that Vjoy device available as an input device, each with its own tab.
+
+
+### Input Filter 
+
+(m76T115+) Inputs are filtered.
+
+GEX will filter (limit) the number of inputs shown on each joystick device to a reasonable and more manageable number.  This is directly aimed at performance by reducing the number of entities visible at anyone time.  It is also for convenience and ease of use reasons: until now, a large number of devices and inputs could significantly impact UI performance and memory at profile design time, whether relevant or not.  These could consume thousands of entities that need to be tracked with a noticeable impact on performance and responsiveness.
+
+![Filter](assets/input_filter_general.png)
+
+"Reasonable" varies with the number of devices, inputs and hardware capabilities. Performance is directly impacted by the number of visible inputs, so it is highly recommended to keep those to a minimum. Inputs can easily be hidden or shown via the filter dialog.  Hiding an input does not delete its mappings.  Mappings however can only be seen if the input is visible.
+
+The filtering does not impact profile execution.  Invisible inputs will still run their mappings if the input is mapped.
+
+Filters only apply to joystick devices (physical and virtual) as they usually represent the bulk of input counts.
+
+Please remember to save the profile to have the filters persist as the data is not saved until the profile is saved.
+
+### Filter Configuration
+
+The filter dialog allows you to select which inputs are visible or not.  The dialog has toggle buttons for each axis, button or hat available on the input joystick type device.  Selected (visible) inputs will be colored, unselected inputs will be gray.  Each input has an indicator that will show if the input has a mapping.  If the device is triggered while the dialog is running, the corresponding functions will highlight.
+
+![Filter Dialog](assets/input_filter_dialog.png)
 
 ### Triggers
 
@@ -2127,7 +2150,7 @@ The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off
 
 Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
 
-## Map to keyboard EX action
+## Map to keyboard/Mouse EX action
 
 This is identical to the base keyboard mapper but adds a few functions I thought would be handy.
 
@@ -2142,7 +2165,7 @@ The make/break/pulse behavior applies to all keys in the action, and the keys ar
 
 
 
-### Output modes
+### Action  modes
 
 | Mode     | Description |
 | ----------- | ----------- |
@@ -2151,6 +2174,7 @@ The make/break/pulse behavior applies to all keys in the action, and the keys ar
 | Auto Repeat | This mode is similar to pulse mode, except the pulse will repeat while the input is held.  The interval specifies the time between pulses.  Set to 0 for no delay, keeping again in mind that most game loops will not detect key presses if they occur within 200ms of each other.|
 | Press | This mode triggers a press only (a "make" in keyboard hardware parlance).  This mode does not release the keys so it's expected at some point, the profile will release the keys.  Dragons: when used to send mouse clicks - it will keep the mouse pressed until the release which can cause behavior issues in the operating system.  Use with caution and only paired with a release mapping somewhere in the profile. Usually you can manually press the keys or the mouse to "undo" a press, provided that input is available (example F13 would not be).|
 | Release | Ths mode triggers a release only (a "break" in keyboard hardware parlance).  This is the companion action to the press mode. |
+| Toggle | Ths mode toggles the key or mouse button. If a key is released, the key is pressed.  If it is pressed, it is released.|
 
 ### Latching
 

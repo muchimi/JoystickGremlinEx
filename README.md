@@ -18,6 +18,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T116A)
+- New: Map to Keyboard/Mouse Ex - new mode - toggle.  Toggle the keyboard or mouse button.
+- Performance: split UI joystick events from runtime joystick events for performance improvement.
+- Fix: Filter - handle unknown device GUID on profile load.
+- Documentation updates.
+
 ### (m76T116)
 - Performance: ensure UI repeaters don't update at runtime to reduce overhead.
 - Fix: Calibration dialog: not finding correct device. 

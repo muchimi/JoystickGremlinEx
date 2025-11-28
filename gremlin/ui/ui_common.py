@@ -3453,12 +3453,18 @@ class InputListenerWidget(QBoxFrame):
         el = gremlin.event_handler.EventListener()
         el.keyboard_event.connect(self._kb_event_cb)
         #if InputType.JoystickAxis in self._event_types or InputType.JoystickButton in self._event_types or InputType.JoystickHat in self._event_types:
-        el.joystick_event.connect(self._joy_event_cb)
+        el.joystick_event_ui.connect(self._joy_event_cb)
         
         if self._listen_mouse:
             # hook the mouse
             mh = gremlin.windows_event_hook.MouseHook()
             mh.register(self._mouse_event_cb)
+
+    def unhook(self):
+        ''' called on widget destruction '''
+        el = gremlin.event_handler.EventListener()
+        el.keyboard_event.disconnect(self._kb_event_cb)
+        el.joystick_event_ui.disconnect(self._joy_event_cb)
             
 
     @property
@@ -5099,9 +5105,8 @@ class QHookedProgressBar(QProgressBar, gremlin.base_classes.JoystickHook):
                  readonly : bool = True,
                  step : float = 0.1,
                  data = None,
-                 hook_edit_only = True, # true if the hook should only hook edit time events 
                  parent = None):
-        self.setEditOnly(hook_edit_only)
+       
         super().__init__(orientation, value, min, max, readonly, step, data, parent)
 
 
@@ -5119,9 +5124,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
     deleted = QtCore.Signal() # triggers on delete
     unhooked = QtCore.Signal() # triggers when unhooked
     
-    def __init__(self, 
-                 hook_edit_only = True,
-                 parent = None):
+    def __init__(self, parent = None):
         super().__init__(parent)
 
 
@@ -5144,7 +5147,6 @@ class ButtonStateWidget(QtWidgets.QWidget):
         height = self._icon_size.height()+2
         self._button_widget.setMinimumHeight(height)
         self._button_widget.setMaximumHeight(height)
-        self._hook_edit_only = hook_edit_only
 
         self._last_state_value = None # not set
 
@@ -5183,9 +5185,6 @@ class ButtonStateWidget(QtWidgets.QWidget):
             self.deleted.emit()
 
 
-    def setHookEditOnly(self, value : bool):
-        self._self._hook_edit_only = value
-
     def hookDevice(self, device_guid, input_type, input_id):
         ''' hooks the input  '''
         if self._hooked:
@@ -5205,9 +5204,6 @@ class ButtonStateWidget(QtWidgets.QWidget):
     def process_event(self, event):
         ''' joystick event handler '''
         if not Shiboken.isValid(self):
-            return
-        if self._hook_edit_only and gremlin.shared_state.is_running:
-            # no update at runtime mode
             return
             
         if self._suspended:
@@ -6786,7 +6782,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         match vis_type:
             case gremlin.types.VisualizationType.AxisCurrent:
                 self._create_current_axis()
-                el.joystick_event.connect(self._current_axis_update)
+                el.joystick_event.connect(self._current_axis_update) # hook runtime event so it works at runtime or edit time
                 el.vjoy_output_event.connect(self._vjoy_current_axis_update) # hook vjoy separately
                     
             case gremlin.types.VisualizationType.AxisTemporal:
@@ -7140,7 +7136,8 @@ class QUsedPushButton(QDataPushButton):
 
 
     def _repaint(self):
-        self.update()
+        if Shiboken.isValid(self):
+            self.update()
 
     
     def paintEvent(self, event):

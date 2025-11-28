@@ -472,6 +472,7 @@ def clear_layout(layout: QtWidgets.QLayout):
         elif child.widget():
             widget = child.widget()
             if hasattr(widget,"unhook"):
+                # call unhook on destruction if defined
                 widget.unhook()
             if hasattr(widget,"_cleanup_ui"):
                 widget._cleanup_ui()
