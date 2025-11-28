@@ -639,14 +639,17 @@ class CalibrationManager():
         
             root = etree.Element("root")
             for device_guid in self.calibration_map:
-                device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-                for input_id in self.calibration_map[device_guid]:
-                    data : CalibrationData = self.calibration_map[device_guid][input_id]
-                    if data.hasData:
-                        node_comment = etree.Comment(f"{device.name} axis {input_id}")
-                        root.append(node_comment)
-                        node = data.to_xml()
-                        root.append(node)
+                device = gremlin.joystick_handling.getDevice(device_guid)
+                if not device:
+                    syslog.error(f"CALIBRATION SAVE: unknown device: {device_guid}")
+                else:
+                    for input_id in self.calibration_map[device_guid]:
+                        data : CalibrationData = self.calibration_map[device_guid][input_id]
+                        if data.hasData:
+                            node_comment = etree.Comment(f"{device.name} axis {input_id}")
+                            root.append(node_comment)
+                            node = data.to_xml()
+                            root.append(node)
 
             try:
                 tree = etree.ElementTree(root)
@@ -695,8 +698,8 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
 
         self.setWindowTitle("Input Axis Calibration")
         info = gremlin.joystick_handling.device_info_from_guid(device_guid)
-        
-        self.main_layout.addWidget(QtWidgets.QLabel(f"{info.name} Axis: {info.axis_names[input_id-1]}"))
+        axis_id = info.getAxisLinearId(input_id)       
+        self.main_layout.addWidget(QtWidgets.QLabel(f"{info.name} Axis: {info.axis_names[axis_id-1]}/L{axis_id}"))
         self.main_layout.addWidget(QtWidgets.QLabel("Note: Calibration options will apply to the computed input data value before any other parts of GremlinEx process the input."))
 
         # device options

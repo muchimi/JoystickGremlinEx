@@ -308,9 +308,7 @@ class InputItemListModel(ui_common.AbstractModel):
         profile = gremlin.shared_state.current_profile
 
         verbose = gremlin.config.Configuration().verbose_mode_filter
-        verbose = True
 
-        # profile.settings.dump_filter(self._device_data.device_guid)
 
         self._index_map = {} # map of index to value
         self._item_map = {}  # map of values to their index
@@ -330,10 +328,6 @@ class InputItemListModel(ui_common.AbstractModel):
                             input_id = data.input_id
                     
 
-                        # if "LEFT VPC" in device.name and data.input_type == InputType.JoystickButton and input_id == 1:
-                        #     pass
-                        # if "LEFT VPC" in device.name:
-                        #     pass
                         filtered = profile.settings.getFiltered(data.device_guid, data.input_type, input_id)
                         if filtered:
                             continue

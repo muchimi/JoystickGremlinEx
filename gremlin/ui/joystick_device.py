@@ -937,21 +937,22 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
         if device.axis_count:
             input_type = InputType.JoystickAxis
             for index in range(device.axis_count):
-                input_id = index + 1
+                linear_id = index
+                input_id = device.getAxisInputId(linear_id)
                 name = device.getAxisName(input_id)
-                data.append((device_guid, input_type, input_id, name))
+                data.append((device_guid, input_type, input_id, name, linear_id))
         if device.button_count:
             input_type = InputType.JoystickButton
             for index in range(device.button_count):
                 input_id = index + 1
                 name = device.get_button_name(input_id)
-                data.append((device_guid, input_type, input_id, name))
+                data.append((device_guid, input_type, input_id, name, input_id))
         if device.hat_count:
             input_type = InputType.JoystickHat
             for index in range(device.hat_count):
                 input_id = index + 1
                 name = device.get_hat_name(input_id)
-                data.append((device_guid, input_type, input_id, name))
+                data.append((device_guid, input_type, input_id, name, input_id))
 
         # axis widget
         
@@ -976,22 +977,26 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
 
         mapped_count = 0
         input_count = 0
-        for device_guid, input_type, input_id, name in data:
-
-            is_filtered = self._is_filtered(input_type, input_id)
+        for device_guid, input_type, input_id, name, linear_id in data:
+            filtered_id = linear_id + 1 if linear_id != input_id else input_id
+            is_filtered = self._is_filtered(input_type, filtered_id)
             is_used = profile.isInputMapped(device.device_guid, input_type, input_id)
             if is_used:
                 mapped_count += 1
             input_count += 1
+            if linear_id == input_id:
+                tooltip= f"{InputType.to_name(input_type)} {input_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id)
+            else:
+                tooltip= f"{InputType.to_name(input_type)} {input_id}/L{linear_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id)
 
             btn = gremlin.ui.ui_common.QUsedPushButton(
                 str(input_id) if input_type != InputType.JoystickAxis else device.get_axis_name(input_id, short_name=True),
                 used = is_used,
                 callback=self._handle_toggle,
-                data =(input_type, input_id),
+                data =(input_type, filtered_id),
                 checkable = True,
                 checked = not is_filtered,
-                tooltip= f"{InputType.to_name(input_type)} {input_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id),
+                tooltip = tooltip
                 )
             btn.setStyleSheet(css)
             
@@ -1301,6 +1306,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         btn :  gremlin.ui.ui_common.QUsedPushButton = self.sender()
         data = btn.data
         input_type, input_id = data
+        
         visible = btn.isChecked()
         is_filtered = not visible
         self._set_filtered(input_type, input_id, is_filtered, emit = True)

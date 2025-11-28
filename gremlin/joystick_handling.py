@@ -297,23 +297,7 @@ def get_curved_axis(device_guid, axis_id):
             
 def get_device(guid : int | str | dinput.GUID, show_error = True) -> dinput.DeviceSummary:
     ''' gets the device for the given ID - issues error message if not found '''
-    if isinstance(guid, int):
-        # vjoy ID 
-        guid = vjoy_guid_from_id(guid)
-    elif isinstance(guid, str):
-        guid = gremlin.util.parse_guid(guid)
-    elif isinstance(guid, dinput.GUID):
-        pass
-    elif guid is None:
-        if show_error: syslog.error(f"JOY: GET DEVICE: identifier is not specified")
-        return None
-    else:
-        return None
-    
-    dev : dinput.DeviceSummary = device_info_from_guid(guid)
-    if not dev:
-        if show_error: syslog.error(f"JOY: GET DEVICE: Device not found: [{guid}]")
-    return dev
+    return device_info_from_guid(guid, show_error)
                      
 
 def get_axis(guid, index, normalized = True, linear = False):
@@ -580,9 +564,9 @@ def getPhysicalDevices() -> list[dinput.DeviceSummary]:
     return [dev for dev in _joystick_device_guid_map.values() if dev.device_type == DeviceType.Joystick and not dev.is_virtual]
 
 
-def getDevice(device_guid):
+def getDevice(device_guid : int | str | dinput.GUID):
     ''' gets a device summary '''
-    return get_device(device_guid)
+    return device_info_from_guid(device_guid)
 
 def getVjoyDeviceGuid(vid):
     ''' gets the vjoy device by the given vjoy id'''
@@ -607,23 +591,36 @@ def getVjoyDeviceMap()->dict:
 
     
 
-def device_info_from_guid(device_guid): # -> DeviceSummary:
-    ''' gets physical device information '''
-    
-    if isinstance(device_guid, int):
-        # vjoy ID sent ?
-        device_guid = getVjoyDeviceGuid(device_guid)
-        if not device_guid:
-            return None
-    if isinstance(device_guid, str):
-        device_guid = gremlin.util.parse_guid(device_guid)
-    if device_guid in _joystick_device_guid_map:
-        return _joystick_device_guid_map[device_guid]
-    # # update for "live" disconnects/reconnects if any
-    # refresh_devices()
-    # if device_guid in _joystick_device_guid_map:
-    #     return _joystick_device_guid_map[device_guid]
 
+def device_info_from_guid(device_guid : int | str | dinput.GUID, show_error = True) -> dinput.DeviceSummary:
+    ''' gets the device for the given ID - issues error message if not found '''
+    if device_guid in _joystick_device_guid_map:
+        return  _joystick_device_guid_map[device_guid]
+    if device_guid in _all_joystick_devices:
+        return _all_joystick_devices[device_guid]
+     
+    guid = None
+    if isinstance(device_guid, int):
+        # vjoy ID 
+        guid = vjoy_guid_from_id(device_guid)
+    elif isinstance(device_guid, str):
+        guid = gremlin.util.parse_guid(device_guid)
+    elif isinstance(device_guid, dinput.GUID):
+        guid = device_guid
+    elif guid is None:
+        if show_error: syslog.error(f"JOY: GET DEVICE: identifier is not specified")
+        return None
+    else:
+        syslog.error(f"JOY: GET DEVICE: don't know how to handle identifier: [{device_guid}]")
+        return None
+    
+    if guid in _joystick_device_guid_map:
+        return  _joystick_device_guid_map[guid]
+    if guid in _all_joystick_devices:
+        return _all_joystick_devices[guid]
+     
+    
+    if show_error: syslog.error(f"JOY: GET DEVICE: Device not found: [{device_guid}]")
     return None
 
 
@@ -1137,37 +1134,6 @@ def joystick_initialized():
 def refresh_devices():
     ''' updates any missing dynamic devices like VIGEM or VJOY from directInput '''
     joystick_devices_initialization()
-
-    # global _joystick_device_guid_map, _all_vjoy_devices_map, _joystick_devices, _all_joystick_devices, dinput_vjoy_device_map
-    # device_count = dinput.DILL.get_device_count()
-    # dinput_vjoy_device_map = {}
-    
-    # # add any missing items
-    # for device_index in range(device_count):
-    #     dev : dinput.DeviceSummary = dinput.DILL.get_device_information_by_index(device_index)
-    #     dinput_key = (dev.axis_count, dev.button_count, dev.hat_count)
-    #     dinput_vjoy_device_map
-    
-
-    #     if dev.is_virtual and dev.vjoy_id == -1:
-    #         # set vjoy data 
-            
-
-
-
-    #     if not dev.device_guid in _all_vjoy_devices_map:
-    #         _joystick_device_guid_map[dev.device_guid] = dev
-    #         _joystick_device_guid_map[dev.device_id] = dev # key by string ID
-    #         if dev.is_virtual and dev.vjoy_id >= 0:
-    #             _all_vjoy_devices_map[dev.vjoy_id] = dev
-        
-    #     d1 = next((d for d in _joystick_devices if d.device_guid == dev.device_guid), None)
-    #     if not d1 and dev.connected:
-    #         _joystick_devices.append(dev)
-
-    #     d1 = next((d for d in _all_joystick_devices if d.device_guid == dev.device_guid), None)
-    #     if not d1:
-    #         _all_joystick_devices.append(dev)
 
 
 

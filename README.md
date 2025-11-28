@@ -18,6 +18,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T116)
+- Performance: ensure UI repeaters don't update at runtime to reduce overhead.
+- Fix: Calibration dialog: not finding correct device. 
+- Fix: Calibration dialog - handle non sequential HID axis - report L number
+- Fix: Filter dialog - handle non sequential HID axis (name and highlight)
+
 ### (m76T115)
 - New: (experimental) Enhanced filters for joystick input devices (see below).
  Fix: Added more manual QT widget life cycle management logic rather than rely on QT's internal management mechanisms prone to memory leaks and synchronization issues between the Python memory manager and the QT C++ memory manager.
