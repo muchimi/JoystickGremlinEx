@@ -1116,7 +1116,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         syslog.info(f"dialog input filter dump for {self.device.name}")
         visible_count = 0
     
-        for device_guid, input_type, input_id, _ in self.input_map:
+        for device_guid, input_type, input_id, _, _ in self.input_map:
             if p_device_guid and p_device_guid != device_guid:
                 continue
             filtered = self._is_filtered(input_type, input_id)
@@ -1173,7 +1173,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
                 
         prompt = None
 
-        for device_guid, input_type, input_id, _ in self.input_map:
+        for device_guid, input_type, input_id, _, _  in self.input_map:
             filtered = False
             match mode:
                 case "mapped":

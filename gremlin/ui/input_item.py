@@ -1169,7 +1169,8 @@ class InputItemListView(ui_common.AbstractView):
         widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout)]
         widget = self.itemAt(index)
         if widgets:
-            widgets.remove(widget)
+            if widget in widgets:
+                widgets.remove(widget)
             for w in widgets:
                 w.setSelected(False, emit = False)
 

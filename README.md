@@ -18,6 +18,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T117)
+- Fix: unpack exception on input filter configuration dialog shortcuts due to data change for T116 non sequential axis issue.
+- Fix: list exception in state selector.
+
 ### (m76T116A)
 - New: Map to Keyboard/Mouse Ex - new mode - toggle.  Toggle the keyboard or mouse button.
 - Performance: split UI joystick events from runtime joystick events for performance improvement.
