@@ -12078,7 +12078,7 @@ class QSyncModeWidget(QtWidgets.QWidget):
     ''' control used to set the synchronize mode for some actions '''
     changed = QtCore.Signal(gremlin.types.SyncMode) # called when a mode changes
     valueChanged = QtCore.Signal(object) # called when the value is changed 
-    def __init__(self, mode = gremlin.types.SyncMode.Default, label = None, callback = None, input_type = None, default_value = None, parent = None):
+    def __init__(self, mode = gremlin.types.SyncMode.Default, label = None, callback = None, input_type = None, default_value = None, sync_modes = None, parent = None):
         super().__init__(parent = parent)
         self._callback = callback # change callback
         self._mode = mode
@@ -12089,7 +12089,9 @@ class QSyncModeWidget(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
     
         self._selector_widget = QDataComboBox(auto_adjust=True)
-        for data in gremlin.types.SyncMode:
+        modes = sync_modes if sync_modes else [mode for mode in gremlin.types.SyncMode]
+        
+        for data in modes:
             self._selector_widget.addItem(data.name, data)
 
         index = self._selector_widget.findData(mode)

@@ -592,7 +592,7 @@ def getVjoyDeviceMap()->dict:
     
 
 
-def device_info_from_guid(device_guid : int | str | dinput.GUID, show_error = True) -> dinput.DeviceSummary:
+def device_info_from_guid(device_guid : int | str | dinput.GUID, show_error = False) -> dinput.DeviceSummary:
     ''' gets the device for the given ID - issues error message if not found '''
     if device_guid in _joystick_device_guid_map:
         return  _joystick_device_guid_map[device_guid]

@@ -23,21 +23,18 @@ from lxml import etree
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
 
-import gremlin.config
-import gremlin.config
+
 import gremlin.config
 import gremlin.event_handler
 import gremlin.input_devices
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
-import gremlin.config
 import gremlin.keyboard
 import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
-import gremlin.config
 from gremlin.profile import safe_format, safe_read
 from gremlin.keyboard import Key, key_from_name, key_from_code
 from gremlin.ui.virtual_keyboard import *
@@ -53,6 +50,8 @@ import gremlin.repeater
 import gremlin.windows_event_hook
 from shiboken6 import Shiboken
 import html
+from gremlin.types import SyncMode
+import vjoy.vjoy
 
 syslog = logging.getLogger("system")
 
@@ -117,7 +116,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             widgets.append(rb)
 
         
-        self.description_widget = gremlin.ui.ui_common.QInfoBox()
+        self.description_widget = gremlin.ui.ui_common.QInfoBox(hide_key=self.__class__.__name__)
         
 
 
@@ -144,17 +143,30 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_action_widget = gremlin.ui.ui_common.getHContainer(widgets, "Actions:", widget_only = True)
 
 
+        self._sync_widget = gremlin.ui.ui_common.QSyncModeWidget(mode = self.action_data.sync_mode,
+                                                                 label = "State on profile start:",
+                                                                 sync_modes=[SyncMode.Ignore, SyncMode.Input],
+                                                                 callback = self._sync_changed)
+        widgets = [self._sync_widget]
+        sync_container = gremlin.ui.ui_common.getHContainer(widgets, left_margin =12, widget_only = True)
+        
+
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.display_container_widget)
         self.main_layout.addWidget(self.container_action_widget)
         self.main_layout.addWidget(self.container_options_widget)
-        self.main_layout.addWidget(self.description_widget)
         self.main_layout.addWidget(self.container_delay_widget)
+        self.main_layout.addWidget(sync_container)
+        self.main_layout.addWidget(self.description_widget)
+
         
 
 
         self.main_layout.addStretch()
         self._update_ui() # update UI based on mode
+
+    def _sync_changed(self, mode):
+        self.action_data.sync_mode = mode        
 
     def _select_keys_cb(self):
         ''' display the keyboard input dialog '''
@@ -521,6 +533,42 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
     def profile_start(self):
         self._ar_running = False
 
+        is_pressed = False
+        self.debug_count = 0
+        device_guid = self.action_data.hardware_device_guid
+        input_id = self.action_data.hardware_input_id
+        input_type = self.action_data.get_input_type()
+        match input_type:
+            case InputType.JoystickHat:
+                value = gremlin.joystick_handling.get_hat(device_guid, input_id)
+                if value in vjoy.vjoy.Hat.to_continuous_position:
+                    self.hat_position = vjoy.vjoy.Hat.to_continuous_position[value]
+                else:
+                    self.hat_position = (0,0)
+                is_pressed = self.hat_position != (0,0)
+                
+            case InputType.JoystickButton:
+                is_pressed = gremlin.joystick_handling.get_button(device_guid, input_id)
+
+            case InputType.JoystickAxis:
+                pass
+        
+        # determine the startup state 
+        match self.action_data.sync_mode:
+            case SyncMode.Ignore:
+                pass
+            case SyncMode.Input:
+                if self.verbose: syslog.info(f"\t sync to input : {is_pressed}")
+                event = gremlin.event_handler.Event(
+                    input_type,
+                    input_id,
+                    device_guid,
+                    value = is_pressed,
+                    is_pressed=is_pressed,
+                )
+                self.process_event(event, is_pressed, extra_data={"virtual":True})
+
+
     def profile_stop(self):
         # release all keys
         if self.mode == KeyboardOutputMode.Hold:
@@ -629,7 +677,6 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                         id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
                         self.registerMacro(id)
 
-           
 
                 case KeyboardOutputMode.Hold:
                     if self.has_keys:
@@ -803,6 +850,8 @@ Can also send mouse buttons, mouse wheel events.'''
         config = gremlin.config.Configuration()
         self._delay = config.last_keyboard_mapper_pulse_value # delay between make/break in milliseconds
         self._autorepeat_delay = config.last_keyboard_mapper_interval_value # delay between autorepeats in milliseconds
+        self.sync_mode = SyncMode.Ignore # ignore by default
+        
 
     @property
     def delay(self):
@@ -956,6 +1005,9 @@ Can also send mouse buttons, mouse wheel events.'''
         # sort the keys for display purposes
         self.keys = gremlin.keyboard.sort_keys(keys)
 
+        if "sync-mode" in node.attrib:
+            self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
+
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
 
@@ -998,6 +1050,9 @@ Can also send mouse buttons, mouse wheel events.'''
                 node_comment = etree.Comment(comment)
                 node.append(node_comment)
                 node.append(key_node)
+
+        node.set("sync-mode", safe_format(self.sync_mode, int))                
+
         return node
 
     def _is_valid(self):

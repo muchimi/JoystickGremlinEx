@@ -2399,7 +2399,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             gremlin.shared_state.reload_device_map()
 
             
-
+            gremlin.shared_state.push_suspend_save_input()
 
             gremlin.shared_state.is_tab_loading = True
            
@@ -2937,6 +2937,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             self.pop_highlighting()
             self._update_highlight_toolbar_enabled()
+            gremlin.shared_state.pop_suspend_save_input()
 
             if verbose: 
                 syslog.info("Tab recreated:")
@@ -4468,6 +4469,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         try:
 
+            gremlin.shared_state.push_suspend_save_input()
             gremlin.shared_state.profile_loading = True
 
             self._profile_load_stack.append(source_xml)
@@ -4650,7 +4652,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
             
             gremlin.shared_state.profile_loading = False # done loading
-
+            gremlin.shared_state.pop_suspend_save_input()
+            
             # restore the mouse cursor
             popCursor()
 

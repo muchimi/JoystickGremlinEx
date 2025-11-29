@@ -102,8 +102,11 @@ char_width = 10
 # true if a profile is running
 is_running = False
 
-# true if UI keyboard should be ignored (such as, when listening to keys)
+# stack - if non zero, keyboard input should be ignored (such as, when listening to keys)
 _suspend_ui_keyinput = 0
+
+# stack = if non zero, saving input should be suspended 
+_suspend_save_input = 0
 
 # list of device names to their GUID
 _virtual_device_guid_to_name_map = {}
@@ -329,6 +332,21 @@ def push_suspend_ui_keyinput():
 
     _suspend_ui_keyinput += 1
 
+def push_suspend_save_input():
+    global _suspend_save_input
+    _suspend_save_input += 1
+
+def pop_suspend_save_input(reset = False):
+    global _suspend_save_input
+    if reset:
+       _suspend_save_input = 0
+       return 
+    if _suspend_save_input > 0:
+        _suspend_save_input -= 1
+
+def is_save_input_suspended() -> bool:
+    global _suspend_save_input
+    return _suspend_save_input > 0
 
 
     

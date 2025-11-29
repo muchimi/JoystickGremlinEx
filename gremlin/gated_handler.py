@@ -1145,7 +1145,7 @@ class GateEventHandler(QtCore.QObject):
         self._value_changed_callbacks = {} # tracks value change callbacks
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_gate and config.verbose_mode_extra
-        verbose = True
+        
         if self.verbose: syslog.info("GATEHANDLER: listen start")
         self._event_queue = queue.Queue() # holds the queue of events to process
         

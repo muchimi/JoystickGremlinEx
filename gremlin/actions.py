@@ -756,10 +756,7 @@ class InputActionCondition(AbstractCondition):
         """
 
         verbose = gremlin.config.Configuration().verbose_mode_condition
-        verbose = True
-
         
-
         syslog = logging.getLogger("system")
         retval = False
         is_pressed = event.is_pressed

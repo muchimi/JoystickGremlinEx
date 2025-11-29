@@ -18,6 +18,11 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T117A)
+- New: Map to keyboard Ex: ability to synchronize with input state on profile start.
+- Fix: last input selected recall on profile load.
+
+
 ### (m76T117)
 - Fix: unpack exception on input filter configuration dialog shortcuts due to data change for T116 non sequential axis issue.
 - Fix: list exception in state selector.

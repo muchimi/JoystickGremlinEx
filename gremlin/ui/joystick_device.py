@@ -1315,7 +1315,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
     def _set_filtered(self, input_type : InputType, input_id : int, value : bool, emit = False):
         ''' sets the filtered state internal to the dialog '''
         verbose = gremlin.config.Configuration().verbose_mode_filter
-        verbose = True
+        
         device_guid = self.device.device_guid
         if not device_guid in self.input_filter:
             self.input_filter[device_guid] = {}

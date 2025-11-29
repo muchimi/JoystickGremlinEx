@@ -1740,7 +1740,8 @@ class Configuration(QtCore.QObject):
         ''' stores the last input '''
 
         import gremlin.joystick_handling
-        if gremlin.shared_state.is_tab_loading:
+        
+        if gremlin.shared_state.is_save_input_suspended():
             # don't save while tabs are loading
             return 
         
@@ -1755,6 +1756,7 @@ class Configuration(QtCore.QObject):
             mode = gremlin.shared_state.current_mode
         
         verbose = self.verbose_mode_inputs
+        
         
         if input_type != gremlin.input_types.InputType.ModeControl and isinstance(input_id, gremlin.base_classes.AbstractInputItem):
             # convert to an ID we can use
@@ -1792,7 +1794,7 @@ class Configuration(QtCore.QObject):
 
             if verbose: 
                 device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                syslog.info(f"CONFIG: save last input {device_name} {gremlin.input_types.InputType.to_string(input_type)} {input_id}") 
+                syslog.info(f"CONFIG: SetLastInput(): {device_name} {gremlin.input_types.InputType.to_string(input_type)} {input_id}") 
         
             self.save_profile()
             self.save()
@@ -1905,6 +1907,8 @@ class Configuration(QtCore.QObject):
         '''
 
         # syslog = logging.getLogger("system")
+        verbose = self.verbose_mode_details
+        
 
 
         if device_guid is None:
@@ -1935,17 +1939,15 @@ class Configuration(QtCore.QObject):
             if return_mode:
                 return (None, None, None, None)
             return (None, None, None)
-
-        verbose = self.verbose_mode_details
+        
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if verbose:        
+            device_name = device.name
+       
         mode = gremlin.shared_state.edit_mode # current mode
-        # verbose = True
-        if verbose:
-            device_name = gremlin.shared_state.get_device_name(device_guid)
-        if not isinstance(device_guid, str):
-            dinput_device_guid = device_guid
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        else:
-            dinput_device_guid = gremlin.util.parse_guid(device_guid)
+        dinput_device_guid = device.device_guid
+        device_guid = device.device_id
+        
         data : dict = self._profile_data.get("last_input", {})
         if device_guid in data:
             input_type, input_id = data[device_guid]
@@ -1953,29 +1955,31 @@ class Configuration(QtCore.QObject):
             try:
                 input_type = gremlin.input_types.InputType.to_enum(input_type)
             except:
-                syslog.error(f"GetLastInput(): unable to convert input type {input_type} to a known type")
+                syslog.error(f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type")
                 input_type = gremlin.input_types.InputType.NotSet
 
             if input_id is not None and isinstance(input_id, int):
                 if return_mode:
                     return (device_guid, input_type, input_id, mode)
+                if verbose:
+                    syslog.info(f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}")
                 return (device_guid, input_type, input_id)
             
             if input_id is not None:
                 input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
                 if input_type is None:
                     if verbose:
-                        syslog.info(f"Loading input selection: nothing found for {device_guid} {device_name}")
+                        syslog.info(f"CONFIG: GetLastInput(): nothing found for {device_guid} {device_name}")
                     if return_mode:
                         return (None, None, None, None)
                     return (None, None, None)
                 if verbose:
-                    syslog.info(f"Loading saved input selection: {device_guid} {device_name} {input_type} {input_id}")
+                    syslog.info(f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}")
 
                 try:
                     input_type = gremlin.input_types.InputType.to_enum(input_type)
                 except:
-                    syslog.error(f"GetLastInput(): unable to convert input type {input_type} to a known type")
+                    syslog.error(f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type")
                     input_type = gremlin.input_types.InputType.NotSet
                 if return_mode:
                     return (device_guid, input_type, input_id, mode)
@@ -1991,7 +1995,7 @@ class Configuration(QtCore.QObject):
                 self._profile_data["last_input"] = data
                 self.save_profile()
                 if verbose:
-                    syslog.info(f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}")
+                    syslog.info(f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}")
                 
                 if return_mode:
                     return (device_guid, input_type, input_id, mode)
@@ -1999,7 +2003,7 @@ class Configuration(QtCore.QObject):
             
 
         if verbose:
-            syslog.info(f"Loading input selection: nothing found for {device_guid} {device_name}")
+            syslog.info(f"CONFIG: GetLastInput(): nothing found for {device_guid} {device_name}")
         if return_mode:
             return (None, None, None, None)
         return (None, None, None)
