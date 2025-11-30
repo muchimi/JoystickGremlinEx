@@ -104,6 +104,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         self.activation_count_widget = QtWidgets.QLabel()
         self.container_condition_frame_layout.addWidget(self.activation_count_widget)
         self.container_condition_model = ConditionModel(self.profile_data, self.profile_data.activation_condition)
+        
         # self.profile_data.activation_condition.registerCallback(self._update_conditions_ui)
         self.container_condition_view = ConditionView()
         self.container_condition_view.setContainer(self.profile_data)
@@ -119,6 +120,9 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         self._update_counts()
         
+    def _update_condition(self):
+        gremlin.util.InvokeUiMethod(self._update_conditions_ui)
+    
     @QtCore.Slot()
     def _update_conditions_ui(self):
         ''' updates the condition UI for this container '''
@@ -1447,9 +1451,9 @@ class ConditionModel(ui_common.AbstractModel):
 
         :param condition the condition to remove.
         """
-        idx = self.condition_data.conditions.index(condition)
-        if idx != -1:
-            del self.condition_data.conditions[idx]
+        if condition in self.condition_data.conditions:
+            self.condition_data.conditions.remove(condition)
+
         tracker = ConditionTracker()
         tracker.unregisterCondition(condition)
         container = self.container
@@ -1608,13 +1612,15 @@ class ConditionView(ui_common.AbstractView):
             self._redraw_lock = True
         
         
-            ui_common.clear_layout(self.conditions_layout)
+            gremlin.util.clear_layout(self.conditions_layout)
 
+            # create a widget for each condition
             lookup = {}
             for entry in ConditionView.condition_map.values():
                 lookup[entry[0]] = entry[1]
 
-            for i in range(self.model.rows()):
+            condition_count = self.model.rows()
+            for i in range(condition_count):
                 data = self.model.data(i)
                 condition_widget = lookup[type(data)](data)
                 condition_widget.deleted.connect(
@@ -1637,6 +1643,8 @@ class ConditionView(ui_common.AbstractView):
             self.model.add_condition(data_type())
         else:
             self.model.add_condition(condition)
+
+
         
 
     def _rule_changed_cb(self, text):
@@ -1651,6 +1659,7 @@ class ConditionView(ui_common.AbstractView):
         self.rule_selector.setCurrentText(
             ConditionView.rules_map[self.model.rule]
         )
+        self.redraw()
 
         
 

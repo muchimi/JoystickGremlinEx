@@ -1514,7 +1514,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             
             self.settings_widget = MacroSettingsWidget(self.action_data)
-            self.settings_widget.resized.connect(self._handle_settings_resized)
+            # self.settings_widget.resized.connect(self._handle_settings_resized)
             
      
 
@@ -1664,28 +1664,16 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.macro_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
             self.list_view.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
             
-
-            # Create editor as well as settings place holder widgets
+            # assemble panels in a grid (splitter will not currently work for some reason in QT)
             self.left_panel_widget, self._left_panel_layout = gremlin.ui.ui_common.getVContainer(self.macro_widget)
-
-            # ,alignment=QtCore.Qt.AlignmentFlag.AlignTop |QtCore.Qt.AlignmentFlag.AlignLeft
-            # assemble right panel
-            #self.right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer(self.editor_container_widget)
             self.right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer([self.editor_container_widget, self.settings_widget])
 
             grid_layout = QtWidgets.QGridLayout()
             grid_layout.addWidget(self.left_panel_widget, 0, 0)
             grid_layout.addWidget(self.right_panel_widget, 0, 1)
-            #grid_layout.addWidget(QtWidgets.QWidget(), 0, 2)
-            grid_layout.setColumnStretch(0,1)
-            grid_layout.setColumnStretch(1,1)
-            #grid_layout.setColumnStretch(1,2)
-
-            # assemble left and right panels
-            #self.panel_widget, self.panel_layout = gremlin.ui.ui_common.getHContainer([self.left_panel_widget, self.right_panel_widget], right_stretch=False) # main panel left and right
-            #self.main_layout.addWidget(self.panel_widget) 
+            grid_layout.setColumnMinimumWidth(0,200)
+            grid_layout.setColumnMinimumWidth(1,200)
             self.main_layout.addLayout(grid_layout)
-            #self.main_layout.addWidget(self.settings_widget)
 
             
         finally:

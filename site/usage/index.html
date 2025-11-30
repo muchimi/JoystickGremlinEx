@@ -435,6 +435,24 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#input-filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      Input Filter
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filter-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Filter Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#triggers" class="md-nav__link">
     <span class="md-ellipsis">
       Triggers
@@ -2150,19 +2168,28 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#map-to-keyboard-ex-action" class="md-nav__link">
+  <a href="#map-to-keyboardmouse-ex-action" class="md-nav__link">
     <span class="md-ellipsis">
-      Map to keyboard EX action
+      Map to keyboard/Mouse EX action
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Map to keyboard EX action">
+    <nav class="md-nav" aria-label="Map to keyboard/Mouse EX action">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#output-modes" class="md-nav__link">
+  <a href="#action-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Output modes
+      Action modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sync-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sync mode
     </span>
   </a>
   
@@ -2832,6 +2859,24 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#input-filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      Input Filter
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filter-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Filter Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#triggers" class="md-nav__link">
     <span class="md-ellipsis">
       Triggers
@@ -4547,19 +4592,28 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#map-to-keyboard-ex-action" class="md-nav__link">
+  <a href="#map-to-keyboardmouse-ex-action" class="md-nav__link">
     <span class="md-ellipsis">
-      Map to keyboard EX action
+      Map to keyboard/Mouse EX action
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Map to keyboard EX action">
+    <nav class="md-nav" aria-label="Map to keyboard/Mouse EX action">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#output-modes" class="md-nav__link">
+  <a href="#action-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Output modes
+      Action modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sync-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sync mode
     </span>
   </a>
   
@@ -5145,7 +5199,18 @@
 <h3 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h3>
 <p>Each device (non special) has a number of available inputs.  An input for a joystick can be a hat, button or axis.  Some devices, like keyboard/mouse and OSC, do not have defined inputs because inputs are customizable for each profile for these devices.  If you want to trigger an action on a keys or a mouse button, an input mut be defined for the specific key(s) or mouse buttons in the keyboard device.  Similarly, if you want to trigger on receiving an OSC network message, an OSC input must defined in the OSC device.</p>
 <p>If you would like to define a new state in the profile, that state needs to be defined as an input in the state device.</p>
-<p>To use VJoy as input devices, that must be enabled in the settings tab and GremlinEx will make that Vjoy device available as an input device, each with its own tab.\</p>
+<p>To use VJoy as input devices, that must be enabled in the settings tab and GremlinEx will make that Vjoy device available as an input device, each with its own tab.</p>
+<h3 id="input-filter">Input Filter<a class="headerlink" href="#input-filter" title="Permanent link">&para;</a></h3>
+<p>(m76T115+) Inputs are filtered.</p>
+<p>GEX will filter (limit) the number of inputs shown on each joystick device to a reasonable and more manageable number.  This is directly aimed at performance by reducing the number of entities visible at anyone time.  It is also for convenience and ease of use reasons: until now, a large number of devices and inputs could significantly impact UI performance and memory at profile design time, whether relevant or not.  These could consume thousands of entities that need to be tracked with a noticeable impact on performance and responsiveness.</p>
+<p><a class="glightbox" href="../assets/input_filter_general.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="Filter" src="../assets/input_filter_general.png" /></a></p>
+<p>"Reasonable" varies with the number of devices, inputs and hardware capabilities. Performance is directly impacted by the number of visible inputs, so it is highly recommended to keep those to a minimum. Inputs can easily be hidden or shown via the filter dialog.  Hiding an input does not delete its mappings.  Mappings however can only be seen if the input is visible.</p>
+<p>The filtering does not impact profile execution.  Invisible inputs will still run their mappings if the input is mapped.</p>
+<p>Filters only apply to joystick devices (physical and virtual) as they usually represent the bulk of input counts.</p>
+<p>Please remember to save the profile to have the filters persist as the data is not saved until the profile is saved.</p>
+<h3 id="filter-configuration">Filter Configuration<a class="headerlink" href="#filter-configuration" title="Permanent link">&para;</a></h3>
+<p>The filter dialog allows you to select which inputs are visible or not.  The dialog has toggle buttons for each axis, button or hat available on the input joystick type device.  Selected (visible) inputs will be colored, unselected inputs will be gray.  Each input has an indicator that will show if the input has a mapping.  If the device is triggered while the dialog is running, the corresponding functions will highlight.</p>
+<p><a class="glightbox" href="../assets/input_filter_dialog.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="Filter Dialog" src="../assets/input_filter_dialog.png" /></a></p>
 <h3 id="triggers">Triggers<a class="headerlink" href="#triggers" title="Permanent link">&para;</a></h3>
 <p>Inputs generate triggers.  There are two types of triggers.  Linear and momentary.</p>
 <h4 id="linear">Linear<a class="headerlink" href="#linear" title="Permanent link">&para;</a></h4>
@@ -6989,13 +7054,13 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 </tbody>
 </table>
 <p>Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.</p>
-<h2 id="map-to-keyboard-ex-action">Map to keyboard EX action<a class="headerlink" href="#map-to-keyboard-ex-action" title="Permanent link">&para;</a></h2>
+<h2 id="map-to-keyboardmouse-ex-action">Map to keyboard/Mouse EX action<a class="headerlink" href="#map-to-keyboardmouse-ex-action" title="Permanent link">&para;</a></h2>
 <p>This is identical to the base keyboard mapper but adds a few functions I thought would be handy.</p>
 <p>The updated keyboard mapper adds separate press (make), release (break) functionality so keys can stay pressed, or just released separately.</p>
 <p>It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.</p>
 <p>The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.</p>
 <p><a class="glightbox" href="../assets/keyboard_mapper_ex.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="keyboard mapper" src="../assets/keyboard_mapper_ex.png" /></a></p>
-<h3 id="output-modes">Output modes<a class="headerlink" href="#output-modes" title="Permanent link">&para;</a></h3>
+<h3 id="action-modes">Action modes<a class="headerlink" href="#action-modes" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -7024,8 +7089,14 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 <td>Release</td>
 <td>Ths mode triggers a release only (a "break" in keyboard hardware parlance).  This is the companion action to the press mode.</td>
 </tr>
+<tr>
+<td>Toggle</td>
+<td>Ths mode toggles the key or mouse button. If a key is released, the key is pressed.  If it is pressed, it is released.</td>
+</tr>
 </tbody>
 </table>
+<h3 id="sync-mode">Sync mode<a class="headerlink" href="#sync-mode" title="Permanent link">&para;</a></h3>
+<p>As of m76T117, the action can synchronize with the mapped input.  If the input the action is mapped to is triggered at profile start (for example, a hardware switch is in the on position), the mapped keys / mouse buttons will be set to match the state of the input when the profile starts.  This mode is designed to keep the profile in synchronized with hardware input panels in simpits.</p>
 <h3 id="latching">Latching<a class="headerlink" href="#latching" title="Permanent link">&para;</a></h3>
 <p>This action can send very complex and unusual keys and mouse buttons, including keys that are not typically available on a regular keyboard like the F13 to F24 function keys.   The action can also combine unusual "latched" sequences such as pressing more than multiple keys and mouse buttons at once.</p>
 <h3 id="numlock-behavior">Numlock behavior<a class="headerlink" href="#numlock-behavior" title="Permanent link">&para;</a></h3>

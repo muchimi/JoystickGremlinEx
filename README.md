@@ -18,6 +18,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T118)
+- New: Condition Viewer: action name will also include the notes field if populated for the action to differentiate it from similar actions
+- New: Map to Keyboard/Ex: exec on press/release options.
+- Fix: Mapping details popup on button grid exception due to API changes.
+- Fix: Macro Action: layout tweak to force horizontal scroll if window is too narrow
+- Fix: Input selection after input filter is applied did not always update the user interface.
+- Fix: Map to VJoy: input sync on start not setting button.
+- Fix: Input viewer: click on VJoy buttons setting wrong widget visualization.
+- Fix: Condition Viewer: not always refreshing on add/remove condition.
+- Fix: Translate exception on callback handling.
+
 ### (m76T117A)
 - New: Map to keyboard Ex: ability to synchronize with input state on profile start.
 - Fix: last input selected recall on profile load.

@@ -330,13 +330,16 @@ def get_hat_position(guid, index) -> tuple:
         return vjoy.Hat.to_continuous_position[direction]
     return (0,0)
 
-def get_button(guid, index) -> bool:
+def get_button(guid, input_id) -> bool:
     ''' gets the button pressed state '''
     dev : dinput.DeviceSummary = get_device(guid)
     if dev and dev.button_count:
-        return dev.get_button(index)
+        if dev.is_virtual and dev.vjoy_id:
+            # query the vjoy interface rather than dinput
+            return VJoyProxy()[dev.vjoy_id].button(input_id).is_pressed
+        return dev.get_button(input_id)
     else:
-        syslog.error(f"JOYSTICK: unable to get button state for device for id [{guid}] index [{index}]")
+        syslog.error(f"JOYSTICK: unable to get button state for device for id [{guid}] index [{input_id}]")
     return False
        
 
@@ -1148,24 +1151,23 @@ class VJoyUsageState():
     
   
     class MappingData:
-        vjoy_id = None
-        vjoy_input_type = None
-        vjoy_input_id = None
-        device_input_type = None
-        device_guid = None
-        device_name = None
-        device_input_id = None
-
-        def __init__(self, vjoy_id, input_type, vjoy_input_id, action):
+        def __init__(self, vjoy_id, input_type, vjoy_input_id, action_id):
             self.vjoy_id = vjoy_id
             self.vjoy_input_type = input_type
             self.vjoy_input_id = vjoy_input_id
-            input_item = action.get_input_item()
+            self.device_guid = None
+            self.device_name = None
+            self.device_input_type = None
+            self.device_input_id = None
+            profile = gremlin.shared_state.current_profile
+            action = profile.findAction(action_id)
+            if action:
+                input_item = action.get_input_item()
 
-            self.device_guid = input_item.device_guid
-            self.device_name = input_item.device_name
-            self.device_input_type = input_item.device_type
-            self.device_input_id = input_item.input_id
+                self.device_guid = input_item.device_guid
+                self.device_name = input_item.device_name
+                self.device_input_type = input_item.device_type
+                self.device_input_id = input_item.input_id
             
     
 

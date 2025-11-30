@@ -143,11 +143,15 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_action_widget = gremlin.ui.ui_common.getHContainer(widgets, "Actions:", widget_only = True)
 
 
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
+        self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
+
         self._sync_widget = gremlin.ui.ui_common.QSyncModeWidget(mode = self.action_data.sync_mode,
                                                                  label = "State on profile start:",
                                                                  sync_modes=[SyncMode.Ignore, SyncMode.Input],
                                                                  callback = self._sync_changed)
-        widgets = [self._sync_widget]
+        widgets = [self._execute_widget, self._sync_widget]
         sync_container = gremlin.ui.ui_common.getHContainer(widgets, left_margin =12, widget_only = True)
         
 
@@ -159,11 +163,23 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(sync_container)
         self.main_layout.addWidget(self.description_widget)
 
+        self.warning_widget = gremlin.ui.ui_common.QWarningWidget()
+        self.main_layout.addWidget(self.warning_widget)
+
         
 
 
         self.main_layout.addStretch()
         self._update_ui() # update UI based on mode
+
+    @QtCore.Slot(bool)
+    def _execute_on_press_changed(self, checked : bool):
+        self.action_data.exec_on_press = checked
+
+    @QtCore.Slot(bool)
+    def _execute_on_release_changed(self, checked : bool):
+        self.action_data.exec_on_release = checked        
+
 
     def _sync_changed(self, mode):
         self.action_data.sync_mode = mode        
@@ -341,17 +357,23 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         delay_visible = False
         autorepeat_visible = False
         mode = self.action_data.mode
+        warning = None
         match mode:
             case KeyboardOutputMode.Press:
                 description = "<b>Press</b> mode will press keys() - the key(s) is not released and should be paired with a release at some point (keyboard 'make')."
             case KeyboardOutputMode.Release:
                 description = "<b>Release</b> mode will release keys(s) previously pressed with the Press mode (keyboard 'break'). If no key is sent, the release mode will also clear any auto-repeat actions to cancel them."
             case KeyboardOutputMode.Hold:
+                if self.action_data.exec_on_release:
+                    warning = "Hold mode cannot be used for execute on release.  The action will not execute at runtime on input release."
+
                 description = "<b>Hold</b> mode will keep the key(s) pressed while the input is on/pressed.  The key(s) will release when the input is off/released.<br>This mode <b>does not</b> autorepeat.  To autorepeat, select autorepeat mode."
             case KeyboardOutputMode.Pulse:
                 delay_visible = True
                 description = "<b>Pulse</b> mode will press the key(s), wait for the delay, then release the key(s)."
             case KeyboardOutputMode.AutoRepeat:
+                if self.action_data.exec_on_release:
+                    warning = "Autorepeat mode cannot be used for execute on release.  The action will not execute at runtime on input release."
                 delay_visible = True
                 autorepeat_visible = True
                 description = "<b>AutoRepeat</b> mode will pulse the key(s) repeatedly. The delay is the time between a press/release, interval is the time between pulses."
@@ -361,6 +383,12 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_delay_widget.setVisible(delay_visible)
         self.description_widget.setText(description)
         self.autorepeat_delay_box.setVisible(autorepeat_visible)
+
+        warning_visible = warning is not None
+        self.warning_widget.setVisible(warning_visible)
+        self.warning_widget.setText(warning)
+
+
 
     def _delay_changed(self):
         self.action_data.delay = self.delay_box.value()
@@ -646,11 +674,19 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value, extra_data = None):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
+        # verbose = True
         (is_local, is_remote) = input_devices.remote_state.state
         is_pressed = event.is_pressed
+        trigger = (is_pressed and self.action_data.exec_on_press) or \
+                (not is_pressed and self.action_data.exec_on_release)
         mode = self.action_data.mode
+
+        if trigger and self.action_data.exec_on_release:
+            # if exec on release, must use auto-release
+            is_pressed = True
+            auto_release = True
         #if event.is_axis or value.current or is_pressed:
-        if is_pressed:
+        if trigger:
             # joystick values or virtual button
             # verbose = True
             match mode:
@@ -851,7 +887,9 @@ Can also send mouse buttons, mouse wheel events.'''
         self._delay = config.last_keyboard_mapper_pulse_value # delay between make/break in milliseconds
         self._autorepeat_delay = config.last_keyboard_mapper_interval_value # delay between autorepeats in milliseconds
         self.sync_mode = SyncMode.Ignore # ignore by default
-        
+        self.exec_on_press = True # true if trigger should execute on input press event
+        self.exec_on_release = False # true if trigger should execute on input release event
+     
 
     @property
     def delay(self):
@@ -1008,6 +1046,11 @@ Can also send mouse buttons, mouse wheel events.'''
         if "sync-mode" in node.attrib:
             self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
 
+        if "exec_on_press" in node.attrib:
+            self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
+        if "exec_on_release" in node.attrib:
+            self.exec_on_release = safe_read(node,"exec_on_release",bool, False)            
+
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
 
@@ -1018,6 +1061,8 @@ Can also send mouse buttons, mouse wheel events.'''
 
         node.set("delay",safe_format(self.delay, int))
         node.set("interval", safe_format(self.autorepeat_delay, int))
+
+
 
         for code in self.keys:
             if isinstance(code, tuple): # key ID (scan_code, extended)
@@ -1051,7 +1096,9 @@ Can also send mouse buttons, mouse wheel events.'''
                 node.append(node_comment)
                 node.append(key_node)
 
-        node.set("sync-mode", safe_format(self.sync_mode, int))                
+        node.set("sync-mode", safe_format(self.sync_mode, int))     
+        node.set("exec_on_press", safe_format(self.exec_on_press, bool))
+        node.set("exec_on_release", safe_format(self.exec_on_release, bool))                   
 
         return node
 

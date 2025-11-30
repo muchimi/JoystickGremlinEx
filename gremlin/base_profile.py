@@ -5169,6 +5169,54 @@ class Profile():
                             for item in mode_object.config[input_type].values():
                                 self._filter_actions_input_item(item, tag, callback, extra_data)
 
+    def _findInputitemAction(self, input_item, action_id) -> AbstractAction:
+        ''' locates an action by its id in an input item'''
+        for container in input_item.containers:
+            for action_set in container.action_sets:
+                for action in action_set:
+                    if action.tag == "gated-axis":
+                        # special handling for gated axis
+                        gate_data :  gremlin.gated_handler.GateData = action.gate_data
+                        gate : gremlin.gated_handler.GateInfo
+                        for gate in gate_data.getGates():
+
+                            # gate containers
+                            for condition, item in gate.item_data_map.items():
+                                a = self._findInputitemAction(item, action_id)
+                                if a: return a
+
+                        rng : gremlin.gated_handler.RangeInfo
+                        for rng in gate_data.getRanges():
+                            # gate containers
+                            for condition, item in rng.item_data_map.items():
+                                a = self._findInputitemAction(item, action_id)
+                                if a: return a
+
+                    if action.id == action_id:
+                        return action
+        return None
+
+    def findAction(self, action_id) -> AbstractAction:
+        ''' gets an action in the profile by its action id '''
+        for dev_guid in self.devices:
+                dev = self.devices[dev_guid]
+                if dev.device_type == gremlin.types.DeviceType.State:
+                    # state device (modeless) - special handling of state input items
+                    state_data = gremlin.shared_state.current_profile.state
+                    input_items = [state_data[key].input_item for key in state_data]
+                    for item in input_items:
+                        action = self._findInputitemAction(item, action_id)
+                        if action: return action
+                else:   
+                    for mode_name in dev.modes:
+                        mode_object = dev.modes[mode_name]
+                        for input_type in mode_object.config:
+                            for item in mode_object.config[input_type].values():
+                                action = self._findInputitemAction(item, action_id)
+                                if action: return action
+        return None
+                               
+
 
     def apply_voice(self, voice_index = None, voice_volume = None, voice_rate = None) -> int:
         ''' applies this voice to all profile TTS entries - returns the count of entries impacted '''

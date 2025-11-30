@@ -615,12 +615,6 @@ class VJoyCondition(AbstractCondition):
             r1 = self.condition.range[0]
             r2 = self.condition.range[1]
             in_range = gremlin.util.valueInRange(current_value, r1, r2)
-            # if r1 > r2:
-            #     r1,r2 = r2,r1
-            # if r1 == r2:
-            #     in_range = math.isclose(current_value, r1, abs_tol = 0.0001)
-            # else:
-            #     in_range = r1 <= current_value <= r2
 
             if self.comparison in ["inside", "outside"]:
                 retval =  in_range if self.comparison == "inside" else not in_range
@@ -640,7 +634,7 @@ class VJoyCondition(AbstractCondition):
             if self.comparison == "pressed":
                 retval = is_pressed # true if the vjoy button is pressed
             elif self.comparison == "released":
-                retval = not is_pressed # true if the vjoy button is not pressed
+                 retval = not is_pressed # true if the vjoy button is not pressed
             else:
                 syslog.error(f"{logtabs}VjoyCondition: Button {self.comparison} is not a valid condition for a button")
                 

@@ -1503,7 +1503,6 @@ class AbstractView(QtWidgets.QWidget):
     item_delete_curve = QtCore.Signal(object, int, object) # widget, index , model data object
     item_closed = QtCore.Signal(object, int, object)  # widget, index, model data object
 
-
     def __init__(self, parent=None):
         """Creates a new view instance.
 
@@ -1523,7 +1522,12 @@ class AbstractView(QtWidgets.QWidget):
                 self._model.data_changed.disconnect(self.redraw)
             self._model = value
             self._model_changed()
-            self._model.data_changed.connect(self.redraw)
+            self._model.data_changed.connect(self._model_changed)
+
+    def _model_changed(self):
+        self.model_changed.emit()
+        self.redraw()
+
 
     def setModel(self, model):
         """Sets the model to display with this view.
@@ -6720,7 +6724,6 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._handle_shutdown)
-        
 
     def _handle_shutdown(self):
         self.unhook()
@@ -6732,6 +6735,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
     @property
     def device_guid(self):
         return self._device.device_guid
+    
+
 
     def process_event(self, event):
         if not gremlin.util.compare_guid(self.device_guid,event.device_guid):
@@ -6852,6 +6857,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             height = max(height, hint.height())
             width += hint.width()
         return QtCore.QSize(width, height)
+        
 
     def _create_button_hat(self):
         """Creates display for button and hat data."""
@@ -7255,10 +7261,6 @@ class ButtonState(QtWidgets.QGroupBox):
         #self.setLayout(button_layout)
         self.setLayout(flow_layout)
 
-
-
-
-    
         
     @QtCore.Slot()
     def _button_clicked(self):
@@ -7267,7 +7269,9 @@ class ButtonState(QtWidgets.QGroupBox):
         input_id = btn.data
         device_guid = self._device.device_guid
         # set the button
-        is_pressed = not gremlin.joystick_handling.get_button(device_guid, input_id)
+        is_pressed = self.isChecked()
+        # is_pressed = not gremlin.joystick_handling.get_button(device_guid, input_id)
+        
         # update the remote clients if needed
         gremlin.joystick_handling.set_button(device_guid, input_id, is_pressed, update_remote = True)
 
@@ -7292,7 +7296,7 @@ class ButtonState(QtWidgets.QGroupBox):
         if input_type == InputType.JoystickButton:
             #is_pressed = event.is_pressed if event.is_pressed is not None else event.current
             state = event.is_pressed if event.is_pressed is not None else False
-            self.buttons[event.identifier].setDown(state)
+            self.buttons[event.identifier].setChecked(state)
             self._event_times[event.identifier] = time.time()
 
 
@@ -8927,12 +8931,6 @@ class QSplitTabWidget(QDataWidget):
             self._blank_input()
         else:
             self._select_item_cb(index)
-            # select the corresponding widget
-            # if index in self._widget_config_device_map:
-            #     key = self._widget_config_device_map[index]
-            #     self.selectRegisteredWidget(key)
-
-
 
    
 

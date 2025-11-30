@@ -90,11 +90,13 @@ class VjoyAction(enum.Enum):
     VJoyHatToButton = 21 # action to map a hat to a button
     VJoySetAxisStepped = 22 # like VjoySetAxis but uses a list of values to bump the index
     VJoyButtonPress = 23 # action on button press
+    VJoyButtonInverted = 24 # hold state (inverted = off means pressed, on means released)
     
     @staticmethod
     def is_button_action(mode):
         ''' true if the mode is a button output mode '''
         return mode in (VjoyAction.VJoyButton,
+                        VjoyAction.VJoyButtonInverted,
                         VjoyAction.VJoyAxisToButton,
                         VjoyAction.VJoyButtonPress,
                         VjoyAction.VJoyButtonRelease,
@@ -186,6 +188,8 @@ class VjoyAction(enum.Enum):
                 return "Steps through set axis values"
             case VjoyAction.VJoyButton:
                 return "Presses or releases a button by input state"
+            case VjoyAction.VJoyButtonInverted:
+                return "Presses or releases a button by inverted input state"
 
         
         msg  = f"Unknown [{action}]"
@@ -246,6 +250,8 @@ class VjoyAction(enum.Enum):
                 return "Stepped Axis Value"
             case VjoyAction.VJoyButton:
                 return "Button"
+            case VjoyAction.VJoyButtonInverted:
+                return "Button (inverted)"
 
         
         msg  = f"Unknown [{action}]"

@@ -192,7 +192,7 @@ class InputItemListModel(ui_common.AbstractModel):
         self._custom_clear_handler = custom_clear_handler
         self._custom_remove_handler = custom_remove_handler
         self._custom_filter_handler = custom_filter_handler # handles entries, return true to include, false to exclude
-        self._update_data()
+        self.updateData()
 
     @property
     def show_filtered(self) -> bool:
@@ -201,12 +201,12 @@ class InputItemListModel(ui_common.AbstractModel):
     def show_filtered(self, value : bool):
         if self._show_filtered_only != value:
             self._show_filtered_only = value
-            self._update_data()
+            self.updateData()
     
 
     def _filter_change_cb(self):
         ''' occurs when the input filter changes '''
-        self._update_data()
+        self.updateData()
 
 
     @property
@@ -230,7 +230,7 @@ class InputItemListModel(ui_common.AbstractModel):
         :param mode the mode handled by the model
         """
         self._mode = mode
-        self._update_data()
+        self.updateData()
 
 
     def _filter_data(self):
@@ -288,8 +288,8 @@ class InputItemListModel(ui_common.AbstractModel):
         while index in i_list:
             index+=1
         return index
-
-    def _update_data(self, apply_filter = True, emit_change = True):
+    
+    def updateData(self, apply_filter = True, emit_change = True):
         ''' loads into the data model all the items for the current mode and device '''
         import gremlin.base_profile
         import gremlin.config
@@ -363,7 +363,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
 
         self._update_source()
-        if apply_filter: self._filter_data()
+        #if apply_filter: self._filter_data()
 
         if emit_change:
             self.data_changed.emit()
@@ -413,12 +413,12 @@ class InputItemListModel(ui_common.AbstractModel):
                     input_id = key.input_id
                     input_items.config[input_type][input_id] = saved_data[input_id]
 
-        self._update_data()
+        self.updateData()
 
 
     def refresh(self, emit = False):
         ''' refreshes the mode data without data reload '''
-        self._update_data(emit_change = emit)
+        self.updateData(emit_change = emit)
 
     def applyFilter(self):
         ''' applies the filters only (does not load new data)'''
@@ -426,7 +426,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
     def clearFilter(self):
         ''' removes any filtering '''
-        self._update_data(apply_filter = False)
+        self.updateData(apply_filter = False)
 
 
 
@@ -516,7 +516,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
             return True
         finally:
-            self._update_data()
+            self.updateData()
 
 
     def action_id_to_index(self, action_id):
@@ -662,6 +662,7 @@ class InputItemListView(ui_common.AbstractView):
         self.custom_widget_handler = custom_widget_handler
         self._deleted = False
 
+
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.scroll_area = QtWidgets.QScrollArea()
@@ -682,8 +683,12 @@ class InputItemListView(ui_common.AbstractView):
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.connect(self._mapping_changed)
         el.sync_input.connect(self._sync_input)
-
         
+
+    def _model_changed(self):
+        # indicate selection is invalid
+        self._current_index = -1
+        self.redraw()
 
     def _sync_input(self, input_item):
         gremlin.util.InvokeUiMethod(self._sync_input_ui, input_item)
@@ -1165,6 +1170,7 @@ class InputItemListView(ui_common.AbstractView):
                 
 
         self._current_index = index
+
 
         widgets = [w for w in gremlin.util.get_layout_widgets(self.scroll_layout)]
         widget = self.itemAt(index)
@@ -4228,7 +4234,10 @@ class ConditionActionWrapper(AbstractActionWrapper):
 
         # Disable all dock features and give it a title
         self.setFeatures(QtWidgets.QDockWidget.NoDockWidgetFeatures)
-        self.setWindowTitle(action_widget.action_data.name)
+        title = f"{action_widget.action_data.name}"
+        if action_widget.action_data.comment:
+            title += f" ({action_widget.action_data.comment})"
+        self.setWindowTitle(title)
 
         # Setup activation condition UI
         container = self.action_widget.action_data

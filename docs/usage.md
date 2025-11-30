@@ -15,8 +15,7 @@ If you would like to define a new state in the profile, that state needs to be d
 
 To use VJoy as input devices, that must be enabled in the settings tab and GremlinEx will make that Vjoy device available as an input device, each with its own tab.
 
-
-### Input Filter 
+### Input Filter
 
 (m76T115+) Inputs are filtered.
 
@@ -606,6 +605,7 @@ This action lets you cycle modes with each press.
 ![map to keyboard](assets/action_map_to_keyboard_ex.png)
 
 This action lets you send a keyboard or mouse button/wheel click to the output.
+
 
 ### Map to Mouse Ex
 
@@ -2165,7 +2165,7 @@ The make/break/pulse behavior applies to all keys in the action, and the keys ar
 
 
 
-### Action  modes
+### Action modes
 
 | Mode     | Description |
 | ----------- | ----------- |
@@ -2175,6 +2175,10 @@ The make/break/pulse behavior applies to all keys in the action, and the keys ar
 | Press | This mode triggers a press only (a "make" in keyboard hardware parlance).  This mode does not release the keys so it's expected at some point, the profile will release the keys.  Dragons: when used to send mouse clicks - it will keep the mouse pressed until the release which can cause behavior issues in the operating system.  Use with caution and only paired with a release mapping somewhere in the profile. Usually you can manually press the keys or the mouse to "undo" a press, provided that input is available (example F13 would not be).|
 | Release | Ths mode triggers a release only (a "break" in keyboard hardware parlance).  This is the companion action to the press mode. |
 | Toggle | Ths mode toggles the key or mouse button. If a key is released, the key is pressed.  If it is pressed, it is released.|
+
+### Sync mode
+
+As of m76T117, the action can synchronize with the mapped input.  If the input the action is mapped to is triggered at profile start (for example, a hardware switch is in the on position), the mapped keys / mouse buttons will be set to match the state of the input when the profile starts.  This mode is designed to keep the profile in synchronized with hardware input panels in simpits.
 
 ### Latching
 

@@ -2224,7 +2224,7 @@ class EventHandler(QtCore.QObject):
 					virtual_code = key.virtual_code
 					keyid_source = key.index_tuple() # use the scan code for now
 					#index = virtual_code if virtual_code > 0 else keyid
-					keyid = gremlin.keyboard.KeyMap.translate(keyid_source, widget_only = True)
+					keyid = gremlin.keyboard.KeyMap.translate(keyid_source)
 						
 					if device_guid not in self.latched_events.keys():
 						self.latched_events[device_guid] = {}

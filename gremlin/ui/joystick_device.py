@@ -368,31 +368,29 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         dialog_filter = JoystickInputDialog(self.device_guid, callback = self._handle_filter_dialog)
         dialog_filter.exec()
 
-    def _update_filter_box(self):
-        profile = gremlin.shared_state.current_profile
-        fs : gremlin.base_profile.JoystickInputStats = profile.settings.getFilteredStats(self.device_guid)
-        if fs.isFiltered:
-            stub = "Not shown: "
-            if fs.axis_count:
-                stub += f"Axis {fs.filtered_axis_count}"
-            if fs.button_count:
-                stub += f"Button {fs.filtered_button_count}"
-            if fs.hat_count:
-                stub += f"Hat {fs.filtered_hat_count}"
-        
-        # compute mappings
-        stup = f"Mappings:"
 
 
     def _handle_filter_dialog(self):
         ''' runs when the filter dialog is closed'''
         dialog = self.sender()
         if dialog.accepted:
-            # profile = gremlin.shared_state.current_profile
-            # profile.settings.dump_filter(self.device_guid)
+            # get the current selected input
+            input_item = self.input_item_list_view.selected_item()
 
             # set the filter list from the visible inputs
-            self.input_item_list_model._update_data()
+            self.input_item_list_model.updateData()
+
+            index = self.input_item_list_model.indexOfInputItem(input_item)
+            if index == -1 and self.input_item_list_model.rows():
+                # select the first item
+                index = 0
+            
+            if index != -1:
+                self.select_item(index)
+                self.input_item_list_view.select_item(index, emit = False)
+
+                        
+
 
             # update the repeater
             self.update_stats_display()
