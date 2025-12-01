@@ -18,6 +18,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T119)
+- Tweak: Minor UI tweaks.
+- Fix: TempoEx not refreshing UI on button add due to recent model tweaks.
+
 ### (m76T118)
 - New: Condition Viewer: action name will also include the notes field if populated for the action to differentiate it from similar actions
 - New: Map to Keyboard/Ex: exec on press/release options.

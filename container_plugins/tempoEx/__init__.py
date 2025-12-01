@@ -59,19 +59,26 @@ class TempoExContainerWidget(AbstractContainerWidget):
         el = gremlin.event_handler.EventListener()
         el.action_delete.connect(self._delete_action)
         
+        
 
 
     def _create_action_ui(self):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
+        self._redraw_lock = False
         self.profile_data.create_or_delete_virtual_button()
         self.short_widget, self.short_layout = gremlin.ui.ui_common.getVContainer()
         self.short_widget.setContentsMargins(8,0,0,0)
+        
+
+        
         self.long_widget, self.long_layout = gremlin.ui.ui_common.getVContainer()
         self.long_widget.setContentsMargins(8,0,0,0)
+        
         self.double_widget, self.double_layout = gremlin.ui.ui_common.getVContainer()
         self.double_widget.setContentsMargins(8,0,0,0)
+        
         self.options_widget, self.options_layout = gremlin.ui.ui_common.getVContainer()
 
         self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Long Press Delay (ms):")
@@ -89,17 +96,6 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
                 
         self.warning_widget = gremlin.ui.ui_common.QWarningWidget(text = "")
-
-#         msg = """TempoEx triggers when the input is <u>released</u> as it measures how long the input was held to determine short press vs long press.
-#  If the input is released before the delay lapses, a short press is triggered. If the input is released on or after the specified delay, a long press is issued.<br>
-# Double-tap triggers on dual <u>presses</u> detected within the double tap delay and the container is in release mode.<br>
-# The auto-release delay determines the time that lapses between the press and release triggers that actions receive from this container on short and double-tap.<br>
-# Long presses do not use the auto-release delay and will release whenever the input releases.
-# Setting auto-release to zero (0) disables the release trigger from being issued to actions.
-# """
-#         self.info_widget = gremlin.ui.ui_common.QInfoBox(msg)
-
-
 
         widgets = [
             self.longpress_delay_widget,
@@ -237,7 +233,6 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.long_layout_widget_list = []
         self.double_layout_widget_list = []
 
-
         # create short press container actions
         
         action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
@@ -261,6 +256,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
                     f"Chain Long Action {i+1:d}",
                     gremlin.ui.ui_common.ContainerViewTypes.Action
                 )
+            
             self.long_layout.addWidget(widget)
             self.long_layout_widget_list.append(widget)
             widget.redraw()
@@ -281,10 +277,13 @@ class TempoExContainerWidget(AbstractContainerWidget):
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
+
         self.action_layout.addWidget(self.content_widget)
 
 
         self._update_warnings()
+
+  
 
 
     def _create_condition_ui(self):
@@ -352,17 +351,34 @@ class TempoExContainerWidget(AbstractContainerWidget):
             return 
         gremlin.util.InvokeUiMethod(self._update_condition_ui)
 
+    def _create_widgets(self, action_sets, label, layout, widget_list):
+        for i, action_set in enumerate(action_sets):
+            widget = self._create_action_set_widget(
+                action_set if action_set is not None else [],
+                f"{label} {i+1:d}",
+                gremlin.ui.ui_common.ContainerViewTypes.Action
+            )
+            layout.addWidget(widget)
+            widget_list.append(widget)
+            widget.redraw()
+            widget.model.data_changed.connect(self.container_modified.emit)
+
     def _add_short_action(self, action_name):
         """Adds a new action to the short action list
 
         :param action_name the name of the action to add
         """
+
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
         action_item.data = "short"
         self.profile_data.short_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()                
+        self.container_modified.emit()     
+
+        action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
+        self._create_widgets(action_sets,"Chain Short Action", self.short_layout, self.short_layout_widget_list)
+
 
     def _paste_short_action(self, action, container):
         ''' called when a paste occurs '''
@@ -372,7 +388,10 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "short"
         self.profile_data.short_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()                
+        self.container_modified.emit()       
+
+        action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
+        self._create_widgets(action_sets,"Chain Short Action", self.short_layout, self.short_layout_widget_list)
 
     def _add_long_action(self, action_name):
         """Adds a new action to the long action list
@@ -384,7 +403,12 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "long"
         self.profile_data.long_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()                
+        self.container_modified.emit()     
+
+        action_sets = [action_set for action_set in self.profile_data.long_action_sets if action_set]   
+        self._create_widgets(action_sets,"Chain Long Action", self.long_layout, self.long_layout_widget_list)
+
+
     
     def _paste_long_action(self, action, container):
         ''' called when a paste occurs '''
@@ -394,7 +418,10 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "long"
         self.profile_data.long_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()                
+        self.container_modified.emit()    
+
+        action_sets = [action_set for action_set in self.profile_data.long_action_sets if action_set]   
+        self._create_widgets(action_sets,"Chain Long Action", self.long_layout, self.long_layout_widget_list)              
 
 
     def _add_double_action(self, action_name):
@@ -407,7 +434,10 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "double"
         self.profile_data.double_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()                
+        self.container_modified.emit()     
+
+        action_sets = [action_set for action_set in self.profile_data.double_action_sets if action_set]   
+        self._create_widgets(action_sets,"Chain Double Action", self.double_layout, self.double_layout_widget_list)
     
     def _paste_double_action(self, action, container):
         ''' called when a paste occurs '''
@@ -417,7 +447,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "double"
         self.profile_data.double_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()                        
+        self.container_modified.emit()     
+        for widget in self.double_layout_widget_list:
+            widget.redraw()
 
     @QtCore.Slot()
     def _delay_changed_cb(self, value):

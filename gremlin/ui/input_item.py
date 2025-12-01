@@ -31,6 +31,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.axis_calibration
 import gremlin.ui.ui_common
+import gremlin.ui.eliding
 from gremlin.util import load_icon, load_pixmap, get_guid
 import gremlin.util
 from gremlin.input_types import InputType
@@ -620,7 +621,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
 class InputItemListView(ui_common.AbstractView):
 
-    """View displaying the contents of an InputItemListModel."""
+    """View displaying the contents of an InputItemListModel. Used in the left panel of the main UI to display inputs."""
 
     # fires when the list view is redrawn
     updated = Signal()
@@ -1236,7 +1237,7 @@ class ActionSetModel(ui_common.AbstractModel):
 
     def add_action(self, action):
         self._action_set.append(action)
-        self.data_changed.emit()
+        
         el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.DeviceChangeEvent()
         event.device_guid = action.hardware_device_guid
@@ -1249,6 +1250,8 @@ class ActionSetModel(ui_common.AbstractModel):
         container : gremlin.base_profile.AbstractContainer = action.get_container()
         container.mapping_changed() # tell the UI about the change
 
+        
+        self.data_changed.emit()
         
 
 
@@ -1346,29 +1349,17 @@ class ActionSetView(ui_common.AbstractView):
         self.view_type = view_type
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        # self.collapsible_container = gremlin.ui.ui_common.QCollapsible(label)
-        # self.collapsible_container.setLocked(True)
-
-
-        #self.main_layout.addWidget(self.collapsible_container)
-
         self.profile_data = profile_data
         self.allowed_interactions = profile_data.interaction_types
         self.label = label
         self._selected = False # true if the object is selected
-
-        # Create a group box widget in which everything else will be placed
-        #self.group_widget = QtWidgets.QGroupBox(self.label)
 
         if icon:
             title = gremlin.ui.ui_common.QIconLabel(icon, icon_size = icon_size, text = f"{self.label} action:")
         else:
             title = QtWidgets.QLabel(f"{self.label} action:")
         self.main_layout.addWidget(title)
-        # hline = gremlin.ui.ui_common.QHorizontalLine()
-        # self.main_layout.addWidget(hline)
 
-        #self.main_layout.addWidget(self.group_widget)
 
         left_panel, left_layout = gremlin.ui.ui_common.getVContainer()
         right_panel, right_layout = gremlin.ui.ui_common.getVContainer()
@@ -1569,6 +1560,9 @@ class ActionSetView(ui_common.AbstractView):
                     
 
             self.model.add_action(action)
+  
+                
+            
 
         finally:
             gremlin.util.popCursor()
@@ -3226,17 +3220,12 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         assert isinstance(profile_data, gremlin.base_profile.AbstractContainer)
         super().__init__(parent)
 
-        # Palette used to render widgets
-        # palette = QtGui.QPalette()
-        # palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.LightGray)
-
-        #if gremlin.shared_state.is_dark_theme:
-        # border_color = gremlin.ui.ui_common.Color.borderColor()
+   
         background_color = gremlin.ui.ui_common.Color.containerBackgroundColor()
         css = f"background-color:{background_color}"
         self.setStyleSheet(css)
 
-        self._abstract_container_content_widget, self._abstract_container_content_layout = gremlin.ui.ui_common.getVContainer()
+        self._abstract_container_content_widget, self._abstract_container_content_layout = gremlin.ui.ui_common.getVContainer(no_stretch=True)
 
         el = gremlin.event_handler.EventListener()
         el.condition_redraw.connect(self._condition_redraw) # hook the condition redraw event so we can remove existing references to the UI going away on redraw
@@ -3267,9 +3256,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._copy_container,
             data = profile_data)
         
-        
-        self._title_bar_widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
-        self.collapsible_widget = gremlin.ui.ui_common.QCollapsible(title_widget = self._title_bar_widget)
+        self.title_frame_widget = gremlin.ui.ui_common.QBorderWidget()
+        self.title_frame_widget.addWidget(self._title_bar_widget)
+
+        # self.title_frame_widget.setMaximumWidth(600)
+        self.title_frame_widget.setMinimumWidth(200)
+
+
+        self.title_frame_widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
+        self.collapsible_widget = gremlin.ui.ui_common.QCollapsible(title_widget = self.title_frame_widget)
         self.collapsible_widget.toggled.connect(self._handle_toggled)
         
         #self.setTitleBarWidget(self._title_bar_widget)
@@ -3278,6 +3273,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # Create tab widget to display various UI controls in
         self.dock_tabs =  gremlin.ui.ui_common.QDataTab()
+        # self.dock_tabs.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Maximum)
+
         background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
         self.setStyleSheet = f"QDockWidget: {{ background-color: {background_color}; }}"
 
@@ -3498,14 +3495,13 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     def _create_action_tab(self):
         # Create root widget of the dock element
         self.action_tab_widget = QtWidgets.QWidget()
-
         # Create layout and place it inside the dock widget
         self.action_layout = QtWidgets.QVBoxLayout(self.action_tab_widget)
 
         # Create the actual UI
         self.dock_tabs.addTab(self.action_tab_widget, "Action")
         self._create_action_ui()
-        self.action_layout.addStretch(10)
+        #self.action_layout.addStretch(10)
 
     def _create_activation_condition_tab(self):
         # Create widget to place inside the tab
@@ -3654,6 +3650,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         :return wrapped widget
         """
         action_set_model = ActionSetModel(action_set_data)
+        
         action_set_view = ActionSetView(
             self.profile_data,
             label,
@@ -3663,6 +3660,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             parent = self
         )
         action_set_view.setModel(action_set_model)
+
         action_set_view.interacted.connect(lambda x: self._handle_interaction(action_set_view, x))
 
         # Store the view widget so we can use it for interactions later on
@@ -3961,7 +3959,7 @@ class TitleBarButton(QtWidgets.QAbstractButton):
         # syslog.info("title paint end")
 
 
-class TitleBar(QtWidgets.QFrame):
+class TitleBar(QtWidgets.QWidget):
 
     """Represents a titlebar for use with dock widgets.
 
@@ -3986,20 +3984,21 @@ class TitleBar(QtWidgets.QFrame):
         import gremlin.util
         super().__init__(parent)
 
-        is_dark = gremlin.shared_state.is_dark_theme
-        border_color = gremlin.ui.ui_common.Color.borderColor()
-
         el = gremlin.event_handler.EventListener()
         el.show_container_id_changed.connect(self._show_container_id_changed)
         
-        css = f"# frame {{border: 1px solid {border_color};}}')"
-        self.setStyleSheet(css) 
-        
         config = gremlin.config.Configuration()
+
         self._id_value = None
 
         self.hint = hint
-        self.label = QtWidgets.QLabel(label)
+        width = gremlin.ui.ui_common.get_text_width(label)
+        if width > 200:
+            fm =  QtGui.QFontMetrics(QtGui.QFont())
+            e_label = fm.elidedText(label, QtCore.Qt.ElideRight, 200)
+        else:
+            e_label = label
+        self.label = QtWidgets.QLabel(e_label)
         self._close_callback = close_callback
         size = 12
 
@@ -4051,11 +4050,13 @@ class TitleBar(QtWidgets.QFrame):
             self.copy_button.clicked.connect(clipboard_cb)
             self.copy_button.setToolTip("Copy")
 
-        self.id_widget = gremlin.ui.ui_common.QDataLineEdit()
-        self.id_widget.setReadOnly(True)
-        self.id_widget.data = data
-        if data is not None and hasattr(data,"id"):
+        if data is not None and hasattr(data,"id") and config.show_container_id:
+            self.id_widget = gremlin.ui.ui_common.QDataLineEdit(width=100)
+            self.id_widget.setReadOnly(True)
+            self.id_widget.data = data
             self.setIdValue(data.id)
+        else:
+            self.id_widget = None
 
 
         self.comment_widget = gremlin.ui.ui_common.QDataLineEdit()
@@ -4066,41 +4067,56 @@ class TitleBar(QtWidgets.QFrame):
 
 
         if hasattr(data,"priority"):
-            self.priority_widget = gremlin.ui.ui_common.QIntLineEdit(data,min_range=0, max_range=1000,value = data.priority)
+            self.priority_widget = gremlin.ui.ui_common.QIntLineEdit(data,min_range=0, max_range=1000,value = data.priority,chars=4)
             self.priority_widget.setToolTip("Execution priority.  Lower priority runs first.")
             self.priority_widget.valueChanged.connect(self._priority_changed)
-            self.priority_container = gremlin.ui.ui_common.getHContainer(self.priority_widget,"Priority", widget_only = True)
+            self.priority_container = gremlin.ui.ui_common.getHContainer(self.priority_widget,"Priority", widget_only = True, right_stretch=False, left_stretch=False)
         else:
             self.priority_widget = None
             self.priority_container = None
 
-        self.layout = QtWidgets.QHBoxLayout(self)
-        #self.layout.setSpacing(0)
-        self.layout.setContentsMargins(5, 0, 5, 0)
 
-        self.layout.addWidget(self.label)
-        self.layout.addWidget(self.id_widget)
-        if self.priority_container:
-            self.layout.addWidget(self.priority_container)
-        self.layout.addWidget(QtWidgets.QLabel("Notes:"))
-        self.layout.addWidget(self.comment_widget)
-        self.layout.addStretch()
-        self.layout.addWidget(self.extra_widget)
+        widgets = [
+            self.label,
+            self.id_widget,
+            "||",
+            self.priority_container,
+            "Notes:",
+            self.comment_widget,
+            self.extra_widget,
+            self.copy_button if clipboard_cb else None,
+            self.help_button,
+            self.close_button
+        ]
+        
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, right_stretch=False, left_stretch=False)
 
-        if clipboard_cb:
-            self.layout.addWidget(self.copy_button)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.addWidget(widget)
 
-        self.layout.addWidget(self.help_button)
-        self.layout.addWidget(self.close_button)
+        # self.main_layout.setContentsMargins(5, 0, 5, 0)
+
+        # self.main_layout.addWidget(self.label)
+        # self.main_layout.addWidget(self.id_widget)
+        # if self.priority_container:
+        #     self.main_layout.addWidget(self.priority_container)
+        # self.main_layout.addWidget(QtWidgets.QLabel("Notes:"))
+        # self.main_layout.addWidget(self.comment_widget)
+        # self.main_layout.addStretch()
+        # self.main_layout.addWidget(self.extra_widget)
+
+        # if clipboard_cb:
+        #     self.main_layout.addWidget(self.copy_button)
+
+        # self.main_layout.addWidget(self.help_button)
+        # self.main_layout.addWidget(self.close_button)
 
 
-        self.setFrameShape(QtWidgets.QFrame.Box)
-        self.setObjectName("frame")
 
         self._show_container_id_changed_ui()
 
     def setIdVisible(self, visible : bool):
-        if Shiboken.isValid(self.id_widget):
+        if self.id_widget and Shiboken.isValid(self.id_widget):
             if visible:
                 self.id_widget.setText(self._id_value)
             else:
@@ -4145,12 +4161,7 @@ class TitleBar(QtWidgets.QFrame):
         if self._close_callback:
             self._close_callback()
 
-    def setBackgroundColor(self, color : str):
-        ''' sets the background color of the title bar '''
-        border_color = gremlin.ui.ui_common.Color.borderColor()
-        css = f"# frame {{border: 1px solid {border_color}; background-color: {color}}}')"
-        self.setStyleSheet(css) 
-        
+
 
 
 class BasicActionWrapper(AbstractActionWrapper):
@@ -4177,15 +4188,20 @@ class BasicActionWrapper(AbstractActionWrapper):
         else:
             hint = gremlin.hints.hint.get(action.tag, "")  
 
-        self._titlebar_widget = TitleBar(
+        self._title_bar_widget = TitleBar(
             f"{action_widget.action_data.name} ({mode})",
             hint,
             self._remove,
             self._clipboard_copy,
             data = action_widget.action_data)
+
+
+        self.title_frame_widget = gremlin.ui.ui_common.QBorderWidget()
+        self.title_frame_widget.addWidget(self._title_bar_widget)
+
         
-        self._titlebar_widget.setBackgroundColor(gremlin.ui.ui_common.Color.actionBackgroundColor())
-        self.setTitleBarWidget(self._titlebar_widget)
+        self.title_frame_widget.setBackgroundColor(gremlin.ui.ui_common.Color.actionBackgroundColor())
+        self.setTitleBarWidget(self.title_frame_widget)
 
         self.main_layout.addWidget(self.action_widget)
 
@@ -4195,7 +4211,7 @@ class BasicActionWrapper(AbstractActionWrapper):
         if not Shiboken.isValid(self):
             return
         config = gremlin.config.Configuration()
-        self._titlebar_widget.setIdVisible(config.show_container_id)
+        self._title_bar_widget.setIdVisible(config.show_container_id)
 
     def _remove(self):
         """Emits the closed event when this widget is being closed."""
@@ -5163,8 +5179,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         self.scroll_area = QtWidgets.QScrollArea()
 
         # Configure the widget holding the layout with all the buttons
-        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         # Configure the scroll area
         #self.scroll_area.setMinimumWidth(300)
@@ -5179,14 +5195,6 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         if verbose: syslog.info(f"create actioncontainerview [{parent.item_data.debug_display}]")
 
         self._widgets = []
-
-    # def doLayout(self):
-    #     layout = self.scroll_layout
-    #     if layout:
-    #         layout.invalidate()
-    #         layout.activate()
-
-
 
     def _cleanup_ui(self):
         ''' widget cleanup '''

@@ -4,6 +4,7 @@ Elidable controls show an ellipsis on a label and line edit if too long
 
 '''
 
+from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontMetrics, QTextLayout
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
@@ -23,6 +24,8 @@ class _GenericEliding:
     # the 2 is a magic number that prevents the ellipses from going missing
     # in certain cases (?)
     _ellipses_width: int = 2
+    _font = QFont()
+    _width = 100
 
     # Public methods
 
@@ -67,15 +70,18 @@ class _GenericEliding:
 
     # private implementation methods
 
-    def _elidedText(self) -> str:
+    def _elidedText(self, width = None, font = None) -> str:
         """Return `self._text` elided to `width`."""
-        fm = QFontMetrics(self.font())
+        fm = QFontMetrics(font or QFont())
         ellipses_width = 0
         if self._elide_mode != Qt.TextElideMode.ElideNone:
-            ellipses_width = self._ellipses_width
-        width = self.width() - ellipses_width
+            ellipses_width = self._ellipses_width or 2
+        if width is None:
+            width = self._width
+        tw = max(width or 0, fm.averageCharWidth() * len(self._text))
+        w = max (32, tw - ellipses_width)
         if not getattr(self, "wordWrap", None) or not self.wordWrap():
-            return fm.elidedText(self._text, self._elide_mode, width)
+            return fm.elidedText(self._text, self._elide_mode, w)
 
         # get number of lines we can fit without eliding
         nlines = self.height() // fm.height() - 1
@@ -86,9 +92,28 @@ class _GenericEliding:
         return "".join([*text[:nlines], last_line])
 
     def _wrappedText(self) -> list[str]:
-        return _GenericEliding.wrapText(self._text, self.width(), self.font())
+        return _GenericEliding.wrapText(self._text, self.width(), self._font or QFont())
     
 
+class ElidedString(_GenericEliding):
+    def __init__(self, text : str = None, width : int = 100, font = None):
+        super().__init__()
+        self._font = font or QFont()
+        self._width = width if width is not None else 100
+        if text:
+            self.setText(text)
+        
+    def text(self, width = None):
+        return self._elidedText(width)
+    
+    def setText(self, text : str):
+        self._text = text
+
+    @staticmethod
+    def elidedText(text : str, width = None, font = None):
+        es = ElidedString(text, width, font)
+        return es.text()
+    
 
 
 class QElidingLabel(_GenericEliding, QLabel):

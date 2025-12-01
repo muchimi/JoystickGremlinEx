@@ -1521,11 +1521,13 @@ class AbstractView(QtWidgets.QWidget):
             if self._model is not None:
                 self._model.data_changed.disconnect(self.redraw)
             self._model = value
-            self._model_changed()
-            self._model.data_changed.connect(self._model_changed)
+            if value:
+                self._model.data_changed.connect(self._model_changed)
+
+            self._model_changed()                
 
     def _model_changed(self):
-        self.model_changed.emit()
+        syslog.info("model changed")
         self.redraw()
 
 
@@ -1535,6 +1537,9 @@ class AbstractView(QtWidgets.QWidget):
         :param model the model to visualize
         """
         self.model = model
+        
+        
+            
 
     
 
@@ -2730,6 +2735,7 @@ class ActionSelector(QtWidgets.QWidget):
     # Signal emitted when an action is going to be added
     action_added = QtCore.Signal(str)  # add button pressed
     action_paste = QtCore.Signal(object, object) # paste button pressed
+
 
 
     def __init__(self, input_type, input_item, parent=None):
@@ -8586,6 +8592,27 @@ class QContentWidget(QtWidgets.QWidget):
         return super().resizeEvent(event)
 
 
+class QVContentWidget(QContentWidget):
+    def __init__(self, parent = None):
+        super().__init__(parent)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+    def addWidget(self, widget):
+        self.main_layout.addWidget(widget)
+    def insertWidget(self, index, widget):
+        self.main_layout.insertWidget(index, widget)
+    def addLayout(self, layout):
+        self.main_layout.addLayout(layout)
+    def removeWidget(self, widget):
+        self.main_layout.removeWidget(widget)
+    def clearLayout(self):
+        gremlin.util.clear_layout(self.main_layout)
+    def getWidgets(self):
+        return gremlin.util.get_layout_widgets(self.main_layout)
+    def getLayout(self):
+        return self.main_layout
+        
 
 
 class QSplitTabWidget(QDataWidget):
@@ -8983,7 +9010,6 @@ class QSplitTabWidget(QDataWidget):
         widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
         return len(widgets) > 0
 
-
 class QRememberMainWindow(QtWidgets.QMainWindow):
     
     def __init__(self, key: str, parent = None):
@@ -9269,27 +9295,7 @@ class QDataTab(QtWidgets.QTabWidget):
     def __init__(self, data = None, parent = None):
         super().__init__(parent)
         self._data = data
-        
-    #     self._update_color()
 
-    # def setStatus(self, index : int, status : str):
-    #     self.setTabProperty(index, "tabStatus", status)
-
-    # def _update_color(self):
-    #     background_color = Color.tabBackgroundColor()
-    #     normal_color = Color.tabForegroundColor()
-    #     missing_color = Color.tabMissingForegroundColor()
-    #     used_color = Color.tabUsedForegroundColor()
-
-    #     css = f"""
-    #         QTabBar::tab {{ background-color: {background_color}; }}
-    #         QTabBar::tab[tabStatus="normal"] {{ color: {normal_color}; }}
-    #         QTabBar::tab[tabStatus="used"] {{ color: {used_color}; }}
-    #         QTabBar::tab[tabStatus="missing"] {{ color: {missing_color}; }}
-    #         """
-        
-    #     self.setStyleSheet(css)
-            
 
     @property
     def data(self):
@@ -9491,6 +9497,8 @@ def getHContainer(widget_or_list = None,
     if widget_or_list:
         if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
+                if item is None:
+                    continue # skip blanks
                 if isinstance(item, str):
                     if item == "|": 
                         # separator
@@ -9557,6 +9565,8 @@ def getVContainer(widget_or_list = None, label = None, alignment = None, font = 
     if widget_or_list:
         if isinstance(widget_or_list, list)  or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
+                if item is None:
+                    continue
                 if isinstance(item, str):
                     if item == "|": 
                         # separator
@@ -11838,7 +11848,6 @@ class QCollapsible(QFrame):
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
 
         # title layout
         
@@ -11871,13 +11880,6 @@ class QCollapsible(QFrame):
         # default content widget
         self._content = None
         
-        # _content = QWidget()
-        # _content.setLayout(QVBoxLayout())
-        
-        # _content.setMaximumHeight(0)
-        # _content.layout().setContentsMargins(QMargins(5, 0, 0, 0))
-        #self.setContent(_content)
-
         if collapsed:
             self.collapse(False)
         else:
@@ -11913,14 +11915,11 @@ class QCollapsible(QFrame):
     def setContent(self, content: QWidget, own = True) -> None:
         """Replace central widget (the widget that gets expanded/collapsed)."""
         self._content = content
-        # if self.isExpanded:
-        #     height = content.sizeHint().height()
-        #     self._content_height = height + 10
-        #     self.setMinimumHeight(self._content_height)
+        
         if own:
             gremlin.util.clear_layout(self.content_layout)
             self.content_layout.addWidget(self._content)
-        #self._animation.setTargetObject(content)
+        
 
 
 
@@ -12335,6 +12334,14 @@ class QScrollableWidget(QtWidgets.QWidget):
     def addWidget(self, widget):
         ''' adds a widget '''
         self._content_layout.addWidget(widget)
+    def insertWidget(self, index, widget):
+        self._content_layout.insertWidget(index, widget)
+    def addLayout(self, layout):
+        self._content_layout.addLayout(layout)
+    def removeWidget(self, widget):
+        self._content_layout.removeWidget(widget)
+    def clearLayout(self):
+        gremlin.util.clear_layout(self._content_layout)        
 
     def clear(self):
         ''' removes all widgets from the layout '''
@@ -12751,3 +12758,41 @@ class QFlowLayout(QtWidgets.QLayout):
 
         return y + line_height - rect.y()
 
+class QBorderWidget(QtWidgets.QFrame):
+    def __init__(self, parent = None):
+        super().__init__(parent = parent)
+
+        is_dark = gremlin.shared_state.is_dark_theme
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+
+        css = f"# frame {{border: 1px solid {border_color};}}')"
+        self.setStyleSheet(css) 
+        self.setFrameShape(QtWidgets.QFrame.Box)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+    def addWidget(self, widget):
+        self.main_layout.addWidget(widget)
+    def insertWidget(self, index, widget):
+        self.main_layout.insertWidget(index, widget)
+    def addLayout(self, layout):
+        self.main_layout.addLayout(layout)
+    def removeWidget(self, widget):
+        self.main_layout.removeWidget(widget)
+    def clearLayout(self):
+        gremlin.util.clear_layout(self.main_layout)
+    def getWidgets(self):
+        return gremlin.util.get_layout_widgets(self.main_layout)
+    def getLayout(self):
+        return self.main_layout
+    def setBackgroundColor(self, color : str):
+        ''' sets the background color of the title bar '''
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        if color:
+            css = f"# frame {{border: 1px solid {border_color}; background-color: {color}}}')"
+        else:
+            css = f"# frame {{border: 1px solid {border_color};}}')"
+        self.setStyleSheet(css) 
+        
+        
+        
