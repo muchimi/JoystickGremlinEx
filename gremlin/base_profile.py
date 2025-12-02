@@ -1917,9 +1917,20 @@ class Settings:
         ''' returns a stats object holding filtered data '''
         return JoystickInputStats(device_guid, self.input_filter)
     
-    def _set_default_filter_list(self, device_guid: dinput.GUID | str | int, device_count : int, input_type : InputType, max_count : int):
+    def _set_default_filter_list(self, device : dinput.DeviceSummary, input_type : InputType, max_count : int):
         ''' gets a default list of filtered inputs based on given parameters '''
         visible_list = []
+        device_guid = device.device_guid
+        match input_type:
+            case InputType.JoystickAxis:
+                device_count = device.axis_count
+            case InputType.JoystickButton:
+                device_count = device.button_count
+            case InputType.JoystickHat:
+                device_count = device.hat_count
+            case _:
+                # not an input type we care about
+                return
         map_data = [index + 1 for index in range(device_count)] # all possoble inputs
 
 
@@ -1962,13 +1973,13 @@ class Settings:
                     device_guid = device.device_guid
                     max_count = config.device_filter_max_axis
                     if device.axis_count:
-                        self._set_default_filter_list(device_guid, device.axis_count, InputType.JoystickAxis, max_count)
+                        self._set_default_filter_list(device, InputType.JoystickAxis, max_count)
                     max_count = config.device_filter_max_button
                     if device.button_count:
-                        self._set_default_filter_list(device_guid, device.button_count, InputType.JoystickButton, max_count)
+                        self._set_default_filter_list(device, InputType.JoystickButton, max_count)
                     max_count = config.device_filter_max_hat
                     if device.hat_count:
-                        self._set_default_filter_list(device_guid, device.hat_count, InputType.JoystickHat, max_count)
+                        self._set_default_filter_list(device, InputType.JoystickHat, max_count)
 
             case "mapped":
                 # set all joystick devices to show mapped inputs
@@ -2030,13 +2041,13 @@ class Settings:
 
             max_count = config.device_filter_max_axis
             if device.axis_count > max_count:
-                self._set_default_filter_list(device_guid, device.axis_count, InputType.JoystickAxis, max_count)
+                self._set_default_filter_list(device, InputType.JoystickAxis, max_count)
             max_count = config.device_filter_max_button
             if device.button_count > max_count:
-                self._set_default_filter_list(device_guid, device.button_count, InputType.JoystickButton, max_count)
+                self._set_default_filter_list(device, InputType.JoystickButton, max_count)
             max_count = config.device_filter_max_hat
             if device.hat_count > max_count:
-                self._set_default_filter_list(device_guid, device.hat_count, InputType.JoystickHat, max_count)
+                self._set_default_filter_list(device, InputType.JoystickHat, max_count)
             else:                    
                 self.input_filter[device_guid] = {}
         
@@ -2984,7 +2995,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             return "this action"
         ''' gets a display name for this input '''
         if self._input_type == InputType.JoystickAxis:
-            return f"Axis {self._input_id}"
+            device = gremlin.joystick_handling.getDevice(self.device_guid)
+            return f"Axis {device.get_axis_name(self._input_id)}"
         elif self._input_type == InputType.JoystickButton:
             return f"Button {self._input_id}"
         elif self._input_type == InputType.JoystickHat:

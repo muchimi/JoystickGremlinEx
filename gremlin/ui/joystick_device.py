@@ -1003,7 +1003,7 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
             
             if not input_type in self.input_widgets:
                 self.input_widgets[input_type] = {}
-            self.input_widgets[input_type][input_id] = btn
+            self.input_widgets[input_type][filtered_id] = btn
 
         self.input_map = data
   
@@ -1017,44 +1017,46 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
         widgets = []
 
 
-        widget = gremlin.ui.ui_common.QDataPushButton("Default", callback = self._handle_filter, ctrl_callback = self._handle_filter, data = "default", tooltip = "Automatic default.\nUse Ctrl-Click to apply to all devices.")
+        widget = gremlin.ui.ui_common.QDataPushButton("Default", callback_ex = self._handle_filter,  data = "default", tooltip = "Automatic default.\nUse Ctrl-Click to apply to all devices.")
         widgets.append(widget)
         if mapped_count:
             # has at least one mapping
-            widget = gremlin.ui.ui_common.QDataPushButton("Mapped only", callback = self._handle_filter, ctrl_callback = self._handle_filter, data = "mapped", tooltip="Include mapped inputs only.\nUse Ctrl-Click to apply to all devices.")
+            widget = gremlin.ui.ui_common.QDataPushButton("Mapped only", callback_ex = self._handle_filter, data = "mapped", tooltip="Include mapped inputs only.\nUse Ctrl-Click to apply to all devices.")
             widgets.append(widget)
 
         
         if device.axis_count:
-            widget = gremlin.ui.ui_common.QDataPushButton("Hide Axis", callback = self._handle_filter, data = "hide_axis", tooltip = "Remove all axes")
+            widget = gremlin.ui.ui_common.QDataPushButton("Hide Axis", callback_ex = self._handle_filter, data = "hide_axis", tooltip = "Remove all axes")
             widgets.append(widget)
-            widget = gremlin.ui.ui_common.QDataPushButton("Show Axis", callback = self._handle_filter, data = "show_axis", tooltip = "Show all axes")
+            widget = gremlin.ui.ui_common.QDataPushButton("Show Axis", callback_ex = self._handle_filter, data = "show_axis", tooltip = "Show all axes")
             widgets.append(widget)
 
         if device.button_count:
-            widget = gremlin.ui.ui_common.QDataPushButton("Hide Buttons", callback = self._handle_filter, data = "hide_buttons",tooltip="Remove all buttons")
+            widget = gremlin.ui.ui_common.QDataPushButton("Hide Buttons", callback_ex = self._handle_filter, data = "hide_buttons",tooltip="Remove all buttons")
             widgets.append(widget)
-            widget = gremlin.ui.ui_common.QDataPushButton("Show Buttons", callback = self._handle_filter, data = "show_buttons",tooltip="Show all buttons")
+            widget = gremlin.ui.ui_common.QDataPushButton("Show Buttons", callback_ex = self._handle_filter, data = "show_buttons",tooltip="Show all buttons")
             widgets.append(widget)
 
         if device.hat_count:
-            widget = gremlin.ui.ui_common.QDataPushButton("Hide Hats", callback = self._handle_filter, data = "hide_hats", tooltip = "Remove all hats")
+            widget = gremlin.ui.ui_common.QDataPushButton("Hide Hats", callback_ex = self._handle_filter, data = "hide_hats", tooltip = "Remove all hats")
             widgets.append(widget)
-            widget = gremlin.ui.ui_common.QDataPushButton("Show Hats", callback = self._handle_filter, data = "show_hats", tooltip = "Show all hats")
+            widget = gremlin.ui.ui_common.QDataPushButton("Show Hats", callback_ex = self._handle_filter, data = "show_hats", tooltip = "Show all hats")
             widgets.append(widget)
 
 
-        widget = gremlin.ui.ui_common.QDataPushButton("Hide All", callback = self._handle_filter, ctrl_callback = self._handle_filter, data = "hide_all", tooltip = "Hide all inputs.\nUse Ctrl-Click to apply to all devices.")
+        widget = gremlin.ui.ui_common.QDataPushButton("Hide All", callback_ex = self._handle_filter,  data = "hide_all", tooltip = "Hide all inputs.\nUse Ctrl-Click to apply to all devices.")
         widgets.append(widget)
-        widget = gremlin.ui.ui_common.QDataPushButton("Show All", callback = self._handle_filter, data = "show_all", tooltip = "Show all inputs")
+        widget = gremlin.ui.ui_common.QDataPushButton("Show All", callback_ex = self._handle_filter, data = "show_all", tooltip = "Show all inputs")
         widgets.append(widget)
-        widget = gremlin.ui.ui_common.QDataPushButton("Revert", callback = self._handle_filter, data = "revert", tooltip = "Revert to current")
+        widget = gremlin.ui.ui_common.QDataPushButton("Revert", callback_ex = self._handle_filter, data = "revert", tooltip = "Revert to current")
         widgets.append(widget)
 
         widget = gremlin.ui.ui_common.getFlowContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)
 
-        msg = """Toggle visible inputs by clicking on them, or press one of the shortcut actions. Control-click on <b>Default</b>, <b>Mapped</b> and <b>Hide All</b> shortcuts to apply the filter to all devices.  Mapped inputs are shown with a green dot.
+        msg = """Toggle visible inputs by clicking on them, or press one of the shortcut actions. Control-click on <b>Default</b>, <b>Mapped</b> and <b>Hide All</b> shortcuts to apply the filter to all devices.
+Shift-click makes the filter additive (existing visible inputs will not be removed).
+Mapped inputs are shown with a green dot.
 Inputs will highlight when the associated axis, button or hat is triggered to help with identification. 
  If an input is hidden, it can be made visible again in this dialog.  Hidden inputs do not delete any mappings. 
 """
@@ -1127,15 +1129,12 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
    
 
     @QtCore.Slot()
-    def _handle_filter(self):
-        widget = self.sender()
+    def _handle_filter(self, widget, is_control : bool, is_shift : bool, is_right : bool):
         mode = widget.data
         profile = gremlin.shared_state.current_profile
         device = self.device
         device_guid = self.device_guid
         verbose = gremlin.config.Configuration().verbose_mode_filter
-
-        is_control = widget.is_control
         
         
         # global modes that impact multiple inputs
@@ -1148,13 +1147,13 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
                 config = gremlin.config.Configuration()
                 max_count = config.device_filter_max_axis
                 if device.axis_count > max_count:
-                    self._set_default_filter_list(device.axis_count, InputType.JoystickAxis, max_count)
+                    self._set_default_filter_list(device, InputType.JoystickAxis, max_count, is_shift)
                 max_count = config.device_filter_max_button
                 if device.button_count > max_count:
-                    self._set_default_filter_list(device.button_count, InputType.JoystickButton, max_count)
+                    self._set_default_filter_list(device, InputType.JoystickButton, max_count, is_shift)
                 max_count = config.device_filter_max_hat
                 if device.hat_count > max_count:
-                    self._set_default_filter_list(device.hat_count, InputType.JoystickHat, max_count)
+                    self._set_default_filter_list(device, InputType.JoystickHat, max_count, is_shift)
 
                 if is_control:
                     # apply to all devices 
@@ -1173,6 +1172,13 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
 
         for device_guid, input_type, input_id, _, _  in self.input_map:
             filtered = False
+            if input_type== InputType.JoystickAxis:
+                device = gremlin.joystick_handling.getDevice(device_guid)
+                linear_id = device.axis_id_map[input_id] # input id -> linear id
+            else:
+                linear_id = input_id
+
+            
             match mode:
                 case "mapped":
                     # filter to mapped devices only
@@ -1229,15 +1235,21 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
 
                 case "revert":
                     # revert to original
-                    filtered = self._is_filtered(input_type, input_id)
+                    filtered = self._is_filtered(input_type, linear_id)
 
                 case _:
                     continue
 
             #if verbose: syslog.info(f"{input_type.name} {input_id} {filtered}")
-            btn : gremlin.ui.ui_common.QDataPushButton = self.input_widgets[input_type][input_id]
-            btn.setChecked(not filtered)
-            self._set_filtered(input_type, input_id, filtered)
+            btn : gremlin.ui.ui_common.QDataPushButton = self.input_widgets[input_type][linear_id]
+            selected = not filtered
+            if not selected and is_shift and not btn.isChecked():
+                # add to the selection
+                btn.setChecked(True)
+                self._set_filtered(input_type, input_id, filtered)
+            else:
+                btn.setChecked(selected) # turn on or off
+                self._set_filtered(input_type, input_id, filtered)
 
         self.updateGroups()
 
@@ -1256,8 +1268,21 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         
         
     
-    def _set_default_filter_list(self, device_count : int, input_type : InputType, max_count : int):
-        ''' gets a default list of filtered inputs based on given parameters '''
+    def _set_default_filter_list(self, device : dinput.DeviceSummary, input_type : InputType, max_count : int, add_only = False):
+        ''' sets a default list of filtered inputs based on given parameters '''
+
+        device_guid = device.device_guid
+        match input_type:
+            case InputType.JoystickAxis:
+                device_count = device.axis_count
+            case InputType.JoystickButton:
+                device_count = device.button_count
+            case InputType.JoystickHat:
+                device_count = device.hat_count
+            case _:
+                # not an input type we care about
+                return
+            
         visible_list = []
         map_data = [index + 1 for index in range(device_count)] # all possible inputs
         profile = gremlin.shared_state.current_profile
@@ -1284,11 +1309,18 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         if map_data:
             map_data = [i for i in map_data if not i in visible_list]
 
+   
         for index in range(device_count):
             input_id = index + 1
             filtered = input_id in map_data
-            self._set_filtered(input_type, input_id, filtered, emit= False) 
             btn = self.input_widgets[input_type][input_id]
+            
+            if filtered and add_only and btn.isChecked():
+                # item should be filtered = only apply if not cummulative
+                continue
+
+            self._set_filtered(input_type, input_id, filtered, emit= False) 
+            
             with QtCore.QSignalBlocker(btn):
                 btn.setChecked(not filtered)
         
@@ -1299,13 +1331,13 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
   
 
     @QtCore.Slot()
-    def _handle_toggle(self):
+    def _handle_toggle(self, btn):
         ''' handles a filter change '''
-        btn :  gremlin.ui.ui_common.QUsedPushButton = self.sender()
         data = btn.data
         input_type, input_id = data
         
         visible = btn.isChecked()
+        # syslog.info(f"checked: {visible} input id: {input_id}")
         is_filtered = not visible
         self._set_filtered(input_type, input_id, is_filtered, emit = True)
         

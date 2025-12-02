@@ -4299,6 +4299,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             if trigger:
                 # trigger the button output
+                if value is None:
+                    value = False # for inputs like OSC
                 vs.setStartState(self.vjoy_id, self.vjoy_input_id, value)
                 self.action_data.button_last_value = value
                 if is_local:

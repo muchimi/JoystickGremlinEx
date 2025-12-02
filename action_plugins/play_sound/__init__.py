@@ -94,8 +94,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.audio_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_audio_change, source=source, value = device_index)
         self.default_widget = gremlin.ui.ui_common.QDataPushButton("Default",
-                                                                   callback = self._handle_select_default,
-                                                                   ctrl_callback = self._handle_select_default_all,
+                                                                   callback_ex= self._handle_select_default,
                                                                    tooltip = "Select system default")
         
         
@@ -178,22 +177,20 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
                 
         
     @QtCore.Slot()
-    def _handle_select_default(self):
+    def _handle_select_default(self, is_control : bool, is_shift : bool, is_right : bool):
         ''' selects the default playback device '''
+
         default_index = self.action_data.getDefaultAudioDeviceIndex()
         index = self.audio_widget.findData(default_index)
         if index != -1:
             self.audio_widget.setCurrentIndex(index)
 
-    @QtCore.Slot()
-    def _handle_select_default_all(self):
-        ''' on control click the default button, change all devices '''
-        self._handle_select_default() # update ours
-        # update the rest of the profile
-        default_device = self.action_data.getDefaultAudioDevice()
-        name = default_device.description()
-        profile = gremlin.shared_state.current_profile
-        profile.setDefaultAudioDevice(name)
+        if is_control:
+            default_device = self.action_data.getDefaultAudioDevice()
+            name = default_device.description()
+            profile = gremlin.shared_state.current_profile
+            profile.setDefaultAudioDevice(name)
+
         
     @QtCore.Slot()
     def _handle_sync_all(self):

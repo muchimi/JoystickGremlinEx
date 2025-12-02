@@ -18,6 +18,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T120)
+- New: Input filter gains a shift mode - when using a shortcut with a shift key down, the filter will only add to the current selection.
+- New: Axis names gain linear (L) index name in input name to be more consistent UI wide.  The L number is the axis number as sequenced by the HID descriptor. The axis number is the axis function reported by the HID descriptor to DINPUT, and is one of 8 possible values. Some devices can report different axes in a non sequential order (some axes are skipped, so linear axis 4 can be input 7) even though there are only 4 axes on the device.
+- Tweak: Minor UI tweaks.
+- Fix: Input Viewer VJOY button toggle not toggling VJOY button in some situations.  Input Viewer can set VJOY axis, buttons or hats manually if needed.
+
+
 ### (m76T119)
 - Tweak: Minor UI tweaks.
 - Fix: TempoEx not refreshing UI on button add due to recent model tweaks.

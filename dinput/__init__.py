@@ -628,6 +628,9 @@ class DeviceSummary:
 
     def get_axis_name(self, axis_id, is_axis_id = True, short_name = False):
         ''' gets the axis name based on the input # '''
+        if not short_name:
+            return f"Axis {self.getAxisName(axis_id, is_linear = not is_axis_id)}"
+        
         if is_axis_id:
             input_id = axis_id
         else:
@@ -652,9 +655,9 @@ class DeviceSummary:
             axis_name = "S2"
         else:
             axis_name = f"(unknown [{input_id}])"
-        if short_name:
-            return axis_name
-        return f"Axis {input_id} ({axis_name})"
+        
+        return axis_name
+        
     
 
     def get_button_name(self, input_id):
@@ -717,14 +720,20 @@ class DeviceSummary:
         
         '''
         am : AxisMap
+        stub = ""
         if is_linear:
+            if index in self.linear_id_map:
+                stub = f" L{index}"
             for am in self.axismap_list:
                 if am.linear_index == index:
-                    return am.getName()
+                    return am.getName() + stub
         else:
+            if index in self.axis_id_map:
+                linear_id = self.axis_id_map[index]
+                stub = f" L{linear_id}"
             for am in self.axismap_list:
                 if am.axis_index == index:
-                    return am.getName()
+                    return am.getName() + stub
         return None
     
     def getAxisData(self):

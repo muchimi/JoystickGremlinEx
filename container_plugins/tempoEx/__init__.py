@@ -173,14 +173,14 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.options_layout.addWidget(widget)
 
 
-
+        icon = gremlin.ui.ui_common.Icons.chevronIcon()
         widgets = [
             self.options_widget,
-            gremlin.ui.ui_common.QHeaderLabel("Short Press Action Sets"),
+            gremlin.ui.ui_common.QHeaderLabel("<b>Short Press Action Sets</b>", icon = icon),
             self.short_widget,
-            gremlin.ui.ui_common.QHeaderLabel("Long Press Action Sets"),
+            gremlin.ui.ui_common.QHeaderLabel("<b>Long Press Action Sets</b>", icon = icon),
             self.long_widget,
-            gremlin.ui.ui_common.QHeaderLabel("Double Tap Press Action Sets"),
+            gremlin.ui.ui_common.QHeaderLabel("<b>Double Tap Press Action Sets</b>", icon = icon),
             self.double_widget,
 
         ]
