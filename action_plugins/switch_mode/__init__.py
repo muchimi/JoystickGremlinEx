@@ -266,11 +266,10 @@ To change the mode temporarily, use the temporary mode switch action.'''
     def mode(self, value: str):
         if value != self._mode and value is not None:
             self._mode = value
-            syslog = logging.getLogger("system")
-            verbose = gremlin.config.Configuration().verbose
-            if verbose:
-                input_item = self.get_input_item()
-                syslog.info(f"SWITCHMODE: mode set to: {value}  input: {str(input_item)}")
+            # verbose = gremlin.config.Configuration().verbose
+            # if verbose:
+            #     input_item = self.get_input_item()
+            #     syslog.info(f"SWITCHMODE: mode set to: {value}  input: {str(input_item)}")
 
     def display_name(self):
         ''' returns a display string for the current configuration '''

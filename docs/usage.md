@@ -15,21 +15,25 @@ If you would like to define a new state in the profile, that state needs to be d
 
 To use VJoy as input devices, that must be enabled in the settings tab and GremlinEx will make that Vjoy device available as an input device, each with its own tab.
 
+<img src="assets/warning.svg" width="32"> It is generally not recommended to use the same VJOY device both as input and output concurrently in the same profile.  Outside of a performance degradation versus using, for example, states (for virtual input needs) due to the overhead involved, it becomes exceedingly easy to create loops and race conditions when using the same VJOY device both as input and output from the same process.  This is known in extreme cases to cause VJOY API issues due to the internal locking of the VJOY software, for example, making the device unavailable.  The VJOY as input feature is meant to be used when the writing is done via another software that sends to VJOY is needed, to trigger something from GremlinEx as a result.  Generally speaking, only one process should write to VJOY, and another process read from VJOY.  These limitations are external to GremlinEx.  This said, with careful planning and understanding of the above limitations, it is possible to use the same VJOY device for input and output in the same profile.  This is an advanced feature and in general the preference is to use an alternative setup where possible using one of the other GrmelinEx features, such as states.
+
 ### Input Filter
 
-(m76T115+) Inputs are filtered.
+Starting with m76T115+, joystick inputs (axis, button, hat) inputs can be filtered (hidden).  This is primarily for convenience and performance, as unused inputs clutter the UI and can result in significant memory usage depending on how many inputs need to be tracked concurrently.  An extreme example would be 16 VJOY devices defined that can total over 2000 inputs, which quickly becomes non manageable even on a very capable system.
 
 GEX will filter (limit) the number of inputs shown on each joystick device to a reasonable and more manageable number.  This is directly aimed at performance by reducing the number of entities visible at anyone time.  It is also for convenience and ease of use reasons: until now, a large number of devices and inputs could significantly impact UI performance and memory at profile design time, whether relevant or not.  These could consume thousands of entities that need to be tracked with a noticeable impact on performance and responsiveness.
 
+<img src="assets/warning.svg" width="32">  Too many inputs can degrade GremlinEx performance by making the UI sluggish and significantly increase memory usage.  This is particularly true with VJOY used as input as these tend to have hundreds of inputs each resulting in well over a thousand inputs GEX needs to track and display, which can result in poor performance.   The filtering options are aimed at managing this excess of inputs, especially those that are not used, to maintain reasonable edit time performance and memory usage.  While GEX can easily handle on most systems 10 or more physical devices with an average input count of 40 or so inputs, where it gets into trouble is when adding hundreds of inputs from virtual devices like VJOY.  Note: this is only edit time performance.  GEX profile runtime execution is not impacted in any significant way when running a profile regardless of number of inputs due to the way the execution engine is setup.  
+
 ![Filter](assets/input_filter_general.png)
 
-"Reasonable" varies with the number of devices, inputs and hardware capabilities. Performance is directly impacted by the number of visible inputs, so it is highly recommended to keep those to a minimum. Inputs can easily be hidden or shown via the filter dialog.  Hiding an input does not delete its mappings.  Mappings however can only be seen if the input is visible.
+"Reasonable" varies with the number of devices, inputs and hardware capabilities. Performance is directly impacted by the number of visible inputs, so it is highly recommended to keep those to a minimum. Inputs can easily be hidden or shown via the filter dialog.  Hiding an input does not delete its mappings.  Mappings however can only be seen if the input is visible.  In practice, a UI degradation can become notiecable with 500 or more visible inputs across multiple active tabs.  This depends on the system, available memory and CPU to GEX.
 
 The filtering does not impact profile execution.  Invisible inputs will still run their mappings if the input is mapped.
 
 Filters only apply to joystick devices (physical and virtual) as they usually represent the bulk of input counts.
 
-Please remember to save the profile to have the filters persist as the data is not saved until the profile is saved.
+<img src="assets/warning.svg" width="32"> Please remember to save the profile to have the filters persist as the data is not saved until the profile is saved.
 
 ### Filter Configuration
 
@@ -724,8 +728,6 @@ Examples of how this action can be used:
 
 ![trigger map button](assets/trigger_map_button.png)
 
-
-
 ## Conditions
 
 GremlinEx can apply conditions to triggers to modify what should happen when an input trigger happens. 
@@ -750,9 +752,6 @@ Conditions are cummulative and apply in the order of evaluation, so conditions o
 | Keyboard (mouse) condition | This condition checks for keyboard and mouse states. |
 | State condition | This condition checks for a state value. |
 | Mode condition | This condition checks for a particular profile mode being active (or inactive). |
-
-
-
 
 ### Virtual Button
 
@@ -1636,6 +1635,8 @@ Note that expressions, like states, are not case sensitive.
 ### State Gotchas
 
 States are designed to be flexible.  As a result of this flexibility, it is possible using expressions to create loops.
+
+<img src="assets/warning.svg" width="32">  Loops are the result of one input trigger eventually causing a re-trigger of that same input.  GremlinEx makes this possible through a combination of states and expression.  If a loop occurs, the application may become sluggish or unresponsive, and in some situations will crash as it will eventually run out of memory.
 
 Example:
 

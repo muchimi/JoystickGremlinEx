@@ -3380,7 +3380,7 @@ class InputListenerWidget(QBoxFrame):
     to press a key or a joystick button """
 
     item_selected = QtCore.Signal(object) # called when the items are selected
-    keyInput = QtCore.Signal(object) # called when a keyboard input is made - the parameter will be a key if mouse/keyboard input
+    keyInput = QtCore.Signal(list) # called when a keyboard input is made - the parameter will be a key if mouse/keyboard input
     closed = QtCore.Signal(bool) # closed - passes the accepted flag
 
     def __init__(
@@ -3584,9 +3584,10 @@ class InputListenerWidget(QBoxFrame):
                         self._multi_key_storage.append(key)
                     else:
                         self._multi_key_storage.append(event)
-                    self.keyInput.emit(key) # notify a key was pressed
+                    self.keyInput.emit(self._multi_key_storage) # notify a key was pressed
                     self._echo_key(key)
                     self.selection = self._multi_key_storage
+                   
 
     def _mouse_event_ui(self, event):
         ''' process mouse events on UI thread '''
@@ -3602,12 +3603,12 @@ class InputListenerWidget(QBoxFrame):
                 if widget and isinstance(widget, QtWidgets.QPushButton):
                     return # ignore if click is on the button
                 self._multi_key_storage.append(key)
-                self.keyInput.emit(key) # notify a key was pressed
+                self.keyInput.emit(self._multi_key_storage) # notify a key was pressed
                 self.selection = self._multi_key_storage
                 self._echo_key(key)
             else:
                 # not listening to multiple keys
-                self.keyInput.emit(key) # notify a key was pressed
+                self.keyInput.emit([key]) # notify a key was pressed
                 self.item_selected.emit([key])
                 self.selection = [key]
                 self._accepted = True

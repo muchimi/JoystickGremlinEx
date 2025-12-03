@@ -1,6 +1,6 @@
 # GremlinEx Overview
 
-GremlinEx is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.
+GremlinEx or GEX is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.
 
 GremlinEx is oriented towards simpits and hardware vendor integration, without the need to run individual vendor's software.  
 
@@ -12,7 +12,7 @@ This is a summary of some of the feature set in GremlinEx.
 
 ### Mapping and transforms
 
-GrmelinEx takes input such physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages, and lets you apply a mapping, also known as a transform, to each input.  GremlinEx supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).
+GEX takes input such physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages, and lets you apply a mapping, also known as a transform, to each input.  GEX supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).
 
 The mapping process can have logic applied to it, such as conditions, so that the mapping can be conditional on a specific context being true.  This can be "is this button also pressed", "is this axis value in this range", "are these keys also pressed", "is this state off", all in various combinations.  Conditions work across all inputs so one input can be used to manage the mapping of another device.
 
@@ -20,7 +20,7 @@ Axis (linear) input can be curved and calibrated.  In fact, multiple curves can 
 
 GremlinEx handles multiple inputs and outputs concurrently.  Routing can change mappings based on conditions, modes and states, and this can be changed dynamically on the fly.
 
-As of M76T68, GremlinEx supports using vJoy as an input and output device simultaneously.  This enables scenarios where an input in GremlinEx triggers map to a vJoy device, and when that vJoy device changes, it triggers an input back into GremlinEx to trigger more actions.  This can create loops, so care should be excercised to not build a loop regardless of the sequence of events.  GremlinEx does not check for loops as they are too expensive performance wise to detect and guard against at runtime.
+As of M76T68, GEX supports using vJoy as an input and output device simultaneously.  This enables scenarios where an input in GremlinEx triggers map to a vJoy device, and when that vJoy device changes, it triggers an input back into GremlinEx to trigger more actions.  This can create loops, so care should be excercised to not build a loop regardless of the sequence of events.  GremlinEx does not check for loops as they are too expensive performance wise to detect and guard against at runtime.
 
 ### Agreggation of multiple devices
 
@@ -305,6 +305,7 @@ GremlinEx supports up to 8 axes, 128 buttons and four 8-way hats on each VJOY de
 It is recommended to have no more than three or four output VJOY devices, the primary reason being that many games only understand the first three HID devices.
 
 
+<img src="assets/warning.svg" width="32"> All defined VJOY devices must have a unique combination of axis, button or hat counts.  This is how these devices are differentiated as different devices as they all have the same name as currently defined in the device driver.  GremlinEx will throw an error if two VJOY devices have identical numbers of axis, buttons and hats.   The suggested method is to remove a button, so the first can be setup with 128 buttons, the second 127, and the third 126, etc...   Another popular method is to change the number of hats per device.
 
 ## General structure of GremlinEx
 

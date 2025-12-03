@@ -27,7 +27,8 @@ from gremlin.input_devices import ButtonReleaseActions
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
-from gremlin.keyboard import key_from_code
+import gremlin.keyboard
+from gremlin.profile import safe_format, safe_read
 import gremlin.util
 from shiboken6 import Shiboken
 import html
@@ -63,7 +64,7 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         text = "<b>Current key combination:</b> "
         names = []
         for key in self.action_data.keys:
-            names.append(key_from_code(key[0],key[1]).name)
+            names.append(gremlin.keyboard.key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
 
         self.key_combination.setText(text)
@@ -76,9 +77,12 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         :param keys the keys to use in the key combination
         """
+
+
         self.action_data.keys = [
             (key.scan_code, key.is_extended) for key in keys
         ]
+        self._populate_ui()
         self.action_modified.emit()
 
     def _record_keys_cb(self):
@@ -89,7 +93,7 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,
-            multi_keys=False
+            multi_keys=False,
         )
 
         self.button_press_dialog.item_selected.connect(self._update_keys)
@@ -116,12 +120,12 @@ class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
         self.press = gremlin.macro.Macro()
         self.needs_auto_release = action.input_is_axis()
         for key in action.keys:
-            self.press.press(key_from_code(key[0], key[1]))
+            self.press.press(gremlin.keyboard.key_from_code(key[0], key[1]))
 
         self.release = gremlin.macro.Macro()
         # Execute release in reverse order
         for key in reversed(action.keys):
-            self.release.release(key_from_code(key[0], key[1]))
+            self.release.release(gremlin.keyboard.key_from_code(key[0], key[1]))
 
     def process_event(self, event, value, extra_data = None):
         if value.current:
@@ -217,11 +221,16 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
 
         :return XML node containing the information of this  instance
         """
+        import gremlin.keyboard
         node = ElementTree.Element("map-to-keyboard")
-        for key in self.keys:
+        for scan_code, extended in self.keys:
             key_node = ElementTree.Element("key")
-            key_node.set("scan-code", str(key[0]))
-            key_node.set("extended", str(key[1]))
+            key_node.set("scan-code", safe_format(scan_code, int))
+            key_node.set("extended", safe_format(extended, bool))
+            key = gremlin.keyboard.key_from_code(scan_code, extended)
+            comment = f"key: {key.name} 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
+            node_comment = ElementTree.Comment(comment)
+            node.append(node_comment)
             node.append(key_node)
         return node
 
@@ -237,7 +246,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         names = []
         text = ""
         for key in self.keys:
-            names.append(key_from_code(key[0],key[1]).name)
+            names.append(gremlin.keyboard.key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
         return f"Keyboard (legacy): {text}"
     
@@ -248,7 +257,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         names = []
         text = ""
         for key in self.keys:
-            names.append(key_from_code(key[0],key[1]).name)
+            names.append(gremlin.keyboard.key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
         table.addField("Key", html.escape(text))
         return table.to_html()
