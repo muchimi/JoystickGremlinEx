@@ -12875,7 +12875,36 @@ class ActionContainerDialog(QRememberDialog):
 
         close_button_widget = QDataPushButton("Close", callback = self.close)
         close_button_widget.setToolTip("Closes the dialog")
-        widget = getHContainer(close_button_widget, widget_only=True, right_stretch=True)
+        widget = getHContainer(close_button_widget, widget_only=True, left_stretch=True)
         self.main_layout.addWidget(widget)
 
+class MessageBoxDialog(QShowAtCursorDialog):
+    ''' enhanced message box '''
+    def __init__(self, title : str = None, text : str = None, icon = None,  parent = None):
+        super().__init__(parent = parent)
+
+        self.setWindowTitle("Notice")
+        self.setModal(True)
         
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        if icon and title:
+            widget = QIconLabel(icon, title)
+            self.main_layout.addWidget(widget)
+        elif title:
+            widget = QtWidgets.QLabel(title)
+            self.main_layout.addWidget(widget)
+
+        if text:
+            widget = QtWidgets.QLabel(text)
+            widget.setTextFormat(QtCore.Qt.RichText)
+            self.main_layout.addWidget(widget)
+
+        
+
+        close_button_widget = QDataPushButton("Close", callback = self.close)
+        close_button_widget.setToolTip("Closes the dialog")
+        widget = getHContainer(close_button_widget, widget_only=True, left_stretch=True)
+        self.main_layout.addWidget(widget)
+
+        self.main_layout.addStretch()

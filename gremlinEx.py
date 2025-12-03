@@ -4449,6 +4449,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _do_load_profile(self, source_xml : str, as_new_profile = False) -> bool | tuple:
         self._profile_load_stack = []
+        if not source_xml:
+            # invalid file
+            return False
+        ext = gremlin.util.get_ext(source_xml)
+        if not ext:
+            source_xml = gremlin.util.swap_ext(source_xml,"xml")
+
+
+        if not os.path.isfile(source_xml):
+            # file does not exist
+            return False
+        
+        
         return self._do_load_profile_internal(source_xml, as_new_profile)
 
     def _do_load_profile_internal(self, source_xml : str, as_new_profile = False) -> bool | tuple:

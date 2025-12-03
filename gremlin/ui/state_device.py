@@ -506,6 +506,12 @@ class StateInputItem(gremlin.base_profile.InputItem):
             verbose = gremlin.config.Configuration().verbose_mode_state
             if verbose: syslog.info(f"STATE: unhook [{self._key}]  id: [{self._id}]")
 
+    def getDependencies(self) -> list:
+        ''' gets a list of state dependencies if the state is an expression '''
+        if self._is_expression:
+            return self._expression_dependencies
+        return []
+
 
     def _handle_profile_unload(self):
         ''' occurs on profile unload before a new profile is loaded  '''
@@ -1446,6 +1452,79 @@ class StateData(QtCore.QObject):
             return True
         return False
         
+    def isUsed(self, key: str | StateInputItem, return_usage : bool = False):
+        ''' examines the profile to see if the state is referenced in a mapping or an expression 
+        
+        :param key: state or state name (key)
+        :param include_usage_data: if set, returns a (used : bool, where_used_name_list : list).  if not set returns used : bool
+
+        
+        '''
+        if isinstance(key, str):
+            key = key.casefold().strip()
+        
+            if not key in self._data:
+                return False
+            
+            state : StateInputItemπ = self._data[key]
+
+        else:
+            state = key
+
+        used_list = []
+        key = state.key
+        used = False
+        # check other states for expressions
+        other : StateInputItem
+        for other in self._data.values():
+            if not other.isExpression or other == state:
+                continue
+            if state in other.getDependencies():
+                if return_usage:
+                    used_list.append(f"Expression: State [{other.key}] Expression: [{other.expression}]")
+                else:
+                    return True # used as a state in another's expression
+            
+        def _action_callback(action, extra_data : dict = None):
+            nonlocal used, key, used_list
+            if action.key == key:
+                used = True # state is used
+                input_item = action.get_input_item()
+                if return_usage:
+                    used_list.append(f"Map to State: Device [{input_item.device_name}] Input [{input_item.display_name}]")
+                else:
+                    return False # stop further processing
+            return True
+        
+        def _condition_callback(input_item, owner, condition, extra_data : dict = None):
+            nonlocal used, key, used_list
+            import gremlin.base_conditions, gremlin.base_profile
+            if isinstance(condition, gremlin.base_conditions.StateCondition):
+                if condition.key == key:
+                    used = True # state is used
+                    if return_usage:
+                        stub = "Container" if isinstance(owner, gremlin.base_profile.AbstractContainer) else "Action"
+                        used_list.append(f"{stub} Condition: Device [{input_item.device_name}] Input [{input_item.display_name}] in [{owner.name}]")
+                    else:
+                        return False # stop further processing
+            return True
+        
+        # look for map to state actions using this state in the profile
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        profile.filter_actions("map_to_state", _action_callback)
+
+
+        # look for conditions using this state in the profile 
+        profile.filter_conditions(_condition_callback)
+        if return_usage:
+            return (used, used_list)
+        return used
+            
+
+            
+            
+        
+
     
     def clear(self):
         ''' clears all data '''
@@ -1681,9 +1760,7 @@ class StateCategoryEditorDelegate(QtWidgets.QStyledItemDelegate):
         if not value or not value.strip():
             gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"Category name cannot be blank.")
             return
-        # if value == self._default_category.name:
-        #     gremlin.ui.ui_common.MessageBox(title = "Category Error", prompt = f"The default category cannot be renamed.")
-        #     return
+        
         model.setData(index, value, QtCore.Qt.EditRole)
 
 
@@ -2620,7 +2697,6 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             [InputType.State], # only allow Mode inputs for this widget,
             custom_update_handler= self._update_handler,
             custom_remove_handler = self._remove_handler,
-            #custom_clear_handler = self._clear_handler,
             custom_filter_handler = self._filter_data
         )        
 
@@ -3034,6 +3110,8 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _remove_handler(self, model, index, emit_change = True):
         ''' clears a single index '''
+
+        sd = StateData()
     
         if index in model._index_map:
             del model._index_map[index]
@@ -3057,12 +3135,6 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._update_handler(model, emit_change)
             self._filter_widget.updateCounts()
             
-
-    # def _clear_handler(self, model, emit_change = True):
-    #     ''' clears all state data '''
-    #     sd = StateData()
-    #     sd.clear()
-        
 
     
     def itemAt(self, index):
@@ -3190,7 +3262,11 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         '''
         import gremlin.ui.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, 
+                                                       populate_ui_callback = self._populate_input_widget_ui, 
+                                                       update_callback = self._update_input_widget, 
+                                                       confirm_delete_callback=self._handle_confirm_delete,
+                                                       config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
         input_id : StateInputItem = data.input_id
@@ -3227,6 +3303,23 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # remember what widget is at what index
         widget.index = index
         return widget
+    
+    def _handle_confirm_delete(self, input_item : gremlin.base_profile.InputItem):
+        ''' confirms if a state can be deleted '''
+        state : StateInputItem= input_item.input_id
+        sd = StateData()
+        is_used, usage_list = sd.isUsed(state, True)
+        if is_used:
+            title = f"<h2>Unable to remove state <b>[{state.key}]</b></h2>"
+            msg = f"Please remove references to this state in the profile before removing it.<br>"
+            msg += "<h3>Usage Instances:</h3><ul>"
+            for entry in usage_list:
+                msg += f"<li>{entry}</li>"
+            msg += "</ul><br>"
+            dialog = gremlin.ui.ui_common.MessageBoxDialog(title = title, text = msg, icon = gremlin.ui.ui_common.Icons.warningIcon())
+            dialog.exec()
+            return False
+        return True
 
     def _create_expression_update_callback(self, state, widget):
         return lambda: self._change_expression_callback(state, widget)

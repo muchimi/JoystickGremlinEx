@@ -80,9 +80,14 @@ class ProfileConverter:
         # file length
         if os.path.getsize(fname) == 0:
             return True
-        
-        tree = etree.parse(fname)
-        root = tree.getroot()
+        try:
+            tree = etree.parse(fname)
+            root = tree.getroot()
+        except Exception as err:
+            # error reading file
+            syslog.error(f"CONVERT: XML error reading file {fname}")
+            return True
+                    
 
         version = self._determine_version(root)
         return version == ProfileConverter.current_version # or version == 9

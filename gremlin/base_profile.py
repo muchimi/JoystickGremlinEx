@@ -2617,10 +2617,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         tracker = ConditionTracker()
         count = tracker.getInputItemConditionCount(self, self.profile_mode) # gremlin.shared_state.current_mode)
         return count > 0
-        # for container in self._containers:
-        #     if container.condition_count or container.action_condition_count:
-        #         return True
-        # return False
+    
+    def getConditions(self):
+        ''' gets a list of conditions for this input '''
+        tracker = ConditionTracker()
+        return tracker.getInputItemConditions(self, self.profile_mode) # gremlin.shared_state.current_mode)
+        
+ 
 
     def get_valid_container_list(self):
         """Returns a list of valid containers for this input  """
@@ -3318,8 +3321,9 @@ class Profile():
     def setDefaultAudioDevice(self, name):
         ''' sets the default audio device for all play actions '''
 
-        def _apply_default_sound(action, extra_data : dict = None):
+        def _apply_default_sound(action, extra_data : dict = None) -> bool:
             action.audio_device = name
+            return True
 
         self.filter_actions("play-sound", _apply_default_sound)
         
@@ -5140,7 +5144,7 @@ class Profile():
             el = gremlin.event_handler.EventListener()
             el.request_reload.emit()
 
-    def _filter_actions_input_item(self, input_item, tag, callback, extra_data : dict = None):
+    def _filter_actions_input_item(self, input_item, tag, callback, extra_data : dict = None) -> bool:
         ''' '''
         for container in input_item.containers:
             for action_set in container.action_sets:
@@ -5153,33 +5157,113 @@ class Profile():
 
                             # gate containers
                             for condition, item in gate.item_data_map.items():
-                                self._filter_actions_input_item(item, tag, callback, extra_data)
+                                result = self._filter_actions_input_item(item, tag, callback, extra_data)
+                                if not result:
+                                    return False
 
                         rng : gremlin.gated_handler.RangeInfo
                         for rng in gate_data.getRanges():
                             # gate containers
                             for condition, item in rng.item_data_map.items():
-                                self._filter_actions_input_item(item, tag, callback, extra_data)
+                                result = self._filter_actions_input_item(item, tag, callback, extra_data)
+                                if not result:
+                                    return False
 
                     if action.tag == tag:
-                        callback(action, extra_data)
+                        result = callback(action, extra_data)
+                        if not result:
+                            return False
+        return True
 
     def filter_actions(self, tag, callback, extra_data : dict = None):
         ''' issues a callback for every matching action tag found in the profile callback(action)'''
         for dev_guid in self.devices:
-                dev = self.devices[dev_guid]
-                if dev.device_type == gremlin.types.DeviceType.State:
-                    # state device (modeless) - special handling of state input items
-                    state_data = gremlin.shared_state.current_profile.state
-                    input_items = [state_data[key].input_item for key in state_data]
-                    for item in input_items:
-                        self._filter_actions_input_item(item, tag, callback, extra_data)
-                else:
-                    for mode_name in dev.modes:
-                        mode_object = dev.modes[mode_name]
-                        for input_type in mode_object.config:
-                            for item in mode_object.config[input_type].values():
-                                self._filter_actions_input_item(item, tag, callback, extra_data)
+            dev = self.devices[dev_guid]
+            if dev.device_type == gremlin.types.DeviceType.State:
+                # state device (modeless) - special handling of state input items
+                state_data = gremlin.shared_state.current_profile.state
+                input_items = [state_data[key].input_item for key in state_data]
+                for item in input_items:
+                    result = self._filter_actions_input_item(item, tag, callback, extra_data)
+                    if not result:
+                        return 
+            else:
+                for mode_name in dev.modes:
+                    mode_object = dev.modes[mode_name]
+                    for input_type in mode_object.config:
+                        for item in mode_object.config[input_type].values():
+                            result = self._filter_actions_input_item(item, tag, callback, extra_data)
+                            if not result:
+                                return
+                            
+    def _filter_conditions_input_item(self, input_item : InputItem, callback, extra_data : dict = None) -> bool:
+        ''' extracts all conditions from the profile and executes the callback for each condition found - if the callback returns false, the chain exits'''
+
+        # condition_list = input_item.getConditions()
+        # if condition_list:
+        #     for condition in condition_list:
+        #         result = callback(condition)
+        #         if not result:
+        #             return # stop
+            
+        # look for sub conditions
+        for container in input_item.containers:
+            if container.has_conditions:
+                for condition in container.activation_condition.conditions:
+                    result = callback(input_item, container, condition)
+                    if not result:
+                        return
+                
+            for action_set in container.action_sets:
+                for action in action_set:
+                    for condition in action.activation_condition.conditions:
+                        result = callback(input_item, action, condition)
+                        if not result:
+                            return
+                    if action.tag == "gated-axis":
+                        # special handling for gated axis
+                        gate_data :  gremlin.gated_handler.GateData = action.gate_data
+                        gate : gremlin.gated_handler.GateInfo
+                        for gate in gate_data.getGates():
+
+                            # gate containers
+                            for condition, item in gate.item_data_map.items():
+                                result = self._filter_conditions_input_item(item, callback, extra_data)
+                                if not result:
+                                    return False
+
+                        rng : gremlin.gated_handler.RangeInfo
+                        for rng in gate_data.getRanges():
+                            # gate containers
+                            for condition, item in rng.item_data_map.items():
+                                result = self._filter_conditions_input_item(item,  callback, extra_data)
+                                if not result:
+                                    return False
+
+        return True                            
+                                
+
+    def filter_conditions(self, callback, extra_data : dict = None):
+        ''' filters conditions in the profile - the callback is called for every condition found in the profile '''
+        for dev_guid in self.devices:
+            dev = self.devices[dev_guid]
+            if dev.device_type == gremlin.types.DeviceType.State:
+                # state device (modeless) - special handling of state input items
+                state_data = gremlin.shared_state.current_profile.state
+                input_items = [state_data[key].input_item for key in state_data]
+                for item in input_items:
+                    result = self._filter_conditions_input_item(item,  callback, extra_data)
+                    if not result:
+                        return 
+            else:
+                for mode_name in dev.modes:
+                    mode_object = dev.modes[mode_name]
+                    for input_type in mode_object.config:
+                        for item in mode_object.config[input_type].values():
+                            result = self._filter_conditions_input_item(item, callback, extra_data)
+                            if not result:
+                                return
+
 
     def _findInputitemAction(self, input_item, action_id) -> AbstractAction:
         ''' locates an action by its id in an input item'''
@@ -5237,7 +5321,7 @@ class Profile():
         
         if voice_index is not None or voice_volume is not None or voice_rate is not None:
 
-            def _apply_voice_callback(action, extra_data : dict = None):
+            def _apply_voice_callback(action, extra_data : dict = None) -> bool:
                 nonlocal count
                 updated = False
                 if voice_index is not None and voice_index != action.voice_index:
@@ -5252,6 +5336,8 @@ class Profile():
 
                 if updated:
                     count += 1
+
+                return True
 
             self.filter_actions("text-to-speech", _apply_voice_callback)
                                                 

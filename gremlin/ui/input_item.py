@@ -165,7 +165,14 @@ class InputItemListModel(ui_common.AbstractModel):
 
     """Model storing a device's input item list."""
 
-    def __init__(self, device_data, mode, allowed_types = None, custom_update_handler = None, custom_remove_handler = None, custom_clear_handler = None, custom_filter_handler = None, show_master_mode = False, show_filtered_only = False):
+    def __init__(self, device_data, mode, allowed_types = None,
+                 custom_update_handler = None, 
+                 custom_remove_handler = None, 
+                 custom_clear_handler = None, 
+                 custom_filter_handler = None,
+                 custom_delete_confirm_handler = None,
+                 show_master_mode = False,
+                 show_filtered_only = False):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
@@ -193,6 +200,8 @@ class InputItemListModel(ui_common.AbstractModel):
         self._custom_clear_handler = custom_clear_handler
         self._custom_remove_handler = custom_remove_handler
         self._custom_filter_handler = custom_filter_handler # handles entries, return true to include, false to exclude
+        self._custom_delete_confirm_handler = custom_delete_confirm_handler # return true if the input can be deleted
+
         self.updateData()
 
     @property
@@ -504,14 +513,12 @@ class InputItemListModel(ui_common.AbstractModel):
             data = self.data(index)
             if data:
                 input_type = data.input_type
-                if not input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
+                if not input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi, InputType.State):
                     # cannot remove other types
                     return False
 
                 input_id = data.input_id
                 input_items = self._device_data.modes[self._mode]
-                # item_list = list(input_items.config[input_type].keys())
-                # item_index = item_list.index(input_id)
                 del input_items.config[input_type][input_id]
 
 
@@ -1694,7 +1701,12 @@ class InputItemWidget(QBoxFrame):
     # signal input value changed
     input_value_changed = Signal(InputIdentifier, float)
 
-    def __init__(self, identifier, parent=None, populate_ui_callback = None, populate_name_callback = None, update_callback = None, config_external = False, data = None):
+    def __init__(self, identifier, parent=None,
+                  populate_ui_callback = None,
+                  populate_name_callback = None, 
+                  update_callback = None, 
+                  confirm_delete_callback = None, 
+                  config_external = False, data = None):
         ''' builds the widget '''
 
         super().__init__(parent)
@@ -1706,6 +1718,7 @@ class InputItemWidget(QBoxFrame):
         self._ui_loaded = False
         self.data = data
         self._selected = False
+        self._confirm_delete_callback = confirm_delete_callback
         self.setContentsMargins(0,0,0,0)
         
         self._debug_layout = False
@@ -1722,6 +1735,7 @@ class InputItemWidget(QBoxFrame):
         self._multi_row = populate_ui_callback is not None
         self.populate_ui = populate_ui_callback # get custom content callback
         self.populate_name = populate_name_callback # get name callback
+        
         self._config_external = config_external # true if the widget is a custom widget configured externally
         self._update_callback = update_callback # callback to use when a specific widget index must be updated
 
@@ -2799,6 +2813,10 @@ class InputItemWidget(QBoxFrame):
     def _close_button_cb(self):
         ''' fires the closed event when the close button has been pressed '''
         
+        if self._confirm_delete_callback:
+            if not self._confirm_delete_callback(self._input_item):
+                # request failed
+                return
 
         # prompt
         msgbox =gremlin.ui.ui_common.ConfirmBox(prompt = "Remove this input?")

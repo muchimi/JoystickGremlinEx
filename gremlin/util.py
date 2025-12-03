@@ -1701,8 +1701,8 @@ def swapext(path, ext = None, prefix= '', suffix = ''):
     else:
         ext = old_ext
     if dirname:
-        return os.path.join(dirname, prefix + base + suffix + ext).lower()
-    return (prefix + base + suffix + ext).lower()
+        return os.path.normpath(os.path.join(dirname, prefix + base + suffix + ext).casefold())
+    return os.path.normpath((prefix + base + suffix + ext).casefold())
 
 def get_ext(path):
     # gets an extension

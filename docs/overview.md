@@ -42,7 +42,11 @@ The main purpose of GremlinEx is to map inputs from various devices to VJoy virt
 
 GremlinEx supports concurrently VJoy as an output device, as well as VJoy as an input device in the same profile.  When a VJoy device is configured as an input, it will add a new VJoy device to the list of input devices that can be mapped to in GremlinEx. When the VJoy button, hat or axis is set, either by another GremlinEx mapping, or a third party application, the input will trigger and GremlinEx will generate output based on the mappings for that input.
 
-By design a mapping that triggers a VJoy output will also trigger that VJoy's input, if mapped and enabled, from the same profile.  This allows VJoy to be used as a bank of axes, hats and buttons for multiple parts of a profile to interact with.  A common scenario is to setup extra VJoy devices to increas the number of buttons, hats and axes GremlinEx can use to keep track of states without having to use custom plugins, or the GremlinEx state machine.
+By design a mapping that triggers a VJoy output will also trigger that VJoy's input, if mapped and enabled, from the same profile.  This allows VJoy to be used as a bank of axes, hats and buttons for multiple parts of a profile to interact with.  A common scenario is to setup extra VJoy devices to increase the number of buttons, hats and axes GremlinEx can use to keep track of states without having to use custom plugins, or the GremlinEx state machine.
+
+![warning](assets/warning.png) It is generally discouraged to use the same VJOY device both as input and output in the same profile due to API limitations that can lead to race conditions, execution loops and deadlocks where VJOY devices could become "locked".  This is because the VJOY software is designed for it to be used per process as either input or output, not both (while possible as we work around this in GEX).  VJOY as input is meant to be used as a way to capture VJOY input data set from a different process (application).  It is supported in GEX, but has caveats that need to be considered when designing the profile to avoid these issues.
+
+![warning](assets/warning.png) VJOY input devices tend to create a significant number of inputs that GEX needs to track - up to 140 inputs per VJOY device used as input.  This can degrade user interface (UI) performance and increase the memory footprint at design time because of the need to visualize and track all these inputs.  Use the input filtering option available as of m76T115 to reduce the number of inputs visible in VJOY devices to keep the input count to a reasonable level.  The impact level is based on hardware capabilities, and the total number of inputs managed by GEX.  It is usually not an issue until you start getting into 400 to 500 inputs GEX has to track at the same time at edit time.  This does not impact runtime performance at all.  If you start noticing edit time performance degradation, it is likely due to the number of inputs and filtering should be used to keep that to a reasonable level.
 
 ### VJoy manual control
 
@@ -304,8 +308,7 @@ GremlinEx supports up to 8 axes, 128 buttons and four 8-way hats on each VJOY de
 
 It is recommended to have no more than three or four output VJOY devices, the primary reason being that many games only understand the first three HID devices.
 
-
-<img src="assets/warning.svg" width="32"> All defined VJOY devices must have a unique combination of axis, button or hat counts.  This is how these devices are differentiated as different devices as they all have the same name as currently defined in the device driver.  GremlinEx will throw an error if two VJOY devices have identical numbers of axis, buttons and hats.   The suggested method is to remove a button, so the first can be setup with 128 buttons, the second 127, and the third 126, etc...   Another popular method is to change the number of hats per device.
+![warning](assets/warning.png)All defined VJOY devices must have a unique combination of axis, button or hat counts.  This is how these devices are differentiated as different devices as they all have the same name as currently defined in the device driver.  GremlinEx will throw an error if two VJOY devices have identical numbers of axis, buttons and hats.   The suggested method is to remove a button, so the first can be setup with 128 buttons, the second 127, and the third 126, etc...   Another popular method is to change the number of hats per device.
 
 ## General structure of GremlinEx
 

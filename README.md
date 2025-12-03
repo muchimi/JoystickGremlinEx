@@ -18,6 +18,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T121)
+- New: States: State deletion will fail if the state is referenced somewhere in the profile such as a mapping, expression or condition.  This is to avoid removing a state without removing its dependencies.  A design decision was made to not automatically remove the references as that could break profile logic and intended behavior (for example, removing a state from an expression would change the expression).
+- Fix: legacy keyboard mapper - key display not updated. While resolving this, also modified the legacy action to output keys in human readable form in the profile XML as with the newer version of this action.
+- Fix: profile version converter: resolved an exception if the XML is malformed.
+- Fix: profile file name: verify .xml extension is provided when loading for files missing extensions when manual typing of the fine name to load is used.
+- Documentation updates.
+
 ### (m76T120)
 - New: Input filter gains a shift mode - when using a shortcut with a shift key down, the filter will only add to the current selection.
 - New: Axis names gain linear (L) index name in input name to be more consistent UI wide.  The L number is the axis number as sequenced by the HID descriptor. The axis number is the axis function reported by the HID descriptor to DINPUT, and is one of 8 possible values. Some devices can report different axes in a non sequential order (some axes are skipped, so linear axis 4 can be input 7) even though there are only 4 axes on the device.
