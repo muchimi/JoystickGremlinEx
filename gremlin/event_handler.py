@@ -496,6 +496,7 @@ class EventListener:
 	# signal emitted when the UI tabs are loaded and profiles are loaded - some widgets use this for post-UI initialization update that needs to occur after the UI data is completely loaded
 	tabs_loaded = Signal()
 	tab_filtered_changed = Signal(object, bool) # fires when tab filtering changes
+	input_filtered_change = Signal(object) # fires when input filter for joystick devices is changed (device_guid)
 
 	refresh_devices = Signal() # used to refresh the device list going into GremlinEx
 

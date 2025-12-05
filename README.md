@@ -19,14 +19,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T122)
+- New: Axis calibration data can be saved to a profile or global.  If calibration data is saved for a profile, it is unique to this profile.  If no profile calibration data is found, the global calibration data is used.  Profile calibration data is saved with the same profile name but as a .calib file.
 - Fix: Map to Keyboard/Mouse Ex: key no longer update on key selection dialog close.
 - Fix: Map to Keyboard/Mouse Ex: multi-key exception.
 - Fix: Filter dialog: filtered axes do not trigger a highlight.
-- Fix: Calibration Dialog: reset button does not update inversion checkbox.
-- Fix: Calibration Dialog: check for C++ garbage collection.
-- Fix: Calibration Dialog: workaround for QT crash on window geometry update 
-- Fix: Calibration Dialog: ensure axis updates occur on UI thread.
-- New: Calibration data can be saved to a profile or global.  If calibration data is saved for a profile, it is unique to this profile.  If no profile calibration data is found, the global calibration data is used.  Profile calibration data is saved with the same profile name but as a .calib file.
+- Fix: Filter dialog: mapped only filter exception on devices with non sequential axes.
+- Fix: Filter dialog: filtering data sync issue.
+- Fix: Calibration Dialog: reset does not update inversion checkbox.
+- Fix: Calibration Dialog: added various QT crash workarounds.
+
+- Update: **Python 3.13.10 December 2, 2025** release (note, cannot use 3.14 because QT does not yet support it).  
+- Update: **Pyside6 (QT for Python) 6.10.1 November 20, 2025** release (bug fixes)
 
 
 ### (m76T121)

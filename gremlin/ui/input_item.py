@@ -328,17 +328,10 @@ class InputItemListModel(ui_common.AbstractModel):
                 for data_key in sorted_keys:
                     data : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
                     # add hardware GUID reference to data block so we have an easier reference to it
-                    if self._show_filtered_only:
-                        # convert axis key to linear
-                        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(data.device_guid)
-                        if data.input_type == InputType.JoystickAxis:
-                            
-                            input_id = device.getAxisLinearId(data.input_id)
-                        else:
-                            input_id = data.input_id
-                    
-
-                        filtered = profile.settings.getFiltered(data.device_guid, data.input_type, input_id)
+                    device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(data.device_guid)
+                    if self._show_filtered_only or device.device_type == DeviceType.Joystick:
+                        filtered = profile.settings.getFiltered(data.device_guid, data.input_type, data.input_id)
+                        
                         if filtered:
                             continue
                         if verbose: syslog.info(f"Input {device.name} : {data.input_type.name} {data.input_id} visible")

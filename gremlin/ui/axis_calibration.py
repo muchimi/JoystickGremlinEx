@@ -41,7 +41,9 @@ import gremlin.threading
 import queue
 import time
 import copy
-syslog = logging.getLogger("system♂")
+
+
+syslog = logging.getLogger("system")
 
 
 class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
@@ -627,9 +629,8 @@ class CalibrationManager():
         if profile:
             fname = profile.profile_file
             if fname:
-                fname = gremlin.util.strip_ext(fname)
-                fname += ".calib.xml"
-                return fname
+                # swap to a .calib file
+                return gremlin.util.swap_ext(fname,".calib")
         return None
     
     @property
@@ -719,13 +720,14 @@ class CalibrationManager():
             load_specific = False
             xpath = "//calibration"
 
+
         for fname, source in f_list:
             if fname and os.path.isfile(fname):
                 
 
                 parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
                 try:
-                    root = etree.parse(self.global_calibration_file, parser=parser)
+                    root = etree.parse(fname, parser=parser)
 
                     nodes = root.xpath(xpath)
                     

@@ -11627,6 +11627,8 @@ class QJoystickInputWidget(QtWidgets.QWidget):
 
 
     def _update_ui(self, filtered_axis = None, filtered_button = None, filtered_hat = None, visible_count = None):
+        if not Shiboken.isValid(self):
+            return
         widgets = []
         fcolor = Color.blueColor()
         gremlin.util.clear_layout(self.main_layout)

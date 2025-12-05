@@ -1050,13 +1050,16 @@ The delete curve button is used to remove a curve.  A confirmation box will be d
 
 ### Axis Calibration
 
-The purpose of calibration is to filter and re-scale input data before it is further processed by GremlinEx by curves or action.  The available filters enable you to:
+The purpose of calibration is to filter or re-scale input data before it is further processed by GremlinEx by curves or action.  The available filters enable you to:
 
 - Tell GremlinEx if the axis has a center detent or not.  Center detents means the input axis usually is held at a center position in normal use.  This is different from a slider axis which is typically only linear and has a minimum/maximum only.
 - Tell GremlinEx if the input should be inverted (reversed).  This feature flips the direction of travel and is hardware dependent. Note that if you need to invert an axis only for a specific profile specific, use the inversion setting with a curve input or response curve setting, or at the action level in Map to Vjoy as the inversion setting in the calibration dialog is global, thus applies to all profiles.
 - If you have a noisy (usually potentiometer based) input, ability to set input deadzones.  Deadzone identify areas of flutter, or noisy input, where the input sends data even if it's not moving, or sends a range of data that varies at the extremity of travel or while in the center position. Inputs that use optical or hall effect sensors to detect motion usually do not need this.
+- Invert the input which is part of calibration.  Inverted data just reverses the input before downstream actions are executed so this can be seen as a "global" setting for the axis.
 
 Starting with GremlinEx 13.40.16, calibration is done individually for each input axis as needed.
+
+Starting with GEX m76T121, calibration data can be saved on a per profile basis, or global, or both.   The way this works is if calibration data is saved on a profile, it will be used instead of any global calibration.  
 
 The calibration button shows in the input axis toolbar for axis devices only as indicated below.
 

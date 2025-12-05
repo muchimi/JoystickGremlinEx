@@ -1883,26 +1883,13 @@ class Settings:
     
         
 
-    def setFiltered(self, device_guid: dinput.GUID | str | int, input_type : InputType, input_id : int, value : bool):
-        ''' marks a joystick input as filtered or not '''
-        device = gremlin.joystick_handling.getDevice(device_guid)
-        if not device:
-            syslog.warning(f"SET FILTER: unknown device [{device_guid}]")
-            return
-            
-        device_guid = device.device_guid
-        if not device_guid in self.input_filter:
-            self.input_filter[device_guid] = {}
-        if not input_type in self.input_filter[device_guid]:
-            self.input_filter[device_guid][input_type] = {}
-        self.input_filter[device_guid][input_type][input_id] = value
-
+    
 
     def isFiltered(self, device_guid: dinput.GUID | str | int) -> bool:
         ''' true if the device has inputs that are currently filtered '''
         device = gremlin.joystick_handling.getDevice(device_guid)
         if not device:
-            syslog.warning(f"IS FILTER: unknown device [{device_guid}]")
+            syslog.warning(f"PROFILE IS FILTER: unknown device [{device_guid}]")
             return False
         device_guid = device.device_guid
         if not device_guid in self.input_filter:
@@ -1965,6 +1952,7 @@ class Settings:
         :param mode: "default","mapped","hide_all" 
         '''
         config = gremlin.config.Configuration()
+        device : dinput.DeviceSummary
         
         match mode:
             case "default":
@@ -1983,10 +1971,11 @@ class Settings:
 
             case "mapped":
                 # set all joystick devices to show mapped inputs
+                
                 for device in gremlin.joystick_handling.all_joystick_devices():
                     device_guid = device.device_guid
                     for index in range(device.axis_count):
-                        input_id = index + 1
+                        input_id = device.axis_sequence_to_input_id(index)
                         is_used = self.profile.isInputMapped(device_guid, InputType.JoystickAxis, input_id)
                         self.setFiltered(device_guid, InputType.JoystickAxis, input_id, not is_used)
                     for index in range(device.button_count):
@@ -2003,7 +1992,7 @@ class Settings:
                 for device in gremlin.joystick_handling.all_joystick_devices():
                     device_guid = device.device_guid
                     for index in range(device.axis_count):
-                        input_id = index + 1
+                        input_id = device.axis_sequence_to_input_id(index)
                         self.setFiltered(device_guid, InputType.JoystickAxis, input_id, True)
                     for index in range(device.button_count):
                         input_id = index + 1
@@ -2019,6 +2008,7 @@ class Settings:
                 continue
             
             syslog.info("=" * 30)
+            syslog.info("PROFILE FILTER DUMP")
             device = gremlin.joystick_handling.getDevice(device_guid)
             syslog.info(f"Input filter dump for {device.name}")
             visible_count = 0
@@ -2031,15 +2021,43 @@ class Settings:
             syslog.info(f"\tVisible count: {visible_count}")
                              
 
+    def setFiltered(self, device_guid: dinput.GUID | str | int, input_type : InputType, input_id : int, value : bool):
+        ''' marks a joystick input as filtered or not '''
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            syslog.warning(f"PROFILE SET FILTER: unknown device [{device_guid}]")
+            return
+        
+        verbose = gremlin.config.Configuration().verbose_mode_filter
+        # verbose = True
+
+        device_guid = device.device_guid
+        if not device_guid in self.input_filter:
+            self.input_filter[device_guid] = {}
+        if not input_type in self.input_filter[device_guid]:
+            self.input_filter[device_guid][input_type] = {}
+        self.input_filter[device_guid][input_type][input_id] = value
+
+        el = gremlin.event_handler.EventListener()
+        el.input_filtered_change.emit(device_guid) # tell the widget the input list has changed
+
+
+        if verbose and input_type == InputType.JoystickAxis and not device.is_virtual and "LEFT" in device.name:
+            syslog.info(f"PROFILE SET FILTER: [{device.name}] axis: [{input_id}] filtered: {self.input_filter[device_guid][input_type][input_id]}")
 
     def getFiltered(self, device_guid : dinput.GUID | str | int, input_type : InputType, input_id : int | object) -> bool:
         ''' gets the joystick input filtered state '''
         device = gremlin.joystick_handling.getDevice(device_guid)
         device_guid = device.device_guid
-        if not device_guid in self.input_filter:
-            config = gremlin.config.Configuration()
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_filter
+        # verbose = True
 
+
+        if not device_guid in self.input_filter:
             max_count = config.device_filter_max_axis
+            if verbose:
+                syslog.info(f"PROFILE GET FILTER: [{device.name}] not found - set default filter")
             if device.axis_count > max_count:
                 self._set_default_filter_list(device, InputType.JoystickAxis, max_count)
             max_count = config.device_filter_max_button
@@ -2050,25 +2068,26 @@ class Settings:
                 self._set_default_filter_list(device, InputType.JoystickHat, max_count)
             else:                    
                 self.input_filter[device_guid] = {}
-        
+    
         if not input_type in self.input_filter[device_guid]:
-            self.input_filter[device_guid][input_type] = {}
+            return True
             
         if not input_id in self.input_filter[device_guid][input_type]:
-            self.input_filter[device_guid][input_type][input_id] = True
+            return True # by default
+
+
+
+
+        if verbose and input_type == InputType.JoystickAxis and not device.is_virtual and "LEFT" in device.name:
+            syslog.info(f"PROFILE GET FILTER: [{device.name}] axis: [{input_id}] filtered: {self.input_filter[device_guid][input_type][input_id]}")
             
         return self.input_filter[device_guid][input_type][input_id]
     
    
     def getFilterMap(self):
         ''' gets the input filter'''
-        return self.input_filter
+        return copy.deepcopy(self.input_filter) # return a copy so settings are not mutable
     
-    def setFromFilterMap(self, data):
-        ''' copies the input filter list as a deep copy '''
-        self.input_filter = copy.deepcopy(data)
-
-
 
 def extract_remap_actions(action_sets):
     """Returns a list of remap actions from a list of actions.

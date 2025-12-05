@@ -574,6 +574,16 @@ class DeviceSummary:
         if index in self.linear_id_map:
             return self.linear_id_map[index]
         return index
+    
+    def axis_sequence_to_input_id(self, index : int):
+        ''' zero based index to input ID for axes'''
+        linear_id = index + 1
+        if self.is_virtual:
+            return linear_id
+        if linear_id in self.linear_id_map:
+            return self.linear_id_map[linear_id]
+        
+
 
         
 
