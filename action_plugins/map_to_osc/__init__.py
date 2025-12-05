@@ -648,7 +648,7 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' reset IP and port to configured defaults '''
         msgbox = gremlin.ui.ui_common.ConfirmBox(f"Reset server data to defaults?")
         result = msgbox.show()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        if result == QtWidgets.QDialog.Accepted:
             config = gremlin.config.Configuration()
             self._server_ip_widget.setText(config.osc_host) # also updates action_data
             self._server_port_widget.setValue(config.osc_output_port) # also updates action_data

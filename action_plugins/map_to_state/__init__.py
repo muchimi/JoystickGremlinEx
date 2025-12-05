@@ -567,7 +567,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' sets all mappings to pulse mode '''
         msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Clear all hat button mappings?")
         result = msgbox.show()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        if result == QtWidgets.QDialog.Accepted:
             positions = self.action_data.hat_positions
             for position in positions:
                 self.action_data.hat_map[position] = 0
@@ -578,7 +578,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' sets all mappings to pulse mode '''
         msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Remap all hat button mappings?")
         result = msgbox.show()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        if result == QtWidgets.QDialog.Accepted:
             positions = self.action_data.hat_positions
             vjoy_id = self.action_data.vjoy_id
             if vjoy_id in self.action_data:

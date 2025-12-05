@@ -814,6 +814,9 @@ class Icons():
     def warningIcon():
         return Icons._icon("ph.shield-warning-fill",qta_color=QtGui.QColor(Color.warningColor()))
     @staticmethod
+    def infoIcon(qta_color = "#34b7eb"):
+        return Icons._icon("fa5s.info-circle",qta_color=qta_color)
+    @staticmethod
     def mappedIcon(qta_color = None):
         if not qta_color: qta_color = Color.normalColor()
         return Icons._icon("ph.tree-structure-fill", qta_color = qta_color)
@@ -3871,66 +3874,26 @@ class ConfirmBox():
     def __init__(self, title = "Confirmation Required:", prompt = "Are you sure?", parent = None):
 
         from gremlin.util import load_pixmap
-        self._message_box = QMessageBox(parent = parent)
-        # pixmap = load_pixmap("warning.svg")
-        # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.questionIcon())
-
-        self._message_box.setIconPixmap(pixmap)
-        self._message_box.setText(title)
-        self._message_box.setInformativeText(prompt)
-        self._message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok |
-            QtWidgets.QMessageBox.StandardButton.Cancel
-            )
-        self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-        #gremlin.util.centerDialog(self._message_box)
-        
-
+        self._message_box = MessageBoxDialog(icon = Icons.questionIcon(), is_yesno=True, parent = parent, title = title, text = prompt)
+   
     def show(self):
         return self._message_box.exec()
 
-class QMessageBox(QtWidgets.QMessageBox):
-    def __init__(self, width = 240, height = 100, parent = None):
-        super().__init__(parent)
-        self._width = width
-        self._height = height
-
-    def resizeEvent(self, event):
-        self.setFixedWidth(self._width)
-        self.setFixedHeight(self._height)
-
-    def showEvent(self, event):
-        # Show the dialog at the current mouse position
-        geom = self.frameGeometry()
-        geom.moveCenter(QtGui.QCursor.pos())
-        self.setGeometry(geom)
-        super().showEvent(event)
 
 
-class MessageBox():
-    def __init__(self, title = "Notice", prompt = "Operation", is_warning = True, parent = None, width = 200):
+@staticmethod
+def MessageBox(title = "Notice", prompt = "Operation", is_warning = True, parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, is_warning, parent)
 
-        from gremlin.util import load_pixmap
-        self._message_box = QMessageBox(parent = parent, width = width)
-
-        # force the cursor
-        
-
-        if is_warning:
-            # pixmap = load_pixmap("warning.svg")
-            # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
-            self._message_box.setIconPixmap(pixmap)
-        self._message_box.setText(title)
-        self._message_box.setInformativeText(prompt)
-        self._message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok
-            )
-        self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-        #gremlin.util.centerDialog(self._message_box)
-        self._message_box.exec()
-
+@staticmethod
+def _message_box_ui(title = "Notice", prompt = "Operation", is_warning = True, parent = None):
+    if is_warning:
+        # warning icon
+        icon = gremlin.ui.ui_common.Icons.warningIcon()
+    else:
+        icon = gremlin.ui.ui_common.Icons.infoIcon()
+    dialog = MessageBoxDialog(title, prompt, icon = icon, parent = parent)
+    dialog.exec()
 
 
 
@@ -3996,6 +3959,7 @@ class QIconLabel(QtWidgets.QWidget):
 
         self._label_widget.setStyleSheet("background: none;")
         container_layout.addWidget(self._label_widget)
+
         if stretch:
             container_layout.addStretch()
 
@@ -4169,7 +4133,7 @@ class QDataPushButton(QtWidgets.QPushButton):
 
 
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, callback_ex = None):
+    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, callback_ex = None, enabled = None):
         ''' custom push button 
         
         :param text: label for the button (optiona)
@@ -4191,6 +4155,8 @@ class QDataPushButton(QtWidgets.QPushButton):
             self.clickedEx.connect(callback_ex)
         self._callback = callback
         self._callback_ex = callback_ex
+        if enabled is not None:
+            self.setEnabled(enabled)
 
         self.installEventFilter(self)
 
@@ -9479,6 +9445,7 @@ def getHContainer(widget_or_list = None,
                   font = None,
                   left_margin = 0,
                   right_margin = 0,
+                  no_stretch = False,
                   widget_only = False):
     ''' gets a qt H container widget 
     
@@ -9499,7 +9466,8 @@ def getHContainer(widget_or_list = None,
     layout = QtWidgets.QHBoxLayout(widget)
     widget.setContentsMargins(left_margin,0,right_margin,0)
     layout.setContentsMargins(0,0,0,0)
-    stretch = left_stretch
+
+    stretch = False if no_stretch else left_stretch
 
     if min_height is not None:
         widget.setMinimumHeight(min_height)
@@ -9509,7 +9477,8 @@ def getHContainer(widget_or_list = None,
 
     if label:
         layout.addWidget(QtWidgets.QLabel(label))
-        stretch = True
+        if not no_stretch:
+            stretch = True
     if widget_or_list:
         if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
@@ -12880,31 +12849,60 @@ class ActionContainerDialog(QRememberDialog):
 
 class MessageBoxDialog(QShowAtCursorDialog):
     ''' enhanced message box '''
-    def __init__(self, title : str = None, text : str = None, icon = None,  parent = None):
+    def __init__(self, title : str = None, text : str = None,  icon = None,  is_yesno = False, parent = None):
         super().__init__(parent = parent)
 
+        gremlin.util.assert_ui_thread()
         self.setWindowTitle("Notice")
         self.setModal(True)
         
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        two_columns = icon is not None
 
-        if icon and title:
-            widget = QIconLabel(icon, title)
+        if two_columns:
+            left_panel = getVContainer(QIconLabel(icon, icon_size=48), widget_only=True)
+            right_panel, content_layout = getVContainer()
+            widget = getHContainer([left_panel, right_panel], widget_only=True)
             self.main_layout.addWidget(widget)
-        elif title:
+        else:
+            content_widget, content_layout = getVContainer()
+            self.main_layout.addWidget(content_widget)
+
+        if title:
             widget = QtWidgets.QLabel(title)
-            self.main_layout.addWidget(widget)
-
+            content_layout.addWidget(widget)
+        
         if text:
             widget = QtWidgets.QLabel(text)
             widget.setTextFormat(QtCore.Qt.RichText)
-            self.main_layout.addWidget(widget)
+            content_layout.addWidget(widget)
 
+
+        self.main_layout.addWidget(QtWidgets.QLabel(" ")) # spacer
+
+        if is_yesno:
+            yes_widget = QDataPushButton("Yes", callback = self._handle_yes)
+            no_widget = QDataPushButton("No", callback = self._handle_no)
+            widgets = ["||",yes_widget, no_widget,"||"]
+
+        else:
+
+            close_button_widget = QDataPushButton("Close", callback = self.close)
+            close_button_widget.setToolTip("Closes the dialog")
+            widgets = ["||",close_button_widget,"||"]
         
-
-        close_button_widget = QDataPushButton("Close", callback = self.close)
-        close_button_widget.setToolTip("Closes the dialog")
-        widget = getHContainer(close_button_widget, widget_only=True, left_stretch=True)
+        
+        widget = getHContainer(widgets, widget_only=True,no_stretch=True)
         self.main_layout.addWidget(widget)
 
         self.main_layout.addStretch()
+
+    @QtCore.Slot()
+    def _handle_yes(self):
+        self.accept()
+
+
+    @QtCore.Slot()
+    def _handle_no(self):
+        self.reject()
+        

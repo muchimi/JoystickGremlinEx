@@ -60,7 +60,7 @@ _deadzone_preset_string_lookup = {
 class DeadzoneWidget(QtWidgets.QWidget):
     ''' deadzone widget '''
 
-    changed = Signal() # indicates the data has changed
+    changed = QtCore.Signal() # indicates the data has changed
     
 
     def __init__(self, profile_data, parent=None):

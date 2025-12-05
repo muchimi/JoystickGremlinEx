@@ -18,6 +18,17 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T122)
+- Fix: Map to Keyboard/Mouse Ex: key no longer update on key selection dialog close.
+- Fix: Map to Keyboard/Mouse Ex: multi-key exception.
+- Fix: Filter dialog: filtered axes do not trigger a highlight.
+- Fix: Calibration Dialog: reset button does not update inversion checkbox.
+- Fix: Calibration Dialog: check for C++ garbage collection.
+- Fix: Calibration Dialog: workaround for QT crash on window geometry update 
+- Fix: Calibration Dialog: ensure axis updates occur on UI thread.
+- New: Calibration data can be saved to a profile or global.  If calibration data is saved for a profile, it is unique to this profile.  If no profile calibration data is found, the global calibration data is used.  Profile calibration data is saved with the same profile name but as a .calib file.
+
+
 ### (m76T121)
 - New: States: State deletion will fail if the state is referenced somewhere in the profile such as a mapping, expression or condition.  This is to avoid removing a state without removing its dependencies.  A design decision was made to not automatically remove the references as that could break profile logic and intended behavior (for example, removing a state from an expression would change the expression).
 - Fix: legacy keyboard mapper - key display not updated. While resolving this, also modified the legacy action to output keys in human readable form in the profile XML as with the newer version of this action.

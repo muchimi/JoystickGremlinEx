@@ -868,20 +868,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         current_mode = gremlin.shared_state.current_mode
         msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
         result = msgbox.show()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        if result == QtWidgets.QDialog.Accepted:
             self._tab_clear_map_execute(device, current_mode)
 
     def _tab_remove_device_cb(self):
         ''' removes a disconnected device from the menu '''
         self.change_visible_profile_devices()
 
-        # tab_guid = gremlin.util.parse_guid(self._active_tab_guid())
-        # device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
-        # if not device.connected:
-        #     msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove this device from the profile?")
-        #     result = msgbox.show()
-        #     if result == QtWidgets.QMessageBox.StandardButton.Ok:
-        #         self._tab_remove_device_execute(device)
 
     def _tab_import_cb(self):
         ''' imports a profile into the device '''
@@ -4637,6 +4630,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not new_profile.settings.input_filter:
                 # default to mapped mode for older profiles without data
                 new_profile.settings.setAllFiltered("mapped")
+
+            # reload the calibration data if the profile has custom calibration
+            mgr = gremlin.ui.axis_calibration.CalibrationManager()
+            mgr.reload()
 
 
             # select the new mode

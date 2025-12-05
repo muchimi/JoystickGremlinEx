@@ -1966,7 +1966,8 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = msg)
         result = msgbox.show()
 
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        
+        if result == QtWidgets.QDialog.Accepted:
 
             self._model.clear()
             for item in keep:

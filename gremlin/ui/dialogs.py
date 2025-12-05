@@ -3539,7 +3539,7 @@ The setting can be overriden by the global mode reload option set in Options for
         msgbox = gremlin.ui.ui_common.ConfirmBox(prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?")
         msgbox.show()
         result = msgbox.show()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        if result == QtWidgets.QDialog.Accepted:
             self._delete_mode_confirm(mode_name)
 
 

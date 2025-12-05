@@ -1003,7 +1003,7 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
             
             if not input_type in self.input_widgets:
                 self.input_widgets[input_type] = {}
-            self.input_widgets[input_type][filtered_id] = btn
+            self.input_widgets[input_type][input_id] = btn
 
         self.input_map = data
   

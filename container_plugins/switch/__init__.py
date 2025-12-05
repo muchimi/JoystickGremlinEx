@@ -238,7 +238,7 @@ class SwitchWidget(QtWidgets.QWidget):
     def _delete_cb(self):
         msgbox = gremlin.ui.ui_common.ConfirmBox(f"Delete switch {self.data.index}?")
         result = msgbox.show()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        if result == QtWidgets.QDialog.Accepted:
             self.delete_item.emit(self.data)
 
     def _listen_cb(self):

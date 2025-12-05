@@ -1234,7 +1234,7 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
         if self.action_data.args:
             msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove arguments?")
             result = msgbox.show()
-            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            if result == QtWidgets.QDialog.Accepted:
                 self.action_data.args.clear()
                 self._update()
 

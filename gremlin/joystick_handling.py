@@ -1129,6 +1129,10 @@ def joystick_devices_initialization():
     # register special devices
     registerSpecialDevices()
 
+    # update calibration on initial joystick device load
+    mgr = gremlin.ui.axis_calibration.CalibrationManager()
+    mgr.reload()
+
 def joystick_initialized():
     global _joystick_initialized
     return _joystick_initialized

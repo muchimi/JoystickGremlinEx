@@ -1972,7 +1972,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             msgbox = gremlin.ui.ui_common.ConfirmBox(f"Delete selected entries?")
             result = msgbox.show()
 
-            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            if result == QtWidgets.QDialog.Accepted:
                 rows = [idx.row() for idx in indices]
                 keep = []
                 for index, item in enumerate(self.action_data.sequence):

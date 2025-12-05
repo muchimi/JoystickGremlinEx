@@ -2200,7 +2200,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         # confirm
         msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove {item.sim_name}?")
         result = msgbox.show()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        if result == QtWidgets.QDialog.Accepted:
             if item and self.options.removeEntry(item):
                 self._populate_ui()
 

@@ -204,6 +204,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         # grab the new data
         self.action_data.keys = gremlin.keyboard.sort_keys(self._keyboard_dialog.keys)
         self.action_modified.emit()
+        self._populate_ui()
         gremlin.shared_state.pop_suspend_ui_keyinput()
 
 
@@ -334,15 +335,19 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             
 
 
-    def _handle_key_input(self, key):
+    def _handle_key_input(self, key : gremlin.keyboard.Key | list[gremlin.keyboard.Key]):
         gremlin.util.InvokeUiMethod(self._handle_key_input_ui, key)
 
-    def _handle_key_input_ui(self, key : gremlin.keyboard.Key):
+    def _handle_key_input_ui(self, key : gremlin.keyboard.Key | list[gremlin.keyboard.Key]):
         # handles an input key on the UI thread
         if not self.keys:
             gremlin.util.clear_layout(self.key_combination_layout) # clear the prior message
-        if not key in self.keys:
-            self._add_key(key)
+        
+        key_list = key if hasattr(key,"__iter__") else [key]
+        
+        for key in key_list:
+            if not key in self.keys:
+                self._add_key(key)
         
 
 

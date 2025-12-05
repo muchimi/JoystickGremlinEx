@@ -2821,7 +2821,7 @@ class InputItemWidget(QBoxFrame):
         # prompt
         msgbox =gremlin.ui.ui_common.ConfirmBox(prompt = "Remove this input?")
         result = msgbox.show()
-        if result != QtWidgets.QMessageBox.StandardButton.Ok:
+        if result != QtWidgets.QDialog.Accepted:
             return
 
         # remove the tracker objects
