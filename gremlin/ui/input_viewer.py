@@ -700,9 +700,12 @@ States can be toggled by clicking on the state button.  Expression states will u
     @QtCore.Slot()
     def _closed(self):
         ''' save the config on close'''
-        self._clear()
         el = gremlin.event_handler.EventListener()
         el.joystick_event.disconnect(self._joystick_event_handler)
+
+        self._clear()
+
+
 
     def _delete_widget(self, widget):
         if widget and Shiboken.isValid(widget):
@@ -716,16 +719,6 @@ States can be toggled by clicking on the state button.  Expression states will u
     def _clear(self):
         ''' clears all widgets '''
         assert gremlin.util.is_ui_thread()
-
-        # if self.state_widget_selector and Shiboken.isValid(self.state_widget_selector):
-        #     with QtCore.QSignalBlocker(self.state_widget_selector):
-        #         self.state_widget_selector.setChecked(False)
-        #         self._state_visible = False
-        
-        # if self.keyboard_widget_selector and Shiboken.isValid(self.keyboard_widget_selector):
-        #     with QtCore.QSignalBlocker(self.keyboard_widget_selector):
-        #         self.keyboard_widget_selector.setChecked(False)
-        #         self._keyboard_visible = False
 
         self._delete_widget(self._state_filter_widget)
         self._delete_widget(self._state_visualizer_widget)
@@ -756,8 +749,6 @@ States can be toggled by clicking on the state button.  Expression states will u
         # widgets = gremlin.util.get_layout_widgets(self.main_layout)
         # for widget in widgets:
         #     self._delete_widget(widget)
-        
-      
     
 
 
@@ -1142,8 +1133,12 @@ class InputViewerArea(QtWidgets.QScrollArea):
 
 
 
-        def updateLayout(self):
-            pass
+    def unhook(self):
+        for widget in self.widgets:
+            gremlin.util.delete_widget(widget)
+        self.widgets.clear()
+        gremlin.util.clear_layout(self.scroll_layout)
+
 
     def sizeHint(self):
         return QtCore.QSize(200,200)
@@ -1197,20 +1192,9 @@ class InputViewerArea(QtWidgets.QScrollArea):
             
     def clear(self):
         ''' clears all widgets '''
-        assert gremlin.util.is_ui_thread()
         if not Shiboken.isValid(self):
             return
-        for widget in self.widgets:
-            
-            if hasattr(widget,"unhook"):
-                widget.unhook()
-            if Shiboken.isValid(widget):
-                widget.setVisible(False)
-                self.container_layout.removeWidget(widget)    
-                widget.deleteLater()
-            #del self.widgets[self.widgets.index(widget)]
-            
-        self.widgets.clear()
+        self.unhook()
 
 
 _visualization_config = VisualizationConfig()

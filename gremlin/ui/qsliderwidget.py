@@ -23,7 +23,7 @@ import gremlin.shared_state
 import gremlin.types
 import gremlin.util
 from  PySide6.QtCore import (
-    Qt, QSize, QPoint, QPointF, QRectF, QRect, QThread, QTimer,
+    Qt, QSize, QPoint, QPointF, QRectF, QRect,
     QEasingCurve, QPropertyAnimation, QSequentialAnimationGroup,
     Slot, Property)
 
@@ -142,7 +142,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._hover_range_handle_pair = None # hover index pairs
         self._hover_lock = False # true when a drag operation is in process to keep the hover as-is
 
-        self._tooltip_timer : QTimer = None # tooltip delay timer
+        self._tooltip_timer  = None # tooltip delay timer
         self._tooltip_handle_map = {} # tooltips to display for the given handle, key is the index of the handle, 0 based
         self._tooltip_range_map = {} # tooltips for a given range, the key is a tuple of the index two bounding gates (a,b)
         self._desired_height = 32
@@ -894,11 +894,10 @@ class QSliderWidget(QtWidgets.QWidget):
         if self._tooltip_timer is not None:
             self._tooltip_timer.cancel()
 
+        # update m76T122 - remove all instances of QTimer to avoid mixing and matching QT threading model from Python threading model
+        # syncing with QT is manually handled to guard against pitfalls
+
         self._tooltip_timer = threading.Timer(1, self._create_tooltip_callback(message))    
-        # self._tooltip_timer = QTimer(self)   
-        # self._tooltip_timer.setInterval(1000)
-        # self._tooltip_timer.setSingleShot(True)
-        # self._tooltip_timer.timeout.connect(lambda: QToolTip.showText(QCursor.pos(), message, self))
         self._tooltip_timer.start()
 
     def _create_tooltip_callback(self, message):

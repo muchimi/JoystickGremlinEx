@@ -489,6 +489,10 @@ def delete_widget(widget : QtWidgets.QWidget):
     if widget and Shiboken.isValid(widget):
         widget.hide() # hide the widget from the UI
         # clear any widget layout to release contents as well
+        if hasattr(widget,"unhook"):
+            widget.unhook()
+        if hasattr(widget,"_cleanup_ui"):
+            widget._cleanup_ui()
         layout = widget.layout()
         if layout is not None:
             clear_layout(layout)

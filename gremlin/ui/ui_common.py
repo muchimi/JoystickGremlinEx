@@ -6493,6 +6493,9 @@ class AxesTimeline(QtWidgets.QGroupBox):
         layout.addLayout(self.legend_layout)
 
 
+    def unhook(self):
+        gremlin.util.clear_layout(self.layout())
+
     def add_point(self, value, series_id):
         """Adds a new point to the timline.
 
@@ -6543,17 +6546,36 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         # Step size per update
         self._step_size = 1
 
-        interval = int(1000/60)
+        # update m76T123 - remove all instances of QTimer to avoid mixing and matching QT threading model from Python threading model
+        # syncing with QT is manually handled to guard against pitfalls
 
-        # Update the plot
-        self._update_timer = QtCore.QTimer(self)
-        self._update_timer.timeout.connect(self._update_pixmap)
-        self._update_timer.start(interval)
+        self._interval = 1/60 # in seconds
+        self._is_running = True # run flag for the update thread
+        self._thread = threading.Thread(target = self._update_runner)
+        self._thread.name = "TimeLinePlotRunner"
+        self._thread.start()
+    
 
-        # Redrawing of the widget
-        self._repaint_timer = QtCore.QTimer(self)
-        self._repaint_timer.timeout.connect(self.update)
-        self._repaint_timer.start(interval)
+
+    def _update_runner(self):
+        ''' update thread for the visualization '''
+        while self._is_running:
+            gremlin.util.InvokeUiMethod(self._handle_update_ui)
+            time.sleep(self._interval)
+
+    def _handle_update_ui(self):
+        if Shiboken.isValid(self):
+            self._update_pixmap()
+            self.update()
+
+
+    def unhook(self):
+        ''' occurs on cleanup '''
+        self._is_running = False
+        if self._thread.is_alive():
+            self._thread.join()
+            self._thread = None
+    
 
     def resizeEvent(self, event):
         """Handles resizing this widget.
@@ -6678,7 +6700,7 @@ class VigemDeviceWidget(QtWidgets.QWidget):
 
         self._hooked = False
 
-    def _clear_ui(self):
+    def _cleanup_ui(self):
         self.unhook()   
 
 
@@ -6830,7 +6852,12 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
 
-    def _clear_ui(self):
+    def _cleanup_ui(self):
+        if self.widgets:
+            for widget in self.widgets:
+                gremlin.util.delete_widget(widget)
+            self.widgets.clear()
+
         self.unhook()
 
     def minimumSizeHint(self):
@@ -12625,13 +12652,17 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
         gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
 
     def _handle_listen_selection_ui(self, event):
+    
         dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
         if self._virtual_only and not dev.is_virtual:
             return
-        self._selected_device =  dev
-        self._selected_input_type = event.event_type
-        self._selected_input_id = event.identifier
-        self.selector_widget.select(self._selected_device, self._selected_input_type, self._selected_input_id)
+        if event.event_type:
+            self._selected_device =  dev
+            self._selected_input_type = event.event_type
+            self._selected_input_id = event.identifier
+            self.selector_widget.select(self._selected_device, self._selected_input_type, self._selected_input_id)
+        else:
+            syslog.warning(f"INPUT SELECTION: received an invalid event with no input type: {str(event)}")
 
 
 
@@ -12645,7 +12676,11 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
     def _execute_cb(self):
         ''' ok button pressed'''
         import gremlin.input_types
-        self._selected_data = (self._selected_device, gremlin.input_types.InputType(self._selected_input_type), self._selected_input_id)
+        if self._selected_device is None or self._selected_input_type is None or self._selected_input_id is None:
+            syslog.warn("INPUT SELECTION: invalid selection - missing device, type or input id")
+            self._selected_data = None
+        else:
+            self._selected_data = (self._selected_device, gremlin.input_types.InputType(self._selected_input_type), self._selected_input_id)
         self.close()
 
 
