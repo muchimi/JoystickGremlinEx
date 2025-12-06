@@ -18,6 +18,10 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T122A)
+- Fix: Save calibration only saves first device in the calibration data.
+- Fix: Removed QT timer from slider widget and replaced with regular timer to avoid potential issue with QT threads.
+
 ### (m76T122)
 - New: Axis calibration data can be saved to a profile or global.  If calibration data is saved for a profile, it is unique to this profile.  If no profile calibration data is found, the global calibration data is used.  Profile calibration data is saved with the same profile name but as a .calib file.
 - Fix: Map to Keyboard/Mouse Ex: key no longer update on key selection dialog close.

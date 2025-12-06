@@ -39,17 +39,29 @@ syslog = logging.getLogger("system")
 class QSliderWidget(QtWidgets.QWidget):
     ''' custom slider object --- WARNING : ALL EVENT HANDLERS NEED TO CHECK FOR UI THREAD '''
 
-    handleClicked = QtCore.Signal(int) # called when a handle is left clicked (handle index)
-    handleRightClicked = QtCore.Signal(int) # called when a handle is right clicked (handle index)
-    handleDoubleClicked = QtCore.Signal(int) # called when a handle is double clicked (handle index)
-    handleDoubleRightClicked = QtCore.Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
-    rangeClicked = QtCore.Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeRightClicked = QtCore.Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeDoubleClicked = QtCore.Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeDoubleRightClicked = QtCore.Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    valueChanged = QtCore.Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
-    handleDragStart = QtCore.Signal(int) # called when a handle is being dragged (handle index)
-    handleDragStop = QtCore.Signal(int) # called when a handle stops being dragged (handle index)
+    # handleClicked = QtCore.Signal(int) # called when a handle is left clicked (handle index)
+    # handleRightClicked = QtCore.Signal(int) # called when a handle is right clicked (handle index)
+    # handleDoubleClicked = QtCore.Signal(int) # called when a handle is double clicked (handle index)
+    # handleDoubleRightClicked = QtCore.Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
+    # rangeClicked = QtCore.Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    # rangeRightClicked = QtCore.Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    # rangeDoubleClicked = QtCore.Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    # rangeDoubleRightClicked = QtCore.Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    # valueChanged = QtCore.Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
+    # handleDragStart = QtCore.Signal(int) # called when a handle is being dragged (handle index)
+    # handleDragStop = QtCore.Signal(int) # called when a handle stops being dragged (handle index)
+
+    handleClicked = Signal(int) # called when a handle is left clicked (handle index)
+    handleRightClicked = Signal(int) # called when a handle is right clicked (handle index)
+    handleDoubleClicked = Signal(int) # called when a handle is double clicked (handle index)
+    handleDoubleRightClicked = Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
+    rangeClicked = Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeRightClicked = Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeDoubleClicked = Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeDoubleRightClicked = Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    valueChanged = Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
+    handleDragStart = Signal(int) # called when a handle is being dragged (handle index)
+    handleDragStop = Signal(int) # called when a handle stops being dragged (handle index)
 
     class PixmapData():
         ''' holds a pixmap definition '''
@@ -158,6 +170,13 @@ class QSliderWidget(QtWidgets.QWidget):
         self._update_offsets()
         self._update_all_handle_pixmaps()
         self.setMouseTracking(True) # track mouse movements
+
+    def unhook(self):
+        ''' cleanup '''
+        self.setMouseTracking(False)
+        if self._tooltip_timer:
+            self._tooltip_timer.cancel()
+
 
     @property 
     def desired_height(self) -> int:
@@ -312,8 +331,6 @@ class QSliderWidget(QtWidgets.QWidget):
         
     def _setValue_ui(self, value : int | float | list | tuple):
         ''' input values expected to be -1 to +1 floating point '''
-        if self._value_lock:
-            return
         try:
             if self._value_lock:
                 return
@@ -338,7 +355,6 @@ class QSliderWidget(QtWidgets.QWidget):
             if values:
                 values.sort() # sort by value so the values are always in smallest to greatest
                 changed = gremlin.util.compare_float_lists(self._values, values)
-                
 
             if changed:
                 verbose = gremlin.config.Configuration().verbose_mode_ui
@@ -876,12 +892,23 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _show_tooltip_ui(self, message : str):
         if self._tooltip_timer is not None:
-            self._tooltip_timer.stop()
-        self._tooltip_timer = QTimer(self)   
-        self._tooltip_timer.setInterval(1000)
-        self._tooltip_timer.setSingleShot(True)
-        self._tooltip_timer.timeout.connect(lambda: QToolTip.showText(QCursor.pos(), message, self))
+            self._tooltip_timer.cancel()
+
+        self._tooltip_timer = threading.Timer(1, self._create_tooltip_callback(message))    
+        # self._tooltip_timer = QTimer(self)   
+        # self._tooltip_timer.setInterval(1000)
+        # self._tooltip_timer.setSingleShot(True)
+        # self._tooltip_timer.timeout.connect(lambda: QToolTip.showText(QCursor.pos(), message, self))
         self._tooltip_timer.start()
+
+    def _create_tooltip_callback(self, message):
+        return lambda : self._handle_show_tooltip(message)
+    
+    def _handle_show_tooltip(self, message):
+        gremlin.util.InvokeUiMethod(self._handle_show_tooltip_ui, message)
+
+    def _handle_show_tooltip_ui(self, message):
+        QToolTip.showText(QCursor.pos(), message, self)
 
     def _hover_update(self,  event : QMouseEvent):
         ''' updates the hover state '''

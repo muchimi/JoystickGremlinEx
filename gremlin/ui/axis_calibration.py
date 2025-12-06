@@ -663,6 +663,8 @@ class CalibrationManager():
     def saveCalibration(self, calibration : CalibrationData, to_global = True, to_local = False) -> bool:
         ''' saves calibration data '''
         device_guid =  gremlin.util.normalize_guid(calibration.device_guid)
+        device = gremlin.joystick_handling.getDevice(device_guid)
+
         input_id = calibration.input_id
         if not device_guid in self.calibration_map:
             self.calibration_map[device_guid] = {}
@@ -780,30 +782,29 @@ class CalibrationManager():
                     root.append(node_comment)
                     node = data.to_xml()
                     root.append(node)
-
         
-            tree = etree.ElementTree(root)
+        tree = etree.ElementTree(root)
 
-            f_list = []
+        f_list = []
 
-            if to_global:
-                f_list.append(self.global_calibration_file)
-            
-            if to_local:
-                f_list.append(self.profile_calibration_file)
+        if to_global:
+            f_list.append(self.global_calibration_file)
+        
+        if to_local:
+            f_list.append(self.profile_calibration_file)
 
-            for fname in f_list:
-                if fname:
-                    try:
-                        if os.path.isfile(fname):
-                            os.unlink(fname)
-                        tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-                        syslog.info(f"Calibration data saved to [{fname}]")
-                    except Exception as ex:
-                        syslog.error(f"Error saving calibration: {ex}")
-                        return False
-                    
-            return True
+        for fname in f_list:
+            if fname:
+                try:
+                    if os.path.isfile(fname):
+                        os.unlink(fname)
+                    tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+                    syslog.info(f"Calibration data saved to [{fname}]")
+                except Exception as ex:
+                    syslog.error(f"Error saving calibration: {ex}")
+                    return False
+                
+        return True
 
 
 class CalibrationDialogEx(QtWidgets.QDialog):
@@ -1053,9 +1054,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             if self._event_queue.empty():
                 time.sleep(0.01)
                 continue
-            event = self._event_queue.get()
-       
-            raw_value = event.value
+            raw_value = self._event_queue.get()
             calibrated_value = self.action_data.getValue(raw_value, normalize = False)
             gremlin.util.InvokeUiMethod(self._update_axis_widget_ui,
                                         raw_value,
@@ -1065,6 +1064,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                                         self.action_data.calibrated_max)     
 
             self._event_queue.task_done()
+
+
 
     def _joystick_event_handler(self, event):
         ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
@@ -1083,7 +1084,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         if event.identifier != self.action_data.input_id:
             return
         
-        self._event_queue.put(event)
+        self._event_queue.put(event.value)
 
 
   
