@@ -3626,3 +3626,90 @@ class AxisState():
 		return True
 
 
+class JoystickCallback():
+	def __init__(self, callback, device_guid = None, input_type = None, input_id = None):
+		self.id = gremlin.util.get_guid() # id of this callback block
+		self.device_guid = gremlin.util.parse_guid(device_guid) # store as GUID as events use GUIDs
+		self.input_type = input_type
+		self.input_id = input_id
+		self.callback = callback
+
+@gremlin.singleton_decorator.SingletonDecorator
+class JoystickEventQueue():
+	''' sets up a threaded queue for handling and distributing joystick events, optionally filtering them '''
+
+	def __init__(self):
+		self._callbacks = [] # list of callbacks
+		self._event_queue = queue.Queue() # holds the queue of events waiting to be processed
+		self._event_thread =  gremlin.threading.AbortableThreadX(target = self._event_runner)
+		self._event_thread.name = "JoystickEventQueue"
+		self._event_thread.start()
+		el = EventListener()
+		el.joystick_event.connect(self.queueJoystickEvent)
+		el.shutdown.connect(self.stop)
+		self._lock = threading.Lock() 
+
+
+	def registerCallback(self, callback, device_guid = None, input_type = None, input_id = None):
+		''' registers a callback, with optional filter, returns the registration ID'''
+		if callback is not None:
+			cb = JoystickCallback(callback, device_guid, input_type, input_id)
+			self._callbacks.append(cb)
+			
+
+	def unregisterCallback(self, callback):
+		''' removes a callback '''
+		if callback is not None:
+			cb = next((cb for cb in self._callbacks if cb.callback == callback), None)
+			if cb:
+				self._lock.acquire()
+				self._callbacks.remove(cb)
+				self._lock.release()
+
+	def setFilter(self, device_guid = None, input_type = None, input_id = None):
+		''' sets or clears a filter on a specific input  '''
+		self._device_guid = device_guid
+		self._input_type = input_type
+		self._input_id = input_id
+
+
+	def stop(self):
+		el = EventListener()
+		el.joystick_event.disconnect(self.queueJoystickEvent)
+		if self._event_thread.is_alive():
+			self._event_thread.stop()
+			self._event_thread.join()
+			self._event_thread = None
+	
+
+	def queueJoystickEvent(self, event):
+		''' queues a single joystick event '''
+		self._event_queue.put(event)
+
+	def queueJoystickEventList(self, event_list):
+		''' queues a list of joystick events '''
+		for event in event_list:
+			self._event_queue.put(event)
+
+	def _event_runner(self):
+		''' runner for inbound joystick events '''
+		while not self._event_thread.stopped():
+			if self._event_queue.empty() or self._lock.locked():
+				# wait if no event or if thhe callback list is being changed, hold
+				time.sleep(0.01)
+				continue
+			
+			event = self._event_queue.get()
+			# ensure callbacks are immutable
+			for cb in self._callbacks:
+				if cb.device_guid:
+					# filtering is enabled
+					if event.device_guid == cb.device_guid:
+						if cb.input_type and event.event_type == cb.input_type:
+							if cb.input_id and event.identifier == cb.input_id:
+								gremlin.util.InvokeUiMethod(cb.callback, event)
+								self._event_queue.task_done()
+				else:								
+					gremlin.util.InvokeUiMethod(cb.callback, event)
+					self._event_queue.task_done()
+			

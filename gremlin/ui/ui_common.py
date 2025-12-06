@@ -6765,7 +6765,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                     # syslog.info(f"input: {input_id} value: {value:0.3f}")
                     #value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
                     widget.add_point(value, input_id)
-        elif vis_type == gremlin.types.VisualizationType.ButtonHat:
+        elif vis_type in (gremlin.types.VisualizationType.ButtonHat, gremlin.types.VisualizationType.Button, gremlin.types.VisualizationType.Hat):
             self._button_hat_update(event)
 
     def _create_visuals(self):
@@ -7311,7 +7311,9 @@ class ButtonState(QtWidgets.QGroupBox):
         if input_type == InputType.JoystickButton:
             #is_pressed = event.is_pressed if event.is_pressed is not None else event.current
             state = event.is_pressed if event.is_pressed is not None else False
-            self.buttons[event.identifier].setChecked(state)
+            btn = self.buttons[event.identifier]
+            btn.setHighlight(state)
+            #btn.setChecked(state)
             self._event_times[event.identifier] = time.time()
 
 

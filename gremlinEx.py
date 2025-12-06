@@ -5168,7 +5168,7 @@ def configure_logger(config):
     try:
         if os.path.isfile(log_file):
             os.unlink(log_file)
-    except:
+    except Exception as err:
         syslog.error(f"Unable to remove old log file [{log_file}]")
         syslog.error(f"{err}\n{traceback.format_exc()}")
         
@@ -5218,6 +5218,7 @@ if __name__ == "__main__":
     
     system_log_path = os.path.join(app_path, "system.log")
     user_log_path = os.path.join(app_path, "user.log")
+    fl = None
 
     try:
         fault_log_path = os.path.join(app_path,"fault.log")
@@ -5439,8 +5440,7 @@ if __name__ == "__main__":
 
     syslog.info("Init completed...")
     el.ui_ready.emit()
-    # el.toggle_highlight.emit(ui.is_highligthing_enabled, ui.is_axis_highlighting, ui.is_button_highlighting)
-
+ 
   
     syslog.info("Apply settings...")
     ui.apply_user_settings() 
@@ -5448,13 +5448,6 @@ if __name__ == "__main__":
     if not config.start_minimized:
         ui.showNormal()
     
-    #splash.finish(ui)
-
-    # generate icons if needed
-    #_icon_generator = gremlin.ui.ui_common.IconGenerator()
-
-    
-
     syslog.info("GremlinEx UI launching")
     try:
         app.exec()
@@ -5480,7 +5473,8 @@ if __name__ == "__main__":
     gremlin.joystick_handling.VJoyProxy.reset()
 
     #hg.remove_process(os.getpid())
-    fl.close()
+    if fl:
+        fl.close()
 
     syslog.info("Terminating GremlinEx")
     #gc.collect()

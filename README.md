@@ -18,10 +18,12 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
-### (m76T123)
+### (m76T123A)
 - Fix: Joystick Listen: harden input selection to handle bad or unexpected API input data (bad data will be noted in the log file and skipped). The cause of the bad data is still under investigation.
 - Fix: Remove all uses of QTimer from legacy UI elements to further guard against QT crashes and threading conflict issues.
 - Fix: Input Viewer: additional manual UI cleanup to release QT resources.
+- Fix: Input Viewer: use updated API to highlight input buttons
+
 
 ### (m76T122A)
 - Fix: Save calibration only saves first device in the calibration data.

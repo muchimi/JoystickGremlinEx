@@ -611,10 +611,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         
         self.closed.connect(self._closed)
         self.installEventFilter(self)
-        
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self._joystick_event_handler)
-        
+
+        self._event_queue = gremlin.event_handler.JoystickEventQueue()
+        self._event_queue.registerCallback(self._joystick_event_handler)
 
         self._event_data = {}
 
@@ -665,14 +664,10 @@ States can be toggled by clicking on the state button.  Expression states will u
             if last_value is not None and gremlin.util.is_close(event.value, last_value, 0.005):
                 return
             self._event_data[device_id][input_id] = event.value
-
-            
-        self._lock.acquire()
-        try:
-            for widget in self._joystick_widgets.values():
-                widget.process_event(event)
-        finally:
-            self._lock.release()
+        
+        for widget in self._joystick_widgets.values():
+            widget.process_event(event)
+        
         
 
     @QtCore.Slot()
@@ -700,8 +695,8 @@ States can be toggled by clicking on the state button.  Expression states will u
     @QtCore.Slot()
     def _closed(self):
         ''' save the config on close'''
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.disconnect(self._joystick_event_handler)
+
+        self._event_queue.unregisterCallback(self._joystick_event_handler)
 
         self._clear()
 
