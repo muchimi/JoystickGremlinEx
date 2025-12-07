@@ -3897,6 +3897,8 @@ def _message_box_ui(title = "Notice", prompt = "Operation", is_warning = True, p
 
 
 
+
+
 class QHLine(QtWidgets.QFrame):
     ''' horizontal line '''
     def __init__(self, parent = None):
@@ -4688,14 +4690,15 @@ class QProgressBar(QtWidgets.QWidget):
     def __init__(self, orientation : Qt.Orientation = Qt.Orientation.Vertical, value : float = 0, min : float = -1.0, max : float = 1.0, readonly : bool = True, step : float = 0.1, data = None, parent = None):
         super().__init__()
         self.parent = parent
-        
+        self.config = gremlin.config.Configuration()
         if orientation == Qt.Orientation.Vertical:
             self._desired_width = 10
             self._desired_height = 100
         else:
             self._desired_width = 100
             self._desired_height = 10
-        self._value = value
+
+        self._value = None
         self._orientation = orientation
         self._step = step
         self._readOnly = readonly
@@ -4728,6 +4731,34 @@ class QProgressBar(QtWidgets.QWidget):
         
         self.setRange(min, max)
         self.installEventFilter(self)
+
+        if value is not None:
+            self._set_value_ui(value)
+
+    def _update_tooltip(self, value):
+        ''' updates the tooltip for the repeater '''
+        stub = None
+        if isinstance(value, gremlin.event_handler.AxisValues):
+            # calibration data
+            stub = f"Value: {value.actual:0.3f} [{self._to_percent(value.actual):0.2f}%]"
+            if value.raw is not None and value.actual != value.raw:
+                stub += f"\nRaw: {value.raw:0.3f} [{self._to_percent(value.raw):0.2f}%]"
+            if value.calibrated is not None:
+                stub += f"\nCalibrated: {value.calibrated:0.3f} [{self._to_percent(value.calibrated):0.2f}%]"
+            if value.curved is not None:
+                stub += f"\nCurved: {value.curved:0.3f} [{self._to_percent(value.curved):0.2f}%]"
+        else:
+            if value is not None:
+                if isinstance(value, list):
+                    stub = f"Value: {value[0]:0.3f} [{self._to_percent(value[0]):0.2f}%]"
+                else:
+                    stub = f"Value: {value:0.3f} [{self._to_percent(value):0.2f}%]"
+        
+        self.setToolTip(stub)
+
+    def _to_percent(self, value):
+        return gremlin.util.scale_to_range(value, target_min = 0, target_max = 100)
+
 
 
     @property
@@ -4921,10 +4952,21 @@ class QProgressBar(QtWidgets.QWidget):
             gremlin.util.InvokeUiMethod(self._set_value_ui, value, emit)
 
     def _set_value_ui(self, value : float | list, emit : bool = True):
+
         if not Shiboken.isValid(self):
             return
+        if self.config.showJoystickRepeaterTooltip:
+            self._update_tooltip(value) # tooltip
+        else:
+            self.setToolTip(None)
         if hasattr(value,"toList"):
-            value = value.toList()
+            if not self.config.splitJoystickRepeater:
+                # hide split data
+                value = value.actual
+                
+            else:
+                # show split data
+                value = value.toList()
         if hasattr(value,"__iter__"):
             # count non null entries
             #syslog.info(f"ProgressBar: {value}")
@@ -5005,6 +5047,7 @@ class QProgressBar(QtWidgets.QWidget):
                     index += 1
 
         self.updateGeometry() # indicate desired size changed 
+        
         
         count = len(self._percent)
         if count != self._row_count:
@@ -6067,7 +6110,12 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 syslog.error(f"AxisCurrentState: unregistered axis [{device.name}] id: [{device.device_guid}] axis: A{axis_id} L{linear_id}]") 
                 continue
 
-            axis_widget = QHookedProgressBar(data = axis_id)
+            
+            # get initial data
+            astate = gremlin.event_handler.AxisState()
+            values = astate.getAxisValues(device.device_guid, axis_id)
+            axis_widget = QHookedProgressBar(data = axis_id, value = values)
+            
             if not self._readonly:
                 axis_widget.valueChanged.connect(self._manual_bar_changed) # axis set by the user
             axis_widget.setReadOnly(self._readonly)
@@ -9123,8 +9171,6 @@ class QShowAtCursorDialog(QtWidgets.QDialog):
         
 
         self.setGeometry(geom)
-
-        
 
         super().showEvent(event)
 
@@ -12888,10 +12934,11 @@ class ActionContainerDialog(QRememberDialog):
 
 class MessageBoxDialog(QShowAtCursorDialog):
     ''' enhanced message box '''
+    
     def __init__(self, title : str = None, text : str = None,  icon = None,  is_yesno = False, parent = None):
         super().__init__(parent = parent)
 
-        gremlin.util.assert_ui_thread()
+
         self.setWindowTitle("Notice")
         self.setModal(True)
         
@@ -12938,10 +12985,49 @@ class MessageBoxDialog(QShowAtCursorDialog):
 
     @QtCore.Slot()
     def _handle_yes(self):
-        self.accept()
-
+        self.setResult(1)
+        self.close()
 
     @QtCore.Slot()
     def _handle_no(self):
-        self.reject()
+        self.setResult(0)
+        self.close()
         
+
+class QTimedLabel(QtWidgets.QWidget):
+    ''' timed label - shows text and makes it go away after a period of time '''
+    def __init__(self, delay = 2, parent=None):
+        super().__init__(parent)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self._label_widget = QtWidgets.QLabel()
+        self._interval = delay
+        self._timer = None
+        self.main_layout.addWidget(self._label_widget)
+
+    def setText(self, text : str = None):
+        gremlin.util.InvokeUiMethod(self._set_text_ui, text)
+
+    def _set_text_ui(self, text : str):
+        self._label_widget.setText(text)
+        if self._timer:
+            self._timer.cancel()
+        self._timer = threading.Timer(self._interval, self._handle_timer)
+        self._timer.start()
+
+    def closeEvent(self, event):
+        if self._timer:
+            self._timer.cancel()
+        return super().closeEvent(event)
+
+    def _handle_timer(self):
+        gremlin.util.InvokeUiMethod(self._handle_timer_ui)
+
+    def _handle_timer_ui(self):
+        self._label_widget.setText("")
+        self._timer = None
+
+
+        
+        
+        
+

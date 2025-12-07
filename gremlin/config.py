@@ -2328,8 +2328,16 @@ class Configuration(QtCore.QObject):
         return self._get_data("splitJoystickRepeater",False)
     @splitJoystickRepeater.setter
     def splitJoystickRepeater(self, value: bool):
-        self._data["splitJoystickRepeater"] = value
-        self.save()
+        self._set_data("splitJoystickRepeater", value)
+
+    @property
+    def showJoystickRepeaterTooltip(self) -> bool:
+        return self._get_data("showJoystickRepeaterTooltip",False)
+    @showJoystickRepeaterTooltip.setter
+    def showJoystickRepeaterTooltip(self, value: bool):
+        self._set_data("showJoystickRepeaterTooltip", value) 
+        
+
 
     @property 
     def hostIp(self) -> str:

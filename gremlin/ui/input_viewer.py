@@ -1132,7 +1132,7 @@ class InputViewerArea(QtWidgets.QScrollArea):
         for widget in self.widgets:
             gremlin.util.delete_widget(widget)
         self.widgets.clear()
-        gremlin.util.clear_layout(self.scroll_layout)
+        gremlin.util.clear_layout(self.container_widget)
 
 
     def sizeHint(self):
@@ -1145,7 +1145,7 @@ class InputViewerArea(QtWidgets.QScrollArea):
         :param widget the widget to add
         """
         assert gremlin.util.is_ui_thread()
-        if not Shiboken.isValid(self) or not Shiboken.isValid(widget):
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self.container_widget):
             return
 
         self.widgets.append(widget)

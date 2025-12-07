@@ -1872,7 +1872,6 @@ class InputItemWidget(QBoxFrame):
             self._curve_container_layout.addWidget(self.clear_curve_widget)
 
 
-
         # axis repeater object
         self.axis_widget = None
 
@@ -2190,7 +2189,12 @@ class InputItemWidget(QBoxFrame):
 
                     if self.identifier.is_axis:
                         # axis
-                        widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
+                        device_guid = self.identifier.device_guid
+                        input_id = self.identifier.input_id
+                        astate = gremlin.event_handler.AxisState()
+                        values = astate.getAxisValues(device_guid, input_id)
+                        widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal, value = values)
+
                         widget.unhooked.connect(self._axis_widget_unhooked)
                         widget.sizeChanged.connect(self._repeater_size_changed)
                         widget.data = self

@@ -1791,6 +1791,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.curve_data = dialog.getCurveData()
         self.action_data.curve_data.curve_update() # update any changes to the curve
 
+
         syslog.info(f"After curve update: {self.action_data.curve_data}")
 
         self._update_curve_icon()

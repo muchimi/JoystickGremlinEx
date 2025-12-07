@@ -124,12 +124,15 @@ class Clipboard(QtCore.QObject):
                 pickled = self.get_windows_clipboard_text()
                 if pickled:
                     try:
-                        if pickled.endswith("="):
+                        # attempt regular pickle
+                        if pickled[-1] == 61: # .endswith("="):
                             data = dill.loads(base64.b64decode(pickled)).encode()
-                
                     except:
                         # attempt json pickle
-                        data = dill.loads(pickled)
+                        try:
+                            data = dill.loads(pickled)
+                        except:
+                            pass
 
                     # validate the data is something we recognize
             except:

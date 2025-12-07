@@ -33,35 +33,36 @@ from PySide6.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter, QFont, QM
 from itertools import pairwise
 import psygnal
 from psygnal import Signal
+import copy
 
 syslog = logging.getLogger("system")
 
 class QSliderWidget(QtWidgets.QWidget):
     ''' custom slider object --- WARNING : ALL EVENT HANDLERS NEED TO CHECK FOR UI THREAD '''
 
-    # handleClicked = QtCore.Signal(int) # called when a handle is left clicked (handle index)
-    # handleRightClicked = QtCore.Signal(int) # called when a handle is right clicked (handle index)
-    # handleDoubleClicked = QtCore.Signal(int) # called when a handle is double clicked (handle index)
-    # handleDoubleRightClicked = QtCore.Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
-    # rangeClicked = QtCore.Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    # rangeRightClicked = QtCore.Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    # rangeDoubleClicked = QtCore.Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    # rangeDoubleRightClicked = QtCore.Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    # valueChanged = QtCore.Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
-    # handleDragStart = QtCore.Signal(int) # called when a handle is being dragged (handle index)
-    # handleDragStop = QtCore.Signal(int) # called when a handle stops being dragged (handle index)
+    handleClicked = QtCore.Signal(int) # called when a handle is left clicked (handle index)
+    handleRightClicked = QtCore.Signal(int) # called when a handle is right clicked (handle index)
+    handleDoubleClicked = QtCore.Signal(int) # called when a handle is double clicked (handle index)
+    handleDoubleRightClicked = QtCore.Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
+    rangeClicked = QtCore.Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeRightClicked = QtCore.Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeDoubleClicked = QtCore.Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeDoubleRightClicked = QtCore.Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    valueChanged = QtCore.Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
+    handleDragStart = QtCore.Signal(int) # called when a handle is being dragged (handle index)
+    handleDragStop = QtCore.Signal(int) # called when a handle stops being dragged (handle index)
 
-    handleClicked = Signal(int) # called when a handle is left clicked (handle index)
-    handleRightClicked = Signal(int) # called when a handle is right clicked (handle index)
-    handleDoubleClicked = Signal(int) # called when a handle is double clicked (handle index)
-    handleDoubleRightClicked = Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
-    rangeClicked = Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeRightClicked = Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeDoubleClicked = Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    rangeDoubleRightClicked = Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    valueChanged = Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
-    handleDragStart = Signal(int) # called when a handle is being dragged (handle index)
-    handleDragStop = Signal(int) # called when a handle stops being dragged (handle index)
+    # handleClicked = Signal(int) # called when a handle is left clicked (handle index)
+    # handleRightClicked = Signal(int) # called when a handle is right clicked (handle index)
+    # handleDoubleClicked = Signal(int) # called when a handle is double clicked (handle index)
+    # handleDoubleRightClicked = Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
+    # rangeClicked = Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    # rangeRightClicked = Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    # rangeDoubleClicked = Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    # rangeDoubleRightClicked = Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    # valueChanged = Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
+    # handleDragStart = Signal(int) # called when a handle is being dragged (handle index)
+    # handleDragStop = Signal(int) # called when a handle stops being dragged (handle index)
 
     class PixmapData():
         ''' holds a pixmap definition '''
@@ -167,7 +168,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._update_pixmaps()
         self._update_targets()
         self.setMarkerValue(0)
-        self._update_offsets()
+        self._update_offsets_ui()
         self._update_all_handle_pixmaps()
         self.setMouseTracking(True) # track mouse movements
 
@@ -177,16 +178,17 @@ class QSliderWidget(QtWidgets.QWidget):
         if self._tooltip_timer:
             self._tooltip_timer.cancel()
 
-
     @property 
     def desired_height(self) -> int:
         return self._desired_height
         
     @desired_height.setter
     def desired_height(self, value : int):
+        gremlin.util.InvokeUiMethod(self._set_desired_height_ui, value)
+
+    def _set_desired_height_ui(self, value : int):
         self._desired_height = value
         self.resize(self.minimumSizeHint())
-
         
     def minimumSizeHint(self):
         '''
@@ -210,26 +212,29 @@ class QSliderWidget(QtWidgets.QWidget):
         return self._single_range
     @singleRange.setter
     def singleRange(self, value):
-        
         if self._single_range != value:
-            if self._lock:
-                return
-            self._lock = True
-            try:
-                self._single_range = value
-                self._update_offsets()
-                self.update()
-            finally:
-                self._lock = False
+            gremlin.util.InvokeUiMethod(self._set_single_range_ui, value)
+    
+    def _set_single_range_ui(self, value):
+        self._single_range = value
+        self._update_offsets_ui()
+        self.update()
+        
 
     def setTickCount(self, value : int): 
+        gremlin.util.InvokeUiMethod(self._set_tick_count, value)    
+
+    def _set_tick_count(self, value : int): 
         ''' sets the number of ticks '''
         value = gremlin.util.clamp(value, 0, 50)
         if self._tick_count != value:
             self._tick_count = value
             self.update()
 
-    def setTickMarks(self, value):
+    def setTickMarks(self, value : int):
+        gremlin.util.InvokeUiMethod(self._set_tick_marks_ui, value)
+
+    def _set_tick_marks_ui(self, value : int):
         ''' sets the tick marks for the axis as set values '''
         if value:
             self._tick_marks = value
@@ -239,18 +244,18 @@ class QSliderWidget(QtWidgets.QWidget):
         self.update()
 
     def setDrawHandles(self, value: bool):
-        ''' enable/disables the drawing of handles '''
         if self._draw_handles != value:
-            if self._lock:
-                return
-            self._lock = True
-            try:
-                self._draw_handles = value
-                self.update()
-            finally:
-                self._lock = False
+            gremlin.util.InvokeUiMethod(self._set_draw_handles_ui, value)
+
+    def _set_draw_handles_ui(self, value: bool):
+        ''' enable/disables the drawing of handles '''
+        self._draw_handles = value
+        self.update()
 
     def setHandleIcon(self, index, icon, use_qta = False, color = "#a0a0a0"):
+        gremlin.util.InvokeUiMethod(self._set_handle_icon_ui, index, icon, use_qta, color)
+
+    def _set_handle_icon_ui(self, index, icon, use_qta = False, color = "#a0a0a0"):
         ''' sets the handle icon - to clear an icon, set it to None
          
         :param index: the handle index (int)
@@ -260,23 +265,17 @@ class QSliderWidget(QtWidgets.QWidget):
 
         '''
         
-        if self._lock:
-            return
-        
-        try:
-            self._lock = True
-            if icon is None:
-                # clear the entry
-                if index in self._handle_icons:
-                    del self._handle_icons[index]
-                    self.update()
-            else:
-                hid = QSliderWidget.HandleIconData(index, icon, use_qta, color)
-                self._handle_icons[index] = hid
-                self._update_handle_pixmaps(hid)
+
+        if icon is None:
+            # clear the entry
+            if index in self._handle_icons:
+                del self._handle_icons[index]
                 self.update()
-        finally:
-            self._lock = False
+        else:
+            hid = QSliderWidget.HandleIconData(index, icon, use_qta, color)
+            self._handle_icons[index] = hid
+            self._update_handle_pixmaps(hid)
+            self.update()
 
 
     def setHandleTooltip(self, index : int, message : str):
@@ -302,34 +301,29 @@ class QSliderWidget(QtWidgets.QWidget):
             del self._tooltip_range_map[key]
         else:
             self._tooltip_range_map[key] = message
-            
-
-
-
-    
 
 
     def setValueIndex(self, index : int, value : int | float):
+        gremlin.util.InvokeUiMethod(self._set_value_index_ui, index, value)
+
+
+    def _set_value_index_ui(self, index : int, value : int | float):
         ''' sets a specific value by index '''
-        
-        verbose = gremlin.config.Configuration().verbose
-        if verbose: gremlin.util.assert_ui_thread()
 
         value = gremlin.util.clamp(value, self._minimum, self._maximum)
         try:
             values = self._values
-            
             values[index] = value
-            self.setValue(values)
+            self._set_value_ui(values)
         except:
             syslog.error(f"Unable to set value index {index} - out of index range error")
 
 
-    def setValue(self, value : int | float | list | tuple):            
-        gremlin.util.InvokeUiMethod(self._setValue_ui, value) # ensure on UI thread
+    def setValue(self, value : int | float | list | tuple): 
+        gremlin.util.InvokeUiMethod(self._set_value_ui, value) # ensure on UI thread
 
         
-    def _setValue_ui(self, value : int | float | list | tuple):
+    def _set_value_ui(self, value : int | float | list | tuple):
         ''' input values expected to be -1 to +1 floating point '''
         try:
             if self._value_lock:
@@ -360,7 +354,7 @@ class QSliderWidget(QtWidgets.QWidget):
                 verbose = gremlin.config.Configuration().verbose_mode_ui
                 if verbose: syslog.info(f"Slider changed: {self.objectName()} [{self._id}]: {values}")
                 self._values = values # [max(min(1.0, n), -1.0) for n in values]
-                self._update_offsets()
+                self._update_offsets_ui()
                 self.update()
         finally:
             self._value_lock = False
@@ -370,16 +364,16 @@ class QSliderWidget(QtWidgets.QWidget):
         ''' gets the list of values in the slider - a single value is returned as a list of one'''
         return self._values
     
+
     def setMarkerVisible(self, value : bool):
-        if self._lock:
-            return
-        try:
-            gremlin.util.assert_ui_thread()
-            self._lock = True
-            self._marker_visible = value
-            self.update()
-        finally:
-            self._lock = False
+        ''' toggle marker visibility '''
+        gremlin.util.InvokeUiMethod(self._set_marker_visible_ui, value)
+    
+    def _set_marker_visible_ui(self, value : bool):
+        ''' toggle marker visibility '''
+        self._marker_visible = value
+        self.update()
+        
 
     @property
     def marker_size(self):
@@ -387,18 +381,17 @@ class QSliderWidget(QtWidgets.QWidget):
     
     @marker_size.setter
     def marker_size(self, value):
-        if value > 0:
-            if self._lock:
-                return
-            try:
-                gremlin.util.assert_ui_thread()
-                self._lock = True
-                self.marker_size = value
-                self._update_pixmaps()
-                self._update_marker_offsets()
-                self.update()
-            finally:
-                self._lock = False
+        if value > 0 and self._marker_size != value:
+            gremlin.util.InvokeUiMethod(self._set_marker_size_ui, value)
+        
+    def _set_marker_size_ui(self, value):
+        ''' sets the relative size of the marker '''
+        self._marker_size = value
+        self._update_pixmaps()
+        self._update_marker_offsets_ui()
+        self.update()
+
+
 
     def setReadOnly(self, value : bool):
         self._readOnly = value
@@ -407,9 +400,8 @@ class QSliderWidget(QtWidgets.QWidget):
         return self._readOnly
     
 
-    def _update_offsets(self):
+    def _update_offsets_ui(self):
         ''' recomputes pixel offsets based on gate values '''
-        gremlin.util.assert_ui_thread()
         size = self.size()
         widget_width = size.width()
         widget_height = size.height()
@@ -476,10 +468,10 @@ class QSliderWidget(QtWidgets.QWidget):
         self._range_top = int((widget_height - self._range_height)*0.5)
         self._handle_positions = gate_positions
         # print (f"Range left: {self._range_left}  right: {self._range_right}  width: {self._range_width} height: {self._range_height} top margin: {self._range_top}")
-        self._update_marker_offsets()
+        self._update_marker_offsets_ui()
         self._update_all_handle_pixmaps()
 
-    def _update_marker_offsets(self):
+    def _update_marker_offsets_ui(self):
         if self._marker_pos:
             # compute marker positions
             source_min = self._minimum
@@ -496,23 +488,27 @@ class QSliderWidget(QtWidgets.QWidget):
         self._target_max = self._maximum # self._to_qinteger_space(self._maximum)
 
     def setMarkerValue(self, value):
-        ''' sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers'''
-        if self._lock:
-            return
-        try:
-            self._lock = True
-            if isinstance(value, float) or isinstance(value, int):
-                value = gremlin.util.clamp(value, self._minimum, self._maximum)
-                list_value = [value]
-            else:
-                list_value = value
-            self._marker_pos = list_value
+        gremlin.util.InvokeUiMethod(self._set_marker_value_ui, value)
 
-            # update geometry + repaint
-            self._update_offsets() 
-            self.update()
-        finally:
-            self._lock = False
+    def _set_marker_value_ui(self, value):
+        ''' sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers'''
+        # if self._lock:
+        #     return
+        # try:
+        #     self._lock = True
+        if isinstance(value, float) or isinstance(value, int):
+            value = gremlin.util.clamp(value, self._minimum, self._maximum)
+            list_value = [value]
+        else:
+            list_value = value
+        self._marker_pos = list_value
+
+        # update geometry + repaint
+        self._update_offsets_ui() 
+        self.update()
+        
+        # finally:
+        #     self._lock = False
 
     def markerValue(self) -> float:
         ''' gets the marker value '''
@@ -525,25 +521,34 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def setMinimum(self, value: float) -> None:
         ''' sets the slider's minimum value '''
+        gremlin.util.InvokeUiMethod(self._set_minimum_ui, value)
+
+    def _set_minimum_ui(self, value : float):
         self._minimum = value
         if self._maximum < self._minimum:
             self._maximum, self._minimum = self._minimum, self._maximum
         self._update_targets()
-        self._update_offsets()
+        self._update_offsets_ui()
 
     def maximum(self) -> float:  # type: ignore
         ''' gets the slider's maximum value '''
         return self._maximum
-
+    
     def setMaximum(self, value: float) -> None:
+        gremlin.util.InvokeUiMethod(self._set_maximum_ui, value)
+
+    def _set_maximum_ui(self, value: float) -> None:
         ''' sets the slider's maximum value '''
         self._maximum = value
         if self._maximum < self._minimum:
             self._maximum, self._minimum = self._minimum, self._maximum
         self._update_targets()
-        self._update_offsets()
+        self._update_offsets_ui()
 
     def setRange(self, range_min : float, range_max : float):
+        gremlin.util.InvokeUiMethod(self._set_range_ui, range_min, range_max)
+
+    def _set_range_ui(self, range_min : float, range_max : float):
         ''' sets the slider's min/max values
         
         :param range_min: min range (float)
@@ -556,7 +561,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._minimum = range_min
         self._maximum = range_max
         self._update_targets()
-        self._update_offsets()
+        self._update_offsets_ui()
 
     
     def range(self):
@@ -820,8 +825,7 @@ class QSliderWidget(QtWidgets.QWidget):
     def resizeEvent(self, event):
         ''' called on resize '''
         super().resizeEvent(event)
-        self._update_offsets()
-        
+        self._update_offsets_ui()
         self.adjustSize()
         self.update()
 

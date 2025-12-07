@@ -985,10 +985,21 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_button_grid_widget.clicked.connect(self._show_button_grid_cb)
 
         # split joystick repeaters raw/calibrated
-        self.split_joystick_repeater_widget = QtWidgets.QCheckBox("Show Raw/Calibrated in repeaters")
-        self.split_joystick_repeater_widget.setToolTip("When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
-        self.split_joystick_repeater_widget.setChecked(self.config.splitJoystickRepeater)
-        self.split_joystick_repeater_widget.clicked.connect(self._split_joystick_repeater_cb)
+
+        self.split_joystick_repeater_widget = gremlin.ui.ui_common.QDataCheckbox("Show Raw/Calibrated in repeaters",
+                                                                                 value = self.config.splitJoystickRepeater,
+                                                                                 callback = self._split_joystick_repeater_cb,
+                                                                                 tooltip = "When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
+        
+        self.split_joystick_repeater_tooltip_widget = gremlin.ui.ui_common.QDataCheckbox("Show tooltips in repeaters",
+                                                                                 value = self.config.showJoystickRepeaterTooltip,
+                                                                                 callback = self._show_joystick_repeater_tooltip_cb,
+                                                                                 tooltip = "When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
+        
+        # self.split_joystick_repeater_widget = QtWidgets.QCheckBox("Show Raw/Calibrated in repeaters")
+        # self.split_joystick_repeater_widget.setToolTip("When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
+        # self.split_joystick_repeater_widget.setChecked(self.config.splitJoystickRepeater)
+        # self.split_joystick_repeater_widget.clicked.connect(self._split_joystick_repeater_cb)
 
         # show parent mode in mode name drop downs
         self.show_parent_mode_widget = QtWidgets.QCheckBox("Show parent mode in mode selector")
@@ -1001,7 +1012,12 @@ class OptionsUi(ui_common.BaseDialogUi):
         box.addWidget(self.disable_joystick_input_widget)
         box.addWidget(self.show_button_grid_widget)
         box.addWidget(self.split_joystick_repeater_widget)
+        box.addWidget(self.split_joystick_repeater_tooltip_widget)
         box.addWidget(self.show_parent_mode_widget)
+        msg = "Note: Repeaters only update on newly received axis movement data."
+        infobox = gremlin.ui.ui_common.QInfoBox(msg,hide_key = "repeater_option_toggle")
+        box.addWidget(infobox)
+
         col2_layout.addWidget(box)
 
 
@@ -2242,6 +2258,14 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         # tell UI options changed
         el = gremlin.event_handler.EventListener()
         el.calibration_options_changed.emit()
+
+    @QtCore.Slot(bool)
+    def _show_joystick_repeater_tooltip_cb(self, checked):
+        self.config.showJoystickRepeaterTooltip = checked
+        # tell UI options changed
+        el = gremlin.event_handler.EventListener()
+        el.calibration_options_changed.emit()
+        
 
     @QtCore.Slot(bool)
     def _show_parent_mode_widget_cb(self, checked):

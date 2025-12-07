@@ -5209,11 +5209,17 @@ def exception_hook(exception_type, value, trace):
 
 if __name__ == "__main__":
 
-
+    
     gremlin.shared_state.ui_ready = False
 
     # log file configuration
     app_path = gremlin.shared_state.data_path
+    
+    # # TODO: see if gremlinex is already running
+    # pm = gremlin.process_monitor.ProcessMonitor()
+    # if pm.process_running("gremlinex.exe"):
+    #     sys.exit(-1)
+        
     
     
     system_log_path = os.path.join(app_path, "system.log")

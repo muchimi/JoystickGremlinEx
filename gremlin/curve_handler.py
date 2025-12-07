@@ -1038,8 +1038,6 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.redraw_scene()
         ch.value_changed.emit(self.value)
 
-
-
     def _dist(self, a, b):
         return ((b.x - a.x)**2 + (b.y - a.y)**2) ** 0.5
 
@@ -1600,6 +1598,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         ch = CurveEventHandler()
         ch.value_changed.connect(self.update_value)
 
+
         clipboard = gremlin.clipboard.Clipboard()
         clipboard.clipboard_changed.connect(self._update_clipboard)
 
@@ -1613,12 +1612,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         if not Shiboken.isValid(self):
             return
         value = gremlin.util.clamp(value)
-        # if value < -1 or value > 1:
-        #     syslog = logging.getLogger("system")
-        #     syslog.warning(f"CurveInput: Error: value {value:0.3f} is out of range -1 to +1 - check input")
-        #     value = gremlin.util.clamp(value,-1,1)
 
-        #if self.action_data.show_input_axis:
         
         ''' draw the current value on the curve '''
         curve_fn = self.curve_model.get_curve_function()

@@ -21,6 +21,20 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T124)
+- New: Global Options: Added info box on repeater calibrated data toggle to explain behavior. 
+- New: Global Options: Added option to show repeater values in tooltip (this may slightly degrade repeater update performance which is why it's an option).
+- New: UI: resolve split (multi-value) axis repeater display behavior
+- Fix: API: Joystick Event queue - persistence of data
+- Fix: API: UI thread invoker - persistence of data
+- Fix: API: added JSON deserialization error check on non JSON data on clipboard init
+- Fix: Input Viewer: QT sync issue when adding/clearing a new visualization (issue introduced in 122)
+- Fix: Calibration dialog: implemented a workaround for QT fatal error
+- Fix: Input Viewer: QT resource release causing UI various anomalies.
+- Fix: Axis Curve Dialog: update axis position when curve applied to input axis (this was broken a while back with API event handling optimization changes).
+
+
+
 ### (m76T123A)
 - Fix: Joystick Listen: harden input selection to handle bad or unexpected API input data (bad data will be noted in the log file and skipped). The cause of the bad data is still under investigation.
 - Fix: Remove all uses of QTimer from legacy UI elements to further guard against QT crashes and threading conflict issues.

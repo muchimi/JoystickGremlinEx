@@ -586,19 +586,14 @@ class JoystickHook:
             if event.is_axis:
                 # axis input - get transforms
                 if event.event_type == InputType.JoystickAxis:
-                    values = self._astate.getAxisValues(self._device_guid, self._input_id, event.value)
-                    self._hook_value = values.actual
-
-                    if self._calibrate:
-                        # get calibrated value
-                        calibrated = values.calibrated
-                        self._hook_calibrated_value = calibrated if calibrated is not None else values.actual
-                    else:
-                        self._hook_calibrated_value = values.actual
+                    values : gremlin.event_handler.AxisValues= self._astate.getAxisValues(self._device_guid, self._input_id, event.value)
+                    self._hook_value = values
+                    # syslog.info(f"hook value: {values}")
+                   
                 else:
                     self._hook_value = event.value
 
-                assert isinstance(self._hook_value, float)
+                # assert isinstance(self._hook_value, float)
                                         
                     
             else:
@@ -716,7 +711,7 @@ class JoystickHook:
                     self._hook_value = 0.0
                     #values = sdata.getAxisValues(self.device_guid, self.input_id, linear = False)
                 else:
-                    self._hook_value = values.actual
+                    self._hook_value = values
 
             if self._hook_callback:
                 self._hook_callback(self._hook_value)

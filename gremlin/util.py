@@ -43,6 +43,7 @@ from psygnal import Signal
 from shiboken6 import Shiboken
 import inspect
 import lxml
+import copy
 
 
 from . import error
@@ -1823,32 +1824,33 @@ class InvokeUiMethod(QtCore.QObject):
         
         '''
 
-        
-
         super().__init__()
         assert method is not None,"Method not provided"
         current_thread = QtCore.QThread.currentThread()
         # keep an object reference to the parameters so they don't get garbage collected before the execution is scheduled
-        self._p0 = p0
-        self._p1 = p1
-        self._p2 = p2
-        self._p3 = p3
-        self._p4 = p4
-        self._p5 = p5
-        self._p6 = p6
-        self._p7 = p7
+        
         
         ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
         
         if current_thread != ui_thread:
-            # non on UI thread, move it to the UI thread
+            # non on the QT UI thread, move it to the UI thread - because this is an indirect call - make a copy of parameters
+            self._p0 = copy.deepcopy(p0) if p0 is not None else None
+            self._p1 = copy.deepcopy(p1) if p1 is not None else None
+            self._p2 = copy.deepcopy(p2) if p2 is not None else None
+            self._p3 = copy.deepcopy(p3) if p3 is not None else None
+            self._p4 = copy.deepcopy(p4) if p4 is not None else None
+            self._p5 = copy.deepcopy(p5) if p5 is not None else None
+            self._p6 = copy.deepcopy(p6) if p6 is not None else None
+            self._p7 = copy.deepcopy(p7) if p7 is not None else None
+            
             self.moveToThread(ui_thread)
             self.setParent(QtWidgets.QApplication.instance())
             self._called.connect(self._execute)
             self.method = method           
             self._called.emit(self._p0, self._p1, self._p2, self._p3, self._p4, self._p5, self._p6, self._p7)     
         else:   
-            self._exec(method, self._p0, self._p1, self._p2, self._p3, self._p4, self._p5, self._p6, self._p7)
+            # direct call
+            self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
 
 
     def _exec(self, method, p0, p1, p2, p3, p4, p5, p6, p7):
@@ -1893,6 +1895,7 @@ class InvokeUiMethod(QtCore.QObject):
         self._exec(self.method, p0, p1, p2, p3, p4, p5, p6, p7)
         
         # trigger garbage collector
+        self._called.disconnect(self._execute)
         self.setParent(None)
 
 

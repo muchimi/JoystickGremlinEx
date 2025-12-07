@@ -2282,6 +2282,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
+        el.reload_axis_state.connect(self._handle_axis_state_request)
+
+    def _handle_axis_state_request(self):
+        ''' request to reload axis state with this input item '''
+        if self._is_axis:
+            astate = gremlin.event_handler.AxisState()
+            astate.registerAxisInputItem(self)
 
     def toExtraData(self, extra_data = None) -> dict:
         ''' creates or adds properties of the input to create an extra data item '''

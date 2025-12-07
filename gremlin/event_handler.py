@@ -680,6 +680,7 @@ class EventListener:
 
 	process_manual_event = Signal(object, object, object) # fires when a manual event should be processed (event, value, extra_data)
 
+	reload_axis_state = Signal() # sent when input items should re-register their axes with AxisState
 
 	def __init__(self):
 		"""Creates a new instance."""
@@ -1878,44 +1879,7 @@ class EventHandler(QtCore.QObject):
 		self._execute_running = False
 		self.reset()
 	
-	# def _queue_start(self):
-	# 	if not self._execute_running:
-	# 		syslog.info("EVENT QUEUE: start")
-	# 		self._execute_queue.clear()
-	# 		self._execute_running = True
-	# 		self._execute_thread = threading.Thread(target = self._execute_queue_runner)
-	# 		self._execute_thread.name = "Execution queue runner"
-	# 		self._execute_thread.start()
-
-
-	# def _queue_stop(self):
-	# 	if self._execute_running:
-	# 		syslog.info("EVENT QUEUE: stopping...")
-	# 		self._execute_running = False
-	# 		self._execute_thread.join()
-	# 		self._execute_thread = None
-	# 		syslog.info("EVENT QUEUE: stopped")
-
-	# def _queue_add(self, event, m_list, f_list):
-	# 	''' add execution items to the list '''
-	# 	if self._execute_running:
-	# 		syslog.info(f"EVENT QUEUE: add: {str(event)}")
-	# 		self._execute_queue.append((event, m_list, f_list)) # this is thread safe in Python
-		
 	
-	# def _execute_queue_runner(self):
-	# 	''' execution queue runner '''
-	# 	while self._execute_running:
-	# 		if self._execute_queue:
-	# 			event, m_list, f_list = self._execute_queue.pop(0)
-	# 			self._execute_callbacks(event, m_list, f_list)
-	# 			time.sleep(0.01)
-		
-	# 	# stop executing requested = clear the queue
-	# 	while self._execute_queue:
-	# 		event, m_list, f_list = self._execute_queue.pop(0)
-	# 		self._execute_callbacks(event, m_list, f_list)
-	# 		time.sleep(0.01)
 		
 
 	def _profile_start(self):
@@ -3373,6 +3337,7 @@ class AxisState():
 		profile = gremlin.shared_state.current_profile
 		if profile:
 			self._update_inputs()
+		syslog.info("axis data reset")
 
 
 	def _update_inputs(self):
@@ -3425,20 +3390,18 @@ class AxisState():
 	
 
 	
-	def registerAxisInputItem(self, item):
+	def registerAxisInputItem(self, input_item):
 		''' registers an axis input item '''
-		if item.get_input_type() == InputType.JoystickAxis:
+		if input_item.get_input_type() == InputType.JoystickAxis:
 			verbose = gremlin.config.Configuration().verbose_mode_joystick
-			device_guid = item.device_guid
+			device_guid = input_item.device_guid
 			if not isinstance(device_guid, str):
 				device_guid = gremlin.util.normalize_guid(device_guid)
-			input_id = item.input_id
+			input_id = input_item.input_id
 			key = self._get_key(device_guid, input_id)
-			if not key in self._joystick_input_item_map:
-				self._joystick_input_item_map[key] = item
-		
-			if not key in self._data:
-				self._data[key] = AxisData(device_guid, input_id)
+			self._joystick_input_item_map[key] = input_item
+			self._data[key] = AxisData(device_guid, input_id)
+			verbose=True
 
 			if verbose: 	
 				device = gremlin.joystick_handling.getDevice(device_guid)
@@ -3467,6 +3430,11 @@ class AxisState():
 	
 	def getItem(self, device_guid, axis_id):
 		''' gets registered axis input item '''
+		if not self._joystick_input_item_map:
+			# data was reset, ask for a reload
+			el = EventListener()
+			el.reload_axis_state.emit()
+			
 		if device_guid:
 			key = self._get_key(device_guid, axis_id)
 			if key in self._joystick_input_item_map:
@@ -3492,7 +3460,7 @@ class AxisState():
 			:param device_guid: id of the device 
 			:param input_id: axis index, linear or axis id based on the flag 
 			:param value: default value if needed
-			:param linar: flag indicating if the index given is linear or axis
+			:param linear: flag indicating if the index given is linear (sequence number) or axis input id
 				
 		'''
 		import gremlin.types
@@ -3627,16 +3595,19 @@ class AxisState():
 
 
 class JoystickCallback():
-	def __init__(self, callback, device_guid = None, input_type = None, input_id = None):
+	def __init__(self, callback, device_guid = None, input_type = None, input_id = None, is_axis = None):
 		self.id = gremlin.util.get_guid() # id of this callback block
 		self.device_guid = gremlin.util.parse_guid(device_guid) # store as GUID as events use GUIDs
 		self.input_type = input_type
 		self.input_id = input_id
 		self.callback = callback
+		self.is_axis = is_axis
 
 @gremlin.singleton_decorator.SingletonDecorator
 class JoystickEventQueue():
-	''' sets up a threaded queue for handling and distributing joystick events, optionally filtering them '''
+	''' sets up a threaded queue for handling and distributing joystick events, optionally filtering them 
+		the callbacks are called on the UI thread
+	'''
 
 	def __init__(self):
 		self._callbacks = [] # list of callbacks
@@ -3650,10 +3621,10 @@ class JoystickEventQueue():
 		self._lock = threading.Lock() 
 
 
-	def registerCallback(self, callback, device_guid = None, input_type = None, input_id = None):
+	def registerCallback(self, callback, device_guid = None, input_type = None, input_id = None, is_axis = None):
 		''' registers a callback, with optional filter, returns the registration ID'''
 		if callback is not None:
-			cb = JoystickCallback(callback, device_guid, input_type, input_id)
+			cb = JoystickCallback(callback, device_guid, input_type, input_id, is_axis)
 			self._callbacks.append(cb)
 			
 
@@ -3666,11 +3637,12 @@ class JoystickEventQueue():
 				self._callbacks.remove(cb)
 				self._lock.release()
 
-	def setFilter(self, device_guid = None, input_type = None, input_id = None):
+	def setFilter(self, device_guid = None, input_type = None, input_id = None, is_axis = None):
 		''' sets or clears a filter on a specific input  '''
 		self._device_guid = device_guid
 		self._input_type = input_type
 		self._input_id = input_id
+		self._is_axis = is_axis
 
 
 	def stop(self):
@@ -3705,11 +3677,16 @@ class JoystickEventQueue():
 				if cb.device_guid:
 					# filtering is enabled
 					if event.device_guid == cb.device_guid:
-						if cb.input_type and event.event_type == cb.input_type:
+
+						if (cb.input_type and event.event_type == cb.input_type) or \
+							 (cb.is_axis is not None and event.is_axis == cb.is_axis):
 							if cb.input_id and event.identifier == cb.input_id:
-								gremlin.util.InvokeUiMethod(cb.callback, event)
+								timer = threading.Timer(0,self._fire_callback, (cb.callback, event,))
+								timer.start()
 								self._event_queue.task_done()
 				else:								
 					gremlin.util.InvokeUiMethod(cb.callback, event)
 					self._event_queue.task_done()
 			
+	def _fire_callback(self, callback, event):
+		gremlin.util.InvokeUiMethod(callback, event)

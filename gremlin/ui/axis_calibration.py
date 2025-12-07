@@ -660,7 +660,7 @@ class CalibrationManager():
 
         return self.calibration_map[device_guid][input_id]
     
-    def saveCalibration(self, calibration : CalibrationData, to_global = True, to_local = False) -> bool:
+    def saveCalibration(self, calibration : CalibrationData, to_global = True, to_local = False, callback = None):
         ''' saves calibration data '''
         device_guid =  gremlin.util.normalize_guid(calibration.device_guid)
         device = gremlin.joystick_handling.getDevice(device_guid)
@@ -670,8 +670,7 @@ class CalibrationManager():
             self.calibration_map[device_guid] = {}
         
         self.calibration_map[device_guid][input_id] = calibration
-        return self._save(to_global, to_local)
-
+        self._save(to_global, to_local, callback)
 
 
     def clearCalibration(self, data, to_global = True, to_local = False ):
@@ -684,6 +683,7 @@ class CalibrationManager():
                 calibration = self.calibration_map[device_guid][input_id]
                 calibration.reset()
                 del self.calibration_map[device_guid][input_id]
+
                 self._save(to_global, to_local)
                 el = gremlin.event_handler.EventListener()
                 el.calibration_changed.emit(calibration)
@@ -761,8 +761,13 @@ class CalibrationManager():
                 except Exception as ex:
                     syslog.error(f"Error loading calibration data: {ex}")
                     return False    
-                
-    def _save(self, to_global = True, to_local = False) -> bool:
+
+
+    def _save(self, to_global = True, to_local = False, callback = None):
+        gremlin.util.InvokeUiMethod(self._save_ui, to_global, to_local, callback)
+
+    def _save_ui(self, to_global = True, to_local = False, callback = None):
+
         ''' saves the calibration data 
         
         :param to_global: saves the calibration globally for all profiles when set, when not set, saves to the local profile only
@@ -802,15 +807,16 @@ class CalibrationManager():
                     syslog.info(f"Calibration data saved to [{fname}]")
                 except Exception as ex:
                     syslog.error(f"Error saving calibration: {ex}")
-                    return False
+                    if callback:
+                        callback(False)
                 
-        return True
+        if callback:
+            callback(True)
 
 
 class CalibrationDialogEx(QtWidgets.QDialog):
     ''' gremlinex single input calibration window '''
 
-    _queue_box = QtCore.Signal(str) # queues a message box for processing
 
     def __init__(self, input_item, parent = None):
         '''
@@ -826,6 +832,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         from gremlin.curve_handler import DeadzoneWidget
 
+        self._lock = False
         self.setModal(True)
         self.input_item = input_item
         input_type = input_item.get_input_type()
@@ -986,6 +993,9 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._deadzone_widget.isCentered = self.action_data.centered
         self._deadzone_widget.changed.connect(self._deadzone_changed)
 
+        self._status_widget = gremlin.ui.ui_common.QTimedLabel()
+
+   
         save_global_widget = gremlin.ui.ui_common.QDataPushButton("Save Global",
                                                                   callback = self._handle_save_global,
                                                                   tooltip = "Saves the calibration data to the global default and close. Note: Profiles that have profile specific calibration data will use that instead.")
@@ -1026,95 +1036,68 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         self.main_layout.addWidget(self._deadzone_widget)
         self.main_layout.addWidget(button_container)
+        self.main_layout.addWidget(self._status_widget)
         self.main_layout.addStretch()
 
 
-        # joystick event handling 
-        self._event_queue = queue.Queue() # holds the queue of events to process
-        self._joystick_event_callbacks = {} # tracks callbacks for event changes
-        self._event_thread =  gremlin.threading.AbortableThread(target = self._event_runner)
-        self._event_thread.name = "CalibrationDialog listener"
-        self._event_thread.start()
-        
-
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self._joystick_event_handler)
-
-        #self.setResizable(False)
+        self._event_queue = gremlin.event_handler.JoystickEventQueue()
+        self._event_queue.registerCallback(self._handle_joystick_event_ui,
+                                           device_guid = self.action_data.device_guid,
+                                           is_axis = True,
+                                           input_id = self.action_data.input_id)
 
         # initial value
         self._update_ui()
-
-        # queue messages
-        self._queue_box.connect(self._show_messagebox)
-
-    def _event_runner(self):
-        ''' runner for inbound joystick events '''
-        while not self._event_thread.stopped():
-            if self._event_queue.empty():
-                time.sleep(0.01)
-                continue
-            raw_value = self._event_queue.get()
-            calibrated_value = self.action_data.getValue(raw_value, normalize = False)
-            gremlin.util.InvokeUiMethod(self._update_axis_widget_ui,
-                                        raw_value,
-                                        calibrated_value,
-                                        self.action_data.calibrated_min,
-                                        self.action_data.calibrated_center if self.action_data.centered else None,
-                                        self.action_data.calibrated_max)     
-
-            self._event_queue.task_done()
-
-
-
-    def _joystick_event_handler(self, event):
-        ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
-        if gremlin.shared_state.is_running:
-            return 
         
-        if self._closing:
-            return
 
-        if not event.is_axis:
-            return 
-        
-        if not gremlin.util.compare_guid(event.device_guid, self.action_data.device_guid):
+    def _handle_joystick_event_ui(self, event):
+        ''' handles a joystick axis event '''
+        if self._lock:
             return
         
-        if event.identifier != self.action_data.input_id:
-            return
+        raw_value = event.value
+        calibrated_value = self.action_data.getValue(raw_value, normalize = False)
+        self._update_axis_widget_ui(
+            raw_value,
+            calibrated_value,
+            self.action_data.calibrated_min,
+            self.action_data.calibrated_center if self.action_data.centered else None,
+            self.action_data.calibrated_max     
+        )
         
-        self._event_queue.put(event.value)
-
-
-  
-         
-
-    def _show_messagebox(self, text : str):
-        gremlin.ui.ui_common.MessageBox(prompt = text, is_warning=False)
-
-    def _queue_messageBox(self, text : str):
-        self._queue_box.emit(text)
 
 
     @QtCore.Slot()
     def _handle_save_global(self):
         ''' saves the global calibration data and close '''
-        
-        result =self.mgr.saveCalibration(self.action_data, to_global = True, to_local = False) 
-        if result: 
+        self._lock = True
+        self.mgr.saveCalibration(self.action_data, to_global = True, to_local = False, callback = self._handle_global_result) 
+
+    def _handle_global_result(self, result : bool):
+        if result:
             self.source_data.copyFrom(self.action_data)
-            self._queue_messageBox("Saved to global calibration data.")
-           
+            self._status_widget.setText("Saved to global calibration data")
+            # icon = gremlin.ui.ui_common.Icons.infoIcon()
+            # dialog = gremlin.ui.ui_common.MessageBoxDialog(text = "Saved to global calibration data", icon = icon)
+            # dialog.show()
+        self._lock = False
 
     @QtCore.Slot()
     def _handle_save_profile(self):
         ''' saves the calibration to the current profile and close '''
+        self._lock = True
+        self.mgr.saveCalibration(self.action_data, to_global = False, to_local = True, callback = self._handle_local_result) 
+
+    def _handle_local_result(self, result : bool):
         
-        result = self.mgr.saveCalibration(self.action_data, to_global = False, to_local = True) 
-        if result: 
+        if result:
             self.source_data.copyFrom(self.action_data)
-            self._queue_messageBox("Saved to profile calibration data.")
+            self._status_widget.setText("Saved to profile calibration data")
+            # icon = gremlin.ui.ui_common.Icons.infoIcon()
+            # dialog = gremlin.ui.ui_common.MessageBoxDialog(text = "Saved to profile calibration data", icon = icon)
+            # dialog.show()
+
+        self._lock = False
 
 
     def closeEvent(self, event):
@@ -1133,19 +1116,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             
         self._closing = True
 
-        # clear the queue
-        if self._event_thread.is_alive():
-            self._event_thread.stop()
-            self._event_thread.join()
-            self._event_thread = None
+        self._event_queue.unregisterCallback(self._handle_joystick_event_ui)
 
-        # mark all events processed
-        while not self._event_queue.empty():
-            self._event_queue.get_nowait()
-
-
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.disconnect(self._joystick_event_handler)
         self._slider.valueChanged.disconnect(self._slider_changed)
         self._deadzone_widget.changed.disconnect(self._deadzone_changed)
 
@@ -1154,10 +1126,6 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._calibrated_center_widget.valueChanged.disconnect(self._calibrated_center_changed)
 
         gremlin.util.clear_layout(self.main_layout)
-        QtWidgets.QApplication.processEvents()
-
-        #return super().closeEvent(event)
-
 
 
 
@@ -1165,6 +1133,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     def _slider_changed(self, handle, value):
         ''' slider changed '''
 
+        syslog.info("slider changed")
         match handle:
             case 0:
                 if value >= self.action_data.calibrated_max:
@@ -1189,8 +1158,10 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         ''' reset calibration for the axis '''
         self.action_data.reset()
         self._update_ui()
-        self._queue_messageBox("Calibration data reset.")
-        #gremlin.ui.ui_common.MessageBox(prompt="Calibration data reset.", is_warning=False)
+        #icon = gremlin.ui.ui_common.Icons.infoIcon()
+        self._status_widget.setText("Reset")
+        #dialog = gremlin.ui.ui_common.MessageBoxDialog(text="Calibration data reset.", icon = icon)
+        #dialog.show()
 
     @QtCore.Slot()
     def _set_center_calibration(self):
@@ -1270,7 +1241,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         ''' updates the data  '''
         if self._closing:
             return
-        gremlin.util.assert_ui_thread()
+        if self._lock:
+            return
         is_centered = self.action_data.centered
         auto_calibrate = self._auto_calibrate_widget.isChecked()
 
@@ -1320,12 +1292,10 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         gremlin.util.InvokeUiMethod(self._update_axis_widget_ui, raw_value, calibrated_value, min_value, center_value, max_value)      
 
     def _update_axis_widget_ui(self, raw_value : float, calibrated_value : float, min_value : float, center_value : float, max_value : float):
-        gremlin.util.assert_ui_thread()
         if Shiboken.isValid(self._slider) and Shiboken.isValid(self._repeater):
-            with QtCore.QSignalBlocker(self._slider):
-                self._slider.setValue([min_value, center_value, max_value])
-                self._slider.setMarkerValue(raw_value)
-                self._repeater.setValue(calibrated_value)
+            self._slider.setValue([min_value, center_value, max_value])
+            self._slider.setMarkerValue(raw_value)
+            self._repeater.setValue(calibrated_value)
 
                 
 
