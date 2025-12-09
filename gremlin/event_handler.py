@@ -1288,7 +1288,7 @@ class EventListener:
 			dinput.DILL.init()
 		syslog.info("DILL: start listen")
 		dinput.DILL.set_device_change_callback(self._joystick_device_handler)
-		dinput.DILL.set_input_event_callback(self._dinput_event_handler)
+		dinput.DILL.set_input_event_callback(self._dinput_event_handler) # DINPUT event handler
 		while self._running and not self._run_event.is_set():
 			# Keep this thread alive until we are done
 			time.sleep(0.05)
@@ -1516,11 +1516,16 @@ class EventListener:
 
 			# get the curved input if the input is curved
 			raw_value = event.value
-			
-			value, should_process = self._apply_calibration(event, True)
-			if not should_process:
+
+			# apply spam filter
+			if not AxisState().shouldProcess(event):
+				# filtered out
 				return
 			
+			# apply input calibration
+			value, _ = self._apply_calibration(event, True)
+	
+			# apply input curve
 			curved_value = self._apply_curve_ex(event.device_guid, event.input_index, value)
 			event = Event(
 				event_type= InputType.JoystickAxis,
@@ -1537,8 +1542,8 @@ class EventListener:
 
 			# notify axis change for tab switches
 			if not gremlin.shared_state.is_running:
-				if AxisState().shouldProcess(event,"state_change"):
-					self.axis_state_change.emit(event)
+				# if AxisState().shouldProcess(event,"state_change"):
+				self.axis_state_change.emit(event)
 
 			
 
@@ -1817,7 +1822,7 @@ class EventListener:
 		# Allow the windows event to propagate further
 		return True
 
-	def _apply_calibration(self, event, return_process : bool = False) -> tuple:
+	def _apply_calibration(self, event : dinput.InputEvent, return_process : bool = False) -> tuple:
 		''' applies calibration data to the vent
 		:param event: the event data
 		:returns: (value, should_process)
@@ -3371,14 +3376,28 @@ class AxisState():
 		self._joystick_input_item_map = {}
 		self._last_axis_values = {} # last value
 		self._last_axis_time = {} # time when last modified
-		self._delay = 0 # delay in seconds for filter - 0 = disabled
+		
 		self._registered_devices = [] # guid of registered devices
 		self.usage_data = gremlin.joystick_handling.VJoyUsageState()
+		self.perf = gremlin.config.Configuration().verbose_mode_perf
+		self._delay = 1/1000 # delay in seconds for filter - 0 = disabled
+		self._delta = 0.001 # delta to trigger a difference 
+		self._skip_count = {} # event skip count
+		self._receive_count = {} # event receive count
 	
 
 		el = EventListener()
 		el.profile_unload.connect(self.reset)
 		el.profile_loaded.connect(self._update_inputs)
+		el.config_option_changed.connect(self._handle_config_changed)
+
+		self._handle_config_changed() # read config
+
+	def _handle_config_changed(self):
+		config = gremlin.config.Configuration()
+		self.perf = config.verbose_mode_perf
+		self._delay = config.axis_spam_delay
+		self._delta = config.axis_spam_delta
 
 
 
@@ -3622,32 +3641,83 @@ class AxisState():
 		return None
 
 	
-	def shouldProcess(self, event : Event, process_key = None):
-		''' true if event should be filtered for an axis event 
-		
-		this is an anti-spam mechanism for noisy inputs
+	def shouldProcess(self, event : dinput.InputEvent | Event, process_key : str = None, delay : float = None, delta : float = None):
+		''' anti-spam filter for axis events to throttle event input for noisy inputs in particular.
+
+		:param event: the axis event (dinput or GEX event)
+		:param process_key: optional, additional key for data tracking to uniquely identify this filter
+		:param delay: delay in seconds, if not provided uses the default delay
+		:param delta: value delta, 0 or positive, event values values below this threshold are ignored
 		
 		'''
-		if event.is_axis:
-			key = event.callbackKey # unique key for this event, device, and input
-			if process_key is not None:
-				key = (key, process_key) # hook to that key only 
 
+		if isinstance(event, dinput.InputEvent):
+			if event.input_type != dinput.InputType.Axis:
+				# not an axis
+				return True
+			key = (event.device_guid, event.input_index)
+			# convert to -1 to +1
+			current_value = gremlin.util.scale_to_range(event.value, source_min = -32767, source_max = 32767)
+			input_id = event.input_index
+		elif isinstance(event, Event):
+			if not event.is_axis:
+				# not an axis
+				return True 
+			key = event.callbackKey
 			current_value = event.value
-			now = time.time()
-			if key in self._last_axis_values:
-				last_value = self._last_axis_values[key]
-				last_modified = self._last_axis_time[key]
-				if self._delay > 0 and (last_modified + self._delay) >= now:
-					# fail: too soon
-					return False
-				if math.isclose(last_value, current_value, abs_tol = 0.001):
-					# fail: same value as before
-					self._last_axis_time[key]  = now
-					return False
+			input_id = event.identifier
+
+		if process_key:
+			key = (key, process_key) # hook to that key only 
+
+		if self.perf:
+			if not key in self._receive_count:
+				self._receive_count[key] = 0
+			self._receive_count[key] +=1
+			reason = ""
+
+		now = time.time()
+		delay = delay or self._delay
+		result = True
+		if key in self._last_axis_values:
+			last_value = self._last_axis_values[key]
+			last_modified = self._last_axis_time[key]
+
+			delta = delta or self._delta
+			if delta and math.isclose(last_value, current_value, abs_tol = delta):
+				# fail: value within the delta change
+				self._last_axis_time[key] = now
+				if self.perf: 
+					reason = f"too close"
+				result = False
+			
+			if not result and delay and (last_modified + delay) >= now:
+				# fail: value too soon
+				if self.perf: 
+					if not key in self._skip_count:
+						self._skip_count[key] = 0
+					self._skip_count[key] +=1
+					device = gremlin.joystick_handling.getDevice(event.device_guid)
+					reason = f"too frequent"
 				
-			self._last_axis_values[key] = current_value
-			self._last_axis_time[key]  = now
+				result = False
+			
+		
+		if not result:
+			if self.perf:
+				if not key in self._skip_count:
+					self._skip_count[key] = 0
+				self._skip_count[key] +=1
+				device = gremlin.joystick_handling.getDevice(event.device_guid)
+				device_stub = device.name if device else f"Unknown device: {str(event.device_guid)}"
+				percent = 100*self._skip_count[key]/self._receive_count[key]
+				stub = f"skip total: {self._skip_count[key]:,} evt received: {self._receive_count[key]:,} {percent:0.2f}% "
+				syslog.info(f"PERF: AXIS FILTER: {device_stub} input [{input_id}] {reason} value: {current_value:0.5f} {stub}")
+			return False
+
+
+		self._last_axis_values[key] = current_value
+		self._last_axis_time[key]  = now
 		return True
 	
         
@@ -3822,10 +3892,14 @@ class JoystickEventProcessor():
 		el.profile_unload.connect(self.profile_unload)
 		el.profile_loading.connect(self.profile_loading)
 		el.profile_loading_completed.connect(self.profile_loaded)
+		el.config_option_changed.connect(self.handle_config_changed)
 		self._axis_state = AxisState()
 		self._lock = threading.Lock() 
-		self.verbose_perf = gremlin.config.Configuration().verbose_mode_perf
+		self.perf = gremlin.config.Configuration().verbose_mode_perf
 		self.start()
+
+	def handle_config_changed(self):
+		self.perf = gremlin.config.Configuration().verbose_mode_perf
 
 	def profile_unload(self):
 		self.stop()
@@ -3939,7 +4013,7 @@ class JoystickEventProcessor():
 				self._event_thread = None
 
 	def start(self):
-		self.verbose_perf = gremlin.config.Configuration().verbose_mode_perf
+		self.perf = gremlin.config.Configuration().verbose_mode_perf
 		if not self._event_thread:
 			el = EventListener()
 			el.joystick_event.connect(self.queueJoystickEvent)
@@ -3999,7 +4073,7 @@ class JoystickEventProcessor():
 								if cb.ui_only and is_running:
 									# skip UI only events at runtime
 									continue 
-								if self.verbose_perf:
+								if self.perf:
 									self._count += 1
 
 								# trigger the event callback on its own thread
@@ -4022,11 +4096,11 @@ class JoystickEventProcessor():
 					
 			
 	def _fire_callback(self, callback, event, values):
-		if self.verbose_perf:
+		if self.perf:
 			start_time = time.time()
 			gremlin.util.InvokeUiMethod(callback, event, values)
 			lapsed = time.time() - start_time
-			syslog.info(f"fire filtered event {event.identifier} count {self._count} time (ms): {lapsed*1000}")
+			syslog.info(f"PERF: DISPATCH event {event.identifier} queue depth: {self._count:,} runtime (ms): {lapsed*1000:0.3f}")
 			self._count -= 1
 		else:
 			gremlin.util.InvokeUiMethod(callback, event, values)

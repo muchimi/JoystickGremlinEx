@@ -746,7 +746,10 @@ class CalibrationManager():
                         if not input_id in device_map[device_guid]:
                             if verbose:  
                                 device = gremlin.joystick_handling.getDevice(device_guid)    
-                                syslog.info(f"CALIB: loading calibration data for [{device.name}] axis [{device.getAxisName(input_id)}] from {source}")
+                                if device:
+                                    syslog.info(f"CALIB: loading calibration data for [{device.name}] axis [{device.getAxisName(input_id)}] from {source}")
+                                else:
+                                    syslog.info(f"CALIB: loading calibration data for unknown [{device_guid}] axis [{input_id}] from {source}")
 
                             if not device_guid in self.calibration_map:
                                 self.calibration_map[device_guid] = {}
@@ -1107,9 +1110,19 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         # should close?
         if self.source_data != self.action_data:
             # changes not saved
-            msgbox = gremlin.ui.ui_common.ConfirmBox(f"Calibration data has changed.", prompt = "Discard data?")
-            result = msgbox.show()
-            if result == QtWidgets.QDialog.Accepted:
+            icon = gremlin.ui.ui_common.Icons.warningIcon()
+            pixmap = icon.pixmap(48)
+            msgbox = QtWidgets.QMessageBox()
+            msgbox.setWindowTitle("Notice")
+            msgbox.setIconPixmap(pixmap)
+            msgbox.setInformativeText("Discard changes?")
+            msgbox.setText("Calibration data has changed and is not saved")
+            msgbox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+            result = msgbox.exec()
+            
+            # msgbox = gremlin.ui.ui_common.ConfirmBox(f"Calibration data has changed.", prompt = "Discard data?")
+            # result = msgbox.show()
+            if result == QtWidgets.QMessageBox.StandardButton.Yes: # QtWidgets.QDialog.Accepted:
                 event.accept()
             else:
                 event.ignore()

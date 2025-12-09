@@ -569,10 +569,10 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
             # handle motion requests
             match event.event_type:
                 case InputType.JoystickAxis: 
-                    sa = gremlin.event_handler.AxisState()
-                    should_process = sa.shouldProcess(event, self.id)
-                    if should_process:
-                        self._perform_axis_motion(event, value)
+                    # sa = gremlin.event_handler.AxisState()
+                    # should_process = sa.shouldProcess(event, self.id)
+                    # if should_process:
+                    self._perform_axis_motion(event, value)
                 case InputType.JoystickHat: 
                     self._perform_hat_motion(event, value) 
                 case InputType.JoystickButton:

@@ -1201,7 +1201,7 @@ There should only be one GremlinEx master server on the subnet.
     def _create_filter_page(self):
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
 
-        box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Joystick Input Filter Options", transparent = True)
+        box1 = gremlin.ui.ui_common.QBoxFrameLayout(title = "Joystick Input Filter Options", transparent = True)
         margin = 12
         
         axis_widget = gremlin.ui.ui_common.QIntLineEdit(
@@ -1237,11 +1237,34 @@ There should only be one GremlinEx master server on the subnet.
             gremlin.ui.ui_common.getGridContainer(hat_widget,"Default Hat count:", widget_only=True, left_margin=margin)
         ]
         for widget in widgets:
-            box.addWidget(widget)
+            box1.addWidget(widget)
         
         gremlin.ui.ui_common.synchronize_grids(widgets)
 
-        page_layout.addWidget(box)
+             
+
+        box2 = gremlin.ui.ui_common.QBoxFrameLayout(title = "Joystick Axis Filter", transparent = True)
+        delay_widget = gremlin.ui.ui_common.QDelayWidget(show_shortcuts=False,
+                                                         value = self.config.axis_spam_delay*1000,
+                                                         tooltip="Axis events received faster than this value will be discarded.\n0 to disable.  1 ms default recommended.",
+                                                         callback=self._handle_spam_delay,
+                                                         label=None)
+        delta_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self.config.axis_spam_delta,
+                                                           min_range = 0,
+                                                           step = 0.001,
+                                                           tooltip = "Minimum axis movement required to trigger.\n0 to disable. 0.001 default recommended.\nSmaller values mean the input is more sensitive.",
+                                                           callback = self._handle_spam_delta)
+        
+        widgets = [
+            gremlin.ui.ui_common.getGridContainer(delay_widget,"Delay (ms):", widget_only=True, left_margin=margin),
+            gremlin.ui.ui_common.getGridContainer(delta_widget,"Threshold:", widget_only=True, left_margin=margin),
+        ]
+        for widget in widgets:
+            box2.addWidget(widget)
+        gremlin.ui.ui_common.synchronize_grids(widgets)
+        
+        box_container = gremlin.ui.ui_common.getHContainer([box1, box2], widget_only=True, align_top = True)
+        page_layout.addWidget(box_container)
 
         widgets = []
         widget = gremlin.ui.ui_common.QDataPushButton("Default", callback = self._handle_filter, tooltip = "Set filter for all joystick devices to default", data = "default")
@@ -1253,6 +1276,9 @@ There should only be one GremlinEx master server on the subnet.
         
         widget = gremlin.ui.ui_common.getFlowContainer(widgets, widget_only=True)
         page_layout.addWidget(widget)
+
+
+        
 
 
 
@@ -1274,6 +1300,12 @@ There should only be one GremlinEx master server on the subnet.
 
     def _handle_filter_hat_changed(self, value):
         self.config.device_filter_max_hat = value
+
+    def _handle_spam_delay(self, value):
+        self.config.axis_spam_delay = value/1000
+    
+    def _handle_spam_delta(self, value):
+        self.config.axis_spam_delta = value
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):
@@ -1636,11 +1668,11 @@ This setting is also available on a profile by profile basis on the profile tab,
         page_layout.addWidget(column_widget)
 
 
-        self.verbose_widget = QtWidgets.QCheckBox("Enable Verbose Log Mode")
+        verbose_widget = QtWidgets.QCheckBox("Enable Verbose Log Mode")
         verbose = self.config.verbose
-        self.verbose_widget.setChecked(verbose)
-        self.verbose_widget.clicked.connect(self._verbose_cb)
-        page_layout.addWidget(self.verbose_widget)
+        verbose_widget.setChecked(verbose)
+        verbose_widget.clicked.connect(self._verbose_cb)
+        page_layout.addWidget(verbose_widget)
 
 
 

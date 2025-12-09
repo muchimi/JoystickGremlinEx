@@ -21,6 +21,15 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T126)
+- Changed: re-enabled axis input filters.
+- New: Perf verbose mode will output filtering applied to axis \[warning - can generate copious log data - use for diagnostics - tweaking only\]
+- New: Perf verbose mode will currently output container/condition/action runtime in milliseconds (1/1000 of a second). Note: most actions in GEX that are long running trigger their own threads (example, TTS) so as not to hold up the profile execution. The lapsed time shown in PERF mode reflects how long GEX took to process the request and offload it to an API component like text to speech, it will not include the actual TTS execution time.
+- New: Axis spam filter options added to global filter options (can be disabled there if needed).
+- Fix: rework of confirm message box for calibration dialog to avoid C++ crash
+- Fix: verbose exception in map to state
+
+
 ### (m76T125A)
 - Fix: invalid param name in calibration dialog registration.
  

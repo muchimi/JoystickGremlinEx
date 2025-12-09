@@ -302,6 +302,10 @@ class Configuration(QtCore.QObject):
         else:
             self._save_ui()
 
+        # tell UI of config changes
+        el = gremlin.event_handler.EventListener()
+        el.config_option_changed.emit()
+
     def _save_ui(self):
         """Writes the version specific configuration file to disk."""
         if self._lock:
@@ -892,8 +896,6 @@ class Configuration(QtCore.QObject):
             self._data["highlight_device"] = value
             self.save()
             self.changed.emit("highlight_device", value)
-            el = gremlin.event_handler.EventListener()
-            el.config_option_changed.emit()
 
 
 
@@ -904,10 +906,9 @@ class Configuration(QtCore.QObject):
     
     @highlight_hotkey_autoswitch.setter
     def highlight_hotkey_autoswitch(self, value : bool):
-        self._data["highlight_hotkey_autoswitch"] = value
+        self._set_data("highlight_hotkey_autoswitch", value)
 
-        el = gremlin.event_handler.EventListener()
-        el.config_option_changed.emit()
+
 
 
     @property
@@ -918,8 +919,7 @@ class Configuration(QtCore.QObject):
     @enable_remote_control.setter
     def enable_remote_control(self, value):
         if type(value) == bool:
-            self._data["allow_remote_control"] = value
-            self.save()
+            self._set_data("allow_remote_control", value)
 
     @property
     def enable_remote_broadcast(self):
@@ -931,11 +931,7 @@ class Configuration(QtCore.QObject):
         ''' remote broadcast master switch enable '''
         import gremlin.event_handler
         if type(value) == bool and self._get_data("enable_remote_broadcast",False)!= value:
-            self._data["enable_remote_broadcast"] = value
-            self.save()
-
-            eh = gremlin.event_handler.EventListener()
-            eh.config_changed.emit()
+            self._set_data("enable_remote_broadcast", value)
 
     @property
     def enable_broadcast_speech(self):
@@ -2854,3 +2850,24 @@ class Configuration(QtCore.QObject):
     @device_filter_max_hat.setter
     def device_filter_max_hat(self, value : int):
         self._set_data("device_filter_max_hat", value)
+
+
+    @property
+    def axis_spam_delay(self) -> float:
+        ''' axis filter delay '''
+        return self._get_data("axis_spam_delay", 1/1000)
+    @axis_spam_delay.setter
+    def axis_spam_delay(self, value : float):
+        if value < 0: value = 0
+        self._set_data("axis_spam_delay", value)
+
+    @property
+    def axis_spam_delta(self) -> float:
+        ''' axis filter delay '''
+        return self._get_data("axis_spam_delta", 0.001)
+    @axis_spam_delta.setter
+    def axis_spam_delta(self, value : float):
+        if value < 0: value = 0
+        self._set_data("axis_spam_delta", value)
+
+                

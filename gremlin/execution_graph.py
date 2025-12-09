@@ -433,10 +433,19 @@ class ExecutionContext():
         el.profile_changed.connect(self.reset) # reload data on profile change
         el.profile_modes_changed.connect(self.reset) # modes changed
         el.profile_loaded.connect(self._handle_profile_load) # reload data on profile load
+        el.config_option_changed.connect(self._handle_config_changed)
 
    
         self._functors = []
         self._reset()
+
+
+    def _handle_config_changed(self):
+        config = gremlin.config.Configuration()
+        self.perf = config.verbose_mode_perf
+        self._verbose_exec = config.verbose_mode_execution
+        self._verbose_detailed = config.verbose_mode_exec_detailed
+        self._verbose_condition = config.verbose_mode_condition
 
     def _reset(self):
 
@@ -454,10 +463,7 @@ class ExecutionContext():
 
         self._processed_events = []
         self._processed_functors = {}
-        config = gremlin.config.Configuration()
-        self._verbose_exec = config.verbose_mode_execution
-        self._verbose_detailed = config.verbose_mode_exec_detailed
-        self._verbose_condition = config.verbose_mode_condition
+        
         self.used_items = {}  # nodes can only be used once
         self._build_error = False # no error
 
@@ -466,7 +472,7 @@ class ExecutionContext():
                 functor.unhook() # ensure prior used functors are unhook so they can release
         self._functors = [] # list of functors in the execution graph
 
-        self.perf_mode = gremlin.config.Configuration().verbose_mode_perf
+        self._handle_config_changed() # update config params
         
 
     @property
@@ -1694,7 +1700,7 @@ class ExecutionContext():
                 if not result:
                     return False
         else:
-            if self.perf_mode:
+            if self.perf:
                 now = time.time()
             if functor.manual_callback:
                 el = gremlin.event_handler.EventListener()
@@ -1703,9 +1709,29 @@ class ExecutionContext():
                     return False
                 
             result =  functor.process_event(event, value, extra_data)
-            if self.perf_mode:
+            if self.perf:
                 lapsed = time.time() - now
-                syslog.info(f"functor lapsed time: {lapsed * 1000}")
+                stub = f"{functor.__class__.__name__}"
+                if hasattr(functor, "id"):
+                     stub += f" id: {functor.id}"
+                if hasattr(functor,"_name"):
+                    stub += f" name: {functor._name}"
+                if hasattr(functor,"hardware_device_guid"):
+                    device_guid = functor.hardware_device_guid
+                    device = gremlin.joystick_handling.getDevice(device_guid)
+                    if device:
+                        stub += f" device: {device.name}"  
+                    else:
+                        stub += f" device: {device_guid}"  
+                if hasattr(functor,"hardware_input_type"):                    
+                    stub += f" type: {functor.hardware_input_type.name}"
+                if hasattr(functor,"hardware_input_id"):
+                    stub += f" input id: {functor.hardware_input_id}"
+                if hasattr(functor,"profile_mode"):
+                    stub += f" mode: {functor.profile_mode}"
+
+
+                syslog.info(f"PERF: functor [{stub}] lapsed time (ms): {lapsed * 1000:0.3f}")
             return result
 
         

@@ -524,8 +524,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         jeq = gremlin.event_handler.JoystickEventProcessor()
         jeq.registerCallback(callback = self._handle_curve_update,
                                             device_guid = data.device_guid,
+                                            input_type = InputType.JoystickAxis,
                                             input_id = data.input_id,
-                                            is_axis = True
+                                            ui_only = True
                                             )
 
         # disable highlighting

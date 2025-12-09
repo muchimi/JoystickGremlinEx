@@ -708,6 +708,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         self.lock = threading.Lock()
         self._started = False
         
+        self.verbose = gremlin.config.Configuration().verbose_mode_state
+        
         # create the state if it doesn't exist
         self.sd = gremlin.ui.state_device.StateData()
         key = self.action_data.key

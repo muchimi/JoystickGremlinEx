@@ -7836,7 +7836,7 @@ class QDelayWidget(QtWidgets.QWidget):
         self._max_value = max_value_seconds * 1000 # max value possible
 
         width = gremlin.ui.ui_common.get_char_width(8)
-        self.delay_label = QtWidgets.QLabel(label if label else "Delay (ms)")
+        self.delay_label = QtWidgets.QLabel(label) if label else None
         self._delay_widget = QIntLineEdit()
         self._delay_widget.invalid.connect(self._handle_invalid_input)
         # self._delay_widget.setRange(0, self._max_value) 
@@ -7845,7 +7845,10 @@ class QDelayWidget(QtWidgets.QWidget):
         self._delay_widget.setValue(value) # default
         self._delay_widget.valueChanged.connect(self._value_changed)
 
-        widgets = [self.delay_label, self._delay_widget]
+        if label:
+            widgets = [self.delay_label, self._delay_widget]
+        else:
+            widgets = [self._delay_widget]
 
         if show_shortcuts:
 
@@ -7913,7 +7916,8 @@ class QDelayWidget(QtWidgets.QWidget):
 
     
     def setLabel(self, text : str):
-        self.delay_label.setText(text)
+        if self.delay_label:
+            self.delay_label.setText(text)
 
     @QtCore.Slot()
     def _value_changed(self):
@@ -9596,7 +9600,8 @@ def getHContainer(widget_or_list = None,
                   left_margin = 0,
                   right_margin = 0,
                   no_stretch = False,
-                  widget_only = False):
+                  widget_only = False,
+                  align_top = False):
     ''' gets a qt H container widget 
     
     :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically, use "|" for separator, "||" to insert a stretch
@@ -9622,7 +9627,9 @@ def getHContainer(widget_or_list = None,
     if min_height is not None:
         widget.setMinimumHeight(min_height)
 
-    if alignment is None and set_alignment:
+    if align_top:
+        alignment = QtCore.Qt.AlignmentFlag.AlignTop
+    elif alignment is None and set_alignment:
         alignment = QtCore.Qt.AlignmentFlag.AlignVCenter
 
     if label:

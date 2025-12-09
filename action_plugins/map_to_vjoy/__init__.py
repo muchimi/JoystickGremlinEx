@@ -1902,8 +1902,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             if not event.identifier == self.action_data.hardware_input_id:
                 return
 
-        if not self._as.shouldProcess(event, self.id):
-            return
+        # if not self._as.shouldProcess(event, self.id):
+        #     return
 
         value = event.value
 
