@@ -2571,6 +2571,62 @@ If the false-positive is reported by your scanning solution, consult the recomme
 
 Some have suggested the code should be signed which could alleviate the issue. However I point out this utility is open source and provided to you free.  Its packaging is provided as a convenience.  The work is the product of hundreds of development hours, and I am not currently in a position to incur a recurring expense to code sign a free tool in the hope it bypasses the rare false-positive detection, and code signing is not a guarantee.  Given the available options and the rarity of the detection, please consider using one of the options above, or just do not use GremlinEx.
 
+
+## Performance
+
+GremlinEx is optimized for profile runtime performance.  Edit time performance is driven by the complexity of the user interface, specifically the number of device inputs loaded concurrently, and the number of inputs displayed on the input viewer.
+
+### Tips to improve design time performance
+
+While not always applicable, the tips below will generally help maximize edit time performance and keep memory/CPU usage to a minimum.
+
+#### Filter inputs
+
+Use the input filter options to keep the number of visible inputs on a given device to a minimum.  The more inputs are loaded, the more resources are used.  UI performance can start to bog down after 100 or so inputs concurrently visible, however on higher end systems this degradation is not experienced until 400 inputs or so.  
+
+Be particularly mindful of devices with lots of inputs, such as VJOY devices when VJOY is used as input.  Use the input filter options to keep the number of inputs to a reasonable level for your machine.
+
+### Configure Axis input filtering
+
+Performance is impacted by noisy axis data coming from devices that "spam" copious events.  These events are handled by the GEX axis filtering function. This function determines which axis inputs should be processed versus ignored.  This generally falls in these general categories:
+
+- events received when the input has not changed values significantly.
+- events received at a high rate
+- events received when the device is not moving our touched (usually sensor noise)
+
+GEX has configurable parameters to modify the filtering to address talkative devices that spam axis update data when the data sent is not particularly relevant to the profile.  The default settings are suitable for most devices in one of the above categories.
+
+Devices particularly prone to noisy axis (linear) data are:
+
+- devices using a potentiometer (resistor based) 'POT' sensor insteald of 'HAL' (magnetic potential difference or hall effect) or optical (contact less) sensors.  Potentiometer based devices are usually found on older or cheaper gaming devices, or devices that are well used.
+- devices that are bulky/large such as rudder pedals - even with the high precision of a hall effect sensor, the bulk of the mechanism can lead to an axis trigger.
+- devices with limited travel, such as thumbsticks - the smaller they are - the worse they tend to be.
+- sensitive devices such as touch screens (these can trigger axis input into GEX over OSC/MIDI).
+
+Note that input filtering is different from deadzone settings where, for example, a deadzone is applied on an axis that does not return to a center position or has issues hitting min/max values at travel extremes.  For these situation, the deadzone mechanism should be used to correct the input data.
+
+#### Input Viewer for diagnostics / testing only
+
+The Input Viewer, while capable, does take a toll on performance proportional to the number of devices shown.  The worst offender is the timeline axis view.  Consider using Input Viewer only while developping and testing a profile and keep it hidden otherwise.  Input Viewer uses resources at profile runtime and design time.
+
+#### Use states instead of modes where possible
+
+Mode context switching is expensive compared to using states.  While modes are often needed for more complex profiles, keep mode changes to a minimum where possible, and leverage state conditions over modes as these are faster as they avoid a context switch.
+
+This said, the use of modes itself is not an issue. Aim to avoid constant mode changes in a profile if possible, if an alternative is feasible.
+
+#### Keep verbose modes to a minimum
+
+Verbose modes are helpful to diagnose logic and performance bottlenecks in a profile.  Some verbose modes can generate thousands of messages, which are needed to help with profile design and identify potential issues.  Once a profile is designed however, verbose modes should be disabled if possible to reduce I/O and overhead associated with generating these messages.
+
+Log files when they get quite large can have a significant impact on performance, even on fast storage devices.
+
+#### Avoid using VJOY devices as input and output concurrently
+
+While GEX allows this configuration, it requies overhead to manage potential conflicts and deadlocks at the VJOY API level that overall can lead to delays.  This is another use-case where the GEX State functionality may be preferrable over using VJOY input/output buttons, however it is a supported configuration.
+
+
+
 ## Runnin GremlinEx from source
 
 ### Environment
