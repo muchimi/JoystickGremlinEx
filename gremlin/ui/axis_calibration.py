@@ -1043,14 +1043,15 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._event_queue = gremlin.event_handler.JoystickEventProcessor()
         self._event_queue.registerCallback(self._handle_joystick_event_ui,
                                            device_guid = self.action_data.device_guid,
-                                           is_axis = True,
-                                           input_id = self.action_data.input_id)
+                                           input_type = InputType.JoystickAxis,
+                                           input_id = self.action_data.input_id,
+                                           ui_only = True)
 
         # initial value
         self._update_ui()
         
 
-    def _handle_joystick_event_ui(self, event):
+    def _handle_joystick_event_ui(self, event, values):
         ''' handles a joystick axis event '''
         if self._lock:
             return
