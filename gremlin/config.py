@@ -1470,7 +1470,18 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_filter(self):
         ''' true if verbose mode is in input filter mode '''
-        return self.verbose and VerboseMode.Filter in self.verbose_mode        
+        return self.verbose and VerboseMode.Filter in self.verbose_mode      
+
+    @property
+    def verbose_mode_perf(self):
+        ''' true if verbose mode for performance timing '''
+        return self.verbose and VerboseMode.Perf in self.verbose_mode  
+    
+    
+    @property
+    def verbose_mode_events(self):
+        ''' true if verbose mode for performance timing '''
+        return self.verbose and VerboseMode.Events in self.verbose_mode  
     
     @property
     def midi_enabled(self):

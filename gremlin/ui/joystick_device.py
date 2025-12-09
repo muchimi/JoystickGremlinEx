@@ -521,7 +521,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._curve_update_handler(value)
 
         # hook joystick queue to update position on the curve
-        jeq = gremlin.event_handler.JoystickEventQueue()
+        jeq = gremlin.event_handler.JoystickEventProcessor()
         jeq.registerCallback(callback = self._handle_curve_update,
                                             device_guid = data.device_guid,
                                             input_id = data.input_id,

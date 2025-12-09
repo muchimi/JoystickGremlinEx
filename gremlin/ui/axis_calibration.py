@@ -1040,7 +1040,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self.main_layout.addStretch()
 
 
-        self._event_queue = gremlin.event_handler.JoystickEventQueue()
+        self._event_queue = gremlin.event_handler.JoystickEventProcessor()
         self._event_queue.registerCallback(self._handle_joystick_event_ui,
                                            device_guid = self.action_data.device_guid,
                                            is_axis = True,

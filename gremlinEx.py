@@ -4473,6 +4473,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._profile_load_stack.append(source_xml)
             return
         
+        eh = gremlin.event_handler.EventHandler()
+        el = gremlin.event_handler.EventListener()
+        
         try:
 
             gremlin.shared_state.push_suspend_save_input()
@@ -4484,8 +4487,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             
 
             pushCursor()
-            eh = gremlin.event_handler.EventHandler()
-            el = gremlin.event_handler.EventListener()
+            
+
+            el.profile_loading.emit() # indicate we are loading a profile
 
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
 
@@ -4638,7 +4642,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # select the new mode
             eh.change_mode(last_edit_mode, force_update = True)
-            
+
             el.profile_loaded.emit()
 
             # ask the UI to update input curve icons
@@ -4659,10 +4663,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
         finally:
-        
+           
+   
             
             gremlin.shared_state.profile_loading = False # done loading
             gremlin.shared_state.pop_suspend_save_input()
+
+            el.profile_loading_completed.emit()
             
             # restore the mouse cursor
             popCursor()
@@ -5405,6 +5412,8 @@ if __name__ == "__main__":
     astate = gremlin.event_handler.AxisState()
     astate.reset()
 
+    # joystick processor instance
+    event_processor = gremlin.event_handler.JoystickEventProcessor() 
     
 
     syslog.info("GremlinEx UI created")

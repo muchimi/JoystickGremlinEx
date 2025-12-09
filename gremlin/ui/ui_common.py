@@ -5128,7 +5128,7 @@ class QProgressBar(QtWidgets.QWidget):
         #syslog.info(f"X: {x} y: {y} w: {w} h: {h} v:{v} value: {self._percent:0.3f}")
 
 
-class QHookedProgressBar(QProgressBar, gremlin.base_classes.JoystickHook):
+class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
     ''' hooked progress bar to a hardware input '''
 
     unhooked = QtCore.Signal() # fires on unhook
@@ -5145,13 +5145,28 @@ class QHookedProgressBar(QProgressBar, gremlin.base_classes.JoystickHook):
         super().__init__(orientation, value, min, max, readonly, step, data, parent)
 
 
-    def hookDevice(self, device_guid, input_type, input_id):    
-        ''' hooks the device '''    
-        if not Shiboken.isValid(self):
-            return
-        self._hookDevice(device_guid, input_type, input_id, self.setValue)
 
+    def hookDevice(self, device_guid, input_type, input_id, ui_only = True, persist = False):    
+        ''' hooks the device '''    
+        if Shiboken.isValid(self):
+            super().hookDevice(self.process_events,
+                                device_guid = device_guid,
+                                input_type = input_type,
+                                input_id = input_id,
+                                ui_only = ui_only,
+                                persist = persist)
         
+
+    def process_events(self, event, values):
+        ''' joystick value changed '''
+        if self._is_virtual:
+            pass
+        self.setValue(values)
+
+    def unhook(self):
+        ''' called when object is removed '''
+        if Shiboken.isValid(self):
+            self.unhookDevice()
 
 class ButtonStateWidget(QtWidgets.QWidget):
     ''' visualizes the state of a button '''
@@ -5400,658 +5415,672 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
 
 
-class AxisStateWidget(QtWidgets.QWidget, gremlin.base_classes.JoystickHook):
-    ''' input axis visualizer '''
+# class AxisStateWidget(QtWidgets.QWidget, gremlin.event_handler.JoystickHook):
+#     ''' input axis visualizer '''
 
-    valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
-    deleted = QtCore.Signal(object) # indicates the item is being deleted
+#     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
+#     deleted = QtCore.Signal(object) # indicates the item is being deleted
 
-    def __init__(self, axis_id = None, show_calibrated = False, show_percentage = False, show_value = False,
-                  show_label = False, show_curve = False, orientation = QtCore.Qt.Orientation.Horizontal,
-                  min_range : float = -1.0, max_range : float = 1.0, comment = None, device = None, decimals = 3, callback = None, parent=None):
-        """Creates a new instance.
+#     def __init__(self, 
+#                 device_guid = None,
+#                 input_type = None,
+#                 axis_id = None,
+#                 show_calibrated = False, show_percentage = False, show_value = False,
+#                 show_label = False, show_curve = False, orientation = QtCore.Qt.Orientation.Horizontal,
+#                 min_range : float = -1.0,
+#                 max_range : float = 1.0, 
+#                 comment = None, 
+#                 decimals = 3, 
+#                 callback = None, 
+#                 parent=None,
+#                 ui_only = True):
+#         """Creates a new instance.
 
-        :param axis_id: id of the axis, used in the label
-        :param show_calibrated: show calibrated data 
-        :param show_percentage: show percent label
-        :param show_value : show value label 
-        :param show_curve : show curve value label
-        :param orientation: horizontal or vertical
-        :param min_range: min range (-1)
-        :param max_range: max range (+1)
-        :param comment: comment label
-        :param device : device to use
-        :param decimals: decimals to use for value data (3)
-        :param callback: update callback when the widget changes values (optional)
-        :param parent the parent of this widget
+#         :param axis_id: id of the axis, used in the label
+#         :param show_calibrated: show calibrated data 
+#         :param show_percentage: show percent label
+#         :param show_value : show value label 
+#         :param show_curve : show curve value label
+#         :param orientation: horizontal or vertical
+#         :param min_range: min range (-1)
+#         :param max_range: max range (+1)
+#         :param comment: comment label
+#         :param device : device to use
+#         :param decimals: decimals to use for value data (3)
+#         :param callback: update callback when the widget changes values (optional)
+#         :param parent the parent of this widget
 
-        """
-        super().__init__(parent)
+#         """
+#         super().__init__(parent)
 
-        self._scale_factor = 1000
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.device = device
-        self.setObjectName("state_repeater")
-        self._is_state = True # indicate this is a state widget
-        self.show_raw = True # true if the raw value should be displayed
-        self._callback = callback
+#         self._scale_factor = 1000
+#         self.main_layout = QtWidgets.QVBoxLayout(self)
+#         self.device = gremlin.joystick_handling.getDevice(device_guid)
+#         self._device_guid = self.device.device_guid
+#         self._input_id = axis_id
+#         self._input_type = input_type
+#         self.setObjectName("state_repeater")
+#         self._is_state = True # indicate this is a state widget
+#         self.show_raw = True # true if the raw value should be displayed
+#         self._callback = callback
 
-       
+#         self.hookDevice(self.process_event, self._device_guid, self._input_type, self._input_id, ui_only)
         
 
-        self.container_widget = QtWidgets.QWidget()
-        if orientation == QtCore.Qt.Orientation.Vertical:
-            self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
+#         self.container_widget = QtWidgets.QWidget()
+#         if orientation == QtCore.Qt.Orientation.Vertical:
+#             self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
             
-        else:
-            # horizontal
-            self.container_layout = QtWidgets.QHBoxLayout(self.container_widget)
+#         else:
+#             # horizontal
+#             self.container_layout = QtWidgets.QHBoxLayout(self.container_widget)
 
-        self.container_layout.setSpacing(4)
+#         self.container_layout.setSpacing(4)
             
 
-        # container for the progress bars (regular + calibrated)
-        self.progress_container_widget = None
-        self.progress_container_layout = None
+#         # container for the progress bars (regular + calibrated)
+#         self.progress_container_widget = None
+#         self.progress_container_layout = None
 
-        self._orientation = orientation
-        self._show_percentage = show_percentage
-        self._show_value = show_value
-        self._show_label = show_label
-        self._show_curve = show_curve
-        self._show_calibrated = show_calibrated
-        self._decimals = decimals if decimals is not None else 3
+#         self._orientation = orientation
+#         self._show_percentage = show_percentage
+#         self._show_value = show_value
+#         self._show_label = show_label
+#         self._show_curve = show_curve
+#         self._show_calibrated = show_calibrated
+#         self._decimals = decimals if decimals is not None else 3
 
-        # widget references 
-        self._progress_widget = None
-        self._progress_raw_widget = None
-        self._progress_calibrated_widget = None
-        self._display_curve_widget = None
-        self._display_label_widget = None
-        self._display_percent_widget = None
-        self._display_value_widget = None
+#         # widget references 
+#         self._progress_widget = None
+#         self._progress_raw_widget = None
+#         self._progress_calibrated_widget = None
+#         self._display_curve_widget = None
+#         self._display_label_widget = None
+#         self._display_percent_widget = None
+#         self._display_value_widget = None
         
-        self._data = None
-        self._comment = comment
+#         self._data = None
+#         self._comment = comment
 
-        self._label_text = ""
-        self._label_value = ""
-        self._label_percentage = ""
-        self._label_curve = ""
+#         self._label_text = ""
+#         self._label_value = ""
+#         self._label_percentage = ""
+#         self._label_curve = ""
 
-        self._display_value = 0.0
-        self._calibrated_value = 0.0
+#         self._display_value = 0.0
+#         self._calibrated_value = 0.0
         
-        if axis_id:
-            self._label_text = f"Axis {axis_id}"
+#         if axis_id:
+#             self._label_text = f"Axis {axis_id}"
 
-        min = min_range
-        max = max_range
-        if min > max:
-            min, max = max, min
-        self._min_range = min_range
-        self._max_range = max_range
+#         min = min_range
+#         max = max_range
+#         if min > max:
+#             min, max = max, min
+#         self._min_range = min_range
+#         self._max_range = max_range
 
-        self._device_guid = device.device_guid if device else None
-        self._input_id = axis_id
-        self._value = 0
-        self._raw_value = 0
-        self._reverse = False
-        self._decimals = 3
-        self._width = 10
-
-        # hook tab events
-        el = gremlin.event_handler.EventListener()
-        el.tab_selected.connect(self._tab_selected)
-        el.tab_unselected.connect(self._tab_unselected)
-        el.calibration_changed.connect(self._calibration_changed)
-        el.calibration_options_changed.connect(self._calibration_options_changed)
-
-        self.main_layout.addWidget(self.container_widget)
-
-        el = gremlin.event_handler.EventListener()
-        el.ui_ready.connect(self._ui_ready)
-
-        self._set_value_ui(self._value)
-
-
-        css = Color.cssRepeater()
-        self.setStyleSheet(css)
-        self.installEventFilter(self)
-
-    def sizeHint(self):
-        if self._orientation == QtCore.Qt.Orientation.Vertical:
-            w = 20
-            h = -1
-        else:
-            w = -1
-            h = 20
-
-        return QtCore.QSize(w, h)
-
-
-    def eventFilter(self, widget, event):
-        ''' grab mouse wheel events to avoid random scrolling '''
-        t = event.type()
-        if t == QtCore.QEvent.Type.Wheel:
-            return True
-        return False
-
-
-    def hookDevice(self, device_guid, input_type, input_id):    
-        ''' hooks the device '''    
-        if not Shiboken.isValid(self):
-            return
-        self._hookDevice(device_guid, input_type, input_id, self.setValue)
         
+#         self._value = 0
+#         self._raw_value = 0
+#         self._reverse = False
+#         self._decimals = 3
+#         self._width = 10
 
-    @QtCore.Slot(object)
-    def _calibration_changed(self, calibration):
-        ''' occurs when calibration data is changed '''
-        if not Shiboken.isValid(self):
-            return
-        if self.device_guid == calibration.device_guid and self.input_id == calibration.input_id:
-            # one of ours
-            isCalibrated = calibration.hasData
-            syslog.info(f"Device calibration changed to: {isCalibrated}")
-            self.setCalibrated(isCalibrated)
-            self.show_calibrated = isCalibrated
-            self._clear_widgets()
-            self._update_widgets()
+#         # hook tab events
+#         el = gremlin.event_handler.EventListener()
+#         el.tab_selected.connect(self._tab_selected)
+#         el.tab_unselected.connect(self._tab_unselected)
+#         el.calibration_changed.connect(self._calibration_changed)
+#         el.calibration_options_changed.connect(self._calibration_options_changed)
 
-    @QtCore.Slot()
-    def _calibration_options_changed(self):
-        ''' refresh when calibration options change '''
-        self._clear_widgets()
-        self._update_widgets()
+#         self.main_layout.addWidget(self.container_widget)
+
+#         el = gremlin.event_handler.EventListener()
+#         el.ui_ready.connect(self._ui_ready)
+
+#         self._set_value_ui(self._value)
+
+
+#         css = Color.cssRepeater()
+#         self.setStyleSheet(css)
+#         self.installEventFilter(self)
+
+#     def unhook(self):
+#         self.unhookDevice(self.process_event)
+
+#     def process_event(self, event):
+#         ''' handles joystick updates '''
+#         astate = gremlin.event_handler.AxisState()
+#         values = astate.getAxisValues(self._device_guid, self._input_type, self._axis_id)
+#         self.setValue(values)
+
+#     def sizeHint(self):
+#         if self._orientation == QtCore.Qt.Orientation.Vertical:
+#             w = 20
+#             h = -1
+#         else:
+#             w = -1
+#             h = 20
+
+#         return QtCore.QSize(w, h)
+
+
+#     def eventFilter(self, widget, event):
+#         ''' grab mouse wheel events to avoid random scrolling '''
+#         t = event.type()
+#         if t == QtCore.QEvent.Type.Wheel:
+#             return True
+#         return False
+
+
+#     @QtCore.Slot(object)
+#     def _calibration_changed(self, calibration):
+#         ''' occurs when calibration data is changed '''
+#         if not Shiboken.isValid(self):
+#             return
+#         if self.device_guid == calibration.device_guid and self.input_id == calibration.input_id:
+#             # one of ours
+#             isCalibrated = calibration.hasData
+#             syslog.info(f"Device calibration changed to: {isCalibrated}")
+#             self.setCalibrated(isCalibrated)
+#             self.show_calibrated = isCalibrated
+#             self._clear_widgets()
+#             self._update_widgets()
+
+#     @QtCore.Slot()
+#     def _calibration_options_changed(self):
+#         ''' refresh when calibration options change '''
+#         self._clear_widgets()
+#         self._update_widgets()
             
     
 
-    def _clear_widgets(self):
-        ''' removes all the widgets for a clean slate '''
-        if not Shiboken.isValid(self):
-            return
-        try:
-            gremlin.ui.ui_common.clear_layout(self.container_layout)
-            self._display_curve_widget = None
-            self._display_label_widget = None
-            self._display_percent_widget = None
-            self._display_value_widget = None
-            self._progress_widget = None
-            self._progress_calibrated_widget = None
-            self.progress_container_widget = None
-            self.progress_container_widget = None
-        except:
-            pass
+#     def _clear_widgets(self):
+#         ''' removes all the widgets for a clean slate '''
+#         if not Shiboken.isValid(self):
+#             return
+#         try:
+#             gremlin.ui.ui_common.clear_layout(self.container_layout)
+#             self._display_curve_widget = None
+#             self._display_label_widget = None
+#             self._display_percent_widget = None
+#             self._display_value_widget = None
+#             self._progress_widget = None
+#             self._progress_calibrated_widget = None
+#             self.progress_container_widget = None
+#             self.progress_container_widget = None
+#         except:
+#             pass
 
-    def _update_widgets(self):
-        ''' loads widgets into the control based on preferences
+#     def _update_widgets(self):
+#         ''' loads widgets into the control based on preferences
         
-        Because QT (as of this writing) does not issue events when it deletes C++ underlying objects, and because the wiring may lead to automatic garbage collection without 
-        Python being aware - we go through special handling to catch these situations and re-create garbage collected elements for this UI widget
+#         Because QT (as of this writing) does not issue events when it deletes C++ underlying objects, and because the wiring may lead to automatic garbage collection without 
+#         Python being aware - we go through special handling to catch these situations and re-create garbage collected elements for this UI widget
         
-        '''
+#         '''
 
-        # gremlin.util.assert_ui_thread()
+#         # gremlin.util.assert_ui_thread()
 
-        if not Shiboken.isValid(self):
-            return
+#         if not Shiboken.isValid(self):
+#             return
 
-        # gremlin.ui.ui_common.clear_layout(self.container_layout)
-        alignment = QtCore.Qt.AlignmentFlag.AlignCenter if self._orientation == QtCore.Qt.Orientation.Vertical else QtCore.Qt.AlignmentFlag.AlignLeft
-        gremlin.ui.ui_common.clear_layout(self.container_layout)
+#         # gremlin.ui.ui_common.clear_layout(self.container_layout)
+#         alignment = QtCore.Qt.AlignmentFlag.AlignCenter if self._orientation == QtCore.Qt.Orientation.Vertical else QtCore.Qt.AlignmentFlag.AlignLeft
+#         gremlin.ui.ui_common.clear_layout(self.container_layout)
         
-        # progress bar label
-        if self._show_label:
-            self._display_label_widget = QtWidgets.QLabel(self._label_text)
-            self.container_layout.addWidget(self._display_label_widget, alignment = alignment)
+#         # progress bar label
+#         if self._show_label:
+#             self._display_label_widget = QtWidgets.QLabel(self._label_text)
+#             self.container_layout.addWidget(self._display_label_widget, alignment = alignment)
         
-        # progress bar widget
-        self._progress_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self._input_id)
-        #widget, layout = getVContainer(self._progress_widget)
-        self.container_layout.addWidget(self._progress_widget, alignment = alignment)
+#         # progress bar widget
+#         self._progress_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self._input_id)
+#         #widget, layout = getVContainer(self._progress_widget)
+#         self.container_layout.addWidget(self._progress_widget, alignment = alignment)
 
-        if self.device and self.device.is_virtual:
-            self._progress_widget.setReadOnly(False)
-            self._progress_widget.valueChanged.connect(self._value_changed)
+#         if self.device and self.device.is_virtual:
+#             self._progress_widget.setReadOnly(False)
+#             self._progress_widget.valueChanged.connect(self._value_changed)
 
-        if self._hooked:
-            # automatic value
-            astate = gremlin.event_handler.AxisState()
-            values = astate.getAxisValues(self._device_guid, self._input_id)
-            if values:
-                # progress bar widget
-                self._progress_widget.setValue(values)        
-        else:
-            # manual value
-            self._progress_widget.setValue(self._value)        
+#         if self._hooked:
+#             # automatic value
+#             astate = gremlin.event_handler.AxisState()
+#             values = astate.getAxisValues(self._device_guid, self._input_id)
+#             if values:
+#                 # progress bar widget
+#                 self._progress_widget.setValue(values)        
+#         else:
+#             # manual value
+#             self._progress_widget.setValue(self._value)        
 
-        if self._show_calibrated:
-            config = gremlin.config.Configuration()
-            if config.splitJoystickRepeater:
-                self._progress_calibrated_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self.input_id)
-                self._progress_calibrated_widget.gradientStartColor = Color.selectGradientAltColor()
-                self._progress_calibrated_widget.gradientEndColor = Color.selectEndGradientAltColor()
-                self._progress_calibrated_widget.setFixedSize(self._progress_calibrated_widget.sizeHint())
-                self.container_layout.addWidget(self._progress_calibrated_widget, alignment = alignment)
-                if self._orientation == QtCore.Qt.Orientation.Vertical:
-                    w = 4 + self._progress_widget.width() + self._progress_calibrated_widget.width() 
-                    self.progress_container_widget.setFixedWidth(w)
-                else:
-                    h = 4 + self._progress_widget.height() + self._progress_calibrated_widget.height()
-                    self.progress_container_widget.setFixedHeight(h)
+#         if self._show_calibrated:
+#             config = gremlin.config.Configuration()
+#             if config.splitJoystickRepeater:
+#                 self._progress_calibrated_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self.input_id)
+#                 self._progress_calibrated_widget.gradientStartColor = Color.selectGradientAltColor()
+#                 self._progress_calibrated_widget.gradientEndColor = Color.selectEndGradientAltColor()
+#                 self._progress_calibrated_widget.setFixedSize(self._progress_calibrated_widget.sizeHint())
+#                 self.container_layout.addWidget(self._progress_calibrated_widget, alignment = alignment)
+#                 if self._orientation == QtCore.Qt.Orientation.Vertical:
+#                     w = 4 + self._progress_widget.width() + self._progress_calibrated_widget.width() 
+#                     self.progress_container_widget.setFixedWidth(w)
+#                 else:
+#                     h = 4 + self._progress_widget.height() + self._progress_calibrated_widget.height()
+#                     self.progress_container_widget.setFixedHeight(h)
                 
-                self._progress_calibrated_widget.setValue(self._calibrated_value)
-                if self.device and self.device.is_virtual:
-                    self._progress_calibrated_widget.setReadOnly(False)
-                    self._progress_calibrated_widget.valueChanged.connect(self._value_changed)
+#                 self._progress_calibrated_widget.setValue(self._calibrated_value)
+#                 if self.device and self.device.is_virtual:
+#                     self._progress_calibrated_widget.setReadOnly(False)
+#                     self._progress_calibrated_widget.valueChanged.connect(self._value_changed)
 
 
-        # progress bar value
-        if self._show_value:
-            if self.device and self.device.is_virtual:
-                self._display_value_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self._value)
-                self._display_value_widget.valueChanged.connect(self._value_changed)
-            else:
-                self._display_value_widget = QtWidgets.QLabel(self._label_value)
-            self.container_layout.addWidget(self._display_value_widget, alignment = alignment)
+#         # progress bar value
+#         if self._show_value:
+#             if self.device and self.device.is_virtual:
+#                 self._display_value_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self._value)
+#                 self._display_value_widget.valueChanged.connect(self._value_changed)
+#             else:
+#                 self._display_value_widget = QtWidgets.QLabel(self._label_value)
+#             self.container_layout.addWidget(self._display_value_widget, alignment = alignment)
 
 
-        # progress bar percentage
-        if self._show_percentage:
-            self._display_percent_widget = QtWidgets.QLabel(self._label_percentage)
-            self.container_layout.addWidget(self._display_percent_widget, alignment = alignment)
+#         # progress bar percentage
+#         if self._show_percentage:
+#             self._display_percent_widget = QtWidgets.QLabel(self._label_percentage)
+#             self.container_layout.addWidget(self._display_percent_widget, alignment = alignment)
 
-        # progress curve 
-        if self._show_curve: 
-            self._display_curve_widget = QtWidgets.QLabel(self._label_curve)
-            self.container_layout.addWidget(self._display_curve_widget, alignment = alignment)
+#         # progress curve 
+#         if self._show_curve: 
+#             self._display_curve_widget = QtWidgets.QLabel(self._label_curve)
+#             self.container_layout.addWidget(self._display_curve_widget, alignment = alignment)
 
-        self.container_layout.addStretch()
+#         self.container_layout.addStretch()
 
-    @QtCore.Slot()
-    def _value_changed(self):
-        if not Shiboken.isValid(self):
-            return
-        widget = self.sender()        
-        value = widget.value()
-        input_id = widget.data
-        device_guid = self.device.device_guid
-        gremlin.joystick_handling.set_axis(device_guid, input_id, value)
+#     @QtCore.Slot()
+#     def _value_changed(self):
+#         if not Shiboken.isValid(self):
+#             return
+#         widget = self.sender()        
+#         value = widget.value()
+#         input_id = widget.data
+#         device_guid = self.device.device_guid
+#         gremlin.joystick_handling.set_axis(device_guid, input_id, value)
 
 
 
     
-    @QtCore.Slot()
-    def _ui_ready(self):
-        ''' fires when the UI is ready '''
-        self._value = self._hook_value
+#     @QtCore.Slot()
+#     def _ui_ready(self):
+#         ''' fires when the UI is ready '''
+#         self._value = self._hook_value
 
-    def _cleanup_ui(self):
-        ''' item is being deleted '''
-        if Shiboken.isValid(self):
-            self.unhookDevice()
-            self.deleted.emit(self)
+#     def _cleanup_ui(self):
+#         ''' item is being deleted '''
+#         if Shiboken.isValid(self):
+#             self.unhookDevice()
+#             self.deleted.emit(self)
 
-    @property
-    def data(self):
-        return self._data
-    @data.setter
-    def data(self, value):
-        self._data = value        
+#     @property
+#     def data(self):
+#         return self._data
+#     @data.setter
+#     def data(self, value):
+#         self._data = value        
 
-    @property
-    def show_curved(self) -> bool:
-        ''' true if repeater shows curved data '''
-        return self._show_curve
-    @show_curved.setter
-    def show_curved(self, value: bool):
-        if not Shiboken.isValid(self):
-            return
-        if value != self._show_curve:
-            self._show_curve = value
-            self._setValue(self._value, self._curve_value)
-            if value:
-                self._update_widgets()
-            else:
-                try:
-                    self.container_layout.removeWidget(self._display_curve_widget)
-                    self._display_curve_widget = None
-                except:
-                    pass
+#     @property
+#     def show_curved(self) -> bool:
+#         ''' true if repeater shows curved data '''
+#         return self._show_curve
+#     @show_curved.setter
+#     def show_curved(self, value: bool):
+#         if not Shiboken.isValid(self):
+#             return
+#         if value != self._show_curve:
+#             self._show_curve = value
+#             self._setValue(self._value, self._curve_value)
+#             if value:
+#                 self._update_widgets()
+#             else:
+#                 try:
+#                     self.container_layout.removeWidget(self._display_curve_widget)
+#                     self._display_curve_widget = None
+#                 except:
+#                     pass
 
-    @property
-    def show_percent(self) -> bool:
-        ''' true if repeater shows percentd data '''
-        return self._show_percentage
-    @show_percent.setter
-    def show_percent(self, value: bool):
-        if not Shiboken.isValid(self):
-            return
-        if value != self._show_percentage:
-            self._show_percentage = value
-            if value:
-                self._update_widgets()
-            else:
-                try:
-                    self.container_layout.removeWidget(self._display_percent_widget)
-                    self._display_percent_widget = None
-                except:
-                    pass
+#     @property
+#     def show_percent(self) -> bool:
+#         ''' true if repeater shows percentd data '''
+#         return self._show_percentage
+#     @show_percent.setter
+#     def show_percent(self, value: bool):
+#         if not Shiboken.isValid(self):
+#             return
+#         if value != self._show_percentage:
+#             self._show_percentage = value
+#             if value:
+#                 self._update_widgets()
+#             else:
+#                 try:
+#                     self.container_layout.removeWidget(self._display_percent_widget)
+#                     self._display_percent_widget = None
+#                 except:
+#                     pass
 
-    @property
-    def show_value(self) -> bool:
-        ''' true if repeater shows percentd data '''
-        return self._show_value
-    @show_value.setter
-    def show_value(self, value: bool):
-        if not Shiboken.isValid(self):
-            return
-        if value != self._show_value:
-            self._show_value = value
-            if value:
-                self._update_widgets()
-            else:
-                try:
-                    self.container_layout.removeWidget(self._display_value_widget)
-                    self._display_value_widget = None                
-                except:
-                    pass
+#     @property
+#     def show_value(self) -> bool:
+#         ''' true if repeater shows percentd data '''
+#         return self._show_value
+#     @show_value.setter
+#     def show_value(self, value: bool):
+#         if not Shiboken.isValid(self):
+#             return
+#         if value != self._show_value:
+#             self._show_value = value
+#             if value:
+#                 self._update_widgets()
+#             else:
+#                 try:
+#                     self.container_layout.removeWidget(self._display_value_widget)
+#                     self._display_value_widget = None                
+#                 except:
+#                     pass
 
-    @property
-    def show_label(self) -> bool:
-        ''' true if repeater shows percentd data '''
-        return self._show_label
-    @show_label.setter
-    def show_label(self, value: bool):
-        if value != self._show_label:
-            self._show_label = value
-            if value:
-                self._update_widgets()
-            else:
-                try:
-                    self.container_layout.removeWidget(self._display_label_widget)
-                    self._display_label_widget = None                
-                except:
-                    pass      
+#     @property
+#     def show_label(self) -> bool:
+#         ''' true if repeater shows percentd data '''
+#         return self._show_label
+#     @show_label.setter
+#     def show_label(self, value: bool):
+#         if value != self._show_label:
+#             self._show_label = value
+#             if value:
+#                 self._update_widgets()
+#             else:
+#                 try:
+#                     self.container_layout.removeWidget(self._display_label_widget)
+#                     self._display_label_widget = None                
+#                 except:
+#                     pass      
 
-    @property
-    def show_calibrated(self) -> bool:
-        ''' true if repeater shows percentd data '''
-        return self._show_calibrated
-    @show_calibrated.setter
-    def show_calibrated(self, value: bool):
-        if value != self._show_calibrated:
-            self.setCalibrated(value)
-            self._show_calibrated = value
-            self._clear_widgets()
-            self._update_widgets()
+#     @property
+#     def show_calibrated(self) -> bool:
+#         ''' true if repeater shows percentd data '''
+#         return self._show_calibrated
+#     @show_calibrated.setter
+#     def show_calibrated(self, value: bool):
+#         if value != self._show_calibrated:
+#             self.setCalibrated(value)
+#             self._show_calibrated = value
+#             self._clear_widgets()
+#             self._update_widgets()
 
-    def setPercentageVisible(self, value: bool):
-        ''' shows or hides the percentage value on the axis '''
-        if not Shiboken.isValid(self):
-            return
-        self.show_percent(value)
+#     def setPercentageVisible(self, value: bool):
+#         ''' shows or hides the percentage value on the axis '''
+#         if not Shiboken.isValid(self):
+#             return
+#         self.show_percent(value)
 
-    def setValueVisible(self, value: bool):
-        self.show_value(value)
+#     def setValueVisible(self, value: bool):
+#         self.show_value(value)
 
-    def setLabel(self, value : str):
-        ''' sets the label for the axis '''
-        if not Shiboken.isValid(self):
-            return
-        self._label_text = value
-        self._update_widgets()
+#     def setLabel(self, value : str):
+#         ''' sets the label for the axis '''
+#         if not Shiboken.isValid(self):
+#             return
+#         self._label_text = value
+#         self._update_widgets()
         
-    def setLabelVisible(self, value: bool):
-        if not Shiboken.isValid(self):
-            return
-        self.show_label(value)
+#     def setLabelVisible(self, value: bool):
+#         if not Shiboken.isValid(self):
+#             return
+#         self.show_label(value)
         
         
 
-    def setWidth(self, value):
-        if value > 0:
-            self._width = value
-            #self._update_css()
+#     def setWidth(self, value):
+#         if value > 0:
+#             self._width = value
+#             #self._update_css()
 
-    def value(self):
-        return self._value
+#     def value(self):
+#         return self._value
 
-    def setValue(self, value, curve_value = None, percent_value = None, other_value = None):
-        """Sets the value shown by the widget.
-        :param value new value to show
-        """
-        gremlin.util.InvokeUiMethod(self._set_value_ui, value, curve_value, percent_value, other_value)
+#     def setValue(self, value, curve_value = None, percent_value = None, other_value = None):
+#         """Sets the value shown by the widget.
+#         :param value new value to show
+#         """
+#         gremlin.util.InvokeUiMethod(self._set_value_ui, value, curve_value, percent_value, other_value)
     
 
-    def _set_value_ui(self, value, calibrated_value = None, curve_value = None, percent_value = None, other_value = None):
-        ''' internal set value '''
+#     def _set_value_ui(self, value, calibrated_value = None, curve_value = None, percent_value = None, other_value = None):
+#         ''' internal set value '''
 
-        if not Shiboken.isValid(self):
-            return
+#         if not Shiboken.isValid(self):
+#             return
         
-        if self._callback:
-            self._callback(value)
+#         if self._callback:
+#             self._callback(value)
         
-        if value is None:
-            return
+#         if value is None:
+#             return
         
-        if hasattr(value,"__iter__"):
-            # value is [actual, raw, calibrated, curved]
-            display_value = value[0]
-            if calibrated_value is not None and curve_value is not None:
-                value = value[0] # use the first vlaue only if we have other data passed
+#         if hasattr(value,"__iter__"):
+#             # value is [actual, raw, calibrated, curved]
+#             display_value = value[0]
+#             if calibrated_value is not None and curve_value is not None:
+#                 value = value[0] # use the first vlaue only if we have other data passed
             
-            if calibrated_value is None:
-                calibrated_value = value[2]
-            if curve_value is None:
-                curve_value = value[3]
-        else:
-            # single value
-            if calibrated_value is None:
-                calibrated_value = value
+#             if calibrated_value is None:
+#                 calibrated_value = value[2]
+#             if curve_value is None:
+#                 curve_value = value[3]
+#         else:
+#             # single value
+#             if calibrated_value is None:
+#                 calibrated_value = value
         
-            if value < self._min_range:
-                value = self._min_range
-            if value > self._max_range:
-                value = self._max_range
-            value += 0   # avoid negative 0 (WHY?)
+#             if value < self._min_range:
+#                 value = self._min_range
+#             if value > self._max_range:
+#                 value = self._max_range
+#             value += 0   # avoid negative 0 (WHY?)
 
-            if curve_value is not None:
-                self._curve_value = curve_value
-                display_value = curve_value
-            else:
-                display_value = value
-                self._curve_value = value
+#             if curve_value is not None:
+#                 self._curve_value = curve_value
+#                 display_value = curve_value
+#             else:
+#                 display_value = value
+#                 self._curve_value = value
 
-            if self._reverse:
-                display_value = gremlin.util.scale_to_range(display_value, invert=True)
-                calibrated_value = gremlin.util.scale_to_range(calibrated_value, invert=True)
+#             if self._reverse:
+#                 display_value = gremlin.util.scale_to_range(display_value, invert=True)
+#                 calibrated_value = gremlin.util.scale_to_range(calibrated_value, invert=True)
                       
-            self._display_value = display_value
-            self._calibrated_value = calibrated_value
+#             self._display_value = display_value
+#             self._calibrated_value = calibrated_value
 
-        if value is None:
-            display_value = None
+#         if value is None:
+#             display_value = None
        
-        self._value = value
+#         self._value = value
 
         
-        if display_value is not None:
-            self._label_value = f"{display_value:+0.{self._decimals}f}"
-        else:
-            self._label_value = "n/a"
+#         if display_value is not None:
+#             self._label_value = f"{display_value:+0.{self._decimals}f}"
+#         else:
+#             self._label_value = "n/a"
             
 
-        if self._show_curve and curve_value is not None:
-            self._label_curve = f"C{curve_value:+0.{self._decimals}f}"
+#         if self._show_curve and curve_value is not None:
+#             self._label_curve = f"C{curve_value:+0.{self._decimals}f}"
             
-        if self._show_percentage:
-            if percent_value is None:
-                if curve_value is None:
-                    percent = gremlin.util.scale_to_range(display_value, target_min=0, target_max = 100)
-                else:
-                    percent = gremlin.util.scale_to_range(curve_value, target_min=0, target_max = 100)
-            else:
-                percent = percent_value
-            self._label_percentage = f"{percent:0.1f} %"
+#         if self._show_percentage:
+#             if percent_value is None:
+#                 if curve_value is None:
+#                     percent = gremlin.util.scale_to_range(display_value, target_min=0, target_max = 100)
+#                 else:
+#                     percent = gremlin.util.scale_to_range(curve_value, target_min=0, target_max = 100)
+#             else:
+#                 percent = percent_value
+#             self._label_percentage = f"{percent:0.1f} %"
 
         
-        try:
-            if self._progress_widget and Shiboken.isValid(self._progress_widget):
-                self._progress_widget.setValue(self._value)
-            else:
-                self._update_widgets()
-                return
+#         try:
+#             if self._progress_widget and Shiboken.isValid(self._progress_widget):
+#                 self._progress_widget.setValue(self._value)
+#             else:
+#                 self._update_widgets()
+#                 return
 
-            if self._show_curve:
-                if self._display_curve_widget and Shiboken.isValid(self._display_curve_widget):
-                    self._display_curve_widget.setText(self._label_curve)
-                else:
-                    self._update_widgets()
-                    return
+#             if self._show_curve:
+#                 if self._display_curve_widget and Shiboken.isValid(self._display_curve_widget):
+#                     self._display_curve_widget.setText(self._label_curve)
+#                 else:
+#                     self._update_widgets()
+#                     return
 
-            if self._show_label:
-                if self._display_label_widget and Shiboken.isValid(self._display_label_widget):
-                    self._display_label_widget.setText(self._label_text)
-                else:
-                    self._update_widgets()
-                    return
+#             if self._show_label:
+#                 if self._display_label_widget and Shiboken.isValid(self._display_label_widget):
+#                     self._display_label_widget.setText(self._label_text)
+#                 else:
+#                     self._update_widgets()
+#                     return
 
             
-            if self._show_value:
-                if self._display_value_widget and Shiboken.isValid(self._display_value_widget):
-                    self._display_value_widget.setText(self._label_value)
-                else:
-                    self._update_widgets()
-                    return
+#             if self._show_value:
+#                 if self._display_value_widget and Shiboken.isValid(self._display_value_widget):
+#                     self._display_value_widget.setText(self._label_value)
+#                 else:
+#                     self._update_widgets()
+#                     return
 
-            if self._show_percentage:
-                if self._display_percent_widget and Shiboken.isValid(self._display_percent_widget):
-                    self._display_percent_widget.setText(self._label_percentage)
-                else:
-                    self._update_widgets()
-                    return
-        finally:
-            self.valueChanged.emit(self._value, self._curve_value)
+#             if self._show_percentage:
+#                 if self._display_percent_widget and Shiboken.isValid(self._display_percent_widget):
+#                     self._display_percent_widget.setText(self._label_percentage)
+#                 else:
+#                     self._update_widgets()
+#                     return
+#         finally:
+#             self.valueChanged.emit(self._value, self._curve_value)
 
            
 
 
-    def value(self):
-        ''' gets the current value '''
-        if Shiboken.isValid(self):
-            return self._value
-        return 0
+#     def value(self):
+#         ''' gets the current value '''
+#         if Shiboken.isValid(self):
+#             return self._value
+#         return 0
 
-    def setRange(self, min = -1.0, max = 1.0, decimals = 3):
-        ''' sets the range of the widget '''
-        if not Shiboken.isValid(self):
-            return
-        if min > max:
-            max, min = min, max
-        self._min_range = min
-        self._max_range = max
-        self._decimals = decimals
-        self._update_range()
+#     def setRange(self, min = -1.0, max = 1.0, decimals = 3):
+#         ''' sets the range of the widget '''
+#         if not Shiboken.isValid(self):
+#             return
+#         if min > max:
+#             max, min = min, max
+#         self._min_range = min
+#         self._max_range = max
+#         self._decimals = decimals
+#         self._update_range()
 
-    def _update_range(self):
-        if self._progress_widget:
-            self._progress_widget = None
-        self._setValue(self._value)
+#     def _update_range(self):
+#         if self._progress_widget:
+#             self._progress_widget = None
+#         self._setValue(self._value)
 
-    def setMaximum(self, value):
-        ''' sets the upper range value '''
-        self.setRange(self._min_range, value)
+#     def setMaximum(self, value):
+#         ''' sets the upper range value '''
+#         self.setRange(self._min_range, value)
 
-    def setMinimum(self, value):
-        ''' sets the lower range value'''
-        self.setRange(value, self._max_range)
+#     def setMinimum(self, value):
+#         ''' sets the lower range value'''
+#         self.setRange(value, self._max_range)
 
-    def setReverse(self, value):
-        self._reverse = value
-        self._setValue(self._value)
+#     def setReverse(self, value):
+#         self._reverse = value
+#         self._setValue(self._value)
 
-    def reverse(self):
-        ''' reverse flag '''
-        if not Shiboken.isValid(self):
-            return
-        return self._reverse
+#     def reverse(self):
+#         ''' reverse flag '''
+#         if not Shiboken.isValid(self):
+#             return
+#         return self._reverse
 
-    @property
-    def enabled(self) -> bool:
-        return self.getEnabled()
+#     @property
+#     def enabled(self) -> bool:
+#         return self.getEnabled()
 
-    @QtCore.Slot(str)
-    def _tab_selected(self, device_guid):
-        ''' triggered when a tab is selected 
+#     @QtCore.Slot(str)
+#     def _tab_selected(self, device_guid):
+#         ''' triggered when a tab is selected 
         
-        :param device_guid: the device selected
+#         :param device_guid: the device selected
         
-        '''
-        if not Shiboken.isValid(self):
-            return
-        if self.getEnabled():
-            # already connected
-            return
+#         '''
+#         if not Shiboken.isValid(self):
+#             return
+#         if self.getEnabled():
+#             # already connected
+#             return
         
-        device_name = gremlin.shared_state.get_device_name(device_guid)
-        if isinstance(device_guid, str):
-            device_guid = gremlin.util.parse_guid(device_guid)
+#         device_name = gremlin.shared_state.get_device_name(device_guid)
+#         if isinstance(device_guid, str):
+#             device_guid = gremlin.util.parse_guid(device_guid)
         
-        if self._device_guid == device_guid:
-            # connect the handler
-            input_id = self._input_id
-            verbose = gremlin.config.Configuration().verbose_mode_inputs
-            if verbose: 
-                # syslog = logging.getLogger("system")
-                syslog.info(f"AxisState: {device_name} axis {str(input_id)} connect")
-            _state_tracker.registerAxisState(self, self._device_guid, self._input_type, self._input_id)
-            self.setEnabled(True)
+#         if self._device_guid == device_guid:
+#             # connect the handler
+#             input_id = self._input_id
+#             verbose = gremlin.config.Configuration().verbose_mode_inputs
+#             if verbose: 
+#                 # syslog = logging.getLogger("system")
+#                 syslog.info(f"AxisState: {device_name} axis {str(input_id)} connect")
+#             _state_tracker.registerAxisState(self, self._device_guid, self._input_type, self._input_id)
+#             self.setEnabled(True)
 
 
     
-    @QtCore.Slot(str)
-    def _tab_unselected(self, device_guid):
-        ''' triggered when a device tab is deselected, also used to force a disconnect
+#     @QtCore.Slot(str)
+#     def _tab_unselected(self, device_guid):
+#         ''' triggered when a device tab is deselected, also used to force a disconnect
          
-        :param device_guid: the device to deselect - if None - deselect all
+#         :param device_guid: the device to deselect - if None - deselect all
           
-        '''
-        if not Shiboken.isValid(self):
-            return
-        if not self.getEnabled():
-            # not connected 
-            return
-        # syslog = logging.getLogger("system")
-        el = gremlin.event_handler.EventListener()
-        if device_guid:
-            if isinstance(device_guid, str):
-                device_guid = gremlin.util.parse_guid(device_guid)
-            disconnect = self._device_guid == device_guid
-            device_name = gremlin.shared_state.get_device_name(device_guid)
-        else:
-            disconnect = True
-            device_name = "reset"
+#         '''
+#         if not Shiboken.isValid(self):
+#             return
+#         if not self.getEnabled():
+#             # not connected 
+#             return
+#         # syslog = logging.getLogger("system")
+#         el = gremlin.event_handler.EventListener()
+#         if device_guid:
+#             if isinstance(device_guid, str):
+#                 device_guid = gremlin.util.parse_guid(device_guid)
+#             disconnect = self._device_guid == device_guid
+#             device_name = gremlin.shared_state.get_device_name(device_guid)
+#         else:
+#             disconnect = True
+#             device_name = "reset"
             
-        if disconnect:
-            # disconnect the handler
-            input_id = self._input_id
-            # syslog.info(f"AxisState: (unselect) {device_name} axis {input_id} disconnect")
-            _state_tracker.unregisterAxisState(self._device_guid, self._input_type, self._input_id)
-            self.setEnabled(False)
+#         if disconnect:
+#             # disconnect the handler
+#             input_id = self._input_id
+#             # syslog.info(f"AxisState: (unselect) {device_name} axis {input_id} disconnect")
+#             _state_tracker.unregisterAxisState(self._device_guid, self._input_type, self._input_id)
+#             self.setEnabled(False)
         
 
 
-    def _update_value(self, value):
-        # invert the input if needed
-        if not Shiboken.isValid(self):
-            return
-        if self._is_hardware_input:
-            self._setValue(value)
-        else:
-            self._setValue(value)
+#     def _update_value(self, value):
+#         # invert the input if needed
+#         if not Shiboken.isValid(self):
+#             return
+#         if self._is_hardware_input:
+#             self._setValue(value)
+#         else:
+#             self._setValue(value)
 
 
 
@@ -6059,7 +6088,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
     """Displays the current state of all axes on a device (input viewer)"""
 
-    def __init__(self, device : DeviceSummary, step = 0.01, parent=None):
+    def __init__(self, device : DeviceSummary, step = 0.01, ui_only = False, parent=None):
         """Creates a new instance.
 
         :param device the device of which to display the axes sate
@@ -6076,6 +6105,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         
+        
         if device.is_virtual:
             self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
             self._readonly = False
@@ -6091,6 +6121,9 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         axes_layout.setSpacing(0)
         #axis_list = device.axis_index_list() 
         name_index = 0
+
+        
+
         for i in range(device.axis_count): 
             linear_id = i + 1
             axis_id = device.linear_id_map[linear_id] # map linear -> axis ID for non sequential axes
@@ -6115,6 +6148,15 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             astate = gremlin.event_handler.AxisState()
             values = astate.getAxisValues(device.device_guid, axis_id)
             axis_widget = QHookedProgressBar(data = axis_id, value = values)
+            axis_widget.hookDevice(
+                        device_guid = device.device_guid,
+                        input_type = InputType.JoystickAxis,
+                        input_id = axis_id,
+                        ui_only=ui_only,
+                        persist = True)
+            
+            
+        
             
             if not self._readonly:
                 axis_widget.valueChanged.connect(self._manual_bar_changed) # axis set by the user
@@ -6166,6 +6208,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         self._readonly = value
 
+  
 
     def isReadOnly(self) -> bool:
         return self._readonly
@@ -6177,11 +6220,14 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             return 
         
         if Shiboken.isValid(self):
-            self._manual_lock = True    
-            widget = self.sender()
-            axis_id = widget.data
-            value = widget.value()
-            gremlin.joystick_handling.set_axis(self.device.device_guid, axis_id, value)
+            try:
+                self._manual_lock = True    
+                widget = self.sender()
+                axis_id = widget.data
+                value = widget.value()
+                gremlin.joystick_handling.set_axis(self.device.device_guid, axis_id, value)
+            finally:
+                self._manual_lock = False
     
                 
 
@@ -6199,6 +6245,14 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             gremlin.joystick_handling.set_axis(self.device.device_guid, axis_id, value)
             
                 
+    def unhook(self):
+        ''' called when widget is being removed '''
+        for widget in self.axis_widgets.values():
+            # remove data hook
+            widget.unhook()
+        
+        self.axis_widgets.clear()
+        
 
 
     def _set_value(self, axis_id : int, value : float | list):
@@ -6221,33 +6275,35 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         self.percent_widgets[axis_id].setText(f"{percent:0.1f} %")
 
 
-    def process_event(self, event):
-        """Updates state visualization based on the given event.
+      
 
-        :param event the event with which to update the state display
-        """
+    # def process_event(self, event):
+    #     """Updates state visualization based on the given event.
+
+    #     :param event the event with which to update the state display
+    #     """
 
        
 
 
-        if event.event_type == InputType.JoystickAxis:
-            axis_id = event.identifier
-            #linear_id = self.device.axis_id_map[axis_id]
-            value = event.value
-            if self.show_raw and not event.is_virtual:
-                sd = gremlin.event_handler.AxisState()
-                values = sd.getAxisValues(self.device.device_guid, axis_id)
-                extra_data = event.extra_data
-                if extra_data and "macro" in extra_data:
-                    values.actual = event.value
+    #     if event.event_type == InputType.JoystickAxis:
+    #         axis_id = event.identifier
+    #         #linear_id = self.device.axis_id_map[axis_id]
+    #         value = event.value
+    #         if self.show_raw and not event.is_virtual:
+    #             sd = gremlin.event_handler.AxisState()
+    #             values = sd.getAxisValues(self.device.device_guid, axis_id)
+    #             extra_data = event.extra_data
+    #             if extra_data and "macro" in extra_data:
+    #                 values.actual = event.value
                 
 
-                self._set_value(axis_id, values)    
-            else:
-                self._set_value(axis_id, value)
+    #             self._set_value(axis_id, values)    
+    #         else:
+    #             self._set_value(axis_id, value)
 
-            if self._manual_lock:
-                self._manual_lock = False
+    #         if self._manual_lock:
+    #             self._manual_lock = False
                 
         
 
@@ -6540,8 +6596,28 @@ class AxesTimeline(QtWidgets.QGroupBox):
         layout.addWidget(self.timeline_container)
         layout.addLayout(self.legend_layout)
 
+        self.device_guid = device.device_guid
+        self.input_id_list = device.getAxisInputIdList()
+        self.interval = 1/60
+        self._is_running = True
+        self._thread = threading.Thread(target = self._update_thread)
+        self._thread.name="Timeline"
+        self._thread.start()
+
+    def _update_thread(self):
+        astate = gremlin.event_handler.AxisState()
+        while self._is_running:
+            for input_id in self.input_id_list:
+                values = astate.getAxisValues(self.device_guid, input_id)
+                if values:
+                    self.add_point(values.actual, input_id)
+            time.sleep(self.interval)
 
     def unhook(self):
+        self._is_running = False
+        if self._thread and self._thread.is_alive():
+            self._thread.join()
+            self._thread = None
         gremlin.util.clear_layout(self.layout())
 
     def add_point(self, value, series_id):
@@ -6561,7 +6637,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
 
 class TimeLinePlotWidget(QtWidgets.QWidget):
 
-    """Visualizes temporal data as a line graph."""
+    """Visualizes temporal joystick data as a line graph."""
 
 
 
@@ -6805,14 +6881,15 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             self._current_axis_update(event)
             
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
-            self._temporal_axis_update(event)
-            for widget in self.widgets:
-                for input_id in self._device.axis_index_list():
-                    values = self._as.getAxisValues(self.device_guid, input_id)
-                    value= values[0]
-                    # syslog.info(f"input: {input_id} value: {value:0.3f}")
-                    #value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
-                    widget.add_point(value, input_id)
+            pass # automatic
+            # self._temporal_axis_update(event)
+            # for widget in self.widgets:
+            #     for input_id in self._device.axis_index_list():
+            #         values = self._as.getAxisValues(self.device_guid, input_id)
+            #         value= values[0]
+            #         # syslog.info(f"input: {input_id} value: {value:0.3f}")
+            #         #value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
+            #         widget.add_point(value, input_id)
         elif vis_type in (gremlin.types.VisualizationType.ButtonHat, gremlin.types.VisualizationType.Button, gremlin.types.VisualizationType.Hat):
             self._button_hat_update(event)
 
@@ -6845,16 +6922,11 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         match vis_type:
             case gremlin.types.VisualizationType.AxisCurrent:
                 self._create_current_axis()
-                el.joystick_event.connect(self._current_axis_update) # hook runtime event so it works at runtime or edit time
+                # el.joystick_event.connect(self._current_axis_update) # hook runtime event so it works at runtime or edit time
                 el.vjoy_output_event.connect(self._vjoy_current_axis_update) # hook vjoy separately
                     
             case gremlin.types.VisualizationType.AxisTemporal:
                 self._create_temporal_axis()
-                el.joystick_event.connect(self._temporal_axis_update)
-                for widget in self.widgets:
-                    for input_id in self._device.axis_index_list():
-                        value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
-                        widget.add_point(value, input_id)
 
             case gremlin.types.VisualizationType.ButtonHat:
                 self._create_button_hat()
@@ -6887,10 +6959,13 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             # if self._device.is_virtual:
             #     el.unregisterVjoyCallback(self._vjoy_current_axis_update)
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
-            el.joystick_event.disconnect(self._temporal_axis_update)
+            #el.joystick_event.disconnect(self._temporal_axis_update)
             #el.vjoy_event.disconnect(self._vjoy_temporal_axis_update) # hook vjoy separately
             # if self._device.is_virtual:
             #     el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
+            jep = gremlin.event_handler.JoystickEventProcessor()
+            jep.unregisterCallback(self._temporal_axis_update) # this unregisters ALL hooks to this callback
+
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._unhook_buttons()
             el.joystick_event.disconnect(self._button_hat_update)
@@ -7112,13 +7187,13 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             widget.process_event(event)
        
 
-    def _temporal_axis_update(self, event : gremlin.event_handler.Event):
-        if self.device_guid != event.device_guid:
-            return
-        if event.event_type == InputType.JoystickAxis:
-            gremlin.util.InvokeUiMethod(self._temporal_axis_update_ui, event) # on ui thread
+    def _temporal_axis_update(self, event : gremlin.event_handler.Event, values):
+        # if self.device_guid != event.device_guid:
+        #     return
+        # if event.event_type == InputType.JoystickAxis:
+        gremlin.util.InvokeUiMethod(self._temporal_axis_update_ui, event, values) # on ui thread
 
-    def _temporal_axis_update_ui(self, event : gremlin.event_handler.Event):
+    def _temporal_axis_update_ui(self, event : gremlin.event_handler.Event, values):
         """Updates the temporal axes display.
 
         :param event the event to use in the update
@@ -13008,11 +13083,12 @@ class QTimedLabel(QtWidgets.QWidget):
         gremlin.util.InvokeUiMethod(self._set_text_ui, text)
 
     def _set_text_ui(self, text : str):
-        self._label_widget.setText(text)
-        if self._timer:
-            self._timer.cancel()
-        self._timer = threading.Timer(self._interval, self._handle_timer)
-        self._timer.start()
+        if Shiboken.isValid(self) and Shiboken.isValid(self._label_widget):
+            self._label_widget.setText(text)
+            if self._timer:
+                self._timer.cancel()
+            self._timer = threading.Timer(self._interval, self._handle_timer)
+            self._timer.start()
 
     def closeEvent(self, event):
         if self._timer:
@@ -13023,7 +13099,8 @@ class QTimedLabel(QtWidgets.QWidget):
         gremlin.util.InvokeUiMethod(self._handle_timer_ui)
 
     def _handle_timer_ui(self):
-        self._label_widget.setText("")
+        if Shiboken.isValid(self) and Shiboken.isValid(self._label_widget):
+            self._label_widget.setText("")
         self._timer = None
 
 

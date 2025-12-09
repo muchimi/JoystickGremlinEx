@@ -612,8 +612,8 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.closed.connect(self._closed)
         self.installEventFilter(self)
 
-        self._event_queue = gremlin.event_handler.JoystickEventQueue()
-        self._event_queue.registerCallback(self._joystick_event_handler)
+        # self._event_queue = gremlin.event_handler.JoystickEventProcessor()
+        # self._event_queue.registerCallback(self._joystick_event_handler, ui_only = False) # needs to update at edit and runtimes
 
         self._event_data = {}
 
@@ -623,6 +623,10 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         if show_keyboard:
             self.showKeyboard()
+
+
+        el = gremlin.event_handler.EventListener()
+        el.profile_loaded.connect(self.refresh)
 
 
     
@@ -649,27 +653,6 @@ States can be toggled by clicking on the state button.  Expression states will u
         config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, True)
         
 
-    
-    def _joystick_event_handler(self, event):
-        ''' handles joystick input updates '''
-        if event.is_axis:
-            # spam filter for events to filter events that aren't relevant to the UI
-            device_id = event.device_id
-            input_id = event.identifier
-            if not device_id in self._event_data:
-                self._event_data[device_id] = {}
-            if not input_id in self._event_data[device_id]:
-                self._event_data[device_id][input_id] = None
-            last_value = self._event_data[device_id][input_id]
-            if last_value is not None and gremlin.util.is_close(event.value, last_value, 0.005):
-                return
-            self._event_data[device_id][input_id] = event.value
-        
-        for widget in self._joystick_widgets.values():
-            widget.process_event(event)
-        
-        
-
     @QtCore.Slot()
     def _font_size_cb(self):
         widget = self.sender()
@@ -694,9 +677,10 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     @QtCore.Slot()
     def _closed(self):
-        ''' save the config on close'''
+        ''' clean up'''
+        el = gremlin.event_handler.EventListener()
+        el.profile_loaded.disconnect(self.refresh)
 
-        self._event_queue.unregisterCallback(self._joystick_event_handler)
 
         self._clear()
 
@@ -734,17 +718,16 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._joystick_widgets.clear()
 
         self.views.clear()
+ 
 
-        # self._state_visible = False
-        # self._keyboard_visible = False
+    def refresh(self):
+        ''' refreshes the visualizers '''
+        gremlin.util.InvokeUiMethod(self._refresh_ui) # refresh the visuals and selectors
 
-        # self._delete_widget(self.views)
-        # self.views = None
+    def _refresh_ui(self):
+        self._clear()
+        self.vis_selector.updateSelector()
 
-        # widgets = gremlin.util.get_layout_widgets(self.main_layout)
-        # for widget in widgets:
-        #     self._delete_widget(widget)
-    
 
 
 

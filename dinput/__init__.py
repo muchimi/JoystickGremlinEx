@@ -692,6 +692,10 @@ class DeviceSummary:
             return list(range(len(self.axismap_list)))
         return []
     
+    def getAxisInputIdList(self):
+        ''' gets the list of valid axis inputs '''
+        return [input_id for input_id in self.axis_id_map]
+    
     def getAxisInputId(self, linear_index : int):
         ''' Gets the input for the linear index
         :param index: index 0 to axis_count -1 

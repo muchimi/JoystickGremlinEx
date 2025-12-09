@@ -433,6 +433,8 @@ class ExecutionContext():
         el.profile_changed.connect(self.reset) # reload data on profile change
         el.profile_modes_changed.connect(self.reset) # modes changed
         el.profile_loaded.connect(self._handle_profile_load) # reload data on profile load
+
+   
         self._functors = []
         self._reset()
 
@@ -463,6 +465,8 @@ class ExecutionContext():
             for functor in self._functors:
                 functor.unhook() # ensure prior used functors are unhook so they can release
         self._functors = [] # list of functors in the execution graph
+
+        self.perf_mode = gremlin.config.Configuration().verbose_mode_perf
         
 
     @property
@@ -1690,13 +1694,19 @@ class ExecutionContext():
                 if not result:
                     return False
         else:
+            if self.perf_mode:
+                now = time.time()
             if functor.manual_callback:
                 el = gremlin.event_handler.EventListener()
                 el.process_manual_event.emit(event, value, extra_data)
                 if not manual:
                     return False
                 
-            return functor.process_event(event, value, extra_data)
+            result =  functor.process_event(event, value, extra_data)
+            if self.perf_mode:
+                lapsed = time.time() - now
+                syslog.info(f"functor lapsed time: {lapsed * 1000}")
+            return result
 
         
     def has_action_for_mode(self, input_item : gremlin.base_profile.InputItem, mode : str):

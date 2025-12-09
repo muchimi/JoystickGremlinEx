@@ -333,11 +333,26 @@ def get_hat_position(guid, index) -> tuple:
 def get_button(guid, input_id) -> bool:
     ''' gets the button pressed state '''
     dev : dinput.DeviceSummary = get_device(guid)
-    if dev and dev.button_count:
-        if dev.is_virtual and dev.vjoy_id:
-            # query the vjoy interface rather than dinput
-            return VJoyProxy()[dev.vjoy_id].button(input_id).is_pressed
-        return dev.get_button(input_id)
+    if dev:
+        if dev.button_count:
+            if dev.is_virtual and dev.vjoy_id:
+                # query the vjoy interface rather than dinput
+                return VJoyProxy()[dev.vjoy_id].button(input_id).is_pressed
+            return dev.get_button(input_id)
+        else:
+            if dev.device_type == DeviceType.Osc:
+                
+                if hasattr(input_id, "message"):
+                    # OSC device
+                    import gremlin.ui.osc_device
+                    osc = gremlin.ui.osc_device.InputOscClient()
+                    osc.start() # ensure started
+                    data = osc.getData(input_id.message) # gets data arguments or None if no data
+                    if data:
+                        return data
+                return False # not received, assume not set
+
+            
     else:
         syslog.error(f"JOYSTICK: unable to get button state for device for id [{guid}] index [{input_id}]")
     return False
@@ -350,7 +365,7 @@ def set_button(guid, index : int, is_pressed : bool, update_remote : bool = Fals
     :param guid: vjoy device ID
     :param index: button id
     :param is_pressed: state of the button to set
-    :param update_remot: if enabled, and remote control is enabled, also updates the remote client
+    :param update_remote: if enabled, and remote control is enabled, also updates the remote client
     
     '''
     import gremlin.event_handler

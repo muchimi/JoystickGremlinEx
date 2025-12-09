@@ -348,6 +348,23 @@ class GateInfo():
             GateConditionType.OnCrossIncrease: True,
         }
 
+    def __deepcopy__(self, memo):
+        import copy
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            try:
+                if k in ("parent"):
+                    # shallow copy passed data or extra data 
+                    setattr(result, k, copy.copy(v))
+                else:
+                    setattr(result, k, copy.deepcopy(v, memo))
+            except:
+                # cannot copy = do a shallow copy
+                setattr(result, k, copy.copy(v))
+        return result
+    
     @property
     def description(self) -> str:
         return self._description
@@ -686,6 +703,15 @@ class RangeInfo():
         self.mode = mode # output mode determines what we do with the input data
         self._fixed_value = None # fixed value to output for this range if the condition is Fixed
         self._swap_gates() # flip the gates so the values are always increasing 
+
+    def __deepcopy__(self, memo):
+        import copy
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.copy(v))
+        return result
 
     
     @property
@@ -3647,6 +3673,7 @@ class TriggerData():
             percent = gremlin.util.scale_to_range(self.value,-1,1,0,100)
             value_stub = "n/a" if self.value is None else f"{self.value:0.{_decimals}f} / {percent:0.2f}%"
             return f"{stub} value: {value_stub}% gate: {self.gate.slider_index+1} {self.gate.gate_display()}"
+       
         
 
 class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):

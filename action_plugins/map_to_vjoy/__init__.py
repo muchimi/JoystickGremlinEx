@@ -4133,7 +4133,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     trigger = False
 
                     if verbose:
-                        device = gremlin.joystick_handling.device_info_from_guid(self.hardware_device_guid)
+                        device = gremlin.joystick_handling.getDevice(self.hardware_device_guid)
+                        assert device is not None,f"Unable to find device for {str(self.hardware_device_guid)}"
                         vjoy_stub = f"sync mode: [{self.action_data.sync_mode.name}] set start value for vjoy axis: {self.vjoy_input_id}"
                         device_stub = f"{device.name} input: {self.action_data.input_type.name} input id: {input_id}"
 
@@ -5290,8 +5291,12 @@ class  MergeData():
         operation = MergeOperationType.to_string(self.operation)
         node.set("operation", safe_format(operation, str))
         node.set("invert", safe_format(self.invert, bool))
-        device = gremlin.joystick_handling.device_info_from_guid(self.device_id)
-        comment = f"Merged Device: {device.name}/[{self.device_id}] Axis: [{self.input_id}]/{device.get_axis_name(self.input_id)} Operation: [{operation}]"
+        device = gremlin.joystick_handling.getDevice(self.device_id)
+        if device is None:
+            syslog.error(f"MERGE DATA: Unable to get device for id {self.device_id}")
+            comment = f"Unknown device: {self.device_id} Operation: [{operation}]"
+        else:
+            comment = f"Merged Device: {device.name}/[{self.device_id}] Axis: [{self.input_id}]/{device.get_axis_name(self.input_id)} Operation: [{operation}]"
         node_comment = ElementTree.Comment(comment)
         node.append(node_comment)
         if self.curve_data:
@@ -6644,7 +6649,8 @@ Supports axis merging, curved output, command, hat and button mappings.
 
                 for data in self._merge_data:
                      device_id, input_id = data.key
-                     device = gremlin.joystick_handling.device_info_from_guid(device_id)
+                     device = gremlin.joystick_handling.getDevice(device_id)
+                     assert device is not None, f"Unable to get device for id {device_id}"
                      table.addField(f"Merge: {device.name}", f"{input_id}" )
 
             case VjoyAction.VJoyButton:

@@ -1058,11 +1058,13 @@ class VerboseMode(IntFlag):
     TTS = auto()
     Sound = auto()
     Filter = auto()
+    Perf = auto()
+    Events = auto()
     All = Keyboard | Joystick | Inputs | Mouse | Details | \
           SimConnect | Condition | Process | Exec | Midi | \
           Device | Macro | Gate | Outputs | UI | ExecDetails |\
           VJoy | State | Extra | Remote | Container | Octavi |\
-          dinput | Curve | TTS | Sound | Filter
+          dinput | Curve | TTS | Sound | Filter | Perf | Events
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

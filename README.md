@@ -20,6 +20,12 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
 # Change log
+### (m76T125)
+- Perf: Refactor of joystick event distribution for visual repeaters to improve performance and shorten repeater event queues (note, this primarily impacts the use of input viewer).
+- Change: Input viewer will refresh widgets on profile load which can change the order of widgets.  At some point we'll look at the initial order of repeaters in input viewer so it's more consistent with the reload order.
+- New: refactor of Timeline axis repeater to moved to a polling mechanism rather than depend on event sequence.
+- Fix: Startup value get button not functional on OSC inputs.
+- Fix: Timed label widget C++ exception on calibration dialog close.
 
 ### (m76T124)
 - New: Global Options: Added info box on repeater calibrated data toggle to explain behavior. 
