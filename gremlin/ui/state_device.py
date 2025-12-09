@@ -3317,8 +3317,18 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             for entry in usage_list:
                 msg += f"<li>{entry}</li>"
             msg += "</ul><br>"
-            dialog = gremlin.ui.ui_common.MessageBoxDialog(title = title, text = msg, icon = gremlin.ui.ui_common.Icons.warningIcon())
-            dialog.exec()
+
+            icon = gremlin.ui.ui_common.Icons.warningIcon()
+            pixmap = icon.pixmap(48)
+            msgbox = QtWidgets.QMessageBox()
+            msgbox.setWindowTitle("Notice")
+            msgbox.setIconPixmap(pixmap)
+            msgbox.setInformativeText(msg)
+            msgbox.setText(title)
+            msgbox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            msgbox.exec()
+
+            
             return False
         return True
 

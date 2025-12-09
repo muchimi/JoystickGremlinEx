@@ -1081,9 +1081,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         if result:
             self.source_data.copyFrom(self.action_data)
             self._status_widget.setText("Saved to global calibration data")
-            # icon = gremlin.ui.ui_common.Icons.infoIcon()
-            # dialog = gremlin.ui.ui_common.MessageBoxDialog(text = "Saved to global calibration data", icon = icon)
-            # dialog.show()
+
         self._lock = False
 
     @QtCore.Slot()
@@ -1097,9 +1095,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         if result:
             self.source_data.copyFrom(self.action_data)
             self._status_widget.setText("Saved to profile calibration data")
-            # icon = gremlin.ui.ui_common.Icons.infoIcon()
-            # dialog = gremlin.ui.ui_common.MessageBoxDialog(text = "Saved to profile calibration data", icon = icon)
-            # dialog.show()
+   
 
         self._lock = False
 
@@ -1172,10 +1168,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         ''' reset calibration for the axis '''
         self.action_data.reset()
         self._update_ui()
-        #icon = gremlin.ui.ui_common.Icons.infoIcon()
         self._status_widget.setText("Reset")
-        #dialog = gremlin.ui.ui_common.MessageBoxDialog(text="Calibration data reset.", icon = icon)
-        #dialog.show()
+        
 
     @QtCore.Slot()
     def _set_center_calibration(self):

@@ -3873,9 +3873,16 @@ class ConfirmBoxEx(QtWidgets.QDialog):
 class ConfirmBox():
     def __init__(self, title = "Confirmation Required:", prompt = "Are you sure?", parent = None):
 
-        from gremlin.util import load_pixmap
-        self._message_box = MessageBoxDialog(icon = Icons.questionIcon(), is_yesno=True, parent = parent, title = title, text = prompt)
-   
+
+        icon = gremlin.ui.ui_common.Icons.questionIcon()
+        pixmap = icon.pixmap(48)
+        msgbox = QtWidgets.QMessageBox()
+        msgbox.setWindowTitle(title)
+        msgbox.setIconPixmap(pixmap)
+        msgbox.setText(prompt)
+        msgbox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+        self._message_box = msgbox
+
     def show(self):
         return self._message_box.exec()
 
@@ -3892,10 +3899,14 @@ def _message_box_ui(title = "Notice", prompt = "Operation", is_warning = True, p
         icon = gremlin.ui.ui_common.Icons.warningIcon()
     else:
         icon = gremlin.ui.ui_common.Icons.infoIcon()
-    dialog = MessageBoxDialog(title, prompt, icon = icon, parent = parent)
-    dialog.exec()
-
-
+        
+    pixmap = icon.pixmap(48)
+    msgbox = QtWidgets.QMessageBox()
+    msgbox.setWindowTitle(title)
+    msgbox.setIconPixmap(pixmap)
+    msgbox.setText(prompt)
+    msgbox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+    msgbox.exec()
 
 
 
@@ -13013,68 +13024,7 @@ class ActionContainerDialog(QRememberDialog):
         close_button_widget.setToolTip("Closes the dialog")
         widget = getHContainer(close_button_widget, widget_only=True, left_stretch=True)
         self.main_layout.addWidget(widget)
-
-class MessageBoxDialog(QShowAtCursorDialog):
-    ''' enhanced message box '''
-    
-    def __init__(self, title : str = None, text : str = None,  icon = None,  is_yesno = False, parent = None):
-        super().__init__(parent = parent)
-
-
-        self.setWindowTitle("Notice")
-        self.setModal(True)
-        
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        two_columns = icon is not None
-
-        if two_columns:
-            left_panel = getVContainer(QIconLabel(icon, icon_size=48), widget_only=True)
-            right_panel, content_layout = getVContainer()
-            widget = getHContainer([left_panel, right_panel], widget_only=True)
-            self.main_layout.addWidget(widget)
-        else:
-            content_widget, content_layout = getVContainer()
-            self.main_layout.addWidget(content_widget)
-
-        if title:
-            widget = QtWidgets.QLabel(title)
-            content_layout.addWidget(widget)
-        
-        if text:
-            widget = QtWidgets.QLabel(text)
-            widget.setTextFormat(QtCore.Qt.RichText)
-            content_layout.addWidget(widget)
-
-
-        self.main_layout.addWidget(QtWidgets.QLabel(" ")) # spacer
-
-        if is_yesno:
-            yes_widget = QDataPushButton("Yes", callback = self._handle_yes)
-            no_widget = QDataPushButton("No", callback = self._handle_no)
-            widgets = ["||",yes_widget, no_widget,"||"]
-
-        else:
-
-            close_button_widget = QDataPushButton("Close", callback = self.close)
-            close_button_widget.setToolTip("Closes the dialog")
-            widgets = ["||",close_button_widget,"||"]
-        
-        
-        widget = getHContainer(widgets, widget_only=True,no_stretch=True)
-        self.main_layout.addWidget(widget)
-
-        self.main_layout.addStretch()
-
-    @QtCore.Slot()
-    def _handle_yes(self):
-        self.setResult(1)
-        self.close()
-
-    @QtCore.Slot()
-    def _handle_no(self):
-        self.setResult(0)
-        self.close()
-        
+       
 
 class QTimedLabel(QtWidgets.QWidget):
     ''' timed label - shows text and makes it go away after a period of time '''
