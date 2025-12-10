@@ -4173,6 +4173,12 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         self.installEventFilter(self)
 
+    def setCallback(self, callback):
+        self._callback = callback
+
+    def setCallbackEx(self, callback):
+        self._callback_ex = callback
+
 
     def eventFilter(self, watched, event):
         if self.isEnabled():
@@ -6162,7 +6168,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             astate = gremlin.event_handler.AxisState()
             values = astate.getAxisValues(device.device_guid, axis_id)
             axis_widget = QHookedProgressBar(data = axis_id, value = values)
-            description = f"axis repeater: [{device.name}] axis id: [{self.input_id}]"
+            description = f"axis repeater: [{device.name}] axis id: [{axis_id}]"
             axis_widget.hookDevice(
                         device_guid = device.device_guid,
                         input_type = InputType.JoystickAxis,
@@ -7344,7 +7350,40 @@ class QUsedPushButton(QDataPushButton):
 
         painter.end()
 
+class StateRepeaterButton(QDataPushButton):
+    ''' state repeater - hooks the state '''
 
+    def __init__(self, state, callback = None, parent = None):
+        super().__init__(state.key, parent = parent, data = state)
+
+        font_size = gremlin.config.Configuration().input_viewer_button_size
+        self.setCheckable(True)
+        css = Color.cssStateButton(font_size)
+        cssAlternate = Color.cssStateExpressionButton(font_size)
+
+  
+        if state.expression:
+            self.setEnabled(False)    
+            self.setStyleSheet(cssAlternate)
+        else:
+            self.setStyleSheet(css)
+
+        self.setChecked(state.value)
+        self.setCallback(callback)
+
+    def toggle(self, emit = False):
+        ''' toggle the repeater state'''
+        self.setState(not self.isChecked(), emit)
+
+    def setState(self, value : bool, emit = False):
+        ''' sets the state of the repeater '''
+        if emit:
+            # fire the signal when checked
+            self.setChecked(value)
+        else:
+            # block the signal
+            with QtCore.QSignalBlocker(self):
+                self.setChecked(value)
 
 
 class ButtonState(QtWidgets.QGroupBox):

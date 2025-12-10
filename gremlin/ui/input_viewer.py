@@ -839,10 +839,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         default_category = cm.default()
         category = None
         
-        font_size = config.input_viewer_button_size
+
         sd = gremlin.ui.state_device.StateData()
-        css = gremlin.ui.ui_common.Color.cssStateButton(font_size)
-        cssAlternate = gremlin.ui.ui_common.Color.cssStateExpressionButton(font_size)
+
 
         is_filter = config.iv_state_filter_enabled
         if is_filter:
@@ -862,20 +861,17 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if is_filter and not self._filter_data(state):
                     continue
 
-                btn = gremlin.ui.ui_common.QDataPushButton(key)
-                btn.data = state # store the state with the button
+                #btn = gremlin.ui.ui_common.QDataPushButton(key)
+                #btn.data = state # store the state with the button
+                btn = gremlin.ui.ui_common.StateRepeaterButton(state, callback = self._state_toggle)
+      
 
-                if state.expression:
-                    btn.setEnabled(False)    
-                    btn.setStyleSheet(cssAlternate)
-                else:
-                    btn.setStyleSheet(css)
 
-                btn.setCheckable(True)
+                #btn.setCheckable(True)
 
-                btn.setChecked(state.value)
+                #btn.setChecked(state.value)
                 if verbose: syslog.info(f"viewer state: {key}  value: {state.value}")
-                btn.clicked.connect(self._state_toggle)
+                #btn.clicked.connect(self._state_toggle)
                 
                 layout.addWidget(btn)
 
@@ -1009,7 +1005,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         if state.key in self._state_buttons:
             widget = self._state_buttons[state.key]
             if Shiboken.isValid(widget):
-                widget.setChecked(state.value)
+                widget.setState(state.value)
         else:
             if verbose: syslog.warning(f"Viewer: state {state.key} widget not found")
 

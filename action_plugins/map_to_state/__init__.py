@@ -732,6 +732,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def profile_start(self):
+        import gremlin.event_handler
+        import gremlin.shared_state
         self.verbose = gremlin.config.Configuration().verbose_mode_state
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
@@ -763,12 +765,14 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
 
         # determine the startup state 
+        
         match self.action_data.sync_mode:
             case SyncMode.Default:
                 if self.verbose: syslog.info(f"\tset default : {self.action_data.state.default_value}")
                 self.action_data.state.value = self.action_data.state.default_value
             case SyncMode.Input:
                 if self.verbose: syslog.info(f"\t sync to input : {is_pressed}")
+
                 
                 if input_type == InputType.JoystickHat:
                     positions = self.action_data.hat_positions
@@ -776,17 +780,22 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                         state = self.hat_state_map[position]
                         if state: # mapped
                             state.value = position == self.hat_position
+                            
                 else:
                     # regular mapping
                     state = self.action_data.state
                     if state and not state.isExpression:
                         state.value = is_pressed
-                    
-       
-
-
-
                 self.action_data.state.value = is_pressed
+                
+                # construct the input event to sync
+                event = gremlin.event_handler.Event(event_type = InputType.State,
+                                                    identifier = self.action_data.state.key,
+                                                    value = is_pressed,
+                                                    is_pressed = is_pressed,
+                                                    device_guid = gremlin.shared_state.state_tab_guid)
+                self.process_event(event, is_pressed)
+
             case SyncMode.LastOrInput:
                 last = self.action_data.state.lastValue
                 if last is None:
@@ -885,8 +894,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
 
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}] input type: [{input_type.name}] mode: [{mode}]")
-    
+     
         if not self._started:
             # trap events kicked off while profile start is going on
             if verbose: syslog.info(f"\tProfile not running - skipping")
@@ -897,14 +905,16 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         key = self.action_data.key
         mode = self.action_data.mode
         is_pressed = event.is_pressed
+        input_type = event.getInputType()
+        
         trigger = (is_pressed and self.action_data.exec_on_press) or \
                 (not is_pressed and self.action_data.exec_on_release) or \
                 mode in ("actual","pulse")        
 
+        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}] input type: [{input_type.name}] mode: [{mode}]")
+    
 
 
-        input_type = event.getInputType()
-        
 
   
 

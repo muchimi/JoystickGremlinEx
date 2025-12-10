@@ -948,6 +948,8 @@ class StateInputItem(gremlin.base_profile.InputItem):
             is_pressed = value,
             override_input_type=InputType.JoystickButton # tell actions we're a button
         )
+
+
         eh = gremlin.event_handler.EventHandler()
         eh.execute_event(event)
 
@@ -1227,7 +1229,34 @@ class StateInputItem(gremlin.base_profile.InputItem):
     def __hash__(self):
         # use ID for hash
         return hash(self._id)
+    
+    def __setstate__(self, data):
+        self._id = data["id"]
+        self._autorelease = data["autorelease"]
+        self._autorelease_delay = data["autorelease_delay"]
+        self._key = data["key"]
 
+        self._input_description = data["input_description"]
+        
+        self._autorelease_mode = data["autorelease_mode"]
+        self._is_expression = data["is_expression"]
+        self._expression_states = [key for key in data["expression_states"]]
+        self._expression = data["expression"]
+    
+    def __getstate__(self):
+        data = {}
+        data["id"] = self._id
+        data["autorelease"] = self._autorelease
+        data["autorelease_delay"] = self._autorelease_delay
+        data["key"] = self._key
+        data["is_expression"] = self._is_expression
+        data["input_description"] = self._input_description
+        data["expression_states"]  =  self._expression_states
+        data["expression"] = self._expression
+
+    def __deepcopy__(self, memo):
+        # do not copy this object
+        return self
         
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''

@@ -21,6 +21,9 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Change log
 
+### (m76T127)
+- fix: exception in UI thread invoker serialization of states
+
 ### (m76T126)
 - Changed: re-enabled axis input filters.
 - New: Perf verbose mode will output filtering applied to axis \[warning - can generate copious log data - use for diagnostics - tweaking only\]

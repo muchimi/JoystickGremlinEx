@@ -316,7 +316,7 @@ class Event:
 	def __str__(self):
 		import gremlin.joystick_handling
 		if self.device_guid:
-			device = gremlin.joystick_handling.getDevice(self.device_gudd)
+			device = gremlin.joystick_handling.getDevice(self.device_guid)
 			device_stub = device.name if device else f" unknown {str(self.device_guid)}"
 		else:
 			device_stub = "n/a"
@@ -794,6 +794,7 @@ class EventListener:
 		# calibration data access
 		self._calibrationManager = None
 		self._verbose_dinput = False
+		self._verbose_perf = False
 		self._verbose_dinput_extra = False
 		self._verbose_vjoy = False
 		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
@@ -977,6 +978,7 @@ class EventListener:
 		''' options were changed '''
 		config = gremlin.config.Configuration()
 		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
+		self._verbose_perf = config.verbose_mode_perf
 		self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
 		self._verbose_vjoy = config.verbose_mode_vjoy
 		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
@@ -1469,7 +1471,7 @@ class EventListener:
 
 
 		from gremlin.util import dill_hat_lookup
-		verbose = self._verbose_dinput
+		verbose = self._verbose_dinput or self._verbose_perf
 		verbose_extra = self._verbose_dinput_extra
 		
 		
@@ -1477,12 +1479,11 @@ class EventListener:
 		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
 
 		if device is None:
-			if verbose: syslog.info(f"DINPUT EVENT: device not found: {event}")
+			if verbose: syslog.info(f"DINPUT EVENT: device not found: [{str(event.device_guid)}]: {event}")
 			return 
 
 		if verbose: 
-			if not device.is_virtual or verbose_extra:
-				syslog.info(f"DINPUT EVENT: device [{device.name}] data: {event}")
+			syslog.info(f"DINPUT EVENT: device [{device.name}] data: {event}")
 			
 
 		event_list = []
@@ -1519,6 +1520,7 @@ class EventListener:
 			if input_type:
 				# track the input event
 				if verbose_vjoy: syslog.info(f"DINPUT VJOY LOOPBACK: register vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
+
 				if not self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
 					return # skip DINPUT event
 
@@ -3944,16 +3946,7 @@ class JoystickEventProcessor():
 		self.reset()
 
 	def reset(self):
-		
-		# callback_list = []
-		# for callback in self._callback_lookup:
-		# 	for device_guid, input_type, input_id in self._callback_lookup[callback]:
-		# 		cb = self._callbacks[device_guid][input_type][input_id][callback]
-		# 		if not cb.persist:
-		# 			callback_list.append(callback)
 
-		# for callback in callback_list:
-		# 	self.unregisterCallback(callback)
 		self._callbacks.clear()
 		self._generic_callback.clear()
 		self._callback_lookup.clear()
