@@ -5154,24 +5154,27 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
                  parent = None):
        
         super().__init__(orientation, value, min, max, readonly, step, data, parent)
+        self._description = None
+        
 
+    def getDescription(self) -> str:
+        return self._description            
 
-
-    def hookDevice(self, device_guid, input_type, input_id, ui_only = True, persist = False):    
+    def hookDevice(self, device_guid, input_type, input_id, ui_only = True, persist = False, description = None):    
         ''' hooks the device '''    
         if Shiboken.isValid(self):
+            self._description = description or f"repeater: [{gremlin.joystick_handling.getDeviceName(self.device_guid)}] input id: [{self.input_id}]"
             super().hookDevice(self.process_events,
                                 device_guid = device_guid,
                                 input_type = input_type,
                                 input_id = input_id,
                                 ui_only = ui_only,
-                                persist = persist)
+                                persist = persist,
+                                )
         
 
     def process_events(self, event, values):
         ''' joystick value changed '''
-        if self._is_virtual:
-            pass
         self.setValue(values)
 
     def unhook(self):
@@ -6159,12 +6162,14 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             astate = gremlin.event_handler.AxisState()
             values = astate.getAxisValues(device.device_guid, axis_id)
             axis_widget = QHookedProgressBar(data = axis_id, value = values)
+            description = f"axis repeater: [{device.name}] axis id: [{self.input_id}]"
             axis_widget.hookDevice(
                         device_guid = device.device_guid,
                         input_type = InputType.JoystickAxis,
                         input_id = axis_id,
                         ui_only=ui_only,
-                        persist = True)
+                        persist = True,
+                        description=description)
             
             
         

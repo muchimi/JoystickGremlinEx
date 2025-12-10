@@ -2205,7 +2205,9 @@ class InputItemWidget(QBoxFrame):
                         widget.setMaximumWidth(200)
                         if self._debug_layout:
                             widget.setStyleSheet("background: purple;")
-                        widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
+                        description = f"input repeater: device [{gremlin.joystick_handling.getDeviceName(self.identifier.device_guid)}] axis id: [{self.identifier.input_id}] "
+
+                        widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id, ui_only = True, description = description)
                         height = widget.sizeHint().height() + 4
                         self._setWidgetHeight(self._repeater_container_widget, height)
 

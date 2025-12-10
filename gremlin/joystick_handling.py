@@ -565,6 +565,8 @@ def device_name_from_guid(device_guid) -> str:
     if dev:
         return dev.name
     return ""
+
+
     
 def known_devices() -> list:
     ''' gets the list of device GUID (strings) known to GremlinEx '''
@@ -585,6 +587,13 @@ def getPhysicalDevices() -> list[dinput.DeviceSummary]:
 def getDevice(device_guid : int | str | dinput.GUID):
     ''' gets a device summary '''
     return device_info_from_guid(device_guid)
+
+def getDeviceName(device_guid : int | str | dinput.GUID):
+    ''' gets the device name'''
+    device = getDevice(device_guid)
+    if device:
+        return device.name
+    return f"unknown: {str(device_guid)}"
 
 def getVjoyDeviceGuid(vid):
     ''' gets the vjoy device by the given vjoy id'''

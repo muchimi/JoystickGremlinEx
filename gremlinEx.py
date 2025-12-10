@@ -5409,6 +5409,8 @@ if __name__ == "__main__":
     sd.hook()
     sd.reset() # initial state
 
+    _tab_state = gremlin.tabstate.TabState() # instance
+
     astate = gremlin.event_handler.AxisState()
     astate.reset()
 

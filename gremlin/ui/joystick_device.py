@@ -520,13 +520,17 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         value = gremlin.joystick_handling.get_axis(data.device_guid, data.input_id)
         self._curve_update_handler(value)
 
+        device_name = gremlin.joystick_handling.getDeviceName(data.device_guid)
+        description = f"curve position update: device: [{device_name}] input: [{data.input_id}]"
+
         # hook joystick queue to update position on the curve
         jeq = gremlin.event_handler.JoystickEventProcessor()
         jeq.registerCallback(callback = self._handle_curve_update,
                                             device_guid = data.device_guid,
                                             input_type = InputType.JoystickAxis,
                                             input_id = data.input_id,
-                                            ui_only = True
+                                            ui_only = True,
+                                            description = description
                                             )
 
         # disable highlighting

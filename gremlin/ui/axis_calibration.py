@@ -1043,12 +1043,14 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self.main_layout.addStretch()
 
 
-        self._event_queue = gremlin.event_handler.JoystickEventProcessor()
-        self._event_queue.registerCallback(self._handle_joystick_event_ui,
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        description = f"calibration axis position device: [{gremlin.joystick_handling.getDeviceName(self.action_data.device_guid)}] input id: [{self.action_data.input_id}]"
+        jep.registerCallback(self._handle_joystick_event_ui,
                                            device_guid = self.action_data.device_guid,
                                            input_type = InputType.JoystickAxis,
                                            input_id = self.action_data.input_id,
-                                           ui_only = True)
+                                           ui_only = True,
+                                           description = description)
 
         # initial value
         self._update_ui()
@@ -1126,7 +1128,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             
         self._closing = True
 
-        self._event_queue.unregisterCallback(self._handle_joystick_event_ui)
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        jep.unregisterCallback(self._handle_joystick_event_ui)
 
         self._slider.valueChanged.disconnect(self._slider_changed)
         self._deadzone_widget.changed.disconnect(self._deadzone_changed)

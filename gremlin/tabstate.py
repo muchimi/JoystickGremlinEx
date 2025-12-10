@@ -17,37 +17,15 @@
 
 
 from __future__ import annotations
-import functools
-import traceback
-import inspect
-import logging
-import time
-import queue
-import threading
-import anytree
-from typing import NamedTuple, Optional
-from threading import Thread, Timer
-from typing import Callable
-import math
-import gremlin.base_classes
-import gremlin.shared_state
-import gremlin.threading
 
-from PySide6 import QtCore, QtWidgets
 
 import dinput
-import gremlin.config
-from gremlin.input_types import InputType
-import gremlin.shared_state
 
 import gremlin.util
 
-import gremlin.keyboard
-import gremlin.ui
 import gremlin.singleton_decorator
-import json
 
-import psygnal
+
 from psygnal import Signal
 
 
@@ -144,4 +122,3 @@ class TabState():
 
     
 
-_tab_state = TabState() # instance

@@ -25,7 +25,6 @@ import traceback
 from PySide6 import QtCore, QtWidgets
 import threading
 import gremlin.config
-import gremlin.event_handler
 import gremlin.input_types
 
 import gremlin.shared_state
@@ -297,12 +296,14 @@ class Configuration(QtCore.QObject):
 
     def save(self):
         import gremlin.util
+        import gremlin.event_handler
         if QtWidgets.QApplication.instance():
             gremlin.util.InvokeUiMethod(self._save_ui) # ensure on UI thread
         else:
             self._save_ui()
 
         # tell UI of config changes
+        
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
 

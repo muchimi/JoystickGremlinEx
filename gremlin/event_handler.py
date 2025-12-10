@@ -314,27 +314,35 @@ class Event:
 		)
 	
 	def __str__(self):
+		import gremlin.joystick_handling
+		if self.device_guid:
+			device = gremlin.joystick_handling.getDevice(self.device_gudd)
+			device_stub = device.name if device else f" unknown {str(self.device_guid)}"
+		else:
+			device_stub = "n/a"
+			
 		if self.event_type == InputType.Mouse:
-			return f"Event: {self._id} Mouse - button {self.identifier} pressed: {self.is_pressed}"
+			stub = f"Mouse - button {self.identifier} pressed: {self.is_pressed}"
 		elif self.event_type in  (InputType.Keyboard, InputType.KeyboardLatched):
-			return f"Event: {self._id} Keyboard - scan code, extended : {self.identifier}  vk: {self.virtual_code} (0x{self.virtual_code:X}) pressed: {self.is_pressed}"
+			stub = f"Keyboard - scan code, extended : {self.identifier}  vk: {self.virtual_code} (0x{self.virtual_code:X}) pressed: {self.is_pressed}"
 		elif self.event_type == InputType.JoystickAxis or self.is_axis:
-			return f"Event: {self._id} Axis : {self.identifier} raw value: {self.raw_value} value: {self.value}"
+			stub = f"Axis : {self.identifier} raw value: {self.raw_value} value: {self.value}"
 		elif self.event_type == InputType.JoystickButton:
-			return f"Event: {self._id} Button : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
+			stub = f"Button : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
 		elif self.event_type == InputType.ModeControl:
-			return f"Event: {self._id} Mode Control : {self.identifier} pressed: {self.is_pressed} value: {self.value} mode: {self.mode}"
+			stub = f"Mode Control : {self.identifier} pressed: {self.is_pressed} value: {self.value} mode: {self.mode}"
 		elif self.event_type == InputType.JoystickHat:
-			return f"Event: {self._id} Hat : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
+			stub = f"Hat : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
 		elif self.event_type == InputType.Midi:
-			return f"Event: {self._id} Midi : {self.identifier} value: {self.value}"
+			stub = f"Midi : {self.identifier} value: {self.value}"
 		elif self.event_type == InputType.OpenSoundControl:
-			return f"Event: {self._id} OSC : {self.identifier} value: {self.value}"
+			stub = f"OSC : {self.identifier} value: {self.value}"
 		elif self.event_type == InputType.State:
-			return f"Event: {self._id} STATE : {str(self.identifier)} value: {self.value}"
+			stub = f"STATE : {str(self.identifier)} value: {self.value}"
+		else:
+			stub = f"{self.event_type} : {str(self.identifier)} value: {self.value}"
 		
-		
-		return f"Event: {self._id} {self.event_type} identifier {self.identifier}"
+		return f"Event: [{self._id}] device: [{device_stub}] {stub}"
 	
 	# serialize
 	def __getstate__(self):
@@ -389,11 +397,11 @@ class JoystickEventQueue:
 		"""Adds an item to the queue if it's not already present."""
 		try:
 			self._lock.acquire()
-			if event.is_axis:
-				key = event.callbackKey	
-				if key in self._seen:
-					return # do not add if the existing event hasn't been processed - this is to avoid axis input spamming
-				self._seen.add(key)
+			# if event.is_axis:
+			# 	key = event.callbackKey	
+			# 	if key in self._seen:
+			# 		return # do not add if the existing event hasn't been processed - this is to avoid axis input spamming
+			# 	self._seen.add(key)
 
 			self._queue.append(event)
 		finally:
@@ -404,9 +412,9 @@ class JoystickEventQueue:
 		if not self.empty():
 			self._lock.acquire()
 			event : Event = self._queue.popleft()
-			if event.is_axis:
-				key = key = event.callbackKey
-				self._seen.remove(key)  # Remove from seen set when dequeued
+			# if event.is_axis:
+			# 	key = key = event.callbackKey
+			# 	self._seen.remove(key)  # Remove from seen set when dequeued
 			self._lock.release()
 			return event
 		else:
@@ -580,6 +588,7 @@ class EventListener:
 	config_option_changed = Signal() # occurs on broadcast configuration change
 
 	options_changed = Signal() # occurs when the options dialog closes to have components check for any changes
+
 
 	# occurs on broadcast mode change
 	broadcast_changed = Signal(StateChangeEvent)
@@ -795,7 +804,7 @@ class EventListener:
 		self.profile_start.connect(self._profile_start)
 		self.profile_stopping.connect(self._profile_stopping_cb)
 		self.profile_after_start.connect(self._profile_started_cb)
-		self.options_changed.connect(self._options_changed)
+		self.config_option_changed.connect(self._options_changed)
 		
 		
 
@@ -970,6 +979,7 @@ class EventListener:
 		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
 		self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
 		self._verbose_vjoy = config.verbose_mode_vjoy
+		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
 
 		
 	def _profile_start(self):
@@ -1329,7 +1339,9 @@ class EventListener:
 			input_id = vjoyevent.input_id
 			value = vjoyevent.value
 			if verbose : syslog.info(f"VJOY EVENT:  [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
-			if self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
+
+			#if self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
+			if AxisState().shouldProcess(vjoyevent):
 				# issue a loop back internal event
 				if verbose : syslog.info(f"VJOY EVENT: loopback trigger (exec) {vjoyevent}")
 				event = Event.from_vjoyEvent(vjoyevent)
@@ -3641,7 +3653,7 @@ class AxisState():
 		return None
 
 	
-	def shouldProcess(self, event : dinput.InputEvent | Event, process_key : str = None, delay : float = None, delta : float = None):
+	def shouldProcess(self, event : dinput.InputEvent | Event | VjoyEvent, process_key : str = None, delay : float = None, delta : float = None):
 		''' anti-spam filter for axis events to throttle event input for noisy inputs in particular.
 
 		:param event: the axis event (dinput or GEX event)
@@ -3650,12 +3662,13 @@ class AxisState():
 		:param delta: value delta, 0 or positive, event values values below this threshold are ignored
 		
 		'''
+		import gremlin.joystick_handling
 
 		if isinstance(event, dinput.InputEvent):
 			if event.input_type != dinput.InputType.Axis:
 				# not an axis
 				return True
-			key = (event.device_guid, event.input_index)
+			key = (event.device_guid, event.input_type, event.input_index)
 			# convert to -1 to +1
 			current_value = gremlin.util.scale_to_range(event.value, source_min = -32767, source_max = 32767)
 			input_id = event.input_index
@@ -3666,6 +3679,10 @@ class AxisState():
 			key = event.callbackKey
 			current_value = event.value
 			input_id = event.identifier
+		elif isinstance(event, VjoyEvent):
+			device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(event.vjoy_id)
+			key = (device_guid, event.input_type, event.input_id)
+			current_value = event.value
 
 		if process_key:
 			key = (key, process_key) # hook to that key only 
@@ -3809,14 +3826,23 @@ class JoystickHook:
 
 	def hookDevice(self, callback, device_guid, input_type, input_id, ui_only = True, persist = False):
 		''' hooks the device and the registered callback '''
+		if self._hooked:
+			# unhook first
+			self.unhookDevice()
+
 		self._callback = callback
 		jep = JoystickEventProcessor()
+		if hasattr(self, "getDescription"):
+			description = self.getDescription()
+		else:
+			description = None
 		jep.registerCallback(callback,
 					device_guid = device_guid,
 					input_type = input_type, 
 					input_id = input_id,
 					ui_only = ui_only,
-					persist = persist)
+					persist = persist,
+					description = description)
 		self._hooked = True
 		self._device_guid = device_guid
 		device = gremlin.joystick_handling.getDevice(device_guid)
@@ -3863,6 +3889,7 @@ class JoystickCallback():
 			  input_id = None, 
 			  ui_only = False,
 			  persist = False, # persist on reset
+			  description = None
 			  ):
 		self.id = gremlin.util.get_guid() # id of this callback block
 		self.device_guid = gremlin.util.parse_guid(device_guid) # store as GUID as events use GUIDs
@@ -3871,6 +3898,16 @@ class JoystickCallback():
 		self.callback = callback
 		self.ui_only = ui_only
 		self.persist = persist
+		self.description = description
+
+	def __str__(self):
+		import gremlin.joystick_handling
+		if self.device_guid:
+			device = gremlin.joystick_handling.getDevice(self.device_gudd)
+			device_stub = device.name if device else f" unknown {str(self.device_guid)}"
+		else:
+			device_stub = "n/a"
+		return f"callback: device: [{device_stub}] input type: [{self.input_type.name}] input id: {self.input_id} {self.description or ''}"
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -3895,11 +3932,12 @@ class JoystickEventProcessor():
 		el.config_option_changed.connect(self.handle_config_changed)
 		self._axis_state = AxisState()
 		self._lock = threading.Lock() 
-		self.perf = gremlin.config.Configuration().verbose_mode_perf
+		self.handle_config_changed() # setup verbose flags
 		self.start()
 
 	def handle_config_changed(self):
-		self.perf = gremlin.config.Configuration().verbose_mode_perf
+		config = gremlin.config.Configuration()
+		self.perf = config.verbose_mode_perf or config.verbose_mode_events
 
 	def profile_unload(self):
 		self.stop()
@@ -3941,6 +3979,7 @@ class JoystickEventProcessor():
 						input_id = None, 
 						ui_only = True, 
 						persist = False,
+						description = None
 						):
 		''' registers a callback, with optional filter
 			:param callback: the callback the processor will call when joystick data changes - this can be (event) or (values)  if a value trigger [value triggers sends all axis information based on configuraiton options]
@@ -3949,9 +3988,11 @@ class JoystickEventProcessor():
 			:param input_id: the input id of the axis, button or hat
 			:param ui_only: true if the trigger only happens at edit time
 			:param persist: if set, the callback is persisted on reset
+			:param description: optional description for the callback for diagnostics purposes
 		   
 		'''
-		verbose= gremlin.config.Configuration().verbose_mode_events
+
+		
 		try:
 			self._lock.acquire() # prevent changes
 			if device_guid is None:
@@ -3972,21 +4013,17 @@ class JoystickEventProcessor():
 				self._callbacks[device_guid][input_type][input_id] = {}
 
 			if callback is not None and not callback in self._callbacks[device_guid][input_type][input_id]:
-				cb = JoystickCallback(callback, device_guid, input_type, input_id, ui_only)
+				cb = JoystickCallback(callback, device_guid, input_type, input_id, ui_only, description = description)
 				self._callbacks[device_guid][input_type][input_id][callback] = cb
 				if not callback in self._callback_lookup:
 					self._callback_lookup[callback] = []
 				self._callback_lookup[callback].append((device_guid, input_type, input_id))
 
-			if verbose:
+			if self.perf:
 				device = gremlin.joystick_handling.getDevice(device_guid)
-				syslog.info(f"EVENT PROCESSOR: Registered callback: [{device.name}] [{device.device_id}] [{input_type.name}] id: [{input_id}]")
+				syslog.info(f"DISPATCH: register callback: [{device.name if device else f'unknown:' + str(device_guid)}] [{input_type.name}] id: [{input_id}] ")
 		finally:
 			self._lock.release()
-
-	
-
-	
 
 	def unregisterCallback(self, callback):
 		''' removes a callback '''
@@ -3996,12 +4033,13 @@ class JoystickEventProcessor():
 				self._generic_callback.remove(callback)
 			if callback is not None and callback in self._callback_lookup:
 				for device_guid, input_type, input_id in self._callback_lookup[callback]:
+					if self.perf:
+						device = gremlin.joystick_handling.getDevice(device_guid)
+						syslog.info(f"DISPATCH: unregister callback: [{device.name if device else f'unknown:' + str(device_guid)}] [{input_type.name}] id: [{input_id}]")
 					del self._callbacks[device_guid][input_type][input_id][callback]
 				del self._callback_lookup[callback]
 		finally:
 			self._lock.release()
-
-
 
 	def stop(self):
 		if self._event_thread:
@@ -4011,6 +4049,7 @@ class JoystickEventProcessor():
 				self._event_thread.stop()
 				self._event_thread.join()
 				self._event_thread = None
+				syslog.info("DISPATCH: shutdown")
 
 	def start(self):
 		self.perf = gremlin.config.Configuration().verbose_mode_perf
@@ -4022,6 +4061,7 @@ class JoystickEventProcessor():
 			self._event_thread =  gremlin.threading.AbortableThreadX(target = self._event_runner)
 			self._event_thread.name = "JoystickEventProcessor"
 			self._event_thread.start()
+			syslog.info("DISPATCH: start")
 
 	def queueJoystickEvent(self, event):
 		''' queues a single joystick event '''
@@ -4056,12 +4096,6 @@ class JoystickEventProcessor():
 					values = event.is_pressed
 				else:
 					values = event.value
-			# if verbose:
-			# 	device = gremlin.joystick_handling.getDevice(device_guid)
-			# 	if device.is_virtual:
-			# 		syslog.info(f"EVENT PROCESSOR: Event: [{device.name}] [{device.device_id}] [{input_type.name}] id: [{input_id}] {event.value}")
-
-			
 			
 			try:
 				self._lock.acquire() # prevent changes while processing an event
@@ -4076,33 +4110,29 @@ class JoystickEventProcessor():
 								if self.perf:
 									self._count += 1
 
-								# trigger the event callback on its own thread
-								#thread = multiprocessing.Process(target = self._fire_callback, args= (cb.callback, event, values))
-								timer = threading.Timer(0,self._fire_callback, (cb.callback, event, values))
+								timer = threading.Timer(0,self._fire_callback, (cb, event, values))
 								timer.start()
 								
 
 				# run generic callbacks - these are event only
 				for callback in self._generic_callback:
 					self._count += 1
-					# thread = multiprocessing.Process(target = self._fire_callback, args= (cb.callback, event, values))
-					# thread.start()
 					timer = threading.Timer(0,self._fire_callback, (cb.callback, event, values))
-					# syslog.info(f"fire generic event {input_type.name} input {input_id} count {self._count}")
 					timer.start()
 			finally:
 				self._lock.release()
 		
 					
 			
-	def _fire_callback(self, callback, event, values):
+	def _fire_callback(self, cb : JoystickCallback, event, values):
 		if self.perf:
 			start_time = time.time()
-			gremlin.util.InvokeUiMethod(callback, event, values)
+			gremlin.util.InvokeUiMethod(cb.callback, event, values)
 			lapsed = time.time() - start_time
-			syslog.info(f"PERF: DISPATCH event {event.identifier} queue depth: {self._count:,} runtime (ms): {lapsed*1000:0.3f}")
+			stub = f" callback: [{cb.description}]" if cb.description else ''
+			syslog.info(f"DISPATCH: {stub} event {str(event)} queue depth: {self._count:,} runtime (ms): {lapsed*1000:0.3f}")
 			self._count -= 1
 		else:
-			gremlin.util.InvokeUiMethod(callback, event, values)
+			gremlin.util.InvokeUiMethod(cb.callback, event, values)
 
 

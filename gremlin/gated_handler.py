@@ -1172,60 +1172,66 @@ class GateEventHandler(QtCore.QObject):
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_gate and config.verbose_mode_extra
         
-        if self.verbose: syslog.info("GATEHANDLER: listen start")
-        self._event_queue = queue.Queue() # holds the queue of events to process
+        # if self.verbose: syslog.info("GATEHANDLER: listen start")
+        # self._event_queue = queue.Queue() # holds the queue of events to process
         
-        self._event_thread =  gremlin.threading.AbortableThread(target = self._event_runner)
-        self._event_thread.name = "GatedHandler listener"
-        self._event_thread.start()
+        # self._event_thread =  gremlin.threading.AbortableThread(target = self._event_runner)
+        # self._event_thread.name = "GatedHandler listener"
+        # self._event_thread.start()
 
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self._joystick_event_handler)
+
+        #el = gremlin.event_handler.EventListener()
+        # el.joystick_event.connect(self._joystick_event_handler)
        
-        self._joystick_event_callbacks = {} # tracks callbacks for event changes
+        #self._joystick_event_callbacks = {} # tracks callbacks for event changes
 
-        el.shutdown.connect(self._shutdown)
+        #el.shutdown.connect(self._shutdown)
 
 
-    def _joystick_event_handler(self, event):   
-        ''' enqueues the received event for later processing '''
-        if self.verbose: syslog.info(f"GATEHANDLER: QUEUE event {event.id}")
-        self._event_queue.put(event)
+    # def _joystick_event_handler(self, event):   
+    #     ''' enqueues the received event for later processing '''
+    #     if self.verbose: syslog.info(f"GATEHANDLER: QUEUE event {event.id}")
+    #     self._event_queue.put(event)
 
-    def _event_runner(self):
-        ''' runner for inbound joystick events '''
-        while not self._event_thread.stopped():
-            if self._event_queue.empty():
-                time.sleep(0.01)
-                continue
-            event = self._event_queue.get()
-            if self.verbose: syslog.info(f"GATEHANDLER: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")
+    # def _event_runner(self):
+    #     ''' runner for inbound joystick events '''
+    #     while not self._event_thread.stopped():
+    #         if self._event_queue.empty():
+    #             time.sleep(0.01)
+    #             continue
+    #         event = self._event_queue.get()
+    #         if self.verbose: syslog.info(f"GATEHANDLER: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")
             
-            for callback in self._joystick_event_callbacks.values():
-                callback(event)
-            self._event_queue.task_done()
+    #         for callback in self._joystick_event_callbacks.values():
+    #             callback(event)
+    #         self._event_queue.task_done()
 
 
         
 
 
 
-    def registerJoystickCallback(self, key, callback):
-        ''' registers a joystick callback '''
-        self._joystick_event_callbacks[key] = callback
-        verbose = gremlin.config.Configuration().verbose_mode_gate
-        if verbose: 
-            syslog.info(f"GATE: register callback for action [{key}] callback count: {len(self._joystick_event_callbacks)}")
+    # def registerJoystickCallback(self, key, callback):
+    #     ''' registers a joystick callback '''
 
-    def unregisterJoystickCallback(self, key):
-        ''' unregisters a joystick callback '''
-        verbose = gremlin.config.Configuration().verbose_mode_gate
-        if key in self._joystick_event_callbacks:
-            del self._joystick_event_callbacks[key]
-            if verbose: 
-                syslog.info(f"GATE: unregister callback for action [{key}] callback count: {len(self._joystick_event_callbacks)}")
-        # else:
-        #     syslog.warning(f"GATE: unregister callback for action [{key}]: key not registered.")
+    #     # jep = gremlin.event_handler.JoystickEventProcessor()
+    #     # description = "gated handler value callback"
+    #     # jep.registerCallback(self._joystick_event_handler, )
+
+    #     self._joystick_event_callbacks[key] = callback
+    #     verbose = gremlin.config.Configuration().verbose_mode_gate
+    #     if verbose: 
+    #         syslog.info(f"GATE: register callback for action [{key}] callback count: {len(self._joystick_event_callbacks)}")
+
+    # def unregisterJoystickCallback(self, key):
+    #     ''' unregisters a joystick callback '''
+    #     verbose = gremlin.config.Configuration().verbose_mode_gate
+    #     if key in self._joystick_event_callbacks:
+    #         del self._joystick_event_callbacks[key]
+    #         if verbose: 
+    #             syslog.info(f"GATE: unregister callback for action [{key}] callback count: {len(self._joystick_event_callbacks)}")
+    #     # else:
+    #     #     syslog.warning(f"GATE: unregister callback for action [{key}]: key not registered.")
         
 
     def registerValueChangedCallback(self, key, callback):
@@ -1253,22 +1259,22 @@ class GateEventHandler(QtCore.QObject):
             for callback in self._value_changed_callbacks[key]:
                 callback(device_id, input_id, value)
 
-    def _shutdown(self):
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.disconnect(self._joystick_event_handler)
+    # def _shutdown(self):
+    #     el = gremlin.event_handler.EventListener()
+    #     el.joystick_event.disconnect(self._joystick_event_handler)
 
-        # clear the queue
-        if self._event_thread.is_alive():
-            if self.verbose: syslog.info("GATEHANDLER: listen stop")
-            self._event_thread.stop()
-            self._event_thread.join()
-            self._event_thread = None
+    #     # clear the queue
+    #     if self._event_thread.is_alive():
+    #         if self.verbose: syslog.info("GATEHANDLER: listen stop")
+    #         self._event_thread.stop()
+    #         self._event_thread.join()
+    #         self._event_thread = None
 
-        # mark all events processed
-        while not self._event_queue.empty():
-            self._event_queue.get_nowait()
+    #     # mark all events processed
+    #     while not self._event_queue.empty():
+    #         self._event_queue.get_nowait()
 
-        self._joystick_event_callbacks.clear()
+    #     self._joystick_event_callbacks.clear()
 
 
 

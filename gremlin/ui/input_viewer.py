@@ -612,9 +612,6 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.closed.connect(self._closed)
         self.installEventFilter(self)
 
-        # self._event_queue = gremlin.event_handler.JoystickEventProcessor()
-        # self._event_queue.registerCallback(self._joystick_event_handler, ui_only = False) # needs to update at edit and runtimes
-
         self._event_data = {}
 
         if show_state:
