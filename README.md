@@ -22,7 +22,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 # Change log
 
 ### (m76T127)
-- fix: exception in UI thread invoker serialization of states
+- Change: additional log detail to validate input viewer update paths from event to update to help diagnose any update issues.
+- Fix: potential ignoring of axis inputs in dispatch due to prior filter in place that is no longer needed.
+- Fix: exception in UI thread invoker serialization of states.
+- Fix: added state data serialization override to force a shallow copy as states are immutable anyway.
+- Fix: activated dinput chain when perf mode is on to visualize full processing.  This will probably be re-separated later.
+- Fix: added warning box on log viewer dialog to dissuade usage on large log file.
+- Tested: This version was tested on gated axis, calibration, state and mode changes and TTS, profile stop/start and new profile to cover all the core bases.
 
 ### (m76T126)
 - Changed: re-enabled axis input filters.

@@ -3055,6 +3055,9 @@ class LogWindowUi(ui_common.BaseDialogUi):
         self.tab_container = QtWidgets.QTabWidget()
         self.main_layout.addWidget(self.tab_container)
 
+        info_widget = gremlin.ui.ui_common.QWarningWidget("Legacy feature:\nThis log viewer can become extremely slow and resource intensive with large log files.\nPlease use an external log viewer where possible like LogExpert.")
+        self.main_layout.addWidget(info_widget)
+
         self._ui_elements = {}
         log_path = gremlin.shared_state.system_log
         self._create_log_display(log_path,"System")
