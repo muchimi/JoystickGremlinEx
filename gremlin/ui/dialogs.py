@@ -1173,7 +1173,7 @@ There should only be one GremlinEx master server on the subnet.
         self.remote_control_select_ip_widget.setEnabled(enabled)
         self.remote_control_server_widget.setEnabled(enabled)
 
-    def _handle_reset_hidden(self):
+    def _handle_reset_hidden(self, widget):
         gremlin.config.Configuration().resetVisualHidden()
 
     def _create_reporting_page(self):
@@ -1286,8 +1286,8 @@ There should only be one GremlinEx master server on the subnet.
         self.tab_container.addTab(content_widget, "Filter")
 
     @QtCore.Slot()
-    def _handle_filter(self):
-        mode = self.sender().data
+    def _handle_filter(self, widget):
+        mode = widget.data
         profile = gremlin.shared_state.current_profile
         profile.settings.setAllFiltered(mode)
 

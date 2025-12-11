@@ -257,6 +257,23 @@ class AxisCalibrationWidget(QtWidgets.QWidget):
 
 
 class CalibrationData:
+    __slots__ = [
+        "device_guid",
+        "input_id",
+        "_is_centered",
+        "_calibrated_min",
+        "_calibrated_max",
+        "_calibrated_center",
+        "_deadzone_min",
+        "_deadzone_max",
+        "_deadzone_center_min",
+        "_deadzone_center_max",
+        "_trigger_threshold",
+        "_trigger_threshold_enabled",
+        "_last_value",
+        "_inverted",
+
+    ]
     def __init__(self, source = None):
         self.device_guid = None # axis device guid this data applies to
         self.input_id = None # axis input id this data applies to
@@ -700,7 +717,7 @@ class CalibrationManager():
           
         '''
         fname = self.profile_calibration_file
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_calib
 
         # build the list of files to load the data from
         f_list = []
@@ -776,7 +793,7 @@ class CalibrationManager():
         :param to_global: saves the calibration globally for all profiles when set, when not set, saves to the local profile only
         
         '''
-    
+        verbose = gremlin.config.Configuration().verbose_mode_calib
         root = etree.Element("root")
         for device_guid in self.calibration_map:
             device = gremlin.joystick_handling.getDevice(device_guid)
@@ -807,7 +824,7 @@ class CalibrationManager():
                     if os.path.isfile(fname):
                         os.unlink(fname)
                     tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-                    syslog.info(f"Calibration data saved to [{fname}]")
+                    if verbose: syslog.info(f"Calibration data saved to [{fname}]")
                 except Exception as ex:
                     syslog.error(f"Error saving calibration: {ex}")
                     if callback:
@@ -1017,7 +1034,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
 
 
-        close_widget = gremlin.ui.ui_common.QDataPushButton("Close",callback = self.close)
+        close_widget = gremlin.ui.ui_common.QDataPushButton("Close",callback = self._handle_close)
         
         widgets = [
             save_global_widget,
@@ -1055,6 +1072,9 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         # initial value
         self._update_ui()
         
+
+    def _handle_close(self, widget):
+        self.close()
 
     def _handle_joystick_event_ui(self, event, values):
         ''' handles a joystick axis event '''

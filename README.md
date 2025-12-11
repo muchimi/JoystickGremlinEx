@@ -2,7 +2,7 @@
 # GremlinEx
 
 
-GremlinEx is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Sound Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, convert text to speech and play sounds.  It can send output to a game or another process.
+GremlinEx (GEX) is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Sound Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, convert text to speech and play sounds.  It can send output to a game or another process.
 
 With OSC support, GremlinEx can receive input from custom designed glass (touch screen) surfaces, and supports two way communication to any device supported by BitFocus Companion such as the Elgato Streamdeck.  This communication is two-way so GremlinEx can also send data to a glass surface or an external hardware panel.
 
@@ -10,6 +10,7 @@ GremlinEx can be expanded using custom plugins written in Python.
 
 ![gremlinex](gremlinex.png)
 ![gremlinex viewer](gremlinex_viewer.png)
+
 
 # Documentation
 
@@ -19,7 +20,21 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
+# Test versions
+
+The most current test releases will contain the latest bug fixes, features and optimizations.  Not all test releases are stable which is why they are not in the release channel, and many are.  Please make a backup of your profiles and enable the versioning option to keep files separate by version just in case, but there is about a year's worth of key updates since the last official release all in the test channel including several stable versions.  
+
+The test versions are available here: https://github.com/muchimi/JoystickGremlinEx/releases/tag/test
+
+
 # Change log
+
+### (m76T128)
+
+- Fix: Input Viewer: state and vjoy button input (click) re-enabled (was disabled in T127 as the API was being changed).
+- Perf: dispatcher thread pool usage (reduction in dispatching overhead)
+- Perf: optimization of core data objects using slots (this generally is aimed at reducing memory and increases data access).
+- Perf: set context switching to 1ms (increases overall responsiveness with axis input in particular - axes can generate thousands of events in short order).
 
 ### (m76T127)
 - Change: additional log detail to validate input viewer update paths from event to update to help diagnose any update issues.

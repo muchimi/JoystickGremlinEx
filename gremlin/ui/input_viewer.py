@@ -1010,8 +1010,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             if verbose: syslog.warning(f"Viewer: state {state.key} widget not found")
 
     @QtCore.Slot()
-    def _state_toggle(self):
-        widget = self.sender()
+    def _state_toggle(self, widget):
         state = widget.data
         key = state.key
         verbose = gremlin.config.Configuration().verbose_mode_state

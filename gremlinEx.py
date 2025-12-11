@@ -5227,7 +5227,8 @@ if __name__ == "__main__":
     # if pm.process_running("gremlinex.exe"):
     #     sys.exit(-1)
         
-    
+    # faster context switching (default is 5ms)
+    sys.setswitchinterval(0.001)
     
     system_log_path = os.path.join(app_path, "system.log")
     user_log_path = os.path.join(app_path, "user.log")

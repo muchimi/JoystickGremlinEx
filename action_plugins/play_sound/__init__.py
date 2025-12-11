@@ -193,7 +193,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
     @QtCore.Slot()
-    def _handle_sync_all(self):
+    def _handle_sync_all(self, widget):
         name = self.action_data.audio_device
         profile = gremlin.shared_state.current_profile
         profile.setDefaultAudioDevice(name)

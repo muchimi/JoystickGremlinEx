@@ -84,7 +84,7 @@ class Color():
     def normalColor():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
     def disabledColor():
-        return "#5F5F5F" if gremlin.shared_state.is_dark_theme else "#9C9C9C"
+        return "#2E2E2E" if gremlin.shared_state.is_dark_theme else "#9C9C9C"
     @staticmethod
     def normalDarkColor():
         return "#AAAAAA" 
@@ -317,8 +317,10 @@ class Color():
     def listenColor(): # color used for listen type buttons
         return Color.blueColor()
     @staticmethod
-    def infoColor(): # color used for information boxes
+    def infoBackgroundColor(): # color used for information boxes
         return "#92882b"  if gremlin.shared_state.is_dark_theme else "#dbd496"
+    def infoColor(): # color used for information boxes
+        return "#f1f1f1"  if gremlin.shared_state.is_dark_theme else "#3d3d3d"
     @staticmethod
     def frameColor(): # color used for frame boxes
         return "#8a8a8a"  if gremlin.shared_state.is_dark_theme else "#dddddd"
@@ -393,10 +395,11 @@ class Color():
     @staticmethod
     def cssInfoBox(): 
         border_color = Color.borderColor()
-        background_color = Color.infoColor()
-        
+        background_color = Color.infoBackgroundColor()
+        foreground_color = Color.infoColor()
         css = f'''
             background: {background_color};
+            color: {foreground_color};
             QFrame {{
                 border: 0px solid {border_color};
                 
@@ -4079,14 +4082,19 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self._data = data
         self._ignore_keyboard = False
         self.installEventFilter(self)
+        self._callback = callback
 
         if value:
             self.setChecked(value)
         if callback:
-            self.clicked.connect(callback)
+            self.clicked.connect(self._handle_clicked)
         if tooltip:
             self.setToolTip(tooltip)
             
+
+    def _handle_clicked(self):
+        if self._callback:
+            self._callback()
 
     @property
     def data(self):
@@ -4162,10 +4170,9 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._data = data
         if tooltip:
             self.setToolTip(tooltip)
-        if callback:
-            self._clicked.connect(callback)
-        if callback_ex:
-            self.clickedEx.connect(callback_ex)
+        self._clicked.connect(self._handle_callback)
+        self.clickedEx.connect(self._handle_callback_ex)
+
         self._callback = callback
         self._callback_ex = callback_ex
         if enabled is not None:
@@ -4173,11 +4180,23 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         self.installEventFilter(self)
 
+    
+
+    def _handle_callback(self):
+        if self._callback:
+            self._callback(self)
+
+
+    def _handle_callback_ex(self, is_ctrl : bool, is_shft : bool, is_alt : bool):
+        if self._callback_ex:
+            self._callback_ex(is_ctrl, is_shft, is_alt)
+
     def setCallback(self, callback):
         self._callback = callback
 
     def setCallbackEx(self, callback):
         self._callback_ex = callback
+
 
 
     def eventFilter(self, watched, event):
@@ -4196,10 +4215,8 @@ class QDataPushButton(QtWidgets.QPushButton):
                         self.setChecked(not self.isChecked())
 
                     self.clickedEx.emit(self, is_ctrl, is_shft, False) # extended click
-                    if self._callback:
-                        self._clicked.emit(self)
-                    else:
-                        self.clicked.emit()
+                    self._clicked.emit(self)
+                    self.clicked.emit()
                     return True
                     
                     
@@ -7257,8 +7274,8 @@ class QUsedPushButton(QDataPushButton):
             el = gremlin.event_handler.EventListener()
             el.input_used_changed.connect(self._handle_used_changed)
 
-        if callback:
-            self.clicked.connect(callback)
+        # if callback:
+        #     self.clicked.connect(callback)
 
     def _handle_used_changed(self, device_guid, input_type, input_id, value : bool):
         # see if it's ours
@@ -7360,7 +7377,7 @@ class StateRepeaterButton(QDataPushButton):
         self.setCheckable(True)
         css = Color.cssStateButton(font_size)
         cssAlternate = Color.cssStateExpressionButton(font_size)
-
+        self.data = state
   
         if state.expression:
             self.setEnabled(False)    
@@ -7384,6 +7401,8 @@ class StateRepeaterButton(QDataPushButton):
             # block the signal
             with QtCore.QSignalBlocker(self):
                 self.setChecked(value)
+
+
 
 
 class ButtonState(QtWidgets.QGroupBox):
@@ -7468,12 +7487,12 @@ class ButtonState(QtWidgets.QGroupBox):
         # update the remote clients if needed
         gremlin.joystick_handling.set_button(device_guid, input_id, is_pressed, update_remote = True)
 
-    def unhook(self):
-        ''' unhooks buttons '''
-        if self._device.is_virtual:
-            for btn in self.buttons:
-                if btn:
-                    btn.clicked.disconnect(self._button_clicked)
+    # def unhook(self):
+    #     ''' unhooks buttons '''
+    #     # if self._device.is_virtual:
+    #     #     for btn in self.buttons:
+    #     #         if btn:
+    #     #             btn.clicked.disconnect(self._button_clicked)
 
     def process_event(self, event):
         """Updates state visualization based on the given event.
@@ -11679,7 +11698,7 @@ class QButtonGrid(QtWidgets.QWidget):
             h_box.addWidget(lbl)
             v_box.addWidget(line2_cont)
 
-            line2_cont.clicked.connect(self._grid_button_clicked)
+           # line2_cont.clicked.connect(self._grid_button_clicked)
 
 
             grid.addWidget(v_cont, row, col)
@@ -11698,10 +11717,10 @@ class QButtonGrid(QtWidgets.QWidget):
         self._state[button_id] = not self._state[button_id]
 
 
-    @QtCore.Slot()
-    def _grid_button_clicked(self):
-        sender = self.sender()
-        pass
+    # @QtCore.Slot()
+    # def _grid_button_clicked(self):
+    #     sender = self.sender()
+    #     pass
         
         
 
@@ -13007,67 +13026,67 @@ class QBorderWidget(QtWidgets.QFrame):
         
         
         
-class ActionConfigWidget(QtWidgets.QWidget):
-    ''' generic action configuration widget for containers - adds ability to configure and delete '''
-    def __init__(self, label : str = None, config_callback = None, delete_callback = None, used_callback = None, data = None, parent = None):
-        super().__init__(parent = parent)
+# class ActionConfigWidget(QtWidgets.QWidget):
+#     ''' generic action configuration widget for containers - adds ability to configure and delete '''
+#     def __init__(self, label : str = None, config_callback = None, delete_callback = None, used_callback = None, data = None, parent = None):
+#         super().__init__(parent = parent)
 
 
-        self.config_callback = config_callback
-        self.delete_callback = delete_callback
-        self.used_callback = used_callback
-        self.label = label
+#         self.config_callback = config_callback
+#         self.delete_callback = delete_callback
+#         self.used_callback = used_callback
+#         self.label = label
 
-        self.label_widget = QtWidgets.QLabel(label or "")
+#         self.label_widget = QtWidgets.QLabel(label or "")
 
-        self.setup_widget = QDataPushButton(callback = config_callback)
-        self.setup_widget.setMaximumWidth(20)
-        self.setup_widget.clicked.connect(self.configure_handler)
-        self.setup_widget.data = data
+#         self.setup_widget = QDataPushButton(callback = config_callback)
+#         self.setup_widget.setMaximumWidth(20)
+#         self.setup_widget.clicked.connect(self.configure_handler)
+#         self.setup_widget.data = data
         
 
-        self.clear_widget = QDataPushButton(callback = delete_callback)
-        self.clear_widget.setIcon(load_icon("mdi.delete"))
-        self.clear_widget.setMaximumWidth(20)
+#         self.clear_widget = QDataPushButton(callback = delete_callback)
+#         self.clear_widget.setIcon(load_icon("mdi.delete"))
+#         self.clear_widget.setMaximumWidth(20)
 
 
-        self.update_icon()
+#         self.update_icon()
 
 
-    def update_icon(self):
-        is_used = self.used_callback() # true if callback is used
-        if is_used:
-            self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color.activeContentColor()))
-        else:
-            self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color.inactiveColor()))
+#     def update_icon(self):
+#         is_used = self.used_callback() # true if callback is used
+#         if is_used:
+#             self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color.activeContentColor()))
+#         else:
+#             self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color.inactiveColor()))
 
 
-class ActionContainerDialog(QRememberDialog):
-    """UI to setup the individual action trigger containers and sub actions """
+# class ActionContainerDialog(QRememberDialog):
+#     """UI to setup the individual action trigger containers and sub actions """
 
-    def __init__(self, item_data, input_type, title = "Action Configuration", parent=None):
-        '''
-        :param: data = the gate or range data block
+#     def __init__(self, item_data, input_type, title = "Action Configuration", parent=None):
+#         '''
+#         :param: data = the gate or range data block
         
-        '''
-        import gremlin.ui.input_item
+#         '''
+#         import gremlin.ui.input_item
         
-        super().__init__(self.__class__.__name__, parent = parent)
-        self.setWindowTitle(title)
-        self.setModal(True)
+#         super().__init__(self.__class__.__name__, parent = parent)
+#         self.setWindowTitle(title)
+#         self.setModal(True)
         
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(800)
+#         self.setMinimumWidth(600)
+#         self.setMinimumHeight(800)
 
-        self.main_layout = QtWidgets.QVBoxLayout(self)
+#         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.container_widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, input_type = input_type)
-        self.main_layout.addWidget(self.container_widget)
+#         self.container_widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, input_type = input_type)
+#         self.main_layout.addWidget(self.container_widget)
 
-        close_button_widget = QDataPushButton("Close", callback = self.close)
-        close_button_widget.setToolTip("Closes the dialog")
-        widget = getHContainer(close_button_widget, widget_only=True, left_stretch=True)
-        self.main_layout.addWidget(widget)
+#         close_button_widget = QDataPushButton("Close", callback = self.close)
+#         close_button_widget.setToolTip("Closes the dialog")
+#         widget = getHContainer(close_button_widget, widget_only=True, left_stretch=True)
+#         self.main_layout.addWidget(widget)
        
 
 class QTimedLabel(QtWidgets.QWidget):

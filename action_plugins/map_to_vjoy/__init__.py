@@ -1083,9 +1083,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.container_axis_to_button_range_widget)
 
     @QtCore.Slot()
-    def _handle_button_range_quick_set(self):
+    def _handle_button_range_quick_set(self, widget):
         ''' handle quick set range buttons '''
-        widget = self.sender()
         data = widget.data
         match data:
             case "reset":

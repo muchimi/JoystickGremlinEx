@@ -16,6 +16,7 @@
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+import concurrent.futures
 import functools
 import traceback
 import inspect
@@ -79,6 +80,31 @@ class Event:
 	whether or not the key's scan code is extended one.
 	"""
 
+	# m76T128 - performance pass - use slots
+	__slots__ = [
+		"event_type",
+		"_id",
+		"_identifier",
+		"device_guid",
+		"is_pressed",
+		"value",
+		"raw_value",
+		"_curve_value",
+		"force_remote",
+		"action_id",
+		"data",
+		"is_axis",
+		"virtual_code",
+		"is_virtual",
+		"is_virtual_button",
+		"is_custom",
+		"mode",
+		"is_repeater",
+		"override_input_type",
+		"extra_data",
+
+
+	]
 	def __init__(
 			self,
 			event_type,
@@ -112,13 +138,10 @@ class Event:
 			is pressed
 		"""
 		self._id = gremlin.util.get_guid() # unique ID for this event
-		#self._event_type = event_type
 		self.event_type = event_type
 		self._identifier = identifier
 		self.device_guid = device_guid
-		#self._is_pressed = is_pressed
 		self.is_pressed = is_pressed
-		#self._value = value
 		self.value = value
 		self.raw_value = raw_value
 		self._curve_value = curved_value
@@ -135,13 +158,7 @@ class Event:
 		self.override_input_type = override_input_type # override input type - used as the input type for actions 
 		self.extra_data = extra_data
 
-	# @property
-	# def is_pressed(self):
-	# 	return self._is_pressed
-	
-	# @is_pressed.setter
-	# def is_pressed(self, value):
-	# 	self._is_pressed = value
+
 
 	@property
 	def curve_value(self) -> float:
@@ -171,19 +188,30 @@ class Event:
 	
 	def __deepcopy__(self, memo):
 		import copy
+		from itertools import chain
 		cls = self.__class__
 		result = cls.__new__(cls)
 		memo[id(self)] = result
-		for k, v in self.__dict__.items():
-			try:
-				if k in ("data","extra_data"):
-					# shallow copy passed data or extra data 
-					setattr(result, k, copy.copy(v))
-				else:
-					setattr(result, k, copy.deepcopy(v, memo))
-			except:
-				# cannot copy = do a shallow copy
-				setattr(result, k, copy.copy(v))
+		slots = chain.from_iterable(getattr(s, '__slots__', []) for s in self.__class__.__mro__)
+		for var in slots:
+			if var in ("data","extra_data"):
+				# shallow copy
+				setattr(result, var, copy.copy(getattr(self, var)))
+			else:
+				# deep copy
+				setattr(result, var, copy.deepcopy(getattr(self, var)))
+
+
+		# for k, v in self.__dict__.items():
+		# 	try:
+		# 		if k in ("data","extra_data"):
+		# 			# shallow copy passed data or extra data 
+		# 			setattr(result, k, copy.copy(v))
+		# 		else:
+		# 			setattr(result, k, copy.deepcopy(v, memo))
+		# 	except:
+		# 		# cannot copy = do a shallow copy
+		# 		setattr(result, k, copy.copy(v))
 		return result
 	
 	@property
@@ -438,6 +466,18 @@ class JoystickEventQueue:
 
 class DeviceChangeEvent:
 	''' sent when a new device is selected '''
+	__slots__ = [
+		"device_guid",
+		"device_name",
+		"device_input_id",
+		"device_input_type",
+		"input_type",
+		"vjoy_id",
+		"vjoy_input_id",
+		"source"
+
+	]
+
 	def __init__(self):
 		self.device_guid = None
 		self.device_name = None
@@ -451,12 +491,23 @@ class DeviceChangeEvent:
 
 class StateChangeEvent:
 	''' sent when the state changes '''
+	__slots__ = [
+		"is_local",
+		"is_remote",
+		"is_broadcast_enabled"
+	]
 	def __init__(self, is_local = False, is_remote = False, is_broadcast_enabled = False):
 		self.is_local = is_local
 		self.is_remote = is_remote
 		self.is_broadcast_enabled = is_broadcast_enabled
 
 class VjoyEvent:
+	__slots__ = [
+		"vjoy_id",
+		"input_type",
+		"input_id",
+		"value"
+	]
 	def __init__(self, vjoy_id, input_type : InputType, input_id : int, value):
 		self.vjoy_id = vjoy_id
 		self.input_type = input_type
@@ -1487,6 +1538,7 @@ class EventListener:
 			
 
 		event_list = []
+		astate = AxisState()
 		
 		
 		is_virtual = device.is_virtual if device is not None else False
@@ -1521,9 +1573,10 @@ class EventListener:
 				# track the input event
 				if verbose_vjoy: syslog.info(f"DINPUT VJOY LOOPBACK: register vjoy [{vjoy_id}] [{input_type.name}] [{input_id}]  value: [{value}]")
 
+				#if not astate.shouldProcess(event):
 				if not self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
 					return # skip DINPUT event
-
+		
 		if event.input_type == dinput.InputType.Axis:
 			if verbose and verbose_extra:
 				syslog.info(f"DINPUT AXIS: {event}")
@@ -1532,7 +1585,7 @@ class EventListener:
 			raw_value = event.value
 
 			# apply spam filter
-			if not AxisState().shouldProcess(event):
+			if not astate.shouldProcess(event):
 				# filtered out
 				return
 			
@@ -3125,7 +3178,7 @@ class JoystickState():
 		self._output_ignored_device_list.clear()
 		self._vjoy_output_ignored_list.clear()
 		current_profile = gremlin.shared_state.current_profile
-		verbose = gremlin.config.Configuration().verbose
+		verbose = gremlin.config.Configuration().verbose_mode_vjoy
 		for dev in gremlin.joystick_handling.all_joystick_devices():
 			device_guid = gremlin.util.normalize_guid(dev.device_guid)
 			# Octavi IFR1 exception - this is ignored because the device also reports in as a game controller - however we read data from it using HID directly, not dinput
@@ -3883,7 +3936,7 @@ class JoystickHook:
 
 
 class JoystickCallback():
-	
+	__slots__ = ["callback","id","device_guid","input_type","input_id","ui_only","persist","description"]
 	def __init__(self, 
 			  callback, 
 			  device_guid = None, 
@@ -3935,11 +3988,13 @@ class JoystickEventProcessor():
 		self._axis_state = AxisState()
 		self._lock = threading.Lock() 
 		self.handle_config_changed() # setup verbose flags
+
+		self.exe = concurrent.futures.ThreadPoolExecutor()
 		self.start()
 
 	def handle_config_changed(self):
 		config = gremlin.config.Configuration()
-		self.perf = config.verbose_mode_perf or config.verbose_mode_events
+		self.perf = config.verbose_mode_perf # or config.verbose_mode_events
 
 	def profile_unload(self):
 		self.stop()
@@ -4045,7 +4100,7 @@ class JoystickEventProcessor():
 				syslog.info("DISPATCH: shutdown")
 
 	def start(self):
-		self.perf = gremlin.config.Configuration().verbose_mode_perf
+		
 		if not self._event_thread:
 			el = EventListener()
 			el.joystick_event.connect(self.queueJoystickEvent)
@@ -4103,15 +4158,17 @@ class JoystickEventProcessor():
 								if self.perf:
 									self._count += 1
 
-								timer = threading.Timer(0,self._fire_callback, (cb, event, values))
-								timer.start()
+								self.exe.submit(self._fire_callback, cb, event, values)
+								# timer = threading.Timer(0,self._fire_callback, (cb, event, values))
+								# timer.start()
 								
 
 				# run generic callbacks - these are event only
 				for callback in self._generic_callback:
-					self._count += 1
-					timer = threading.Timer(0,self._fire_callback, (cb.callback, event, values))
-					timer.start()
+					if self.perf: self._count += 1
+					self.exe.submit(self._fire_callback, cb, event, values)
+					# timer = threading.Timer(0,self._fire_callback, (cb.callback, event, values))
+					# timer.start()
 			finally:
 				self._lock.release()
 		

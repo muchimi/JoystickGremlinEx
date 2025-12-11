@@ -1060,11 +1060,13 @@ class VerboseMode(IntFlag):
     Filter = auto()
     Perf = auto()
     Events = auto()
+    Calib = auto()
     All = Keyboard | Joystick | Inputs | Mouse | Details | \
           SimConnect | Condition | Process | Exec | Midi | \
           Device | Macro | Gate | Outputs | UI | ExecDetails |\
           VJoy | State | Extra | Remote | Container | Octavi |\
-          dinput | Curve | TTS | Sound | Filter | Perf | Events
+          dinput | Curve | TTS | Sound | Filter | Perf | Events |\
+          Calib
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value
