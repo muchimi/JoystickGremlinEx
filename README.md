@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T128A)
+- Fix: checkbox exception due to widget API change in T128.
+
 ### (m76T128)
 
 - Fix: Input Viewer: state and vjoy button input (click) re-enabled (was disabled in T127 as the API was being changed).

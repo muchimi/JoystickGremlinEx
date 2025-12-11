@@ -4094,7 +4094,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
 
     def _handle_clicked(self):
         if self._callback:
-            self._callback()
+            self._callback(self.isChecked())
 
     @property
     def data(self):
