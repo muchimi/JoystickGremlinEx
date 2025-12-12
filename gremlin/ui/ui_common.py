@@ -7073,10 +7073,11 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             
 
     def _unhook_buttons(self):
-        if self._device.is_virtual:
-            widgets = [widget for widget in self.widgets if isinstance(widget, ButtonState)]
-            for widget in widgets:
-                widget.unhook()
+        pass
+        # if self._device.is_virtual:
+        #     widgets = [widget for widget in self.widgets if isinstance(widget, ButtonState)]
+        #     for widget in widgets:
+        #         widget.unhook()
 
     def _create_current_axis(self):
         """Creates display for current axes data."""

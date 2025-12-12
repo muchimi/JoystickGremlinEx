@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T129A)
+- Fix: unhook exception in state visualizer.
+
 ### (m76T129)
 - Fix: additional pass on checkbox/button widget updates 
 - Updated documentation on custom scripting
