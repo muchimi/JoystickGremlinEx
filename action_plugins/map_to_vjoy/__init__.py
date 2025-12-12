@@ -711,11 +711,12 @@ class GridPopupWindow(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.main_layout.addWidget(widget)
 
             
-        close_widget  = gremlin.ui.ui_common.QDataPushButton("Close", callback = self.close)
+        close_widget  = gremlin.ui.ui_common.QDataPushButton("Close", callback = self._handle_close)
         widget = gremlin.ui.ui_common.getHContainer(close_widget, widget_only=True, left_stretch=True)
         self.main_layout.addWidget(widget)
         
-
+    def _handle_close(self, widget):
+        self.close()
 
 
 class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):

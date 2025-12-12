@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T129)
+- Fix: additional pass on checkbox/button widget updates 
+- Updated documentation on custom scripting
 
 ### (m76T128A/B)
 - Fix: checkbox exception due to widget API change in T128.

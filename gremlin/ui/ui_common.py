@@ -4154,15 +4154,17 @@ class QDataPushButton(QtWidgets.QPushButton):
 
 
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, callback_ex = None, enabled = None):
+    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, callback_ex = None, clicked = None, enabled = None):
         ''' custom push button 
         
         :param text: label for the button (optiona)
         :param data: data object tracked with the button (optional)
         :param parent: parent widget (optional)
         :param tooltip: tooltip (optional)
-        :param callback: click callback() (optional) 
+        :param callback: click callback(widget) (optional) 
         :param callback_ex: click callback (ctrl, shft, right) as boolean flags as parameters to the event (optional)
+        :param clicked: click callback() 
+        :param enabled: default enabled state (optional) - button is enabled by default
 
         
         '''
@@ -4177,6 +4179,8 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._callback_ex = callback_ex
         if enabled is not None:
             self.setEnabled(enabled)
+        if clicked:
+            self.clicked.connect(clicked)
 
         self.installEventFilter(self)
 
@@ -7486,13 +7490,6 @@ class ButtonState(QtWidgets.QGroupBox):
         
         # update the remote clients if needed
         gremlin.joystick_handling.set_button(device_guid, input_id, is_pressed, update_remote = True)
-
-    # def unhook(self):
-    #     ''' unhooks buttons '''
-    #     # if self._device.is_virtual:
-    #     #     for btn in self.buttons:
-    #     #         if btn:
-    #     #             btn.clicked.disconnect(self._button_clicked)
 
     def process_event(self, event):
         """Updates state visualization based on the given event.
@@ -13024,70 +13021,7 @@ class QBorderWidget(QtWidgets.QFrame):
             css = f"# frame {{border: 1px solid {border_color};}}')"
         self.setStyleSheet(css) 
         
-        
-        
-# class ActionConfigWidget(QtWidgets.QWidget):
-#     ''' generic action configuration widget for containers - adds ability to configure and delete '''
-#     def __init__(self, label : str = None, config_callback = None, delete_callback = None, used_callback = None, data = None, parent = None):
-#         super().__init__(parent = parent)
-
-
-#         self.config_callback = config_callback
-#         self.delete_callback = delete_callback
-#         self.used_callback = used_callback
-#         self.label = label
-
-#         self.label_widget = QtWidgets.QLabel(label or "")
-
-#         self.setup_widget = QDataPushButton(callback = config_callback)
-#         self.setup_widget.setMaximumWidth(20)
-#         self.setup_widget.clicked.connect(self.configure_handler)
-#         self.setup_widget.data = data
-        
-
-#         self.clear_widget = QDataPushButton(callback = delete_callback)
-#         self.clear_widget.setIcon(load_icon("mdi.delete"))
-#         self.clear_widget.setMaximumWidth(20)
-
-
-#         self.update_icon()
-
-
-#     def update_icon(self):
-#         is_used = self.used_callback() # true if callback is used
-#         if is_used:
-#             self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color.activeContentColor()))
-#         else:
-#             self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color.inactiveColor()))
-
-
-# class ActionContainerDialog(QRememberDialog):
-#     """UI to setup the individual action trigger containers and sub actions """
-
-#     def __init__(self, item_data, input_type, title = "Action Configuration", parent=None):
-#         '''
-#         :param: data = the gate or range data block
-        
-#         '''
-#         import gremlin.ui.input_item
-        
-#         super().__init__(self.__class__.__name__, parent = parent)
-#         self.setWindowTitle(title)
-#         self.setModal(True)
-        
-#         self.setMinimumWidth(600)
-#         self.setMinimumHeight(800)
-
-#         self.main_layout = QtWidgets.QVBoxLayout(self)
-
-#         self.container_widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, input_type = input_type)
-#         self.main_layout.addWidget(self.container_widget)
-
-#         close_button_widget = QDataPushButton("Close", callback = self.close)
-#         close_button_widget.setToolTip("Closes the dialog")
-#         widget = getHContainer(close_button_widget, widget_only=True, left_stretch=True)
-#         self.main_layout.addWidget(widget)
-       
+               
 
 class QTimedLabel(QtWidgets.QWidget):
     ''' timed label - shows text and makes it go away after a period of time '''

@@ -1094,7 +1094,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
 
     @QtCore.Slot()
-    def _handle_save_global(self):
+    def _handle_save_global(self, widget):
         ''' saves the global calibration data and close '''
         self._lock = True
         self.mgr.saveCalibration(self.action_data, to_global = True, to_local = False, callback = self._handle_global_result) 
@@ -1107,7 +1107,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._lock = False
 
     @QtCore.Slot()
-    def _handle_save_profile(self):
+    def _handle_save_profile(self, widget):
         ''' saves the calibration to the current profile and close '''
         self._lock = True
         self.mgr.saveCalibration(self.action_data, to_global = False, to_local = True, callback = self._handle_local_result) 
@@ -1187,7 +1187,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         gremlin.util.InvokeUiMethod(self._update_ui) # ensure on UI thread
 
     @QtCore.Slot()
-    def _reset_calibration(self):
+    def _reset_calibration(self, widget):
         ''' reset calibration for the axis '''
         self.action_data.reset()
         self._update_ui()
