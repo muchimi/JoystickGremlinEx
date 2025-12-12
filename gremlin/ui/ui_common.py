@@ -11492,7 +11492,7 @@ class QInfoBox(QtWidgets.QFrame):
         if text:
             self.setText(text)
 
-    def _handle_hide_visual(self):
+    def _handle_hide_visual(self, checked):
         config = gremlin.config.Configuration()
         config.setVisualHidden(self._hide_key, True)
         self.setStyleSheet("")
