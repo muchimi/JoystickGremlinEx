@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T129B)
+- Fix: check for old tab position being invalid on profile load in case tab is no longer available.
+
 ### (m76T129A)
 - Fix: unhook exception in state visualizer.
 

@@ -1,7 +1,6 @@
 # Advanced Scripting
 
-Scripting in GremlinEx (GEX) requires at least a basic understanding of Python programming and the Python language.  As such is is an advanced feature.
-
+Scripting in GremlinEx (GEX) requires at least a basic understanding of Python programming and the Python language.  As such it is an advanced feature.
 
 ## Plugins
 
@@ -21,7 +20,6 @@ A user plugin is typically for:
 - to add very specialized behaviors not otherwise available via delivered containers and actions for which a general action/container does not exist
 - to easily solve complex logic issues that are more difficult or inefficient or impractical in delivered containers/actions/conditions : if you need to use a lot of conditions and modes - you may want to consider a user plugin instead.
 - to access the full functionality of the Python libraries driven by GEX input triggers
-
 
 ## Requirements
 
