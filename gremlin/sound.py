@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from lxml import etree as ElementTree
@@ -41,7 +41,8 @@ import gremlin.singleton_decorator
 import queue
 import enum
 import time
-
+import json
+import importlib.util
 
 syslog = logging.getLogger("system")
 
@@ -114,6 +115,7 @@ class Sound():
         self.sound_map = {} # holds sound objects by key (guid -> sound object)
         self.sound_file_map = {} # holds the sound file (file -> key)
         self.sound_volume_map = {} # holds the sound volume for each key - if not present used the default volume
+        self.sound_audio_file_map = {} # [key] -> audio file path
         self._audio_device = None 
         self._event_queue = queue.Queue() # sound queue - holds SoundCommand objects
         self._thread = None # sound thread
@@ -259,14 +261,28 @@ class Sound():
         if os.path.isfile(sound_file):
             sound_file = sound_file.casefold()
             if not sound_file in self.sound_file_map:
-                key = self._next_key
-                self._next_key += 1
+                key = gremlin.util.get_guid() # self._next_key
                 self.sound_file_map[sound_file] = key
-                sound = pygame.mixer.Sound(sound_file)
-                self.sound_map[key] = sound
+            else:
+                key = self.sound_file_map[sound_file]
+
+            self.sound_audio_file_map[key] = sound_file
+            
+            sound = pygame.mixer.Sound(sound_file)
+            self.sound_map[key] = sound
             return self.sound_file_map[sound_file]
         
         return None
+    
+    def releaseSoundKey(self, sound_file):
+        
+        sound_file = sound_file.casefold()
+        if sound_file and sound_file in self.sound_file_map:
+            sound = self.sound_file_map[sound_file]
+            self.sound_file_map[sound_file] = None
+            pygame.mixer.stop()
+            del sound
+            del self.sound_file_map[sound_file]
     
     def queueAction(self, action : SoundEvent):
         ''' queues a sound action '''
@@ -313,7 +329,7 @@ class Sound():
             if verbose: syslog.info(f"SOUNDLISTEN: DEQUEUE event {event.action.name}  QUEUE size: {self._event_queue.qsize():,}")		
             if pygame.mixer.get_init() is None:
                 if self._playback_device_name:
-                    pygame.mixer.pre_init(self._playback_device_name)
+                    pygame.mixer.pre_init(devicename=self._playback_device_name)
                 pygame.mixer.init()
             match event.action:
                 case SoundAction.Play:
@@ -322,7 +338,8 @@ class Sound():
                     if verbose: syslog.info(f"\tplay [{key}]")
                     data : PlaybackOptions = event.data
                     if key in self.sound_map:
-                        sound : pygame.mixer.Sound = self.sound_map[key]
+                        sound = pygame.mixer.Sound(self.sound_audio_file_map[key])
+                        #sound : pygame.mixer.Sound = self.sound_map[key]
                         if data.stop_previous:
                             # stop previous sounds
                             pygame.mixer.stop()
@@ -365,3 +382,4 @@ class Sound():
 
 
             
+

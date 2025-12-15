@@ -1419,10 +1419,16 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         input_type = self.action_data.get_input_type()
         default_value = self.action_data.axis_start_value if input_type == InputType.JoystickAxis else self.action_data.button_start_value
 
+        modes = [
+            SyncMode.Default,
+            SyncMode.Input
+        ]
+
         self._sync_widget = gremlin.ui.ui_common.QSyncModeWidget(mode = self.action_data.sync_mode,
                                                             callback = self._sync_on_start_changed,
                                                             input_type = input_type,
-                                                            default_value = default_value
+                                                            default_value = default_value,
+                                                            sync_modes= modes
                                                             )
         self._sync_widget.valueChanged.connect(self._default_value_changed)
         widgets = [self._sync_widget]
@@ -4156,15 +4162,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                 if verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use last value : {last:0.3f}")
                                 value = last
                         case SyncMode.LastOrDefault:
-                            trigger = True
-                            last = self.action_data.button_last_value
-                            if last is None:
-                                value = self.action_data.state.default_value
-                                if verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use default value : {value}")
+                            pass # do nothing
 
-                            else:
-                                if verbose: syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or default: use last value : {last}")
-                                value = last
+                            
                         case SyncMode.Ignore:
                             pass # do nothing
 
@@ -5428,7 +5428,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.axis_scaling : float  = 1.0
         self.axis_start_value : float = 0.0 # start value if sync mode is set to default and the output is an axis
         self.axis_last_value = None # last axis value
-
+     
         self.curve_data = None # present if curve data is needed
 
         self.button_start_value : bool = False # start button value if output to button is selected (if sync mode is set to default)

@@ -1018,11 +1018,11 @@ class CalibrationDialogEx(QtWidgets.QDialog):
    
         save_global_widget = gremlin.ui.ui_common.QDataPushButton("Save Global",
                                                                   callback = self._handle_save_global,
-                                                                  tooltip = "Saves the calibration data to the global default and close. Note: Profiles that have profile specific calibration data will use that instead.")
+                                                                  tooltip = "Saves the calibration data to the global default. Note: Profiles that have profile specific calibration data will use that instead.")
         
         save_profile_widget = gremlin.ui.ui_common.QDataPushButton("Save Profile",
                                                                   callback = self._handle_save_profile,
-                                                                  tooltip = "Saves the calibration data to the profile and close.  The profile will use this data instead of the global calibration if it exists.",
+                                                                  tooltip = "Saves the calibration data to the profile.  The profile will use this data instead of the global calibration if it exists.",
                                                                   enabled = gremlin.shared_state.current_profile.profile_file is not None)
         
 

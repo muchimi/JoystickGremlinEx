@@ -1044,6 +1044,9 @@ class Buttons():
     def getExpandAllWidget(tooltip = "Collapse All", callback = None, width = 24, height = 24):
         return Buttons._template(None, Icons.expandAllIcon(), tooltip, callback, width=width, height=height)
     
+    
+    
+    
 
 class WidgetTracker():
 
@@ -4190,10 +4193,9 @@ class QDataPushButton(QtWidgets.QPushButton):
         if self._callback:
             self._callback(self)
 
-
-    def _handle_callback_ex(self, is_ctrl : bool, is_shft : bool, is_alt : bool):
+    def _handle_callback_ex(self, is_ctrl : bool, is_shft : bool, is_alt : bool, is_right : bool):
         if self._callback_ex:
-            self._callback_ex(is_ctrl, is_shft, is_alt)
+            self._callback_ex(is_ctrl, is_shft, is_alt, is_right)
 
     def setCallback(self, callback):
         self._callback = callback
@@ -4417,7 +4419,7 @@ class QDataIPLineEdit(QDataLineEdit):
 
 class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
-    def __init__(self, data = None, callback = None, parent = None, wheel_enabled = True, auto_adjust = False, source = None, value = None):
+    def __init__(self, data = None, callback = None, parent = None, wheel_enabled = True, auto_adjust = False, source = None, value = None, tooltip = None):
         ''' creates a combo box 
         
         :param data: data object the widget carries
@@ -4448,6 +4450,9 @@ class QDataComboBox(QComboBox):
 
         if self._callback:
             self.currentIndexChanged.connect(self._handle_callback)
+
+        if tooltip:
+            self.setToolTip(tooltip)
 
     def _handle_callback(self):
         self._callback(self.currentData())
