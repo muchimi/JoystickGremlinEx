@@ -693,3 +693,6 @@ class InputItemBindingModel(QtCore.QObject):
         fset=_set_description,
         notify=descriptionChanged
     )
+
+
+        

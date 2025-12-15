@@ -29,11 +29,14 @@ for root, _, files in os.walk(".xml"):
         if fname.endswith(".xml"):
             xml_files.append((os.path.join(root, fname), root))
 
+
 added_files = [
     ("about", "about"),
     ("doc", "doc"),
     ("gfx", "gfx"),
 ]
+
+
 
 added_files.extend(action_plugins_files)
 added_files.extend(container_plugins_files)
@@ -44,26 +47,70 @@ added_binaries = [
     ("dill.dll", "."),
     ("vigem/ViGEmClient.dll", "."),
     ("SimConnect.dll","."),
-    ("hidapi.dll",".")
+    ("hidapi.dll","."),
+    ("rubberband.exe","."),
+    ("rubberband-r3.exe","."),
+    ("sndfile.dll","."),
+
+
 	
 ]
 
-'''
-excludes=["torch",
-        "torchvision",
-        "torchaudio",
-        "torch._C",
-        "torch.utils",
-        "torch.cuda",
-        "torch.backends",
-        "torch.distributed",
-        "noisereduce",
-        "pyrubberband",
-        "coqui-tts",
-        "soundfile",
-        "pydub",
-        "numba"],
-'''
+from PyInstaller.utils.hooks import collect_all
+
+pkgs = [
+    "torch",
+   
+    "scipy",
+    "sklearn", 
+    "TTS",
+
+
+]
+
+modules = [
+    'mido.backends.rtmidi',
+    "windows_event_hook",
+    "soundfile",
+    "pydub",
+    "pyrubberband",
+    'lxml',
+    'pyttsx3',
+    'hid',
+    "psygnal",
+    "graphviz",
+    "pygame",
+    "torch._C",
+    
+]
+
+def merge_collect_all(pkgs):
+    datas, binaries, hiddenimports = [], [], []
+    for p in pkgs:
+        d, b, h = collect_all(p)
+        datas += d
+        binaries += b
+        hiddenimports += h
+
+    # de-dupe (important when packages overlap)
+    datas = list(dict.fromkeys(datas))
+    binaries = list(dict.fromkeys(binaries))
+    hiddenimports = list(dict.fromkeys(hiddenimports))
+    return datas, binaries, hiddenimports
+
+
+
+datas, binaries, hidden_imports = merge_collect_all(pkgs)
+hidden_imports.extend(modules)
+added_binaries.extend(binaries)
+added_files.extend(datas)
+
+
+
+# dedup
+added_binaries = list(dict.fromkeys(added_binaries))
+added_files = list(dict.fromkeys(added_files))
+hidden_imports = list(dict.fromkeys(hidden_imports))
 
 
 a = Analysis(
@@ -71,23 +118,10 @@ a = Analysis(
     pathex=['C:/JoystickGremlin-develop'],
     binaries=added_binaries,
     datas=added_files,
-    hiddenimports=['mido.backends.rtmidi','lxml','pyttsx3','hid',"windows_event_hook","psygnal","graphviz","pygame"],
+    hiddenimports=hidden_imports,
     hookspath=None,
     runtime_hooks=None,
-    excludes=["torch",
-        "torchvision",
-        "torchaudio",
-        "torch._C",
-        "torch.utils",
-        "torch.cuda",
-        "torch.backends",
-        "torch.distributed",
-        "noisereduce",
-        "pyrubberband",
-        "coqui-tts",
-        "soundfile",
-        "pydub",
-        "numba"],
+    excludes=None,
     win_no_prefer_redirects=None,
     win_private_assemblies=None,
     cipher=block_cipher,

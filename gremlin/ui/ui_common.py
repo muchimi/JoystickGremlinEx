@@ -3894,11 +3894,16 @@ class ConfirmBox():
 
 
 
-@staticmethod
+def MessageBoxWarning(title = "Warning", prompt = "Operation",  parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, True, parent)
+
+def MessageBoxInfo(title = "Notice", prompt = "Operation", parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, False, parent)
+
 def MessageBox(title = "Notice", prompt = "Operation", is_warning = True, parent = None, width = 200):
     gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, is_warning, parent)
 
-@staticmethod
+
 def _message_box_ui(title = "Notice", prompt = "Operation", is_warning = True, parent = None):
     if is_warning:
         # warning icon
@@ -12317,8 +12322,11 @@ class QSyncModeWidget(QtWidgets.QWidget):
             self._selector_widget.addItem(data.name, data)
 
         index = self._selector_widget.findData(mode)
-        assert index != -1, f"invalid mode passed: {mode}"
-        self._selector_widget.setCurrentIndex(index)
+        if index != -1:
+            self._selector_widget.setCurrentIndex(index)
+        else:
+            self._mode = self._selector_widget.currentData()
+        
 
         widgets = [self._selector_widget]
         default_widgets = []

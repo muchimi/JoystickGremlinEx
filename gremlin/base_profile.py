@@ -5375,6 +5375,12 @@ class Profile():
 
         return count
     
+
+    def convertTTS(speaker : str = None, tts_speed : float = 1.0):
+        ''' converts profile TTS entries to playsound entries '''
+        
+
+    
 ''' END PROFILE '''
 
 class Mode:

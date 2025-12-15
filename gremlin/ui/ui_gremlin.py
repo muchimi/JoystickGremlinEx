@@ -7,10 +7,13 @@
 # WARNING! All changes made in this file will be lost!
 
 from PySide6 import QtCore, QtGui, QtWidgets
-
+import os, shutil
+import logging
+syslog = logging.getLogger("system")
 class Ui_Gremlin(object):
     def setupUi(self, main_window):
         import gremlin.ui.ui_common
+        import gremlin.ktts
         main_window.setObjectName("Gremlin")
         main_window.resize(800, 600)
         self.main = QtWidgets.QWidget(main_window)
@@ -189,9 +192,17 @@ class Ui_Gremlin(object):
         self.actionConvertLegacy.setText("Convert legacy actions")
         self.actionConvertLegacy.setToolTip("Converts remap and keyboard actions to their current equivalents in GremlinEx")
         self.actionConvertLegacy.triggered.connect(self._handle_convert_legacy)
-        
-        
 
+
+        
+        self.actionConvertTTS = QtGui.QAction(main_window)
+        self.actionConvertTTS.setText("Convert TTS to AI")
+        self.actionConvertTTS.setToolTip("Converts Map to TTS actions to Play Sound actions converting the text to a wav file if AI is available")
+        self.actionConvertTTS.triggered.connect(self._handle_convert_tts)
+
+        ktts = gremlin.ktts.KTTS()
+        enabled = ktts.is_available()
+        self.actionConvertTTS.setEnabled(enabled)
         
 
         self.menuRecent.addAction(self.actionEmpty)
@@ -222,6 +233,7 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionViewInput)
         self.menuTools.addAction(self.actionCheatsheet)
         self.menuTools.addAction(self.actionConvertLegacy)
+        self.menuTools.addAction(self.actionConvertTTS)
         
         
 
@@ -288,7 +300,41 @@ class Ui_Gremlin(object):
             el = gremlin.event_handler.EventListener()
             el.request_reload.emit()
 
+    def _handle_convert_tts(self):
+        import gremlin.util
+        import gremlin.profile
+        import gremlin.event_handler
+        import gremlin.ktts
 
+        ktts = gremlin.ktts.KTTS()
+        if not ktts.is_available():
+            gremlin.ui.ui_common.MessageBoxWarning(prompt = "AI engine not found on this system.")
+            return False
+        
+        profile_converter = gremlin.profile.ProfileConverter()
+        profile = gremlin.shared_state.current_profile
+        fname = profile.profile_file
+        if not fname or not os.path.isfile(fname):
+            gremlin.ui.ui_common.MessageBoxWarning(prompt = "Invalid profile file.\nEnsure profile is saved.")
+            return False
+        
+        # make a backup
+        backup_fname = gremlin.util.swap_ext(fname, suffix = "_tts")
+        index = 1
+        while os.path.isfile(backup_fname):
+            backup_fname = gremlin.util.swap_ext(fname, suffix = f"_tts_{index}")
+            index += 1
+        try:
+            shutil.copy(fname, backup_fname)
+            syslog.info(f"CONVERT TTS: backup file saved to: {backup_fname}")
+        except Exception as e:
+            syslog.error(f"CONVERT TTS: unable to make backup file: {str(e)}")
+            return False
+        
+        
+        if profile_converter.convert_tts(fname):
+            el = gremlin.event_handler.EventListener()
+            el.request_profile_reload.emit(fname, False)
 
 
 

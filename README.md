@@ -30,7 +30,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m76T130)
-- New: (experimental) support for AI generated TTS using a local LLM if installed.  If installed, supported via the map to sound.  See documentation on how to setup the local AI LLM.
+- New: (experimental) support for AI generated TTS using a local LLM if installed.  If installed, supported via the map to sound.  See documentation on how to setup the local AI LLM.  Note: this model is not supported as a packaged (.exe) setup due to file size and additional setup and licensing requirements.
 - Fix: Filter missing right click parameters.
 - Fix: Removed invalid sync modes for vjoy remap.
 

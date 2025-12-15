@@ -2877,3 +2877,9 @@ class Configuration(QtCore.QObject):
         self._set_data("axis_spam_delta", value)
 
                 
+    @property
+    def ai_tts_last_speaker(self) -> str:
+        return self._get_data("ai_tts_last_speaker", None)
+    @ai_tts_last_speaker.setter
+    def ai_tts_last_speaker(self, value : str):
+        self._set_data("ai_tts_last_speaker", value)

@@ -89,7 +89,7 @@ import gremlin.macro_handler # reference needed for packaging
 import gremlin.ui.octavi_device
 import gremlin.ui.virpil_device
 import gremlin.sound
-
+import gremlin.ktts
 
 
 # Import QtMultimedia so pyinstaller doesn't miss it

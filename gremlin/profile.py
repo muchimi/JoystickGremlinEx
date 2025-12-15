@@ -60,6 +60,105 @@ def mode_list(profile = None):
 
 
 
+class TTSDialog(QtWidgets.QDialog):
+
+    def __init__(self, speaker : str = None, tts_speed : float = 1.0, parent = None):
+        super().__init__(parent = parent)
+
+        import gremlin.ui.ui_common
+        import gremlin.config
+
+        self.setWindowTitle("TTS AI generation Options")
+        self.setModal(True)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.speaker = speaker
+        if tts_speed is None:
+            tts_speed = 1.0
+        self.tts_speed = tts_speed
+
+        # get a list of speakers
+        
+        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, callback = self._handle_speaker_changed, tooltip = "Selected speaker for AI voice generation.")
+        self._update_speakers(initialize = True)
+
+        refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(label=None, callback = self._handle_refresh_speakers,tooltip="Refresh available AI speakers")
+
+        self.tts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range = 0.1, max_range = 10.0, value = tts_speed, callback = self._handle_tts_speed_changed, tooltip = "Speed rate modifier for the generated audio.\n1.0 is the normal rate.")
+
+        
+
+        widgets = [
+                "Speaker:",
+                self.speaker_widget,
+                refresh_speaker_widget,
+                "TTS speed:",
+                self.tts_speed_widget,
+                ]
+        
+        ai_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.main_layout.addWidget(ai_container)
+        
+        ok_button = gremlin.ui.ui_common.QDataPushButton("Ok", callback = self._handle_ok)
+        cancel_button = gremlin.ui.ui_common.QDataPushButton("Cancel", callback = self._handle_cancel)
+
+        widgets = ["||",ok_button, cancel_button,"||"]
+        button_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.main_layout.addWidget(button_container)
+
+    def _handle_tts_speed_changed(self, value : float):
+        self.tts_speed = value
+
+    def _handle_refresh_speakers(self):
+        self._update_speakers(initialize = True)
+
+    def _handle_ok(self, widget):
+        self.accept()
+
+    def _handle_cancel(self, widget):
+        self.reject()
+    
+    def _handle_speaker_changed(self, value):
+        import gremlin.config
+        self.speaker = value
+        gremlin.config.Configuration().ai_tts_last_speaker = value
+
+    def _update_speakers(self, initialize = False):
+        config = gremlin.config.Configuration()
+        
+        ktts = gremlin.ktts.KTTS()
+        try:
+            gremlin.util.pushCursor()
+            speakers = ktts.getSpeakers(initialize = initialize)
+            with QtCore.QSignalBlocker(self.speaker_widget):
+                self.speaker_widget.clear()
+            if speakers:
+                for speaker in speakers:
+                    self.speaker_widget.addItem(speaker, speaker)
+                if self.speaker:
+                    speaker = self.speaker
+                else:
+                    speaker = config.ai_tts_last_speaker
+                if speaker:
+                    index = self.speaker_widget.findText(speaker)
+                    if index != -1:
+                        self.speaker_widget.setCurrentIndex(index)
+                else:
+                    speaker = self.speaker_widget.currentText()
+                    config.ai_tts_last_speaker = speaker
+                    self.speaker = speaker
+            else:
+                if self.action_data.speaker:
+                    speaker = self.action_data.speaker
+                    self.speaker_widget.addItem(speaker, speaker)
+            
+            self.speaker_widget.setEnabled(speakers is not None)
+        finally:
+            gremlin.util.popCursor()
+        
+            
+        
+
 class ProfileConverter:
 
     """Handle converting and checking profiles."""
@@ -1052,6 +1151,146 @@ class ProfileConverter:
                 node.set("value", new_value)
 
         return root
+    
+
+    
+
+    def convert_tts(self, fname : str, speaker = None, tts_speed : float = 1.0, generate = True) -> bool:
+        # change value for button macro actions from boolean to actual action names
+
+
+        import gremlin.util
+        import gremlin.ui.ui_common
+
+        if not fname or not os.path.isfile(fname):
+            gremlin.ui.ui_common.MessageBoxWarning(prompt = "Invalid profile file.\nEnsure profile is saved.")
+            return False
+
+        if generate:
+            ktts = gremlin.ktts.KTTS()
+            if not ktts.is_available():
+                gremlin.ui.ui_common.MessageBoxWarning(prompt = "KTTS is not installed")
+                return False
+
+            # display dialog
+            dialog = TTSDialog(speaker, tts_speed)
+            result = dialog.exec()
+            if result != QtWidgets.QDialog.Accepted:
+                return False
+        
+        try:
+
+            parser = etree.XMLParser(remove_blank_text=True)
+            root = etree.parse(fname, parser)
+
+            nodes = root.xpath("//text-to-speech")
+            count = len(nodes)
+            ui = gremlin.shared_state.ui
+            progress_dialog = QtWidgets.QProgressDialog("Operation in progress...", "Cancel", 0, count, parent = ui)
+            progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
+            progress_dialog.setAutoClose(True)
+            progress_dialog.setMinimumDuration(0) # Show immediately
+            time.sleep(0.05) 
+            QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
+
+
+            canceled = False
+            index = 1
+            for node in nodes:
+                # read attributes
+
+                progress_dialog.setLabelText(f"Processing {index} out of {count}...")
+                progress_dialog.setValue(index)
+                time.sleep(0.05) 
+                QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
+
+                if progress_dialog.wasCanceled():
+                    canceled = True
+                    break
+                volume = safe_read(node, "volume", int, 50)
+                volume = gremlin.util.clamp(volume, 0, 100)    
+                rate = safe_read(node, "rate", int, 100)
+                if rate == 0:
+                    rate = 100 # default
+
+                if "text" in node.attrib:
+                    text = node.get("text")
+                clearQueue = safe_read(node,"clear-queue",bool, False)
+                abort = safe_read(node, "abort", bool, False)
+                exec_on_press = safe_read(node,"exec_on_press",bool, True)
+                exec_on_release = safe_read(node,"exec_on_release",bool, False)
+
+                playback_ms = 0
+                save_on_generate = True
+                loops = 1
+                fadein_ms = 0
+                fadeout_ms = 0
+                stop_previous = clearQueue
+                mode = 'ktts'
+                
+                # remove attribs
+                node.attrib.clear()
+
+                # convert the node in place
+                node.tag = "play-sound"
+
+                node.set("action_id", gremlin.util.get_guid())
+                node.set("text", text)
+                if speaker:
+                    node.set("speaker", speaker)
+                
+                node.set("mode", mode)
+                node.set("tts_speed", safe_format(tts_speed, float))
+                node.set("save", safe_format(save_on_generate, bool))
+                node.set("exec_on_press", safe_format(exec_on_press, bool))
+                node.set("exec_on_release", safe_format(exec_on_release, bool))  
+                node.set("loops", safe_format(loops,int))      
+                node.set("playback-ms", safe_format(playback_ms, int))
+                node.set("fadein-ms", safe_format(fadein_ms, int))
+                node.set("fadeout-ms", safe_format(fadeout_ms, int))
+                node.set("stop-previous", safe_format(stop_previous, bool))
+
+                
+
+                if generate:
+                    # generate the wav file
+                    progress_dialog.setLabelText(f"Generate voice file {index} out of {count}...")
+
+                    tts_file = ktts.getNewWav()
+                    wav = ktts.generateWav(tts_file, text, speaker, tts_speed)
+                    if wav:
+                        node.set("tts_file", tts_file)
+
+                
+
+                time.sleep(0.05) 
+                QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
+              
+                index += 1
+                    
+
+            if canceled:
+                return False
+                    
+            # Save converted version
+            tree = root
+            if os.path.isfile(fname):
+                try:
+                    os.unlink(fname)
+                except Exception as e:
+                    syslog.error(f"CONVERT TTS: unable to delete existing profile file: {str(e)}")
+                    return False
+            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            syslog.info(f"CONVERT TTS: saved data to : {fname}")
+
+            gremlin.ui.ui_common.MessageBoxInfo(prompt = f"Converted {count} TTS nodes\nProfile will now reload.")
+
+
+        except Exception as e:
+            syslog.error(f"CONVERT TTS: unable to convert file: {str(e)}")
+            return False
+        
+        return True
             
     
     def _p3_extract_map_to_keyboard(self, input_item):

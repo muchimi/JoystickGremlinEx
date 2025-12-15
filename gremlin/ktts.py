@@ -19,7 +19,6 @@
 # some code based on source from: https://github.com/h2oai/h2ogpt/tree/main
 
 from __future__ import annotations
-import filelock
 import io
 import os
 import shutil
@@ -32,7 +31,6 @@ import gremlin.event_handler
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
-import gremlin.ui.ui_about
 from gremlin.util import load_icon, userprofile_path
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
@@ -40,25 +38,19 @@ import threading
 from shiboken6 import Shiboken
 from gremlin.util import safe_format, safe_read
 import logging
-import psygnal
 from psygnal import Signal
-import pygame
 import gremlin.singleton_decorator
-import queue
-import enum
 import time
 import json
 import importlib.util
 import numpy as np
-import pydub
-import noisereduce
-import traceback
-import tempfile
-import uuid
-import wave
+import sys
 
 syslog = logging.getLogger("system")
 
+
+KTTS_DISABLED = getattr(sys, 'frozen', False) # disabled if running packaged
+            
 
 @gremlin.singleton_decorator.SingletonDecorator
 class KTTS():
@@ -101,26 +93,57 @@ class KTTS():
             self._sound_folder = gremlin.util.userprofile_path()
 
 
-    def ensure_tts(self):
+    def ensure_tts(self) -> bool:
         if self._initialized:
             return True
         
+        if not self.is_available():
+            return False
+        
+        gremlin.util.InvokeUiMethod(self._ensure_tts_ui)
+
+        return self._initialized
+        
+    def _ensure_tts_ui(self):
+
 
         # this can take a while
+        ui = gremlin.shared_state.ui
+        progress_dialog = QtWidgets.QProgressDialog("Initializing KTTS module...", "", 0, 3, parent = ui)
+        progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
+        progress_dialog.setAutoClose(True)
+        progress_dialog.setMinimumDuration(0) # Show immediately
+        progress_dialog.setCancelButton(None) # no cancel button
+        time.sleep(0.05) 
+        QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
 
         syslog.info("KTTS: init... (can take a while)")
 
+        
         import torch
+        progress_dialog.setValue(1)
+        time.sleep(0.05) 
+        QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
+
+
 
         from TTS.api import TTS
         syslog.info("KTTS: import complete")
-
+        progress_dialog.setValue(2)
+        time.sleep(0.05) 
+        QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
 
         
         # determine where the model runs
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         syslog.info("KTTS: instancing... (this can take a while the first time)")
         tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(self._device)
+
+        progress_dialog.setValue(3)
+        time.sleep(0.05) 
+        QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
+
+
         if not tts:
             tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
             self._device = "cpu"
@@ -137,9 +160,20 @@ class KTTS():
 
     def is_available(self) -> bool:
         ''' true if coqui-tts is found and initialized '''
+        if KTTS_DISABLED:
+            return False
+        
         return self._installed
     
+    def is_loaded(self) -> bool:
+        ''' true if coqui-tts is found and initialized '''
+        if KTTS_DISABLED:
+            return False
+        return self._initialized
+    
     def is_speed_available(self) -> bool:
+        if KTTS_DISABLED:
+            return False
         return self._has_rubberband
     
     def get_config(self) -> str:
@@ -201,30 +235,55 @@ class KTTS():
         id = gremlin.util.get_guid()
         tts_file = os.path.join(self._sound_folder,f"{id}.wav")
         return tts_file
+
+
+
+    def generateActionWav(self, action) -> str:
+        ''' generates a wave file for the given action
         
-    
-    def generateActionWav(self, action):
-        ''' gets the wave file for a specific TTS action
-         
         :param action: the play action
+        :returns: the file name or None
+
+        '''
+        tts_file = action.tts_file
+        if not tts_file:
+            tts_file = self.getNewWav()
+            action.tts_file = tts_file
+
+        return self.generateWav(tts_file, action.text, action.speaker, action.tts_speed)
+    
+    def generateWav(self, tts_file : str, text, speaker : str = None, tts_speed : float = 1.0) -> str:
+        ''' gets the wave file for the given options
+         
+        :param tts_file: the path to create
+        :param text: the text to use
         :param speaker: the speaker voice to use, optional
         :param tts_speed: float, the playback speed factor 1.0 = normal
+
+        :returns: the file name or None
         '''
         
-        text = self.sanitize_text(action.text)
+        text = self.sanitize_text(text)
         if not text:
+            syslog.warning("KTTS: sanitized text is blank, nothing to generate.")
             return None # no text
         
+        # pick a default speaker
+        speakers = self.getSpeakers(True)
+        if not speakers:
+            syslog.error(f"KTTS: unable to get speaker list.")
+            return None
+        if not speaker or not speaker in speakers:
+            speaker = speakers[0]
+
         # speaker to use
-        speaker = action.speaker
-        if speaker:
-            syslog.info(f"KTTS: generate voice using [{speaker}]")
+        syslog.info(f"KTTS: generate voice using [{speaker}]")
 
         # rate
-        tts_speed = action.tts_speed if self._has_rubberband else 1.0
+        tts_speed = tts_speed if self._has_rubberband else 1.0
             
         
-        wav = action.tts_file
+        wav = tts_file
         if os.path.isfile(wav):
             try:
                 os.unlink(wav)
@@ -232,8 +291,7 @@ class KTTS():
                 syslog.error(f"KTTS: unable to remove existing file: {str(e)}")
                 return wav
             
-        wav = self.getNewWav()
-        action.tts_file = wav
+        
     
         ''' generate '''
         if not self.ensure_tts():
