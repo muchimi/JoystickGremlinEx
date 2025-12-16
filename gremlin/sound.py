@@ -381,5 +381,264 @@ class Sound():
 
 
 
-            
+class TTSGeneratorDialog(QtWidgets.QDialog):
+    ''' generic dialog box audio generator '''
+    def __init__(self, parent=None):
+        super().__init__(parent = parent)
+        config = gremlin.config.Configuration()
 
+        self._speaker = config.ai_tts_last_speaker
+        self.tts_speed = 1.0
+
+        self.setWindowTitle("Generate AI Options")
+        self.setModal(True)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.text_field = QtWidgets.QPlainTextEdit()
+        
+        widgets = [
+            "Text (one line per audio file will be generated)",
+            self.text_field,
+        ]
+
+        text_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
+        self.main_layout.addWidget(text_container)
+
+
+
+        widgets = []
+
+        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip = "Selected speaker for AI voice generation.")
+        widgets.append(self.speaker_widget)
+
+
+        self.tts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range = 0.1, max_range = 10.0, value = self.tts_speed, callback = self._handle_tts_speed_changed, tooltip = "Speed rate modifier for the generated audio.\n1.0 is the normal rate.")
+
+
+        widget = gremlin.ui.ui_common.QDataCheckbox("Overwrite existing filenames",
+                                                    value = config.ai_tts_overwrite_filenames, 
+                                                    callback = self._handle_overwrite_filename_changed,
+                                                    tooltip = "Use the input text as the file name for the generated audio file.\nIf not set, a unique GUID will be used." 
+                                                    )
+        widgets.append(widget)
+
+
+
+        options_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
+        self.main_layout.addWidget(options_container)
+
+        generate_widget = gremlin.ui.ui_common.QDataPushButton("Generate", callback = self._handle_generate)
+        close_widget = gremlin.ui.ui_common.QDataPushButton("Close", callback = self._handle_close)
+        open_widget = gremlin.ui.ui_common.QDataPushButton("Open folder", callback = self._handle_open_folder)
+
+
+        widgets = [generate_widget,open_widget,close_widget]
+        button_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, left_stretch=True)
+        self.main_layout.addWidget(button_container)
+
+        # initialize AI and load speaker list
+        self._update_speakers(initialize = True)
+        self.speaker_widget.setCallback(self._handle_speaker_changed)
+        
+    def _handle_close(self, widget):
+        self.close()
+
+    def _handle_open_folder(self, widget):
+        ''' opens the sound folder '''
+        ktts = gremlin.ktts.KTTS()
+        folder = ktts.getSoundFolder()
+        gremlin.util.create_folder(folder) # create if it doesn't exist yet
+        gremlin.util.open_folder(folder)
+
+    def _handle_tts_speed_changed(self, value : float):
+        self.tts_speed = value
+
+    def _handle_speaker_changed(self, value):
+        self.speaker = value
+        config = gremlin.config.Configuration()
+        config.ai_tts_last_speaker = value
+
+    def _update_speakers(self, initialize = True):
+        config = gremlin.config.Configuration()
+        last_speaker = config.ai_tts_last_speaker
+        if not self.speaker:
+            # default speaker is the last one if we have one defined
+            self.speaker = last_speaker
+
+        ktts = gremlin.ktts.KTTS()
+        try:
+            gremlin.util.pushCursor()
+            speakers = ktts.getSpeakers(initialize = initialize)
+            with QtCore.QSignalBlocker(self.speaker_widget):
+                self.speaker_widget.clear()
+            if speakers:
+                # we have a list of speakers
+                for speaker in speakers:
+                    self.speaker_widget.addItem(speaker, speaker)
+                if self.speaker:
+                    speaker = self.speaker
+                else:
+                    speaker = config.ai_tts_last_speaker
+                if speaker:
+                    index = self.speaker_widget.findText(speaker)
+                    if index != -1:
+                        self.speaker_widget.setCurrentIndex(index)
+            else:
+                if self.speaker:
+                    speaker = self.speaker
+                    self.speaker_widget.addItem(speaker, speaker)
+            
+            self.speaker_widget.setEnabled(speakers is not None)
+        finally:
+            gremlin.util.popCursor()
+
+
+        if self.speaker:
+            index = self.speaker_widget.findData(self.speaker)
+            if index != -1:
+                with QtCore.QSignalBlocker(self.speaker_widget):
+                    self.speaker_widget.setCurrentIndex(index)
+
+
+    @property
+    def speaker(self) -> str:
+        return self._speaker
+    @speaker.setter
+    def speaker(self, value):
+        self._speaker = value
+
+    def _handle_overwrite_filename_changed(self, checked):
+        config = gremlin.config.Configuration()
+        config.ai_tts_overwrite_filenames = checked        
+
+    def _handle_generate(self, widget):
+        ''' generate the audio files '''
+        import gremlin.ktts
+        import gremlin.config
+        import gremlin.util
+
+        speaker = self.speaker
+        tts_speed = self.tts_speed
+
+        text = self.text_field.toPlainText()
+        if not text:
+            return # nothing to do
+        config = gremlin.config.Configuration()
+        overwrite = config.ai_tts_overwrite_filenames
+
+        lines = text.splitlines()
+        ktts = gremlin.ktts.KTTS()
+        wav = ktts.getNewWav()
+        ext = gremlin.util.get_ext(wav)
+        dir = os.path.dirname(wav)
+
+        ui = gremlin.shared_state.ui
+        count = len(lines)
+        progress_dialog = QtWidgets.QProgressDialog("Generating audio", "", 0, count, parent = ui)
+        progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
+        progress_dialog.setAutoClose(True)
+        progress_dialog.setMinimumDuration(0) # Show immediately
+        progress_dialog.setCancelButton(None) # no cancel button
+        time.sleep(0.05) 
+        QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
+        
+        for index, text in enumerate(lines):
+            progress_dialog.setValue(index+1)
+            time.sleep(0.05) 
+            QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
+
+
+
+            suggested_name = gremlin.util.textWordsToUnderscore(text)
+            suggested_file = os.path.join(dir, suggested_name)
+            fname = gremlin.util.swap_ext(suggested_file,ext)
+            if os.path.isfile(fname):
+                if overwrite:
+                    try:
+                        os.unlink(fname)
+                    except Exception as e:
+                        syslog.error(f"PLAY: unable to remove existing audio file [{fname}]: {str(e)}")
+            # use index for a unique name if needed
+            if os.path.isfile(fname):
+                index = 1
+                base_fname = fname
+                while os.path.isfile(fname):
+                    fname = gremlin.util.swap_ext(base_fname, suffix=f"_{index}")
+                    index += 1
+            
+            # generate the output
+            wav = ktts.generateWav(tts_file = fname, text = text, speaker = speaker, tts_speed = tts_speed)
+
+
+
+
+
+
+
+
+class GenerateDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent = parent)
+
+        config = gremlin.config.Configuration()
+
+        self.setWindowTitle("Generate AI Options")
+        self.setModal(True)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.main_layout.addWidget(QtWidgets.QLabel("AI generation options:"))
+
+        widgets = []
+        widget = gremlin.ui.ui_common.QDataCheckbox("Save profile on generate",
+                                                    value = config.ai_tts_save_on_generate,
+                                                    callback = self._handle_save_on_generate_changed,
+                                                    tooltip = "Save the profile automatically once the audio file have been generated.")
+        widgets.append(widget)
+
+        
+        widget = gremlin.ui.ui_common.QDataCheckbox("Use word based filenames",
+                                                    value = config.ai_tts_use_word_filenames, 
+                                                    callback = self._handle_word_filename_changed,
+                                                    tooltip = "Use the input text as the file name for the generated audio file.\nIf not set, a unique GUID will be used." 
+                                                    )
+        widgets.append(widget)
+
+
+        widget = gremlin.ui.ui_common.QDataCheckbox("Overwrite existing filenames",
+                                                    value = config.ai_tts_overwrite_filenames, 
+                                                    callback = self._handle_overwrite_filename_changed,
+                                                    tooltip = "Use the input text as the file name for the generated audio file.\nIf not set, a unique GUID will be used." 
+                                                    )
+        widgets.append(widget)
+
+   
+   
+
+        option_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only =True, left_margin=12)
+        self.main_layout.addWidget(option_container)
+
+        ok_widget = gremlin.ui.ui_common.QDataPushButton("Ok", callback = self._handle_ok)
+        cancel_widget = gremlin.ui.ui_common.QDataPushButton("Cancel", callback = self._handle_cancel)
+        widgets = ["||", ok_widget, cancel_widget,"||"]
+        button_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.main_layout.addWidget(button_container)
+
+
+    def _handle_save_on_generate_changed(self, checked):
+        config = gremlin.config.Configuration()
+        config.ai_tts_save_on_generate = checked
+
+    def _handle_word_filename_changed(self, checked):
+        config = gremlin.config.Configuration()
+        config.ai_tts_use_word_filenames = checked
+
+    def _handle_overwrite_filename_changed(self, checked):
+        config = gremlin.config.Configuration()
+        config.ai_tts_overwrite_filenames = checked
+
+
+    def _handle_ok(self, widget):
+        self.accept()
+
+    def _handle_cancel(self, widget):
+        self.reject()

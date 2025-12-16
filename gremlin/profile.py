@@ -79,8 +79,9 @@ class TTSDialog(QtWidgets.QDialog):
 
         # get a list of speakers
         
-        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, callback = self._handle_speaker_changed, tooltip = "Selected speaker for AI voice generation.")
+        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip = "Selected speaker for AI voice generation.")
         self._update_speakers(initialize = True)
+        self.speaker_widget.setCallback(self._handle_speaker_changed)
 
         refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(label=None, callback = self._handle_refresh_speakers,tooltip="Refresh available AI speakers")
 
@@ -1161,6 +1162,14 @@ class ProfileConverter:
 
         import gremlin.util
         import gremlin.ui.ui_common
+        import gremlin.config
+        import gremlin.shared_state
+
+        config = gremlin.config.Configuration()
+        if not speaker:
+            speaker = config.ai_tts_last_speaker # use the last speaker if none provided
+
+        ui = gremlin.shared_state.ui
 
         if not fname or not os.path.isfile(fname):
             gremlin.ui.ui_common.MessageBoxWarning(prompt = "Invalid profile file.\nEnsure profile is saved.")
@@ -1173,7 +1182,7 @@ class ProfileConverter:
                 return False
 
             # display dialog
-            dialog = TTSDialog(speaker, tts_speed)
+            dialog = TTSDialog(speaker, tts_speed, parent = ui)
             result = dialog.exec()
             if result != QtWidgets.QDialog.Accepted:
                 return False
@@ -1185,7 +1194,7 @@ class ProfileConverter:
 
             nodes = root.xpath("//text-to-speech")
             count = len(nodes)
-            ui = gremlin.shared_state.ui
+            
             progress_dialog = QtWidgets.QProgressDialog("Operation in progress...", "Cancel", 0, count, parent = ui)
             progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
             progress_dialog.setAutoClose(True)
@@ -1198,6 +1207,13 @@ class ProfileConverter:
             index = 1
             for node in nodes:
                 # read attributes
+
+                if "text" in node.attrib:
+                    text = node.get("text")
+                    if not text:
+                        continue # no text
+                else:
+                    continue # no text
 
                 progress_dialog.setLabelText(f"Processing {index} out of {count}...")
                 progress_dialog.setValue(index)
@@ -1213,8 +1229,7 @@ class ProfileConverter:
                 if rate == 0:
                     rate = 100 # default
 
-                if "text" in node.attrib:
-                    text = node.get("text")
+
                 clearQueue = safe_read(node,"clear-queue",bool, False)
                 abort = safe_read(node, "abort", bool, False)
                 exec_on_press = safe_read(node,"exec_on_press",bool, True)
@@ -1256,12 +1271,64 @@ class ProfileConverter:
                     # generate the wav file
                     progress_dialog.setLabelText(f"Generate voice file {index} out of {count}...")
 
-                    tts_file = ktts.getNewWav()
-                    wav = ktts.generateWav(tts_file, text, speaker, tts_speed)
-                    if wav:
-                        node.set("tts_file", tts_file)
+                    wav = ktts.getNewWav()
+                    if config.ai_tts_use_word_filenames:
+                        # use a word based file name based on the TTS text (which presumably is unique)
+                        ext = gremlin.util.get_ext(wav)
+                        suggested_name = gremlin.util.textWordsToUnderscore(text)
+                        dir = os.path.dirname(wav)
+                        suggested_file = os.path.join(dir, suggested_name)
+                        suggested_file = gremlin.util.swap_ext(suggested_file,ext)
+                        
+                        if os.path.isfile(suggested_file):
+                            # word file already exists
+                            if config.ai_tts_overwrite_filenames:
+                                # re-use the same file - delete current
+                                target_file = suggested_file
+                                try:
+                                    os.unlink(suggested_file)
+                                except Exception as e:
+                                    syslog.error(f"CONVERT: unable to remove file {suggested_file}")
+                                    syslog.error(f"\tError: {str(e)}")
+                                    return False
+                            else:
+                                # don't reuse, find a unique file name by sequencing
+                                index = 1
+                                fname = gremlin.util.swap_ext(suggested_file,suffix = f"_{index}")
+                                while os.path.isfile(fname):
+                                    index += 1
+                                    fname = gremlin.util.swap_ext(suggested_file,suffix = f"_{index}")
 
-                
+                                target_file = fname
+                        else:
+                            # use the generated file name 
+                            target_file = suggested_file
+                        
+                        
+                    # generate on a temporary file
+                    wav = ktts.generateWav(tts_file = wav, text = text, speaker = speaker, tts_speed = tts_speed)
+                    if wav:
+                        # file was generated ok
+                        if target_file != wav:
+                            # rename or overwrite the file 
+                            if os.path.isfile(target_file):
+                                try:
+                                    os.unlink(target_file)
+                                except Exception as e:
+                                    syslog.error(f"CONVERT: unable to remove file [{wav}] to [{target_file}]")
+                                    syslog.error(f"\tError: {str(e)}")
+                                    target_file = wav # do not rename
+
+                            # rename the generated file
+                            try:
+                                shutil.copy(wav, target_file)
+                                os.unlink(wav)
+                            except Exception as e:
+                                syslog.error(f"CONVERT: unable to save file [{wav}] to [{target_file}]")
+                                syslog.error(f"\tError: {str(e)}")
+                                target_file = wav # do not rename
+
+                        node.set("tts_file", target_file)
 
                 time.sleep(0.05) 
                 QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
@@ -1283,7 +1350,7 @@ class ProfileConverter:
             tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
             syslog.info(f"CONVERT TTS: saved data to : {fname}")
 
-            gremlin.ui.ui_common.MessageBoxInfo(prompt = f"Converted {count} TTS nodes\nProfile will now reload.")
+            gremlin.ui.ui_common.MessageBoxInfo(prompt = f"Converted {count} TTS nodes\nProfile will now reload.", parent = ui)
 
 
         except Exception as e:

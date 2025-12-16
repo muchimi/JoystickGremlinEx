@@ -85,7 +85,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         widget = gremlin.ui.virtual_keyboard.QKeyWidget()
         self._key_height = widget.desiredHeight
-        self.display_container_widget.setMinimumHeight(self._key_height)
+        self.display_container_widget.setMinimumHeight(self._key_height + 4)
         self.display_container_layout.addWidget(self.key_combination_widget)
         
         self.listen_multi_widget = gremlin.ui.ui_common.Buttons.getListenWidget(label="Listen (multi)", callback = self._record_multi_keys_cb)

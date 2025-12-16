@@ -3895,28 +3895,46 @@ class ConfirmBox():
 
 
 def MessageBoxWarning(title = "Warning", prompt = "Operation",  parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, True, parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "warning", parent)
 
 def MessageBoxInfo(title = "Notice", prompt = "Operation", parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, False, parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "info", parent)
+
+def MessageBoxYesNo(title = "Notice", prompt = "Operation", parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "yesno", parent)    
+
+def MessageBoxOkCancel(title = "Notice", prompt = "Operation", parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "okcancel", parent)    
 
 def MessageBox(title = "Notice", prompt = "Operation", is_warning = True, parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, is_warning, parent)
+    mode = "warning" if is_warning else "info"
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, mode, parent)
 
 
-def _message_box_ui(title = "Notice", prompt = "Operation", is_warning = True, parent = None):
-    if is_warning:
-        # warning icon
-        icon = gremlin.ui.ui_common.Icons.warningIcon()
-    else:
-        icon = gremlin.ui.ui_common.Icons.infoIcon()
+def _message_box_ui(title = "Notice", prompt = "Operation", mode : str = "info", parent = None):
+    buttons = QtWidgets.QMessageBox.StandardButton.Ok
+    if parent is None:
+        parent = gremlin.shared_state.ui
+    match mode:
+        case "warning":
+            # warning icon
+            icon = gremlin.ui.ui_common.Icons.warningIcon()
+        case "question" | "yesno":
+            icon = gremlin.ui.ui_common.Icons.questionIcon()
+            buttons = QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+        case "okcancel":
+            icon = gremlin.ui.ui_common.Icons.questionIcon()
+            buttons = QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel
+        case _:
+            icon = gremlin.ui.ui_common.Icons.infoIcon()
+
         
     pixmap = icon.pixmap(48)
     msgbox = QtWidgets.QMessageBox()
     msgbox.setWindowTitle(title)
     msgbox.setIconPixmap(pixmap)
     msgbox.setText(prompt)
-    msgbox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+    msgbox.setStandardButtons(buttons)
     msgbox.exec()
 
 
@@ -4453,14 +4471,17 @@ class QDataComboBox(QComboBox):
                 if index != -1:
                     self.setCurrentIndex(index)
 
-        if self._callback:
-            self.currentIndexChanged.connect(self._handle_callback)
+        self.currentIndexChanged.connect(self._handle_callback)
 
         if tooltip:
             self.setToolTip(tooltip)
 
     def _handle_callback(self):
-        self._callback(self.currentData())
+        if self._callback:
+            self._callback(self.currentData())
+
+    def setCallback(self, callback):
+        self._callback = callback
 
     
     def eventFilter(self, widget, event):

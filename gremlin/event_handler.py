@@ -631,6 +631,7 @@ class EventListener:
 	request_profile_reload = Signal(str, bool) # request a profile to load (str = profile file, bool = as new profile flag)
 	request_reload = Signal() # request a reload of the current profile data
 	
+	
 	process_monitor_changed = Signal() # process monitor options changed
 
 	host_ip_changed = Signal(str) # indicates the local machines' host IP changed

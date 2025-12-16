@@ -197,12 +197,18 @@ class Ui_Gremlin(object):
         
         self.actionConvertTTS = QtGui.QAction(main_window)
         self.actionConvertTTS.setText("Convert TTS to AI")
-        self.actionConvertTTS.setToolTip("Converts Map to TTS actions to Play Sound actions converting the text to a wav file if AI is available")
+        self.actionConvertTTS.setToolTip("Converts Map to TTS actions to Play Sound actions converting the text to a wav file if KTTS is available")
         self.actionConvertTTS.triggered.connect(self._handle_convert_tts)
+
+        self.actionGenerateTTS = QtGui.QAction(main_window)
+        self.actionGenerateTTS.setText("Generate TTS via KTTS")
+        self.actionGenerateTTS.setToolTip("Converts bulk text to TTS audio files via KTTS if available")
+        self.actionGenerateTTS.triggered.connect(self._handle_generate_tts)
 
         ktts = gremlin.ktts.KTTS()
         enabled = ktts.is_available()
         self.actionConvertTTS.setEnabled(enabled)
+        self.actionGenerateTTS.setEnabled(enabled)
         
 
         self.menuRecent.addAction(self.actionEmpty)
@@ -234,6 +240,7 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionCheatsheet)
         self.menuTools.addAction(self.actionConvertLegacy)
         self.menuTools.addAction(self.actionConvertTTS)
+        self.menuTools.addAction(self.actionGenerateTTS)
         
         
 
@@ -300,23 +307,50 @@ class Ui_Gremlin(object):
             el = gremlin.event_handler.EventListener()
             el.request_reload.emit()
 
+    def _handle_generate_tts(self):
+        import gremlin.util
+        import gremlin.profile
+        import gremlin.event_handler
+        import gremlin.ktts
+        import gremlin.shared_state
+        import gremlin.sound
+
+        ui = gremlin.shared_state.ui
+        ktts = gremlin.ktts.KTTS()
+        if not ktts.is_available():
+            return
+
+        dialog = gremlin.sound.TTSGeneratorDialog(ui)
+        dialog.exec()
+
+
     def _handle_convert_tts(self):
         import gremlin.util
         import gremlin.profile
         import gremlin.event_handler
         import gremlin.ktts
+        import gremlin.shared_state
+        import gremlin.sound
 
+        ui = gremlin.shared_state.ui
         ktts = gremlin.ktts.KTTS()
         if not ktts.is_available():
-            gremlin.ui.ui_common.MessageBoxWarning(prompt = "AI engine not found on this system.")
+            gremlin.ui.ui_common.MessageBoxWarning(prompt = "AI engine not found on this system.", parent = ui)
             return False
         
         profile_converter = gremlin.profile.ProfileConverter()
         profile = gremlin.shared_state.current_profile
         fname = profile.profile_file
         if not fname or not os.path.isfile(fname):
-            gremlin.ui.ui_common.MessageBoxWarning(prompt = "Invalid profile file.\nEnsure profile is saved.")
+            gremlin.ui.ui_common.MessageBoxWarning(prompt = "Invalid profile file.\nEnsure profile is saved.", parent = ui)
             return False
+        
+        dialog = gremlin.sound.GenerateDialog(parent = ui)
+        result = dialog.exec()
+        if result != QtWidgets.QDialog.DialogCode.Accepted:
+            # do not convert
+            return
+
         
         # make a backup
         backup_fname = gremlin.util.swap_ext(fname, suffix = "_tts")

@@ -2024,11 +2024,10 @@ class Settings:
     def setFiltered(self, device_guid: dinput.GUID | str | int, input_type : InputType, input_id : int, value : bool):
         ''' marks a joystick input as filtered or not '''
         device = gremlin.joystick_handling.getDevice(device_guid)
-        if not device:
-            syslog.warning(f"PROFILE SET FILTER: unknown device [{device_guid}]")
-            return
-        
         verbose = gremlin.config.Configuration().verbose_mode_filter
+        if not device:
+            if verbose: syslog.warning(f"PROFILE SET FILTER: unknown device [{device_guid}]")
+            return
         # verbose = True
 
         device_guid = device.device_guid

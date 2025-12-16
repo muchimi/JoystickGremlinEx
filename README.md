@@ -29,6 +29,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76T131)
+- New: KTTS: general TTS audio generator from a list of entries, one per line.
+- New: KTTS: automatic TTS audio file naming using words.
+- New: updated documentation for GEX script environment setup and KTTS setup.
+- Fix: Map to Keyboard Ex: slight clipping can occur on key display.
+
+
 ### (m76T130)
 - New: (experimental) support for AI generated TTS using a local LLM if installed.  If installed, supported via the map to sound.  See documentation on how to setup the local AI LLM.  Note: this model is not supported as a packaged (.exe) setup due to file size and additional setup and licensing requirements.
 - Fix: Filter missing right click parameters.

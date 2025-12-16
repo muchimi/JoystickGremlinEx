@@ -2552,3 +2552,18 @@ def triplets(items):
             t.append(None)
         t_list.append(t)
     return t_list
+
+
+def textWordsToUnderscore(text : str, word_count : int = 5):
+    ''' takes an arbitrary text string and return the specified word count as an underscored string - strips punctuation'''
+    if not text:
+        return None
+    source = text.strip().casefold()
+    words = re.findall(r'\w+', source)
+    selected_words = words[:word_count]
+    suggested_name = ""
+    for word in selected_words:
+        if suggested_name:
+            suggested_name += "_"
+        suggested_name += word
+    return suggested_name

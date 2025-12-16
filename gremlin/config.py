@@ -2883,3 +2883,25 @@ class Configuration(QtCore.QObject):
     @ai_tts_last_speaker.setter
     def ai_tts_last_speaker(self, value : str):
         self._set_data("ai_tts_last_speaker", value)
+
+    @property
+    def ai_tts_save_on_generate(self) -> str:
+        return self._get_data("ai_tts_save_on_generate", None)
+    @ai_tts_save_on_generate.setter
+    def ai_tts_save_on_generate(self, value : str):
+        self._set_data("ai_tts_save_on_generate", value)
+
+    @property
+    def ai_tts_use_word_filenames(self) -> str:
+        return self._get_data("ai_tts_use_word_filenames", None)
+    @ai_tts_use_word_filenames.setter
+    def ai_tts_use_word_filenames(self, value : str):
+        self._set_data("ai_tts_use_word_filenames", value)
+
+                
+    @property
+    def ai_tts_overwrite_filenames(self) -> str:
+        return self._get_data("ai_tts_overwrite_filenames", None)
+    @ai_tts_overwrite_filenames.setter
+    def ai_tts_overwrite_filenames(self, value : str):
+        self._set_data("ai_tts_overwrite_filenames", value)                

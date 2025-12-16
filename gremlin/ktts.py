@@ -231,10 +231,13 @@ class KTTS():
         wav = action.tts_file
         return wav and os.path.isfile(wav)
 
-    def getNewWav(self):
+    def getNewWav(self) -> str:
         id = gremlin.util.get_guid()
         tts_file = os.path.join(self._sound_folder,f"{id}.wav")
         return tts_file
+    
+    def getSoundFolder(self) -> str:
+        return self._sound_folder
 
 
 
@@ -250,7 +253,7 @@ class KTTS():
             tts_file = self.getNewWav()
             action.tts_file = tts_file
 
-        return self.generateWav(tts_file, action.text, action.speaker, action.tts_speed)
+        return self.generateWav(tts_file = tts_file, text = action.text, speaker = action.speaker, tts_speed = action.tts_speed)
     
     def generateWav(self, tts_file : str, text, speaker : str = None, tts_speed : float = 1.0) -> str:
         ''' gets the wave file for the given options

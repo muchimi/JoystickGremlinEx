@@ -22,7 +22,7 @@ from lxml import etree as ElementTree
 import qtawesome as qta
 import gremlin.util
 import gremlin.event_handler
-
+import re
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
@@ -65,6 +65,12 @@ class PlayMode(enum.Enum):
                 return PlayMode.CoquiAI
             case _:
                 return PlayMode.AudioFile
+
+
+
+
+    
+
 
 
 
@@ -126,12 +132,14 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.tts_file_widget = gremlin.ui.ui_common.QLineEdit(text = self.action_data.tts_file)
         self.tts_file_widget.setReadOnly(True)
 
-        self.tts_file_delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = self._handle_file_delete)
+        self.tts_file_delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = self._handle_file_delete,tooltip = "Delete the audio file")
+        self.tts_file_rename_widget = gremlin.ui.ui_common.QDataPushButton("Rename", callback = self._handle_file_rename, tooltip = "Rename the audio file")
 
 
 
-        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, callback = self._handle_speaker_changed, tooltip = "Selected speaker for AI voice generation.")
+        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip = "Selected speaker for AI voice generation.")
         self._update_speakers(initialize = False)
+        self.speaker_widget.setCallback(self._handle_speaker_changed)
 
 
 
@@ -140,7 +148,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         icon = gremlin.ui.ui_common.load_icon("ri.voiceprint-fill")
         self.generate_widget = gremlin.ui.ui_common.QDataPushButton("Generate", callback = self._handle_generate, tooltip = "Generate the AI voice.")
         self.generate_widget.setIcon(icon)
-        save_on_generate_widget = gremlin.ui.ui_common.QDataCheckbox("Save profile on generate", value = self.action_data.save_on_generate, callback = self._handle_save_on_generate_changed)
+        
         self.tts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range = 0.1, max_range = 10.0, value = self.action_data.tts_speed, callback = self._handle_tts_speed_changed, tooltip = "Speed rate modifier for the generated audio.\n1.0 is the normal rate.")
 
         widgets = [
@@ -150,7 +158,6 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             "TTS speed:",
             self.tts_speed_widget,
             self.generate_widget,
-            save_on_generate_widget,
             ]
         
         ai_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
@@ -159,7 +166,12 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         widgets = [
             "Text:",
             self.text_field,
-            gremlin.ui.ui_common.getHContainer([self.tts_file_widget,self.tts_file_delete_widget], label = "Cache file:", widget_only=True),
+            gremlin.ui.ui_common.getHContainer([
+                self.tts_file_widget,
+                self.tts_file_delete_widget,
+                self.tts_file_rename_widget
+                ],
+                  label = "Cache file:", widget_only=True),
             ai_container,
 
         ]
@@ -329,21 +341,35 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _handle_file_delete(self, widget):
         wav = self.action_data.tts_file
         if wav and os.path.isfile(wav):
-            try:
-                os.unlink(wav)
-            except Exception as e:
-                syslog.error(f"PLAY: unable to delete file: {wav}")
-                syslog.error(f"Error: {str(e)}")
-                return
-        self.action_data.tts_file = None
-        self.tts_file_widget.setText("")
+            ui = gremlin.shared_state.ui
+            result = gremlin.ui.ui_common.MessageBoxYesNo(prompt="Delete cached file?", parent = ui)
+            if result == QtWidgets.QMessageBox.StandardButton.Yes:
+                try:
+                    os.unlink(wav)
+                except Exception as e:
+                    syslog.error(f"PLAY: unable to delete file: {wav}")
+                    syslog.error(f"Error: {str(e)}")
+                    return
+                self.action_data.tts_file = None
+                self.tts_file_widget.setText("")
+                self._update_ui()
+
+    def _handle_file_rename(self, widget):
+        ''' renames the file '''
+        self.action_data.renameFile()
+        self.tts_file_widget.setText(self.action_data.tts_file)
         self._update_ui()
+        
 
     def _handle_refresh_speakers(self):
         self._update_speakers(initialize = True)
 
     def _update_speakers(self, initialize = False):
         config = gremlin.config.Configuration()
+        last_speaker = config.ai_tts_last_speaker
+        if not self.action_data.speaker:
+            # default speaker is the last one if we have one defined
+            self.action_data.speaker = last_speaker
 
         ktts = gremlin.ktts.KTTS()
         try:
@@ -352,6 +378,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             with QtCore.QSignalBlocker(self.speaker_widget):
                 self.speaker_widget.clear()
             if speakers:
+                # we have a list of speakers
                 for speaker in speakers:
                     self.speaker_widget.addItem(speaker, speaker)
                 if self.action_data.speaker:
@@ -377,18 +404,17 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
     def _handle_generate(self, widget):
-        
         if self.action_data.text:
-            try:
-                gremlin.util.pushCursor()
-                result = self.action_data.generate()
-                self._update_ui()
-                if result and self.action_data.save_on_generate:
-                    syslog.info("PLAY: save profile on wav generation...")
-                    profile = gremlin.shared_state.current_profile
-                    profile.save()
-            finally:
-                gremlin.util.popCursor()
+            ui = gremlin.shared_state.ui
+            dialog = gremlin.sound.GenerateDialog(self.action_data, parent = ui)
+            result = dialog.exec()
+            if result == QtWidgets.QDialog.accepted:
+                try:
+                    gremlin.util.pushCursor()
+                    self.action_data.generate()
+                finally:
+                    gremlin.util.popCursor()
+            self._update_ui()
 
         # update speakers if not done
         enabled = self.speaker_widget.isEnabled()
@@ -622,7 +648,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self._tts_file = None # sound file for TTS 
         self.tts_speed = 1.0 # for AI generation, speed factor, 1.0 = normal rate
         self.volume = 100 # default volume as a percentage 0 to 100
-        self.save_on_generate = True # save profile on AI file generation
+        
         self.key = None # sound key for the sound file
         self.loops = 1 # number of times the sample is played back
         self.playback_ms = 0 # playback milliseconds, 0 means play normally
@@ -644,6 +670,9 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
         self._sound = None # holds the sound object 
         
+    @property
+    def save_on_generate(self) -> bool:
+        return gremlin.config.Configuration().ai_tts_save_on_generate
 
     @property
     def audio_device(self) -> str:
@@ -693,12 +722,25 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             InputType.JoystickHat
         ]
     
+    def getSuggestedFilename(self):
+        # get a suggested file name using the first few words of the text
+        wav = self.tts_file
+        if wav and os.path.isfile(wav):
+            ext = gremlin.util.get_ext(wav)
+            suggested_name = gremlin.util.textWordsToUnderscore(self.action_data.text)
+            dir = os.path.dirname(wav)
+            suggested_file = os.path.join(dir, suggested_name)
+            suggested_file = gremlin.util.swap_ext(suggested_file,ext)
+            return suggested_file
+
+    
     def generate(self) -> bool:
         ''' generates the output wav file with current options 
         
         :returns: true on success
         
         '''
+        config = gremlin.config.Configuration()
         ktts = gremlin.ktts.KTTS()
         # release the sound file if it exists
         tts_file = self.tts_file
@@ -710,8 +752,63 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             assert os.path.isfile(wav)
             self.tts_file = wav
             self.play()
-            return True
+            if config.ai_tts_use_word_filenames:
+                new_wav = self.getSuggestedFilename()
+                if os.path.isfile(new_wav):
+                    # prompt for a new file name if it exists and save the profile if needed
+                    self.renameFile() 
+                else:
+                    # simple rename
+                    try:
+                        os.rename(wav, new_wav)
+                        self.action_data.tts_file = new_wav
+                    except Exception as e:
+                        syslog.error(f"PLAY: unable to rename the file: {str(e)}")
+                        ui = gremlin.shared_state.ui
+                        gremlin.ui.ui_common.MessageBoxWarning(prompt = f"An error occured when renaming the file:\n{str(e)}", parent = ui)
+                        return False
+                    if self.action_data.save_on_generate:
+                        # save the profile
+                        syslog.info("PLAY: save profile on wav generation...")
+                        profile = gremlin.shared_state.current_profile
+                        profile.save()
+
+                return True
         return False
+    
+    def renameFile(self, new_name : str = None):
+        ''' renames the wav file '''
+        wav = self.tts_file
+        if wav and os.path.isfile(wav):
+            ext = gremlin.util.get_ext(wav)
+            ui = gremlin.shared_state.ui
+
+            suggested_file = self.getSuggestedFilename()
+
+            # prompt for the file using the suggested name
+            new_name, ok = QtWidgets.QFileDialog.getSaveFileName(
+                parent = ui,
+                caption = "Enter New File Name",
+                dir = suggested_file,
+                filter = f"Audio Files (*{ext})"
+                )
+            if ok and new_name:
+                try:
+                    if os.path.isfile(new_name):
+                        # replace
+                        os.unlink(new_name) 
+                    os.rename(wav, new_name)
+                except Exception as e:
+                    syslog.error(f"PLAY: unable to rename the file: {str(e)}")
+                    gremlin.ui.ui_common.MessageBoxWarning(prompt = f"An error occured when renaming the file:\n{str(e)}", parent = ui)
+                    return
+                self.action_data.tts_file = new_name
+                self.tts_file_widget.setText(new_name)
+                if self.action_data.save_on_generate:
+                    # save the profile
+                    syslog.info("PLAY: save profile on wav generation...")
+                    profile = gremlin.shared_state.current_profile
+                    profile.save()
     
     def play(self):
         ''' plays the sound '''
@@ -821,7 +918,6 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         if "speaker" in node.attrib:
             speaker = node.get("speaker")
         self.speaker = speaker # speaker for AI
-        self.save_on_generate = safe_read(node,"save", bool, True)
         self.tts_file = safe_read(node,"tts_file", str, '')
         self.sound_file = node.get("file")
         self.tts_speed = safe_read(node,"tts_speed", float, 1.0)
@@ -854,7 +950,6 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         if self.text:
             node.set("text", self.text)
         node.set("tts_speed", safe_format(self.tts_speed, float))
-        node.set("save", safe_format(self.save_on_generate, bool))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))  
         node.set("loops", safe_format(self.loops,int))      
