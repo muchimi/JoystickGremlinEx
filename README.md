@@ -29,6 +29,26 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T132)
+- New: Trigger container (by request).  See below for details.  
+- Fix: Exception when using Switch container.  
+- Documentation updates: list of containers and actions and general description of what they do.
+
+
+#### Trigger container   
+
+This container can schedule actions to run at a future time based on a configurable delay in seconds.  Whenever that delay lapses, the contained actions will trigger.  The container also defines optional conditions that will be tested before contained actions trigger.  These conditions determine if the actions should run or not at the time they are scheduled to run.
+
+If the delay is zero, the trigger occurs immediately.
+If no conditions are set, the actions are executed.
+
+The container can be triggered on input press or release depending on the options.  Actions always get a "pressed" value and the event received will always be a button.
+
+If the container is re-triggered, the scheduled time is reset.
+
+Note that the trigger conditions are not the same as the container conditions that determine if the container should execute in the first place.  Same for the action conditions if specified.  
+
+The scheduling occurs outside of modes.  If the profile mode changes, the trigger container may no longer be available, but the actions that were scheduled to run in the future will still run in the future.
 
 ### (m76T131)
 - New: KTTS: general TTS audio generator from a list of entries, one per line.

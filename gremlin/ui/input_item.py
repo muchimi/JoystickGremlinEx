@@ -3162,7 +3162,7 @@ class ConditionStateTracker():
                     if container.id in self._cache[device_guid][mode][input_id]:
                         info = self._cache[device_guid][mode][input_id][container.id]
                         container_widget : AbstractContainerWidget = info.containerWidget
-                        container_widget._update_ui(container)
+                        container_widget._update_condition_ui(container)
                         enabled = info.input_item.hasConditions()
                         dock_tabs = info.dock_tabs
                         self.set_condition_tab_state(dock_tabs, enabled)
@@ -3330,7 +3330,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # this is for CONTAINER CONDITIONS only (Action conditions are handled elsewhere) - this hooks the condition state tab to the conditions added to the container
         el = gremlin.event_handler.EventListener()
-        el.condition_state_changed.connect(self._update_ui)
+        el.condition_state_changed.connect(self._update_container_ui)
 
         self.activation_count_widget = None
         #el.condition_state_changed.emit(self.container)
@@ -3351,7 +3351,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         el.collapse_all_containers.connect(self._handle_collapse)
         el.expand_all_containers.connect(self._handle_expand)
 
-        self._update_ui(self.container)
+        self._update_container_ui(self.container)
 
     @QtCore.Slot()
     def _handle_toggled(self):
@@ -3453,7 +3453,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     
 
     @QtCore.Slot(object)
-    def _update_ui(self, container):
+    def _update_container_ui(self, container):
         ''' update the condition icon in the RIGHT PANEL tab '''
         if not Shiboken.isValid(self.dock_tabs):
             return
@@ -3517,8 +3517,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # Create the actual UI
         self.dock_tabs.addTab(self.action_tab_widget, "Action")
+        self._create(self.profile_data)
         self._create_action_ui()
-        #self.action_layout.addStretch(10)
+     
 
     def _create_activation_condition_tab(self):
         # Create widget to place inside the tab
@@ -3718,6 +3719,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             "implemented in subclass"
         )
 
+    def _create(self, action_data = None):
+        # optional override by subclasses - called before _create_action_ui
+        pass
+        
     def _create_action_ui(self):
         """Creates the UI elements for the widget."""
         raise gremlin.error.MissingImplementationError(

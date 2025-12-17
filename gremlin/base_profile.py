@@ -361,8 +361,34 @@ class ActionSet(list):
         self.data = data # any special tag to identify the action set
 
 
+class ConditionContainer():
+    ''' holds conditions for containers '''
 
-class AbstractContainer(ProfileData):
+    def __init__(self):
+        self._id = gremlin.util.get_guid() # unique GUID of this container
+        self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
+        self.activation_condition.setContainer(self)
+        self._container = None
+
+    @property
+    def condition_count(self):
+        return len(self.activation_condition.conditions)
+ 
+    @property
+    def id(self):
+        return self._id
+
+    def setId(self, value : str):
+        ''' sets the ID '''
+        self._id = value
+
+    def setContainer(self, container):
+        self._container = container
+
+    def get_container(self):
+        return self._container
+
+class AbstractContainer(ProfileData, ConditionContainer):
 
     """Base class for action container related information storage."""
 
@@ -392,15 +418,14 @@ class AbstractContainer(ProfileData):
         super().__init__(parent)
 
         self.parent = parent
-        self._id = gremlin.util.get_guid() # unique GUID of this container
         self._action_sets = []
         self.action_model = None # set at creation by the parent of this container
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to produce action_sets)
-        self._condition_enabled = True
+        self._condition_enabled = True # condition flag
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
         self._virtual_button_user_enabled = True # determins if callbacks use the virtual button function - user set 
-        self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
-        self.activation_condition.setContainer(self)
+        # self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
+        # self.activation_condition.setContainer(self)
         self.virtual_button = None
         self.current_view_type = None
         self.parent_node = node
@@ -574,12 +599,6 @@ class AbstractContainer(ProfileData):
                     
         return False
         
-        # if self.activation_condition is not None:
-        #     # if len(self.activation_condition.conditions) == 0:
-        #     #     self.refresh_conditions()
-        #     return len(self.activation_condition.conditions) > 0
-        # return False
-    
 
     @property
     def condition_count(self)->int:
@@ -588,13 +607,7 @@ class AbstractContainer(ProfileData):
             return len(self.activation_condition.conditions)
         return 0
     
-    @property
-    def id(self):
-        return self._id
-
-    def setId(self, value : str):
-        ''' sets the ID '''
-        self._id = value    
+    
     
     @property
     def condition_enabled(self):

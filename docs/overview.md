@@ -262,13 +262,76 @@ The other is the sequential container which allows for actions that are not dire
 
 In both cases, the order of output is always top to bottom, so the execution order is predictable.
 
-### Rich set of mapping actions and containers
+### Available Containers
 
 GremlinEx has a rich set of mapping actions aimed at simulation and game output.    GremlinEx can merge multiple input axis values from multiple inputs to derive a single axis value, or supports breaking up input axis with stepped and gated triggers on specific points or ranges.   Containers group mappings for additional functionality.  GremlinEx supports macros.
 
 For example, a button can be used to trigger a complex macro, set a value on a joystick, say something with Text To Speech (TTS), change a profile mode, or sends keystrokes to an application.
 
 An axis can map to an axis, or can be setup to trigger specific actions based on the position of the axis and the direction of travel.
+
+
+| Container | Input Requirements | Description |
+| ----- | ---- | ---- |
+| Basic | Any | Simple container that defines actions to execute. This is the most common container.  When an action is added, a basic container is created to contain it. |
+| Button | Button |  A container that executes two sets of actions, one for when the input is pressed, the other for when the input is released. |
+| Chain | Button | A container that executes actions as chained steps.  Each trigger of the container advanced the step.  When the last step is executed, it loops back to the first step. |
+| Double Tap | Button | A container that runs its actions on input double click. |
+| Hat Buttons | Hat | A container that maps hat input to buttons (nine possible actions, one for each hat position, and the hat center). |
+| Range | Axis | A container that triggers when the input is in a given range. For more sophisticated mapping of an axis, use the gated axis action instead. |
+| Sequence | Button | A container that runs steps like a macro.  The container can randomize the step order, the time between steps, and the duration of each step (duration defined as the time between a "press" and a "release" for each step).  This container is a superset of the macro action and unlike the macro action can contain several actions that are not supported by the macro action. |
+| Smart Toggle | Button | If the input is held down the action will perform as a typical remap action would, i.e. staying active as long as the input is pressed.  However, when a short button press is detected, specified by the Toggle time then the first such press toggles the down state, i.e. holding the action down, and the second short press releases the action again. |
+| Switch | Button | This container triggers defined actions based on the input value.  It can trigger on press, release or whenever the input state changes. |
+| Tempo | Button | This container performs actions based on short tor long press.  Legacy container preserved for legacy profiles. |
+| TempoEx | Button | This container is an enhanced version of the legacy Tempo container and adds the ability to trigger on double click, along with various other new options not in Tempo. |
+| Tick | Axis  | This container triggers actions at defined ticks on the input axis. For more sophisticated mapping of an axis, use the gated axis action instead. |
+| Trigger | Button | This container triggers actions in the future.  When the delay lapses, the container evaluates an optional set of conditions to determine if the actions should run or not.  The conditions evaluated are different from the regular container conditions.  Trigger conditions are tested at the time the delayed actions run, whereas the regular conditions are evaluated to determine if the container should trigger in the first place. |
+
+### Available Actions
+
+GEX has a number of custom actions that perform the actual mapping of inputs to outputs.  Actions are contained by containers.
+
+| Action | Input Requirements | Description |
+| ----- | ---- | ---- |
+| Control | Button | This action can set various runtime options for GEX and are aimed at changing profile behavior at runtime. |
+| Cycle Modes | Button | This action steps through the defined list of profile modes.  Every trigger advances the step.  When the last step is selected, it loops back to the first step. |
+| Description | Any | This action does nothing outside of adding a description to a container or action. |
+| Gated Axis | Axis | This action defines gates (positions on an axis) and ranges (space between two gates) and lets you map other actions based on the current axis position.  Gates can trigger a different set of actions based on how the gate is crossed: any direction, crossing down, or crossing up. Gates support button actions.  Ranges trigger different action sets based on entry, exit, any change while the input is in-range, or any change if the output is outside the range.  Ranges can also re-scale the value or invert it, or send a fixed value, or send no value.  Ranges support axis actions.  Gated Axis is designed to split up an axis and is used heavily in flight simulation and throttle mapping or whenever specific actions need to run at specific intervals or positions of travel for a given input axis.  |
+| Macro | Button | This action defines stepped macros including joystick, keyboard, mouse and state.  The big brother version of macros is the Sequence container that has even more options for macro-like functionality. |
+| Map to Gamepad | Any | This action maps to game controller output via VIGEM. |
+| Map to Keyboard | Button | This action is the legacy keyboard mapper. Its purpose is to output a key. |
+| Map to Keyboard/Mouse Ex | Button | This action maps to one or more keys, including extended keys and media keys, and mouse buttons and mouse wheel. Supports repeat, pulse, press, release, toggle and other modes. |
+| Map to Mouse | Button or Axis | This action maps to mouse output, including mouse axes or mous ebutton.  This is a legacy action to be compatible with older profiles. |
+| Map to MouseEx | Button or Axis | This action maps to mouse output, including mouse axes or mous ebutton.  This is the new version although for mouse button output, consider using Map to Keyboard/Mouse Ex. |
+| Map to Octavi IFR1 | Button | This action is specific to controlling the Octavi IFR1 device. |
+| Map to OSC | Button | This action sends OSC messages to the network.  This allows GEX to update glass surfaces and panels via OSC. |
+| Map tp OSC Ex | Button | This action sends OSC messages to the network.  This allows GEX to update glass surfaces and panels via OSC.  More advanced version. |
+| Map to Simconnect | Button or Axis | This action sends commands to Microsoft Flight Simulator 2020 or 2024. Includes support for calculator expressions to control add-ons via the GEX WASM module.  This allows GEX to control axes and functions in the simulator without having to use the internal Flight Simulator mapper.  Requires MSFS to be running on the same machine as GEX. |
+| Map to State | Button | This action manages GremlinEx's state machine.  It can be used to set or clear states. |
+| Map to Trigger | Button | This action issues a "fake input" to the profile for any supported device.  This action mimics the input being triggered on the real device. |
+| Map to Vjoy (Vjoy Remap) | Any | This is the updated action to map to VJOY devices. Supports various modes, including axis merging and output curves for axes.  |
+| Noop | Any | This is a no-op (do nothing) action.  This is used when you use a container that requires an action, but you do not want anything to happen. |
+| Pause | Any | This pauses the profile execution.  See Resume. |
+| Play Sound | Button | This action plays an audio file (.wav or .mp3).  Wav is recommended.  This action can also be used to generate AI voices from text if KTTS is installed and GremlinEx runs as a script (not a package). Once the audio files are generated, KTTS is not needed and the regular small form factor packaged version of GEX can be used. |
+| Previouse Mode | Button | Changes to the prior profile mode. |
+| Remap | Any | This is the legacy VJOY mapper and is there to maintain compatibility with legacy profiles.  Use Map to Vjoy (Vjoy Remap) instead. |
+| Response Curve | Axis | This is a legacy curve adjuster that applies the curve to the other actions.  This is legacy action to maintain compatibility with legacy profiles and the functionality is completely integrated with Map to Vjoy. Use Map to Vjoy (Vjoy remap) instead. |
+| Response Curve Ex  | Axis | More advanced version of Response curve, from an early version of GEX.  Use Map to Vjoy (Vjoy remap) instead. |
+| Resume | Button | This resumes execution of a profile suspended with the Pause action. |
+| Run Process | Button | This action runs an external process (.exe) from the profile. |
+| Split Axis | Axis | Legacy action to maintain compatibility with legacy profiles.  Please use Gated Axis instead. |
+| Switch Mode | Button | This action changes the profile mode. |
+| System | Button | This action is similar to Control. |
+| Temporary Mode Switch | Button | This action will cause a mode switch when the input is pressed, and change it back to the current mode when released. |
+| Text to Speech | Button | This action will generate an audio message using the legacy WIndows TTS API in real time.  Play Sound is recommended and this legacy API is known to conflict with the audio layer and voice quality and choices are limited.  It is also much slower and uses more resources than playing a .wav file. |
+| Toggle Pause | Button | This action toggles a profile execution.  See Pause and Resume. |
+
+
+
+
+
+
+
 
 ### Custom plugins (advanced)
 

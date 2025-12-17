@@ -62,7 +62,8 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         """
         super().__init__(parent)
         self.profile_data = profile_data
-        if isinstance(profile_data, gremlin.base_profile.AbstractContainer):
+        #if isinstance(profile_data, gremlin.base_profile.AbstractContainer) or isinstance(profile_data, gremlin.base_profile.ConditionContainer):
+        if isinstance(profile_data, gremlin.base_profile.ConditionContainer):
             self.container = profile_data
         else:
             self.container = None
@@ -1401,12 +1402,15 @@ class ConditionModel(ui_common.AbstractModel):
         super().__init__(parent)
         self.condition_data = condition_data
         self.action_data = action_data
-        self.input_item = action_data.input_item
+        self.input_item = None
         self.container = None
         if isinstance(action_data, gremlin.base_profile.AbstractContainer):
             self.container = action_data
+            self.input_item = action_data.input_item 
         elif isinstance(action_data, gremlin.base_profile.AbstractAction):
             # find the container for the given action 
+            self.container = action_data.get_container()
+        elif isinstance(action_data, gremlin.base_profile.ConditionContainer):
             self.container = action_data.get_container()
 
     def rows(self):
@@ -1435,8 +1439,9 @@ class ConditionModel(ui_common.AbstractModel):
         mode = gremlin.shared_state.current_mode
         container = self.container
         input_item = self.input_item
-        data = ConditionTrackerData(mode, input_item, container, condition, rule = ActivationRule.All)
-        tracker.registerCondition(data)
+        if input_item:
+            data = ConditionTrackerData(mode, input_item, container, condition, rule = ActivationRule.All)
+            tracker.registerCondition(data)
         self.data_changed.emit()
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.emit(container)
@@ -1454,8 +1459,10 @@ class ConditionModel(ui_common.AbstractModel):
         if condition in self.condition_data.conditions:
             self.condition_data.conditions.remove(condition)
 
-        tracker = ConditionTracker()
-        tracker.unregisterCondition(condition)
+        if self.input_item:
+            tracker = ConditionTracker()
+            tracker.unregisterCondition(condition)
+
         container = self.container
         
         el = gremlin.event_handler.EventListener()

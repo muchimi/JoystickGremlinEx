@@ -1062,8 +1062,9 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
             condition.from_xml(cond_node, data)
             self.conditions.append(condition)
             condition.setOwner(self)
-            item = ConditionTrackerData(mode, input_item, container, condition, rule)
-            tracker.registerCondition(item)
+            if input_item:
+                item = ConditionTrackerData(mode, input_item, container, condition, rule)
+                tracker.registerCondition(item)
             
             
 
