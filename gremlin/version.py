@@ -18,13 +18,11 @@
 
 
 APPLICATION_NAME = "GremlinEx"
-APPLICATION_BASE = "m76T132"
+APPLICATION_BASE = "m76T133"
 APPLICATION_MAIN = "1.0ex"
 
 #APPLICATION_BASE = ""
 APPLICATION_VERSION = f"{APPLICATION_MAIN} ({APPLICATION_BASE})"
-
-
 
 from gremlin.singleton_decorator import SingletonDecorator
 

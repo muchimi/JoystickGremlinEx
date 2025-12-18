@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76T133)
+- Changed name of "Trigger" container to "Delayed Trigger" to avoid confusion with the "Trigger" action.
+- New: Filter: Ability to save default filters for a device to use for all new profiles.  This saves the default filter settings for a given device for new profiles.  This default can be deleted.  The data is persisted outside the profile.
+
+
 ### (m76T132)
 - New: Trigger container (by request).  See below for details.  
 - Fix: Exception when using Switch container.  

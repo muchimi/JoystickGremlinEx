@@ -1585,6 +1585,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # non regular devices
         self.profile.initialize_regular_devices()
 
+        # reload defaults for the profile
+        self.profile.settings.loadFilterDefaults() 
+
         # reset joystick input/output flags
         sd = gremlin.event_handler.JoystickState()
         sd.reset()

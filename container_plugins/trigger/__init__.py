@@ -339,7 +339,7 @@ class TriggerContainer(AbstractContainer):
 
     """Represents a container which holds exactly one action."""
 
-    name = "Trigger"
+    name = "Delay Trigger"
     tag = "trigger"
     hint = '''This container can delay trigger delayed actions.'''
     

@@ -82,6 +82,7 @@ a = Analysis(
         "torch.cuda",
         "torch.backends",
         "torch.distributed",
+        "transformers",
         "noisereduce",
         "pyrubberband",
         "coqui-tts",
@@ -92,6 +93,9 @@ a = Analysis(
         "scipy",
         "pandas",
         "pil",
+        "TensorFlow",
+        "pycrfsuite",
+        
         ],
     win_no_prefer_redirects=None,
     win_private_assemblies=None,

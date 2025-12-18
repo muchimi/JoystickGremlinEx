@@ -1142,13 +1142,33 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
 
         self.main_layout.addStretch()
 
+        # status for device filter
+        self.status_widget = gremlin.ui.ui_common.QIconLabel()
+        self.main_layout.addWidget(self.status_widget)
+
+        self.save_default_widget = QtWidgets.QPushButton("Set Default for device")
+        self.save_default_widget.clicked.connect(self._handle_set_default_for_device)
+        self.save_default_widget.setToolTip("Saves the current filter selection as default for new profiles for this device")
+
+        self.delete_default_widget = QtWidgets.QPushButton("Delete Default")
+        self.delete_default_widget.clicked.connect(self._handle_delete_default_for_device)
+        self.delete_default_widget.setToolTip("Saves the current filter selection as default for new profiles for this device")
+
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
 
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
+        widgets = [
+            self.save_default_widget,
+            self.delete_default_widget,
+            "||",
+            self.ok_widget,
+            self.cancel_widget
 
-        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget],left_stretch=True, widget_only = True)
+        ]
+
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget)
 
         if callback:
@@ -1158,6 +1178,22 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_handler)
 
+        self._update_ui()
+
+    def _update_ui(self):
+        ''' updates widgets '''
+        profile = gremlin.shared_state.current_profile
+        delete_visible = False
+        if profile.settings.isDefaultFiltered(self.device.device_guid):
+            icon = gremlin.ui.ui_common.Icons.recordIcon("#1EC047")
+            label = "This device has a default saved."
+            delete_visible = True
+        else:
+            icon = gremlin.ui.ui_common.Icons.recordIcon("#7E7E7E")
+            label = "No saved defaults found."
+        self.status_widget.setIcon(icon)
+        self.status_widget.setText(label)
+        self.delete_default_widget.setVisible(delete_visible)
 
     def _build_input_filter(self):
         ''' builds the input list from the profile settings '''
@@ -1497,6 +1533,37 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         ''' cancel button pressed '''
         self.reject()       
 
+    
 
+    @QtCore.Slot()
+    def _handle_set_default_for_device(self):
+        profile = gremlin.shared_state.current_profile
+        device_guid = self.device.device_guid
+        for input_type in self.input_filter[device_guid]:
+            for input_id in self.input_filter[device_guid][input_type]:
+                profile.settings.setDefaultFiltered(device_guid, input_type, input_id,self.input_filter[device_guid][input_type][input_id])
+       
+       # save the profile
+        result = profile.settings.saveFilterDefaults()
+        if result:
+            gremlin.ui.ui_common.MessageBoxInfo(prompt = f"Default filter saved.\nDevice [{self.device.name}].", parent = self)
+        else:
+            gremlin.ui.ui_common.MessageBoxWarning(prompt = f"Error saving defaults.\nCheck the log file for details.\nDevice [{self.device.name}].", parent = self)
+
+        self._update_ui()
+
+    @QtCore.Slot()
+    def _handle_delete_default_for_device(self):
+        gremlin.ui.ui_common.MessageBoxYesNo(prompt = f"Delete defaults for device [{self.device.name}]?", callback = self._handle_delete_confirm, parent = self)
+        
+
+    def _handle_delete_confirm(self, result):
+        if result == QtWidgets.QMessageBox.StandardButton.Yes:
+            profile = gremlin.shared_state.current_profile
+            device_guid = self.device.device_guid
+            result = profile.settings.clearDefaultsFiltered(device_guid)
+            if not result:
+                gremlin.ui.ui_common.MessageBoxWarning(prompt = f"Error deleting defaults.\nCheck the log file for details.\nDevice [{self.device.name}].", parent = self)
+            self._update_ui()
 
 

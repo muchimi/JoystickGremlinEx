@@ -3895,23 +3895,23 @@ class ConfirmBox():
 
 
 def MessageBoxWarning(title = "Warning", prompt = "Operation",  parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "warning", parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "warning", None, parent)
 
 def MessageBoxInfo(title = "Notice", prompt = "Operation", parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "info", parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "info", None, parent)
 
-def MessageBoxYesNo(title = "Notice", prompt = "Operation", parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "yesno", parent)    
+def MessageBoxYesNo(title = "Notice", prompt = "Operation", callback = None,  parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "yesno", callback, parent)    
 
-def MessageBoxOkCancel(title = "Notice", prompt = "Operation", parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "okcancel", parent)    
+def MessageBoxOkCancel(title = "Notice", prompt = "Operation", callback = None, parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "okcancel", callback, parent)    
 
-def MessageBox(title = "Notice", prompt = "Operation", is_warning = True, parent = None, width = 200):
+def MessageBox(title = "Notice", prompt = "Operation", is_warning = True, callback = None, parent = None, width = 200):
     mode = "warning" if is_warning else "info"
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, mode, parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, mode, callback, parent)
 
 
-def _message_box_ui(title = "Notice", prompt = "Operation", mode : str = "info", parent = None):
+def _message_box_ui(title = "Notice", prompt = "Operation", mode : str = "info", callback = None, parent = None):
     buttons = QtWidgets.QMessageBox.StandardButton.Ok
     if parent is None:
         parent = gremlin.shared_state.ui
@@ -3935,7 +3935,9 @@ def _message_box_ui(title = "Notice", prompt = "Operation", mode : str = "info",
     msgbox.setIconPixmap(pixmap)
     msgbox.setText(prompt)
     msgbox.setStandardButtons(buttons)
-    msgbox.exec()
+    result = msgbox.exec()
+    if callback:
+        callback(result)
 
 
 
