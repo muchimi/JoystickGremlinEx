@@ -895,6 +895,10 @@ class EventListener:
 		self._event_thread.name = "EVENTLISTENER listener"
 		self._event_thread.start()
 
+		self.profile_unload.connect(self.reset) # reset data on profile unload before a new profile is loaded
+	
+
+
 
 	def registerVjoyCallback(self, callback):
 		if not callback in self._vjoy_callbacks:
@@ -940,6 +944,15 @@ class EventListener:
 
 
 			self._event_queue.task_done()
+
+	def reset(self):
+		self._vjoy_events.clear()
+		self._vjoy_callbacks.clear()
+
+		# clear the event queue
+		while not self._event_queue.empty():
+			self._event_queue.get()
+					
 
 	@QtCore.Slot()
 	def _shutdown_handler(self):
@@ -3169,12 +3182,12 @@ class JoystickState():
 		self._output_ignored_device_list = {} # list of ignored devices (device_guid)
 		self._vjoy_output_ignored_list = {} # list of ignored vjoy IDs for output (int)
 		self._vjoy_as_input = {} # map of VJOY devices used as input by GremlinEx
+				
 
 	def hook(self):
 		el = EventListener()
 		el.vjoy_as_input_changed.connect(self._vjoy_as_input_changed) # hook vjoy as input changes
-		el.profile_unload.connect(self.reset) # reset data on profile unload before a new profile is loaded
-		
+		el.profile_loaded.connect(self.reset) # reset data on profile unload before a new profile is loaded
 
 	def reset(self):
 		''' resets the ignored device list '''
@@ -3184,6 +3197,10 @@ class JoystickState():
 		self._input_ignored_device_list.clear()
 		self._output_ignored_device_list.clear()
 		self._vjoy_output_ignored_list.clear()
+		self._vjoy_as_input.clear()
+
+
+		''' reload on new profile '''
 		current_profile = gremlin.shared_state.current_profile
 		verbose = gremlin.config.Configuration().verbose_mode_vjoy
 		for dev in gremlin.joystick_handling.all_joystick_devices():
@@ -3870,16 +3887,16 @@ class JoystickHook:
 
 	def unhookDevice(self):
 		''' unhooks the device '''
+		
 		if self._hooked:
 			jep = JoystickEventProcessor()
 			jep.unregisterCallback(self._callback)
 			self._hooked = False
-
-			verbose = gremlin.config.Configuration().verbose_mode_events
+			config = gremlin.config.Configuration()
+			verbose = config.verbose_mode_events or config.verbose_mode_perf
 			if verbose:
 				device = gremlin.joystick_handling.getDevice(self._device_guid)
-				if device.is_virtual:
-					syslog.info(f"JOYSTICK HOOK: unhook [{device.name}] [{device.device_id}] [{self._input_type.name}] [{self._input_id}]")
+				syslog.info(f"JOYSTICK HOOK: unhook [{device.name}] [{device.device_id}] [{self._input_type.name}] [{self._input_id}]")
 
 			self._device_guid = None
 			self._input_type = None

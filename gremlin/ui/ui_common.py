@@ -5239,8 +5239,7 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
 
     def unhook(self):
         ''' called when object is removed '''
-        if Shiboken.isValid(self):
-            self.unhookDevice()
+        super().unhookDevice()
 
 class ButtonStateWidget(QtWidgets.QWidget):
     ''' visualizes the state of a button '''

@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T134A)
+- Fix: ensure callback unhook repeater on profile reload even if QT object has already been garbage collected (this may help with lag on new profile load for axis repeaters).
+
 ### (m76T134)
 
 - Optimization: vjoy to vjoy loopback (this is when a vjoy device input is used to output to itself or another vjoy device - or vjoy as input mode). 
