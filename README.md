@@ -29,6 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T134)
+
+- Optimization: vjoy to vjoy loopback (this is when a vjoy device input is used to output to itself or another vjoy device - or vjoy as input mode). 
+
+Change 1: eliminate the threading model for these loopback events. Over time, this could cause an overall decrease in GEX performance depending on CPU and memory due to the VJOY API latency and too many threads created for waiting events. This is because events can arrive faster than the VJOY API can process them.  These events now use the same queue system as for other inputs (new anti-spam and thread optimized logic introduced in T126).
+
+Change 2: remove a spurious log message entry that could slow things down due to log I/O latency (adjusted verbose mode handling).
+
+Change 3: adjusted the event runner idle loop (on queue empty) to match the updated GEX thread context switch time (1 ms).  This could introduce a 10ms delay on detection of a new event to process.
 
 ### (m76T133)
 - Changed name of "Trigger" container to "Delayed Trigger" to avoid confusion with the "Trigger" action.

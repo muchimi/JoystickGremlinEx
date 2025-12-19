@@ -845,11 +845,13 @@ class EventListener:
 
 		# calibration data access
 		self._calibrationManager = None
-		self._verbose_dinput = False
+		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
 		self._verbose_perf = False
 		self._verbose_dinput_extra = False
-		self._verbose_vjoy = False
+		self._verbose_vjoy = config.verbose_mode_vjoy
 		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
+		self._verbose_queue = self._verbose_vjoy or self._verbose_dinput
+		self._verbose_inputs = config.verbose_mode_inputs
 
 
 		self._profile_started = False
@@ -908,23 +910,22 @@ class EventListener:
 
 	def queueJoystickEvent(self, event):
 		''' queues a single joystick event '''
-		verbose = gremlin.config.Configuration().verbose
-		if verbose: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")		
+		if self._verbose_queue: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")		
 		self._event_queue.put(event)
 
 	def queueJoystickEventList(self, event_list):
 		''' queues a list of joystick events '''
-		verbose = gremlin.config.Configuration().verbose_mode_inputs
+		verbose = self._verbose_queue
 		for event in event_list:
 			if verbose: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")
 			self._event_queue.put(event)
 
 	def _event_runner(self):
 		''' runner for inbound joystick events '''
-		verbose = gremlin.config.Configuration().verbose_mode_inputs
+		verbose = self._verbose_inputs
 		while not self._event_thread.stopped():
 			if self._event_queue.empty():
-				time.sleep(0.01)
+				time.sleep(0.001)
 				continue
 			
 			event = self._event_queue.get()
@@ -1034,6 +1035,8 @@ class EventListener:
 		self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
 		self._verbose_vjoy = config.verbose_mode_vjoy
 		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
+		self._verbose_queue = self._verbose_vjoy or self._verbose_dinput
+		self._verbose_inputs = config.verbose_mode_inputs
 
 		
 	def _profile_start(self):
@@ -1262,7 +1265,7 @@ class EventListener:
 		threading.current_thread().reset()
 		while not self._keyboard_thread.stopped():
 			if self._keyboard_queue.empty():
-				time.sleep(0.01)
+				time.sleep(0.001)
 				continue
 			self._process_queue()
 
@@ -1355,7 +1358,7 @@ class EventListener:
 		dinput.DILL.set_input_event_callback(self._dinput_event_handler) # DINPUT event handler
 		while self._running and not self._run_event.is_set():
 			# Keep this thread alive until we are done
-			time.sleep(0.05)
+			time.sleep(0.001)
 		syslog.info("DILL: shutdown")
 		dinput.DILL.set_device_change_callback(None)
 		dinput.DILL.set_input_event_callback(None)
@@ -1399,21 +1402,24 @@ class EventListener:
 				# issue a loop back internal event
 				if verbose : syslog.info(f"VJOY EVENT: loopback trigger (exec) {vjoyevent}")
 				event = Event.from_vjoyEvent(vjoyevent)
-				thread = threading.Thread(target = self._execute_loopback_callback, args = (event,))
-				thread.name = "vjoy loopback"
-				thread.start()
+				self.queueJoystickEvent(event)
+				
+
+				# thread = threading.Thread(target = self._execute_loopback_callback, args = (event,))
+				# thread.name = "vjoy loopback"
+				# thread.start()
 			else:
 				if verbose : syslog.info(f"VJOY EVENT: looback filtered (skip) {vjoyevent}")
 
 
-	def _execute_loopback_callback(self, event):
-		''' executes a vjoy loopback event '''
-		# if self._verbose_vjoy : syslog.info(f"VJOY LOOPBACK: trigger execute: {str(event)}")
-		eh = EventHandler()
-		verbose = self._verbose_vjoy
-		# verbose = True # debug mode - force output for diagnostics regardless of user settings
-		if verbose : syslog.info(f"VJOY EVENT THREAD: looback execute: {str(event)}")
-		eh.execute_event(event)
+	# def _execute_loopback_callback(self, event):
+	# 	''' executes a vjoy loopback event '''
+	# 	# if self._verbose_vjoy : syslog.info(f"VJOY LOOPBACK: trigger execute: {str(event)}")
+	# 	eh = EventHandler()
+	# 	verbose = self._verbose_vjoy
+	# 	# verbose = True # debug mode - force output for diagnostics regardless of user settings
+	# 	if verbose : syslog.info(f"VJOY EVENT THREAD: looback execute: {str(event)}")
+	# 	eh.execute_event(event)
 
 
 
@@ -4127,7 +4133,7 @@ class JoystickEventProcessor():
 		while not self._event_thread.stopped():
 			if self._event_queue.empty() or self._lock.locked():
 				# wait if no event or if thhe callback list is being changed, hold
-				time.sleep(0.01)
+				time.sleep(0.001)
 				continue
 			is_running = gremlin.shared_state.is_running
 			event = self._event_queue.get()

@@ -95,6 +95,8 @@ a = Analysis(
         "pil",
         "TensorFlow",
         "pycrfsuite",
+        "pysbd",
+        "librosa",
         
         ],
     win_no_prefer_redirects=None,

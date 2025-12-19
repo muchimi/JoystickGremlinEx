@@ -842,7 +842,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             if time.time() > trigger_time:
                 macro_mgr.queue_macro(self.delay_press_release)
                 trigger_time = time.time() + self.autorepeat_delay + self.delay
-            time.sleep(0.01)
+            time.sleep(0.001)
         if verbose:
             log_info("autorepeat stop...")
         macro_mgr.clear_queue()
