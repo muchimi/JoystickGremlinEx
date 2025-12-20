@@ -1226,9 +1226,13 @@ class KeyMap:
         '''
         # flip the extended bit to force numlock OFF for numeric keypad so we always get the numeric keys
         scan_code, is_extended = keyid
-        if keyid in KeyMap._g_translate_map.keys():
-            return KeyMap._g_translate_map[keyid]
         vk = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
+        if keyid in KeyMap._g_translate_map.keys():
+            result = KeyMap._g_translate_map[keyid]
+            if not isinstance(result[0], tuple):
+                return ((scan_code, is_extended),vk)
+            return result
+
         return (keyid, vk)
     
     @staticmethod
@@ -1273,6 +1277,9 @@ class KeyMap:
     @staticmethod
     def keyid_tostring(keyid):
         scan_code, is_extended = keyid
+        if isinstance(scan_code, tuple):
+            # source is (scan_code, extended), virtual_code
+            scan_code, is_extended = scan_code
         return f"({scan_code} 0x{scan_code:X}, {is_extended})"
     
     @staticmethod

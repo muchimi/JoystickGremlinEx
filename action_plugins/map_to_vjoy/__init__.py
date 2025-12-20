@@ -1296,9 +1296,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _clear_map(self):
         ''' sets all mappings to pulse mode '''
-        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Clear all hat button mappings?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result = gremlin.ui.ui_common.ConfirmBox(prompt = "Clear all hat button mappings?")
+        if result:
             positions = self.action_data.hat_positions
             for position in positions:
                 self.action_data.hat_map[position] = 0
@@ -1307,9 +1306,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _auto_map(self):
         ''' sets all mappings to pulse mode '''
-        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Remap all hat button mappings?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result = gremlin.ui.ui_common.ConfirmBox(prompt = "Remap all hat button mappings?")
+        if result:
             positions = self.action_data.hat_positions
             dev = self.action_data.vjoy_map[self.action_data.vjoy_id]
             button_count = dev.button_count
@@ -2591,9 +2589,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(int)
     def _step_delete(self, index: int):
         ''' delete requested '''
-        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Delete step {index}?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result = gremlin.ui.ui_common.ConfirmBox(f"Delete step {index}?")
+        if result:
             del self.action_data.target_step_list[index]
             self._ensure_step_widgets() # redo the layout
             self.slider_widget.setTickMarks(self.action_data.target_step_list)

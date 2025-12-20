@@ -1138,8 +1138,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             msgbox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
             result = msgbox.exec()
             
-            # msgbox = gremlin.ui.ui_common.ConfirmBox(f"Calibration data has changed.", prompt = "Discard data?")
-            # result = msgbox.show()
+
             if result == QtWidgets.QMessageBox.StandardButton.Yes: # QtWidgets.QDialog.Accepted:
                 event.accept()
             else:

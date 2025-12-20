@@ -3876,42 +3876,36 @@ class ConfirmBoxEx(QtWidgets.QDialog):
     def result(self):
         return self._result
 
-class ConfirmBox():
-    def __init__(self, title = "Confirmation Required:", prompt = "Are you sure?", parent = None):
+def ConfirmBox(prompt = "Are you sure", informative_text = None, parent = None) -> bool:
+
+    result = False
+    def set_result(value):
+        nonlocal result
+        result = value == QtWidgets.QMessageBox.StandardButton.Yes
 
 
-        icon = gremlin.ui.ui_common.Icons.questionIcon()
-        pixmap = icon.pixmap(48)
-        msgbox = QtWidgets.QMessageBox()
-        msgbox.setWindowTitle(title)
-        msgbox.setIconPixmap(pixmap)
-        msgbox.setText(prompt)
-        msgbox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
-        self._message_box = msgbox
-
-    def show(self):
-        return self._message_box.exec()
+    MessageBoxYesNo(prompt = prompt, informative_text = informative_text, callback = set_result)
+    return result
 
 
+def MessageBoxWarning(title = "Warning", prompt = "Operation", informative_text = None,  parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "warning", None, parent)
 
-def MessageBoxWarning(title = "Warning", prompt = "Operation",  parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "warning", None, parent)
+def MessageBoxInfo(title = "Notice", prompt = "Operation", informative_text = None, parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt,  informative_text,"info", None, parent)
 
-def MessageBoxInfo(title = "Notice", prompt = "Operation", parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "info", None, parent)
+def MessageBoxYesNo(title = "Notice", prompt = "Operation", informative_text = None, callback = None,  parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt,  informative_text,"yesno", callback, parent)    
 
-def MessageBoxYesNo(title = "Notice", prompt = "Operation", callback = None,  parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "yesno", callback, parent)    
+def MessageBoxOkCancel(title = "Notice", prompt = "Operation", informative_text = None, callback = None, parent = None, width = 200):
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "okcancel", callback, parent)    
 
-def MessageBoxOkCancel(title = "Notice", prompt = "Operation", callback = None, parent = None, width = 200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, "okcancel", callback, parent)    
-
-def MessageBox(title = "Notice", prompt = "Operation", is_warning = True, callback = None, parent = None, width = 200):
+def MessageBox(title = "Notice", prompt = "Operation", informative_text = None, is_warning = True, callback = None, parent = None, width = 200):
     mode = "warning" if is_warning else "info"
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, mode, callback, parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, mode, callback, parent)
 
 
-def _message_box_ui(title = "Notice", prompt = "Operation", mode : str = "info", callback = None, parent = None):
+def _message_box_ui(title = "Notice", prompt = "Operation", informative_text = None, mode : str = "info", callback = None, parent = None):
     buttons = QtWidgets.QMessageBox.StandardButton.Ok
     if parent is None:
         parent = gremlin.shared_state.ui
@@ -3930,11 +3924,14 @@ def _message_box_ui(title = "Notice", prompt = "Operation", mode : str = "info",
 
         
     pixmap = icon.pixmap(48)
-    msgbox = QtWidgets.QMessageBox()
+    msgbox = QtWidgets.QMessageBox(parent=parent)
     msgbox.setWindowTitle(title)
     msgbox.setIconPixmap(pixmap)
     msgbox.setText(prompt)
+    if informative_text:
+        msgbox.setInformativeText(informative_text)
     msgbox.setStandardButtons(buttons)
+
     result = msgbox.exec()
     if callback:
         callback(result)

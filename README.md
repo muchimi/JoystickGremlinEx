@@ -29,8 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T135)
+- Fix: Keyboard Device: key identifier mismatch preventing keyboard/mouse input triggers.
+- Fix: Events: some keyboard and mouse event set to incorrect override type preventing some actions from triggering, such as map to state.
+- Fix: Events: mouse button events could trigger twice.
+- Fix: UI: message box refactor (message boxes were changed recently to avoid a QT crash).  This would cause some return values to be ignored.
+- UI: Virtual keyboard mouse button tooltips are now more descriptive.
+
 ### (m76T134A)
-- Fix: ensure callback unhook repeater on profile reload even if QT object has already been garbage collected (this may help with lag on new profile load for axis repeaters).
+- Fix: ensure callback unhook repeater on profile reload even if QT object has already been garbage collected (this may have been responsible for lag on new profile load for axis repeaters after a profile had previously been loaded).
 
 ### (m76T134)
 

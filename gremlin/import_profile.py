@@ -2109,9 +2109,8 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _clear_profile(self):
         ''' clears the current profile data before import '''
-        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Reset profile?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result = gremlin.ui.ui_common.Confirmbox(f"Reset profile?")
+        if result:
             self.target_profile = gremlin.base_profile.Profile()
 
     @QtCore.Slot()

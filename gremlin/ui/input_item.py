@@ -1048,21 +1048,8 @@ class InputItemListView(ui_common.AbstractView):
         data = self.model.data(index)
         if data and (data.containers or data.input_type == InputType.KeyboardLatched):
             # prompt confirm
-            message_box = QtWidgets.QMessageBox()
-            message_box.setText("Delete confirmation")
-            message_box.setInformativeText("This will delete associated actions for this entry.\nAre you sure?")
-            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
-            # pixmap = load_pixmap("warning.svg")
-            # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-            message_box.setIconPixmap(pixmap)
-            message_box.setStandardButtons(
-                QtWidgets.QMessageBox.StandardButton.Ok |
-                QtWidgets.QMessageBox.StandardButton.Cancel
-                )
-            message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-            gremlin.util.centerDialog(message_box)
-            result = message_box.exec()
-            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            result = gremlin.ui.ui_common.ConfirmBox("Delete confirmation","This will delete associated actions for this entry.\nAre you sure?")
+            if result:
                 self._confirmed_close(index)
         else:
             # no need to confirm
@@ -2818,9 +2805,9 @@ class InputItemWidget(QBoxFrame):
                 return
 
         # prompt
-        msgbox =gremlin.ui.ui_common.ConfirmBox(prompt = "Remove this input?")
-        result = msgbox.show()
-        if result != QtWidgets.QDialog.Accepted:
+        ui = gremlin.shared_state.ui
+        result =gremlin.ui.ui_common.ConfirmBox(prompt = "Remove this input?", parent = ui)
+        if not result:
             return
 
         # remove the tracker objects
@@ -2832,7 +2819,7 @@ class InputItemWidget(QBoxFrame):
         widget_tracker.unregisterButtonState(device_guid, input_type, input_id)
 
         self.closed.emit(self)
-        
+
 
 
     QtCore.Slot()

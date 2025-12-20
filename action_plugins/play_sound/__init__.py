@@ -342,8 +342,8 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         wav = self.action_data.tts_file
         if wav and os.path.isfile(wav):
             ui = gremlin.shared_state.ui
-            result = gremlin.ui.ui_common.MessageBoxYesNo(prompt="Delete cached file?", parent = ui)
-            if result == QtWidgets.QMessageBox.StandardButton.Yes:
+            result = gremlin.ui.ui_common.ConfirmBox(prompt="Delete cached file?", parent = ui)
+            if result:
                 try:
                     os.unlink(wav)
                 except Exception as e:

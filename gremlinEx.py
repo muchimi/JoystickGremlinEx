@@ -866,9 +866,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tab_guid = gremlin.util.parse_guid(self._active_tab_guid())
         device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
         current_mode = gremlin.shared_state.current_mode
-        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result =  gremlin.ui.ui_common.ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
+        if result:
             self._tab_clear_map_execute(device, current_mode)
 
     def _tab_remove_device_cb(self):

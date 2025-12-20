@@ -1969,10 +1969,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         if indices:
 
             # warn box 
-            msgbox = gremlin.ui.ui_common.ConfirmBox(f"Delete selected entries?")
-            result = msgbox.show()
-
-            if result == QtWidgets.QDialog.Accepted:
+            result = gremlin.ui.ui_common.ConfirmBox(f"Delete selected entries?")
+            if result:
                 rows = [idx.row() for idx in indices]
                 keep = []
                 for index, item in enumerate(self.action_data.sequence):

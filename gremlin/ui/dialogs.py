@@ -1572,7 +1572,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         # Configure the widget holding the layout with all the buttons
         self.scroll_widget.setLayout(self.scroll_layout)
-        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding,QtWidgets.QSizePolicy.Expanding)
+        #self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding,QtWidgets.QSizePolicy.Expanding)
         self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
@@ -3595,10 +3595,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
 
     def _delete_mode(self, mode_name):
-        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?")
-        msgbox.show()
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        if gremlin.ui.ui_common.ConfirmBox(prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?"):
             self._delete_mode_confirm(mode_name)
 
 

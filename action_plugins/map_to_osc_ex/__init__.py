@@ -1212,9 +1212,8 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _reset_server(self):
         ''' reset IP and port to configured defaults '''
-        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Reset server data to defaults?")
-        result = msgbox.show()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+        result = gremlin.ui.ui_common.ConfirmBox(f"Reset server data to defaults?")
+        if result:
             config = gremlin.config.Configuration()
             self._server_ip_widget.setText(config.osc_host) # also updates action_data
             self._server_port_widget.setValue(config.osc_output_port) # also updates action_data
@@ -1232,9 +1231,8 @@ class MapToOscExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _clear_args(self):
         ''' removes all args '''
         if self.action_data.args:
-            msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove arguments?")
-            result = msgbox.show()
-            if result == QtWidgets.QDialog.Accepted:
+            result = gremlin.ui.ui_common.ConfirmBox(f"Remove arguments?")
+            if result:
                 self.action_data.args.clear()
                 self._update()
 

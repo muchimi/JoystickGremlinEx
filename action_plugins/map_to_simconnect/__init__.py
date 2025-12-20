@@ -2198,9 +2198,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         item, _ = widget.data
 
         # confirm
-        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove {item.sim_name}?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result = gremlin.ui.ui_common.ConfirmBox(f"Remove {item.sim_name}?")
+        if result:
             if item and self.options.removeEntry(item):
                 self._populate_ui()
 

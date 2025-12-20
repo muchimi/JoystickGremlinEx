@@ -1425,18 +1425,10 @@ class EventListener:
 				if verbose : syslog.info(f"VJOY EVENT: looback filtered (skip) {vjoyevent}")
 
 
-	# def _execute_loopback_callback(self, event):
-	# 	''' executes a vjoy loopback event '''
-	# 	# if self._verbose_vjoy : syslog.info(f"VJOY LOOPBACK: trigger execute: {str(event)}")
-	# 	eh = EventHandler()
-	# 	verbose = self._verbose_vjoy
-	# 	# verbose = True # debug mode - force output for diagnostics regardless of user settings
-	# 	if verbose : syslog.info(f"VJOY EVENT THREAD: looback execute: {str(event)}")
-	# 	eh.execute_event(event)
 
 
 
-	#def shouldProcessVjoy(self, vjoy_id : int, input_type : InputType, input_id : int, value, record_only : bool = False) -> bool:
+
 	def shouldProcessVjoy(self, vjoy_id : int, input_type : InputType, input_id : int, value) -> bool:
 		''' tracks vjoy events from directinput or internally triggered '''
 		import gremlin.joystick_handling
@@ -1882,15 +1874,17 @@ class EventListener:
 				return
 
 			# translate mouse input to a keyboard input
-			key = gremlin.keyboard.key_from_mousebutton(event.button_id)
-			if key:
-				evt = gremlin.windows_event_hook.KeyEvent(
-					virtual_code = key.virtual_code, 
-					scan_code = key.scan_code, 
-					is_extended = key.is_extended,
-					is_pressed = event.is_pressed,
-					is_injected = event.is_injected)
-				self._keyboard_handler(evt)
+			# key = gremlin.keyboard.key_from_mousebutton(event.button_id)
+			# if key:
+			# 	evt = gremlin.windows_event_hook.KeyEvent(
+			# 		virtual_code = key.virtual_code, 
+			# 		scan_code = key.scan_code, 
+			# 		is_extended = key.is_extended,
+			# 		is_pressed = event.is_pressed,
+			# 		is_injected = event.is_injected
+			# 		)
+			# 	self._keyboard_handler(evt)
+			
 			# key_id = (event.button_id.value + 0x1000, False)
 			# self._keyboard_state[key_id] = event.is_pressed
 
@@ -2347,7 +2341,8 @@ class EventHandler(QtCore.QObject):
 						self.latched_events[device_guid][mode][keyid] = []
 					self.latched_events[device_guid][mode][keyid].append(identifier)
 					if verbose:
-						syslog.info(f"Key latch registered by guid {device_guid}  mode: {mode} vk: {virtual_code} (0x{virtual_code:X}) source keyid: {gremlin.keyboard.KeyMap.keyid_tostring(keyid_source)} -> translated keyId: {gremlin.keyboard.KeyMap.keyid_tostring(keyid)} name: {key.name} -> {identifier.display_name}")
+						syslog.info(f"Key latch registered by guid {device_guid}  mode: {mode} vk: {virtual_code} (0x{virtual_code:X}) source keyid: [{gremlin.keyboard.KeyMap.keyid_tostring(keyid_source)}]-> translated keyId: [{gremlin.keyboard.KeyMap.keyid_tostring(keyid)}] name: {key.name} -> {identifier.display_name}  Primary key: [{primary_key}]")
+
 					
 
 				if device_guid not in self.latched_callbacks.keys():
@@ -2439,7 +2434,7 @@ class EventHandler(QtCore.QObject):
 			
 			mouse_button = event.identifier
 			# convert the mouse button to the virtual scan code we use for mouse events
-			index = (mouse_button.value + 0x1000, False)
+			index = ((mouse_button.value + 0x1000, False), 0)
 			verbose = gremlin.config.Configuration().verbose_mode_mouse
 			if verbose:
 				syslog.info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
@@ -2448,7 +2443,7 @@ class EventHandler(QtCore.QObject):
 			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			device_guid = event.device_guid
 			# index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
-			index, _ = gremlin.keyboard.KeyMap.translate(event.identifier)
+			index = gremlin.keyboard.KeyMap.translate(event.identifier)
 			if verbose: syslog.info(f"matching key event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 
 		#event_key = Key(scan_code = identifier[0], is_extended = identifier[1], is_mouse = is_mouse, virtual_code= virtual_code)
@@ -2463,9 +2458,14 @@ class EventHandler(QtCore.QObject):
 			if self.runtime_mode in data.keys():
 				data = data[self.runtime_mode]
 				matching_keys = []
-				if index in data.keys():
+				# ensure index is the correct format
+				(a,b),c = index
+				if a == 0x1000 + 2:
+					pass
+				if index in data:
 					#print ("found identifier")
 					matching_keys = data[index]
+
 				if not matching_keys:
 					index_ex = (index[0], not index[1])
 					if index_ex in data.keys():
@@ -2879,15 +2879,14 @@ class EventHandler(QtCore.QObject):
 						if is_latched:
 							latch_key = input_item.key
 
-					
-
 						if latch_key:
 
-							# override the event type to a keyboard so actions think we're using a keyboard when using a mouse click
-							event.override_input_type = InputType.Keyboard
+							# override the event type for keyboard so actions treat mouse/kbd input as a joystick button for mapping purposes
+							event.override_input_type = InputType.JoystickButton
 
-							#print (f"Found latched key: {latch_key}")
+							
 							m_list = self._matching_latched_callbacks(event, latch_key)
+							
 							if m_list:
 								if verbose:
 									trigger_line = "***** TRIGGER " + "*"*30
@@ -2895,9 +2894,8 @@ class EventHandler(QtCore.QObject):
 									syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
 									syslog.info(trigger_line)
 								self._trigger_callbacks(m_list, event)
-								return
-							# else:
-							# 	print (f"No callbacks found for: {latch_key}")
+							return
+						
 					verbose = gremlin.config.Configuration().verbose_mode_inputs
 				else:
 					if verbose:

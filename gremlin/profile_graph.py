@@ -1366,20 +1366,6 @@ class ProfileGraph():
 
         config = gremlin.config.Configuration()
 
-        # if self.has_unknowns() and config.import_prompt_enabled and not self._remap_prompt_issued:
-        #     if gremlin.shared_state.import_prompt_stack:
-        #         # already prompted, don't prompt again
-        #         return
-        #     gremlin.shared_state.import_prompt_stack += 1
-        #     gremlin.util.popCursorTemporary()
-        #     base_dir, base_file = os.path.split(source_xml)
-        #     msgbox = ui_common.ConfirmBoxEx(title = "Import profile?", prompt = f"Profile [{base_file}] has one or more devices that could not be found.\nWould you like to remap devices?", again_prompt=True)
-        #     result = msgbox.exec()
-        #     gremlin.util.popCursorTemporary(False)
-        #     checked = msgbox.checked
-        #     config.import_prompt_enabled = not checked
-        #     if msgbox.result == QtWidgets.QMessageBox.StandardButton.Ok:
-        #         self.remap()
         
     def to_xml(self, target_xml : str) -> bool:
         ''' writes the profile graph to XML'''

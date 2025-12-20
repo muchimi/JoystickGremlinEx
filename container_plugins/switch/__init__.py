@@ -236,9 +236,8 @@ class SwitchWidget(QtWidgets.QWidget):
         
     @QtCore.Slot()
     def _delete_cb(self):
-        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Delete switch {self.data.index}?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result = gremlin.ui.ui_common.ConfirmBox(f"Delete switch {self.data.index}?")
+        if result:
             self.delete_item.emit(self.data)
 
     def _listen_cb(self):

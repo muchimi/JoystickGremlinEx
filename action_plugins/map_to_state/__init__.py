@@ -565,9 +565,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _clear_map(self):
         ''' sets all mappings to pulse mode '''
-        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Clear all hat button mappings?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result = gremlin.ui.ui_common.ConfirmBox(prompt = "Clear all hat button mappings?")
+        if result:
             positions = self.action_data.hat_positions
             for position in positions:
                 self.action_data.hat_map[position] = 0
@@ -576,9 +575,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _auto_map(self):
         ''' sets all mappings to pulse mode '''
-        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Remap all hat button mappings?")
-        result = msgbox.show()
-        if result == QtWidgets.QDialog.Accepted:
+        result = gremlin.ui.ui_common.ConfirmBox(prompt = "Remap all hat button mappings?")
+        if result:
             positions = self.action_data.hat_positions
             vjoy_id = self.action_data.vjoy_id
             if vjoy_id in self.action_data:
@@ -728,7 +726,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         if key and not self.sd.exists(key):
             description = self.action_data.description
             self.sd.register(key,False, description if description else "auto-created state")
-        #self.debug_count = 0
+        
+        # self.last_event = None
 
 
     def profile_start(self):
@@ -900,7 +899,14 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             if verbose: syslog.info(f"\tProfile not running - skipping")
             return False
 
-        
+
+        # if event.is_pressed:
+        #     pass
+        # if self.last_event:
+        #     if self.last_event.is_pressed == event.is_pressed:
+        #         pass
+
+        # self.last_event = event
 
         key = self.action_data.key
         mode = self.action_data.mode
@@ -911,7 +917,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                 (not is_pressed and self.action_data.exec_on_release) or \
                 mode in ("actual","pulse")        
 
-        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}] input type: [{input_type.name}] mode: [{mode}]")
+        if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}] input type: [{input_type.name}] mode: [{mode}] exec on press: [{self.action_data.exec_on_press}]  exec on release: [{self.action_data.exec_on_release}]")
     
 
 
@@ -922,7 +928,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         if trigger:
             # trigger mode (act as press)
             match input_type:
-                case InputType.JoystickButton:
+                case InputType.JoystickButton: #| InputType.Keyboard | InputType.KeyboardLatched:
                     # button
                     match mode:
                         case "actual":
@@ -942,6 +948,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                             state = not self.sd.value(key)
                             if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] TOGGLE -> {'ON' if state else 'OFF'}")
                             self.sd.setValue(key, state)
+                            if not state:
+                                pass
                             
                         case "pulse":
                             if is_pressed:
@@ -1057,6 +1065,8 @@ class MapToState(gremlin.base_profile.AbstractAction):
     input_types = [
          InputType.JoystickButton,
          InputType.JoystickHat,
+         InputType.Keyboard,
+         InputType.KeyboardLatched
     ]
 
     def __init__(self, parent):
