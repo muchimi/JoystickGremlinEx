@@ -5063,6 +5063,7 @@ class QProgressBar(QtWidgets.QWidget):
     def _update_value_ui(self):
         if not Shiboken.isValid(self):
             return
+
         if hasattr(self._value,"__iter__"):
             # count how many are not None
             values = self._value
@@ -5217,17 +5218,19 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
     def getDescription(self) -> str:
         return self._description            
 
-    def hookDevice(self, device_guid, input_type, input_id, ui_only = True, persist = False, description = None):    
+    def hookDevice(self, hook_id, device_guid, input_type, input_id, ui_only = True, persist = False, description = None):    
         ''' hooks the device '''    
         if Shiboken.isValid(self):
             self._description = description or f"repeater: [{gremlin.joystick_handling.getDeviceName(self.device_guid)}] input id: [{self.input_id}]"
-            super().hookDevice(self.process_events,
-                                device_guid = device_guid,
-                                input_type = input_type,
-                                input_id = input_id,
-                                ui_only = ui_only,
-                                persist = persist,
-                                )
+            super().hookDevice(
+                            hook_id,
+                            self.process_events,
+                            device_guid = device_guid,
+                            input_type = input_type,
+                            input_id = input_id,
+                            ui_only = ui_only,
+                            persist = persist,
+                            )
         
 
     def process_events(self, event, values):
@@ -5305,10 +5308,11 @@ class ButtonStateWidget(QtWidgets.QWidget):
             self.deleted.emit()
 
 
-    def hookDevice(self, device_guid, input_type, input_id):
+    def hookDevice(self, hook_id, device_guid, input_type, input_id):
         ''' hooks the input  '''
         if self._hooked:
             return
+        self._hook_id = hook_id
         self._hooked = True
         self._device_guid = device_guid
         self._input_id = input_id
@@ -6166,6 +6170,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         """
         super().__init__(parent)
 
+        
         self._manual_lock = False # semaphore for manual updates
         self.device = device
         self._readonly = True
@@ -6193,7 +6198,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         name_index = 0
 
         
-
+        hook_id = device.device_id
         for i in range(device.axis_count): 
             linear_id = i + 1
             axis_id = device.linear_id_map[linear_id] # map linear -> axis ID for non sequential axes
@@ -6203,6 +6208,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             widget.setFixedWidth(80)
             widget.setFixedHeight(150)
             sd = gremlin.event_handler.AxisState()
+            
                         
             axis_name = device.axis_names[name_index]
             name_index +=1
@@ -6220,6 +6226,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             axis_widget = QHookedProgressBar(data = axis_id, value = values)
             description = f"axis repeater: [{device.name}] axis id: [{axis_id}]"
             axis_widget.hookDevice(
+                        hook_id,
                         device_guid = device.device_guid,
                         input_type = InputType.JoystickAxis,
                         input_id = axis_id,
@@ -6917,7 +6924,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         assert device is not None, "Device must be provided"
 
         self._device = device
-        
+        self.hook_id = gremlin.util.get_guid()
         self.vis_type = vis_type
         self.widgets = []
         layout = QtWidgets.QHBoxLayout()
@@ -7027,16 +7034,11 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             el.joystick_event.disconnect(self._current_axis_update)
-            #el.vjoy_event.disconnect(self._vjoy_current_axis_update) # hook vjoy separately
-            # if self._device.is_virtual:
-            #     el.unregisterVjoyCallback(self._vjoy_current_axis_update)
+
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
-            #el.joystick_event.disconnect(self._temporal_axis_update)
-            #el.vjoy_event.disconnect(self._vjoy_temporal_axis_update) # hook vjoy separately
-            # if self._device.is_virtual:
-            #     el.unregisterVjoyCallback(self._vjoy_temporal_axis_update)
-            jep = gremlin.event_handler.JoystickEventProcessor()
-            jep.unregisterCallback(self._temporal_axis_update) # this unregisters ALL hooks to this callback
+            pass
+            # jep = gremlin.event_handler.JoystickEventProcessor()
+            # jep.unregisterCallback(self.hook_id) # this unregisters ALL hooks to this callback
 
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._unhook_buttons()

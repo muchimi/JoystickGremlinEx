@@ -29,6 +29,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76T135B)
+- Fix: UI: identified an issue on profile reload that would not clear prior UI update event queues.
+- Fix: Calibration: calibration icon on calibration reset not updating.
+- Fix: Calibration: added a message box to remind to save on calibration data reset.  Save is not automatic because there are two possible places to save the data to.
+
+### (m76T135A)
+- Internal build
+
+
 ### (m76T135)
 - Fix: Keyboard Device: key identifier mismatch preventing keyboard/mouse input triggers.
 - Fix: Events: some keyboard and mouse event set to incorrect override type preventing some actions from triggering, such as map to state.

@@ -853,6 +853,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         from gremlin.curve_handler import DeadzoneWidget
 
         self._lock = False
+
         self.setModal(True)
         self.input_item = input_item
         input_type = input_item.get_input_type()
@@ -862,6 +863,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         
         device_guid = input_item.device_guid
         input_id = input_item.input_id
+        self.hook_id = gremlin.util.normalize_guid(input_item.id)
         self.calibrated_on_entry = input_item.calibration.hasData # true if the item has calibration data on entry
         self._closing = False 
         self.mgr : CalibrationManager = CalibrationManager()
@@ -1062,12 +1064,13 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         jep = gremlin.event_handler.JoystickEventProcessor()
         description = f"calibration axis position device: [{gremlin.joystick_handling.getDeviceName(self.action_data.device_guid)}] input id: [{self.action_data.input_id}]"
-        jep.registerCallback(self._handle_joystick_event_ui,
-                                           device_guid = self.action_data.device_guid,
-                                           input_type = InputType.JoystickAxis,
-                                           input_id = self.action_data.input_id,
-                                           ui_only = True,
-                                           description = description)
+        jep.registerCallback(self.hook_id,
+                             self._handle_joystick_event_ui,
+                            device_guid = self.action_data.device_guid,
+                            input_type = InputType.JoystickAxis,
+                            input_id = self.action_data.input_id,
+                            ui_only = True,
+                            description = description)
 
         # initial value
         self._update_ui()
@@ -1130,7 +1133,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             # changes not saved
             icon = gremlin.ui.ui_common.Icons.warningIcon()
             pixmap = icon.pixmap(48)
-            msgbox = QtWidgets.QMessageBox()
+            msgbox = QtWidgets.QMessageBox(parent = self)
             msgbox.setWindowTitle("Notice")
             msgbox.setIconPixmap(pixmap)
             msgbox.setInformativeText("Discard changes?")
@@ -1148,7 +1151,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._closing = True
 
         jep = gremlin.event_handler.JoystickEventProcessor()
-        jep.unregisterCallback(self._handle_joystick_event_ui)
+        
+        jep.unregisterCallback(self.hook_id)
 
         self._slider.valueChanged.disconnect(self._slider_changed)
         self._deadzone_widget.changed.disconnect(self._deadzone_changed)
@@ -1189,9 +1193,10 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     def _reset_calibration(self, widget):
         ''' reset calibration for the axis '''
         self.action_data.reset()
+        value = self.action_data.hasData
         self._update_ui()
         self._status_widget.setText("Reset")
-        
+        gremlin.ui.ui_common.MessageBoxInfo(prompt = "Calibration reset.", informative_text = "Remember to save the data.", parent = self)        
 
     @QtCore.Slot()
     def _set_center_calibration(self):

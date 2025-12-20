@@ -97,7 +97,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.data : gremlin.ui.tab= data
         self._refresh_lock = False # semaphore to block refresh in progress
-        
+        self.hook_id = gremlin.util.get_guid()
         self.curve_update_handler = {} # map of curve handlers to the input by index
 
         self.device = device
@@ -524,14 +524,16 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         description = f"curve position update: device: [{device_name}] input: [{data.input_id}]"
 
         # hook joystick queue to update position on the curve
-        jeq = gremlin.event_handler.JoystickEventProcessor()
-        jeq.registerCallback(callback = self._handle_curve_update,
-                                            device_guid = data.device_guid,
-                                            input_type = InputType.JoystickAxis,
-                                            input_id = data.input_id,
-                                            ui_only = True,
-                                            description = description
-                                            )
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        jep.registerCallback(
+            self.hook_id,
+            callback = self._handle_curve_update,
+            device_guid = data.device_guid,
+            input_type = InputType.JoystickAxis,
+            input_id = data.input_id,
+            ui_only = True,
+            description = description
+            )
 
         # disable highlighting
         gremlin.shared_state.push_suspend_highlighting()
@@ -543,7 +545,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # renable highlighting
         gremlin.shared_state.pop_suspend_highlighting()
 
-        jeq.unregisterCallback(self._handle_curve_update)
+        jep.unregisterCallback(self.hook_id)
         
         self._update_curve_icon(index, data)
 
@@ -551,7 +553,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if self._curve_update_handler:
             self._curve_update_handler(event.value)
 
-
+    def unhook(self):
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        jep.unregisterCallback(self.hook_id)
 
     def _delete_curve_item_cb(self, widget, index, data):
         ''' delete curve request '''

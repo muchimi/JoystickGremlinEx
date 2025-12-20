@@ -1533,13 +1533,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         pushCursor()
 
 
-
-
-
         if not self._save_changes_request():
             return
         
         el = gremlin.event_handler.EventListener()
+        
         
         if gremlin.shared_state.current_profile:
             current_profile = gremlin.shared_state.current_profile
@@ -1590,6 +1588,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # reset joystick input/output flags
         sd = gremlin.event_handler.JoystickState()
         sd.reset()
+
+        # reset event processor 
+        jap = gremlin.event_handler.JoystickEventProcessor()
+        jap.reset()
 
         # setup profile default input filters
         self.profile.settings.setAllFiltered("default")
@@ -4493,7 +4495,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             pushCursor()
             
-
             el.profile_loading.emit() # indicate we are loading a profile
 
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
@@ -4506,6 +4507,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # reset execution context
             ec = gremlin.execution_graph.ExecutionContext()
             ec.reset(no_rebuild = True)
+
+            # reset joystick input/output flags
+            sd = gremlin.event_handler.JoystickState()
+            sd.reset()
+
+            # reset event processor 
+            jap = gremlin.event_handler.JoystickEventProcessor()
+            jap.reset()
+            
 
 
             el.request_activate.emit(False)

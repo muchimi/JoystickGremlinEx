@@ -1691,6 +1691,7 @@ class InputItemWidget(QBoxFrame):
 
         super().__init__(parent)
 
+      
         self.parent = parent
         self.widget_width = None # actual width in pixels
         self.widget_height = None # actual height in pixels
@@ -2143,6 +2144,23 @@ class InputItemWidget(QBoxFrame):
                 widget.setFixedHeight(h)
 
 
+    def unhook(self):
+        hook_id = gremlin.util.normalize_guid(self.data.id)
+        if self.axis_widget:
+            verbose = gremlin.config.Configuration().verbose_mode_perf
+            if verbose:
+                description = f"input repeater:  hook id: [{hook_id}] [{str(self.input_item.id)}] device [{gremlin.joystick_handling.getDeviceName(self.identifier.device_guid)}] axis id: [{self.identifier.input_id}] "
+                syslog.info(f"Unregister repeater: {description}")
+            self.axis_widget.unhookDevice()
+            self.axis_widget.setParent(None)
+            self.axis_widget.deleteLater()
+            self.axis_widget = None
+        if self.button_widget:
+            self.button_widget.setParent(None)
+            self.button_widget.deleteLater()
+            self.button_widget = None
+        
+
 
 
     def _update_repeater(self):
@@ -2156,6 +2174,7 @@ class InputItemWidget(QBoxFrame):
             return
         
         config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_perf
 
         widget = None # widget created for the repeater
 
@@ -2173,7 +2192,7 @@ class InputItemWidget(QBoxFrame):
                 input_type in (InputType.JoystickAxis, InputType.JoystickButton,  InputType.JoystickHat, InputType.OpenSoundControl, InputType.Midi):
 
                 if self.identifier.is_valid:
-
+                    hook_id = gremlin.util.normalize_guid(self.data.id)
                     if self.identifier.is_axis:
                         # axis
                         device_guid = self.identifier.device_guid
@@ -2192,9 +2211,10 @@ class InputItemWidget(QBoxFrame):
                         widget.setMaximumWidth(200)
                         if self._debug_layout:
                             widget.setStyleSheet("background: purple;")
-                        description = f"input repeater: device [{gremlin.joystick_handling.getDeviceName(self.identifier.device_guid)}] axis id: [{self.identifier.input_id}] "
-
-                        widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id, ui_only = True, description = description)
+                        
+                        description = f"input repeater:  hook id: [{hook_id}] [{str(self.input_item.id)}] device [{gremlin.joystick_handling.getDeviceName(self.identifier.device_guid)}] axis id: [{self.identifier.input_id}] "
+                        if verbose: syslog.info(f"register repeater: {description}")
+                        widget.hookDevice(hook_id, self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id, ui_only = True, description = description)
                         height = widget.sizeHint().height() + 4
                         self._setWidgetHeight(self._repeater_container_widget, height)
 
@@ -2203,7 +2223,7 @@ class InputItemWidget(QBoxFrame):
                         # button
                         widget = gremlin.ui.ui_common.ButtonStateWidget()
                         widget.unhooked.connect(self._button_widget_unhooked)
-                        widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
+                        widget.hookDevice(hook_id, self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
                         #widget.hookDevice(self._device_guid, input_type, self._input_id )
                         self.button_widget = widget
                         self._repeater_container_layout.addWidget(widget)                
@@ -2841,6 +2861,7 @@ class InputItemWidget(QBoxFrame):
         # open the calibration button for this input
         dialog = gremlin.ui.axis_calibration.CalibrationDialogEx(self.data)
         dialog.exec()
+        self.data.calibration.copyFrom(dialog.action_data)
         self._update_axis_icons()
         
 
