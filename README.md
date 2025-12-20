@@ -29,6 +29,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T135C)
+- Fix: Input Viewer: clear button now resets keyboard and state selectors.
 
 ### (m76T135B)
 - Fix: UI: identified an issue on profile reload that would not clear prior UI update event queues.

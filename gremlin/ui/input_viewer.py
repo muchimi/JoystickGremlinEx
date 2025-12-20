@@ -180,7 +180,7 @@ class VisualizationSelector(QtWidgets.QWidget):
     changed = Signal(dinput.DeviceSummary,VisualizationType,bool)
     clear = Signal() # delete all
 
-    def __init__(self, change_callback, parent=None):
+    def __init__(self, change_callback, viewer, parent=None):
         """Creates a new instance.
 
         :param parent the parent of this widget
@@ -188,7 +188,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         super().__init__(parent)
 
         devices = gremlin.joystick_handling.joystick_devices()
-
+        self.viewer = viewer
         self._selector_widgets = []
         self._selector_callbacks = {}
         self._change_callback = change_callback
@@ -342,7 +342,6 @@ class VisualizationSelector(QtWidgets.QWidget):
                     checked = config.getValue(device_guid, VisualizationType.Hat, False)
                     ho_cb.setChecked(checked)
                     if checked: change_callback(dev, VisualizationType.Hat, True)
-
 
 
         # fire all the callbacks to update
@@ -499,10 +498,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
                                                                            tooltip="Toggle keyboard/mouse visualizer")
         self.keyboard_widget_selector.setIgnoreKeyboard(True)
 
-
         show_keyboard = checked
-        
-
 
         checked = v_config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, False)
         self.state_widget_selector = gremlin.ui.ui_common.QDataCheckbox("State",
@@ -524,7 +520,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.combine_widget.setIgnoreKeyboard(True)
 
 
-        self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget)
+        self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget, viewer = self)
         self.vis_selector.changed.connect(self._add_remove_visualization_widget)
         self.vis_selector.clear.connect(self._clear)
 
@@ -713,6 +709,16 @@ States can be toggled by clicking on the state button.  Expression states will u
             self._delete_widget(widget)
 
         self._joystick_widgets.clear()
+
+        
+        # update the keyboard and state checkboxes
+        checked = False
+        with QtCore.QSignalBlocker(self.keyboard_widget_selector):
+            self.keyboard_widget_selector.setChecked(checked)
+
+        with QtCore.QSignalBlocker(self.state_widget_selector):
+            self.state_widget_selector.setChecked(checked)
+
 
         self.views.clear()
  
