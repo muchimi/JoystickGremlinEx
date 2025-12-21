@@ -191,6 +191,10 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         if self._input_item is not None:
             return self._input_item.input_id
         return None
+    
+    def get_input_item(self):
+        ''' gets the input item '''
+        return self._input_item
 
 
     def update_inputs(self, item_data):
@@ -3367,6 +3371,8 @@ class Profile():
         self._start_state = {}  # profile startup output state - index by [device_id (str)][buttons/axis (str)][id (int)] = value (float or bool)
         self._removed_devices = [] # list of removed devices from the profile, list of device_id (str)
 
+
+        self.override_start_mode = None # override mode for profile startup if any (not persisted)
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         

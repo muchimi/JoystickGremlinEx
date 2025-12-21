@@ -594,13 +594,7 @@ class EventListener:
 	# Signal emitted when a profile is changed (to refresh UI)
 	profile_changed = Signal()
 
-	# profile loaded event
-	profile_loading = Signal() # fires when a profile is being loaded
-	profile_loading_completed = Signal() # fires when profile loading is completed (with or without errors)
-	profile_loaded =  Signal() # fires after a profile was loaded (no errors)
 
-	# profile unloaded - trigger when a profile is being unloaded
-	profile_unloaded = Signal()
 	
 	# signal emitted when the selected hardware device changes
 	profile_device_changed = Signal(DeviceChangeEvent)
@@ -627,6 +621,14 @@ class EventListener:
 
 	profile_stop_toolbar = Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
 	profile_unload = Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
+	profile_loading = Signal() # fires when a profile is being loaded
+	profile_loading_completed = Signal() # fires when profile loading is completed (with or without errors)
+	profile_loaded =  Signal() # fires after a profile was loaded (no errors)
+
+	# profile unloaded - trigger when a profile is being unloaded
+	profile_unloaded = Signal()
+
+	
 	request_profile_stop = Signal(str) # request the profile to stop (message to display: str)
 	request_profile_reload = Signal(str, bool) # request a profile to load (str = profile file, bool = as new profile flag)
 	request_reload = Signal() # request a reload of the current profile data
@@ -2010,7 +2012,7 @@ class EventHandler(QtCore.QObject):
 		self.plugins = {}
 		self._mode_validator_callbacks = {}  # list of validators (callbacks) that return a boolean True if the mode change can occur - signature must be callable(str)->bool
 		self._last_tts_data = TTSNotifyData() # last mode that triggered a TTS verbal notice
-		
+		self._change_mode_callback = None # change mode handler 
 		el = EventListener()
 		el.profile_start.connect(self._profile_start)
 		el.profile_stop.connect(self._profile_stop)
@@ -2577,8 +2579,8 @@ class EventHandler(QtCore.QObject):
 					rate = config.initial_load_rate_tts
 					tts = gremlin.tts.TextToSpeech()
 					tts.speak(text, rate) # default rate is 100
-	
 
+	
 	def change_mode(self, new_mode, emit = True, force_update = False, tts = True, validate = True):
 		"""Changes the GremlinEx currently active mode.
 
@@ -3894,7 +3896,6 @@ class JoystickHook:
 		if self._hooked:
 			jep = JoystickEventProcessor()
 			jep.unregisterCallback(self._hook_id)
-			self._hooked = False
 			config = gremlin.config.Configuration()
 			verbose = config.verbose_mode_events or config.verbose_mode_perf
 			if verbose:
@@ -3904,6 +3905,7 @@ class JoystickHook:
 			self._device_guid = None
 			self._input_type = None
 			self._input_id = None
+			self._hooked = False
 		
 
 	def hookDevice(self, hook_id, callback, device_guid, input_type, input_id, ui_only = True, persist = False):

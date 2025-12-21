@@ -1474,7 +1474,7 @@ There should only be one GremlinEx master server on the subnet.
 
         #page_widget, page_layout = gremlin.ui.ui_common.getGridContainer()
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
-        page_widget.setMaximumWidth(600)
+        #page_widget.setMaximumWidth(600)
 
         #col1_widget, col1_layout = gremlin.ui.ui_common.getVContainer()
         #col2_widget, col2_layout = gremlin.ui.ui_common.getVContainer()
@@ -1563,8 +1563,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         
 
         # profile map widgets
-        self.container_map_widget = QtWidgets.QWidget()
-        self.container_map_layout = QtWidgets.QVBoxLayout(self.container_map_widget)
+
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
@@ -1589,12 +1588,13 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.scroll_layout.addWidget(self.map_widget)
         self.scroll_layout.setContentsMargins(6,0,6,0)
         self.scroll_layout.addStretch()
-        self.container_map_layout.addWidget(self.scroll_area)
 
-        container_bar_widget = QtWidgets.QWidget()
-        container_bar_layout = QtWidgets.QHBoxLayout()
-        container_bar_widget.setLayout(container_bar_layout)
+        # widgets = [
+        #     self.scroll_area,
+        # ]
+        # self.container_map_widget = gremlin.ui.ui_common.getHContainer(widgets, left_margin = 6, widget_only=True)
 
+  
 
         sort_profile_widget = QtWidgets.QPushButton("Sort Profile")
         sort_profile_widget.clicked.connect(self._sort_profile_cb)
@@ -1610,9 +1610,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         add_map_widget.clicked.connect(self._add_profile_map_cb)
         add_map_widget.setToolTip("Adds a new application (process) to profile mapping entry")
 
-
-        backup_container_widget, backup_container_layout = gremlin.ui.ui_common.getHContainer()
-
+      
         self.backup_count_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.backup_count_widget.setRange(0, 50)
         count = self.config.backup_count
@@ -1623,22 +1621,30 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.backup_count_disabled = QtWidgets.QLabel("(disabled)")
         self.backup_count_disabled.setVisible(count == 0)
 
-        backup_container_layout.addWidget(QtWidgets.QLabel("Profile backup count:"))
-        backup_container_layout.addWidget(self.backup_count_widget)
-        backup_container_layout.addWidget(self.backup_count_disabled)
-        backup_container_layout.addStretch()
+
+
+
+        widgets = [
+            "Profile backup count:",
+            self.backup_count_widget,
+            self.backup_count_disabled
+        ]
+        backup_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+        page_layout.addWidget(backup_container)
+        
+
+        widgets = [
+            "Process/Profile map:",
+            "||",
+            sort_profile_widget,
+            sort_process_widget,
+            add_map_widget,
+        ]
+
+        container_bar_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
         page_layout.addWidget(container_bar_widget)
-        container_bar_layout.addWidget(QtWidgets.QLabel("Process/Profile map:"))
-        container_bar_layout.addStretch()
-
-        container_bar_layout.addWidget(sort_profile_widget)
-        container_bar_layout.addWidget(sort_process_widget)
-        container_bar_layout.addWidget(add_map_widget)
-
-        page_layout.addWidget(backup_container_widget)
-        page_layout.addWidget(container_bar_widget)
-        page_layout.addWidget(self.container_map_widget)
+        page_layout.addWidget(self.scroll_area)
         
 
         # force a data reload
@@ -2703,9 +2709,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 container_layout.addWidget(xml_widget,row,0,1,2)
                 row+=1
 
-                options_line = QtWidgets.QWidget()
-                options_layout = QtWidgets.QGridLayout(options_line)
-                options_layout.setContentsMargins(0,0,0,0)
+     
 
 
                 restore_widget = ui_common.QDataCheckbox("Restore last mode on start", item)
@@ -2733,10 +2737,13 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 mode_widget.setToolTip("Default startup mode for this profile")
 
 
-                #options_layout.addWidget(force_numlock_widget,0,0,1,-1)
-                options_layout.addWidget(restore_widget,1,0)
-                options_layout.addWidget(QtWidgets.QLabel("Default start mode:"),1,1)
-                options_layout.addWidget(mode_widget,1,2)
+                widgets = [
+                    "Default start mode:",
+                    mode_widget,
+                    restore_widget
+                ]
+                options_line = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+                
 
                 container_layout.addWidget(options_line,row,0,1,-1)
                 row+=1

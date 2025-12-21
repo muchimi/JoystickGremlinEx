@@ -712,13 +712,19 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         
         # update the keyboard and state checkboxes
-        checked = False
-        with QtCore.QSignalBlocker(self.keyboard_widget_selector):
-            self.keyboard_widget_selector.setChecked(checked)
+        self._toggle_keyboard_widget(False)
+        self._toggle_state_widget(False)
 
-        with QtCore.QSignalBlocker(self.state_widget_selector):
-            self.state_widget_selector.setChecked(checked)
+        # checked = False
+        # with QtCore.QSignalBlocker(self.keyboard_widget_selector):
+        #     self.keyboard_widget_selector.setChecked(checked)
 
+        # with QtCore.QSignalBlocker(self.state_widget_selector):
+        #     self.state_widget_selector.setChecked(checked)
+
+        # config = VisualizationConfig()
+        # config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, checked)
+        # config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, checked)
 
         self.views.clear()
  
@@ -982,10 +988,11 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     def hideState(self):
         ''' hides the state device '''
-        if self._state_visible:
-            if self._state_visualizer_widget and Shiboken.isValid(self._state_visualizer_widget):
-                self._state_visualizer_widget.setVisible(False)
-            self._state_visible = False
+        if self._state_visualizer_widget and Shiboken.isValid(self._state_visualizer_widget):
+            self._state_visualizer_widget.setVisible(False)
+        self._state_visible = False
+        with QtCore.QSignalBlocker(self.state_widget_selector):
+            self.state_widget_selector.setChecked(False)
         
 
 

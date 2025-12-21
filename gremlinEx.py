@@ -188,7 +188,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         
         
         
-
+        
         self._profile_load_stack = []
         self._profile_load_temporary_files = []
         self._profile_hash = None # active profile hash to detect changes
@@ -3965,6 +3965,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._process_change_in_progress = True
 
         config = gremlin.config.Configuration()
+        profile = gremlin.shared_state.current_profile
 
         verbose = config.verbose_mode_process
         # syslog = logging.getLogger("system")
@@ -4006,7 +4007,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
 
-            current_profile_path = self.profile.profile_file
+            current_profile_path = profile.profile_file if profile else None
         
             is_running = gremlin.shared_state.is_running # true if gremlin is running at process change
             if is_running :
@@ -4016,12 +4017,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # see if we have a mapping entry for this executable
             profile_item = self._profile_map.get_map(new_process_path)
+            start_mode = None
+            if profile_item:
+                start_mode = profile_item.default_mode
+                
 
             new_profile_path = profile_item.profile if profile_item else None
 
             if not current_profile_path or not os.path.isfile(current_profile_path):
-                syslog.error("PROC: current profile is not saved - auto process start is unable to function")
-                gremlin.ui.ui_common.MessageBox(prompt = f"Current profile  [{current_profile_path}] is not saved or the XML could not be found.  Process auto-start disabled.")
+                syslog.infog("PROC: no current profile found - auto process start is unable to function")
+                # gremlin.ui.ui_common.MessageBox(prompt = f"Current profile  [{current_profile_path}] is not saved or the XML could not be found.  Process auto-start disabled.")
                 return
             
             current_profile_base = os.path.basename(current_profile_path)
@@ -4070,7 +4075,38 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     syslog.info(f"PROC: process change: deactivate current profile: [{current_base_name}] - saving last used mode: [{gremlin.shared_state.runtime_mode}]")
 
 
-                el.request_activate.emit(False)
+                el.request_activate.emit(False) # stop any current profile
+
+                if option_reset_mode_on_process_activate:
+                    # restore only the profile default mode
+                    restore_mode = loaded_profile.get_default_mode()
+                    if verbose: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog")
+                elif option_restore_mode:
+                    # restore to the mapped profile default mode defined in mappings
+                    restore_mode = self._get_process_mode(new_process_path)
+                    if verbose and restore_mode: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from runtime memory")
+                    if not restore_mode:
+                        restore_mode = gremlin.shared_state.current_profile.get_restore_mode() # saved JSON mode
+                        if verbose and restore_mode: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog")
+                    if not restore_mode:
+                        restore_mode = gremlin.shared_state.current_profile.get_default_mode()
+                        if verbose: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog as a fallback")
+
+                # a mapping profile was found - new profile was loaded if needed - see if we need to change the mode
+                if restore_mode is not None:
+                    if restore_mode != current_mode:
+                        if not restore_mode in loaded_profile.get_modes():
+                            syslog.error(f"PROC: Unable to find mode [{restore_mode}] in profile - defaulting to default mode dialog startup mode")
+                            restore_mode = loaded_profile.get_default_mode()
+
+                        
+                        if verbose: syslog.info(f"PROC: request mode change to [{restore_mode}]")
+                        self._process_autoload_start_mode = restore_mode
+                        #eh.change_mode(restore_mode, force_update = True) # set the selected mode - note that this may fail if mode locking is enabled
+                        mode_changed = True
+                                            
+
+                
                
 
                 # remember the last used mode for the profile before we change to the new - only do this if we are in runtime
@@ -4085,6 +4121,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 else:
                     if verbose: syslog.info(f"\tSave last used mode: no active mode found for profile [{current_base_name}]")
 
+
+                    
+    
+
                 self._active_process_path = new_process_path
 
                 # change profile
@@ -4092,9 +4132,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 
                 # load the new profile
                 self._do_load_profile(new_profile_path)
+                
 
+              
                 loaded_profile = gremlin.shared_state.current_profile
                 self.profile = loaded_profile
+
+                if start_mode:
+                    self.profile.override_start_mode = start_mode
+                    eh.change_mode(start_mode)
 
                 if verbose: syslog.info(f"PROC: process change: loaded profile [{new_profile_base}]")
 
@@ -4127,32 +4173,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if verbose: syslog.info(f"PROC: profile load mode: {current_mode}  derived mode to restore: [{restore_mode}]")
 
                 
-                if option_reset_mode_on_process_activate:
-                    # restore only the profile default mode
-                    restore_mode = loaded_profile.get_default_mode()
-                    if verbose: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog")
-                elif option_restore_mode:
-                    # restore to the mapped profile default mode defined in mappings
-                    restore_mode = self._get_process_mode(new_process_path)
-                    if verbose and restore_mode: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from runtime memory")
-                    if not restore_mode:
-                        restore_mode = gremlin.shared_state.current_profile.get_restore_mode() # saved JSON mode
-                        if verbose and restore_mode: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog")
-                    if not restore_mode:
-                        restore_mode = gremlin.shared_state.current_profile.get_default_mode()
-                        if verbose: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog as a fallback")
-
-                # a mapping profile was found - new profile was loaded if needed - see if we need to change the mode
-                if restore_mode is not None:
-                    if restore_mode != current_mode:
-                        if not restore_mode in loaded_profile.get_modes():
-                            syslog.error(f"PROC: Unable to find mode [{restore_mode}] in profile - defaulting to default mode dialog startup mode")
-                            restore_mode = loaded_profile.get_default_mode()
-
-                        
-                        if verbose: syslog.info(f"PROC: request mode change to [{restore_mode}]")
-                        eh.change_mode(restore_mode, force_update = True) # set the selected mode - note that this may fail if mode locking is enabled
-                        mode_changed = True
+              
 
                 # done
 
@@ -4180,6 +4201,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 syslog.info(f"PROC: END Process change detected: process: >>>>>> [{process_base}] <<<<<<<  final profile: [{base_profile}] mode: [{gremlin.shared_state.current_mode}]")
 
             self._process_change_in_progress = False
+
+
 
     def _tray_icon_activated_cb(self, reason):
         """Callback triggered by clicking on the system tray icon.
@@ -4871,19 +4894,24 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # syslog = logging.getLogger("system")
         syslog.info(f"RUNTIME MODE: Runtime mode determination for profile [{self.profile.name}]")
 
-        if option_restore_mode:
-            syslog.info("\tAutomatic restore runtime mode is activated")
-            key = self.profile.profile_file
-            if key in self._runtime_mode_map:
-                last_mode = self._runtime_mode_map[key]
-                syslog.info(f"\tusing cached runtime mode [{last_mode}]")
-            else:
-                last_mode = self.profile.get_last_runtime_mode()
-                syslog.info(f"\tusing profile saved last runtime mode [{last_mode}]")
-
+        if self.profile.override_start_mode:
+            last_mode = self.profile.override_start_mode
+            self.profile.override_start_mode = None # one time use
         else:
-            last_mode = self.profile.get_start_mode()
-            syslog.info(f"\tusing profile default start mode [{last_mode}]")
+
+            if option_restore_mode:
+                syslog.info("\tAutomatic restore runtime mode is activated")
+                key = self.profile.profile_file
+                if key in self._runtime_mode_map:
+                    last_mode = self._runtime_mode_map[key]
+                    syslog.info(f"\tusing cached runtime mode [{last_mode}]")
+                else:
+                    last_mode = self.profile.get_last_runtime_mode()
+                    syslog.info(f"\tusing profile saved last runtime mode [{last_mode}]")
+
+            else:
+                last_mode = self.profile.get_start_mode()
+                syslog.info(f"\tusing profile default start mode [{last_mode}]")
         
         mode_list = gremlin.profile.mode_list()
 

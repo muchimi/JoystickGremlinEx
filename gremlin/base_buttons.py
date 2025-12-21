@@ -55,6 +55,7 @@ class VirtualAxisButton(AbstractVirtualButton):
         self.device_guid = container.device_guid # associated device
         self.input_id = container.get_input_id()
         self.mode = gremlin.shared_state.current_mode
+        self.hook_id = container.get_input_item().id
         self.input_type = container.get_input_type()
         
 

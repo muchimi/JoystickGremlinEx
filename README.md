@@ -28,9 +28,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T136)
+- Fix: Profile auto start: start mode when auto-running a profile on process match.
+- Fix: removed warning "profile not saved" on profile auto-start on process match.
+- UI: tweak options layout on profile page.
 
-### (m76T135C)
-- Fix: Input Viewer: clear button now resets keyboard and state selectors.
+### (m76T135D)
+- Fix: Input Viewer: clear button now syncs keyboard and state selectors.
 
 ### (m76T135B)
 - Fix: UI: identified an issue on profile reload that would not clear prior UI update event queues.

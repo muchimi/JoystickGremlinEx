@@ -204,7 +204,8 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         """Populates the UI elements with data."""
         self.lower_limit_widget.setValue(self.condition_data.lower_limit)
         self.upper_limit_widget.setValue(self.condition_data.upper_limit)
-        self.axis_repeater_widget.hookDevice(self.condition_data.device_guid,
+        self.axis_repeater_widget.hookDevice(self.condition_data.hook_id,
+                                             self.condition_data.device_guid,
                                              self.condition_data.input_type,
                                              self.condition_data.input_id)
         self.direction_widget.setCurrentText(
@@ -212,6 +213,11 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
                 self.condition_data.direction
             ).capitalize()
         )
+
+    def unhook(self):
+        self.axis_repeater_widget.unhookDevice(self.condition_data.hook_id)
+        
+        
 
     def _lower_limit_cb(self, value):
         """Updates the lower limit value.

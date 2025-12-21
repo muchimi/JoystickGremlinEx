@@ -740,12 +740,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
             
         with QtCore.QSignalBlocker(self.axis_repeater_widget):
             if not visible:
-                self.axis_repeater_widget.unhookDevice()
+                self.axis_repeater_widget.unhookDevice(self.condition.id)
             else:
-                self.axis_repeater_widget.hookDevice(self.condition.device_guid, self.condition.input_type, self.condition.input_id)
+                self.axis_repeater_widget.hookDevice(self.condition.id, self.condition.device_guid, self.condition.input_type, self.condition.input_id)
                 
         self.axis_repeater_widget.setVisible(visible)
-                
+
+    def unhook(self):
+        self.axis_repeater_widget.unhookDevice(self.condition.id)
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
