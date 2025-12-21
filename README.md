@@ -28,6 +28,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T136A)
+- Fix: OSC: serialization
+- Fix: Extended button callbacks: some handlers missing new parameter post refactor.
+
 ### (m76T136)
 - Fix: Profile auto start: start mode when auto-running a profile on process match.
 - Fix: removed warning "profile not saved" on profile auto-start on process match.

@@ -12025,7 +12025,7 @@ class QInputLockWidget(QtWidgets.QWidget):
         # self.filter = not self.filter
 
 
-    def _handle_context(self, widget, is_control : bool, is_shift : bool, is_right: bool):
+    def _handle_context(self, widget, is_control : bool, is_shift : bool, is_alt : bool, is_right: bool):
         ''' right click of filter button '''
         if is_right:
             import gremlin.event_handler

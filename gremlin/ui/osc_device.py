@@ -2222,6 +2222,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
 
     def __init__(self, parent = None):
         super().__init__(parent=parent) # parent is the mode object this input belongs to
+
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_osc
         self._message = None # the OSC message command
@@ -2279,6 +2280,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
 
         return table.to_html()
 
+    def __deepcopy__(self, memo):
+        return self
 
 
 
@@ -2593,8 +2596,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
             self._command_mode = OscInputItem.command_mode_from_string(safe_read(node,"cmd_mode", str, ""))
             self._min_range = safe_read(node,"min",float, 0.0)
             self._max_range = safe_read(node,"max",float, 1.0)
-            self.source_index = safe_read(node,"source_index", int, 0)
-            if self.verbose: syslog.info(f"OSC: xml source index: {self._source_index}")
+            self._source_index = safe_read(node,"source_index", int, 0)
+            
             if "autorelease" in node.attrib:
                 self._trigger_autorelease = safe_read(node,"autorelease", bool, False)
             else:
@@ -2664,8 +2667,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         target._source_index = source._source_index
         target._update_display_name()
         return target
-        
     
+
 
         
 

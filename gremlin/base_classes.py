@@ -373,7 +373,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         pass
 
     @abstractmethod
-    def parse_xml(self):
+    def parse_xml(self, data = None):
         ''' must implement '''
         pass
 

@@ -1271,7 +1271,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
    
 
     @QtCore.Slot()
-    def _handle_filter(self, widget, is_control : bool, is_shift : bool, is_right : bool):
+    def _handle_filter(self, widget, is_control : bool, is_shift : bool, is_alt : bool, is_right : bool):
         mode = widget.data
         profile = gremlin.shared_state.current_profile
         device = self.device

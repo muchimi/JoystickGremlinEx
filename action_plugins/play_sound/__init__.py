@@ -468,7 +468,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
                 
         
     @QtCore.Slot()
-    def _handle_select_default(self, is_control : bool, is_shift : bool, is_right : bool):
+    def _handle_select_default(self, is_control : bool, is_shift : bool, is_alt : bool, is_right : bool):
         ''' selects the default playback device '''
 
         default_index = self.action_data.getDefaultAudioDeviceIndex()
