@@ -4778,6 +4778,7 @@ class QProgressBar(QtWidgets.QWidget):
             self._desired_width = 100
             self._desired_height = 10
 
+        self._valid = True # true until the widget is no longer valid from Shibokent due to QT GC
         self._value = None
         self._orientation = orientation
         self._step = step
@@ -4814,6 +4815,10 @@ class QProgressBar(QtWidgets.QWidget):
 
         if value is not None:
             self._set_value_ui(value)
+
+    @property
+    def valid(self) -> bool:
+        return self._valid
 
     def _update_tooltip(self, value):
         ''' updates the tooltip for the repeater '''
@@ -5034,6 +5039,7 @@ class QProgressBar(QtWidgets.QWidget):
     def _set_value_ui(self, value : float | list, emit : bool = True):
 
         if not Shiboken.isValid(self):
+            self._valid = False
             return
         if self.config.showJoystickRepeaterTooltip:
             self._update_tooltip(value) # tooltip
@@ -5247,6 +5253,10 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
 
     def process_events(self, event, values):
         ''' joystick value changed '''
+        if not self.valid:
+            # self unregister on QT GC garbage collection
+            self.unhook()
+            return
         self.setValue(values)
 
     def unhook(self):
@@ -8560,214 +8570,313 @@ class QCustomFlowLayout(QtWidgets.QLayout):
 
 
 
-
 class QFlowLayout(QtWidgets.QLayout):
-    def __init__(self, parent=None, margin=-1, hspacing=-1, vspacing=-1):
-        '''
-        :params:
-        parent = parent of the object
-        margin = margin, -1 for auto
-        hspacing = horizontal spacing, -1 for auto
-        vspacing = vertical spacing, -1 for auto
-        sort_property = name of the index member of the item to set the display order, None to disable
-        '''
+    ''' flow layout '''
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self._hspacing = hspacing
-        self._vspacing = vspacing
-        self._items = []
-        self.setContentsMargins(margin, margin, margin, margin)
-        self._grid_layout = True
-        self._row = 0
-        self._col = 0
-        self._lineHeight = 0
 
-    def rowCount(self) -> int:
-        return self._row
+        if parent is not None:
+            self.setContentsMargins(QMargins(0, 0, 0, 0))
+
+        self._item_list = []
 
     def __del__(self):
-        del self._items[:]
+        item = self.takeAt(0)
+        while item:
+            item = self.takeAt(0)
 
     def addItem(self, item):
-        self._items.append(item)
-
-    def sortItems(self, callback):
-        ''' sorts the items based on the given sort property '''
-        self._items.sort(key = lambda item: callback(item))
-
-    def horizontalSpacing(self):
-        if self._hspacing >= 0:
-            return self._hspacing
-        else:
-            return self.smartSpacing(
-                QtWidgets.QStyle.PM_LayoutHorizontalSpacing)
-
-    def verticalSpacing(self):
-        if self._vspacing >= 0:
-            return self._vspacing
-        else:
-            return self.smartSpacing(
-                QtWidgets.QStyle.PM_LayoutVerticalSpacing)
+        self._item_list.append(item)
 
     def count(self):
-        return len(self._items)
+        return len(self._item_list)
 
     def itemAt(self, index):
-        if 0 <= index < len(self._items):
-            return self._items[index]
+        if 0 <= index < len(self._item_list):
+            return self._item_list[index]
+
+        return None
 
     def takeAt(self, index):
-        if 0 <= index < len(self._items):
-            return self._items.pop(index)
+        if 0 <= index < len(self._item_list):
+            return self._item_list.pop(index)
+
+        return None
+    
 
     def expandingDirections(self):
-        return QtCore.Qt.Orientations(0)
+        return Qt.Orientation(0)
 
     def hasHeightForWidth(self):
         return True
 
     def heightForWidth(self, width):
-        return self.doLayout(QtCore.QRect(0, 0, width, 0), True)
+        height = self._do_layout(QRect(0, 0, width, 0), True)
+        return height
 
     def setGeometry(self, rect):
-        super().setGeometry(rect)
-        self.doLayout(rect, False)
+        super(QFlowLayout, self).setGeometry(rect)
+        self._do_layout(rect, False)
 
     def sizeHint(self):
         return self.minimumSize()
 
     def minimumSize(self):
-        size = QtCore.QSize()
-        lineheight = 0
-        for item in self._items:
-            lineheight = max(lineheight, item.sizeHint().height())
-        for item in self._items:
-            size = size.expandedTo(item.minimumSize())
-            #size = size.expandedTo(item.sizeHint()) + QSize(item.geometry().x(), item.geometry().y())
-        left, top, right, bottom = self.getContentsMargins()
-        size += QtCore.QSize(left + right, top + bottom)
-        size += QSize(0, lineheight * self._row)
+        size = QSize()
+
+        lineHeight = 0
+        for item in self._item_list:
+            item_size = item.minimumSize()
+            size = size.expandedTo(item_size)
+            lineHeight = max(lineHeight, item_size.height())
+
+
+
+        size += QSize(2 * self.contentsMargins().top(), 2 * self.contentsMargins().top() + lineHeight / 2)
         return size
 
-    def doLayout(self, rect, testonly):
-        left, top, right, bottom = self.getContentsMargins()
-        effective = rect.adjusted(+left, +top, -right, -bottom)
-        x = effective.x()
-        y = effective.y()
-        lineheight = 0
+    def _do_layout(self, rect, test_only):
+        x = rect.x()
+        y = rect.y()
+        line_height = 0
+        spacing = self.spacing()
+
+        for item in self._item_list:
+            style = item.widget().style()
+            layout_spacing_x = style.layoutSpacing(
+                QSizePolicy.ControlType.PushButton, QSizePolicy.ControlType.PushButton,
+                Qt.Orientation.Horizontal
+            )
+            layout_spacing_y = style.layoutSpacing(
+                QSizePolicy.ControlType.PushButton, QSizePolicy.ControlType.PushButton,
+                Qt.Orientation.Vertical
+            )
+            space_x = spacing + layout_spacing_x
+            space_y = spacing + layout_spacing_y
+            next_x = x + item.sizeHint().width() + space_x
+            if next_x - space_x > rect.right() and line_height > 0:
+                x = rect.x()
+                y = y + line_height + space_y
+                next_x = x + item.sizeHint().width() + space_x
+                line_height = 0
+
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
+
+            x = next_x
+            line_height = max(line_height, item.sizeHint().height())
+
+        return y + line_height - rect.y()
 
 
-        # visible_count = len(self._items)
-        # invisible_count = 0
+
+# class QFlowLayout(QtWidgets.QLayout):
+#     def __init__(self, parent=None, margin=-1, hspacing=-1, vspacing=-1):
+#         '''
+#         :params:
+#         parent = parent of the object
+#         margin = margin, -1 for auto
+#         hspacing = horizontal spacing, -1 for auto
+#         vspacing = vertical spacing, -1 for auto
+#         sort_property = name of the index member of the item to set the display order, None to disable
+#         '''
+#         super().__init__(parent)
+#         self._hspacing = hspacing
+#         self._vspacing = vspacing
+#         self._items = []
+#         self.setContentsMargins(margin, margin, margin, margin)
+#         self._grid_layout = True
+#         self._row = 0
+#         self._col = 0
+#         self._lineHeight = 0
+
+#     def rowCount(self) -> int:
+#         return self._row
+
+#     def __del__(self):
+#         del self._items[:]
+
+#     def addItem(self, item):
+#         self._items.append(item)
+
+#     def sortItems(self, callback):
+#         ''' sorts the items based on the given sort property '''
+#         self._items.sort(key = lambda item: callback(item))
+
+#     def horizontalSpacing(self):
+#         if self._hspacing >= 0:
+#             return self._hspacing
+#         else:
+#             return self.smartSpacing(
+#                 QtWidgets.QStyle.PM_LayoutHorizontalSpacing)
+
+#     def verticalSpacing(self):
+#         if self._vspacing >= 0:
+#             return self._vspacing
+#         else:
+#             return self.smartSpacing(
+#                 QtWidgets.QStyle.PM_LayoutVerticalSpacing)
+
+#     def count(self):
+#         return len(self._items)
+
+#     def itemAt(self, index):
+#         if 0 <= index < len(self._items):
+#             return self._items[index]
+
+#     def takeAt(self, index):
+#         if 0 <= index < len(self._items):
+#             return self._items.pop(index)
+
+#     def expandingDirections(self):
+#         return QtCore.Qt.Orientations(0)
+
+#     def hasHeightForWidth(self):
+#         return True
+
+#     def heightForWidth(self, width):
+#         return self.doLayout(QtCore.QRect(0, 0, width, 0), True)
+
+#     def setGeometry(self, rect):
+#         super().setGeometry(rect)
+#         self.doLayout(rect, False)
+
+#     def sizeHint(self):
+#         return self.minimumSize()
+
+#     def minimumSize(self):
+#         size = QtCore.QSize()
+#         lineheight = 0
+#         for item in self._items:
+#             lineheight = max(lineheight, item.sizeHint().height())
+#         for item in self._items:
+#             size = size.expandedTo(item.minimumSize())
+#             #size = size.expandedTo(item.sizeHint()) + QSize(item.geometry().x(), item.geometry().y())
+#         left, top, right, bottom = self.getContentsMargins()
+#         size += QtCore.QSize(left + right, top + bottom)
+#         size += QSize(0, lineheight * self._row)
+#         return size
+
+#     def doLayout(self, rect, testonly):
+#         left, top, right, bottom = self.getContentsMargins()
+#         effective = rect.adjusted(+left, +top, -right, -bottom)
+#         x = effective.x()
+#         y = effective.y()
+#         lineheight = 0
+
+
+#         # visible_count = len(self._items)
+#         # invisible_count = 0
 
         
-        if self._grid_layout:
-            # compute max width
-            max_w = 0
-            pos_x = {}
-            pos_x[0] = x
+#         if self._grid_layout:
+#             # compute max width
+#             max_w = 0
+#             pos_x = {}
+#             pos_x[0] = x
 
-            for item in self._items:
-                widget = item.widget()
-                if not widget.isVisible():
-                    #invisible_count+=1
-                    continue
-                # if hasattr(widget,"display_name"):
-                #     print (f"layout: {str(widget.display_name())}")
-                hspace = self.horizontalSpacing()
-                if hspace == -1:
-                    hspace = widget.style().layoutSpacing(
-                        QtWidgets.QSizePolicy.PushButton,
-                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
-                vspace = self.verticalSpacing()
-                if vspace == -1:
-                    vspace = widget.style().layoutSpacing(
-                        QtWidgets.QSizePolicy.PushButton,
-                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
-                item_w = item.sizeHint().width() + hspace
-                max_w = max(max_w,item_w)
-                lineheight = max(lineheight, item.sizeHint().height())
-            # compute columns
+#             for item in self._items:
+#                 widget = item.widget()
+#                 if not widget.isVisible():
+#                     #invisible_count+=1
+#                     continue
+#                 # if hasattr(widget,"display_name"):
+#                 #     print (f"layout: {str(widget.display_name())}")
+#                 hspace = self.horizontalSpacing()
+#                 if hspace == -1:
+#                     hspace = widget.style().layoutSpacing(
+#                         QtWidgets.QSizePolicy.PushButton,
+#                         QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
+#                 vspace = self.verticalSpacing()
+#                 if vspace == -1:
+#                     vspace = widget.style().layoutSpacing(
+#                         QtWidgets.QSizePolicy.PushButton,
+#                         QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
+#                 item_w = item.sizeHint().width() + hspace
+#                 max_w = max(max_w,item_w)
+#                 lineheight = max(lineheight, item.sizeHint().height())
+#             # compute columns
 
-            self._lineHeight = lineheight
+#             self._lineHeight = lineheight
 
-            usable_width = effective.right() - x
-            if max_w == 0:
-                max_w = usable_width
-            max_col = max(1, usable_width // max_w)
+#             usable_width = effective.right() - x
+#             if max_w == 0:
+#                 max_w = usable_width
+#             max_col = max(1, usable_width // max_w)
 
-            # print (f"available width {usable_width} max widget {max_w} columns: {max_col}")
-            for col in range(max_col):
-                pos_x[col] = col * max_w
-                # print(f"\tcol {col} position {pos_x[col]}")
+#             # print (f"available width {usable_width} max widget {max_w} columns: {max_col}")
+#             for col in range(max_col):
+#                 pos_x[col] = col * max_w
+#                 # print(f"\tcol {col} position {pos_x[col]}")
 
-            col = 0
-            row = 0
-            index = 0
-            for item in self._items:
-                widget = item.widget()
-                if not widget.isVisible():
-                    continue
-                x = pos_x[col]
+#             col = 0
+#             row = 0
+#             index = 0
+#             for item in self._items:
+#                 widget = item.widget()
+#                 if not widget.isVisible():
+#                     continue
+#                 x = pos_x[col]
 
-                if not testonly:
-                    item.setGeometry(
-                        QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
-                    # print (f"flow [{index}] position {x} {y}")
-                    index+=1
+#                 if not testonly:
+#                     item.setGeometry(
+#                         QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+#                     # print (f"flow [{index}] position {x} {y}")
+#                     index+=1
 
-                col += 1
-                if col == max_col:
-                    col = 0
-                    row += 1
-                    y += lineheight + vspace
+#                 col += 1
+#                 if col == max_col:
+#                     col = 0
+#                     row += 1
+#                     y += lineheight + vspace
 
-            self._row = row
-            self._col = max_col
+#             self._row = row
+#             self._col = max_col
 
 
-            #print (f"layout visible: {visible_count} invisible: {invisible_count}")
+#             #print (f"layout visible: {visible_count} invisible: {invisible_count}")
 
-            return y + lineheight - rect.y() + bottom
+#             return y + lineheight - rect.y() + bottom
 
-        else:
-            item : QtWidgets.QWidgetItem
-            for item in self._items:
-                widget = item.widget()
-                hspace = self.horizontalSpacing()
-                if hspace == -1:
-                    hspace = widget.style().layoutSpacing(
-                        QtWidgets.QSizePolicy.PushButton,
-                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
-                vspace = self.verticalSpacing()
-                if vspace == -1:
-                    vspace = widget.style().layoutSpacing(
-                        QtWidgets.QSizePolicy.PushButton,
-                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
-                nextX = x + item.sizeHint().width() + hspace
+#         else:
+#             item : QtWidgets.QWidgetItem
+#             for item in self._items:
+#                 widget = item.widget()
+#                 hspace = self.horizontalSpacing()
+#                 if hspace == -1:
+#                     hspace = widget.style().layoutSpacing(
+#                         QtWidgets.QSizePolicy.PushButton,
+#                         QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
+#                 vspace = self.verticalSpacing()
+#                 if vspace == -1:
+#                     vspace = widget.style().layoutSpacing(
+#                         QtWidgets.QSizePolicy.PushButton,
+#                         QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
+#                 nextX = x + item.sizeHint().width() + hspace
 
-                if nextX - hspace > effective.right() and lineheight > 0:
-                    x = effective.x()
-                    y = y + lineheight + vspace
-                    nextX = x + item.sizeHint().width() + hspace
-                    lineheight = 0
+#                 if nextX - hspace > effective.right() and lineheight > 0:
+#                     x = effective.x()
+#                     y = y + lineheight + vspace
+#                     nextX = x + item.sizeHint().width() + hspace
+#                     lineheight = 0
 
-                if not testonly:
-                    item.setGeometry(
-                        QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
-                x = nextX
+#                 if not testonly:
+#                     item.setGeometry(
+#                         QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+#                 x = nextX
 
-                lineheight = max(lineheight, item.sizeHint().height())
+#                 lineheight = max(lineheight, item.sizeHint().height())
 
-        return y + lineheight - rect.y() + bottom
+#         return y + lineheight - rect.y() + bottom
 
-    def smartSpacing(self, pm):
-        parent = self.parent()
-        if parent is None:
-            return -1
-        elif parent.isWidgetType():
-            return parent.style().pixelMetric(pm, None, parent)
-        else:
-            return parent.spacing()
+#     def smartSpacing(self, pm):
+#         parent = self.parent()
+#         if parent is None:
+#             return -1
+#         elif parent.isWidgetType():
+#             return parent.style().pixelMetric(pm, None, parent)
+#         else:
+#             return parent.spacing()
         
 
 
@@ -12948,98 +13057,6 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
 
 
  
-# class QFlowLayout(QtWidgets.QLayout):
-#     ''' flow layout '''
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-
-#         if parent is not None:
-#             self.setContentsMargins(QMargins(0, 0, 0, 0))
-
-#         self._item_list = []
-
-#     def __del__(self):
-#         item = self.takeAt(0)
-#         while item:
-#             item = self.takeAt(0)
-
-#     def addItem(self, item):
-#         self._item_list.append(item)
-
-#     def count(self):
-#         return len(self._item_list)
-
-#     def itemAt(self, index):
-#         if 0 <= index < len(self._item_list):
-#             return self._item_list[index]
-
-#         return None
-
-#     def takeAt(self, index):
-#         if 0 <= index < len(self._item_list):
-#             return self._item_list.pop(index)
-
-#         return None
-    
-
-#     def expandingDirections(self):
-#         return Qt.Orientation(0)
-
-#     def hasHeightForWidth(self):
-#         return True
-
-#     def heightForWidth(self, width):
-#         height = self._do_layout(QRect(0, 0, width, 0), True)
-#         return height
-
-#     def setGeometry(self, rect):
-#         super(QFlowLayout, self).setGeometry(rect)
-#         self._do_layout(rect, False)
-
-#     def sizeHint(self):
-#         return self.minimumSize()
-
-#     def minimumSize(self):
-#         size = QSize()
-
-#         for item in self._item_list:
-#             size = size.expandedTo(item.minimumSize())
-
-#         size += QSize(2 * self.contentsMargins().top(), 2 * self.contentsMargins().top())
-#         return size
-
-#     def _do_layout(self, rect, test_only):
-#         x = rect.x()
-#         y = rect.y()
-#         line_height = 0
-#         spacing = self.spacing()
-
-#         for item in self._item_list:
-#             style = item.widget().style()
-#             layout_spacing_x = style.layoutSpacing(
-#                 QSizePolicy.ControlType.PushButton, QSizePolicy.ControlType.PushButton,
-#                 Qt.Orientation.Horizontal
-#             )
-#             layout_spacing_y = style.layoutSpacing(
-#                 QSizePolicy.ControlType.PushButton, QSizePolicy.ControlType.PushButton,
-#                 Qt.Orientation.Vertical
-#             )
-#             space_x = spacing + layout_spacing_x
-#             space_y = spacing + layout_spacing_y
-#             next_x = x + item.sizeHint().width() + space_x
-#             if next_x - space_x > rect.right() and line_height > 0:
-#                 x = rect.x()
-#                 y = y + line_height + space_y
-#                 next_x = x + item.sizeHint().width() + space_x
-#                 line_height = 0
-
-#             if not test_only:
-#                 item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
-
-#             x = next_x
-#             line_height = max(line_height, item.sizeHint().height())
-
-#         return y + line_height - rect.y()
 
 class QBorderWidget(QtWidgets.QFrame):
     def __init__(self, parent = None):

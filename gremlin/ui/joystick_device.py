@@ -961,6 +961,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
 class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
+#class JoystickInputDialog(QtWidgets.QDialog):
     ''' handles the filtering of inputs '''
 
     def __init__(self, device_guid, callback = None, parent = None):
@@ -970,11 +971,13 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
         :param parent: parent widget, optional
         '''
 
-        super().__init__(self.__class__.__name__, width = 400, height = 300, parent = parent)
-
+        super().__init__(self.__class__.__name__, parent = parent)
+        #super().__init__(parent=parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.setWindowTitle("Input Filter Configuration")
         self.setModal(True)
+
+  
 
         self.input_widgets = {} # holds a reference to the input widget 
 
@@ -1089,10 +1092,19 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
   
         mapped_count_widget.setText(f"- Found {input_count} input(s), {mapped_count} mapped")
         self.stats_widget.setStats(self.stats)
-            
+
+        container_group, container_layout = gremlin.ui.ui_common.getVContainer()
         # add groups
         for group_widget in self.group_widgets.values():
-            self.main_layout.addWidget(group_widget)
+            container_layout.addWidget(group_widget)
+
+
+        # scroll area
+        self.scroll_area = gremlin.ui.ui_common.QScrollableWidget(container_group)
+        self.scroll_area.setMinimumHeight(200)
+        self.main_layout.addWidget(self.scroll_area)
+
+            
 
         widgets = []
 
@@ -1327,6 +1339,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
                         
 
                     filtered = not profile.isInputMapped(device_guid, input_type, input_id)
+                    
                 case "show_all":
                     # filter all inputs
                     filtered = False # remove all filters

@@ -418,32 +418,41 @@ class JoystickEventQueue:
 	'''
 	def __init__(self):
 		self._queue = collections.deque()  # Underlying queue for FIFO order
-		self._seen = set()                 # Set to track seen items for uniqueness
-		self._lock = threading.Lock()
+		#self._seen = set()                 # Set to track seen items for uniqueness
+		#self._lock = threading.Lock()
+		# self._lock = False
 
 	def put(self, event : Event):
 		"""Adds an item to the queue if it's not already present."""
-		try:
-			self._lock.acquire()
+		#try:
+			# self._lock.acquire()
+			# self.acquire()
+			# self._lock = True
 			# if event.is_axis:
 			# 	key = event.callbackKey	
 			# 	if key in self._seen:
 			# 		return # do not add if the existing event hasn't been processed - this is to avoid axis input spamming
 			# 	self._seen.add(key)
 
-			self._queue.append(event)
-		finally:
-			self._lock.release()
+		self._queue.append(event)
+		# finally:
+		# 	self._lock = False
+		# 	# self._lock.release()
+
+	# def acquire(self):
+	# 	while not self._lock:
+	# 		time.sleep(0.001)
+
 
 	def get(self):
 		"""Removes and returns an item from the front of the queue."""
 		if not self.empty():
-			self._lock.acquire()
+			#self._lock.acquire()
 			event : Event = self._queue.popleft()
 			# if event.is_axis:
 			# 	key = key = event.callbackKey
 			# 	self._seen.remove(key)  # Remove from seen set when dequeued
-			self._lock.release()
+			# self._lock.release()
 			return event
 		else:
 			raise IndexError("Queue is empty")
@@ -459,9 +468,9 @@ class JoystickEventQueue:
 	def __len__(self):
 		return self.qsize()
 
-	def __contains__(self, event : Event):
-		key = event.callbackkey
-		return key in self._seen
+	# def __contains__(self, event : Event):
+	# 	key = event.callbackkey
+	# 	return key in self._seen
 
 
 class DeviceChangeEvent:

@@ -28,6 +28,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T137A)
+- Fix: Axis repeaters will self unregister if garbage collected by GC and not already caught.
+- Fix: UI: flow layout occasional vertical size clipping.
+- New: Filter Dialog: scrollbars added for small displays.
+
 ### (m76T137)
 - Fix: Filter dialog: axis selection for devices that skip axes was not handled correctly.
 - Fix: Filter dialog: button UI event fixes
