@@ -994,7 +994,7 @@ class SimconnectOptions():
         # scan for lvars
         #self._scan_lvars()
         ui = gremlin.shared_state.ui
-        progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders... (this can take a while)", cancelButtonText = "Cancel", minimum = 0, maximum= 100, parent = ui) #, flags = QtCore.Qt.FramelessWindowHint)
+        progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders... (this can take a while)", cancelButtonText = "Cancel", minimum = 0, maximum= 100) #, flags = QtCore.Qt.FramelessWindowHint)
         progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         progress.setValue(0)
         progress.show()

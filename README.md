@@ -28,17 +28,23 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T137B)
+- Fix: Simconnect plugin error.
+- Fix: invalid device name will not longer throw an exception and report an error instead.
+
 ### (m76T137A)
 - Fix: Axis repeaters will self unregister if garbage collected by GC and not already caught.
 - Fix: UI: flow layout occasional vertical size clipping.
-- New: Filter Dialog: scrollbars added for small displays.
+- New: Filter Dialog: scrollbars added for small displays.  
+- Change: additional optimization of joystick event queue.
 
 ### (m76T137)
 - Fix: Filter dialog: axis selection for devices that skip axes was not handled correctly.
 - Fix: Filter dialog: button UI event fixes
 - Fix: Gated Axis: UI rework for QT stability
 - Fix: TTS: exception in TTS stop.
-- New: TTS: add option to override the global duplicate message suppression option.  Enabling this will force the speech to be generated on each trigger.
+- New: TTS: add option to override the global duplicate message suppression option.  Enabling this will force the speech to be generated on each trigger.  
+
 
 ### (m76T136C)
 - UI: more tweak options layout on profile page.

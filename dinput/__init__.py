@@ -723,21 +723,30 @@ class DeviceSummary:
         :param is_linear: true if the index is the linear axis index (range 0 to axis_count), false if the axis identifier
         
         '''
-        am : AxisMap
-        stub = ""
-        if is_linear:
-            if index in self.linear_id_map:
-                stub = f" L{index}"
-            for am in self.axismap_list:
-                if am.linear_index == index:
-                    return am.getName() + stub
-        else:
-            if index in self.axis_id_map:
-                linear_id = self.axis_id_map[index]
-                stub = f" L{linear_id}"
-            for am in self.axismap_list:
-                if am.axis_index == index:
-                    return am.getName() + stub
+        try:
+            am : AxisMap
+            stub = ""
+            if is_linear:
+                if index in self.linear_id_map:
+                    stub = f" L{index}"
+                for am in self.axismap_list:
+                    if am.linear_index == index:
+                        return am.getName() + stub
+            else:
+                if index in self.axis_id_map:
+                    linear_id = self.axis_id_map[index]
+                    stub = f" L{linear_id}"
+                for am in self.axismap_list:
+                    if not hasattr(am,"axis_index"):
+                        syslog.error(f"Invalid data found for device : {self.name}")
+                        syslog.error(f"axis map contains: {self.axismap_list}")
+                        return None
+                    if am.axis_index == index:
+                        return am.getName() + stub
+        except Exception as e:
+            syslog.error(f"GET AXIS NAME: unable to get axis name for device : {self.name}")
+            syslog.error(f"{str(e)}")
+
         return None
     
     def getAxisData(self):
