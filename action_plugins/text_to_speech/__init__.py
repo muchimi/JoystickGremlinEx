@@ -104,8 +104,17 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
+        override_widget = gremlin.ui.ui_common.QDataCheckbox("Override Suppress",
+                                                             value = self.action_data.override_suppress,
+                                                             callback = self._handle_suppress_change,
+                                                             tooltip="If enabled, overrides global settings to suppress repeated speech and plays on each trigger."
+                                                             )
 
-        widgets = [self.abort_off_widget, self.abort_on_widget, self.clear_queue_widget, self._execute_widget]
+        widgets = [self.abort_off_widget,
+                   self.abort_on_widget,
+                   self.clear_queue_widget,
+                   override_widget,
+                   self._execute_widget,]
         
         self.container_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
@@ -137,6 +146,11 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         if checked:
             self.action_data.abort = widget.data
             self._update_ui()
+
+    @QtCore.Slot(bool)
+    def _handle_suppress_change(self, checked):
+        self.action_data.override_suppress = checked
+
         
         
     def _update_ui(self):
@@ -211,7 +225,10 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
                 voice = self.tts.getVoices()[self.action_data.voice_index]
                 self.tts.set_voice(voice)
                 self.tts.set_volume(self.action_data.volume)
-                self.tts.speak(self.action_data.text, self.action_data.rate, self.action_data.clearQueue)
+                self.tts.speak(self.action_data.text,
+                               self.action_data.rate,
+                               self.action_data.clearQueue,
+                               self.action_data.override_suppress)
     
     def profile_start(self):
         if self.action_data.enabled:
@@ -272,6 +289,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self.clearQueue = False # true if pending items are cleared when new voice items are queued
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
+        self.override_suppress = False # override suppression flag
 
     @property
     def voice_name(self):
@@ -339,6 +357,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self._abort = safe_read(node, "abort", bool, False)
         self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
         self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+        self.override_suppress = safe_read(node,"override-suppress", bool, False)
 
 
     def _generate_xml(self):
@@ -351,6 +370,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         node.set("abort", safe_format(self._abort, bool))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
+        node.set("override-suppress", safe_format(self.override_suppress, bool))
         
         return node
 

@@ -1162,8 +1162,8 @@ class GateEventHandler(QtCore.QObject):
     slider_update_event = Signal(object) # signals a slider to update passes a joystick (event)
     unhook_gate = Signal(object) # fires when the gate is unhooked, object = the gate data object
     visibility_changed = Signal(object, bool) # fires when visibility changes
+    request_gate_configure = Signal(object) # fires when a gate should be configured (gate)
 
-    
     
 
     def __init__(self):
@@ -1310,7 +1310,6 @@ class GateData():
 
         el.shutdown.connect(self.unhook) # unhook on shutdown
         el.profile_unload.connect(self.unhook) # unkook on profile change
-
 
 
     def ensureGates(self):
@@ -3634,17 +3633,18 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
                  delete_callback,
                  delete_enabled = True,
                  is_container = True,
+                 action_data = None,
                  parent = None,
-
                  ):
         
         super().__init__(parent = parent)
         assert isinstance(gate,GateInfo)
         self.gate = gate
+        self.action_data = action_data
         
         self.setup_icon = None
         self.delete_callback = delete_callback
-        self.configure_handler = configure_callback
+
         self.display_index = 0 # display index for ordering
         self.warning_visible = False # flag for warning label/icon
         self._lock = False
@@ -3742,22 +3742,6 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
                 # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
                 self.value_widget.setValue(value)
     
-    # def _gate_index_changed(self, gate):
-    #     gremlin.util.InvokeUiMethod(self._gate_index_changed_ui, gate)
-
-    # def _gate_index_changed_ui(self, gate):
-    #     if Shiboken.isValid(self) and gate.id == self.gate.id:
-    #         self.update_gate_label()
-
-    # def _display_mode_changed(self, display_mode):
-    #     gremlin.util.InvokeUiMethod(self._display_mode_changed_ui, display_mode)
-
-    # def _display_mode_changed_ui(self, display_mode):
-    #     ''' set the display mode '''
-    #     if Shiboken.isValid(self):
-    #         with QtCore.QSignalBlocker(self.value_widget):
-    #             # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
-    #             self.value_widget.setValue(self.gate.display_value)
 
     def update_display(self):
         if Shiboken.isValid(self):
@@ -3816,11 +3800,12 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.grab_widget.data = (gate, self.value_widget)
         
 
-        self.setup_widget = gremlin.ui.ui_common.QDataPushButton()
+        self.setup_widget = gremlin.ui.ui_common.QDataPushButton(
+            callback=self._handle_configure_request,
+            tooltip = f"Setup actions for gate {gate.gate_display()}",
+            data = gate,
+        )
         self.setup_widget.setMaximumWidth(20)
-        self.setup_widget.clicked.connect(self.configure_handler)
-        self.setup_widget.setToolTip(f"Setup actions for gate {gate.gate_display()}")
-        self.setup_widget.data = gate
         
 
         self.clear_widget = gremlin.ui.ui_common.QDataPushButton()
@@ -3841,8 +3826,12 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         main_layout.addWidget(self.clear_widget)
         main_layout.addStretch()
 
-    # def _handle_configure_request(self):
-    #     self.configure_handler()
+    def _handle_configure_request(self, widget):
+        gremlin.util.assert_ui_thread()
+        dialog = ActionContainerUi(gate_data = self.gate.parent, info_object = self.gate, action_data = self.action_data, input_type=InputType.JoystickButton)
+        #dialog.delete_requested.connect(self._delete_gate_cb)
+        dialog.exec()
+        #dialog.delete_requested.disconnect(self._delete_gate_cb)
 
 
     def update_warning(self):
@@ -4107,3 +4096,542 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
     def condition_name(self) -> str:
         return f"Gated Axis Range Condition: condition: {self._condition_type.name} range: {self.range_info.to_display()}"
         
+
+
+
+class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
+    """UI to setup the individual action trigger containers and sub actions """
+
+    delete_requested = QtCore.Signal(GateInfo) # fired when the remove button is clicked - passes the GateData to blitz
+
+    def __init__(self, gate_data : GateData, info_object : RangeInfo | GateInfo, action_data, input_type : InputType, parent=None):
+        '''
+        :param: data = the gate or range data block
+        
+        '''
+
+        
+        super().__init__(self.__class__.__name__, parent = parent)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self._id = gremlin.util.get_guid()
+
+        self._range_info : RangeInfo = None
+        self._gate_info : GateInfo = None
+        is_range = isinstance(info_object, RangeInfo)
+        self._gate_data : GateData = gate_data
+        self._is_range = is_range
+        self._action_data = action_data
+        self._cache = InputConfigurationWidgetCache()
+        self._tab_widgets = {} # holds the widgets for the tabs
+        self._input_type = input_type # type of input for the container and action selectors
+
+        # make modal
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+
+        # Actual configuration object being managed
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(800)
+        
+        self.trigger_container_widget = QtWidgets.QWidget()
+        self.trigger_condition_layout = QtWidgets.QHBoxLayout(self.trigger_container_widget)
+
+
+        
+    
+        
+
+        # the tab container contains all possible trigger modes for the range or gate as a tab
+        # each tab contains the mappings and options for that trigger condition
+        self._condition_tab = QtWidgets.QTabWidget()
+        self._condition_tab.currentChanged.connect(self._condition_changed_cb)
+        self._condition_pages = {}  # map of condition pages keyed by GateCondition
+        self.container_condition_widget = QtWidgets.QWidget()
+        self.container_condition_widget.setContentsMargins(0,0,0,0)
+        self.container_condition_layout = QtWidgets.QVBoxLayout(self.container_condition_widget)
+        self.container_condition_layout.setContentsMargins(0,0,0,0)
+        self.container_condition_layout.addWidget(self._condition_tab)
+
+        self._icon_enabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color = gremlin.ui.ui_common.Color.activeColor())
+        self._icon_disabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.inactiveColor())
+
+
+        if is_range:
+            # range has an output mode for how to handle the output value for the range
+
+            range_info : RangeInfo = info_object
+            self._range_info = range_info
+            self.setWindowTitle("Gated Axis Range Configuration")
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration: {info_object.range_display()}"))
+
+            self.range_description_widget = gremlin.ui.ui_common.QDataLineEdit()
+            self.range_description_widget.setMinimumWidth(200)
+            self.range_description_widget.setText(self._range_info.description)
+            self.range_description_widget.textChanged.connect(self._range_description_changed)
+            widget, layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel("Range Description:"), self.range_description_widget])
+            self.trigger_condition_layout.addWidget(widget)
+        
+
+            # print (f"Range: configuration: {range_info.range_display_ex()}")
+            
+            self.slider_frame_widget = QtWidgets.QFrame()
+            self.slider_frame_layout = QtWidgets.QVBoxLayout(self.slider_frame_widget)
+            self.slider_frame_widget.setStyleSheet('.QFrame{background-color: transparent;}')
+            self.slider = gremlin.ui.qsliderwidget.QSliderWidget(object_name = f"Slider for ActionContainer: {info_object.range_display()}") 
+            self.slider.setMinimumHeight(48)
+            self.slider.setRange(-1,1)
+            self.slider_frame_layout.addWidget(self.slider)
+
+            gh = GateEventHandler()
+
+            self._gate_data.registerTriggerCallback(self._trigger_handler)
+            gh.registerValueChangedCallback(self._id, self._input_value_changed_handler)
+
+            # display two gates for a range
+            values = [range_info.g1.value, range_info.g2.value]
+            self.slider.setValue(values)
+            self.slider.setReadOnly(True)
+
+
+
+            self.axis_widget = gremlin.ui.ui_common.QHookedProgressBar(orientation = QtCore.Qt.Orientation.Horizontal)
+            
+            self.output_mode_widget = gremlin.ui.ui_common.QComboBox()
+            self.output_container_widget = QtWidgets.QWidget()
+            self.output_container_widget.setContentsMargins(0,0,0,0)
+            self.output_container_layout = QtWidgets.QHBoxLayout(self.output_container_widget)
+            self.output_container_layout.addWidget(QtWidgets.QLabel("Output Mode:"))
+            self.output_container_layout.addWidget(self.output_mode_widget)
+            self.output_container_layout.addWidget(QtWidgets.QLabel("Output Value:"))
+            self.output_container_layout.addWidget(self.axis_widget)
+            self.output_container_layout.addStretch()
+            
+
+            # populates and picks the default mode
+            self._gate_data.populate_output_widget(self.output_mode_widget, default = self._range_info.mode)
+            self.output_mode_widget.currentIndexChanged.connect(self._output_mode_changed_cb)
+
+            # ranged data
+            self.container_output_range_widget = QtWidgets.QWidget()
+            self.container_output_range_layout = QtWidgets.QHBoxLayout(self.container_output_range_widget)
+            self.container_output_range_widget.setContentsMargins(0,0,0,0)
+            
+            self.sb_range_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
+            self.sb_range_min_widget.setValue(info_object.output_range_min)
+            self.sb_range_min_widget.valueChanged.connect(self._range_min_changed_cb)
+
+            self.sb_range_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
+            self.sb_range_max_widget.setValue(info_object.output_range_max)
+
+            self.sb_range_max_widget.valueChanged.connect(self._range_max_changed_cb)
+
+            self.sb_fixed_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+            if info_object.fixed_value is None:
+                info_object.fixed_value = info_object.v1
+            self.sb_fixed_value_widget.setValue(info_object.fixed_value)
+            self.sb_fixed_value_widget.valueChanged.connect(self._fixed_value_changed_cb)
+
+            label = QtWidgets.QLabel("Scaling options:")
+            label.setToolTip("Scaling rescales the input range to the specified min/max scaled range.  This remaps the input value to a new value before the value is sent to the mapped actions/containers.")
+            self.container_output_range_layout.addWidget(label)
+
+            self.container_output_range_layout.addWidget(QtWidgets.QLabel("Range Min:"))
+            self.container_output_range_layout.addWidget(self.sb_range_min_widget)
+            self.container_output_range_layout.addWidget(QtWidgets.QLabel("Range Max:"))
+            self.container_output_range_layout.addWidget(self.sb_range_max_widget)
+
+            self.reset_range_button_widget = QtWidgets.QPushButton("Reset")
+            self.reset_range_button_widget.setToolTip("Reset the scale to the default input range")
+            self.reset_range_button_widget.clicked.connect(self._range_reset_cb)
+
+            self.container_output_range_layout.addWidget(self.reset_range_button_widget)
+            self.container_output_range_layout.addStretch()
+            
+            self.container_fixed_widget = QtWidgets.QWidget()
+            self.container_fixed_widget.setContentsMargins(0,0,0,0)
+            self.container_fixed_layout = QtWidgets.QHBoxLayout(self.container_fixed_widget)
+
+            label = QtWidgets.QLabel("Fixed Value:")
+            label.setToolTip("The fixed value will be the value sent to actions/containers while the input is within the current range.  Used the Filter mode if no data should be output.")
+            self.container_fixed_layout.addWidget(label)
+            self.container_fixed_layout.addWidget(self.sb_fixed_value_widget)
+            self.container_fixed_layout.addStretch()
+
+            self.container_range_data_widget = QtWidgets.QWidget()
+            self.container_range_data_widget.setContentsMargins(0,0,0,0)
+            self.container_range_data_layout = QtWidgets.QVBoxLayout(self.container_range_data_widget)
+            self.container_range_data_layout.addWidget(self.container_output_range_widget)
+            self.container_range_data_layout.addWidget(self.container_fixed_widget)
+
+              
+            # update the repeater
+            self._update_axis_widget()
+
+            
+            self.main_layout.addWidget(self.slider_frame_widget)
+
+
+        else:
+            # gate configuration
+            self.setWindowTitle("Gated Axis Gate Configuration")
+            self._gate_info = info_object
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {self._gate_info.slider_index + 1} Configuration:"))
+
+            self.gate_description_widget = gremlin.ui.ui_common.QDataLineEdit()
+            self.gate_description_widget.setMinimumWidth(200)
+            self.gate_description_widget.setText(self._gate_info.description)
+            self.gate_description_widget.textChanged.connect(self._gate_description_changed)
+            widget, layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel("Gate Description:"), self.gate_description_widget])
+            self.trigger_condition_layout.addWidget(widget)
+
+            
+        # delay
+        if self._gate_info:
+            value = self._gate_info.delay
+        else:
+            value = self._range_info.delay
+
+        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = value,
+            tooltip = "Delay in milliseconds between a press and release event for gate crossings or range enter/exit triggers",
+            callback = self._delay_changed_cb,
+            label = "Trigger Delay:",
+            show_shortcuts=False
+        )
+    
+        self.trigger_condition_layout.addStretch()
+        self.trigger_condition_layout.addWidget(self.delay_widget, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
+        
+
+            
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.connect(self._mapping_changed_cb)
+        
+        
+        self.main_layout.addWidget(self.trigger_container_widget)
+        self.main_layout.addWidget(self.container_condition_widget)
+
+
+        self._create_conditions_ui()
+        self._update_ui()
+
+
+        #self._condition_changed_cb()
+
+    def closeEvent(self, event) -> None:
+        
+        
+        # release tab widgets tracking items and widgets
+        with QtCore.QSignalBlocker(self._condition_tab):
+            self._tab_widgets.clear() 
+            self._condition_pages.clear() 
+            self._condition_tab.clear()
+
+
+
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.disconnect(self._mapping_changed_cb)
+        
+        gh = GateEventHandler()
+
+        self._gate_data.unregisterTriggerCallback(self._trigger_handler)
+        gh.unregisterValueChangedCallback(self._id, self._input_value_changed_handler)
+
+        self._cache.clear() # release cache objects
+        self._range_info = None
+        self._gate_info = None
+
+        # forcibly clear all widgets from QT
+        gremlin.util.clear_layout(self.main_layout)
+
+    def _current_input_axis(self):
+        ''' gets the current input axis value '''
+        device_guid = self._action_data.hardware_device_guid
+        input_id = self._action_data.hardware_input_id
+        if gremlin.joystick_handling.is_hardware_device(device_guid):
+            return gremlin.joystick_handling.get_curved_axis(device_guid, input_id)
+        else:
+            return input_id.axis_value
+
+
+    def _trigger_handler(self, trigger: TriggerData):
+        ''' process range output value '''
+
+        if trigger.is_range and trigger.range == self._range_info \
+            and trigger.mode == TriggerMode.ValueInRange:
+            # value update for in-range 
+            self.axis_widget.setValue(trigger.value)
+
+    def _input_value_changed_handler(self, device_id, input_id, value : float):
+        # update input value
+        if gremlin.util.compare_guid(self._action_data, device_id) and input_id == self._action_data.input_id:
+            self.slider.setMarkerValue(value)
+            
+
+    def _update_axis_widget(self, value : float = None):
+        ''' updates the axis output repeater with the value 
+        
+        :param value: the floating point input value, if None uses the cached value
+        
+        '''
+        if value is None:
+            value = self._current_input_axis()
+        range_info = self._range_info
+        value = self._gate_data._get_filtered_range_value(range_info, value)
+        if value is not None:
+            self.axis_widget.setValue(value)
+
+    def _delay_changed_cb(self, delay):
+        ''' delay value changed for gates or ranges '''
+        if self._gate_info:
+            self._gate_info.delay = delay
+        elif self._range_info:
+            self._range_info.delay = delay
+
+    QtCore.Slot()
+    def _delete_gate_confirm_cb(self):
+        ''' delete requested '''
+        self._remove_gate(self._range_info)
+
+    def _prompt_delete(self) -> bool:
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Delete confirmation")
+        message_box.setInformativeText("This will delete this entry.\nAre you sure?")
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        #pixmap = gremlin.util.load_pixmap("warning.svg")
+        #pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        message_box.setIconPixmap(pixmap)
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+            )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+        return result == QtWidgets.QMessageBox.StandardButton.Ok
+
+    def _remove_gate(self, data, prompt = True):
+        if prompt and not self._prompt_delete():
+            return
+        self._delete_confirmed_cb(data)
+
+    def _delete_confirmed_cb(self, data):
+        self.delete_requested.emit(self._range_info)
+        self.close()
+
+    QtCore.Slot()
+    def _range_min_changed_cb(self):
+        value = self.sb_range_min_widget.value()
+        self._range_info.output_range_min = value
+        self._update_axis_widget()        
+
+    QtCore.Slot()
+    def _range_max_changed_cb(self):
+        self._range_info.output_range_max = self.sb_range_max_widget.value()
+        self._update_axis_widget()        
+
+    @QtCore.Slot()
+    def _range_reset_cb(self):
+        ''' reset range '''
+        info_object = self._range_info
+        self.sb_range_min_widget.setValue(info_object.range_min)
+        self.sb_range_max_widget.setValue(info_object.range_max)
+
+    QtCore.Slot()
+    def _fixed_value_changed_cb(self):
+        self._range_info.fixed_value = self.sb_fixed_value_widget.value()
+        # update the repeater
+        self._update_axis_widget()
+
+    @QtCore.Slot()
+    def _output_mode_changed_cb(self):
+        ''' change the output mode of a range'''
+        value = self.output_mode_widget.currentData()
+        self._range_info.mode = value
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+        if verbose:
+            syslog.info(f"Range: set output mode: {value} for range {self._range_info.range_display_ex()} {self._range_info.id}")
+        self._update_ui()
+    
+    @QtCore.Slot()
+    def _range_description_changed(self):
+        self._range_info.description = self.range_description_widget.text()
+
+    @QtCore.Slot()
+    def _gate_description_changed(self):
+        self._gate_info.description = self.gate_description_widget.text()
+
+    @QtCore.Slot(int)
+    def _condition_changed_cb(self, index):
+        widget = self._condition_tab.widget(index)
+        condition : GateConditionType = widget.data
+        # remember the last selected page for next time
+        if self._range_info:
+            self._range_info.setLastCondition(condition)
+        else:
+            self._gate_info.setLastCondition(condition)
+
+
+
+    def _update_ui(self):
+        ''' updates controls based on the options '''
+        if self._is_range:
+            # range conditions
+            fixed_visible = self._range_info.mode == GateRangeOutputMode.Fixed
+            range_visible = self._range_info.mode == GateRangeOutputMode.Ranged
+
+            self.container_fixed_widget.setVisible(fixed_visible)
+            self.container_output_range_widget.setVisible(range_visible)
+
+            # update the repeater
+            self._update_axis_widget()
+
+
+    def _create_conditions_ui(self):
+        ''' creates the conditions UI'''
+
+        if self._is_range:
+            # valid range conditions
+            conditions = (GateConditionType.InRange, GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.OutsideRange)
+        else:
+            # valid gate conditions
+            conditions = (GateConditionType.OnCross, GateConditionType.OnCrossIncrease, GateConditionType.OnCrossDecrease)            
+
+
+        with QtCore.QSignalBlocker(self._condition_tab):     
+            
+            self._condition_tab.clear()
+            for condition in conditions:
+                condition_container_widget = gremlin.ui.ui_common.QDataWidget()
+                condition_container_widget.data = condition # store the condition as the data 
+                condition_container_layout = QtWidgets.QVBoxLayout(condition_container_widget)
+                self._condition_pages[condition] = condition_container_widget
+                self._condition_tab.addTab(condition_container_widget, f"Condition: {GateConditionType.to_display_name(condition)}")
+                description_widget = QtWidgets.QLabel(GateConditionType.to_description(condition))
+                condition_container_layout.addWidget(description_widget)
+                
+                
+        
+                if self._is_range: # range action
+                    if condition not in (GateConditionType.InRange, GateConditionType.OutsideRange):
+                        autorelease_widget = gremlin.ui.ui_common.QDataCheckbox("Autorelease")
+                        autorelease_widget.setChecked(self._range_info.autorelease_map[condition])
+                        autorelease_widget.data = (self._range_info, condition)
+                        condition_container_layout.addWidget(autorelease_widget)
+                        autorelease_widget.clicked.connect(self._autorelease_changed)
+                else:
+                    autorelease_widget = gremlin.ui.ui_common.QDataCheckbox("Autorelease")
+                    autorelease_widget.setChecked(self._gate_info.autorelease_map[condition])
+                    autorelease_widget.data = (self._gate_info, condition)
+                    condition_container_layout.addWidget(autorelease_widget)
+                    autorelease_widget.clicked.connect(self._autorelease_changed)
+                    
+                
+
+                # all conditions are button type conditions except the in-range which is an axis
+                input_type = InputType.JoystickButton 
+                # condition specific widgets
+                if condition == GateConditionType.InRange:
+                    condition_container_layout.addWidget(self.output_container_widget)
+                    condition_container_layout.addWidget(self.container_range_data_widget)
+                    input_type = InputType.JoystickAxis
+
+                item_data = self._range_info.itemData(condition) if self._is_range else self._gate_info.itemData(condition)
+                container_widget = self._cache.retrieve_by_data(item_data)        
+                if not container_widget:
+                    # create the container, cache it
+                    container_widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
+                    self._cache.register(item_data, container_widget)
+                condition_container_layout.addWidget(container_widget)
+                
+
+            # pick the last used condition
+            condition = self._range_info.condition if self._is_range else self._gate_info.condition
+            index = conditions.index(condition)
+            self._condition_tab.setCurrentIndex(index)
+
+        self._update_tab_icons()
+
+    @QtCore.Slot(bool)
+    def _autorelease_changed(self, checked):
+        ''' called when the autorelease checkbox is changed '''
+        info, condition = self.sender().data
+        info.autorelease_map[condition] = checked
+
+
+    def _update_tab_icons(self):
+        ''' updates the tab icons based on the container status '''
+        
+        for index in range(self._condition_tab.count()):
+            widget = self._condition_tab.widget(index)
+            condition = widget.data
+            has_condition = self._range_info.hasContainers(condition) if self._is_range else self._gate_info.hasContainers(condition)
+            self._condition_tab.setTabIcon(index, self._icon_enabled if has_condition else self._icon_disabled)
+                
+    QtCore.Slot(object)
+    def _mapping_changed_cb(self, item_data : gremlin.ui.input_item.InputItemMappingWidget):
+        ''' hooks a mapping change '''
+        item_data_map = self._range_info.item_data_map if self._is_range else self._gate_info.item_data_map
+        if item_data in item_data_map.values():
+            # one of ours - update the icon status
+            self._update_tab_icons()
+            
+
+
+@gremlin.singleton_decorator.SingletonDecorator
+class InputConfigurationWidgetCache():
+    ''' caches the joystick input widget for each device/input combination  '''
+    def __init__(self):
+        self._widget_map = {}
+
+
+    def register(self, key, widget):
+        if not key in self._widget_map:
+            self._widget_map[key] = widget
+            
+            
+    def clear(self):
+        ''' clears the cache '''
+        self._widget_map.clear()
+
+
+    def retrieve(self, key):
+        if key in self._widget_map:
+            return self._widget_map[key]
+        return None
+    
+    def retrieve_by_data(self,item_data):
+        if item_data:
+            key = item_data.id
+            return self.retrieve(key)
+        return None
+
+    def remove(self, key):
+        if key in self._widget_map:
+            del self._widget_map[key]
+
+    def dump(self):
+        ''' dumps the cache content to the log for debug purposes '''
+        # syslog = logging.getLogger("system")
+        items = list(self._widget_map.values())
+        items.sort(key = lambda x: (x.item_data.profile_mode, x.item_data.device_guid, x.item_data.input_type, x.item_data.input_id))
+        current_device_guid = None
+        current_mode = None
+        current_input_type = None
+        
+        syslog.info("-"*50)
+        syslog.info("UI widget cache dump")
+        for index, input_item_config in enumerate(items):
+            item: gremlin.base_profile.InputItem = input_item_config.item_data
+           
+            if not current_device_guid or current_device_guid != item.device_guid:
+                device_name = gremlin.shared_state.get_device_name(item.device_guid)
+                current_device_guid = item.device_guid
+                syslog.info(f"\tDevice {device_name} id {str(item.device_guid)}:")
+            if not current_input_type or current_input_type != item.input_type:
+                current_input_type = item.input_type
+                syslog.info(f"\t\tInput Type: {InputType.to_display_name(item.input_type)}")
+            syslog.info(f"\t\t\tInput Id: {item.display_name} cache index [{index:,}]")
+
+            
+

@@ -1452,8 +1452,13 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
 
    
         for index in range(device_count):
-            input_id = index + 1
-            filtered = input_id in map_data
+
+            if input_type == InputType.JoystickAxis:
+                # correct for skipped axes
+                input_id = device.getAxisInputId(index)
+            else:
+                input_id = index + 1
+            filtered = input_id in map_data    
             btn = self.input_widgets[input_type][input_id]
             
             if filtered and add_only and btn.isChecked():

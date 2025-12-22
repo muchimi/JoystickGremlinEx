@@ -58,17 +58,15 @@ class TextToSpeech:
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_tts
-
+        self._started = False
+        self._tts_thread = None
+        self._queue_thread = None
+        self._queue = queue.Queue()
+        self.valid = config.tts_enabled
         try:
             self.engine = pyttsx3.init()
             self.voices = self.engine.getProperty('voices')
             self.default_voice = next((voice for voice in self.voices if "David Desktop" in voice.name), None)
-            self._started = False
-            self.valid = config.tts_enabled
-            self._tts_thread = None
-            self._queue_thread = None
-            self._queue = queue.Queue()
-
             
             if verbose:
                 syslog.info(f"TTS voice listing:")
@@ -127,10 +125,10 @@ class TextToSpeech:
                     syslog.error(f"TTS: unable to activate TTS: {err}")
 
 
-    def speak(self, text, rate = 100, clear = False):     
-        gremlin.util.InvokeUiMethod(self._speak_ui, text, rate, clear) # ensure on UI thread
+    def speak(self, text : str, rate : int = 100, clear : bool = False, override_suppress : bool = False):     
+        gremlin.util.InvokeUiMethod(self._speak_ui, text, rate, clear, override_suppress) # ensure on UI thread
 
-    def _speak_ui(self, text, rate = 100, clear = False):     
+    def _speak_ui(self, text, rate = 100, clear = False, override_suppress : bool = False):     
         if not self.valid:
             return
         # syslog = logging.getLogger("system")
@@ -141,7 +139,7 @@ class TextToSpeech:
             verbose = config.verbose_mode_tts
 
             
-            if config.tts_suppress_duplicate:
+            if config.tts_suppress_duplicate and not override_suppress:
                 h = hash(text)
                 if h == self._last_hash:
                     if verbose: syslog.info(f"TTS: SUPRESS duplicate: {text}")
@@ -242,12 +240,14 @@ class TextToSpeech:
        
         try:
             syslog.info("TTS: stop")
-            self._queue_thread.stop()
-            self._queue_thread.join()
-            self._queue_thread
+            if self._queue_thread and self._queue_thread.is_alive():
+                self._queue_thread.stop()
+                self._queue_thread.join()
+            self._queue_thread = None
 
-            self._tts_thread.stop()
-            self._tts_thread.join()
+            if self._tts_thread and self._tts_thread.is_alive():
+                self._tts_thread.stop()
+                self._tts_thread.join()
             self._tts_thread = None
 
             self.engine.stop()
