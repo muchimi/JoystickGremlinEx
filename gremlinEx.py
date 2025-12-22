@@ -4025,7 +4025,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             new_profile_path = profile_item.profile if profile_item else None
 
             if not current_profile_path or not os.path.isfile(current_profile_path):
-                syslog.infog("PROC: no current profile found - auto process start is unable to function")
+                syslog.info("PROC: no current profile found - auto process start is unable to function")
                 # gremlin.ui.ui_common.MessageBox(prompt = f"Current profile  [{current_profile_path}] is not saved or the XML could not be found.  Process auto-start disabled.")
                 return
             

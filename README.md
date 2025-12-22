@@ -28,6 +28,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T136B)
+- Fix: typo causing exception.
+
 ### (m76T136A)
 - Fix: OSC: serialization
 - Fix: Extended button callbacks: some handlers missing new parameter post refactor.
