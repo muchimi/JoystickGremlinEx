@@ -28,6 +28,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T136C)
+- UI: more tweak options layout on profile page.
+- Fix: context handler for input lock widget missing parameter due to API change
+
 ### (m76T136B)
 - Fix: typo causing exception.
 

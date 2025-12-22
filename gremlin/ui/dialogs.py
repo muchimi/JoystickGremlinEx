@@ -1472,17 +1472,14 @@ There should only be one GremlinEx master server on the subnet.
     def _create_profile_page(self):
         """Creates the profile options page."""
 
-        #page_widget, page_layout = gremlin.ui.ui_common.getGridContainer()
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
-        #page_widget.setMaximumWidth(600)
-
-        #col1_widget, col1_layout = gremlin.ui.ui_common.getVContainer()
-        #col2_widget, col2_layout = gremlin.ui.ui_common.getVContainer()
-
-        #page_layout.addWidget(col1_widget, 0,0)
-        #page_layout.addWidget(col2_widget, 0,1)
+        page_layout.setContentsMargins(6,0,6,0)
+        page_widget.setStyleSheet("background: black;")
+        color = gremlin.ui.ui_common.Color.tabBackgroundColor()
+        css = f"background: {color};"
+        page_widget.setStyleSheet(css)
+  
         
-
         # holds the mapping of a process (.exe) to a profile (.xml)
         self._profile_mapper = gremlin.base_profile.ProfileMap()
         self._profile_map_exe_widgets = {}
@@ -1568,6 +1565,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
+        self.scroll_layout.setContentsMargins(6,0,6,0)
 
         # Configure the widget holding the layout with all the buttons
         self.scroll_widget.setLayout(self.scroll_layout)
@@ -1589,12 +1587,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.scroll_layout.setContentsMargins(6,0,6,0)
         self.scroll_layout.addStretch()
 
-        # widgets = [
-        #     self.scroll_area,
-        # ]
-        # self.container_map_widget = gremlin.ui.ui_common.getHContainer(widgets, left_margin = 6, widget_only=True)
 
-  
 
         sort_profile_widget = QtWidgets.QPushButton("Sort Profile")
         sort_profile_widget.clicked.connect(self._sort_profile_cb)
@@ -1641,11 +1634,8 @@ This setting is also available on a profile by profile basis on the profile tab,
             add_map_widget,
         ]
 
-        container_bar_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
-
-        page_layout.addWidget(container_bar_widget)
-        page_layout.addWidget(self.scroll_area)
-        
+        container_bar_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True, left_margin=6, right_margin=6)
+  
 
         # force a data reload
         self._profile_mapper.load_profile_map()
@@ -1654,11 +1644,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         # enable/disable components
         self._autoload_mapped_profile(self.autoload_profile_widget.isChecked())
 
+        page_layout.addWidget(container_bar_widget)
+        page_layout.addWidget(self.scroll_area)
 
-        
-
-        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
-        self.tab_container.addTab(content_widget, "Profile Options")
+        self.tab_container.addTab(page_widget, "Profile Options")
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_verbose_page(self):

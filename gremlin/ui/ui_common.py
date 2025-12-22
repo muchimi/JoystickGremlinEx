@@ -4175,7 +4175,7 @@ class QDataPushButton(QtWidgets.QPushButton):
     ''' custom push button with data field and right click context events '''
 
     _clicked = QtCore.Signal(object) # click internal (widget)
-    clickedEx = QtCore.Signal(object, bool, bool, bool) # fires on control click (widget, ctrl, shft, right)
+    clickedEx = QtCore.Signal(object, bool, bool, bool, bool) # fires on control click (widget, ctrl, shft, right)
 
 
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
@@ -4193,6 +4193,11 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         
         '''
+        # if callback_ex:
+        #     import inspect
+        #     sig = inspect.signature(callback_ex)
+        #     if len(sig.parameters) != 5:
+        #         pass
         super().__init__(text, parent)
         self._data = data
         if tooltip:
@@ -4233,16 +4238,17 @@ class QDataPushButton(QtWidgets.QPushButton):
             if t == QtCore.QEvent.Type.MouseButtonPress:
                 button = event.buttons()
                 # Check if Control modifier is active
-                is_ctrl = bool(event.modifiers() & Qt.ControlModifier)
-                is_shft = bool(event.modifiers() & Qt.ShiftModifier)
+                is_ctrl = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
+                is_shft = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+                is_alt = bool(event.modifiers() & Qt.KeyboardModifier.AltModifier)
                 if button == QtCore.Qt.RightButton:
-                    self.clickedEx.emit(self, is_ctrl, is_shft, True) # extended click
+                    self.clickedEx.emit(self, is_ctrl, is_shft, is_alt, True) # extended click
                     return True # handled
                 elif button == QtCore.Qt.LeftButton:
                     if self.isCheckable():
                         self.setChecked(not self.isChecked())
 
-                    self.clickedEx.emit(self, is_ctrl, is_shft, False) # extended click
+                    self.clickedEx.emit(self, is_ctrl, is_shft, is_alt, False) # extended click
                     self._clicked.emit(self)
                     self.clicked.emit()
                     return True
