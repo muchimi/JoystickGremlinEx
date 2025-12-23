@@ -4209,7 +4209,10 @@ class JoystickEventProcessor():
 						if input_id in self._callbacks[device_guid][input_type]:
 							if self.verbose:
 								device = gremlin.joystick_handling.getDevice(device_guid)
-								syslog.info(f"DISPATCH: callback: [{device.name if device else f'unknown:' + str(device_guid)}] [{input_type.name}] id: [{input_id}] callback count: {len(self._callbacks[device_guid][input_type][input_id])} ")
+								if device:
+									syslog.info(f"DISPATCH: callback: device [{device.device_id}][{device.name}] [{input_type.name}] id: [{input_id}] callback count: {len(self._callbacks[device_guid][input_type][input_id])} ")
+								else:
+									syslog.info(f"DISPATCH: callback: device [{str(device_guid)}][unknown device] [{input_type.name}] id: [{input_id}] callback count: {len(self._callbacks[device_guid][input_type][input_id])} ")
 							for hook_id in self._callbacks[device_guid][input_type][input_id]:
 								cb = self._callbacks[device_guid][input_type][input_id][hook_id]
 					
@@ -4234,7 +4237,11 @@ class JoystickEventProcessor():
 					
 			
 	def _fire_callback(self, cb : JoystickCallback, event, values):
+		
 		if self.verbose:
+			device = gremlin.joystick_handling.getDevice(event.device_guid)
+			if "RIGHT" in device.name and event.identifier == 2:
+				pass
 			start_time = time.time()
 			gremlin.util.InvokeUiMethod(cb.callback, event, values)
 			lapsed = time.time() - start_time

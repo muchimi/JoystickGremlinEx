@@ -5215,8 +5215,6 @@ class QProgressBar(QtWidgets.QWidget):
 
         #syslog.info(f"X: {x} y: {y} w: {w} h: {h} v:{v} value: {self._percent:0.3f}")
 
-
-_hook_count = 0
 _hook_registry = {} # registers hook list [hook_id]
 
 class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
@@ -5303,9 +5301,7 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
                     # already registered
                     return
                 if verbose:
-                    global _hook_count
-                    _hook_count += 1
-                    syslog.info(f"DEV: hook (axis): [{_hook_count}] [{self._hook_id}] {self._description}")
+                    syslog.info(f"DEV: hook (axis): [{len(_hook_registry)}] [{self._hook_id}] {self._description}")
                 super().hookDevice(
                         self._hook_id,
                         self.process_events,
@@ -5321,14 +5317,12 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
             
     def unhook(self):
         ''' called when object is removed '''
-        global _hook_count, _hook_registry
+        global _hook_registry
         if self._hook_id in _hook_registry:
             verbose = gremlin.config.Configuration().verbose_mode_hooks
-            if verbose:
-               
-                _hook_count -= 1
-                syslog.info(f"DEV: unhook (axis): [{_hook_count}] [{self._hook_id}] {self._description}")
             del _hook_registry[self._hook_id]
+            if verbose:
+                syslog.info(f"DEV: unhook (axis): [{len(_hook_registry)}] [{self._hook_id}] {self._description}")
             self._hooked = False
             super().unhookDevice()
 
@@ -5456,12 +5450,12 @@ class ButtonStateWidget(QtWidgets.QWidget):
     def _do_hook(self):
         ''' hooks the input  '''
         if self._hook_requested and not self._hooked:
+            global _hook_registry
             verbose = gremlin.config.Configuration().verbose_mode_hooks
             if self._hook_id and self._device_guid and self._input_type and self._input_id:
+                _hook_registry[self._hook_id] = True
                 if verbose:
-                    global _hook_count
-                    _hook_count += 1
-                    syslog.info(f"DEV: hook (button): [{_hook_count}] [{self._hook_id}] {self._description}")                
+                    syslog.info(f"DEV: hook (button): [{len(_hook_registry)}] [{self._hook_id}] {self._description}")                
                 self._hooked = True
                 self._last_state_value = None # reset state
                 self.updateState()
@@ -5476,15 +5470,16 @@ class ButtonStateWidget(QtWidgets.QWidget):
     def unhookDevice(self):
         if not self._hooked:
             return
+        global _hook_registry
         verbose = gremlin.config.Configuration().verbose_mode_hooks
-        if verbose:
-            global _hook_count
-            _hook_count -= 1
-            syslog.info(f"DEV: unhook (button): [{_hook_count}] [{self._hook_id}] {self._description}")
+        if self._hook_id in _hook_registry:
+            del _hook_registry[self._hook_id]
+            if verbose:
+                syslog.info(f"DEV: unhook (button): [{len(_hook_registry)}] [{self._hook_id}] {self._description}")
 
-        self._hooked = False
-        el = gremlin.event_handler.EventListener()
-        el.button_state_change.disconnect(self.process_event)
+            self._hooked = False
+            el = gremlin.event_handler.EventListener()
+            el.button_state_change.disconnect(self.process_event)
 
     def process_event(self, event):
         ''' joystick event handler '''
@@ -6356,7 +6351,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         name_index = 0
 
         
-        hook_id = device.device_id
+
         for i in range(device.axis_count): 
             linear_id = i + 1
             axis_id = device.linear_id_map[linear_id] # map linear -> axis ID for non sequential axes
@@ -6383,6 +6378,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             values = astate.getAxisValues(device.device_guid, axis_id)
             axis_widget = QHookedProgressBar(data = axis_id, value = values)
             description = f"axis repeater: [{device.name}] axis id: [{axis_id}]"
+            hook_id = f"IVR {device.device_id} A{axis_id}"
             axis_widget.hookDevice(
                         hook_id,
                         device_guid = device.device_guid,
