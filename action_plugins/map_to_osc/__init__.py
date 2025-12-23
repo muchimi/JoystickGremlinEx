@@ -783,6 +783,11 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
         
 
     def _start_client(self):
+        config = gremlin.config.Configuration()
+        if not config.osc_enabled:
+            # ignore if OSC is not enabled
+            return False
+        
         if not self.osc_client:
             verbose = gremlin.config.Configuration().verbose_mode_osc
             device = gremlin.joystick_handling.get_device(self.hardware_device_guid)
@@ -792,8 +797,12 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
                                                             self.action_data.server_ip,
                                                             self.action_data.server_port,                                            
                                                             name=f"OSC {device_name}/{self.action_data.hardware_input_id}")
-                self.osc_client.start()
-                self.valid = True
+                
+                if self.osc_client:
+                    self.osc_client.start()
+                    self.valid = True
+                else:
+                    syslog.error("OSC: failed to start client.")
                 
                 
             else:
@@ -838,6 +847,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None) -> bool:
+
         if not self._start_client():
             return
         
@@ -910,6 +920,7 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
     #     InputType.Midi
 
     # ]
+
 
     functor = MapToOscFunctor
     widget = MapToOscWidget
@@ -1133,7 +1144,9 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
 
         :return True if the action is configured correctly, False otherwise
         """
-        return True
+        config = gremlin.config.Configuration()
+        return config.osc_enabled
+
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''

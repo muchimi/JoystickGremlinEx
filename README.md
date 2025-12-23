@@ -28,6 +28,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T138)
+- New: if a control key is held down on the keyboard as GEX starts, GEX will **not** auto-load the last profile.  Same as -np command line option.
+- Optimization: repeaters will self hook/unhook based on visibility and track themselves.
+-  Change: removed exec options for description as those made no sense to have for this action which is a noop.
+- Fix: exception when adding a condition in some situations.
+- Fix: Ensure event dispatch is started on hook registration.
+- Fix: OSC: disable map to OSC/ex if OSC is not enabled and prevent interface from auto-starting if the profile has an OSC mapping / reference defined.
+
+
+
 ### (m76T137B)
 - Fix: Simconnect plugin error.
 - Fix: invalid device name will not longer throw an exception and report an error instead.

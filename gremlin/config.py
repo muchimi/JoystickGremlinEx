@@ -1486,6 +1486,15 @@ class Configuration(QtCore.QObject):
         return self.verbose and VerboseMode.Calib in self.verbose_mode  
     
     @property
+    def verbose_mode_hooks(self):
+        ''' true if verbose mode for performance timing '''
+        return self.verbose and VerboseMode.Hooks in self.verbose_mode      
+    
+    @property
+    def verbose_mode_dev(self):
+        return self.verbose and __debug__
+    
+    @property
     def midi_enabled(self):
         ''' true if MIDI module is enabled '''
         return self._get_data("midi_enabled", True)

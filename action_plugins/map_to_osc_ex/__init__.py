@@ -1540,7 +1540,8 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
 
         :return True if the action is configured correctly, False otherwise
         """
-        return True
+        config = gremlin.config.Configuration()
+        return config.osc_enabled
 
 
     def _get_args(self, is_pressed, value):
@@ -1621,17 +1622,22 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
         return params
     
     def _start_client(self):
-            if not self.client_started or self.osc_client is None:
-                self.osc_client = None
-                server_ip = self.server_ip
-                server_port = self.server_port
-                device_name = gremlin.shared_state.get_device_name(self.hardware_device_guid)
-                osc = OscInterface()
-                if gremlin.util.validateIp(server_ip):
-                    self.osc_client = osc.getClient(self.action_id, 
-                                                                server_ip,
-                                                                server_port,                                            
-                                                                name=f"OSC {device_name}/{self.hardware_input_id}")
+        config = gremlin.config.Configuration()
+        if not config.osc_enabled:
+            # ignore if OSC is not enabled
+            return False
+        if not self.client_started or self.osc_client is None:
+            self.osc_client = None
+            server_ip = self.server_ip
+            server_port = self.server_port
+            device_name = gremlin.shared_state.get_device_name(self.hardware_device_guid)
+            osc = OscInterface()
+            if gremlin.util.validateIp(server_ip):
+                self.osc_client = osc.getClient(self.action_id, 
+                                                server_ip,
+                                                server_port,                                            
+                                                name=f"OSC {device_name}/{self.hardware_input_id}")
+                if self.osc_client:
                     self.osc_client.start()
                     self.valid = True
                     self.client_started = True
@@ -1639,10 +1645,13 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
                     if verbose:
                         syslog.info(f"OSC SEND: client start target: {server_ip} port: {server_port}")
                 else:
-                    syslog.error(f"OSC SEND: invalid target IP: {server_ip}")
-                    self.valid = False
-                    return
-
+                    syslog.error("OSC SEND: osc client failed to start.")
+            else:
+                syslog.error(f"OSC SEND: invalid target IP: {server_ip}")
+                self.valid = False
+                return False
+                
+        return True
 
 
     def _stop_client(self):
@@ -1654,13 +1663,19 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
 
     def process_event(self, is_pressed, value) -> bool:
         ''' sends a command '''
+
+        if not self._start_client():
+            return False
+        
+        
         if not self.command:
             # command must be set
             return False
         
         # activate OSC if it is not
         if not self.osc_client:
-            self._start_client()
+            return False
+         
 
         
         verbose = gremlin.config.Configuration().verbose_mode_osc

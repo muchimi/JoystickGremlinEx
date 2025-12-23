@@ -50,15 +50,15 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.inner_layout.addWidget(self.label)
         self.inner_layout.addWidget(self.description)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press,
-                                                                    self.action_data.exec_on_release,
-                                                                    press_callback = self._execute_on_press_changed, 
-                                                                    release_callback = self._execute_on_release_changed)
-        # self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
+        # self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press,
+        #                                                             self.action_data.exec_on_release,
+        #                                                             press_callback = self._execute_on_press_changed, 
+        #                                                             release_callback = self._execute_on_release_changed)
+        # # self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         # self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
         self.main_layout.addLayout(self.inner_layout)
-        self.main_layout.addWidget(self._execute_widget)
+        # self.main_layout.addWidget(self._execute_widget)
 
     def _populate_ui(self):
         self.description.setText(self.action_data.description)
@@ -82,12 +82,7 @@ class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action, parent)
 
     def process_event(self, event, value, extra_data = None):
-        is_pressed = event.is_pressed
-        trigger = (is_pressed and self.action_data.exec_on_press) or \
-                    (not is_pressed and self.action_data.exec_on_release) 
-        
-        if trigger:
-            syslog.info(f"DESCRIPTION: {self.action_data.description}  (input pressed: [{is_pressed}])")
+        ''' handle events '''
         return True
 
 
@@ -119,8 +114,8 @@ Also see notes on actions and containers.
         super().__init__(parent)
         self.description = ""
         self.parent = parent
-        self.exec_on_press = True # true if trigger should execute on input press event
-        self.exec_on_release = False # true if trigger should execute on input release event
+        # self.exec_on_press = True # true if trigger should execute on input press event
+        # self.exec_on_release = False # true if trigger should execute on input release event
 
 
     def icon(self):
@@ -131,22 +126,22 @@ Also see notes on actions and containers.
 
     def _parse_xml(self, node, data = None, extra_data = None):
         self.description = gremlin.profile.safe_read(node, "description", str, "")
-        self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
-        self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+        # self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
+        # self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
 
 
     def _generate_xml(self):
         node = ElementTree.Element("description")
         node.set("description", str(self.description))
-        node.set("exec_on_press", safe_format(self.exec_on_press, bool))
-        node.set("exec_on_release", safe_format(self.exec_on_release, bool))  
+        # node.set("exec_on_press", safe_format(self.exec_on_press, bool))
+        # node.set("exec_on_release", safe_format(self.exec_on_release, bool))  
         return node
 
     def _is_valid(self):
         return True
     
     def __str__(self):
-        return f"DescriptionAction: {self.description} exec on press: [{self.exec_on_press} on release: {self.exec_on_release}]"
+        return f"DescriptionAction: {self.description}" # exec on press: [{self.exec_on_press} on release: {self.exec_on_release}]"
 
 
     def to_html(self) -> str:
@@ -156,10 +151,10 @@ Also see notes on actions and containers.
         
         table.addField("Description", html.escape(self.description))
 
-        if self.exec_on_press:
-            table.addField("Exec (press)", "Yes")
-        if self.exec_on_release:
-            table.addField("Exec (release)", "Yes")
+        # if self.exec_on_press:
+        #     table.addField("Exec (press)", "Yes")
+        # if self.exec_on_release:
+        #     table.addField("Exec (release)", "Yes")
 
         return table.to_html()
 

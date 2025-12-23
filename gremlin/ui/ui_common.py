@@ -3534,6 +3534,7 @@ class InputListenerWidget(QBoxFrame):
             self._callback(event)
         self.item_selected.emit(event)
         self.selection = event
+        self.unhook()
         self.close()
 
 
@@ -5215,6 +5216,9 @@ class QProgressBar(QtWidgets.QWidget):
         #syslog.info(f"X: {x} y: {y} w: {w} h: {h} v:{v} value: {self._percent:0.3f}")
 
 
+_hook_count = 0
+_hook_registry = {} # registers hook list [hook_id]
+
 class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
     ''' hooked progress bar to a hardware input '''
 
@@ -5231,37 +5235,116 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
        
         super().__init__(orientation, value, min, max, readonly, step, data, parent)
         self._description = None
-        
+        self._hook_requested = False # true if the hook was requested via a call to hookevent
+        self._persist = False
 
     def getDescription(self) -> str:
-        return self._description            
+        return self._description
+    
+    def event(self, event):
+        if event.type() == QEvent.Show:
+            if self._hook_requested:
+                self._do_hook()
+        elif event.type() == QEvent.Hide:
+            self.unhook()
+        return super().event(event)    
 
     def hookDevice(self, hook_id, device_guid, input_type, input_id, ui_only = True, persist = False, description = None):    
         ''' hooks the device '''    
-        if Shiboken.isValid(self):
-            self._description = description or f"repeater: [{gremlin.joystick_handling.getDeviceName(self.device_guid)}] input id: [{self.input_id}]"
-            super().hookDevice(
-                            hook_id,
-                            self.process_events,
-                            device_guid = device_guid,
-                            input_type = input_type,
-                            input_id = input_id,
-                            ui_only = ui_only,
-                            persist = persist,
-                            )
+
         
+        changed = False
+        des = description or f"repeater (axis): [{gremlin.joystick_handling.getDeviceName(self.device_guid)}] input id: [{self.input_id}]"
+        if des != self._description:
+            changed = True
+            self._description = des
+        if hook_id != self._hook_id:
+            self._hook_id = hook_id
+            changed = True
+        if self._device_guid != device_guid:
+            self._device_guid = device_guid
+            changed = True
+        if input_type != self._input_type:
+            self._input_type = input_type   
+            changed = True
+        if input_id != self._input_id:
+            changed = True
+            self._input_id = input_id
+        if ui_only != self._ui_only:
+            self._ui_only = ui_only
+            changed = True
+        
+        self._persist = persist
+        self._hook_requested = True
+        
+
+
+        if self.isVisible():
+            if not self._hooked:
+                # first time hook
+                self._do_hook()
+            elif changed:
+                # remove old hook
+                self.unhook()
+
+                # set new hook
+                self._do_hook()
+
+
+         
+    def _do_hook(self):
+        global _hook_registry
+        if self._hook_requested and not self._hooked:
+         
+            verbose = gremlin.config.Configuration().verbose_mode_hooks
+            
+            if self._hook_id and self._device_guid and self._input_type and self._input_id:
+                if self._hook_id in _hook_registry:
+                    # already registered
+                    return
+                if verbose:
+                    global _hook_count
+                    _hook_count += 1
+                    syslog.info(f"DEV: hook (axis): [{_hook_count}] [{self._hook_id}] {self._description}")
+                super().hookDevice(
+                        self._hook_id,
+                        self.process_events,
+                        device_guid = self._device_guid,
+                        input_type = self._input_type,
+                        input_id = self._input_id,
+                        ui_only = self._ui_only,
+                        persist = self._persist,
+                        )
+                
+                _hook_registry[self._hook_id] = True
+                self._hooked = True
+            
+    def unhook(self):
+        ''' called when object is removed '''
+        global _hook_count, _hook_registry
+        if self._hook_id in _hook_registry:
+            verbose = gremlin.config.Configuration().verbose_mode_hooks
+            if verbose:
+               
+                _hook_count -= 1
+                syslog.info(f"DEV: unhook (axis): [{_hook_count}] [{self._hook_id}] {self._description}")
+            del _hook_registry[self._hook_id]
+            self._hooked = False
+            super().unhookDevice()
 
     def process_events(self, event, values):
         ''' joystick value changed '''
+        
         if not self.valid:
             # self unregister on QT GC garbage collection
+            verbose = gremlin.config.Configuration().verbose_mode_hooks
+            if verbose: syslog.info(f"DEV: auto unhook (axis): [{self._hook_id}] {self._description}")
             self.unhook()
             return
+        
         self.setValue(values)
 
-    def unhook(self):
-        ''' called when object is removed '''
-        super().unhookDevice()
+
 
 class ButtonStateWidget(QtWidgets.QWidget):
     ''' visualizes the state of a button '''
@@ -5278,7 +5361,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self.main_layout.setSpacing(0)
         self.main_layout.setContentsMargins(0,0,0,0)
         self._deleted = False
-
+       
         self._icon_size = QtCore.QSize(16,16)
         self._device_guid = None
         self._input_id = None
@@ -5296,6 +5379,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._last_state_value = None # not set
 
         self._button_widget.setStyleSheet("")
+        self._valid = True # assume ok
 
         self._hat_icons = {} # icon hats, keyed by position
         
@@ -5308,9 +5392,22 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
         self._hooked = False
         self._suspended = False
+        self._hook_requested = False # true if the hook was requested via a call to hookevent
+        self._hook_id = None
+        
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
+
+
+    def event(self, event):
+        if event.type() == QEvent.Show:
+            if self._hook_requested:
+                self._do_hook()
+        elif event.type() == QEvent.Hide:
+            self.unhook()
+        return super().event(event)    
+
 
     def desiredHeight(self):
         return self.sizeHint().height()
@@ -5330,26 +5427,71 @@ class ButtonStateWidget(QtWidgets.QWidget):
             self.deleted.emit()
 
 
-    def hookDevice(self, hook_id, device_guid, input_type, input_id):
-        ''' hooks the input  '''
-        if self._hooked:
-            return
-        self._hook_id = hook_id
-        self._hooked = True
-        self._device_guid = device_guid
-        self._input_id = input_id
-        self._input_type = input_type
-        self._last_state_value = None # reset state
-        self.updateState()
-        self._tab_selected(device_guid)
-        el = gremlin.event_handler.EventListener()
-        el.button_state_change.connect(self.process_event)
-        self.unhooked.emit()
+    def hookDevice(self, hook_id : str, device_guid, input_type, input_id, description : str = None):
+        self._description = description or f"repeater (button): [{gremlin.joystick_handling.getDeviceName(self.device_guid)}] input id: [{self.input_id}]"
+        changed = False
+        if self._hook_id != hook_id:
+            self._hook_id = hook_id
+            changed = True
+        if self._device_guid != device_guid:
+            self._device_guid = device_guid
+            changed = True
+        if self._input_type != input_type:
+            self._input_type = input_type
+            changed = True
+        if self._input_id != input_id:
+            self._input_id = input_id
+            changed = True
 
+        self._hook_requested = True
+        if self.isVisible():
+            if not self._hooked:
+                self._do_hook()
+            elif changed:
+                # data changed 
+                self.unhook()
+                self._do_hook()
+
+
+    def _do_hook(self):
+        ''' hooks the input  '''
+        if self._hook_requested and not self._hooked:
+            verbose = gremlin.config.Configuration().verbose_mode_hooks
+            if self._hook_id and self._device_guid and self._input_type and self._input_id:
+                if verbose:
+                    global _hook_count
+                    _hook_count += 1
+                    syslog.info(f"DEV: hook (button): [{_hook_count}] [{self._hook_id}] {self._description}")                
+                self._hooked = True
+                self._last_state_value = None # reset state
+                self.updateState()
+                self._tab_selected(self._device_guid)
+                el = gremlin.event_handler.EventListener()
+                el.button_state_change.connect(self.process_event)
+
+
+    def unhook(self):
+        self.unhookDevice()
+
+    def unhookDevice(self):
+        if not self._hooked:
+            return
+        verbose = gremlin.config.Configuration().verbose_mode_hooks
+        if verbose:
+            global _hook_count
+            _hook_count -= 1
+            syslog.info(f"DEV: unhook (button): [{_hook_count}] [{self._hook_id}] {self._description}")
+
+        self._hooked = False
+        el = gremlin.event_handler.EventListener()
+        el.button_state_change.disconnect(self.process_event)
 
     def process_event(self, event):
         ''' joystick event handler '''
-        if not Shiboken.isValid(self):
+        if not self._valid: 
+            verbose = gremlin.config.Configuration().verbose_mode_hooks
+            if verbose: syslog.info(f"DEV: (button) auto unhook: [{self._hook_id}] {self._description}")
+            self.unhook()
             return
             
         if self._suspended:
@@ -5381,14 +5523,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
             self._update_value(state)
 
 
-    def unhookDevice(self):
-        if not Shiboken.isValid(self):
-            return
-        if not self._hooked:
-            return
-        self._hooked = False
-        el = gremlin.event_handler.EventListener()
-        el.button_state_change.disconnect(self.process_event)
+  
         
  
 
@@ -5436,6 +5571,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
     def _update_value(self, is_pressed):
         ''' updates a button position '''
         if not Shiboken.isValid(self):
+            self._value = False
             return
         if self._last_state_value is None or self._last_state_value != is_pressed:
             # syslog.info(f"update button state: {is_pressed}")
@@ -7327,13 +7463,33 @@ class QUsedPushButton(QDataPushButton):
         if checked is not None:
             self.setChecked(checked)
 
+        self._hook_requested = False
+
         if used_device_guid:
             # hook the callback 
+            self._hook_requested = True
+            self._do_hook()
+            
+        
+
+    def event(self, event):
+        if event.type() == QEvent.Show:
+            if self._hook_requested:
+                self._do_hook()
+        elif event.type() == QEvent.Hide:
+            self.unhook()
+        return super().event(event)
+    
+    def _do_hook(self):
+        if self._hook_requested:
             el = gremlin.event_handler.EventListener()
             el.input_used_changed.connect(self._handle_used_changed)
 
-        # if callback:
-        #     self.clicked.connect(callback)
+    def unhook(self):
+        if self._hook_requested:
+            el = gremlin.event_handler.EventListener()
+            el.input_used_changed.disconnect(self._handle_used_changed)
+
 
     def _handle_used_changed(self, device_guid, input_type, input_id, value : bool):
         # see if it's ours

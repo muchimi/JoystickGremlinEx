@@ -47,7 +47,7 @@ from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
 from gremlin.types import TabDeviceType
 from shiboken6 import Shiboken
 import gremlin.tabstate
-
+import win32api, win32con
 
 import gremlin.joystick_handling
 
@@ -359,6 +359,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._context_menu_tab_index = None
 
         # Load existing configuration or create a new one otherwise
+
+        # disable autoload if ctrl key is held
+        if win32api.GetKeyState(win32con.VK_CONTROL) < 0 :
+            syslog.info("START: autoload profile disabled (ctrl key detected)")
+            self.config.auto_load_disabled = True
+
         
         if not self.config.auto_load_disabled and self.config.last_profile and os.path.isfile(self.config.last_profile):
             # check if this was a profile swap that we load the profile from the current user folder
@@ -5369,6 +5375,8 @@ if __name__ == "__main__":
     app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
 
     config = gremlin.config.Configuration()
+
+
 
     # command line parser
     parser = QtCore.QCommandLineParser()

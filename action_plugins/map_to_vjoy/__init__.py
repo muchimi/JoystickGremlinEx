@@ -101,6 +101,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         self.data = data
         self._filter_input = filter_input
         self.action_data = action_data
+        self._hook_requested = False
 
         config = gremlin.config.Configuration()
 
@@ -300,6 +301,25 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
 
 
 
+    def event(self, event):
+        if event.type() == QtCore.QEvent.Show:
+            if self._hook_requested:
+                self._do_hook()
+        elif event.type() == QtCore.QEvent.Hide:
+            self.unhook()
+        return super().event(event)    
+
+    def _do_hook(self):
+        if not self._hook_requested:
+            self._hook_requested = True
+
+    def unhook(self):
+        if self._hook_requested:
+            self._hook_requested = False
+
+        
+
+
     def _handle_curve_changed(self, curve_data):
         ''' update made to the merged axis curve '''
         self.data.curve_data = curve_data
@@ -321,9 +341,6 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
                 self.merge_axis_repeater_widget.setValue([value, cv])
             else:
                 self.merge_axis_repeater_widget.setValue(value)
-
-
-
 
     def _update_axis_list(self, device_id, select_input_id = None):
         ''' updates the axis list for a merge input '''
@@ -458,24 +475,29 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         self.data.device_id = device_id
         self.data.input_id = input_id
         self._select_merge_target(device_id, input_id)
+        self.axis_listen_dialog.close()
 
     def _select_merge_target(self, device_id, input_id):
-        ''' selects a given merge axis'''
-        index = self.merge_selector_device_widget.findData(device_id)
-        if index != -1:
-            if index != self.merge_selector_device_widget.currentIndex():
-                with QtCore.QSignalBlocker(self.merge_selector_device_widget):
-                    self.merge_selector_device_widget.setCurrentIndex(index) # this also updates the axis list if needed
-                    self._update_axis_list(device_id, input_id)
-                    self.data.device_id = device_id
-                    self.data.device_guid = gremlin.util.parse_guid(device_id)
+        gremlin.util.InvokeUiMethod(self._select_merge_target_ui, device_id, input_id)
 
-            index = self.merge_selector_input_widget.findData(input_id)
+    def _select_merge_target_ui(self, device_id, input_id):
+        ''' selects a given merge axis'''
+        if Shiboken.isValid(self):
+            index = self.merge_selector_device_widget.findData(device_id)
             if index != -1:
-                if index != self.merge_selector_input_widget.currentIndex():
-                    with QtCore.QSignalBlocker(self.merge_selector_input_widget):
-                        self.merge_selector_input_widget.setCurrentIndex(index)
-                        self.data.input_id = input_id
+                if index != self.merge_selector_device_widget.currentIndex():
+                    with QtCore.QSignalBlocker(self.merge_selector_device_widget):
+                        self.merge_selector_device_widget.setCurrentIndex(index) # this also updates the axis list if needed
+                        self._update_axis_list(device_id, input_id)
+                        self.data.device_id = device_id
+                        self.data.device_guid = gremlin.util.parse_guid(device_id)
+
+                index = self.merge_selector_input_widget.findData(input_id)
+                if index != -1:
+                    if index != self.merge_selector_input_widget.currentIndex():
+                        with QtCore.QSignalBlocker(self.merge_selector_input_widget):
+                            self.merge_selector_input_widget.setCurrentIndex(index)
+                            self.data.input_id = input_id
 
 
 class StepWidget(gremlin.ui.ui_common.QDataWidget):
@@ -741,6 +763,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param action_data profile data managed by this widget
         :param parent the parent of this widget
         """
+        self._hook_requested = False
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, VjoyRemap))
 
@@ -1611,8 +1634,23 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.container_output_range_widget)
 
 
+
+
+    def event(self, event):
+        if event.type() == QtCore.QEvent.Show:
+            if self._hook_requested:
+                self._do_hook()
+        elif event.type() == QtCore.QEvent.Hide:
+            self.unhook()
+        return super().event(event)    
+
     def _enable_axis_tracking(self):
-        if not self._axis_tracking_enabled:
+        self._hook_requested = True
+        self._do_hook()
+
+
+    def _do_hook(self):
+        if self._hook_requested and not self._axis_tracking_enabled:
             self._axis_tracking_enabled = True
             el = gremlin.event_handler.EventListener()
             el.custom_joystick_event.connect(self._joystick_event_handler)
@@ -1621,7 +1659,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             el.profile_start.connect(self._profile_start)
             el.profile_stop.connect(self._profile_stop)
 
-            # send the first update
+    def unhook(self):
+        if self._hook_requested:
+            self._disable_axis_tracking()
 
 
     def _disable_axis_tracking(self):
@@ -5502,15 +5542,6 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
         self.refresh_vjoy()
-
-    # @property
-    # def axis_last_value(self):
-    #     return self._axis_last_value
-
-    # @axis_last_value.setter
-    # def axis_last_value(self, value : float):
-    #     self._axis_last_value = value
-
 
     def actionDeleted(self):
         ''' called if the action is being deleted '''

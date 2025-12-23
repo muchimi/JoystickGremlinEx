@@ -2026,6 +2026,7 @@ class OscInterface(QtCore.QObject):
         config = gremlin.config.Configuration()
         if not config.osc_enabled:
             # disabled
+            syslog.info("OSC: osc is disabled, client will not start.")
             return None
         
         key = (server, port)
@@ -2036,38 +2037,40 @@ class OscInterface(QtCore.QObject):
             if verbose:
                 # syslog = logging.getLogger("system")
                 syslog.info(f"OSC: register client {key}")
-        else:
-            client = self._client_pool[key]
+        
         if not key in self._client_map:
             self._client_map[key] = []
         if not client_id in self._client_map[key]:
             self._client_map[key].append(client_id)
-        return client
+        
+        return self._client_pool[key]
     
     def closeClient(self, client_id : str, client : OscClient):
         ''' removes a client from the pool '''
 
         key = (client._server_ip, client._output_port)    
-        if not key in self._client_map:
-            self._client_map[key] = []
-            
-        if client_id in self._client_map[key]:
-            self._client_map[key].remove(client_id)
-    
-        if self._client_map[key]:
-            # client is still used
-            return 
+
+        if key in self._client_pool:
         
-        if client is not None:
+            if not key in self._client_map:
+                self._client_map[key] = []
+                
+            if client_id in self._client_map[key]:
+                self._client_map[key].remove(client_id)
+        
+            if self._client_map[key]:
+                # client is still used
+                return 
             
-            if key in self._client_pool:
+            if client is not None:
                 client.stop()
                 verbose = gremlin.config.Configuration().verbose_mode_osc
                 if verbose:
                     # syslog = logging.getLogger("system")
                     syslog.info(f"OSC: unregister client {key}")
-                del self._client_pool[key]
 
+            del self._client_pool[key]
+                    
         
     def stopClients(self):
         ''' stops all registered clients '''
@@ -2229,6 +2232,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
         self._message_data = None # the list of values associated with that command
         self._message_data_string = None # the string representation of the data args
         self._mode = OscInputItem.InputMode.Button
+        self._override_input_type = InputType.JoystickButton
         self._command_mode = OscInputItem.CommandMode.Message
         self._title_name = "OSC (not configured)"
         self._display_name =  ""
@@ -2244,6 +2248,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
         self._autorelease_delay = int(config.osc_default_autorelease_delay * 1000) # default release delay in milliseconds
         self._profile_mode = gremlin.shared_state.edit_mode
         self._autorelease_timer = None # autorelease timer for this input 
+        
       
         self._axis_values = []
         current_mode = gremlin.shared_state.current_mode
@@ -2373,6 +2378,11 @@ class OscInputItem(gremlin.base_profile.InputItem):
         ''' changes the input mode'''
         if self._mode != value:
             self._mode = value
+            match value:
+                case OscInputItem.InputMode.Axis:
+                    self._override_input_type = InputType.JoystickAxis
+                case OscInputItem.InputMode.Button:
+                    self._override_input_type = InputType.JoystickButton 
             self._update()
             self.input_type_changed.emit(self)
 
@@ -4243,9 +4253,14 @@ class InputOscClient(QtCore.QObject):
         import gremlin.input_devices
         import gremlin.shared_state
 
-        self.start() # start if not started
 
         config = gremlin.config.Configuration()
+        if not config.osc_enabled:
+            return
+
+        self.start() # start if not started
+
+        
         verbose = config.verbose_mode_osc
         # syslog = logging.getLogger("system")
         self._update_messages()
@@ -4290,7 +4305,8 @@ class InputOscClient(QtCore.QObject):
         
             if not input_item in self._osc_map[message_key]:
                 self._osc_map[message_key].append(input_item)
-            if self._verbose:
+            verbose = gremlin.config.Configuration().verbose_mode_osc
+            if  verbose:
                 syslog.info(f"OSC: register trigger on: {input_item.display_name} source index: {input_item.source_index} mode: {input_item.mode_string} key: {message_key}")
                 
         
@@ -4311,6 +4327,9 @@ class InputOscClient(QtCore.QObject):
         ''' starts the client '''
         
         # build a list of messages configured for input
+        config = gremlin.config.Configuration()
+        if not config.osc_enabled:
+            return
 
 
         # build a list of input items to OSC messages
@@ -4324,6 +4343,10 @@ class InputOscClient(QtCore.QObject):
     def _start(self):
         from gremlin.ui.osc_device import OscInterface
         import gremlin.shared_state
+        config = gremlin.config.Configuration()
+        if not config.osc_enabled:
+            return
+
         if self._started:
             return
         self._interface = OscInterface()
