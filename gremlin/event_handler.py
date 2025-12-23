@@ -2945,6 +2945,7 @@ class EventHandler(QtCore.QObject):
 				
 				m_list = self._matching_callbacks(event)
 				f_list = self._matching_functors(event)
+			
 				if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
 			if m_list or f_list:
@@ -2996,7 +2997,7 @@ class EventHandler(QtCore.QObject):
 		''' triggers callbacks '''
 		if m_list:
 			self._trigger_callbacks(m_list, event)
-			return # don't do f_list if m_list processed
+			# return # don't do f_list if m_list processed
 
 		if f_list:
 			self._trigger_functor_callbacks(f_list, event)
@@ -3081,9 +3082,9 @@ class EventHandler(QtCore.QObject):
 		if device_guid in self.latched_functors:
 			modes = gremlin.shared_state.current_profile.getModeHierarchy(self.runtime_mode)
 			for mode in modes:
-				if mode in self.latched_functors[device_guid].keys():
+				if mode in self.latched_functors[device_guid]:
 					key = event.callbackKey
-					if key in self.latched_functors[device_guid][mode].keys():
+					if key in self.latched_functors[device_guid][mode]:
 						functors_list = self.latched_functors[device_guid][mode][key]
 						if functors_list:
 							break

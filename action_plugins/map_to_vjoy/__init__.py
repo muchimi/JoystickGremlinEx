@@ -195,22 +195,19 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
             for dev in devices:
                 self.merge_device_map[dev.device_id] = dev
                 axis_list = {}
-                for input_id in range(1, dev.axis_count+1):
+                for index in range(dev.axis_count):
+                    input_id = dev.axis_sequence_to_input_id(index)
                     if dev.device_guid == self.action_data.hardware_device_guid and \
                         input_id == self.action_data.hardware_input_id:
                         # skip self as a possible input
                         continue
-                    axis_name = joystick_handling.get_axis_name(input_id)
-                    axis_list[input_id] = f"Axis {input_id} ({axis_name})"
-
+                    axis_list[input_id] = dev.get_axis_name(input_id)
                 if axis_list:
                     self.merge_input_map[dev.device_id] = axis_list
                     self.merge_selector_device_widget.addItem(dev.name, dev.device_id)
 
 
         self.last_merge_device_id = None
-
-
 
         self._update_axis_list(default_device.device_id, selected_input_id)
 
@@ -349,29 +346,30 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
             return
 
         device = joystick_handling.device_info_from_guid(device_id)
-        input_device_id = self.action_data.get_device_guid()
-        input_input_id = self.action_data.get_input_id()
+        input_device_id = self.action_data.hardware_device_guid
+        input_input_id = self.action_data.hardware_input_id
 
         with QtCore.QSignalBlocker(self.merge_selector_input_widget):
             self.merge_selector_input_widget.clear()
             if not device:
                 return
             index = 0
-            select_index = None
+            
 
             valid_input_ids = device.getValidAxisInputIds()
+            # gremlin.util.compare_guid(device.device_guid, input_device_id)
             for input_id in valid_input_ids:
-                if gremlin.util.compare_guid(device.device_guid, input_device_id) and input_id == input_input_id:
+                if input_id == input_input_id:
                     # skip current input as a merge target
                     continue
                 axis_name = device.getAxisName(input_id)
+                syslog.info(f"merged axis: {axis_name}  input id: {input_id} item input id: {input_input_id}")
                 self.merge_selector_input_widget.addItem(axis_name, input_id)
-                if select_index is None and input_id == select_input_id:
-                    select_index = index
-                index += 1
 
-            if select_index is not None:
-                self.merge_selector_input_widget.setCurrentIndex(select_index)
+            index = self.merge_selector_input_widget.findData(select_input_id)
+            if index != 1:
+                self.merge_selector_input_widget.setCurrentIndex(index)
+            
 
             self.last_merge_device_id = device.device_id
 
@@ -4108,6 +4106,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             latched = []
             for data in self.action_data._merge_data:
                 latched.append((data.device_guid, InputType.JoystickAxis, data.input_id))
+                device = gremlin.joystick_handling.getDevice(data.device_guid)
+                syslog.info(f"MERGE: latched [{device.name}] axis: {data.input_id}  {device.get_axis_name(data.input_id)}")
             return latched
             #return [(self.action_data.merge_device_guid, self.action_data.merge_input_type, self.action_data.merge_input_id)]
         if self.action_data.action_mode == VjoyAction.VJoySetAxisStepped:

@@ -28,6 +28,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+
+### (m76T139A)
+- Fix: Merged axis list was incorrect if the device had skipped axes.
+- Fix: Latched axes that had mappings would not execute in some situations.
+
 ### (m76T138)
 - New: if a control key is held down on the keyboard as GEX starts, GEX will **not** auto-load the last profile.  Same as -np command line option.
 - Optimization: repeaters will self hook/unhook based on visibility and track themselves.

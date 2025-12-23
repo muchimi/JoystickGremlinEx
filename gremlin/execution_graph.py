@@ -1179,8 +1179,10 @@ class ExecutionContext():
                         device_guid = device_guid,
                         identifier= input_id
                 )
-                # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                # print (f"Added extra functor: {device_name} mode: {mode} event: {str(event)} ")
+                verbose = gremlin.config.Configuration().verbose_mode_exec
+                if verbose:
+                    device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                    syslog.info (f"LATCH: Added extra functor: [{device_name}] input id: [{input_id}] mode: {mode} event: {str(event)} ")
                 eh.add_latched_functor(device_guid, mode, event, functor)
         action.setEnabled(True)
         return functor
@@ -2501,8 +2503,10 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                             device_guid = device_guid,
                             identifier= input_id
                     )
-                    # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                    # print (f"Added extra functor: {device_name} mode: {mode} event: {str(event)} ")
+                    verbose = gremlin.config.Configuration().verbose_mode_exec
+                    if verbose:
+                        device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                        syslog.info (f"LATCH: Added extra functor: [{device_name}] input id: [{input_id}] mode: {mode} event: {str(event)} ")
                     eh.add_latched_functor(device_guid, mode, event, functor)
                 
 
