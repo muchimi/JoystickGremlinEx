@@ -33,7 +33,6 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Incorporates merge changes (with some modifications from Artesim - thank you!). 
 - Change: Input Viewer: all axis output values are now copyable (read/only for hardware axis, read/write for vjoy).  This just makes all boxes consistent (only vjoy data was using the input boxes before).
 - Change: As part of effort to track down inconsistent latency issues, T139 implements an additional event processing algorithm to better manage axis input events. A new 'smart' queue custom data structure is used. At this point although shows early improvement in internal torture tests metrics and additional tweaks will be added as needed.
-
 - Change: removed the option to disable input repeaters when input viewer is visible because the repeater logic has changed making this option a moot point.
 
 ### (m76T138B)
