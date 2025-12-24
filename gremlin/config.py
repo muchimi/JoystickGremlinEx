@@ -1489,6 +1489,11 @@ class Configuration(QtCore.QObject):
     def verbose_mode_hooks(self):
         ''' true if verbose mode for performance timing '''
         return self.verbose and VerboseMode.Hooks in self.verbose_mode      
+            
+    @property
+    def verbose_mode_merge(self):
+        ''' true if verbose mode is in output mode '''
+        return self.verbose and VerboseMode.Merge in self.verbose_mode
     
     @property
     def verbose_mode_dev(self):

@@ -973,10 +973,10 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
 
         # disable live repeaters when input viewer visible
-        self.disable_joystick_input_widget = QtWidgets.QCheckBox("Disable joystick repeaters when Input Viewer visible")
-        self.disable_joystick_input_widget.setToolTip("When enabled, axis and button visuals will not update while Input Viewer is visible/enabled.\brThis is to help with performance on some systems.")
-        self.disable_joystick_input_widget.setChecked(self.config.input_viewer_disables_repeaters)
-        self.disable_joystick_input_widget.clicked.connect(self._disable_joystick_input_cb)
+        # self.disable_joystick_input_widget = QtWidgets.QCheckBox("Disable joystick repeaters when Input Viewer visible")
+        # self.disable_joystick_input_widget.setToolTip("When enabled, axis and button visuals will not update while Input Viewer is visible/enabled.\brThis is to help with performance on some systems.")
+        # self.disable_joystick_input_widget.setChecked(self.config.input_viewer_disables_repeaters)
+        # self.disable_joystick_input_widget.clicked.connect(self._disable_joystick_input_cb)
 
         # show button grid
         self.show_button_grid_widget = QtWidgets.QCheckBox("Show button grid")
@@ -1009,7 +1009,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Repeaters", transparent = True)
         box.addWidget(self.show_joystick_input_widget)
-        box.addWidget(self.disable_joystick_input_widget)
+        #box.addWidget(self.disable_joystick_input_widget)
         box.addWidget(self.show_button_grid_widget)
         box.addWidget(self.split_joystick_repeater_widget)
         box.addWidget(self.split_joystick_repeater_tooltip_widget)

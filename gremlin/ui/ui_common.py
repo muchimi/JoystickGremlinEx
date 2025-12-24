@@ -6408,15 +6408,13 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             
             value = values[0]
             #value = gremlin.joystick_handling.get_axis(device.device_guid, index)
-            
+            value_widget = QFloatLineEdit(data = axis_id)
             if self.device.is_virtual:
-                value_widget = QFloatLineEdit(data = axis_id)
                 value_widget.setReadOnly(self._readonly)
                 if not self._readonly:
                     value_widget.valueChanged.connect(self._manual_input_changed)
-                
             else:
-                value_widget = QtWidgets.QLabel(f"{value:+0.3f}")
+                value_widget.setReadOnly(True)
 
             #axis.setValue(value)
             self.axis_widgets[axis_id] = axis_widget
@@ -6457,7 +6455,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         value = values.actual
         percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
         self.percent_widgets[input_id].setText(f"{percent:0.1f} %")
-        self.value_label_widgets[input_id].setText(f"{value:+0.3f}")
+        self.value_label_widgets[input_id].setValue(value)
                                                
 
 

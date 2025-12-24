@@ -43,7 +43,6 @@ import gremlin.singleton_decorator
 import time
 import json
 import importlib.util
-import numpy as np
 import sys
 
 syslog = logging.getLogger("system")

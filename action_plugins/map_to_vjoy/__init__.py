@@ -348,6 +348,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         device = joystick_handling.device_info_from_guid(device_id)
         input_device_guid = self.action_data.hardware_device_guid
         input_input_id = self.action_data.hardware_input_id
+        verbose = gremlin.config.Configuration().verbose_mode_merge
 
         with QtCore.QSignalBlocker(self.merge_selector_input_widget):
             self.merge_selector_input_widget.clear()
@@ -363,7 +364,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
                     # skip current input as a merge target
                     continue
                 axis_name = device.getAxisName(input_id)
-                syslog.info(f"merged axis: {axis_name}  input id: {input_id} item input id: {input_input_id}")
+                if verbose: syslog.info(f"merged axis: {axis_name}  input id: {input_id} item input id: {input_input_id}")
                 self.merge_selector_input_widget.addItem(axis_name, input_id)
 
             index = self.merge_selector_input_widget.findData(select_input_id)
@@ -4104,10 +4105,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
             latched = []
+            verbose = gremlin.config.Configuration().verbose_mode_merge
             for data in self.action_data._merge_data:
                 latched.append((data.device_guid, InputType.JoystickAxis, data.input_id))
                 device = gremlin.joystick_handling.getDevice(data.device_guid)
-                syslog.info(f"MERGE: latched [{device.name}] axis: {data.input_id}  {device.get_axis_name(data.input_id)}")
+                if verbose: syslog.info(f"MERGE: latched [{device.name}] axis: {data.input_id}  {device.get_axis_name(data.input_id)}")
             return latched
             #return [(self.action_data.merge_device_guid, self.action_data.merge_input_type, self.action_data.merge_input_id)]
         if self.action_data.action_mode == VjoyAction.VJoySetAxisStepped:
@@ -5688,7 +5690,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             if channels is enabled, returns the data as an AxisValue object with channels
         '''
         config = gremlin.config.Configuration()
-        verbose = (config.verbose_mode_curve and gremlin.shared_state.is_running) or config.verbose_mode_vjoy
+        verbose = config.verbose_mode_merge or (config.verbose_mode_curve and gremlin.shared_state.is_running) or config.verbose_mode_vjoy
         curve_value = None
         merged_values = None
 
