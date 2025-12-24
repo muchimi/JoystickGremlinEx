@@ -346,7 +346,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
             return
 
         device = joystick_handling.device_info_from_guid(device_id)
-        input_device_id = self.action_data.hardware_device_guid
+        input_device_guid = self.action_data.hardware_device_guid
         input_input_id = self.action_data.hardware_input_id
 
         with QtCore.QSignalBlocker(self.merge_selector_input_widget):
@@ -359,7 +359,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
             valid_input_ids = device.getValidAxisInputIds()
             # gremlin.util.compare_guid(device.device_guid, input_device_id)
             for input_id in valid_input_ids:
-                if input_id == input_input_id:
+                if input_id == input_input_id and gremlin.util.compare_guid(input_device_guid,device_id):
                     # skip current input as a merge target
                     continue
                 axis_name = device.getAxisName(input_id)

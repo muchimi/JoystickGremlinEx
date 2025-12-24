@@ -527,6 +527,10 @@ class VjoyEvent:
 	def key(self) -> tuple:
 		''' unique key for this event '''
 		return (self.vjoy_id, self.input_type.value, self.input_id, self.value)
+	
+	@property 
+	def device_guid(self):
+		return gremlin.joystick_handling.vjoy_guid_from_id(self.vjoy_id)
 
 
 	def __str__(self):

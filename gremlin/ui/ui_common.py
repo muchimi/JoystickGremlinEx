@@ -5037,7 +5037,7 @@ class QProgressBar(QtWidgets.QWidget):
         if value is not None:
             gremlin.util.InvokeUiMethod(self._set_value_ui, value, emit)
 
-    def _set_value_ui(self, value : float | list, emit : bool = True):
+    def _set_value_ui(self, value, emit : bool = True):
 
         if not Shiboken.isValid(self):
             self._valid = False
@@ -5235,9 +5235,13 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
         self._description = None
         self._hook_requested = False # true if the hook was requested via a call to hookevent
         self._persist = False
+        self._value_change_callback = None
 
     def getDescription(self) -> str:
         return self._description
+    
+    def setValueChangeCallback(self, callback):
+        self._value_change_callback = callback
     
     def event(self, event):
         if event.type() == QEvent.Show:
@@ -5335,8 +5339,13 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
             if verbose: syslog.info(f"DEV: auto unhook (axis): [{self._hook_id}] {self._description}")
             self.unhook()
             return
-        
-        self.setValue(values)
+        gremlin.util.InvokeUiMethod(self._set_local_value_ui, values)
+
+    def _set_local_value_ui(self, values):
+        ''' set value on UI thread '''    
+        self._set_value_ui(values)
+        if self._value_change_callback:
+            self._value_change_callback(self._device_guid, self._input_type, self.input_id, values)
 
 
 
@@ -6387,6 +6396,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                         ui_only=ui_only,
                         persist = True,
                         description=description)
+            axis_widget.setValueChangeCallback(self._handle_axis_value_changed)
             
             
         
@@ -6442,6 +6452,15 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         self._readonly = value
 
   
+    def _handle_axis_value_changed(self, device_guid, input_type, input_id, values):
+        ''' called by axis handler when axis value changes '''
+        value = values.actual
+        percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
+        self.percent_widgets[input_id].setText(f"{percent:0.1f} %")
+        self.value_label_widgets[input_id].setText(f"{value:+0.3f}")
+                                               
+
+
 
     def isReadOnly(self) -> bool:
         return self._readonly
@@ -6510,35 +6529,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
       
 
-    # def process_event(self, event):
-    #     """Updates state visualization based on the given event.
-
-    #     :param event the event with which to update the state display
-    #     """
-
-       
-
-
-    #     if event.event_type == InputType.JoystickAxis:
-    #         axis_id = event.identifier
-    #         #linear_id = self.device.axis_id_map[axis_id]
-    #         value = event.value
-    #         if self.show_raw and not event.is_virtual:
-    #             sd = gremlin.event_handler.AxisState()
-    #             values = sd.getAxisValues(self.device.device_guid, axis_id)
-    #             extra_data = event.extra_data
-    #             if extra_data and "macro" in extra_data:
-    #                 values.actual = event.value
-                
-
-    #             self._set_value(axis_id, values)    
-    #         else:
-    #             self._set_value(axis_id, value)
-
-    #         if self._manual_lock:
-    #             self._manual_lock = False
-                
-        
+    
 
 
 class HatWidget(QtWidgets.QWidget):

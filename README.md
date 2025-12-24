@@ -29,7 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76T139A)
+### (m76T138B)
+- Fix: exception when using a vjoy device as input in shouldprocess()
+- Fix: unable to select axis in merge axis (due to refactor in 138A)
+- Fix: input viewer: value updates for axes.
+
+### (m76T138A)
 - Fix: Merged axis list was incorrect if the device had skipped axes.
 - Fix: Latched axes that had mappings would not execute in some situations.
 
