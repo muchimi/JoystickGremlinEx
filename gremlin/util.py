@@ -819,9 +819,11 @@ def _find_file(file_path, root_folder = None):
             extensions = [".svg",".png"]
         
         for dirpath, _, filenames in os.walk(root_folder):
-            last = os.path.basename(dirpath)
-            if last.startswith("."):
-                # ignore hidden folders
+            if any([part.startswith('.') for part in Path(dirpath).relative_to(root_folder).parts]):
+                # ignore hidden folders, anywhere between the search root and the current file
+                # note: this also allows skipping non-hidden folders within hidden ones (like in .git),
+                #     : thereby saving quite a bit of room in the "circuit breaker", when running from
+                #     : a git repository
                 continue
             circuit_breaker-=1
             if circuit_breaker == 0:
