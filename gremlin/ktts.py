@@ -43,7 +43,6 @@ import gremlin.singleton_decorator
 import time
 import json
 import importlib.util
-import numpy as np
 import sys
 
 syslog = logging.getLogger("system")
@@ -315,9 +314,6 @@ class KTTS():
     def sanitize_text(self, text):
         ''' removes characters that are problematic in text '''
         import re
-        text = re.sub("```.*?```", "", text, flags=re.DOTALL)
-        text = re.sub("`.*?`", "", text, flags=re.DOTALL)
-        text = re.sub("\(.*?\)", "", text, flags=re.DOTALL)
         text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
         text = re.sub(r"`.*?`", "", text, flags=re.DOTALL)
         text = re.sub(r"\(.*?\)", "", text, flags=re.DOTALL)
