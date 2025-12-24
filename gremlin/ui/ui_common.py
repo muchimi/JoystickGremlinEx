@@ -6457,10 +6457,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         value = values.actual
         percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
         self.percent_widgets[input_id].setText(f"{percent:0.1f} %")
-        self.value_label_widgets[input_id].setText(f"{value:+0.3f}")
-                                               
-
-
+        self._set_value(axis_id=input_id,
+                        value=value)
 
     def isReadOnly(self) -> bool:
         return self._readonly
