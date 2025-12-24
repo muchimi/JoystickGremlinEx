@@ -1026,7 +1026,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                     # step delay
                     if repeat_index < repeat_count - 1:
                         delay = options.getDelay(exec_delay_ms)
-                        if verbose_extra: syslog.info(f"\step repeat interval delay [{delay}]")
+                        if verbose_extra: syslog.info(f"step repeat interval delay [{delay}]")
                         if delay > 0:
                             self._wait(delay)
                             if not self._is_running: break
@@ -1037,7 +1037,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             delay = exec_delay_s
             
             if delay > 0:
-                if verbose_extra: syslog.info(f"\step repeat interval delay [{delay}]")
+                if verbose_extra: syslog.info(f"step repeat interval delay [{delay}]")
                 self._wait(delay)
                 if not self._is_running: break
 

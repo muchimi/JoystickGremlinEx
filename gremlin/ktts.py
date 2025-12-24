@@ -318,6 +318,9 @@ class KTTS():
         text = re.sub("```.*?```", "", text, flags=re.DOTALL)
         text = re.sub("`.*?`", "", text, flags=re.DOTALL)
         text = re.sub("\(.*?\)", "", text, flags=re.DOTALL)
+        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+        text = re.sub(r"`.*?`", "", text, flags=re.DOTALL)
+        text = re.sub(r"\(.*?\)", "", text, flags=re.DOTALL)
 
         # remove marks
         text = text.replace("```", "")
