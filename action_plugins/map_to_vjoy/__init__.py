@@ -5777,16 +5777,23 @@ Supports axis merging, curved output, command, hat and button mappings.
             merged_values = [v1]
             value = v1
             sd = gremlin.event_handler.AxisState()
+            if verbose:
+                d1_name = gremlin.joystick_handling.getDeviceName(self.hardware_device_guid)
+                syslog.info(f"MERGE: source: [{d1_name}] axis: [{self.hardware_input_id}] steps: {len(self._merge_data)}")
+                step = 1
+                
+
             for data in self._merge_data:
                 merge_device_id = data.device_id
                 merge_input_id = data.input_id
                 merge_device_guid = data.device_guid
                 merge_input_type = InputType.JoystickAxis
+
                 if not merge_device_id or merge_input_id is None or merge_device_guid is None:
                     # no data
                     continue
 
-
+                
                 v2 = None
 
                 if gremlin.joystick_handling.is_hardware_device(merge_device_guid):
@@ -5796,6 +5803,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     else:
                         sd.registerDeviceGuid(merge_device_guid)
                         values = sd.getAxisValues(merge_device_guid, merge_input_id)
+
                         if values:
                             v2 = values.actual
                         else:
@@ -5839,6 +5847,8 @@ Supports axis merging, curved output, command, hat and button mappings.
                     v2 = data.curve_data.curve_value(v2)
 
                 merged_values.append(v2) # add the merge value
+
+                
 
                 match data.operation:
                     case MergeOperationType.Add:
@@ -5917,9 +5927,19 @@ Supports axis merging, curved output, command, hat and button mappings.
                         else:
                             value = v2 + ( (t + 1) * v1 )
 
+                
+                
 
-                if verbose: syslog.info(f"Merge operation: {data.operation.name}: v1 {v1:0.03f} v2: {v2:0.03f} result: {value:0.03f}")
-                v1 = value
+                if verbose:
+                    d2_name = gremlin.joystick_handling.getDeviceName(merge_device_guid)
+                    
+
+                    syslog.info(f"Merge operation: step [{step}]: {data.operation.name}: v1 {v1:0.03f} - merge with [{d2_name}] axis [{merge_input_id}]  v2: [{v2:0.03f}] result: [{value:0.03f}]")
+                    step += 1
+
+                v1 = value 
+
+                
 
             if self.invert_merged_output:
                 # invert the final output if needed

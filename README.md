@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T139A)
+- Fix: missing GC validation checks - input viewer current axis
+- New: axis merge instrumentation in log file (verbose mode: merge)
+
 ### (m76T139)
 - Incorporates merge changes (with some modifications from Artesim - thank you!). 
 - Change: Input Viewer: all axis output values are now copyable (read/only for hardware axis, read/write for vjoy).  This just makes all boxes consistent (only vjoy data was using the input boxes before).

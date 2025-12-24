@@ -5323,12 +5323,12 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
         ''' called when object is removed '''
         global _hook_registry
         if self._hook_id in _hook_registry:
+            super().unhookDevice()
             verbose = gremlin.config.Configuration().verbose_mode_hooks
             del _hook_registry[self._hook_id]
-            if verbose:
-                syslog.info(f"DEV: unhook (axis): [{len(_hook_registry)}] [{self._hook_id}] {self._description}")
+            if verbose: syslog.info(f"DEV: unhook (axis): [{len(_hook_registry)}] [{self._hook_id}] {self._description}")
             self._hooked = False
-            super().unhookDevice()
+            
 
     def process_events(self, event, values):
         ''' joystick value changed '''
@@ -6360,7 +6360,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         name_index = 0
 
         
-
+        verbose = gremlin.config.Configuration().verbose_mode_hooks
         for i in range(device.axis_count): 
             linear_id = i + 1
             axis_id = device.linear_id_map[linear_id] # map linear -> axis ID for non sequential axes
@@ -6397,6 +6397,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                         persist = True,
                         description=description)
             axis_widget.setValueChangeCallback(self._handle_axis_value_changed)
+            if verbose:
+                syslog.info(f"Register: hook: [{hook_id}] description: [{description}]")
             
             
         
@@ -6452,12 +6454,14 @@ class AxesCurrentState(QtWidgets.QGroupBox):
   
     def _handle_axis_value_changed(self, device_guid, input_type, input_id, values):
         ''' called by axis handler when axis value changes '''
-        value = values.actual
-        percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
-        self.percent_widgets[input_id].setText(f"{percent:0.1f} %")
-        self.value_label_widgets[input_id].setText(f"{value:+0.3f}")
-                                               
-
+        w1 = self.percent_widgets[input_id]
+        w2 = self.value_label_widgets[input_id]
+        if Shiboken.isValid(self) and Shiboken.isValid(w1) and Shiboken.isValid(w2):
+            value = values.actual
+            percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
+            w1.setText(f"{percent:0.1f} %")
+            w2.setValue(value)
+        
 
 
     def isReadOnly(self) -> bool:
