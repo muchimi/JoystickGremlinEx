@@ -4864,6 +4864,10 @@ class QProgressBar(QtWidgets.QWidget):
         return self._value
         
     def eventFilter(self, widget, event):
+        if self._readOnly:
+            # ignore
+            return super().eventFilter(widget, event)
+
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change

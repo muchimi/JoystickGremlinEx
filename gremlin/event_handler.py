@@ -4184,52 +4184,52 @@ class JoystickEventProcessor():
 			if self._event_queue.empty():
 				time.sleep(0.001)
 				continue
-			with self._lock:
-				is_running = gremlin.shared_state.is_running
-				event = self._event_queue.get()
+			#with self._lock:
+			is_running = gremlin.shared_state.is_running
+			event = self._event_queue.get()
 
-				device_guid = event.device_guid
-				input_type = event.event_type
-				input_id = event.identifier
+			device_guid = event.device_guid
+			input_type = event.event_type
+			input_id = event.identifier
 
-				# get axis values 
-				is_axis = event.is_axis or input_type == InputType.JoystickAxis
-				if is_axis:
-					values = self._axis_state.getAxisValues(device_guid, input_id)
+			# get axis values 
+			is_axis = event.is_axis or input_type == InputType.JoystickAxis
+			if is_axis:
+				values = self._axis_state.getAxisValues(device_guid, input_id)
+			else:
+				if input_type == InputType.JoystickButton:
+					values = event.is_pressed
 				else:
-					if input_type == InputType.JoystickButton:
-						values = event.is_pressed
-					else:
-						values = event.value
-	
-				if device_guid in self._callbacks:
-					if input_type in self._callbacks[device_guid]:
-						if input_id in self._callbacks[device_guid][input_type]:
+					values = event.value
+
+			if device_guid in self._callbacks:
+				if input_type in self._callbacks[device_guid]:
+					if input_id in self._callbacks[device_guid][input_type]:
+						if self.verbose:
+							device = gremlin.joystick_handling.getDevice(device_guid)
+							if device:
+								syslog.info(f"DISPATCH: callback: device [{device.device_id}][{device.name}] [{input_type.name}] id: [{input_id}] callback count: {len(self._callbacks[device_guid][input_type][input_id])} ")
+							else:
+								syslog.info(f"DISPATCH: callback: device [{str(device_guid)}][unknown device] [{input_type.name}] id: [{input_id}] callback count: {len(self._callbacks[device_guid][input_type][input_id])} ")
+						for hook_id in self._callbacks[device_guid][input_type][input_id]:
+							cb = self._callbacks[device_guid][input_type][input_id][hook_id]
+				
+							if cb.ui_only and is_running:
+								# skip UI only events at runtime
+								continue 
+
 							if self.verbose:
-								device = gremlin.joystick_handling.getDevice(device_guid)
-								if device:
-									syslog.info(f"DISPATCH: callback: device [{device.device_id}][{device.name}] [{input_type.name}] id: [{input_id}] callback count: {len(self._callbacks[device_guid][input_type][input_id])} ")
-								else:
-									syslog.info(f"DISPATCH: callback: device [{str(device_guid)}][unknown device] [{input_type.name}] id: [{input_id}] callback count: {len(self._callbacks[device_guid][input_type][input_id])} ")
-							for hook_id in self._callbacks[device_guid][input_type][input_id]:
-								cb = self._callbacks[device_guid][input_type][input_id][hook_id]
-					
-								if cb.ui_only and is_running:
-									# skip UI only events at runtime
-									continue 
+								self._count += 1
 
-								if self.verbose:
-									self._count += 1
+							self.exe.submit(self._fire_callback, cb, event, values)
+				
+							
 
-								self.exe.submit(self._fire_callback, cb, event, values)
-					
-								
-
-				# run generic callbacks - these are event only
-				for cb in self._generic_callback.values():
-					if self.verbose: self._count += 1
-					self.exe.submit(self._fire_callback, cb, event, values)
-			
+			# run generic callbacks - these are event only
+			for cb in self._generic_callback.values():
+				if self.verbose: self._count += 1
+				self.exe.submit(self._fire_callback, cb, event, values)
+		
 
 		
 					

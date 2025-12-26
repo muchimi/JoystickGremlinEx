@@ -29,8 +29,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76T140)
-- Change: refactor of joystick event handling in vjoyremap, response curve, to use the updated event model API.
+
+### (m76T140_2)
+- Change: ignore mouse inputs if repeater is in read/only mode.
+- Change: disable locking in event processing (because locking is done in the queue - no need to lock twice)
+
+### (m76T140_1)
+- Change: refactor of joystick event handling in vjoy remap and gated axis UI elements.
+
 
 ### (m76T139A)
 - Fix: missing GC validation checks - input viewer current axis
