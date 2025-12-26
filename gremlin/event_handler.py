@@ -4180,6 +4180,7 @@ class JoystickEventProcessor():
 	def _event_runner(self):
 		''' runner for inbound joystick events '''
 		# verbose = True
+		use_pool = False
 		while not self._event_thread.stopped():
 			if self._event_queue.empty():
 				time.sleep(0.001)
@@ -4221,7 +4222,10 @@ class JoystickEventProcessor():
 							if self.verbose:
 								self._count += 1
 
-							self.exe.submit(self._fire_callback, cb, event, values)
+							if use_pool:
+								self.exe.submit(self._fire_callback, cb, event, values)
+							else:
+								self._fire_callback(cb, event, values)
 				
 							
 

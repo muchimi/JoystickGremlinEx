@@ -5046,10 +5046,12 @@ class QProgressBar(QtWidgets.QWidget):
         if not Shiboken.isValid(self):
             self._valid = False
             return
-        if self.config.showJoystickRepeaterTooltip:
-            self._update_tooltip(value) # tooltip
-        else:
-            self.setToolTip(None)
+        
+        # if self.config.showJoystickRepeaterTooltip:
+        #     self._update_tooltip(value) # tooltip
+        # else:
+        #     self.setToolTip(None)
+        
         if hasattr(value,"toList"):
             if not self.config.splitJoystickRepeater:
                 # hide split data

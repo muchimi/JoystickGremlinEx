@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T140_3)
+- Change: disable repeater tooltips on value change (to determine if lag may be caused by computations)
+- Change: 
 
 ### (m76T140_2)
 - Change: ignore mouse inputs if repeater is in read/only mode.
