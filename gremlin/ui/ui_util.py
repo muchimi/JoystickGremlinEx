@@ -107,32 +107,32 @@ class InputListenerModel(QtCore.QObject):
 
     def _connect_listeners(self) -> None:
         # Start listening to user inputs
-        event_listener = event_handler.EventListener()
-        event_listener.keyboard_event.connect(self._kb_event_cb)
+        el = event_handler.EventListener()
+        el.keyboard_event.connect(self._kb_event_cb)
         if InputType.JoystickAxis in self._event_types or \
                 InputType.JoystickButton in self._event_types or \
                 InputType.JoystickHat in self._event_types:
-            event_listener.joystick_event.connect(self._joy_event_cb)
+            el.joystick_event.connect(self._joy_event_cb)
         elif InputType.Mouse in self._event_types:
-            event_listener = gremlin.event_handler.EventListener()
-            if not event_listener.mouseEnabled():
+            el = gremlin.event_handler.EventListener()
+            if not el.mouseEnabled():
                 # hook mouse
-                event_listener.enableMouse()
+                el.enableMouse()
             windows_event_hook.MouseHook().start()
-            event_listener.mouse_event.connect(self._mouse_event_cb)
+            el.mouse_event.connect(self._mouse_event_cb)
 
     def _disconnect_listeners(self) -> None:
-        event_listener = event_handler.EventListener()
+        el = event_handler.EventListener()
         try:
-            event_listener.keyboard_event.disconnect(self._kb_event_cb)
+            el.keyboard_event.disconnect(self._kb_event_cb)
         except RuntimeError as e:
             pass
         try:
-            event_listener.joystick_event.disconnect(self._joy_event_cb)
+            el.joystick_event.disconnect(self._joy_event_cb)
         except RuntimeError as e:
             pass
         try:
-            event_listener.mouse_event.disconnect(self._mouse_event_cb)
+            el.mouse_event.disconnect(self._mouse_event_cb)
         except RuntimeError as e:
             pass
 

@@ -1607,6 +1607,13 @@ class AxisCurveWidget(QtWidgets.QWidget):
         ''' handler to update a visual input value on the curve'''
         gremlin.util.InvokeUiMethod(self._update_value_ui, value)
 
+    def unhook(self):
+        ch = CurveEventHandler()
+        ch.value_changed.disconnect(self.update_value)
+        self.curve_data = None
+        gremlin.util.clear_layout(self.main_layout)
+        
+
     def _update_value_ui(self, value):
         ''' updates dot on the curve based on the value -1 to +1 - runs on UI thread '''
         if not Shiboken.isValid(self):

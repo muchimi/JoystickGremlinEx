@@ -1653,8 +1653,28 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._axis_tracking_enabled = True
             el = gremlin.event_handler.EventListener()
             el.custom_joystick_event.connect(self._joystick_event_handler)
+
             if not self.chained_input:
-                el.joystick_event.connect(self._joystick_event_handler)
+                jep = gremlin.event_handler.JoystickEventProcessor()
+                device_guid = self.action_data.get_device_guid()
+                input_type = self.action_data.get_input_type()
+                input_id = self.action_data.get_input_id()
+
+                dev = gremlin.joystick_handling.getDevice(device_guid)
+
+                description = f"VjoyRemap: [{dev.name}] axis [{dev.get_axis_name(input_id)}]"
+                jep.registerCallback(
+                    self.action_data.action_id, 
+                    self._joystick_event_handler,
+                    device_guid = device_guid,
+                    input_type = input_type, 
+                    input_id = input_id,
+                    ui_only = True,
+                    persist = False,
+                    description = description)
+
+            # if not self.chained_input:
+            #     el.joystick_event.connect(self._joystick_event_handler)
             el.profile_start.connect(self._profile_start)
             el.profile_stop.connect(self._profile_stop)
 
@@ -1663,13 +1683,17 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._disable_axis_tracking()
 
 
+
     def _disable_axis_tracking(self):
         ''' disables tracking '''
         if self._axis_tracking_enabled:
             el = gremlin.event_handler.EventListener()
             el.custom_joystick_event.disconnect(self._joystick_event_handler)
             if not self.chained_input:
-                el.joystick_event.disconnect(self._joystick_event_handler)
+                jep = gremlin.event_handler.JoystickEventProcessor()
+                jep.unregisterCallback(self.action_data.action_id)
+
+                #el.joystick_event.disconnect(self._joystick_event_handler)
             self._axis_tracking_enabled = False
 
 
@@ -4554,7 +4578,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         #     return True
         if event.is_axis:
             # process input options and any merge and curve operation - the current value will already be curved by the input curve if one exists
-            config = gremlin.config.Configuration()
+            # config = gremlin.config.Configuration()
             verbose = self.verbose
 
             if event.is_repeater:
@@ -5722,9 +5746,6 @@ Supports axis merging, curved output, command, hat and button mappings.
         if not curves:
             # process curves
             curves = [self.curve_data] if self.curve_data else []
-
-
-
 
         if self.action_mode == VjoyAction.VJoyAxis:
             # plain axis

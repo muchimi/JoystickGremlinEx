@@ -363,7 +363,7 @@ GremlinEx was tested with MSFS 2024 including all current beta versions.
 
 ### VJoy support
 
-GremlinEx was tested with VJOY 2.9.1 64bit.  There are several releases of VJOY however however 2.9.1 is the one tested and verified to function with Windows 11.  
+GremlinEx was tested with VJOY 2.1.9.1 64bit.  There are several releases of VJOY however however 2.1.9.1 is the one tested and verified to function with Windows 11.  Please see the [resource section](resources.md).
 
 GremlinEx does not currently support force feedback inputs, nor output via VJOY.
 

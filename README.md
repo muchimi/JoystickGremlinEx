@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T140)
+- Change: refactor of joystick event handling in vjoyremap, response curve, to use the updated event model API.
+
 ### (m76T139A)
 - Fix: missing GC validation checks - input viewer current axis
 - New: axis merge instrumentation in log file (verbose mode: merge)

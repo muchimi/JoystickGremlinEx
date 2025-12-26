@@ -6449,7 +6449,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         self.main_layout.addLayout(axes_layout)
 
 
-        self._readonly = value
+    
 
   
     def _handle_axis_value_changed(self, device_guid, input_type, input_id, values):

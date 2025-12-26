@@ -246,8 +246,8 @@ class Axis:
         import gremlin.event_handler
         from gremlin.input_types import InputType
 
-        if self.axis_id == 3 and self.vjoy_id == 1 and p_value == 0.0:
-            pass
+        # if self.axis_id == 3 and self.vjoy_id == 1 and p_value == 0.0:
+        #     pass
 
 
         if p_value is None:
@@ -265,9 +265,10 @@ class Axis:
             self._deadzone_fn(min(1.0, max(-1.0, p_value)))
         )
 
-        el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, self._value)
-        el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
+        # TEST - disable loopback T139+ 
+        # el = gremlin.event_handler.EventListener()
+        # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, self._value)
+        # el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
         # el.vjoy_callback(event)  test for lag
 
 

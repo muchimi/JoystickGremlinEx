@@ -61,8 +61,26 @@ class TickContainerWidget(AbstractContainerWidget):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
+        
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        device_guid = self.action_data.get_device_guid()
+        input_type = self.action_data.get_input_type()
+        input_id = self.action_data.get_input_id()
+
+        dev = gremlin.joystick_handling.getDevice(device_guid)
+
+        description = f"VjoyRemap: [{dev.name}] axis [{dev.get_axis_name(input_id)}]"
+        jep.registerCallback(
+            self.action_data.action_id, 
+            self._joystick_event_handler,
+            device_guid = device_guid,
+            input_type = input_type, 
+            input_id = input_id,
+            ui_only = True,
+            persist = False,
+            description = description)        
         el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self._joystick_event_handler)
+        # el.joystick_event.connect(self._joystick_event_handler)
 
         self.action_data : TickContainer = self.profile_data
         self.action_data.create_or_delete_virtual_button()
@@ -130,6 +148,11 @@ class TickContainerWidget(AbstractContainerWidget):
                 self.action_layout,
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
+
+    def unhook(self):
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        jep.unregisterCallback(self.action_data.action_id)
+
 
     def _joystick_event_handler(self, event):
         ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
