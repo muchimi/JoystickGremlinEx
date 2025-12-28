@@ -68,7 +68,7 @@ import gremlin.curve_handler
 from gremlin.types import ButtonOutputMode
 
 
-
+# os.environ['LINE_PROFILE'] = "1"
 
 syslog = logging.getLogger("system")
 
@@ -1652,29 +1652,29 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         if self._hook_requested and not self._axis_tracking_enabled:
             self._axis_tracking_enabled = True
             el = gremlin.event_handler.EventListener()
-            el.custom_joystick_event.connect(self._joystick_event_handler)
+            # el.custom_joystick_event.connect(self._joystick_event_handler)
 
             if not self.chained_input:
-                jep = gremlin.event_handler.JoystickEventProcessor()
-                device_guid = self.action_data.get_device_guid()
-                input_type = self.action_data.get_input_type()
-                input_id = self.action_data.get_input_id()
+                #jep = gremlin.event_handler.JoystickEventProcessor()
+                #device_guid = self.action_data.get_device_guid()
+                # input_type = self.action_data.get_input_type()
+                # input_id = self.action_data.get_input_id()
 
-                dev = gremlin.joystick_handling.getDevice(device_guid)
+                # dev = gremlin.joystick_handling.getDevice(device_guid)
 
-                description = f"VjoyRemap: [{dev.name}] axis [{dev.get_axis_name(input_id)}]"
-                jep.registerCallback(
-                    self.action_data.action_id, 
-                    self._joystick_event_handler,
-                    device_guid = device_guid,
-                    input_type = input_type, 
-                    input_id = input_id,
-                    ui_only = True,
-                    persist = False,
-                    description = description)
+                # description = f"VjoyRemap: [{dev.name}] axis [{dev.get_axis_name(input_id)}]"
+                # jep.registerCallback(
+                #     self.action_data.action_id, 
+                #     self._joystick_event_handler,
+                #     device_guid = device_guid,
+                #     input_type = input_type, 
+                #     input_id = input_id,
+                #     ui_only = True,
+                #     persist = False,
+                #     description = description)
 
-            # if not self.chained_input:
-            #     el.joystick_event.connect(self._joystick_event_handler)
+            
+                el.joystick_event.connect(self._joystick_event_handler)
             el.profile_start.connect(self._profile_start)
             el.profile_stop.connect(self._profile_stop)
 
@@ -1688,12 +1688,12 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' disables tracking '''
         if self._axis_tracking_enabled:
             el = gremlin.event_handler.EventListener()
-            el.custom_joystick_event.disconnect(self._joystick_event_handler)
+            # el.custom_joystick_event.disconnect(self._joystick_event_handler)
             if not self.chained_input:
-                jep = gremlin.event_handler.JoystickEventProcessor()
-                jep.unregisterCallback(self.action_data.action_id)
+                # jep = gremlin.event_handler.JoystickEventProcessor()
+                # jep.unregisterCallback(self.action_data.action_id)
 
-                #el.joystick_event.disconnect(self._joystick_event_handler)
+                el.joystick_event.disconnect(self._joystick_event_handler)
             self._axis_tracking_enabled = False
 
 
@@ -1720,6 +1720,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.container_merge_layout.addWidget(invert_merged_output_widget)
 
+        
         for data in self.action_data._merge_data:
             widget = MergeWidget(data, f"Merge Axis {count}:", filter_input =self._filter_input, action_data = self.action_data)
             widget.delete_requested.connect(self._delete_merge_widget)
@@ -1934,51 +1935,40 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._enable_axis_tracking()
 
 
-    def _joystick_event_handler(self, event):
+    def _joystick_event_handler(self, event, values = None):
         ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
         if gremlin.shared_state.is_running:
             return
-
-
+        
 
         if not event.is_axis:
             return
 
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
             # allow event processing for any device part of the merge operation
-            valid_guids = [data.device_id for data in self.action_data._merge_data]
-            valid_guids.append(gremlin.util.normalize_guid(self.action_data.hardware_device_guid))
+            if not self.action_data.isMergeEvent(event):
+                return
+            
+            
             device_guid = gremlin.util.normalize_guid(event.device_guid)
-            if not device_guid in valid_guids:
-                return
-            valid_inputs = [data.input_id for data in self.action_data._merge_data]
-            valid_inputs.append(self.action_data.hardware_input_id)
+            input_id = event.identifier
+            event_key = (device_guid, input_id)
 
-            for data in self.action_data._merge_data:
-                if data.callback:
-                    d_device_id, d_input_id = data.key
-                    if d_device_id == device_guid and d_input_id == event.identifier:
-                        data.callback(event.value)
-
-
-            if not event.identifier in valid_inputs:
-                return
+            md_list = [md for md in self.action_data._merge_data if md.key == event_key and md.callback is not None]
+            for data in md_list:
+                data.callback(event.value)
+            
         else:
             if not event.device_guid == self.action_data.hardware_device_guid:
                 return
             if not event.identifier == self.action_data.hardware_input_id:
                 return
 
-        # if not self._as.shouldProcess(event, self.id):
-        #     return
-
         value = event.value
 
         if self.curve_update_handler:
             # update the dynamic curve widget if active
             self.curve_update_handler(value)
-
-
 
         gremlin.util.InvokeUiMethod(self._update_repeater, value) # ensure on UI thread
 
@@ -3958,6 +3948,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.step_index = action_data.target_step_start_index
         v1 = action_data.button_range_min
         v2 = action_data.button_range_max
+        self._latched_container_condition_node = None
+        self._latched_action_condition_node = None
+        
   
         self.usage_data = gremlin.joystick_handling.VJoyUsageState()
 
@@ -4125,8 +4118,15 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         ''' sets the axis' reverse state '''
         self.usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, value)
 
-    def latch_extra_inputs(self):
-        ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
+    def latch_extra_inputs(self, container_condition_node = None, action_condition_node = None):
+        ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id)
+         
+        :param container_condition_node: the execution graph condition node applied to the container, if any
+        :param action_condition_node: the execution graph condition node applied to the action, if any
+          
+        '''
+        self._latched_container_condition_node = container_condition_node
+        self._latched_action_condition_node = action_condition_node
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
             latched = []
             verbose = gremlin.config.Configuration().verbose_mode_merge
@@ -4134,6 +4134,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 latched.append((data.device_guid, InputType.JoystickAxis, data.input_id))
                 device = gremlin.joystick_handling.getDevice(data.device_guid)
                 if verbose: syslog.info(f"MERGE: latched [{device.name}] axis: {data.input_id}  {device.get_axis_name(data.input_id)}")
+
             return latched
             #return [(self.action_data.merge_device_guid, self.action_data.merge_input_type, self.action_data.merge_input_id)]
         if self.action_data.action_mode == VjoyAction.VJoySetAxisStepped:
@@ -4466,10 +4467,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             if not gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                 return
 
-            self.lock.acquire()
-            try:
-
-
+            with self.lock:
+            
                 # value position is now between 0 and 1
                 offset = self.direction * self.action_data.relative_value * self.scale_factor
 
@@ -4487,10 +4486,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, value)
                 # remember the last value
                 self.action_data.axis_last_value = value
-
-            finally:
-                self.lock.release()
-
+            
 
     def _set_axis_value(self):
         ''' sets the axis value '''
@@ -4570,28 +4566,62 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
     #         return (pow((value - v_start) / v_end - 1, power) + 1) * v_end + v_start
     #     return pow((value - v_start) / v_end, power) * v_end + v_start
 
-
     def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
         # if self.action_data.merged and event.is_axis:
         #     # merged axis data is handled by the internal hook - ignore
         #     return True
         if event.is_axis:
-            # process input options and any merge and curve operation - the current value will already be curved by the input curve if one exists
-            # config = gremlin.config.Configuration()
+            # axis input
             verbose = self.verbose
 
+            if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
+                # make sure conditions are valid for latched input
+                # the reason is conditions are only evaluated for the actual mapped input, not the latched inputs
+                # therfore we need to evaluate the conditions for the latched input as well
+                if event.device_guid != self.hardware_device_guid or \
+                    event.identifier != self.hardware_input_id:
+                    # event is for a latched input = run conditions if any are applied
+
+                    # check for condition applied to container
+                    if self._latched_container_condition_node:
+                        node = self._latched_container_condition_node
+                        if not hasattr(node,"rule"):
+                            node.rule = gremlin.actions.ActivationRule.All
+
+                        for functor in node.functors:
+                            result = functor.process_event(event, action_value, extra_data)
+                            match node.rule:
+                                case gremlin.actions.ActivationRule.Any:
+                                    if result:
+                                        # one condition succeeded
+                                        break
+                                case gremlin.actions.ActivationRule.All:
+                                    if not result:
+                                        # any one condition failed failes the whole stack
+                                        return True
+                      
+                    
+                    # check for condition applied to this action
+                    if self._latched_action_condition_node:
+                        node = self._latched_action_condition_node
+                        for functor in node.functors:
+                            result = functor.process_event(event, action_value, extra_data)
+                            match node.rule:
+                                case gremlin.actions.ActivationRule.Any:
+                                    if result:
+                                        # one condition succeeded
+                                        break
+                                case gremlin.actions.ActivationRule.All:
+                                    if not result:
+                                        # any one condition failed failes the whole stack
+                                        return True
+                       
+           
             if event.is_repeater:
                 # use the repeater value
                 value = event.value
             else:
-
-                # raw_value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
-                # received = action_value.current
-
-                # get list of curves that applies to this input
-
-
 
                 curves = None
                 if event.curve_value is not None:
@@ -4626,7 +4656,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         return self._process_event(event, action_value, extra_data)
 
 
-
+    
     def _process_event(self, event : gremlin.event_handler.Event, action_value : gremlin.actions.Value, extra_data):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
@@ -4775,10 +4805,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                         # update tracking values
 
-                        self.lock.acquire()
+                        #self.lock.acquire()
                         self.scale_factor = scale_factor
                         self.direction = direction
-                        self.lock.release()
+                        #self.lock.release()
 
 
                         if verbose_extra: syslog.info(f"Tick value: {direction * scale_factor : 0.3f}")
@@ -5216,6 +5246,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             self.functor_complete.emit() # indicate completed
         return result
 
+
     def _set_axis(self, vid : int, axis_id : int , value : float):
         ''' sets the axis value using the inversion factor '''
 
@@ -5305,6 +5336,11 @@ class  MergeData():
     @property
     def key(self) -> tuple:
         return (self._device_id, self._input_id) # unique key
+    
+    @property
+    def keyOp(self) -> tuple:
+        ''' gets a key that includes the operation to conduct'''
+        return (self._device_id, self._input_id, self.operation) # unique key
 
 
     @property
@@ -5510,6 +5546,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
 
         self._merge_data = [] # list of merged axes
+        
         self.invert_merged_output = False # true if merged axis output is inverted
 
         self.output_range_min : float = -1.0 # min for merged output
@@ -5989,8 +6026,21 @@ Supports axis merging, curved output, command, hat and button mappings.
         for data in self._merge_data:
             if gremlin.util.compare_guid(device_guid, data.device_guid):
                 return True
-
         return False
+    
+    def isMergeEvent(self, event) -> bool:
+        ''' True if the event is part of a merge operation  '''
+        if event.is_axis:
+            device_guid = gremlin.util.normalize_guid(event.device_guid)
+            input_id = event.identifier
+            if event.device_guid == self.get_device_guid() and event.identifier == self.get_input_id():
+                # process self
+                return True
+            key = (device_guid, input_id)
+            keys = [md.key for md in self._merge_data]
+            return key in keys
+        return False
+
 
 
     @property
@@ -6394,6 +6444,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             self.invert_merged_output = safe_read(node,"invert-merged-output", bool, False)
 
             self._merge_data = []
+            
             if self.action_mode == VjoyAction.VJoyMergeAxis:
                 # legacy
                 if "merge_device_id" in node.attrib and "merge_input_id" in node.attrib:
@@ -6415,6 +6466,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     invert = safe_read(node,"merge_invert", bool, False)
                     data = MergeData(device_id, input_id, operation = merge_mode, invert = invert)
                     self._merge_data.append(data)
+                    
                 else:
                     # as of m76t22 - multi-merge support
                     for child in node:
@@ -6423,7 +6475,10 @@ Supports axis merging, curved output, command, hat and button mappings.
                                 data = MergeData()
                                 data.from_xml(data_node)
                                 self._merge_data.append(data)
+                                
                             break
+
+        
 
 
 
@@ -6590,9 +6645,6 @@ Supports axis merging, curved output, command, hat and button mappings.
                     for data in self._merge_data:
                         node_data = data.to_xml()
                         child.append(node_data)
-
-
-
 
 
                 node.set("merge_invert", safe_format(self.merge_invert, bool))
@@ -6824,8 +6876,6 @@ Supports axis merging, curved output, command, hat and button mappings.
 
 
         return label
-
-
 
 
 

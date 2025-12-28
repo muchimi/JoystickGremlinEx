@@ -106,7 +106,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         self.container_condition_frame_layout.addWidget(self.activation_count_widget)
         self.container_condition_model = ConditionModel(self.profile_data, self.profile_data.activation_condition)
         
-        # self.profile_data.activation_condition.registerCallback(self._update_conditions_ui)
+       
         self.container_condition_view = ConditionView()
         self.container_condition_view.setContainer(self.profile_data)
         self.container_condition_view.setModel(self.container_condition_model)

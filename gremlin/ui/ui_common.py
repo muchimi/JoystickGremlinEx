@@ -5257,12 +5257,12 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
             self.unhook()
         return super().event(event)    
 
-    def hookDevice(self, hook_id, device_guid, input_type, input_id, ui_only = True, persist = False, description = None):    
+    def hookDevice(self, hook_id, device_guid, input_type, input_id, ui_only = True, persist = False, description = None, ui_thread = True):    
         ''' hooks the device '''    
 
         
         changed = False
-        des = description or f"repeater (axis): [{gremlin.joystick_handling.getDeviceName(self.device_guid)}] input id: [{self.input_id}]"
+        des = description or f"repeater (axis): [{gremlin.joystick_handling.getDeviceName(self.device_guid)}] input id: [{self.input_id}]{' +ui' if ui_only else ''}{' +uit' if ui_thread else ''}"
         if des != self._description:
             changed = True
             self._description = des
@@ -5280,6 +5280,9 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
             self._input_id = input_id
         if ui_only != self._ui_only:
             self._ui_only = ui_only
+            changed = True
+        if ui_thread != self._ui_thread:
+            self._ui_thread = ui_thread
             changed = True
         
         self._persist = persist
@@ -5320,6 +5323,7 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
                         input_id = self._input_id,
                         ui_only = self._ui_only,
                         persist = self._persist,
+                        ui_thread=True # update on UI thread
                         )
                 
                 _hook_registry[self._hook_id] = True
@@ -5336,7 +5340,7 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
             self._hooked = False
             
 
-    def process_events(self, event, values):
+    def process_events(self, event, values = None):
         ''' joystick value changed '''
         
         if not self.valid:
@@ -5345,7 +5349,11 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
             if verbose: syslog.info(f"DEV: auto unhook (axis): [{self._hook_id}] {self._description}")
             self.unhook()
             return
-        gremlin.util.InvokeUiMethod(self._set_local_value_ui, values)
+        if __debug__ and self._ui_thread and gremlin.util.assert_ui_thread():
+            # ensure on ui thread
+            pass
+        self._set_local_value_ui(values)
+        #gremlin.util.InvokeUiMethod(self._set_local_value_ui, values)
 
     def _set_local_value_ui(self, values):
         ''' set value on UI thread '''    
@@ -6391,20 +6399,28 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             # get initial data
             astate = gremlin.event_handler.AxisState()
             values = astate.getAxisValues(device.device_guid, axis_id)
-            axis_widget = QHookedProgressBar(data = axis_id, value = values)
-            description = f"axis repeater: [{device.name}] axis id: [{axis_id}]"
-            hook_id = f"IVR {device.device_id} A{axis_id}"
-            axis_widget.hookDevice(
-                        hook_id,
-                        device_guid = device.device_guid,
-                        input_type = InputType.JoystickAxis,
-                        input_id = axis_id,
-                        ui_only=ui_only,
-                        persist = True,
-                        description=description)
-            axis_widget.setValueChangeCallback(self._handle_axis_value_changed)
-            if verbose:
-                syslog.info(f"Register: hook: [{hook_id}] description: [{description}]")
+
+
+            axis_widget = QProgressBar(data = axis_id, value = values)
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event.connect(self.process_event)
+
+
+            # axis_widget = QHookedProgressBar(data = axis_id, value = values)
+            # description = f"axis repeater: [{device.name}] axis id: [{axis_id}]"
+            # hook_id = f"IVR {device.device_id} A{axis_id}"
+            # axis_widget.hookDevice(
+            #             hook_id,
+            #             device_guid = device.device_guid,
+            #             input_type = InputType.JoystickAxis,
+            #             input_id = axis_id,
+            #             ui_only=ui_only,
+            #             persist = True,
+            #             description=description,
+            #             )
+            # axis_widget.setValueChangeCallback(self._handle_axis_value_changed)
+            # if verbose:
+            #     syslog.info(f"Register: hook: [{hook_id}] description: [{description}]")
             
             
         
@@ -6454,8 +6470,43 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         axes_layout.setColumnStretch(i+1,2)
         self.main_layout.addLayout(axes_layout)
 
+    def unhook(self):
+        ''' called when widget is being removed '''
 
-    
+        # disconnect joystick handler
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.disconnect(self.process_event)
+
+        # disconnect widgets if needed
+        if not self._readonly:
+            for widget in self.axis_widgets.values():
+                # remove data hook
+                widget.valueChanged.disconnect(self._manual_bar_changed)
+            for widget in self.value_label_widgets.values():
+                widget.valueChanged.disconnect(self._manual_input_changed)
+             # widget.unhook()
+
+        # cleanup for GC
+        self.axis_widgets.clear()
+        self.value_label_widgets.clear()
+        gremlin.util.clear_layout(self.main_layout)
+        
+
+
+    def process_event(self, event):
+        if not event.is_axis:
+            return
+        if event.device_guid != self.device.device_guid:
+            return
+        astate = gremlin.event_handler.AxisState()
+        input_id = event.identifier
+        values = astate.getAxisValues(event.device_guid, input_id, event.value)
+        if input_id in self.axis_widgets:
+            self.axis_widgets[input_id].setValue(values)
+        if input_id in self.value_label_widgets:
+            self.value_label_widgets[input_id].setValue(values.actual)
+        
+
 
   
     def _handle_axis_value_changed(self, device_guid, input_type, input_id, values):
@@ -6505,14 +6556,6 @@ class AxesCurrentState(QtWidgets.QGroupBox):
             gremlin.joystick_handling.set_axis(self.device.device_guid, axis_id, value)
             
                 
-    def unhook(self):
-        ''' called when widget is being removed '''
-        for widget in self.axis_widgets.values():
-            # remove data hook
-            widget.unhook()
-        
-        self.axis_widgets.clear()
-        
 
 
     def _set_value(self, axis_id : int, value : float | list):
@@ -7415,13 +7458,13 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             widget.process_event(event)
        
 
-    def _temporal_axis_update(self, event : gremlin.event_handler.Event, values):
+    def _temporal_axis_update(self, event : gremlin.event_handler.Event, values = None):
         # if self.device_guid != event.device_guid:
         #     return
         # if event.event_type == InputType.JoystickAxis:
         gremlin.util.InvokeUiMethod(self._temporal_axis_update_ui, event, values) # on ui thread
 
-    def _temporal_axis_update_ui(self, event : gremlin.event_handler.Event, values):
+    def _temporal_axis_update_ui(self, event : gremlin.event_handler.Event, values = None):
         """Updates the temporal axes display.
 
         :param event the event to use in the update

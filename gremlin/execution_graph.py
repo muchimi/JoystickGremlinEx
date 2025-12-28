@@ -1163,10 +1163,11 @@ class ExecutionContext():
         functor : gremlin.base_conditions.AbstractFunctor = container.functor(container, node)
         return functor
 
-    def _get_action_functor(self, action, node):
+    def _get_action_functor(self, action, node, container_condition_node, action_condition_node):
         ''' creates a functor instance for an action '''
         functor : gremlin.base_conditions.AbstractFunctor = action.functor(action, node)
-        extra_inputs = functor.latch_extra_inputs()
+         
+        extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
         if extra_inputs:
             # register the extra inputs for this functor
             eh = gremlin.event_handler.EventHandler()
@@ -1273,15 +1274,15 @@ class ExecutionContext():
                 # parent the container to the condition
                 container_node.parent = virtual_condition_node
 
-            
+            container_condition_node = None
             if container.has_conditions:
-                condition_node = self._get_condition_node(container, container_node.parent)
+                container_condition_node = self._get_condition_node(container, container_node.parent)
                 # parent the container to the new condition and parent the condition to the current parent
-                condition_node.parent = container_node.parent
-                container_node.parent = condition_node
+                container_condition_node.parent = container_node.parent
+                container_node.parent = container_condition_node
                 if not return_node:
-                    return_node = condition_node
-                latched_conditions.append(condition_node)
+                    return_node = container_condition_node
+                latched_conditions.append(container_condition_node)
 
             if not return_node:
                 return_node = container_node # default return node is the container
@@ -1330,6 +1331,7 @@ class ExecutionContext():
 
 
                     action_node.parent = action_set_group_node
+                    action_condition_node = None
                     if action.has_conditions:
                         action_condition_node = self._get_condition_node(action, action_set_group_node)
                         action_node.parent = action_condition_node # action node is owned by its condition node
@@ -1342,7 +1344,7 @@ class ExecutionContext():
                     action_node.link = m_action_node # link the execution tree action node to the input tree action node
 
                     action_node.container = container
-                    functor = self._get_action_functor(action, action_node)
+                    functor = self._get_action_functor(action, action_node, container_condition_node, action_condition_node)
                     action_node.functors.append(functor)
                     action_node.description = f"Action node: [{str(action)}]"
 
@@ -2338,6 +2340,8 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
 
         # If container based conditions exist add them before any actions
+
+        condition_functor = None
         if container.has_conditions: 
             
             functor = self._create_activation_condition(container.activation_condition, container, is_container_condition = True)
@@ -2346,6 +2350,8 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
             container_plugins.register_functor(functor)
             sequence.append("ContainerCondition")
             node.sequence.append("ContainerCondition")
+            condition_functor = functor
+            
 
 
         functor = container.functor(container, node)
@@ -2476,6 +2482,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             # Create default activation condition if needed
             has_input_action = self._contains_input_action_condition(action.activation_condition)
 
+            condition_functor = None
             if add_default_activation and not has_input_action:
                 condition = gremlin.base_conditions.InputActionCondition()
                 condition.comparison = ActionSetExecutionGraph.comparison_map[action.default_button_activation]
@@ -2486,6 +2493,8 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                 sequence.append("Condition")
                 nodes[action].functors.append(functor)
                 nodes[action].sequence.append("Condition")
+                condition_functor = functor
+                
                 
 
             # Create action functor

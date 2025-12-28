@@ -549,7 +549,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         self._update_curve_icon(index, data)
 
-    def _handle_curve_update(self, event):
+    def _handle_curve_update(self, event, values):
         if self._curve_update_handler:
             self._curve_update_handler(event.value)
 

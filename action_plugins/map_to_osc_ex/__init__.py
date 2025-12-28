@@ -236,12 +236,17 @@ class OscArg(QtCore.QObject):
 
         node.set("source-mode", self._source_mode)
         if self._source_mode == "device":
-            device = gremlin.joystick_handling.device_info_from_guid(self._source_device_id)
-            axis_name = device.axis_names[self._source_axis_id-1]
-            comment_node = ElementTree.Comment(f" Source device: {device.name} Source axis: {axis_name} ")
-            node.append(comment_node)
-            if self._source_device_id: node.set("device-guid",self._source_device_id)
-            if self._source_axis_id is not None: node.set("axis", safe_format(self._source_axis_id, int))
+            
+            if self._source_device_id and self._source_axis_id is not None:
+                device = gremlin.joystick_handling.getDevice(self._source_device_id)
+                if device:
+                    axis_name = device.axis_names[self._source_axis_id-1]
+                else:
+                    axis_name = f"unknown device [{self._source_device_id}] Source Axis: [{self._source_axis_id-1}]"
+                comment_node = ElementTree.Comment(f" Source device: {device.name} Source axis: {axis_name} ")
+                node.append(comment_node)
+                node.set("device-guid",self._source_device_id)
+                node.set("axis", safe_format(self._source_axis_id, int))
 
         if is_number:
             node.set("min-range", safe_format(self._min_range, float))
@@ -1344,7 +1349,7 @@ class MapToOscExFunctor(gremlin.base_profile.AbstractFunctor):
 
 
         
-    def latch_extra_inputs(self):
+    def latch_extra_inputs(self, container_condition_functors = None, action_condition_functors = None):
         ''' returns the list of additional latched inputs that should trigger this action 
             list of (device_guid, input_type, input_id) to latch to this action (trigger on change) '''
         latched_list = []

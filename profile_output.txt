@@ -1,0 +1,661 @@
+Timer unit: 1e-07 s
+
+Total time: 3.97919 s
+File: C:\JoystickGremlin-develop\action_plugins\map_to_vjoy\__init__.py
+Function: VJoyRemapFunctor._process_event at line 4627
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  4627                                               @profile
+  4628                                               def _process_event(self, event : gremlin.event_handler.Event, action_value : gremlin.actions.Value, extra_data):
+  4629                                                   ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
+  4630      2682      56807.0     21.2      0.1          (is_local, is_remote) = input_devices.remote_state.state
+  4631                                           
+  4632      2682       9070.0      3.4      0.0          verbose = self.verbose
+  4633      2682       7844.0      2.9      0.0          verbose_extra = self.verbose_extra
+  4634      2682       7064.0      2.6      0.0          verbose_extra = verbose
+  4635                                                   # syslog = logging.getLogger("system")
+  4636      2682       7436.0      2.8      0.0          if event.force_remote:
+  4637                                                       # force remote mode on if specified in the event
+  4638                                                       is_remote = True
+  4639                                                       is_local = False
+  4640                                           
+  4641      2682       7112.0      2.7      0.0          force_remote = event.force_remote
+  4642                                           
+  4643      2682       7247.0      2.7      0.0          auto_complete = True # assume the functor completes this pass
+  4644                                           
+  4645      2682       7192.0      2.7      0.0          self.action_data : VjoyRemap
+  4646                                           
+  4647      2682      93279.0     34.8      0.2          input_type = event.getInputType()
+  4648      2682       7236.0      2.7      0.0          result = True # assume functor executes
+  4649                                           
+  4650      2682       7785.0      2.9      0.0          if event.is_axis: # self.input_type == InputType.JoystickAxis:
+  4651                                                       # axis response mode
+  4652                                           
+  4653      2682       7329.0      2.7      0.0              if verbose: syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current:0.3f}  Event raw: {event.raw_value:0.3f} value: {event.value:0.3f} curve: {event.curve_value:0.3f}")
+  4654                                           
+  4655      2682       9844.0      3.7      0.0              axis_mode = self.action_data.axis_mode
+  4656                                           
+  4657                                                       # read the value from the extra data if set
+  4658      2682       9019.0      3.4      0.0              if extra_data is not None and "value" in extra_data:
+  4659                                                           value = extra_data["value"]
+  4660                                                       else:
+  4661                                                           # use curve value if any
+  4662      2682      19670.0      7.3      0.0                  value = event.curve_value
+  4663      2682       7152.0      2.7      0.0                  if value is None:
+  4664                                                               # use regular value if any
+  4665                                                               value = event.value
+  4666                                           
+  4667      2682       6780.0      2.5      0.0                  if value is None:
+  4668                                                               return True
+  4669                                           
+  4670      2682       9908.0      3.7      0.0              if value is None or not isinstance(value, float):
+  4671         1          4.0      4.0      0.0                  if verbose: syslog.error(f"VJOYREMAP: invalid value {value} for axis")
+  4672         1          3.0      3.0      0.0                  return
+  4673                                           
+  4674                                           
+  4675                                                       # axis mode
+  4676      2681       8532.0      3.2      0.0              match self.action_mode:
+  4677      2681       9454.0      3.5      0.0                  case VjoyAction.VJoyAxisToButton:
+  4678                                                               v1 = self.range_low
+  4679                                                               v2 = self.range_high
+  4680                                                               in_range = gremlin.util.valueInRange(value, v1, v2)
+  4681                                                               # syslog.info(f"axis: {value:0.3f}")
+  4682                                                               is_pressed = None
+  4683                                                               match self.action_data.button_mode:
+  4684                                                                   case ButtonOutputMode.Hold:
+  4685                                                                       if in_range:
+  4686                                           
+  4687                                                                           if not self.in_range:
+  4688                                                                               # toggle ON
+  4689                                                                               self.in_range = True
+  4690                                                                               is_pressed = True
+  4691                                                                               if verbose: syslog.info(f"AXIS TO BUTTON: ON in range vjoy {self.vjoy_id} button {self.vjoy_input_id}")
+  4692                                           
+  4693                                           
+  4694                                                                       else:
+  4695                                                                           # not in range
+  4696                                                                           if self.in_range:
+  4697                                                                               # toggle OFF
+  4698                                                                               if verbose: syslog.info(f"AXIS TO BUTTON: OFF out of range vjoy {self.vjoy_id} button {self.vjoy_input_id}")
+  4699                                                                               self.in_range = False
+  4700                                                                               is_pressed = False
+  4701                                           
+  4702                                                                   case ButtonOutputMode.Pulse:
+  4703                                                                       input_id = self.vjoy_input_id
+  4704                                                                       device_id = self.vjoy_id
+  4705                                                                       if in_range:
+  4706                                                                           if not self.in_range:
+  4707                                                                               self.in_range = True
+  4708                                                                               if verbose: syslog.info(f"VJOY: trigger start range pulse vjoy {device_id} hat {input_id}")
+  4709                                                                               repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
+  4710                                                                               self.pulse_start(device_id, input_id, self.pulse_delay/1000, repeat_interval, is_local, is_remote, force_remote)
+  4711                                                                               auto_complete = False
+  4712                                                                       else:
+  4713                                                                           if self.in_range:
+  4714                                                                               self.in_range = False
+  4715                                                                               if verbose: syslog.info(f"VJOY: trigger stop range pulse vjoy {device_id} hat {input_id}")
+  4716                                                                               self.pulse_stop(device_id, input_id)
+  4717                                                                       return True
+  4718                                           
+  4719                                           
+  4720                                                                   case ButtonOutputMode.Press:
+  4721                                                                       is_pressed = True
+  4722                                           
+  4723                                                                   case ButtonOutputMode.Release:
+  4724                                                                       is_pressed = False
+  4725                                           
+  4726                                                                   case _:
+  4727                                                                       # do nothing
+  4728                                                                       return True
+  4729                                           
+  4730                                                               if is_pressed is not None:
+  4731                                                                   if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: {is_pressed}")
+  4732                                                                   self.action_data.button_last_value = is_pressed
+  4733                                                                   if is_local:
+  4734                                                                       if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  4735                                                                           joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = is_pressed
+  4736                                                                   if is_remote:
+  4737                                                                       self.remote_client.send_button(self.vjoy_id, self.vjoy_input_id, is_pressed)
+  4738                                           
+  4739      2681       7094.0      2.6      0.0                  case _:
+  4740      2681       9689.0      3.6      0.0                      if axis_mode == "absolute":
+  4741                                                                   # apply any range function to the raw position
+  4742                                           
+  4743                                           
+  4744      2681       7044.0      2.6      0.0                          if verbose: syslog.info(f"AXIS ABSOLUTE: send vjoy {self.vjoy_id} axis {self.vjoy_input_id} range: [{self.range_low:0.3f},{self.range_high:0.3f}] scale: {self.axis_scaling:0.3f} value: {value:0.3f}")
+  4745                                           
+  4746      2681       6661.0      2.5      0.0                          if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
+  4747                                           
+  4748      2681      23194.0      8.7      0.1                          self.action_data.axis_last_value = value
+  4749      2681   38704337.0  14436.5     97.3                          self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+  4750                                           
+  4751                                                                   # remember the last value
+  4752      2681      45735.0     17.1      0.1                          self.action_data.axis_last_value = value
+  4753                                           
+  4754                                                               elif axis_mode == "relative":
+  4755                                                                   # relative mode
+  4756                                           
+  4757                                                                   if self.action_data.use_relative_value:
+  4758                                                                       # input is an axis
+  4759                                                                       scale_factor = event.value
+  4760                                                                       if scale_factor < 0:
+  4761                                                                           scale_factor = -scale_factor
+  4762                                                                           direction = -1
+  4763                                                                       else:
+  4764                                                                           direction = +1
+  4765                                                                       if not self._relative_pulse_worker:
+  4766                                                                           self._relative_pulse_worker = gremlin.repeater.PulseWorker(0, self.action_data.relative_pulse_delay/1000, on_callback = self._relative_pulse_on, data = (self.vjoy_id, self.vjoy_input_id, is_local, is_remote))
+  4767                                           
+  4768                                                                   else:
+  4769                                                                       self.scale_factor = 1.0
+  4770                                           
+  4771                                                                   if self.action_data.reverse:
+  4772                                                                       direction = -direction
+  4773                                           
+  4774                                                                   # update tracking values
+  4775                                           
+  4776                                                                   #self.lock.acquire()
+  4777                                                                   self.scale_factor = scale_factor
+  4778                                                                   self.direction = direction
+  4779                                                                   #self.lock.release()
+  4780                                           
+  4781                                           
+  4782                                                                   if verbose_extra: syslog.info(f"Tick value: {direction * scale_factor : 0.3f}")
+  4783                                           
+  4784                                                                   if scale_factor >= 0.02:
+  4785                                                                       if not self._relative_pulse_worker.is_running:
+  4786                                                                           if verbose_extra: syslog.info("VJOY: Tick start")
+  4787                                                                           self._relative_pulse_worker.start() # start pulsing updates to the axis while deviated
+  4788                                                                   else:
+  4789                                                                       if verbose_extra: syslog.info("VJOY: Tick stop")
+  4790                                                                       self._relative_pulse_worker.stop() # stop pulsing updates to the axis if not deviated
+  4791                                           
+  4792                                                                   return True # done
+  4793                                           
+  4794                                           
+  4795                                                   elif self.action_mode == VjoyAction.VJoyHatToButton:
+  4796                                           
+  4797                                                       if isinstance(action_value, tuple):
+  4798                                                           position = action_value
+  4799                                                       else:
+  4800                                                           position = action_value.current
+  4801                                           
+  4802                                                       pressed_positions = list(self.pressed_hat_buttons.keys())
+  4803                                                       is_pressed = event.is_pressed # position != (0,0)
+  4804                                                       mode = self.action_data.hat_mode_map[position]
+  4805                                           
+  4806                                                       input_id = self.action_data.hat_map[position]
+  4807                                                       device_id =self.vjoy_id
+  4808                                                       # sticky = self.action_data.hat_sticky
+  4809                                                       if input_id > 0:
+  4810                                           
+  4811                                                           match mode:
+  4812                                                               case ButtonOutputMode.Pulse:
+  4813                                                                   if is_pressed:
+  4814                                                                       if verbose: syslog.info(f"VJOY: trigger start pulse vjoy {device_id} hat {input_id}")
+  4815                                                                       repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
+  4816                                                                       self.pulse_start(device_id, input_id, self.pulse_delay/1000, repeat_interval, is_local, is_remote, force_remote)
+  4817                                                                       auto_complete = False
+  4818                                                                   else:
+  4819                                                                       if verbose: syslog.info(f"VJOY: trigger stop pulse vjoy {device_id} hat {input_id}")
+  4820                                                                       self.pulse_stop(device_id, input_id)
+  4821                                           
+  4822                                                                       # threading.Timer(0.01, self._fire_pulse, [self.vjoy_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
+  4823                                                               case ButtonOutputMode.Hold:
+  4824                                                                   if is_pressed:
+  4825                                                                       # release the prior buttons
+  4826                                                                       for pressed_position in pressed_positions:
+  4827                                                                           if position == pressed_position:
+  4828                                                                               continue
+  4829                                                                           release_input_id = self.pressed_hat_buttons[pressed_position]
+  4830                                                                           if release_input_id > 0:
+  4831                                                                               if is_local:
+  4832                                                                                   if gremlin.joystick_handling.is_vjoy_connected(device_id):
+  4833                                                                                       joystick_handling.VJoyProxy()[device_id].button(release_input_id).is_pressed = False
+  4834                                                                               if is_remote:
+  4835                                                                                   self.remote_client.send_button(device_id, release_input_id, False)
+  4836                                           
+  4837                                                                           del self.pressed_hat_buttons[pressed_position]
+  4838                                                               case ButtonOutputMode.Press:
+  4839                                                                   is_pressed = True
+  4840                                                                   if input_id in self.pressed_hat_buttons:
+  4841                                                                       del self.pressed_hat_buttons[input_id]
+  4842                                                               case ButtonOutputMode.Release:
+  4843                                                                   is_pressed = False
+  4844                                                                   if input_id in self.pressed_hat_buttons:
+  4845                                                                       del self.pressed_hat_buttons[input_id]
+  4846                                                               case ButtonOutputMode.NoOp:
+  4847                                                                   # do nothing
+  4848                                                                   return True
+  4849                                           
+  4850                                                           # press the new button
+  4851                                                           self.pressed_hat_buttons[position] = input_id
+  4852                                                           self.action_data.button_last_value = is_pressed
+  4853                                                           if is_local:
+  4854                                                               if gremlin.joystick_handling.is_vjoy_connected(device_id):
+  4855                                                                   joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = is_pressed
+  4856                                                           if is_remote:
+  4857                                                               self.remote_client.send_button(device_id, input_id, is_pressed)
+  4858                                           
+  4859                                           
+  4860                                                       else:
+  4861                                                           # release
+  4862                                                           match mode:
+  4863                                                               case ButtonOutputMode.NoOp:
+  4864                                                                   # do nothing
+  4865                                                                   return True
+  4866                                                               case ButtonOutputMode.Press:
+  4867                                                                   return True
+  4868                                                               case ButtonOutputMode.Release:
+  4869                                                                   return True
+  4870                                           
+  4871                                           
+  4872                                                           for pressed_position in pressed_positions:
+  4873                                                               input_id = self.pressed_hat_buttons[pressed_position]
+  4874                                                               if input_id > 0:
+  4875                                                                   if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: False")
+  4876                                                                   if is_local:
+  4877                                                                       if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  4878                                                                           joystick_handling.VJoyProxy()[self.vjoy_id].button(input_id).is_pressed = False
+  4879                                                                   if is_remote:
+  4880                                                                       self.remote_client.send_button(self.vjoy_id, input_id, False)
+  4881                                           
+  4882                                                               del self.pressed_hat_buttons[pressed_position]
+  4883                                           
+  4884                                           
+  4885                                           
+  4886                                           
+  4887                                                       self.hat_position = position
+  4888                                           
+  4889                                                   elif input_type in VJoyRemapWidget.input_type_buttons:
+  4890                                                       # process a button output
+  4891                                                       is_paired = remote_state.paired
+  4892                                                       force_remote = event.force_remote or is_paired
+  4893                                           
+  4894                                           
+  4895                                           
+  4896                                           
+  4897                                                       # determine if event should be fired based on release mode
+  4898                                                       is_pressed = event.is_pressed
+  4899                                                       trigger = False
+  4900                                                       fire_event =  (self.action_data.exec_on_release and not is_pressed) or (self.action_data.exec_on_press and is_pressed)
+  4901                                           
+  4902                                                       # if self.vjoy_input_id == 2:
+  4903                                                       #     syslog.info(f"=============================================================== button 2 set pressed {is_pressed}")
+  4904                                           
+  4905                                           
+  4906                                                       if self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonInverted):
+  4907                                                           # normal default behavior
+  4908                                           
+  4909                                                           match self.action_mode:
+  4910                                                               case VjoyAction.VJoyButton:
+  4911                                                                   pressed_value = is_pressed
+  4912                                                               case VjoyAction.VJoyButtonInverted:
+  4913                                                                   pressed_value = not is_pressed
+  4914                                           
+  4915                                                           if not is_pressed and self.action_data.exec_on_release:
+  4916                                                               pressed_value = not pressed_value
+  4917                                                               if is_local:
+  4918                                                                   if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  4919                                                                       if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]")
+  4920                                                                       joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = pressed_value
+  4921                                                               if is_remote or is_paired:
+  4922                                                                   self.remote_client.send_button(self.vjoy_id, self.vjoy_input_id, pressed_value, force_remote = force_remote)
+  4923                                           
+  4924                                                           if (self.action_data.exec_on_press and is_pressed):
+  4925                                                               auto_release = False
+  4926                                                               if is_pressed and not self.action_data.ignore_release:
+  4927                                                                   if extra_data and "autorelease" in extra_data:
+  4928                                                                       auto_release = extra_data["autorelease"]
+  4929                                                                   else:
+  4930                                                                       auto_release = input_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release
+  4931                                                                   if auto_release:
+  4932                                                                       if verbose: syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
+  4933                                                                       input_devices.ButtonReleaseActions().register_button_release(
+  4934                                                                           (self.vjoy_id, self.vjoy_input_id),
+  4935                                                                           event,
+  4936                                                                           is_local = is_local,
+  4937                                                                           is_remote = is_remote,
+  4938                                                                           force_remote = force_remote,
+  4939                                                                           activate_on = False # released
+  4940                                                                       )
+  4941                                           
+  4942                                                               if verbose: syslog.info(f"\t{self.vjoy_input_id} pressed: {is_pressed}  ignore release: {self.action_data.ignore_release}")
+  4943                                                               trigger = is_pressed or (not auto_release and not is_pressed)  # trigger on press, or on release unless an auto-release was already registered for the release action to avoid double releases
+  4944                                                               if not is_pressed and self.action_data.ignore_release:
+  4945                                                                   # ignore release action on press/release modes
+  4946                                                                   if verbose: syslog.info("\tignoring release")
+  4947                                                                   trigger = False
+  4948                                                           elif not is_pressed:
+  4949                                                               # send a release trigger
+  4950                                                               trigger = True
+  4951                                           
+  4952                                                           if trigger:
+  4953                                           
+  4954                                                               if is_local:
+  4955                                                                   if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  4956                                                                       if verbose: syslog.info(f"\tTrigger vjoy [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [{is_pressed}]")
+  4957                                                                       joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = pressed_value
+  4958                                                               if is_remote or is_paired:
+  4959                                                                   self.remote_client.send_button(self.vjoy_id, self.vjoy_input_id, pressed_value, force_remote = is_paired )
+  4960                                                           else:
+  4961                                                               # indicate no execution
+  4962                                                               result = False
+  4963                                           
+  4964                                           
+  4965                                           
+  4966                                           
+  4967                                           
+  4968                                           
+  4969                                                       elif self.action_mode == VjoyAction.VJoyButtonPress:
+  4970                                                           # press button (no auto release)
+  4971                                                           if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: True")
+  4972                                           
+  4973                                                           if fire_event:
+  4974                                                               self.action_data.button_last_value = True
+  4975                                                               if is_local:
+  4976                                                                   if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  4977                                                                       joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = True
+  4978                                                               if is_remote or is_paired:
+  4979                                                                   self.remote_client.send_button(self.vjoy_id, self.vjoy_input_id, True, force_remote = is_paired )
+  4980                                           
+  4981                                           
+  4982                                                       elif self.action_mode == VjoyAction.VJoyButtonRelease:
+  4983                                                           # release button (no auto release)
+  4984                                                           if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: False")
+  4985                                                           if fire_event:
+  4986                                                               self.action_data.button_last_value = False
+  4987                                                               if is_local:
+  4988                                                                   if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  4989                                                                       joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = False
+  4990                                                               if is_remote or is_paired:
+  4991                                                                   self.remote_client.send_button(self.vjoy_id, self.vjoy_input_id, False, force_remote = is_paired )
+  4992                                           
+  4993                                           
+  4994                                           
+  4995                                           
+  4996                                                       elif self.action_mode == VjoyAction.VJoyToggle:
+  4997                                                           # toggle action
+  4998                                           
+  4999                                                           if fire_event:
+  5000                                                               if input_type in [InputType.JoystickButton, InputType.Keyboard] \
+  5001                                                                       and event.is_pressed:
+  5002                                                                   if is_local:
+  5003                                                                       if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  5004                                                                           button = joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id)
+  5005                                                                           button.is_pressed = not button.is_pressed
+  5006                                                                           self.action_data.button_last_value = button.is_pressed
+  5007                                                                           if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: {button.is_pressed}")
+  5008                                                                   if is_remote:
+  5009                                                                       self.remote_client.toggle_button(self.vjoy_id, self.vjoy_input_id)
+  5010                                           
+  5011                                           
+  5012                                                       elif self.action_mode == VjoyAction.VJoyPulse:
+  5013                                                           input_id = self.vjoy_input_id
+  5014                                                           device_id = self.vjoy_id
+  5015                                                           if verbose: syslog.info(f"VJOY: trigger start pulse vjoy {device_id} button {input_id}")
+  5016                                                           # pulse action
+  5017                                                           if fire_event:
+  5018                                                               auto_complete = False
+  5019                                                               repeat_interval =  self.action_data.pulse_repeat_delay/1000 if self.action_data.pulse_repeat else -1
+  5020                                                               self.pulse_start(device_id, input_id, self.pulse_delay/1000, repeat_interval, is_local, is_remote, force_remote)
+  5021                                                           else:
+  5022                                                               if verbose: syslog.info(f"VJOY: trigger stop pulse vjoy {device_id} button {input_id}")
+  5023                                                               self.pulse_stop(self.vjoy_id, input_id)
+  5024                                                       elif self.action_mode == VjoyAction.VJoyInvertAxis:
+  5025                                                           # invert the specified axis
+  5026                                                           if fire_event:
+  5027                                                               self.toggle_reverse()
+  5028                                           
+  5029                                           
+  5030                                                       elif self.action_mode == VjoyAction.VJoySetAxis:
+  5031                                                           # set the value on the specified axis
+  5032                                                           if fire_event:
+  5033                                                               return self._set_axis_value()
+  5034                                                               # if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  5035                                           
+  5036                                                               #     if self.action_data.target_use_last:
+  5037                                                               #         # set the output to the current value, but wiggle it so the target app detects a change
+  5038                                                               #         # this is to "reset" an axis to a known value if the target environment changed the input outside of the control data being setn
+  5039                                                               #         # the wiggle value is a small offet to trigger the target game to cause it to retrigger - there has to be a change of the game would not pick it up
+  5040                                                               #         offset = 0.01
+  5041                                                               #         # read the current output value
+  5042                                                               #         value = self.action_data.axis_last_value
+  5043                                                               #         if value is None:
+  5044                                                               #             # read the last value
+  5045                                                               #             value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+  5046                                                               #             if verbose: syslog.info(f"reading axis value: {value:0.3f}")
+  5047                                                               #         else:
+  5048                                                               #             if verbose: syslog.info(f"using last axis value: {value:0.3f}")
+  5049                                           
+  5050                                                               #         wiggle_value = value - offset
+  5051                                                               #         if wiggle_value < -1.0:
+  5052                                                               #             wiggle_value = value + offset
+  5053                                           
+  5054                                                               #         self.target_value = value # value to restore after wiggle
+  5055                                           
+  5056                                                               #         if verbose: syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
+  5057                                                               #         self._set_axis(self.vjoy_id, self.vjoy_input_id, wiggle_value)
+  5058                                                               #         timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
+  5059                                                               #         timer.start()
+  5060                                           
+  5061                                                               #         return True
+  5062                                           
+  5063                                           
+  5064                                                               #     target_value_valid = self.target_value_valid or self.action_data.use_relative_value
+  5065                                           
+  5066                                           
+  5067                                                               #     if target_value_valid and fire_event:
+  5068                                                               #         target_value = self.target_value
+  5069                                           
+  5070                                                               #         if self.action_data.use_relative_value:
+  5071                                                               #             # read the current output axis value
+  5072                                                               #             value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+  5073                                                               #             # apply the offset
+  5074                                                               #             value += target_value
+  5075                                                               #         else:
+  5076                                                               #             value = target_value
+  5077                                           
+  5078                                                               #         value = gremlin.util.clamp(value)
+  5079                                                               #         if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
+  5080                                                               #         self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+  5081                                           
+  5082                                                               #         # remember the last value
+  5083                                                               #         syslog.info(f"set setaxis last value: {value:0.3f}")
+  5084                                                               #         self.action_data.axis_last_value = value
+  5085                                           
+  5086                                                       elif self.action_mode == VjoyAction.VJoyRangeAxis:
+  5087                                                           # changes the output range on the target device / axis
+  5088                                                           if fire_event:
+  5089                                                               self.usage_data.set_range(self.vjoy_id, self.vjoy_input_id, self.range_low, self.range_high)
+  5090                                           
+  5091                                                       elif VjoyAction.is_command(self.action_mode):
+  5092                                                           # update remote control mode
+  5093                                                           if fire_event:
+  5094                                                               remote_state.mode = self.action_mode
+  5095                                           
+  5096                                                       elif self.action_mode == VjoyAction.VJoySetAxisStepped:
+  5097                                                           # process stepped axis request
+  5098                                                           if fire_event:
+  5099                                                               latched = self.action_data._stepped_latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id
+  5100                                                               primary = event.device_guid == self.hardware_device_guid and event.identifier == self.hardware_input_id
+  5101                                           
+  5102                                                             
+  5103                                                               if primary or latched:
+  5104                                                                   trigger = False
+  5105                                                                   trigger = (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release)
+  5106                                                                   if trigger:
+  5107                                                                       trigger = False
+  5108                                                                       key = ("stepped-axis",self.vjoy_input_id)
+  5109                                                                       device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
+  5110                                                                       if not key in device.data:
+  5111                                                                           device.data[key] = self.action_data.target_step_start_index
+  5112                                           
+  5113                                                                       start_index = device.data[key]
+  5114                                                                       count = len(self.action_data.target_step_list)
+  5115                                                                       index = start_index
+  5116                                           
+  5117                                                                       value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+  5118                                                                       if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
+  5119                                                                           # sync the current index with the current axis value
+  5120                                                                           v1 = v2 = None
+  5121                                                                           # syslog.info(f"Sync mode: {value:0.3f}")
+  5122                                                                           for i in range(count):
+  5123                                                                               v2 = self.action_data.target_step_list[i]
+  5124                                                                               if v1 is not None:
+  5125                                                                                   if value >= v1 and value <= v2:
+  5126                                                                                       index = i
+  5127                                                                                       # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f} match value: {value:0.3f}")
+  5128                                                                                       break
+  5129                                           
+  5130                                                                                   # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f}")
+  5131                                                                               v1 = v2
+  5132                                           
+  5133                                           
+  5134                                           
+  5135                                           
+  5136                                                                       direction = self.action_data.target_step_direction
+  5137                                           
+  5138                                                                       if primary:
+  5139                                                                           # up direction
+  5140                                                                           if verbose: syslog.info(f"STEPPED AXIS: Step {'up' if direction == 1 else 'down'}")
+  5141                                                                           index += direction
+  5142                                                                           trigger = True
+  5143                                                                       elif latched:
+  5144                                                                           # down direction
+  5145                                                                           if verbose: syslog.info(f"STEPPED AXIS: Step {'down' if direction == 1 else 'up'}")
+  5146                                                                           index -= direction
+  5147                                                                           trigger = True
+  5148                                           
+  5149                                                                       if trigger:
+  5150                                                                           index = gremlin.util.clamp(index, 0, count-1)
+  5151                                                                           value = self.action_data.target_step_list[index]
+  5152                                                                           if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis {self.vjoy_input_id} value: {value:0.3f}")
+  5153                                           
+  5154                                                                           # if self.step_linear:
+  5155                                                                           #     # smooth changes between values
+  5156                                                                           #     self._step_is_running = False
+  5157                                                                           #     if self.step_thread.is_alive():
+  5158                                                                           #         self._step_thread.join()
+  5159                                           
+  5160                                                                           #     self.action_data.target_value = value
+  5161                                                                           #     current = self.action_data.axis_last_value
+  5162                                                                           #     if not current:
+  5163                                                                           #         current = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+  5164                                                                           #     if self.step_timer:
+  5165                                                                           #         self.step_timer.cancel()
+  5166                                                                           #     time = 2.0
+  5167                                                                           #     tick = 0.25
+  5168                                                                           #     delta = current - value
+  5169                                                                           #     offset = delta * time / tick
+  5170                                           
+  5171                                                                           #     self.step_thread = threading.Thread(target = self._step_runner, args=(tick, current, value, offset,))
+  5172                                                                           #     self.step_thread.name = "step_runner"
+  5173                                                                           #     self._step_is_running = True
+  5174                                                                           #     self.step_thread.start()
+  5175                                                                           # else:
+  5176                                                                           # one shot value
+  5177                                                                           self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+  5178                                           
+  5179                                                                           device.data[key] = index
+  5180                                                                           if verbose: syslog.info(f"STEPPED AXIS: start index: {start_index} new index: {index} step value: {value:0.3f}")
+  5181                                           
+  5182                                                                           # remember the last value
+  5183                                                                           syslog.info(f"set step last value: {value:0.3f}")
+  5184                                                                           self.action_data.axis_last_value = value
+  5185                                                           else:
+  5186                                                               # wrong input
+  5187                                                               result = False
+  5188                                           
+  5189                                           
+  5190                                                       else:
+  5191                                                           # basic handling of the button
+  5192                                                           if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}")
+  5193                                                           if fire_event:
+  5194                                                               self.action_data.button_last_value = is_pressed
+  5195                                                               if is_local:
+  5196                                                                   if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  5197                                                                       joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = is_pressed
+  5198                                                               if is_remote:
+  5199                                                                   self.remote_client.send_button(self.vjoy_id, self.vjoy_input_id, is_pressed)
+  5200                                           
+  5201                                           
+  5202                                           
+  5203                                                   elif input_type == InputType.JoystickHat:
+  5204                                           
+  5205                                                       if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} direction: {action_value.current}")
+  5206                                                       if is_local:
+  5207                                                           if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+  5208                                                               joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = action_value.current
+  5209                                                       if is_remote:
+  5210                                                           self.remote_client.send_hat(self.vjoy_id, self.vjoy_input_id, action_value.current)
+  5211                                           
+  5212                                           
+  5213      2681       9257.0      3.5      0.0          if auto_complete:
+  5214      2681     662429.0    247.1      1.7              self.functor_complete.emit() # indicate completed
+  5215      2681      10697.0      4.0      0.0          return result
+
+Total time: 4.45297 s
+File: C:\JoystickGremlin-develop\action_plugins\map_to_vjoy\__init__.py
+Function: VJoyRemapFunctor.process_event at line 4570
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  4570                                               @profile
+  4571                                               def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
+  4572                                                   ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
+  4573                                                   # if self.action_data.merged and event.is_axis:
+  4574                                                   #     # merged axis data is handled by the internal hook - ignore
+  4575                                                   #     return True
+  4576      2682      12368.0      4.6      0.0          if event.is_axis:
+  4577                                                       # process input options and any merge and curve operation - the current value will already be curved by the input curve if one exists
+  4578                                                       # config = gremlin.config.Configuration()
+  4579      2682       9413.0      3.5      0.0              verbose = self.verbose
+  4580                                           
+  4581      2682       8052.0      3.0      0.0              if event.is_repeater:
+  4582                                                           # use the repeater value
+  4583                                                           value = event.value
+  4584                                                       else:
+  4585                                           
+  4586                                                           # raw_value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+  4587                                                           # received = action_value.current
+  4588                                           
+  4589                                                           # get list of curves that applies to this input
+  4590                                           
+  4591                                           
+  4592                                           
+  4593      2682       7706.0      2.9      0.0                  curves = None
+  4594      2682      28113.0     10.5      0.1                  if event.curve_value is not None:
+  4595                                                               # curve data already applied, only apply our own curve if present
+  4596      2682      12240.0      4.6      0.0                      if self.action_data.curve_data:
+  4597        18         77.0      4.3      0.0                          curves = [self.action_data.curve_data]
+  4598      2682      37751.0     14.1      0.1                      value = event.curve_value
+  4599      2682       7907.0      2.9      0.0                      if verbose: source = "input curve value"
+  4600                                                           else:
+  4601                                                               # not using curve data, apply all applicable curves
+  4602                                                               curves = self.getCurveData(event, action_value)
+  4603                                                               if verbose: source = "action value"
+  4604                                                               value = action_value.current
+  4605                                           
+  4606      2682       7234.0      2.7      0.0                  if verbose: curve_count = len(curves) if curves else 0
+  4607                                           
+  4608                                                           # this handles axis merging and applies any curves and axis inversion
+  4609      2682    4018205.0   1498.2      9.0                  filtered_value = self.action_data.get_filtered_axis_value(value, curves = curves)
+  4610      2682       8004.0      3.0      0.0                  if filtered_value is None:
+  4611                                                               filtered_value = value
+  4612                                           
+  4613      2682     104973.0     39.1      0.2                  ranged_value = self.action_data.get_ranged_axis_value(filtered_value)
+  4614                                           
+  4615      2682       7527.0      2.8      0.0                  if ranged_value is None:
+  4616                                                               ranged_value = filtered_value
+  4617                                           
+  4618      2682       7640.0      2.8      0.0                  if verbose: syslog.info(f"VjoyRemap: using input value source {source}: [{value:0.3f}] -> filtered [{filtered_value:0.3f}] -> range [{ranged_value:0.3f}] applied curves: {curve_count}")
+  4619                                           
+  4620      2682     104074.0     38.8      0.2              action_value = gremlin.actions.Value(value = ranged_value, raw = event.raw_value, is_pressed = event.is_pressed)
+  4621      2682      62296.0     23.2      0.1              event.curve_value = ranged_value
+  4622                                           
+  4623      2682   40086090.0  14946.3     90.0          return self._process_event(event, action_value, extra_data)
+
+  3.98 seconds - C:\JoystickGremlin-develop\action_plugins\map_to_vjoy\__init__.py:4627 - VJoyRemapFunctor._process_event
+  4.45 seconds - C:\JoystickGremlin-develop\action_plugins\map_to_vjoy\__init__.py:4570 - VJoyRemapFunctor.process_event

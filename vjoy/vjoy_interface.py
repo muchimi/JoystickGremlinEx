@@ -28,11 +28,11 @@ class VJoyState(enum.Enum):
 
     """Enumeration of the possible VJoy device states."""
 
-    Owned = 0       # The device is owned by the current application
-    Free = 1        # The device is not owned by any application
-    Bust = 2        # The device is owned by another application
-    Missing = 3     # The device is not present
-    Unknown = 4     # Unknown type of error
+    Owned = 0       # The device is owned by the current application VJD_STAT_OWN
+    Free = 1        # The device is not owned by any application VJD_STAT_FREE
+    Bust = 2        # The device is owned by another application VJD_STAT_BUSY
+    Missing = 3     # The device is not present VJD_STAT_MISS
+    Unknown = 4     # Unknown type of error VJD_STAT_UNKN
 
 
 class VJoyInterface:

@@ -154,7 +154,7 @@ class TickContainerWidget(AbstractContainerWidget):
         jep.unregisterCallback(self.action_data.action_id)
 
 
-    def _joystick_event_handler(self, event):
+    def _joystick_event_handler(self, event, values = None):
         ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
         if gremlin.shared_state.is_running:
             return 

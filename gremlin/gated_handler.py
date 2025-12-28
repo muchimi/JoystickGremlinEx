@@ -1546,7 +1546,7 @@ class GateData():
    
 
     @QtCore.Slot(object)
-    def _joystick_event_handler(self, event):
+    def _joystick_event_handler(self, event, values = None):
         ''' handles joystick input at runtime
         
         To avoid challenges with other GremlinEx functionality - we handle our own hierarchy calls to our subcontainers here.

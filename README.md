@@ -29,9 +29,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T141)
+
+- Fix: input viewer repeater lag: refactored update to input viewer to minimize any lag when a large number of repeaters are selected.
+- New: Vjoy Remap: Merged Axis: check for conditions on latched input. This is a new feature.  Previously, merged axis condition could only be evaluated on the primary input.
+- Fix: Map to OSC: profile serialization with an invalid device or axis causes an exception.
+- Fix: Legacy Remap: doesn't know how to handle new device types.  This would cause an error when adding a remap action to the Profile/Mode device.
+
 ### (m76T140_3)
 - Change: disable repeater tooltips on value change (to determine if lag may be caused by computations)
-- Change: 
+- Change: enable direct call instead of pooled thread call for dispatch events.
 
 ### (m76T140_2)
 - Change: ignore mouse inputs if repeater is in read/only mode.

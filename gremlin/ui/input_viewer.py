@@ -74,8 +74,7 @@ class VisualizationConfig():
         gremlin.util.InvokeUiMethod(self._save_ui) # ensure save on UI thread
 
     def _save_ui(self):
-        locked = self._lock.acquire(timeout = 2)
-        if locked:   
+        with self._lock:
             try:
 
                 ''' saves to the config file '''
@@ -113,8 +112,7 @@ class VisualizationConfig():
             except Exception as err:
                 syslog.error("VIZ CONFIG SAVE")
                 syslog.error(f"{err}\n{traceback.format_exc()}")
-            finally:
-                self._lock.release()
+           
         
 
     def clear(self):
@@ -777,9 +775,9 @@ States can be toggled by clicking on the state button.  Expression states will u
                 # create the widget
                 widget = ui_common.JoystickDeviceWidget(device, visualization)
                 self.views.add_widget(widget)
-                self._lock.acquire()
+                #self._lock.acquire()
                 self._joystick_widgets[key] = widget
-                self._lock.release()
+                #self._lock.release()
                 widget.hook()
                 if visualization in (gremlin.types.VisualizationType.AxisCurrent, gremlin.types.VisualizationType.AxisTemporal):
                     widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Preferred)
@@ -800,9 +798,9 @@ States can be toggled by clicking on the state button.  Expression states will u
                 widget.unhook()
                 widget.setVisible(False)
                 widget.setParent(None)
-                self._lock.acquire()
+                #self._lock.acquire()
                 self.views.remove_widget(widget)
-                self._lock.release()
+                #self._lock.release()
                 widget.deleteLater()
 
         

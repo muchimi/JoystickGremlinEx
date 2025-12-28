@@ -322,6 +322,7 @@ class MouseController:
         """Starts the thread that will send motions when required."""
         if not self._is_running:
             self._thread = threading.Thread(target=self._control_loop, daemon=False)
+            self._thread.name = "MouseController"
             self._thread.start()
             syslog.info("MOUSE CONTROL: start")
 

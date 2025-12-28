@@ -511,7 +511,7 @@ class SwitchContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
                         self.switch_on_press = True
 
 
-    def latch_extra_inputs(self):
+    def latch_extra_inputs(self, container_condition_functors = None, action_condition_functors = None):
         ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
         latch_list = []
         data : SwitchData

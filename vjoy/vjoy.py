@@ -243,8 +243,8 @@ class Axis:
         :param value the position of the axis in the range [-1, 1]
         """
         
-        import gremlin.event_handler
-        from gremlin.input_types import InputType
+        # import gremlin.event_handler
+        # from gremlin.input_types import InputType
 
         # if self.axis_id == 3 and self.vjoy_id == 1 and p_value == 0.0:
         #     pass
@@ -669,10 +669,11 @@ class VJoy:
         return self._acquired
     
     def ensure_ownership(self):
-        # ensure runs on UI thread
-        gremlin.util.InvokeUiMethod(self._ensure_ownership_ui) # ui thread
+        # modified T140 based on profiling data - remove flip to UI thread
+        # # ensure runs on UI thread
+        # gremlin.util.InvokeUiMethod(self._ensure_ownership_ui) # ui thread
 
-    def _ensure_ownership_ui(self):
+    #def _ensure_ownership_ui(self):
         """Ensure this devices is still owned by the process.
 
         This object can only be constructed if it successfully acquires the
@@ -684,6 +685,12 @@ class VJoy:
         """
         if self.vjoy_id is None:
             return False
+        
+        # # new T140 - check to see if we alreayd own the vjoy device
+        # status : VJoyState = VJoyInterface.GetVJDStatus(self.vjoy_id)
+        # if status == VJoyState.Owned:
+        #     return True
+
         
         if self.pid != VJoyInterface.GetOwnerPid(self.vjoy_id):
             retry_count = 5

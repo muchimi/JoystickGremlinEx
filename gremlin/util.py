@@ -1924,6 +1924,8 @@ def assert_ui_thread():
         assert False,"call not on UI thread"
 
 
+
+
 def highlight_qcolor(color : QColor, factor : float = 1.1) -> QColor:
     '''
     computes a highlight color from a QT color object
