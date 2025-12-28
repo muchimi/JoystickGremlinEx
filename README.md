@@ -30,15 +30,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m76T142)
+
 - New: Calibration Dialog: bounds button to reset boundaries for auto-calibration.
-- New: Calibration Dialog: Calibrate button brings up a more classic calibration.
-- Change: Removed "modify profile" legacy menu entry as this feature has been (mostly) replaced with the templating function.
+- New: Calibration Dialog: Calibrate button brings up a more classic calibration dialog to set boundaries.
+- Change: Removed "modify profile" legacy menu entry as this feature has been (mostly) replaced with the templating function.  This is not a frequently used tool as evidenced by the exception not reported in about 2 years.
 - Change: Legacy Action Convert (tools menu) will now open the converted profile as a new, unsaved profile if any conversions take place.
- New: Gated Axis: Added an option to show/hide the filters/events area.
+- New: Gated Axis: Added an option to show/hide the filters/events area.
 - Fix: profile serialization error on functions that need to serialize the profile.
 - Fix: Gated Axis: Gated axis trigger still displays events when no filter is selected.
 - Fix: Calibration Dialog: auto-calibration updates.
- dialog in which to update movement bounds as an alternate method to auto-calibration.
 - Fix: Trigger Container: pass condition if no condition provided (was previously failing by default which is not the designed behavior).
 - Fix: Trigger Container: Added info box.
 - Fix: Config: exception if last device used no longer exists on profile load.
