@@ -107,7 +107,7 @@ class CodeRunner:
         ui.actionCreate1to1Mapping.setEnabled(enabled)
         # ui.actionMergeAxis.setEnabled(enabled)
         # ui.actionSwapDevices.setEnabled(enabled)
-        ui.actionModifyProfile.setEnabled(enabled)
+        # ui.actionModifyProfile.setEnabled(enabled)
         
 
 

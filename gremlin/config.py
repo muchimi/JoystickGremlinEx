@@ -1968,12 +1968,20 @@ class Configuration(QtCore.QObject):
             return (None, None, None)
         
         device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            # device not found
+            if return_mode:
+                return (None, None, None, None)
+            return (None, None, None)
+
         if verbose:        
             device_name = device.name
-       
+    
         mode = gremlin.shared_state.edit_mode # current mode
         dinput_device_guid = device.device_guid
         device_guid = device.device_id
+        
+
         
         data : dict = self._profile_data.get("last_input", {})
         if device_guid in data:
@@ -2919,3 +2927,19 @@ class Configuration(QtCore.QObject):
     @ai_tts_overwrite_filenames.setter
     def ai_tts_overwrite_filenames(self, value : str):
         self._set_data("ai_tts_overwrite_filenames", value)                
+
+    @property
+    def gated_axis_display_events(self) -> bool:
+        ''' option for the gated axis action to show or hide events '''
+        return self._get_data("gated_axis_display_events", True)
+    @gated_axis_display_events.setter
+    def gated_axis_display_events(self, value: bool):
+        self._set_data("gated_axis_display_events", value)
+
+    @property
+    def auto_calibrate(self) -> bool:
+        ''' option for auto calibration in the calibrate window '''
+        return self._get_data("auto_calibrate", True)
+    @auto_calibrate.setter
+    def auto_calibrate(self, value: bool):
+        self._set_data("auto_calibrate", value)

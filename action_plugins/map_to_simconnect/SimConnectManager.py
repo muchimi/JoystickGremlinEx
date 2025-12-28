@@ -699,7 +699,7 @@ class SimConnectManager(QtCore.QObject):
                 syslog.error(f"{err}\n{traceback.format_exc()}")
         if os.path.isfile(self._lvars_xml):
             self._lvars.clear()
-            parser = etree.XMLParser(remove_blank_text=True)
+            parser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
             tree = etree.parse(self._lvars_xml, parser)
             root = tree.getroot()
             for node in root.xpath("//command"):

@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin
 import gremlin.config
 import gremlin.joystick_handling
@@ -834,6 +834,119 @@ class CalibrationManager():
             callback(True)
 
 
+class CalibrationListenerWidget(QtWidgets.QFrame):
+    def __init__(
+            self,
+            device_guid,
+            input_id,
+            callback,
+            parent=None
+        ):
+        super().__init__(parent)
+
+        # Disable ui input selection on joystick input
+        gremlin.shared_state.push_suspend_highlighting()
+
+        self.device_guid = device_guid
+        self.input_id = input_id
+        self.callback = callback # called when the dialog closes
+
+        self.calibrationMin = 0
+        self.calibrationMax = 0
+
+        # Create and configure the ui overlay
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.addWidget(
+            QtWidgets.QLabel(f"""<center>Move the axis to its extreme positions.<br/><br/>Press a button or click Ok to accept.<br/>.Press Esc abort.</center>""")
+        )
+        
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
+        palette = QtGui.QPalette()
+        palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
+        self.setPalette(palette)
+
+        self.result = False
+
+        ok_widget = gremlin.ui.ui_common.Buttons.getOkWidget(callback = self._accept_ui)
+        self.main_layout.addWidget(ok_widget, alignment= QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        # capture the events
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self.joystick_event_handler)
+        el.keyboard_event.connect(self._kb_event_cb)
+
+        # capture the esc key
+
+    def _kb_event_cb(self, event):
+        ''' capture a key - esc'''
+        gremlin.util.InvokeUiMethod(self._kb_event_ui, event)
+
+
+
+
+    def accept(self):
+        gremlin.util.InvokeUiMethod(self._accept_ui)
+
+
+    def _accept_ui(self):
+        self.result = True
+        self.close()
+
+    def reject(self):
+        gremlin.util.InvokeUiMethod(self._reject_ui)
+
+    def _reject_ui(self):
+        self.result = False
+        self.close()
+
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        ''' called when dialog is closing '''
+        gremlin.shared_state.pop_suspend_highlighting()
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.disconnect(self.joystick_event_handler)
+        el.keyboard_event.disconnect(self._kb_event_cb)
+        if self.callback:
+            self.callback()
+        return super().closeEvent(event)
+    
+    def _kb_event_ui(self, event):
+        from gremlin.keyboard import key_from_code, key_from_name
+        key = key_from_code(
+                event.identifier[0],
+                event.identifier[1]
+        )
+        if event.is_pressed and key == key_from_name("esc"):   
+            self.reject()
+    
+    def joystick_event_handler(self, event):
+        
+        if event.device_guid != self.device_guid:
+            return
+        if not event.is_axis:
+            # see if a button was clicked
+            if not event.is_pressed:
+                return
+            if event.event_type == InputType.JoystickButton:
+                self.accept()
+            if event.event_type == InputType.JoystickHat:
+                if event.value != (0,0):
+                    # not centered
+                    self.accept()
+            return
+        
+        if event.identifier != self.input_id:
+            return
+        value = event.value
+        if value < self.calibrationMin:
+            self.calibrationMin = value
+        if value > self.calibrationMax:
+            self.calibrationMax = value
+
+         
+
 class CalibrationDialogEx(QtWidgets.QDialog):
     ''' gremlinex single input calibration window '''
 
@@ -853,6 +966,10 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         from gremlin.curve_handler import DeadzoneWidget
 
         self._lock = False
+        self._calibrating = False # true if calibrating 
+
+        config = gremlin.config.Configuration()
+        self._auto_calibrate = config.auto_calibrate
 
         self.setModal(True)
         self.input_item = input_item
@@ -899,14 +1016,21 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._inverted_widget.clicked.connect(self._inverted_changed)
 
 
-        self._calibrate_widget = QtWidgets.QPushButton("Calibrate")
-        self._calibrate_widget.setToolTip("Sets the calibration endpoints to center. After pressing this, move the input axis to its maximum travel positions to automatically set the calibration data.")
+        self._calibrate_widget = QtWidgets.QPushButton("Calibrate",)
+        self._calibrate_widget.setToolTip("Brings up the calibration dialog to calibrate the axis to its bounds.")
         self._calibrate_widget.clicked.connect(self._start_calibration)
 
-        self._auto_calibrate_widget = QtWidgets.QCheckBox("Auto Calibrate")
-        self._auto_calibrate_widget.setToolTip("If set, the axis will auto-calibrate to min/max travel as needed.")
-        self._auto_calibrate_widget.setChecked(True)
-        self._auto_calibrate_widget.clicked.connect(self._update_ui)
+        self._bounds_center_widget = QtWidgets.QPushButton("Bounds Center",)
+        self._bounds_center_widget.setToolTip("Sets the calibration endpoints to center. After pressing this, move the input axis to its maximum travel positions to automatically set the calibration data.")
+        self._bounds_center_widget.clicked.connect(self._bounds_center)
+
+        self._auto_calibrate_widget = gremlin.ui.ui_common.QDataCheckbox(
+            label = "Auto Calibrate",
+            value = self._auto_calibrate,
+            tooltip = "If set, the axis will auto-calibrate to min/max travel as needed as the input is moved.",
+            callback = self._auto_calibrate_changed,
+        )
+
 
 
         self._threshold_enabled_widget = QtWidgets.QCheckBox("Enable threshold")
@@ -931,6 +1055,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._options_container_repeater_layout.addWidget(self._inverted_widget)
         self._options_container_repeater_layout.addWidget(self._center_widget)
         self._options_container_repeater_layout.addWidget(self._calibrate_widget)
+        self._options_container_repeater_layout.addWidget(self._bounds_center_widget)
+        
         #self._options_container_repeater_layout.addWidget(self._reset_widget)
         self._options_container_repeater_layout.addWidget(self._auto_calibrate_widget)
 
@@ -1074,6 +1200,11 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         # initial value
         self._update_ui()
+    
+    def _auto_calibrate_changed(self, checked):
+        config = gremlin.config.Configuration()
+        config.auto_calibrate = checked
+        self._auto_calibrate = checked
         
 
     def _handle_close(self, widget):
@@ -1083,8 +1214,23 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         ''' handles a joystick axis event '''
         if self._lock:
             return
+        if self._calibrating:
+            # ignore while calibrating
+            return
         
         raw_value = event.value
+        if self._auto_calibrate:
+            changed = False
+            if raw_value < self.action_data.calibrated_min:
+                self.action_data.calibrated_min = raw_value
+                changed = True
+            if raw_value > self.action_data.calibrated_max:
+                self.action_data.calibrated_max = raw_value
+                changed = True
+            if changed:
+                self.action_data._update()
+                self._update_ui()
+            
         calibrated_value = self.action_data.getValue(raw_value, normalize = False)
         self._update_axis_widget_ui(
             raw_value,
@@ -1208,10 +1354,60 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     @QtCore.Slot()
     def _start_calibration(self):
         ''' resets the calibration data enpoints'''
-        self.action_data._calibrated_min = 0
-        self.action_data._calibrated_max = 0
+        if self._calibrating:
+            return
+        self._calibrating = True
+        # display a dialog box 
+
+        self._listen_ui()
+
+    @QtCore.Slot()
+    def _bounds_center(self):
+        ''' sets the calibration bounds to center to reset the auto calibration '''
+        self.action_data.calibrated_max = 0
+        self.action_data.calibrated_min = 0
         self.action_data._update()
         self._update_ui()
+
+
+    def _listen_ui(self, current_port_only = False):
+        ''' listens to an inbound OSC message - runs on UI thread'''
+
+        
+
+        gremlin.util.assert_ui_thread()
+        config = gremlin.config.Configuration()
+        device_guid = self.action_data.device_guid
+        input_type = InputType.JoystickAxis
+        input_id = self.action_data.input_id
+        self.calibrate_dialog = CalibrationListenerWidget(device_guid = device_guid, input_id = input_id, callback = self._capture_calibration)
+
+        # Display the dialog centered in the middle of the UI
+        root = self
+        while root.parent():
+            root = root.parent()
+        geom = root.geometry()
+
+        self.calibrate_dialog.setGeometry(
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
+            300,
+            150
+        )
+        self.calibrate_dialog.show()
+
+    def _capture_calibration(self):
+        result = self.calibrate_dialog.result
+        if result:
+            # accept calibration data 
+            self.action_data._calibrated_max = self.calibrate_dialog.calibrationMax
+            self.action_data._calibrated_min = self.calibrate_dialog.calibrationMin
+
+            self.action_data._update()
+            self._update_ui()
+
+        self._calibrating = False
+
 
     @QtCore.Slot(bool)
     def _threshold_enabled_changed(self, checked):

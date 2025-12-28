@@ -217,6 +217,27 @@ class BaseExecutionConditionNode(ExecutionGraphNode):
     def addCondition(self, condition):
         self.conditions.append(condition)
 
+    def execute(self, event, action_value, extra_data = None):
+        ''' executes the condition functors - true if the condition passed, false if it failed '''
+        
+        if self.functors:
+            for functor in self.functors:
+                result = functor.process_event(event, action_value, extra_data)
+                match self.rule:
+                    case gremlin.actions.ActivationRule.Any:
+                        if result:
+                            # succeed if any condition passes
+                            return True
+                    case gremlin.actions.ActivationRule.All:
+                        if not result:
+                            # any one condition failed failes the whole stack
+                            break
+            return result
+        # no functors = succeed
+        return True
+        
+                    
+
     def to_string(self):
         if self.conditions:
             stub = ""

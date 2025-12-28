@@ -1295,7 +1295,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.ui.actionOptions.setEnabled(enabled)
         self.ui.actionCreate1to1Mapping.setEnabled(enabled)
-        self.ui.actionModifyProfile.setEnabled(enabled)
+        # self.ui.actionModifyProfile.setEnabled(enabled)
         self.ui.menuRecent.setEnabled(enabled)
         # self.ui.actionSwapDevices.setEnabled(enabled)
         # self.ui.actionMergeAxis.setEnabled(enabled)
@@ -1709,7 +1709,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionOpenLogFile.triggered.connect(self.reveal_logfile)
         self.ui.actionOpenXmlProfile.triggered.connect(self.open_profile_xml)
         self.ui.actionOpenGremlinExFolder.triggered.connect(self.open_gremlinex_folder)
-        self.ui.actionModifyProfile.triggered.connect(self.profile_creator)
+        # self.ui.actionModifyProfile.triggered.connect(self.profile_creator)
         self.ui.actionExit.triggered.connect(self._force_close)
         # Actions
         self.ui.actionCreate1to1Mapping.triggered.connect(self._create_1to1_mapping)

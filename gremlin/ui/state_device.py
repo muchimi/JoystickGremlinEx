@@ -1495,7 +1495,7 @@ class StateData(QtCore.QObject):
             if not key in self._data:
                 return False
             
-            state : StateInputItemπ = self._data[key]
+            state  = self._data[key]
 
         else:
             state = key
@@ -1626,6 +1626,11 @@ class StateData(QtCore.QObject):
         node = sc.to_xml()
         root.append(node)
         return root
+    
+    def __deepcopy__(self, memo):
+        # deep copy returns self as this is a singleton object
+        return self
+
 
     def from_xml(self, root, data = None, extra_data = None):
         ''' reads saved data '''

@@ -1339,13 +1339,16 @@ class ProfileGraph():
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
                 syslog.info(f"{pre}{str(node)}")
 
-    def from_xml(self, source_xml : str, data = None):
+    def from_xml(self, source_xml : str, data = None, fname_is_xml : bool = False):
         ''' reads a profile from XML '''
         parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-        tree = etree.parse(source_xml, parser)
-        root = tree.getroot()
+        if fname_is_xml:
+            root = etree.fromstring(source_xml, parser)
+        else:
+            tree = etree.parse(source_xml, parser)
+            root = tree.getroot()
 
-        self._root = ProfileRootNode(source_xml) # root node
+        #self._root = ProfileRootNode(source_xml) # root node
         self._root.from_xml(root, data)
 
         self._source_xml = source_xml

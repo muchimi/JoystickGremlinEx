@@ -181,7 +181,8 @@ class ProfileConverter:
         if os.path.getsize(fname) == 0:
             return True
         try:
-            tree = etree.parse(fname)
+            parser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
+            tree = etree.parse(fname, parser)
             root = tree.getroot()
         except Exception as err:
             # error reading file
@@ -1386,7 +1387,7 @@ class ProfileConverter:
         return node
     
 
-    def convert_legacy(self, fname, convert_keyboard = True, convert_remap = True):
+    def convert_legacy(self, fname, convert_keyboard : bool = True, convert_remap : bool = True, save_legacy : bool = False):
         ''' converts legacy actions 
         
         remap -> vjoy remap
@@ -1396,17 +1397,19 @@ class ProfileConverter:
         import gremlin.ui.ui_common
 
         # backup
-        legacy_fname = gremlin.util.swap_ext(fname,".xml",suffix = "_legacy")
-        index = 1
-        while os.path.isfile(legacy_fname):
-            legacy_fname = gremlin.util.swap_ext(fname,".xml",suffix = f"_legacy_{index}")
-            index += 1
-        try:
-            shutil.copyfile(fname, legacy_fname)
-        except Exception as err:
-            syslog.error(f"Unable to write converted file: {fname}")
-            syslog.error(err)
-            return False
+        if save_legacy:
+            legacy_fname = gremlin.util.swap_ext(fname,".xml",suffix = "_legacy")
+            index = 1
+            while os.path.isfile(legacy_fname):
+                legacy_fname = gremlin.util.swap_ext(fname,".xml",suffix = f"_legacy_{index}")
+                index += 1
+            try:
+                shutil.copyfile(fname, legacy_fname)
+            except Exception as err:
+                syslog.error(f"Unable to write converted file: {fname}")
+                syslog.error(err)
+                return False
+        
 
 
 
@@ -1471,32 +1474,51 @@ class ProfileConverter:
         
         if not converted:
             # nothing converted, blitz the backup file
-            try:
-                os.unlink(legacy_fname)
-            except Exception as err:
-                syslog.error(f"Unable to remove backup file: {legacy_fname}")
-                syslog.error(err)
-                
+            if save_legacy:
+                try:
+                    os.unlink(legacy_fname)
+                except Exception as err:
+                    syslog.error(f"Unable to remove backup file: {legacy_fname}")
+                    syslog.error(err)
+            
             syslog.info("CONVERT: did not find any actions to convert")
             gremlin.ui.ui_common.MessageBox(title = "Conversion Results",
                 prompt = "No actions converted.")
 
         else:
+            # items were converted
+            if save_legacy:
+                target_fname = fname
+                syslog.info(f"\tSaved original profile to: {legacy_fname}")
+            else:
+                target_fname = gremlin.util.getTemporaryFile("xml")
             # save
             try:
                 tree = etree.ElementTree(root)
-                tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+                tree.write(target_fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
             except Exception as err:
                 syslog.error(f"Unable to write converted file: {fname}")
                 syslog.error(err)
                 return False
             syslog.info(f"CONVERT: converted {keyboard_count} keyboard actions and {remap_count} remap actions.")
-            syslog.info(f"\tSaved original profile to: {legacy_fname}")
+
 
             # output a message box
             gremlin.ui.ui_common.MessageBox(title = "Conversion Results",
                 prompt = f"Converted {keyboard_count} keyboard actions and {remap_count} remap actions.")
             
+            
+            el = gremlin.event_handler.EventListener()
+            
+
+            if save_legacy:
+                # cleanup temporary file used to load the profile as new
+                el.request_profile_reload.emit(target_fname, False)
+                        
+            else:
+                el.request_profile_reload.emit(target_fname, True)
+                os.unlink(target_fname)
+
 
         return converted
 

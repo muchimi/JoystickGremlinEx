@@ -169,8 +169,8 @@ class Ui_Gremlin(object):
         self.actionLogEdit.setObjectName("actionLogEdit")
         # self.actionMergeAxis = QtGui.QAction(main_window)
         # self.actionMergeAxis.setObjectName("actionMergeAxis")
-        self.actionModifyProfile = QtGui.QAction(main_window)
-        self.actionModifyProfile.setObjectName("actionModifyProfile")
+        # self.actionModifyProfile = QtGui.QAction(main_window)
+        # self.actionModifyProfile.setObjectName("actionModifyProfile")
         self.actionRecent = QtGui.QAction(main_window)
         self.actionRecent.setObjectName("actionRecent")
         self.actionEmpty = QtGui.QAction(main_window)
@@ -190,7 +190,7 @@ class Ui_Gremlin(object):
 
         self.actionConvertLegacy = QtGui.QAction(main_window)
         self.actionConvertLegacy.setText("Convert legacy actions")
-        self.actionConvertLegacy.setToolTip("Converts remap and keyboard actions to their current equivalents in GremlinEx")
+        self.actionConvertLegacy.setToolTip("Converts legacy Remap, Curve and Keyboard actions to their new equivalents in GremlinEx.\nReloads into a new profile.")
         self.actionConvertLegacy.triggered.connect(self._handle_convert_legacy)
 
 
@@ -220,8 +220,8 @@ class Ui_Gremlin(object):
         #self.menuFile.addSeparator()
         #self.menuFile.addAction(self.actionImportProfile)
        
-        self.menuFile.addSeparator()
-        self.menuFile.addAction(self.actionModifyProfile)
+        #self.menuFile.addSeparator()
+        #self.menuFile.addAction(self.actionModifyProfile)
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionExit)
 
@@ -303,9 +303,7 @@ class Ui_Gremlin(object):
         import gremlin.event_handler
         profile_converter = gremlin.profile.ProfileConverter()
         profile = gremlin.shared_state.current_profile
-        if profile_converter.convert_legacy(profile.profile_file):
-            el = gremlin.event_handler.EventListener()
-            el.request_reload.emit()
+        profile_converter.convert_legacy(profile.profile_file)
 
     def _handle_generate_tts(self):
         import gremlin.util
@@ -426,7 +424,7 @@ class Ui_Gremlin(object):
         self.actionLogDisplay.setText(_translate("GremlinEx", "&Log display"))
         self.actionLogEdit.setText(_translate("GremlinEx", "&Log display in editor"))
         #self.actionMergeAxis.setText(_translate("GremlinEx", "&Merge Axis"))
-        self.actionModifyProfile.setText(_translate("GremlinEx", "Modify Profile"))
+        #self.actionModifyProfile.setText(_translate("GremlinEx", "Modify Profile"))
         self.actionRecent.setText(_translate("GremlinEx", "&Recent"))
         self.actionEmpty.setText(_translate("GremlinEx", "Empty"))
         #self.actionSwapDevices.setText(_translate("GremlinEx", "Swap Devices"))

@@ -107,6 +107,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         super().__init__(parent)
         self._sort_lock = False
+        self._loaded = False
 
         self.id = gremlin.util.get_guid() # unique ID for this widget
 
@@ -114,6 +115,13 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._stack = [] # save stack for saved state
         self.setObjectName(f"{object_name} [{self.id}]" if object_name else f"GateAxisWidget: [{self.id}]")
         config = gremlin.config.Configuration()
+
+        # hook config changes
+        el = gremlin.event_handler.EventListener()
+        el.config_option_changed.connect(self._options_changed)
+        self._option_display_events = config.gated_axis_display_events
+		
+        
         self.verbose_ui = config.verbose_mode_ui
         self.verbose_extra = config.verbose_mode_extra
 
@@ -214,9 +222,20 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         # manual and grab value widgets
 
+        display_event_widget = gremlin.ui.ui_common.QDataCheckbox(
+            value = self._option_display_events,
+            callback = self._handle_display_event_changed,
+            tooltip = "Hide or show events",
+            label = "Show events"
+
+        )
+
+        display_event_container = gremlin.ui.ui_common.getHContainer(display_event_widget, bottom_margin = 6, widget_only=True)
 
         self._display_label_widget = QtWidgets.QLabel("Display Mode:")
-        self._display_mode_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
+        self._display_mode_widget = gremlin.ui.ui_common.QDataComboBox()
+        
+
         self._show_output_mode = show_output_mode
         if show_output_mode:
             self._display_mode_widget.addItem("Output range", userData = DisplayMode.Normal)
@@ -231,10 +250,12 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._display_mode_widget.setCurrentIndex(index)
         self._display_mode_widget.currentIndexChanged.connect(self._display_mode_changed_cb)
 
+        self._display_mode_widget.setWidthToContent()
+
         widgets = [
             self._configure_trigger_widget,
             self._display_label_widget,
-            self._display_mode_widget
+            self._display_mode_widget,
         ]
 
 
@@ -282,7 +303,10 @@ It is recommended to configure and finalize the general number of gates before a
 It is also possible to save existing mappings via action duplication to the same or different container, saving the mappings to templates or the clipboard before
 making changes that impact the order of gates or ranges."""
 
+
         warning_widget = gremlin.ui.ui_common.QInfoBox(text = msg, hide_key="gated_axis")
+
+        self.main_layout.addWidget(QtWidgets.QLabel())
         self.main_layout.addWidget(warning_widget)        
 
         row = 1
@@ -297,6 +321,8 @@ making changes that impact the order of gates or ranges."""
         widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget,row,0,1,-1)
         
+        row+=1
+        self.main_layout.addWidget(display_event_container,row,0,1,-1)
         row+=1
         self.main_layout.addWidget(self.container_options_widget,row,0,1,-1)
         row+=1
@@ -347,7 +373,28 @@ making changes that impact the order of gates or ranges."""
         # keyboard hook for undo key
         el = gremlin.event_handler.EventListener()
         el.keyboard_event.connect(self._keyboard_handler)
+
+        self._update_filter() # update filters based on current selection
+        self._update_event_ui()
+
  
+
+    def _handle_display_event_changed(self, checked):
+        config = gremlin.config.Configuration()
+        config.gated_axis_display_events = checked
+
+    def _update_event_ui(self):
+        visible = self._option_display_events
+        if Shiboken.isValid(self):
+            self.container_options_widget.setVisible(visible)
+            self.container_output_widget.setVisible(visible)
+
+    def _options_changed(self):
+        ''' options were changed '''
+        config = gremlin.config.Configuration()
+        self._option_display_events = config.gated_axis_display_events
+        self._update_event_ui()
+
 
     def _handle_display_mode_changed(self, display_mode):
         # update all ranges
@@ -602,6 +649,8 @@ making changes that impact the order of gates or ranges."""
             gh.slider_update_event.disconnect(self._handle_slider_update)
 
 
+            el = gremlin.event_handler.EventListener()
+            el.options_changed.disconnect(self._options_changed)
             self._hooked = False
             
 
@@ -799,6 +848,8 @@ making changes that impact the order of gates or ranges."""
     def _update_range_display(self):
         ''' called when the range display mode changes '''
         if not Shiboken.isValid(self):
+            return
+        if not self._option_display_events:
             return
         widgets = [self.get_range_widget(rwi) for rwi in self._rwi_map.keys()]
         widget : RangeWidgetInfo
@@ -1245,11 +1296,15 @@ making changes that impact the order of gates or ranges."""
         row = 0
         col = 0
         for _, trigger in enumerate(TriggerMode):
-            widget = gremlin.ui.ui_common.QDataCheckbox(TriggerMode.to_display_name(trigger), data = trigger)
             if not trigger in self._gate_data.filter_map.keys():
                 self._gate_data.filter_map[trigger] = True
-            widget.setChecked(self._gate_data.filter_map[trigger])
-            widget.clicked.connect(self._filter_cb)
+            widget = gremlin.ui.ui_common.QDataCheckbox(
+                label = TriggerMode.to_display_name(trigger),
+                data = trigger,
+                callbackEx = self._filter_cb,
+                value = self._gate_data.filter_map[trigger])
+            
+            
             self.container_filter_layout.addWidget(widget, row, col)
             col +=1
             if col > 5:
@@ -1279,19 +1334,28 @@ making changes that impact the order of gates or ranges."""
         ''' select all filter'''
         for widget in self._filter_widgets:
             widget.setChecked(True)
+        self._update_filter()
 
     @QtCore.Slot()
     def _clear_all_filters_cb(self):
         ''' clear all filters'''
         for widget in self._filter_widgets:
-            widget.setChecked(False)            
+            widget.setChecked(False)
+        self._update_filter()
 
+    def _update_filter(self):
+        filtered = False
+        for widget in self._filter_widgets:
+            if widget.isChecked():
+                filtered = True
+                break
+        self._is_filtered = filtered
 
     @QtCore.Slot(bool)
-    def _filter_cb(self, checked):
-        widget = self.sender()
+    def _filter_cb(self, widget, checked):
         trigger : TriggerMode = widget.data
         self._gate_data.filter_map[trigger] = checked
+        self._update_filter()
 
     def _create_output_ui(self):
         ''' creates the output line ui options '''
@@ -1574,12 +1638,16 @@ making changes that impact the order of gates or ranges."""
 
     def _handle_range_trigger_display(self):
         ''' updates the range trigger display '''
+        if not self._is_filtered or not self._option_display_events:
+            return # nothing to display 
         gremlin.util.InvokeUiMethod(self._handle_range_trigger_display_ui) # ensure UI thread
 
     def _handle_range_trigger_display_ui(self):
         ''' updates the range trigger display '''
         if not Shiboken.isValid(self):
             return
+        
+        
 
         self.output_range_trigger_widget.setPlainText(self._gate_data.trigger_range_text)
         # scroll to bottom
@@ -1588,6 +1656,8 @@ making changes that impact the order of gates or ranges."""
 
     def _handle_gate_trigger_display(self):
         ''' updates the gate trigger display'''
+        if not self._is_filtered or not self._option_display_events:
+            return # nothing to display 
         gremlin.util.InvokeUiMethod(self._handle_gate_trigger_display_ui) # ensure UI thread
 
     def _handle_gate_trigger_display_ui(self):

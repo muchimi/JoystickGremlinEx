@@ -574,7 +574,7 @@ class AbstractContainer(ProfileData, ConditionContainer):
             el.condition_state_changed.emit(self)
 
 
-
+    
 
 
 
@@ -3342,8 +3342,11 @@ class Profile():
 
     def __init__(self, parent = None):
         """Constructor creating a new instance."""
-        import gremlin.ui.state_device
+        
+        self.__sub_init__(parent)
 
+    def __sub_init__(self, parent):
+        import gremlin.ui.state_device
         self._mode_tree = None # holds the mode tree (anytree, m73 and later) - this holds the profile's mode hiarchy
         self.devices : dict[Device] = {} # holds devices attached to this profile
         self.vjoy_devices = {}
@@ -3377,6 +3380,30 @@ class Profile():
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         
         self.initialize_regular_devices() # non joystick devices
+
+
+    def __getstate__(self):
+        ''' serialization override '''
+        state = {}
+        state["xml"] = self.to_xml() # serialize to XML
+
+        return state
+
+    def __setstate__(self, state):
+        ''' serialization override '''
+        self.__sub_init__(None)
+        xml = state["xml"]
+        # write the xml to a temporary file in case it has to be converted formats
+        tmp = gremlin.util.getTemporaryFile("xml")
+        with open(tmp,"wb") as f:
+            f.write(xml)
+
+        self.from_xml(tmp)
+        self._profile_fname = None
+        os.unlink(tmp)
+   
+        
+        
 
     def unload(self):
         ''' unloads the current profile - clears all references and unhooks events '''
@@ -4569,7 +4596,7 @@ class Profile():
             return modes[0]
 
 
-    def from_xml(self, fname, data = None, extra_data = None):
+    def from_xml(self, fname, data = None, extra_data = None, fname_is_xml : bool = False):
         """Parses the profile XML document into the profile data structure.
 
         :param fname the path to the XML file to parse
@@ -4578,17 +4605,20 @@ class Profile():
         verbose = gremlin.config.Configuration().verbose
         import_data = ProfileImportData()
         import_data.used_ids = {} # reset used list
-
-
-        profile_converter = gremlin.profile.ProfileConverter()
         profile_was_updated = False
-        if not profile_converter.is_current(fname):
-            syslog.warning("Outdated profile, converting")
-            profile_converter.convert_profile(fname)
-            profile_was_updated = True
 
-        tree = etree.parse(fname)
-        root = tree.getroot()
+        if fname_is_xml:
+            # fname is an xml stream
+            root = etree.fromstring(fname)
+        else:
+            profile_converter = gremlin.profile.ProfileConverter()
+            
+            if not profile_converter.is_current(fname):
+                syslog.warning("Outdated profile, converting")
+                profile_converter.convert_profile(fname)
+                profile_was_updated = True
+            tree = etree.parse(fname)   
+            root = tree.getroot()
 
         self._start_mode = None
         if "start_mode" in root.attrib:
@@ -4758,10 +4788,12 @@ class Profile():
             # use a default mode
             self._start_mode = self.get_default_mode()
 
-        self._profile_fname = gremlin.util.fix_path(fname)
-
-        name, _ = os.path.splitext(os.path.basename(fname))
-        self._profile_name = name
+        if  fname_is_xml:
+            self._profile_fname = None
+        else:
+            self._profile_fname = gremlin.util.fix_path(fname)
+            name, _ = os.path.splitext(os.path.basename(fname))
+            self._profile_name = name
 
         # update missing modes from devices
         for device in self.devices.values():
@@ -4814,7 +4846,7 @@ class Profile():
 
         # load the profile graph
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
-        self._profile_graph.from_xml(fname)
+        self._profile_graph.from_xml(fname, fname_is_xml = fname_is_xml)
 
 
 

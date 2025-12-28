@@ -76,6 +76,16 @@ class TriggerContainerWidget(AbstractContainerWidget):
         ]
         delay_container = gremlin.ui.ui_common.getHContainer(widgets,"Trigger delay (s):", widget_only=True, left_margin = 12)
 
+
+        msg = '''This container will execute the contained actions on input trigger if the defined condition succeeds.
+If the condition fails when the timer lapses, the actions will not be executed.
+If there is no condition defined, the condition will succeeed and the actions will executed.
+If the timer is set to 0, the actions get executed immediately if the condition passes (or is not set)
+'''
+
+        info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key = "TriggerContainer")
+        self.action_layout.addWidget(info_widget)
+
         self.action_layout.addWidget(QtWidgets.QLabel("Trigger Configuration:"))
         self.action_layout.addWidget(delay_container)
 
@@ -300,30 +310,34 @@ class TriggerContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor
         )
         
         # evaluate the conditions
-        
-        if self.verbose_condition: 
-            syslog.info("TRIGGER CONTAINER: evaluate conditions:")
-        for condition in self.conditions:
-            result = condition.process_event(event, True)
-            if self.verbose_condition:
-                gremlin.shared_state.pushLog()
-                logTabs = gremlin.shared_state.logTabs(True)
-                condition_name = condition.condition_name()
-                if isinstance(condition, gremlin.actions.ActivationCondition):
-                    syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
-                elif isinstance(condition, gremlin.actions.AbstractCondition):
-                    syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}") 
-                gremlin.shared_state.popLog()
+    
+        result = True
+        if self.conditions:
+            for condition in self.conditions:
+                result = condition.process_event(event, True)
+                if self.verbose_condition:
+                    gremlin.shared_state.pushLog()
+                    logTabs = gremlin.shared_state.logTabs(True)
+                    condition_name = condition.condition_name()
+                    if isinstance(condition, gremlin.actions.ActivationCondition):
+                        syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                    elif isinstance(condition, gremlin.actions.AbstractCondition):
+                        syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}") 
+                    gremlin.shared_state.popLog()
 
-            match self.rule:
-                case gremlin.actions.ActivationRule.Any:
-                    if result:
-                        # one condition succeeded
-                        break
-                case gremlin.actions.ActivationRule.All:
-                    if not result:
-                        # any one condition failed failes the whole stack
-                        break
+                match self.rule:
+                    case gremlin.actions.ActivationRule.Any:
+                        if result:
+                            # one condition succeeded
+                            break
+                    case gremlin.actions.ActivationRule.All:
+                        if not result:
+                            # any one condition failed failes the whole stack
+                            break
+
+    
+        if self.verbose: 
+            syslog.info(f"TRIGGER CONTAINER: evaluate conditions: {'PASS' if result else 'FAIL'}")
 
         if result:
             # conditions succeeded - run the functors 

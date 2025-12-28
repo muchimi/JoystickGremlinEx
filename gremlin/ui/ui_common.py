@@ -4095,10 +4095,12 @@ class QDataLabel(QtWidgets.QLabel):
 
 class QDataCheckbox(QtWidgets.QCheckBox):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, label : str = None, data = None, callback = None, value : bool = None, tooltip = None, parent = None):
+    def __init__(self, label : str = None, data = None, callback = None, callbackEx = None, value : bool = None, tooltip = None, parent = None):
         '''
         :param text: the label (optional, recommended)
         :param data: the data tracked by this control (optional)
+        :param callback: the callback to call (checked)
+        :param callbackEx: the extended callback to call (widget, checked)
         :param value: default value (optional)
         :param tooltip: tooltip to display (optional)
         :param parent: parent widget (optional)
@@ -4109,18 +4111,20 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self._ignore_keyboard = False
         self.installEventFilter(self)
         self._callback = callback
-
+        self._callbackEx = callbackEx
         if value:
             self.setChecked(value)
-        if callback:
-            self.clicked.connect(self._handle_clicked)
+        self.stateChanged.connect(self._handle_clicked)
         if tooltip:
             self.setToolTip(tooltip)
-            
 
     def _handle_clicked(self):
+        checked = self.isChecked()
         if self._callback:
-            self._callback(self.isChecked())
+            self._callback(checked)
+        if self._callbackEx:
+            self._callbackEx(self, checked)
+        
 
     @property
     def data(self):
@@ -4515,6 +4519,17 @@ class QDataComboBox(QComboBox):
     @data.setter
     def data(self, value):
         self._data = value
+
+    def setWidthToContent(self):
+        ''' updates the width of the combo box to its contents '''
+        count = 0
+        for i in range(self.count()):
+            item_text = self.itemText(i)
+            count = max(count, len(item_text))
+
+        width = get_char_width(count + 4)
+        self.setMaximumWidth(width)
+    
 
 class QLimitedComboBox(QDataComboBox):
     ''' a row limited combo box '''
@@ -10025,6 +10040,8 @@ def getHContainer(widget_or_list = None,
                   font = None,
                   left_margin = 0,
                   right_margin = 0,
+                  top_margin = 0,
+                  bottom_margin = 0,
                   no_stretch = False,
                   widget_only = False,
                   align_top = False):
@@ -10045,7 +10062,7 @@ def getHContainer(widget_or_list = None,
     '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QHBoxLayout(widget)
-    widget.setContentsMargins(left_margin,0,right_margin,0)
+    widget.setContentsMargins(left_margin, top_margin, right_margin, bottom_margin)
     layout.setContentsMargins(0,0,0,0)
 
     stretch = False if no_stretch else left_stretch
@@ -11824,6 +11841,7 @@ class QInfoBox(QtWidgets.QFrame):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self._label_widget = QAutoResizingTextEdit()
         self._label_widget.setReadOnly(True)
+        self._hide_key = hide_key
         css = Color.cssInfoBox()
         if hide_key:
             

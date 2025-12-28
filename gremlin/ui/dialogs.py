@@ -1533,7 +1533,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.convert_vjoy_remap_widget = QtWidgets.QCheckBox("Convert legacy Remap")
         self.convert_vjoy_remap_widget.clicked.connect(self._convert_vjoy_remap)
         self.convert_vjoy_remap_widget.setChecked(self.config.convert_vjoy_remap)
-        self.convert_vjoy_remap_widget.setToolTip("When set, Remap actions will convert to Map To Vjoy when GremlinEx starts.")
+        self.convert_vjoy_remap_widget.setToolTip("When set, Remap actions will convert to Map To Vjoy when GremlinEx starts.\nThis will load a new, unsaved profile with the converted actions.")
 
         # Activate profile on launch
         self.convert_response_curve_widget = QtWidgets.QCheckBox("Convert legacy Response Curve")

@@ -4586,37 +4586,16 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     # check for condition applied to container
                     if self._latched_container_condition_node:
                         node = self._latched_container_condition_node
-                        if not hasattr(node,"rule"):
-                            node.rule = gremlin.actions.ActivationRule.All
-
-                        for functor in node.functors:
-                            result = functor.process_event(event, action_value, extra_data)
-                            match node.rule:
-                                case gremlin.actions.ActivationRule.Any:
-                                    if result:
-                                        # one condition succeeded
-                                        break
-                                case gremlin.actions.ActivationRule.All:
-                                    if not result:
-                                        # any one condition failed failes the whole stack
-                                        return True
-                      
-                    
+                        result = node.execute(event, action_value, extra_data)
+                        if not result:
+                            return True # condition failed but functor is ok
+                                 
                     # check for condition applied to this action
                     if self._latched_action_condition_node:
                         node = self._latched_action_condition_node
-                        for functor in node.functors:
-                            result = functor.process_event(event, action_value, extra_data)
-                            match node.rule:
-                                case gremlin.actions.ActivationRule.Any:
-                                    if result:
-                                        # one condition succeeded
-                                        break
-                                case gremlin.actions.ActivationRule.All:
-                                    if not result:
-                                        # any one condition failed failes the whole stack
-                                        return True
-                       
+                        result = node.execute(event, action_value, extra_data)
+                        if not result:
+                            return True # condition failed but functor is ok
            
             if event.is_repeater:
                 # use the repeater value
