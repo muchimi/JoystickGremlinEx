@@ -456,7 +456,7 @@ class ExecutionContext():
         el.profile_loaded.connect(self._handle_profile_load) # reload data on profile load
         el.config_option_changed.connect(self._handle_config_changed)
 
-   
+        
         self._functors = []
         self._reset()
 
@@ -469,7 +469,7 @@ class ExecutionContext():
         self._verbose_condition = config.verbose_mode_condition
 
     def _reset(self):
-
+        self._is_built = False # true if the context was rebuilt since the last profile stop
         self._mode_tree = None
         self._mode_ancestors = {}  # map of mode branches by mode
         self._mode_descendants = {} # map of mode children by mode
@@ -576,18 +576,33 @@ class ExecutionContext():
         pass
 
     def _rebuild(self):
+
+        if self._is_built and self._node_map:
+            return # already built
         
         verbose = gremlin.config.Configuration().verbose_mode_exec
+        verbose = True
         if verbose: syslog.info("CONTEXT: rebuild")
         
         self.used_items = {}  # nodes can only be used once
         self._build_error = False # true if a build error occurred
-        self._build_execution_tree()
+        result = self._build_execution_tree()
         assert len(self.graph.children) > 0
 
-        # tell the ui the execution context changed
-        el = gremlin.event_handler.EventListener()
-        el.execution_context_changed.emit()
+        self._is_built = result
+        if verbose: syslog.info(f"CONTEXT: rebuild {'Ok' if result else 'Failed'}")
+
+        if result:
+            # tell the ui the execution context changed
+            el = gremlin.event_handler.EventListener()
+            el.execution_context_changed.emit()
+        else:
+            # reset data
+            self._functor_map.clear() 
+            self._node_map.clear()
+            self._exec_map.clear()
+        
+
 
     def getLastBuildError(self) -> bool:
         ''' true if build errored out'''
@@ -595,14 +610,12 @@ class ExecutionContext():
             
 
     def _profile_start(self):
-        # ''' profile start - rebuild the execution tree '''
-        # verbose = gremlin.config.Configuration().verbose_mode_exec
-        # if verbose: syslog.info("CONTEXT: rebuild on profile start")
-        # self._rebuild()
+        ''' profile start - rebuild the execution tree '''
+        verbose = gremlin.config.Configuration().verbose_mode_exec
+        if verbose: syslog.info("CONTEXT: rebuild on profile start")
+        self._rebuild()
         
-        # update debug vars on start
-        pass
-
+    
 
     def _profile_hook(self):
         ''' hook phase - before profile start occurs '''
@@ -625,7 +638,7 @@ class ExecutionContext():
         config = gremlin.config.Configuration() 
         if config.verbose: syslog.info(f"CONTEXT: profile stopped {len(self._functors):,} functors")
 
-
+        self._is_built = False # rebuild for next time
 
     def _walk_mode_tree(self, node, branch):
         ''' walks a mode tree manually to build the mode hierarchy (recursive)'''
@@ -1514,7 +1527,7 @@ class ExecutionContext():
         self._functor_map.clear() # map of functor ID to functors
         self._node_map.clear()
         self._exec_map.clear() # map of node id to the node's execution entry node
-        verbose = gremlin.config.Configuration().verbose_mode_execution
+        verbose = gremlin.config.Configuration().verbose_mode_exec
         mode_source = gremlin.shared_state.current_profile.traverse_mode()
         mode_source.sort(key = lambda x: x[0]) # sort parent to child
         mode_list = [mode for (_,mode) in mode_source if mode] # parent mode first
@@ -1533,7 +1546,7 @@ class ExecutionContext():
             mode_nodes[mode] = mode_item
         
         mode_tree = gremlin.shared_state.current_profile.modeTree()
-        gremlin.shared_state.current_profile.dumpModeTree()
+        if verbose: gremlin.shared_state.current_profile.dumpModeTree()
         tree_nodes = {}
         for node in anytree.PreOrderIter(mode_tree):
             mode_name = node.name

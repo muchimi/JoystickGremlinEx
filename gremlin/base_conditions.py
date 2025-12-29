@@ -746,15 +746,27 @@ class AbstractSelfTriggerFunctor(AbstractTriggerFunctor):
     def profile_started(self):
         super().profile_started()
         self._ec = gremlin.execution_graph.ExecutionContext()
-        container_node = self._ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
+        self.container_node = self._ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
 
-        if not container_node:
+        if not self.container_node:
             syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
             self._valid = False
             return
         
-        group_node = container_node.children[0] # group node is the only child of the container node
-        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
+        if self.container_node.nodeType != gremlin.execution_graph.ExecutionGraphNodeType.Container:
+            syslog.error(f"Invalid container node type: [{self.container_node.nodeType.name}] found.  Expected [Container]")
+            self._valid = False
+            return
+
+        
+        if not self.container_node.children:
+            syslog.error("Unable to find container group node for action in execution context.")
+            self.action_set_nodes = []
+            self._valid = False
+            return
+
+        group_node = self.container_node.children[0] # group node is the only child of the container node
+        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set and node.has_actions]
 
         self._valid = True
 

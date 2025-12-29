@@ -684,9 +684,13 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         
         ec = gremlin.execution_graph.ExecutionContext()
         container_node = ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
+        if not container_node:
+            # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
+            syslog.error(f"TEMPOEX: Disabled: Unable to find the container in the execution tree: [{str(self.action_data)}] - missing container ID: [{self.action_data.id}]")
+            self.valid = False
 
-        if self.verbose:
-            syslog.info("TEMPOEX configuration:")
+        if self.verbose or not self.valid:
+            syslog.info("TEMPOEX: Configuration:")
             syslog.info(f"\tContainer ID: {self.action_data.id}")
             input_item : gremlin.base_profile.InputItem = self.action_data._input_item
             syslog.info(f"\tAttached input: {input_item.display_name}")
@@ -702,11 +706,16 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
             syslog.info(f"\tDtap action sets: {len(self.action_data.double_action_sets)}")
             self.action_data.dumpActionSets(self.action_data.double_action_sets,"Dtap Action Set")
 
-        if not container_node:
-            # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
-            syslog.error(f"Unable to find a container in the execution tree: {str(self.action_data)} - missing container ID: [{self.action_data.id}]")
+ 
+        if not self.valid:
+            return
+        
+        if not container_node.children:
+            # this indicates a build or configuration error
+            syslog.warning(f"TEMPOEX: Disabled: The container node has no children: [{str(self.action_data)}] ")
             self.valid = False
             return
+        
         
         assert container_node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container,"Logic error: Node is not a container node"
 
