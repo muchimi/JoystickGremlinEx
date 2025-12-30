@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T144)
+- Fix: Adjusted event dispatcher start/stop logic to avoid starting twice.
+
 ### (m76T143)
 - Change: TempoEx: additional checks and instrumentation on TempoEx profile start to validate configuration/setup and output additional information if TempoEx fails on profile start.
 - Change: add an execution tree rebuild step on profile start after a profile stop to ensure tree rebuild on profile changes/updates between runs.

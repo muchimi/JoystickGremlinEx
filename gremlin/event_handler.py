@@ -4065,6 +4065,7 @@ class JoystickEventProcessor():
 		self._count = 0 # number of items in the fire queue
 		self._callback_count = 0 # number of registered callbacks
 		self._event_thread =  None
+		self._started = False
 		self._is_running = gremlin.shared_state.is_running
 		el = EventListener()
 		el.shutdown.connect(self.handle_shutdown)
@@ -4207,25 +4208,24 @@ class JoystickEventProcessor():
 		
 
 	def stop(self):
-		if self._event_thread:
-			el = EventListener()
-			el.joystick_event.disconnect(self.queueJoystickEvent)
-			if self._event_thread.is_alive():
-				self._event_thread.stop()
-				self._event_thread.join()
-				syslog.info("DISPATCH: shutdown")
-			self._event_thread = None
-
-			if self._ui_event_thread.is_alive():
-				self._ui_event_thread.stop()
-				self._ui_event_thread.join()
-				syslog.info("UI DISPATCH: shutdown")
-			self._ui_event_thread = None
+		''' stop the dispatch thread if started'''
+		if self._started:
+			with self._lock:
+				if self._event_thread:
+					el = EventListener()
+					el.joystick_event.disconnect(self.queueJoystickEvent)
+					if self._event_thread.is_alive():
+						self._event_thread.stop()
+						self._event_thread.join()
+						syslog.info("DISPATCH: shutdown")
+					self._event_thread = None
+					self._started = False
+			
 
 			
 
 	def start(self):
-		
+		''' start the dispatch thread if stopped '''
 		if not self._event_thread:
 			el = EventListener()
 			el.joystick_event.connect(self.queueJoystickEvent)
@@ -4237,10 +4237,12 @@ class JoystickEventProcessor():
 			self._ui_event_thread = gremlin.threading.AbortableThreadX(target = self._ui_event_runner)
 			self._ui_event_thread.name = "UIJoystickEventProcessor"
 
-		if not self._event_thread.is_alive():
-			self._event_thread.start()
-			self._ui_event_thread.start()
-			syslog.info("DISPATCH: start")
+			if not self._started:
+				with self._lock:
+					self._started = True
+					self._event_thread.start()
+					self._ui_event_thread.start()
+					syslog.info("DISPATCH: start")
 
 
 	def queueJoystickEvent(self, event):
