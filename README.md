@@ -31,6 +31,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 ### (m76T144)
 - Fix: Adjusted event dispatcher start/stop logic to avoid starting twice.
+- Fix: Input Viewer: keyboard and state selection persistence was being reset on close.
 
 ### (m76T143)
 - Change: TempoEx: additional checks and instrumentation on TempoEx profile start to validate configuration/setup and output additional information if TempoEx fails on profile start.

@@ -4112,7 +4112,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self.installEventFilter(self)
         self._callback = callback
         self._callbackEx = callbackEx
-        if value:
+        if value is not None:
             self.setChecked(value)
         self.stateChanged.connect(self._handle_clicked)
         if tooltip:

@@ -708,21 +708,6 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         self._joystick_widgets.clear()
 
-        
-        # update the keyboard and state checkboxes
-        self._toggle_keyboard_widget(False)
-        self._toggle_state_widget(False)
-
-        # checked = False
-        # with QtCore.QSignalBlocker(self.keyboard_widget_selector):
-        #     self.keyboard_widget_selector.setChecked(checked)
-
-        # with QtCore.QSignalBlocker(self.state_widget_selector):
-        #     self.state_widget_selector.setChecked(checked)
-
-        # config = VisualizationConfig()
-        # config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, checked)
-        # config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, checked)
 
         self.views.clear()
  
@@ -895,7 +880,8 @@ States can be toggled by clicking on the state button.  Expression states will u
                 i+=1
             
         else:
-            layout.addWidget(QtWidgets.QLabel("No states found."))
+            widget = gremlin.ui.ui_common.QWarningWidget("No states found.")
+            layout.addWidget(widget)
 
     def showKeyboard(self):
         ''' keyboard device '''
@@ -1060,6 +1046,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._state_visible  = checked
         config = VisualizationConfig()
         config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, checked)
+
+        checked = config.getValue(gremlin.shared_state.state_tab_guid, VisualizationType.State)
+        syslog.info(f"state set to : {checked}")
 
     @QtCore.Slot(bool)
     def _toggle_combine_button_hat(self, checked):
