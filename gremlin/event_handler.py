@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1958,7 +1958,8 @@ class EventListener:
 		new_value = calibration.getValue(value, filter = filter)
 		if verbose:
 			device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-			syslog.info(f"CALIBRATION: filter: device: [{device.name}] id: [{device_guid}] filter: [{filter}] in: {value:0.3f} out: {new_value[0]:0.3f}") 
+			nv = new_value[0] if hasattr(new_value,"__iter__") else new_value
+			syslog.info(f"CALIBRATION: filter: device: [{device.name}] id: [{device_guid}] filter: [{filter}] in: {value:0.3f} out: {nv:0.3f}") 
 
 		return new_value
 
@@ -4106,7 +4107,7 @@ class JoystickEventProcessor():
 		self.reset()
 
 	def profile_loaded(self):
-		# resume processing after while loading a profile
+		# ensure started after while loading a profile
 		self.start()
 
 	def getCallbackKey(self, device_guid, input_type, input_id):

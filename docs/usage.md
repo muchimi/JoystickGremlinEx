@@ -123,6 +123,23 @@ The simplest container is called the basic container, which is the default.  Con
 
 Some containers (like range) have similar, but not identical functionality to some actions.
 
+
+| Container | Description | Typical Use-Case |
+| ----------- | ----------- | ----------- |
+| Basic | The basic container is a container for one or more actions.  This is the simplest container.  All actions in GEX have to be in a container, and this is the simplest container that can be used. | This is the default container when adding a new action to an input and the most common.  Note that adding an action to an input automatically puts it in the basic container if no container exists. |
+| Button | This container has two sets of actions, one for when a button is pressed, the other for when a button is released. | This container is best used with input that behave like buttons if a different action has to be executed on button press or release. |
+| Chain | This container executes actions in the order the appear in stepped mode.  Every input trigger advances one step.  When the last action is executed, it wraps around. This container should not contain a mode change action. | This container is used for example to trigger state changes in sequence.   |
+| Delay Trigger | This container executes one or more actions in the future.  The action will execute even on mode change.  Conditions applied to the container are evaluated at the scheduled time.  If the container is retriggered, the clock is reset and the delay starts again. |  This container is best used when combined with conditions, so execute this after several seconds have lapsed unless the condition changed. |
+| Double Tap | Similar to the Button container, this adds the ability to detect a rapid double press of the input. | Similar to a mouse double click, this applies to a keyboard or button double pressed quickly. |
+| Sequence | This container lets GEX actions to be used as a macro.  All actions will be executed, one after the other in the order they appear.  The container can also randomize these actions and randomize the delay between action executions. This container should not contain a mode change action. | This is the container equivalent of macros, and because actions have more functionality than the action macro, can be used to create very complex macros superseding the capabilities of the macro action. |
+| Smart Toggle | This container is used to toggle an output based on the short or long press of the input.  A short press pulses the output.  A long press causes the output to be toggled on. | Used for "sticky" output for keyboard or joystick buttons based on a quick toggle, or a hold function.  This container should not contain a mode change action. |
+| Switch | This container is designed to support two way and three way hardware switches. | This container simplifies the mapping of actions to hardware buttons that only trigger in specific positions such as on, but not off.  The container makes it easy to do these mapping without having to use conditions, or to detect input state changes. |
+| State | This container is similar to the basic container however only executes the contained actions after checking a profile state (on or off). | This container eliminates the need to apply a state condition to a container and can be used to run differnt groups of actions based on a state, and without using performance intensive mode context switches.  Use one container for each group of actions.  Expression states can be used to combine multiple states if needed if multiple states are involved (for example A and B, A and B and C, A or B, B and not D, etc.).  Referencing an expression state for this container makes this a very powerful way to group actions that should only execute based on multiple states and increases the readability of the profile while making it simpler to create. |
+| Tempo | This is a container that performs actions on short press, or long press. | This is a legacy container for compatibiliy with older profiles. |
+| TempoEx | This is a container that defines separate actions for short press, long press our double click of the input.  This container does not work for actions that require a release trigger at the onset. | Use this container instead of Tempo although both work pretty much the same. |
+
+
+
 ### Actions
 
 Actions are specific entities that actually produce output.  Actions are contained by containers.

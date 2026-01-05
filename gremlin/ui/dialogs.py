@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -3895,6 +3895,8 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             script += f"\n# decorators for mode {mode_name}\n"
             for line in a_map[mode_name]:
                 script += line + "\n"
+
+        
 
         # set the clipboard data
         clipboard = Clipboard()

@@ -30,12 +30,20 @@ import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_conditions import AbstractFunctor
 from shiboken6 import Shiboken
+from gremlin.util import safe_format, safe_read
 import logging
+from PySide6 import QtCore, QtGui, QtWidgets
+import gremlin.ui.state_device
 
 syslog = logging.getLogger("system")
-class BasicContainerWidget(AbstractContainerWidget):
+class StateContainerWidget(AbstractContainerWidget):
 
-    """Basic container which holds a single action."""
+    """
+    State container which holds one or more actions conditions by a state.
+    Actions in the container execute if a particular state is set, or not set depending on the options.
+    This avoids the need to setup a condition checking for a state on a particular group of actions or container.
+
+    """
 
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.
@@ -44,7 +52,7 @@ class BasicContainerWidget(AbstractContainerWidget):
         :param parent the parent of this widget
         """
         super().__init__(profile_data, parent)
-
+        
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -52,7 +60,37 @@ class BasicContainerWidget(AbstractContainerWidget):
             return
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if verbose_ui: syslog.info("BasicContainerWidget: create action UI start")
+        if verbose_ui: syslog.info("StateContainerWidget: create action UI start")
+        
+
+        self.state_selector_widget = gremlin.ui.ui_common.QComboBox()
+        self.state_selector_widget.currentIndexChanged.connect(self._handle_state_changed)
+        widgets = ["State:", self.state_selector_widget]
+        widget = gremlin.ui.ui_common.getGridContainer(widgets, widget_only=True)
+        self.action_layout.addWidget(widget)
+        w1 = widget
+
+        self.state_description_widget = QtWidgets.QLabel()
+        widgets = ["Description:", self.state_description_widget]
+        widget = gremlin.ui.ui_common.getGridContainer(widgets, widget_only=True)
+        w2 = widget
+        
+        widgets = []
+        rb = gremlin.ui.ui_common.QDataRadioButton(value = self.container.required_value, label = "On/Pressed", data = True, callbackEx = self._handle_execute_changed,
+                                                   tooltip = "The container actions execute if the state exists and is on/pressed." )
+        widgets.append(rb)
+        rb = gremlin.ui.ui_common.QDataRadioButton(value = not self.container.required_value, label = "Off/Released", data = False, callbackEx = self._handle_execute_changed,
+                                                   tooltip = "The container actions execute if the state exists and is off/released." )
+        widgets.append(rb)
+        rb = gremlin.ui.ui_common.QDataRadioButton(value = not self.container.required_value, label = "Any value", data = None, callbackEx = self._handle_execute_changed,
+                                                   tooltip = "The container actions execute if the state exists and is either on/pressed or off/released." )
+        widgets.append(rb)
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = gremlin.ui.ui_common.getGridContainer(["Execute when state is:",widget], widget_only=True)
+        self.action_layout.addWidget(widget)
+        w3 = widget
+        
+
         has_actions = False
         for action_set in self.profile_data.action_sets:
             if action_set:
@@ -66,7 +104,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             self.profile_data.create_or_delete_virtual_button()
             widget = self._create_action_set_widget(
                 action_sets[0],
-                "Basic",
+                "State",
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
 
@@ -91,13 +129,58 @@ class BasicContainerWidget(AbstractContainerWidget):
 
             self.action_layout.addWidget(action_selector)
 
-        if verbose_ui: syslog.info("BasicContainerWidget: create action UI completed")
+
+        self.populate_selector()
+
+        gremlin.ui.ui_common.synchronize_grids([w1, w2, w3]) 
+
+        if verbose_ui: syslog.info("StateContainerWidget: create action UI completed")
+
+    def _handle_execute_changed(self, widget, checked : bool):
+        if checked:
+            self.container.required_value = widget.data
+    
+    def _handle_state_changed(self):
+        self.container.state = self.state_selector_widget.currentText()
+        data = self.state_selector_widget.currentData()
+        if data:
+            description = data.description
+        else:
+            description = "No state selected"
+        self.setDescription(description)
+
+    def setDescription(self, value):
+        self.state_description_widget.setText(value if value else "n/a")
+
+
+    def populate_selector(self):
+        ''' updates the available states '''
+        with QtCore.QSignalBlocker(self.state_selector_widget):
+            self.state_selector_widget.clear()
+            sd = gremlin.ui.state_device.StateData()
+            # add a not set value
+            self.state_selector_widget.addItem("[Not Set]", None)
+            for key, data in sd.getStates().items():
+                self.state_selector_widget.addItem(key, data)
+        
+            key = self.container.state
+            if key:
+                index = self.state_selector_widget.findText(key)
+                if index >= 0:
+                    self.state_selector_widget.setCurrentIndex(index)
+            
+                data = self.state_selector_widget.currentData()
+                description = data.description
+            else:
+                description = "No state selected"
+
+            self.setDescription(description)        
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
-                "Basic",
+                "State",
                 gremlin.ui.ui_common.ContainerViewTypes.Conditions
             )
             self.activation_condition_layout.addWidget(widget)
@@ -160,7 +243,7 @@ class BasicContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
-        title = "Basic: "
+        title = "State: "
         if len(self.profile_data.action_sets) > 0:
             stub =  ", ".join(a.name for a in self.profile_data.action_sets[0])
             title += stub
@@ -168,13 +251,18 @@ class BasicContainerWidget(AbstractContainerWidget):
         return title
 
 
-class BasicContainerFunctor(AbstractFunctor):
+class StateContainerFunctor(AbstractFunctor):
 
     """Executes the contents of the associated basic container."""
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
+        self.sd = gremlin.ui.state_device.StateData()
+        self.verbose = False
 
+    def profile_start(self):
+        config = gremlin.config.Configuration()
+        self.verbose = config.verbose_mode_container or config.verbose_mode_state
 
     def process_event(self, event, value, extra_data = None):
         """Executes the content with the provided data.
@@ -183,17 +271,40 @@ class BasicContainerFunctor(AbstractFunctor):
         :param value the value received with the event
         :return True if execution was successful, False otherwise
         """
-        return True
+        
+        
+        key = self.action_data.state
+        if not key:
+            # state not provided = succeed
+            if self.verbose: syslog.info("STATE CONTAINER: no state provided: SUCCESS")
+            return True
+        
+        state = self.sd.getState(key)
+        if state is None:
+            # state does not exist = FAIL
+            if self.verbose: syslog.info(f"STATE CONTAINER: state [{key}] does not exist: FAIL")
+            return False
+        
+        required_value = self.action_data.required_value
+        if required_value is None:
+            if self.verbose: syslog.info("STATE CONTAINER: required value ANY:  SUCCESS")
+            return True
+        
+        state_value = state.value
+        result = state_value == required_value
+        if self.verbose: syslog.info(f"STATE CONTAINER: required value [{required_value}] state [{key}] value [{state_value}]: {'SUCCESS' if result else 'FAIL'}")
+        return result
+        
 
 
 
-class BasicContainer(AbstractContainer):
+class StateContainer(AbstractContainer):
 
     """Represents a container which holds exactly one action."""
 
-    name = "Basic"
-    tag = "basic"
-    hint = '''This is a simple container that contains an action.'''
+    name = "State"
+    tag = "state"
+    hint = '''This container executes its contents based on a current state.'''
 
     # input_types = [
     #     InputType.JoystickAxis,
@@ -204,8 +315,8 @@ class BasicContainer(AbstractContainer):
     
     interaction_types = []
 
-    functor = BasicContainerFunctor
-    widget = BasicContainerWidget
+    functor = StateContainerFunctor
+    widget = StateContainerWidget
 
     def __init__(self, parent=None, node = None):
         """Creates a new instance.
@@ -213,6 +324,9 @@ class BasicContainer(AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
+        self.state = None # the state
+        self.required_value = True # execute on state set by default
+
     
     def add_action(self, action, index=-1):
         assert isinstance(action, gremlin.base_profile.AbstractAction)
@@ -259,6 +373,9 @@ class BasicContainer(AbstractContainer):
 
         :param node the XML node with which to populate the container
         """
+        if "state" in node.attrib:
+            self.state = node.get("state")
+        self.required_value = safe_read(node,"value",bool,True)
         
 
     def _generate_xml(self):
@@ -267,7 +384,11 @@ class BasicContainer(AbstractContainer):
         :return XML node representing the data of this container
         """
         node = ElementTree.Element("container")
-        node.set("type", "basic")
+        node.set("type", "state")
+        if self.state:
+            node.set("state", self.state)
+        node.set("value", safe_format(self.required_value, bool))
+
         as_node = ElementTree.Element("action-set")
         for action in self.action_sets[0]:
             as_node.append(action.to_xml())
@@ -284,5 +405,5 @@ class BasicContainer(AbstractContainer):
 
 # Plugin definitions
 version = 1
-name = "basic"
-create = BasicContainer
+name = "state"
+create = StateContainer

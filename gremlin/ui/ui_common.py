@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2025 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -4148,11 +4148,13 @@ class QDataCheckbox(QtWidgets.QCheckBox):
 
 class QDataRadioButton(QtWidgets.QRadioButton):
     ''' a radio button that has a data property to track an object associated with the checkbox '''
-    def __init__(self, label : str = None, data = None, callback = None, value : bool = None, tooltip = None, parent = None):
+    def __init__(self, label : str = None, data = None, callback = None, callbackEx = None, value : bool = None, tooltip = None, parent = None):
         ''' data enabled checkbox 
         :param text: the label (optional, recommended)
         :param data: the data tracked by this control (optional)
         :param value: default value (optional)
+        :param callback: the callback to execute when the radio button state is changed, passes the checked (bool) value [bool] if provided
+        :param callbackEx: the callback to execute when the radio button state is changed, passes the widget itself, and checked (bool) value  [widget, checked] if provided
         :param tooltip: tooltip to display (optional)
         :param parent: parent widget (optional)
         
@@ -4162,10 +4164,22 @@ class QDataRadioButton(QtWidgets.QRadioButton):
 
         if value:
             self.setChecked(value)
-        if callback:
-            self.clicked.connect(callback)
+        self._callback = callback
+        self._callback_ex = callbackEx
+        self.clicked.connect(self._handle_callback)
         if tooltip:
             self.setToolTip(tooltip)
+
+    def _handle_callback(self):
+        if self._callback:
+            self.callback(self.isChecked())
+        if self._callback_ex:
+            self._callback_ex(self, self.isChecked())
+
+
+    def unhook(self):
+        self.clicked.disconnect(self._handle_callback)
+
 
 
     @property

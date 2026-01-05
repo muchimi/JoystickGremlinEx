@@ -28,6 +28,39 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T145)
+
+- New: State Container.
+
+This container will execute actions it contains based on the status of a profile state.  It is identical in function to having a basic container and a state condition applied to that basic container.
+
+The state container avoids the need for a separate condition, and the evaluation is made in the container itself, rather than through the condition system.  This makes execution potentially faster, as certainly simpler when creating mappings.
+
+Multiple states can be used as follows: the container can use expression states to monitor, and the expression state is based on multiple states.  To do this, create a new expression state using a boolean expression that captures the requirements of the other states, and use that expression state as the state for this container.
+
+The container behaves as follows:
+
+If no state is given, the container behaves like a basic container and always runs the actions.
+
+If a state is provided, the container will check the state's value at the time of the event, and execute the actions based on the requested state value:
+
+There are three possible state values:
+
+on = the state must be on/pressed to execute the actions.
+off = the state must be off/released to execute the actions.
+any = the actions will be executed regardless of the state.  This is only there to check if a state exists, and for future expansion of capabilities.
+
+If the state no longer exists, the container fails in all cases.
+
+If GEX verbosity is set to state or container, the container will output the decision logic at runtime to the log and indicate a PASS/FAIL code based on the event received.
+
+Important: the state is checked by the container on all events received, and for a button press for example, there are two events (a press and a release). This is important because if you change the state via another input between a PRESS/RELEASE of the input that triggers the state container, the contained actions may not be executed.  This behavior is this way because it is how conditions function as well.
+
+- Fix: Adjusted verbose info message for calibrated data to handle multi or single values for calibration data objects.  
+
+- Documentation updates on containers.
+
+
 
 ### (m76T144)
 - Fix: Adjusted event dispatcher start/stop logic to avoid starting twice.
