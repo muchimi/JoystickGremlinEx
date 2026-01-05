@@ -34,7 +34,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 This container will execute actions it contains based on the status of a profile state.  It is identical in function to having a basic container and a state condition applied to that basic container.
 
-The state container avoids the need for a separate condition, and the evaluation is made in the container itself, rather than through the condition system.  This makes execution potentially faster, as certainly simpler when creating mappings.
+The state container avoids the need for a separate condition, and the evaluation is made in the container itself, rather than through the condition system.  This makes execution potentially faster, and certainly simpler when creating mappings.
 
 Multiple states can be used as follows: the container can use expression states to monitor, and the expression state is based on multiple states.  To do this, create a new expression state using a boolean expression that captures the requirements of the other states, and use that expression state as the state for this container.
 
@@ -58,7 +58,7 @@ Important: the state is checked by the container on all events received, and for
 
 - Fix: Adjusted verbose info message for calibrated data to handle multi or single values for calibration data objects.  
 
-- Documentation updates on containers.
+- Documentation updates on containers located [at this link](https://muchimi.github.io/JoystickGremlinEx/usage/#containers)
 
 
 
