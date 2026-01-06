@@ -136,45 +136,49 @@ class StateContainerWidget(AbstractContainerWidget):
 
         if verbose_ui: syslog.info("StateContainerWidget: create action UI completed")
 
+
     def _handle_execute_changed(self, widget, checked : bool):
         if checked:
             self.container.required_value = widget.data
     
     def _handle_state_changed(self):
-        self.container.state = self.state_selector_widget.currentText()
-        data = self.state_selector_widget.currentData()
-        if data:
-            description = data.description
-        else:
-            description = "No state selected"
-        self.setDescription(description)
+        if Shiboken.isValid(self.state_selector_widget):
+            self.container.state = self.state_selector_widget.currentText()
+            data = self.state_selector_widget.currentData()
+            if data:
+                description = data.description
+            else:
+                description = "No state selected"
+            self.setDescription(description)
 
     def setDescription(self, value):
-        self.state_description_widget.setText(value if value else "n/a")
+        if Shiboken.isValid(self.state_description_widget):
+            self.state_description_widget.setText(value if value else "n/a")
 
 
     def populate_selector(self):
         ''' updates the available states '''
-        with QtCore.QSignalBlocker(self.state_selector_widget):
-            self.state_selector_widget.clear()
-            sd = gremlin.ui.state_device.StateData()
-            # add a not set value
-            self.state_selector_widget.addItem("[Not Set]", None)
-            for key, data in sd.getStates().items():
-                self.state_selector_widget.addItem(key, data)
-        
-            key = self.container.state
-            if key:
-                index = self.state_selector_widget.findText(key)
-                if index >= 0:
-                    self.state_selector_widget.setCurrentIndex(index)
+        if Shiboken.isValid(self.state_selector_widget):
+            with QtCore.QSignalBlocker(self.state_selector_widget):
+                self.state_selector_widget.clear()
+                sd = gremlin.ui.state_device.StateData()
+                # add a not set value
+                self.state_selector_widget.addItem("[Not Set]", None)
+                for key, data in sd.getStates().items():
+                    self.state_selector_widget.addItem(key, data)
             
-                data = self.state_selector_widget.currentData()
-                description = data.description
-            else:
-                description = "No state selected"
+                key = self.container.state
+                if key:
+                    index = self.state_selector_widget.findText(key)
+                    if index >= 0:
+                        self.state_selector_widget.setCurrentIndex(index)
+                
+                    data = self.state_selector_widget.currentData()
+                    description = data.description
+                else:
+                    description = "No state selected"
 
-            self.setDescription(description)        
+                self.setDescription(description)        
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:

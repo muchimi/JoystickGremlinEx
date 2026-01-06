@@ -602,6 +602,7 @@ class EventListener:
 
 	# state event
 	state_event = Signal(Event)
+	
 	state_name_change = Signal(str,str,object) # fires when a state changes names (old_name, new_name, StateInputItem)
 	state_category_add = Signal(object) # fires when a state category is added (StateCategory)
 	state_category_delete = Signal(object) # fires when a state category is removed (StateCategory)

@@ -566,8 +566,8 @@ class CodeRunner:
             # hook osc events
             evt_listener.osc_event.connect(self.event_handler.execute_event)
 
-            # hook state events
-            evt_listener.state_event.connect(self.event_handler.execute_event)
+            # # hook state events
+            # evt_listener.state_event.connect(self.event_handler.execute_event)
 
             # set keyboard startup state for numlock - use global numlock or profile numlock
             # determine numlock state
@@ -762,7 +762,7 @@ class CodeRunner:
         el.virtual_event.disconnect(self.event_handler.execute_event)
         el.midi_event.disconnect(self.event_handler.execute_event)
         el.osc_event.disconnect(self.event_handler.execute_event)
-        el.state_event.disconnect(self.event_handler.execute_event)
+        #el.state_event.disconnect(self.event_handler.execute_event)
 
         el.keyboard_event.disconnect(kb.keyboard_event)
         el.gremlin_active = False

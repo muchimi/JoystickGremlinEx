@@ -662,7 +662,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
             # only toggle non-expression states
             self._value = not self._value
             if self._emit:
-                self.changed.emit(self)
+                self._fire_changed(self._value)
             return self._value
         return None
 
@@ -949,7 +949,11 @@ class StateInputItem(gremlin.base_profile.InputItem):
             override_input_type=InputType.JoystickButton # tell actions we're a button
         )
 
+        # indicate there was a state change
+        el = gremlin.event_handler.EventListener()
+        el.state_event.emit(event)
 
+        # handle state changes directly at design or runtime
         eh = gremlin.event_handler.EventHandler()
         eh.execute_event(event)
 
