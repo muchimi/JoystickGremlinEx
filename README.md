@@ -28,6 +28,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+
+
+### (m76T146)
+- Fix: Added QT desync handling code to the state container widget.
+- Fix: Manual state changes via the Input Viewer may not always trigger a state change event.
+- Updated: sample custom plugin code adds more comments/instructions on how to use the GEX API related to input events including joystick button, axis, hats, OSC and MIDI, and state changes. [Demo code here](https://gist.github.com/muchimi/f5f0197eb96b755a9e5548c5db232eb7).
+
+
 ### (m76T145)
 
 - New: State Container.
@@ -60,10 +68,7 @@ Important: the state is checked by the container on all events received, and for
 
 - Documentation updates on containers located [at this link](https://muchimi.github.io/JoystickGremlinEx/usage/#containers)
 
-### (m76T145)
-- Fix: Added QT desync handling code to the state container widget.
-- Fix: Manual state changes via the Input Viewer may not always trigger a state change event.
-- Updated: sample custom plugin code adds more comments/instructions on how to use the GEX API related to input events including joystick button, axis, hats, OSC and MIDI, and state changes. [Demo code here](https://gist.github.com/muchimi/f5f0197eb96b755a9e5548c5db232eb7).
+
 
 ### (m76T144)
 - Fix: Adjusted event dispatcher start/stop logic to avoid starting twice.
