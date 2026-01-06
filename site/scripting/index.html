@@ -575,6 +575,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#advanced-sample-plugin-hook-any-input-event-no-decorators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced sample plugin - hook any input event (no decorators)
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -740,6 +749,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#advanced-sample-plugin-hook-any-input-event-no-decorators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced sample plugin - hook any input event (no decorators)
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -873,6 +891,14 @@ def cruise_toggle(event, vjoy):
 <p>For convenience, GEX can automatically generate the relevant Python constants and variables needed to hook devices.
 GEX will generate this for your complete device list.  This is done from the Device Information window in the tools menu.<br />
 The 'Generate plugin script header' button will place the relevant Python code into the clipboard that can be pasted into the plugin.  This will contain all required definitions and GUIDs.</p>
+<h2 id="advanced-sample-plugin-hook-any-input-event-no-decorators">Advanced sample plugin - hook any input event (no decorators)<a class="headerlink" href="#advanced-sample-plugin-hook-any-input-event-no-decorators" title="Permanent link">&para;</a></h2>
+<p>This <a href="https://gist.github.com/muchimi/f5f0197eb96b755a9e5548c5db232eb7">referenced GIST code</a> contains a full working sample using the GremlinEx API that lets you hook keyboard, mouse, joystick, OSC, MIDI and state changes from within a profile.</p>
+<p>The sample plugin should be placed in the same folder as your profile as a .py file and referenced in the profile in the plugin device page.</p>
+<p>When the profile runs, the plugin will load and automatically start running.  Monitored inputs will cause a log entry to be created for what was detected.</p>
+<p>Note that for OSC, MIDI and STATE inputs, an input entry must be created in the profile for GEX to make them available to you in the plugin.</p>
+<p>The instance class should be unique to each profile, so be sure to change the name of the class if you re-use this sample and you use multiple scripts in the same profile.</p>
+<p>The sample also demonstrates how to hook/unhook the GEX event model, and what data is passed to each event handler based on what the input is.</p>
+<p><a href="https://gist.github.com/muchimi/f5f0197eb96b755a9e5548c5db232eb7">Example .PY code</a></p>
 
 
 

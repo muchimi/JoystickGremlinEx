@@ -159,6 +159,7 @@ def cruise_toggle(event, vjoy):
 ```
 
 
+
 ## Generating Python device headers
 
 
@@ -166,3 +167,18 @@ For convenience, GEX can automatically generate the relevant Python constants an
 GEX will generate this for your complete device list.  This is done from the Device Information window in the tools menu.  
 The 'Generate plugin script header' button will place the relevant Python code into the clipboard that can be pasted into the plugin.  This will contain all required definitions and GUIDs.
 
+## Advanced sample plugin - hook any input event (no decorators)
+
+This [referenced GIST code](https://gist.github.com/muchimi/f5f0197eb96b755a9e5548c5db232eb7) contains a full working sample using the GremlinEx API that lets you hook keyboard, mouse, joystick, OSC, MIDI and state changes from within a profile.
+
+The sample plugin should be placed in the same folder as your profile as a .py file and referenced in the profile in the plugin device page.
+
+When the profile runs, the plugin will load and automatically start running.  Monitored inputs will cause a log entry to be created for what was detected.
+
+Note that for OSC, MIDI and STATE inputs, an input entry must be created in the profile for GEX to make them available to you in the plugin.
+
+The instance class should be unique to each profile, so be sure to change the name of the class if you re-use this sample and you use multiple scripts in the same profile.
+
+The sample also demonstrates how to hook/unhook the GEX event model, and what data is passed to each event handler based on what the input is.
+
+[Example .PY code](https://gist.github.com/muchimi/f5f0197eb96b755a9e5548c5db232eb7)
