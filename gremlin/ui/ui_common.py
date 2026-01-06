@@ -4172,7 +4172,7 @@ class QDataRadioButton(QtWidgets.QRadioButton):
 
     def _handle_callback(self):
         if self._callback:
-            self.callback(self.isChecked())
+            self._callback(self.isChecked())
         if self._callback_ex:
             self._callback_ex(self, self.isChecked())
 

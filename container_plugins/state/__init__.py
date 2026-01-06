@@ -174,7 +174,7 @@ class StateContainerWidget(AbstractContainerWidget):
                         self.state_selector_widget.setCurrentIndex(index)
                 
                     data = self.state_selector_widget.currentData()
-                    description = data.description
+                    description = data.description if data else "N/A"
                 else:
                     description = "No state selected"
 

@@ -288,7 +288,7 @@ class StepOptionsWidget(QtWidgets.QWidget):
 
     @QtCore.Slot(float)
     def _handle_repeat_delay_max_changed(self, value):
-        self.options.repeat_max_delay = value        
+        self.options.repeat_max_delay = value
 
     @QtCore.Slot(float)
     def _handle_autorelease_delay_min_changed(self, value):
@@ -296,7 +296,7 @@ class StepOptionsWidget(QtWidgets.QWidget):
 
     @QtCore.Slot(float)
     def _handle_autorelease_delay_max_changed(self, value):
-        self.options.repeat_max_delay = value        
+        self.options.repeat_max_delay = value
 
     @QtCore.Slot(bool)
     def _handle_randomize_delay_changed(self, checked : bool):
@@ -391,8 +391,14 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         widgets = []
         for mode, data in modes:
-            rb = gremlin.ui.ui_common.QDataRadioButton(label=mode, data = data, value = self.profile_data.mode == data, callback = self._handle_mode_changed)
+            rb = gremlin.ui.ui_common.QDataRadioButton(label=mode, data = data, value = self.profile_data.mode == data, callbackEx = self._handle_mode_changed)
             widgets.append(rb)
+
+        self._wiggle_count_enabled_widget = gremlin.ui.ui_common.QDataCheckbox("Random Step Count",
+                                                                               callback = self._handle_wiggle_count_enabled_change,
+                                                                               value = self.profile_data.wiggle_count_enabled,
+                                                                               tooltip = "Enable the wiggle count mode to randomize how many steps execute per sequence trigger.")
+   
 
         widget = gremlin.ui.ui_common.getHContainer(widgets,"Execution mode:",widget_only=True)
         self.action_layout.addWidget(widget)
@@ -401,7 +407,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         widgets = [
             self._wiggle_random_widget,
-            self._wiggle_steps_widget
+            self._wiggle_steps_widget, 
+            self._wiggle_count_enabled_widget
         ]
 
         self.container_wiggle_options_widget = gremlin.ui.ui_common.getHContainer(widgets,"Wiggle mode:", widget_only=True)
@@ -412,10 +419,32 @@ class SequenceContainerWidget(AbstractContainerWidget):
                                                                            tooltip="Time (ms) between a press and release event sent to individual wiggle steps",
                                                                            callback=self._handle_wiggle_exec_delay_change
         )
-                                                                           
+
+        self._wiggle_count_min_widget = gremlin.ui.ui_common.QIntLineEdit(min_range=1,
+                                                                      max_range=1000,
+                                                                      tooltip="Minimum number of steps to execute in wiggle mode. 0 to disable.<br>If set to 5, up to 5 wiggle steps will run and wiggle will stop after 5.",
+                                                                      callback = self._handle_wiggle_count_min_change,
+                                                                      value = self.profile_data.wiggle_count_min)
+        
+        self._wiggle_count_max_widget = gremlin.ui.ui_common.QIntLineEdit(min_range=1,
+                                                                      max_range=1000,
+                                                                      tooltip="Max number of steps to execute in wiggle mode. 0 to disable.<br>If set to 5, up to 5 wiggle steps will run and wiggle will stop after 5.",
+                                                                      callback = self._handle_wiggle_count_max_change,
+                                                                      value = self.profile_data.wiggle_count_max)
+
+
+        self.container_wiggle_count_max_widget = gremlin.ui.ui_common.getHContainer(self._wiggle_count_max_widget,"Max", widget_only = True)
+
+        self.container_wiggle_count_widget = gremlin.ui.ui_common.getHContainer(
+            ["Wiggle Step Count Min: ",
+             self._wiggle_count_min_widget,
+            self.container_wiggle_count_max_widget,
+            ],
+            widget_only=True)
+        self.action_layout.addWidget(self.container_wiggle_count_widget)
 
         self.action_layout.addWidget(self._wiggle_exec_delay_widget)
-                   
+        self.action_layout.addWidget(self._wiggle_exec_delay_widget)
         self.action_layout.addWidget(self._wiggle_min_delay_widget)
         self.action_layout.addWidget(self._wiggle_max_delay_widget)
 
@@ -545,13 +574,17 @@ class SequenceContainerWidget(AbstractContainerWidget):
         return True # valid
     
 
-    @QtCore.Slot()
-    def _handle_mode_changed(self):
-        widget = self.sender()
+    @QtCore.Slot(bool)
+    def _handle_mode_changed(self, widget, checked):
         mode = widget.data
         self.profile_data.mode = mode
         self._update_widgets()
         
+    @QtCore.Slot(bool)
+    def wiggle_count_enabled(self, checked : bool):
+        self.profile_data.wiggle_count_enabled = checked
+        self._update_widgets()
+
 
     @QtCore.Slot(int)
     def _handle_min_delay_change(self, value):
@@ -579,6 +612,11 @@ class SequenceContainerWidget(AbstractContainerWidget):
     def _handle_max_invalid_value(self):
         self.setWarning("Invalid max delay value")
 
+    @QtCore.Slot(bool)
+    def _handle_wiggle_count_enabled_change(self, checked : bool):
+        self.profile_data.wiggle_count_enabled = checked
+        self._update_widgets()
+
     @QtCore.Slot(int)
     def _handle_wiggle_exec_delay_change(self, value):
         self.profile_data.wiggle_exec_delay = value        
@@ -591,7 +629,42 @@ class SequenceContainerWidget(AbstractContainerWidget):
     def _handle_autorelease_delay_change(self, value):
         self.profile_data.normal_autorelease_delay = value        
 
-       
+    @QtCore.Slot(int)
+    def _handle_wiggle_count_min_change(self, value):
+        max_value = self.profile_data.wiggle_count_max
+        min_value = self._wiggle_count_max_widget.minimum()
+
+        if value > max_value:
+            # bump max
+            self._update_count_widget(self._wiggle_count_max_widget, min_value = value, value = value)
+            self.profile_data.wiggle_count_max = value
+
+        elif min_value > value:
+            self._update_count_widget(self._wiggle_count_max_widget, min_value = value)
+
+        self.profile_data.wiggle_count_min = value
+        self._update_widgets()
+        
+
+
+    @QtCore.Slot(int)
+    def _handle_wiggle_count_max_change(self, value):
+        min_value = self.profile_data.wiggle_count_min
+        if value < min_value:
+            value = min_value
+            self._update_count_widget(self._wiggle_count_max_widget, min_value = value, value = value)
+        self.profile_data.wiggle_count_max = value
+        
+    def _update_count_widget(self, widget, value = None,  min_value = None, max_value = None):
+        if Shiboken.is_valid(widget):
+            with QtCore.QSignalBlocker(widget):
+                if max_value is not None:
+                    widget.setMaximum(max_value)
+                if min_value is not None:
+                    widget.setMinimum(min_value)
+                if value is not None:
+                    widget.setValue(value)
+
 
 
     def _update_widgets(self):
@@ -600,6 +673,14 @@ class SequenceContainerWidget(AbstractContainerWidget):
         normal_enabled = not wiggle_enabled
         resume_enabled = mode != "normal"
         self._wiggle_min_delay_widget.setVisible(wiggle_enabled)
+       
+        self.container_wiggle_options_widget.setVisible(wiggle_enabled)
+
+        if wiggle_enabled:
+            count_enabled = self.profile_data.wiggle_count_enabled
+            self.container_wiggle_count_widget.setVisible(count_enabled)
+            self.container_wiggle_count_max_widget.setVisible(count_enabled)
+
 
         max_enabled = wiggle_enabled and self.profile_data.wiggle_random
         self._wiggle_max_delay_widget.setVisible(max_enabled)
@@ -642,10 +723,6 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._warning_widget.setText(text)
         self._warning_widget.setVisible(visible)
 
-
-    # @QtCore.Slot(bool)
-    # def _trigger_mode_changed(self, checked: bool):
-    #     self.profile_data.exec_on_release = checked
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
@@ -871,7 +948,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                         self.start_normal()
                     else:
                         if verbose: syslog.info(f"SEQUENCE EVENT: normal mode: start ignored because prior sequence is still running  - profile mode: {profile_mode}")
-                
+
+             
 
 
         return True 
@@ -977,6 +1055,13 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         nodes = [node for node in self.action_set_nodes]
         verbose = self._verbose
         verbose_extra = self._verbose_extra
+        count_enabled = self.action_data.wiggle_count_enabled
+        
+        min_steps = self.action_data.wiggle_count_min
+        max_steps = self.action_data.wiggle_count_max
+        max_steps = random.randrange(min_steps, max_steps) if count_enabled else 0
+
+        step_count = 0
 
         if not nodes:
             # nothing to run
@@ -1001,12 +1086,19 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         wiggle_steps = self.container.wiggle_randomize_steps
         exec_delay_ms = self.container.wiggle_exec_delay 
         exec_delay_s = exec_delay_ms / 1000
-        if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) starting wiggle with  min delay: [{min_delay}] max delay: [{max_delay}] random mode: [{wiggle_random}]")
+        if verbose: 
+            syslog.info(f"SEQUENCE RUNNER: (wiggle) starting wiggle with  min delay: [{min_delay}] max delay: [{max_delay}] random mode: [{wiggle_random}]")
+            if max_steps:
+                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) max step count [{max_steps}]")
+
 
         while self._is_running:
             node = nodes[index]
             options : StepOptions = self.action_data.getOptions(index) # execution options for the step
-            repeat_count = options.getCount() # number of times to repeate
+            repeat_count = options.getCount() # number of times to repeat
+            if max_steps and repeat_count < max_steps:
+                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) - repeat count adjusted to {max_steps} due to step count mode enabled")
+                repeat_count = max_steps
 
             for repeat_index in range(repeat_count):
                 if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: execute node ID: sequence [{index}] [{node.id}]")
@@ -1033,6 +1125,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
             if not self._is_running: break
 
+
+
             # delay between steps
             delay = exec_delay_s
             
@@ -1052,6 +1146,14 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                     index = 0
                     if verbose: syslog.info("SEQUENCE RUNNER: (wiggle) looping sequence")
             self.action_data.last_step = index
+
+            if max_steps:
+                # abort after the step count reached if requested
+                step_count += 1
+                if step_count >= max_steps:
+                    if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) max step count reached ({step_count})")
+                    self._is_running = False
+                    break
 
         if verbose: syslog.info("SEQUENCE RUNNER: (wiggle) sequence completed - exiting runner")
             
@@ -1117,6 +1219,9 @@ Unlike a macro, any action suitable for the input can be used.'''
         self.normal_exec_delay = 0 # wait time between steps when running normally
         self.normal_autorelease_delay = 250 # wait time between autoreleases of each step when running normally
         self.step_options = {} # map of step options indexed by step number 
+        self.wiggle_count_min = 1 # min number of wiggle steps to take.
+        self.wiggle_count_max = 1 # max number of wiggle steps to take.
+        self.wiggle_count_enabled = False # true if wiggle mode count is enabled
 
         self.mode = "normal" # run mode
 
@@ -1153,6 +1258,15 @@ Unlike a macro, any action suitable for the input can be used.'''
         self.wiggle_exec_delay = safe_read(node,"wiggle-exec", int, 5000)
         self.wiggle_random = safe_read(node,"wiggle-random", bool, True)
         self.wiggle_randomize_steps = safe_read(node,"wiggle-random-steps", bool, False)
+        value = safe_read(node,"wiggle-count-min", int, 1)
+        if value > 0:
+            self.wiggle_count_min = value
+
+        value = safe_read(node,"wiggle-count-max", int, 1)
+        if value > 0:
+            self.wiggle_count_max = value
+        self.wiggle_count_enabled = safe_read(node,"wiggle-count-enabled", bool, False)
+
         self.resume_mode = safe_read(node,"resume-mode", bool, False)
         self.normal_autorelease_delay = safe_read(node,"autorelease-exec", int, 250)
         self.normal_exec_delay = safe_read(node,"normal-exec", int, 0)
@@ -1195,6 +1309,9 @@ Unlike a macro, any action suitable for the input can be used.'''
         node.set("wiggle-exec", safe_format(self.wiggle_exec_delay, int))
         node.set("wiggle-random", safe_format(self.wiggle_random, bool))
         node.set("wiggle-random-steps", safe_format(self.wiggle_randomize_steps, bool))
+        node.set("wiggle-count-min", safe_format(self.wiggle_count_min, int))
+        node.set("wiggle-count-max", safe_format(self.wiggle_count_max, int))
+        node.set("wiggle-count-enabled", safe_format(self.wiggle_count_enabled, bool))
         node.set("resume-mode", safe_format(self.resume_mode, bool))
         node.set("normal-exec", safe_format(self.normal_exec_delay, int))
         node.set("autorelease-exec", safe_format(self.normal_autorelease_delay, int))
@@ -1241,9 +1358,11 @@ Unlike a macro, any action suitable for the input can be used.'''
             if self.wiggle_random:
                 table.addField("Wiggle Random", "Enabled")
                 table.addField("Random Steps", "Yes" if self.wiggle_randomize_steps else "No")
-                table.addField("Wigle Min Delay", f"{self.wiggle_min_delay} ms")
-                table.addField("Wigle Max Delay", f"{self.wiggle_max_delay} ms")
-                table.addField("Wigle Exec Delay", f"{self.wiggle_exec_delay} ms")
+                table.addField("Wiggle Min Delay", f"{self.wiggle_min_delay} ms")
+                table.addField("Wiggle Max Delay", f"{self.wiggle_max_delay} ms")
+                table.addField("Wiggle Exec Delay", f"{self.wiggle_exec_delay} ms")
+                table.addField("Wiggle Count Min", f"{self.wiggle_count_min}")
+                table.addField("Wiggle Count Max", f"{self.wiggle_count_max}")
 
 
         if self.exec_on_press:
