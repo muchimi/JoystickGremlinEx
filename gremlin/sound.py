@@ -131,6 +131,7 @@ class SoundEvent():
 
 
 
+
 @gremlin.singleton_decorator.SingletonDecorator
 class Sound():
     ''' wrapper class to play sounds via pygame and QT multimedia '''
@@ -148,6 +149,8 @@ class Sound():
             self.device_sample_rate_map = {}
             self.running_data = {} # data for running audio streams
             self._playback_enabled = True # enable playback
+            self._sound_tasks = [] # tracks sound tasks
+            
             
             device_list = sd.query_devices()
             
@@ -373,7 +376,19 @@ class Sound():
                 pygame.mixer.quit() # we will re-init the mixer later
         elif USE_SD:
             # terminate the thread pools
-            self._playback_enabled = False
+            self._playback_enabled = False # stop all streams
+            # wait for all the tasks to be completed
+            while self._sound_tasks:
+                self._task_trim()
+                time.sleep(0.01)
+            self._playback_enabled = True # renable once all streams are done
+
+    def _task_trim(self):
+        ''' trims the task list of completed tasks '''
+        if self._sound_tasks:
+            done_list = [t for t in self._sound_tasks if t.done()]
+            self._sound_tasks = [t for t in self._sound_tasks if not t in done_list]
+        
 
 
     def play(self, filename : str, options : PlaybackOptions):
@@ -382,6 +397,8 @@ class Sound():
             if not self._playback_enabled:
                 # playback is not enabled
                 return
+            
+            self._task_trim() # cleanup prior tasks
             
             device_name = options.device # playback device name
             loops = options.loops # number of loops to play
@@ -489,7 +506,9 @@ class Sound():
                 self.running_data[filename] = {}
 
 
-            self.pool.submit(self._play_runner, data, device_id, loops)
+            task = self.pool.submit(self._play_runner, data, device_id, loops)
+            self._sound_tasks.append(task)
+            
         
         except Exception as e:
             syslog.error(f"SOUND: PLAY: An error occurred: {e}")
