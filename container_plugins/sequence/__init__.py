@@ -880,7 +880,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         if not self.valid:
             return False
         
-        verbose = gremlin.config.Configuration().verbose_mode_container
+        config =  gremlin.config.Configuration()
+        verbose = config.verbose_mode_container or config.verbose_mode_sequence
         
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
@@ -1053,13 +1054,21 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         event_release = event_press.fake_button(False,True)
         
         nodes = [node for node in self.action_set_nodes]
-        verbose = self._verbose
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_sequence or config.verbose_mode_container
         verbose_extra = self._verbose_extra
         count_enabled = self.action_data.wiggle_count_enabled
         
-        min_steps = self.action_data.wiggle_count_min
-        max_steps = self.action_data.wiggle_count_max
-        max_steps = random.randrange(min_steps, max_steps) if count_enabled else 0
+        min_step_count = self.action_data.wiggle_count_min
+        max_step_count = self.action_data.wiggle_count_max
+
+        if count_enabled:
+            if min_step_count == max_step_count:
+                max_count = min_step_count
+            else:
+                max_count = random.randrange(min_step_count, max_step_count) if count_enabled else 0
+        else:
+            max_count = 0
 
         step_count = 0
 
@@ -1088,20 +1097,26 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         exec_delay_s = exec_delay_ms / 1000
         if verbose: 
             syslog.info(f"SEQUENCE RUNNER: (wiggle) starting wiggle with  min delay: [{min_delay}] max delay: [{max_delay}] random mode: [{wiggle_random}]")
-            if max_steps:
-                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) max step count [{max_steps}]")
+            if max_count:
+                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) max step count [{max_count}]")
 
+
+        if wiggle_steps:
+            # pick a step at random
+            index = random.randrange(0, count)
+            if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) randomize step: pick random next step: [{index}]")
 
         while self._is_running:
+
+            if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) - execute step index: [{index}]")
             node = nodes[index]
             options : StepOptions = self.action_data.getOptions(index) # execution options for the step
-            repeat_count = options.getCount() # number of times to repeat
-            if max_steps and repeat_count < max_steps:
-                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) - repeat count adjusted to {max_steps} due to step count mode enabled")
-                repeat_count = max_steps
+            
 
+            # handle single step repeats
+            repeat_count = options.getCount() # number of times to repeat
             for repeat_index in range(repeat_count):
-                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: execute node ID: sequence [{index}] [{node.id}]")
+                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: loop [{repeat_index}] executes step [{index}] node: [{node.id}]")
                 self._ec.execute_node(node, event_press, True, None) # issue press
                 # autorelease delay 
                 delay = options.getAutoreleaseDelay(exec_delay_ms)
@@ -1125,11 +1140,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
             if not self._is_running: break
 
-
-
-            # delay between steps
+            # handle delay between steps
             delay = exec_delay_s
-            
             if delay > 0:
                 if verbose_extra: syslog.info(f"step repeat interval delay [{delay}]")
                 self._wait(delay)
@@ -1139,6 +1151,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             # next node to run
             if wiggle_steps:
                 index = random.randrange(0, count) # pick the next random step
+                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) randomize step: pick random next step: [{index}]")
             else:
                 index += 1
                 if index == count:
@@ -1147,10 +1160,10 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                     if verbose: syslog.info("SEQUENCE RUNNER: (wiggle) looping sequence")
             self.action_data.last_step = index
 
-            if max_steps:
+            if max_count:
                 # abort after the step count reached if requested
                 step_count += 1
-                if step_count >= max_steps:
+                if step_count >= max_count:
                     if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) max step count reached ({step_count})")
                     self._is_running = False
                     break

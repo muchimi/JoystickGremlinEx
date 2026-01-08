@@ -23,28 +23,45 @@ import qtawesome as qta
 import gremlin.util
 import gremlin.event_handler
 
-import gremlin.base_profile
+
 import gremlin.config
-from gremlin.input_types import InputType
-import gremlin.ui.ui_about
+
+
 from gremlin.util import load_icon, userprofile_path
-import gremlin.ui.input_item
+
 import gremlin.ui.ui_common
 import threading
-from shiboken6 import Shiboken
+
 from gremlin.util import safe_format, safe_read
 import logging
-import psygnal
 from psygnal import Signal
-import pygame
+
 import gremlin.singleton_decorator
 import queue
 import enum
 import time
-import json
-import importlib.util
 
 syslog = logging.getLogger("system")
+
+USE_SD = True # use sound device for playback
+USE_QT = False # use QT for playback
+USE_PG = False # use pygame for playback
+
+if USE_PG:
+    import pygame
+    
+import scipy
+import scipy._cyutility
+
+if USE_SD:
+    import sounddevice as sd # for sound playback
+    import soundfile as sf # for reading sound files as numpy data
+    import numpy as np # for sound device library
+    import concurrent.futures # for thread pool of concurrent playback
+    import pyrubberband as pyrb # for sound sample rate modification 
+ 
+    from scipy import signal # for audio resampling if needed
+
 
 class SoundAction(enum.Enum):
     Play = 1 # play a sound key using the options previously selected
@@ -55,7 +72,7 @@ class SoundAction(enum.Enum):
 
 class PlaybackOptions():
     ''' holds sound playback options '''
-    def __init__(self, key : str, loops : int = 1, volume : float = None, playback_ms : int = 0, fadein_ms : int = 0, fadeout_ms : int = 0, stop_previous : bool = False):
+    def __init__(self, key : str, device : str = None, loops : int = 1, volume : float = None, playback_ms : int = 0, fadein_ms : int = 0, fadeout_ms : int = 0, stop_previous : bool = False, rate : float = None):
         ''' playback options 
         
         :param key: the sound file key as registered with the sound module (getSoundKey())
@@ -65,39 +82,53 @@ class PlaybackOptions():
         :param fadein_ms: time in milliseconds for the time for the sound to fade in - if the sound is too short, it may never reach max volume
         :param fadeout_ms: time in milliseconds for the time for the sound to fade out
         '''
-        self.key = key
-        self.loops = loops - 1 if loops > 0 else 0 # sounds plays once, loops are extra repeats
+        self.key = key # this is a GUID for PG mode, and the file name for SD mode
+        self.device : str = device # playback device - if not set - default playback is used
+        if USE_PG:
+            self.loops = loops - 1 if loops > 0 else 0 # sounds plays once, loops are extra repeats
+        elif USE_SD:
+            self.loops = loops
         self.volume = volume
-        self.playback_ms = playback_ms
-        self.fadein_ms = fadein_ms
-        self.fadeout_ms = fadeout_ms
+        self.playback_ms = playback_ms # this only works for PG mode
+        self.fadein_ms = fadein_ms # this only works for PG mode
+        self.fadeout_ms = fadeout_ms # this only works for PG mode
         self.stop_previous = stop_previous
+        self.rate = rate # playback rate (1.0 = normal)
 
 
 class SoundEvent():
     ''' single commands for the queue '''
-    def __init__(self, action : SoundAction, key : str = None, data = None):
+    def __init__(self, action : SoundAction, key : str = None,  data = None):
         self.key = key
         self.data = data
         self.action = action
 
     @staticmethod
-    def PlayAction(key : str, loops : int = 1, volume : float = None, playback_ms : int = 0, fadein_ms : int = 0, fadeout_ms : int = 0, stop_previous : bool = False):
-        data = PlaybackOptions(key, loops, volume, playback_ms, fadein_ms, fadeout_ms, stop_previous)
-        return SoundEvent(SoundAction.Play, key = key, data = data)
+    def PlayAction(key : str, device : str, loops : int = 1, volume : float = None, playback_ms : int = 0, fadein_ms : int = 0, fadeout_ms : int = 0, stop_previous : bool = False, rate : float = 1.0):
+        data = PlaybackOptions(key, device, loops, volume, playback_ms, fadein_ms, fadeout_ms, stop_previous, rate)
+        return SoundEvent(action = SoundAction.Play, key = key, data = data)
     
     @staticmethod
     def ChangeDeviceAction(device_name : str):
-        return SoundEvent(SoundAction.ChangeDevice, data = device_name)
+        return SoundEvent(action = SoundAction.ChangeDevice, data = device_name)
     
     @staticmethod
     def SetVolumeAction(key : str, volume : int):
-        return SoundEvent(SoundAction.SetVolume, key = key, data = volume / 100)
+        return SoundEvent(action = SoundAction.SetVolume, key = key, data = volume / 100)
     
     @staticmethod
     def StopAction():
-        return SoundEvent(SoundAction.Stop)
+        return SoundEvent(action = SoundAction.Stop)
     
+# class SoundData():
+#     ''' holds compiled sound data for SD mode '''
+#     def __init__(self, filename : str, device_id: int, options : PlaybackOptions, data, ):
+#         self.filename = filename
+#         self.device_id = device_id
+#         self.data = data
+#         self.id = gremlin.util.get_guid() # unique record id
+#         self.options = options
+
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -107,11 +138,61 @@ class Sound():
         
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._handle_shutdown)
-        
-        # list of devices from QT multimedia
-        devices = QtMultimedia.QMediaDevices.audioOutputs()
-        self.device_map = {index:device for index, device in enumerate(devices)}
+
         self._playback_device_name = None
+        
+        if USE_SD:
+            # use sound device library
+            self.device_map = {}
+            self.device_name_to_id_map = {}
+            self.device_sample_rate_map = {}
+            self.running_data = {} # data for running audio streams
+            self._playback_enabled = True # enable playback
+            
+            device_list = sd.query_devices()
+            
+            for device  in device_list:
+                if device['max_output_channels'] > 0:
+                    name = device['name']
+                    index = device['index']
+                    api_id = device['hostapi']
+                    api = sd.query_hostapis(device['hostapi'])
+                    api_name = api['name']
+                    samplerate = device['default_samplerate']
+
+                    syslog.info(f"API: [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                    if api_name == 'Windows WASAPI':
+                        # only use wasapi as that has the lowest latency
+                        # other choices are 'MME'
+                        # 'Windows DirectSound'
+                        self.device_map[index] = name
+                        self.device_name_to_id_map[name] = index
+                        self.device_sample_rate_map[index] = samplerate
+
+
+            # get the default device
+            device = sd.query_devices(kind='output')
+            name = device['name']
+            if not name in self.device_name_to_id_map:
+                # different API - match by starting name
+                for device_name in self.device_name_to_id_map:
+                    if device_name.startswith(name):
+                        name = device_name
+                        break
+
+            self._playback_device_name = name
+
+
+            self.pool = concurrent.futures.ThreadPoolExecutor() # supports mutliple concurrent audio threads
+
+        else:
+            # list of devices from QT multimedia
+            devices = QtMultimedia.QMediaDevices.audioOutputs()
+            self.device_map = {index:device for index, device in enumerate(devices)}
+            # flip the device map
+            self.device_name_to_id_map = {id:name for id,name in self.device_map.items()}
+        
+        
         self.sound_map = {} # holds sound objects by key (guid -> sound object)
         self.sound_file_map = {} # holds the sound file (file -> key)
         self.sound_volume_map = {} # holds the sound volume for each key - if not present used the default volume
@@ -123,8 +204,9 @@ class Sound():
         self._is_paused = False # true if queue processing is paused
         self._next_key = 0 # next key to use for each registered sound
 
-        pygame.init()
-        pygame.mixer.init()
+        if USE_PG:
+            pygame.init()
+            pygame.mixer.init()
 
     def start(self):
         ''' starts the sound queue '''
@@ -135,7 +217,6 @@ class Sound():
             self._thread.start()
             syslog.info("SOUND: starting engine")
            
-
     def stop(self):
         ''' stops the sound queue '''
         if self._is_running:
@@ -144,13 +225,33 @@ class Sound():
                 self._thread.join()
             self._thread = None
             syslog.info("SOUND: engine shutdown")
+
+    def ensureStarted(self) -> bool:
+        ''' makes sure the mixer is started - returns true if initialized '''
+        self.start()        
+        if USE_PG:
+            if not pygame.mixer.get_init():
+                try:
+                    if not self._playback_device_name:
+                        syslog.error(f"SOUND: Unable to initialize sound: device not selected.")
+                        return False
+                    
+                    pygame.mixer.pre_init(self._playback_device_name)
+                    pygame.mixer.init()
+                except Exception as ex:
+                    syslog.error(f"SOUND: Unable to initialize sound: {str(ex)}")
+                    return False
+        return True
+
             
 
     def _handle_shutdown(self):
         self.stop() # stop the runner
         self.soundStop() 
         self.device_map.clear()
-        pygame.quit()
+        self.device_name_to_id_map.clear()
+        if USE_PG:
+            pygame.quit()
 
 
     @property
@@ -189,10 +290,14 @@ class Sound():
         device = next((d for d in self.device_map.values() if d.description() == description),None) 
         return device
     
-    def findDeviceIndex(self, description : str):
-        ''' gets the device index for a specific device description (name) '''
-        index = next((i for i, d in self.device_map.items() if d.description() == description),None) 
-        return index
+    def findDeviceIndex(self, name : str):
+        ''' gets the device index for a specific device name '''
+        if name in self.device_name_to_id_map:
+            return self.device_name_to_id_map[name]
+        return None
+    
+        # index = next((i for i, d in self.device_map.items() if d.description() == name),None) 
+        # return index
 
     def getAudioDevice(self):
         ''' gets the audio device to play from '''
@@ -205,7 +310,10 @@ class Sound():
             device = default_audio_device
         return device
     
-    def getDefaultAudioDevice(self):
+    def getDefaultAudioDevice(self) -> str:
+        if USE_SD:
+            return sd.default.device
+        
         return  QtMultimedia.QMediaDevices.defaultAudioOutput()
     
     def getDefaultAudioDeviceIndex(self):
@@ -224,14 +332,20 @@ class Sound():
     def setPlaybackDevice(self, name : str):
         ''' changes the playback device '''
         if self._playback_device_name != name:
-            if pygame.mixer.get_init():
-                # stop the mixer so we can change the device
-                pygame.mixer.stop()
-                pygame.mixer.quit()
+            if USE_PG:
+                if pygame.mixer.get_init():
+                    # stop the mixer so we can change the device
+                    pygame.mixer.stop()
+                    pygame.mixer.quit()
+                
+                pygame.mixer.pre_init(devicename = name)
+                pygame.mixer.init()
+
+            if USE_SD:
+                sd.default.device = name
             
-            pygame.mixer.pre_init(devicename = name)
             self._playback_device_name = name 
-            pygame.mixer.init()
+            
 
     def playbackDevice(self) -> str:
         return self._playback_device_name
@@ -239,60 +353,222 @@ class Sound():
     def setDefaultPlaybackDevice(self):
         ''' sets the playback device to system default '''
         device = self.getDefaultAudioDevice()
-        self.setPlaybackDevice(device.description())
+        if USE_PG:
+            self.setPlaybackDevice(device.description())
 
     def soundStart(self):
         # reset the mixer
-        self.soundStop()
-        if not pygame.mixer.get_init():
-            pygame.mixer.init()
-
-
+        if USE_PG:
+            self.soundStop()
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+        elif USE_SD:
+            self._playback_enabled = True
 
     def soundStop(self):
-        ''' terminate the mixer '''
-        if pygame.mixer.get_init():
-            pygame.mixer.stop() # stop playing whatever is being played now
-            pygame.mixer.quit() # we will re-init the mixer later
+        ''' terminate any active playbacks '''
+        if USE_PG:
+            if pygame.mixer.get_init():
+                pygame.mixer.stop() # stop playing whatever is being played now
+                pygame.mixer.quit() # we will re-init the mixer later
+        elif USE_SD:
+            # terminate the thread pools
+            self._playback_enabled = False
 
+
+    def play(self, filename : str, options : PlaybackOptions):
+        ''' plays a sound file via SD low level library '''
+        try:
+            if not self._playback_enabled:
+                # playback is not enabled
+                return
+            
+            device_name = options.device # playback device name
+            loops = options.loops # number of loops to play
+
+            if device_name:
+                if device_name in self.device_name_to_id_map:
+                    device_id = self.device_name_to_id_map[device_name]
+                    device_samplerate = self.device_sample_rate_map[device_id]
+            else:
+                # get the current default device
+                device = sd.query_devices(kind='output')
+                device_id = device['index']
+                device_samplerate = device['default_samplerate']
+                device_name = device['name']
+
+            # process the audio file
+            with sf.SoundFile(filename) as f:
+                data = f.read(dtype='float32', always_2d=True) # default is 64bit, change to 32bit floats
+                samplerate = f.samplerate # audio file sample rate in hertz 
+                channels = f.channels # 1 for mono, 2 for stereo (usual)
+                
+
+        
+        
+            
+            rate = options.rate # playback rate (pitch corrected)
+            volume = options.volume # volume to apply
+            fade_in = options.fadein_ms # fade in duration
+            fade_out = options.fadeout_ms # fade out duration
+            duration = options.playback_ms # max duration of the sample to play back
+            verbose = gremlin.config.Configuration().verbose_mode_sound
+
+            fade_in = 0
+            fade_out = 0
+
+
+
+            #data, samplerate = sf.read(filename, dtype='float32')
+
+            # resample the audio to match the device sample rate
+
+            if device_samplerate != samplerate:
+                # determin how many new samples are needed 
+                new_sample_count = int(len(data) * device_samplerate / samplerate)
+
+                # 3. Resample the audio data using scipy.signal.resample
+                resampled_audio = signal.resample(data, new_sample_count)
+
+                # Ensure data type is compatible with sounddevice (e.g., float32)
+                data = np.array(resampled_audio, dtype='float32')
+
+
+            total_frames = len(data)
+
+            # modify the playback rate if requested maintaining the pitch (this is approximate)
+            if rate is not None and rate != 1.0:
+                # this maintains pitch using pyrubberband
+                data = pyrb.time_stretch(data, samplerate, rate)
+
+
+            # modify the playback duration if requested (this will make the sample shorter only)
+            if duration is not None and duration > 0:
+                duration_seconds = duration / 1000 # to seconds
+                frame_count = int(duration_seconds * samplerate) 
+                if total_frames > frame_count:
+                    # trim needed
+                    data = data[:frame_count]
+
+
+            # modify the playback volume 
+            if volume is not None and volume >= 0:
+                data = data * (volume / 100) # convert percent to volume.  50% = 0.5 = half volume                    
+
+            # apply a fade in ramp if requested
+            if fade_in is not None and fade_in > 0:
+                duration_seconds = fade_in / 1000
+                frame_count = int(duration_seconds * samplerate)
+                # creates vector ramp from 0.0 to 1.0 volume over the fade duration
+                fade_ramp = np.linspace(0.0, 1.0, frame_count)
+                multiplier = np.ones(total_frames)
+                multiplier[-len(fade_ramp):] = fade_ramp
+
+                if data.ndim > 1: # Stereo
+                    data = (data * multiplier[:, np.newaxis]).astype(data.dtype)
+                else: # Mono
+                    data = (data * multiplier).astype(data.dtype)
+
+            # apply a fade out ramp if requested
+            if fade_out is not None and fade_out > 0:
+                duration_seconds = fade_out / 1000
+                frame_count = int(duration_seconds * samplerate) 
+                # creates vector ramp from 1.0 to 0.0 volume
+                fade_ramp = np.linspace(1.0, 0.0, frame_count)
+                multiplier = np.ones(total_frames)
+                multiplier[-len(fade_ramp):] = fade_ramp
+
+                if channels > 1: # Stereo
+                    data = (data * multiplier[:, np.newaxis]).astype(data.dtype)
+                else: # Mono
+                    data = (data * multiplier).astype(data.dtype)
+
+            # cache the playback data
+            
+            if not filename in self.running_data:
+                self.running_data[filename] = {}
+
+
+            self.pool.submit(self._play_runner, data, device_id, loops)
+        
+        except Exception as e:
+            syslog.error(f"SOUND: PLAY: An error occurred: {e}")
+
+
+
+    def _play_runner(self, data, device_id, loops):
+
+        try:
+
+            for _ in range(loops):
+                event = threading.Event()
+                current_frame = 0
+                def callback(outdata, frames, time, status):
+                    nonlocal current_frame, event
+                    if status:
+                        syslog.info(status)
+                    chunksize = min(len(data) - current_frame, frames)
+                    outdata[:chunksize] = data[current_frame:current_frame + chunksize]
+                    if chunksize < frames or not self._playback_enabled:
+                        # terminate playback on last frame or playback abort
+                        outdata[chunksize:] = 0
+                        event.set()
+                    current_frame += chunksize
+
+                stream = sd.OutputStream(callback=callback, device=device_id, finished_callback=event.set, channels=data.ndim)
+                with stream:
+                    event.wait()  # wait until playback is finished
+
+            #syslog.info(f"playback done")
+
+
+        except sd.CallbackStop:
+            event.set()
+        except Exception as e:
+            syslog.error(f"SOUND: PLAY: An error occurred: {e}")
+                        
+    
 
     def getSoundKey(self, sound_file) -> int:
         ''' registers a sound file and returns a key '''
         if os.path.isfile(sound_file):
             sound_file = sound_file.casefold()
-            if not sound_file in self.sound_file_map:
-                key = gremlin.util.get_guid() # self._next_key
-                self.sound_file_map[sound_file] = key
-            else:
-                key = self.sound_file_map[sound_file]
+            if USE_PG:
+                if not sound_file in self.sound_file_map:
+                    key = gremlin.util.get_guid() # self._next_key
+                    self.sound_file_map[sound_file] = key
+                else:
+                    key = self.sound_file_map[sound_file]
 
-            self.sound_audio_file_map[key] = sound_file
-            
-            sound = pygame.mixer.Sound(sound_file)
-            self.sound_map[key] = sound
-            return self.sound_file_map[sound_file]
+                self.sound_audio_file_map[key] = sound_file
+                
+                sound = pygame.mixer.Sound(sound_file)
+                self.sound_map[key] = sound
+                return self.sound_file_map[sound_file]
+            if USE_SD:
+                # use the filename as the key for SD playback
+                return sound_file 
         
         return None
     
     def releaseSoundKey(self, sound_file):
-        
-        sound_file = sound_file.casefold()
-        if sound_file and sound_file in self.sound_file_map:
-            sound = self.sound_file_map[sound_file]
-            self.sound_file_map[sound_file] = None
-            pygame.mixer.stop()
-            del sound
-            del self.sound_file_map[sound_file]
+        if USE_PG:
+            sound_file = sound_file.casefold()
+            if sound_file and sound_file in self.sound_file_map:
+                sound = self.sound_file_map[sound_file]
+                self.sound_file_map[sound_file] = None
+                pygame.mixer.stop()
+                del sound
+                del self.sound_file_map[sound_file]
     
     def queueAction(self, action : SoundEvent):
-        ''' queues a sound action '''
-        
+        ''' queues a sound action - PG mode only'''
         self._event_queue.put(action)
         if not self._is_running:
             self.start() # ensure started
 
     def queueActions(self, actions : list[SoundEvent]):
-        ''' queues multiple sound actions '''
+        ''' queues multiple sound actions  - PG mode only'''
         self._is_paused = True # pause sound processing
         for action in actions:
             self._event_queue.put(action)
@@ -301,7 +577,7 @@ class Sound():
             self.start() # ensure started
         
     def clearQueue(self):
-        ''' clears pending sound actions '''
+        ''' clears pending sound actions  - PG mode only'''
         self._is_paused = True # pause processing
         while not self._event_queue.empty():
             self._event_queue.get()
@@ -310,7 +586,7 @@ class Sound():
             
 
     def _queue_runner(self):
-        ''' processes the sound queue '''
+        ''' processes the sound queue - PG mode onlyt '''
         verbose = gremlin.config.Configuration().verbose_mode_sound
         current_device_name = None
         
@@ -327,54 +603,68 @@ class Sound():
 
             event : SoundEvent = self._event_queue.get()
             if verbose: syslog.info(f"SOUNDLISTEN: DEQUEUE event {event.action.name}  QUEUE size: {self._event_queue.qsize():,}")		
-            if pygame.mixer.get_init() is None:
-                if self._playback_device_name:
-                    pygame.mixer.pre_init(devicename=self._playback_device_name)
-                pygame.mixer.init()
+            if USE_PG:
+                if pygame.mixer.get_init() is None:
+                    if self._playback_device_name:
+                        pygame.mixer.pre_init(devicename=self._playback_device_name)
+                    pygame.mixer.init()
             match event.action:
                 case SoundAction.Play:
                     # play item
                     key = event.key
                     if verbose: syslog.info(f"\tplay [{key}]")
                     data : PlaybackOptions = event.data
-                    if key in self.sound_map:
-                        sound = pygame.mixer.Sound(self.sound_audio_file_map[key])
-                        #sound : pygame.mixer.Sound = self.sound_map[key]
-                        if data.stop_previous:
-                            # stop previous sounds
-                            pygame.mixer.stop()
-                        if data.volume is not None:
-                            volume = data.volume
-                            sound.set_volume(volume)
-                        if data.fadeout_ms:
-                            sound.fadeout(data.fadeout_ms)
-                        sound.play(data.loops,data.playback_ms, data.fadein_ms)
-                        self._event_queue.task_done()
+                    if USE_SD:
+                        self.play(key, data)
+                    elif USE_PG:
+                        if key in self.sound_map:
+                            audio_file = self.sound_audio_file_map[key]
+                            sound = pygame.mixer.Sound(self.sound_audio_file_map[key])
+                            #sound : pygame.mixer.Sound = self.sound_map[key]
+                            if data.stop_previous:
+                                # stop previous sounds
+                                pygame.mixer.stop()
+                            if data.volume is not None:
+                                volume = data.volume
+                                sound.set_volume(volume)
+                            if data.fadeout_ms:
+                                sound.fadeout(data.fadeout_ms)
+                            sound.play(data.loops,data.playback_ms, data.fadein_ms)
+                    self._event_queue.task_done()
 
                 case SoundAction.SetVolume:
-                    key = event.key
-                    if key in self.sound_map:
-                        if verbose: syslog.info(f"\tset volume [{key}] volume: {event.data:0.3f}")
-                        sound : pygame.mixer.Sound = self.sound_map[key]
-                        volume = event.data
-                        self.sound_volume_map[key] = volume
-                        self._event_queue.task_done()
+                    if USE_PG:
+                        key = event.key
+                        if key in self.sound_map:
+                            if verbose: syslog.info(f"\tset volume [{key}] volume: {event.data:0.3f}")
+                            sound : pygame.mixer.Sound = self.sound_map[key]
+                            volume = event.data
+                            self.sound_volume_map[key] = volume
+                    self._event_queue.task_done()
 
                 case SoundAction.ChangeDevice:
-                    device_name = event.data
+                    if USE_PG:
+                        device_name = event.data
 
-                    if current_device_name != device_name:
-                        if verbose: syslog.info(f"\tchange device [{device_name}]")
-                        self.setPlaybackDevice(device_name)
-                        current_device_name = device_name
-                        self._playback_device_name = device_name
-                        self._event_queue.task_done()
+
+                        if current_device_name != device_name:
+                            if verbose: syslog.info(f"\tchange device [{device_name}]")
+                            self.setPlaybackDevice(device_name)
+                            current_device_name = device_name
+                            self._playback_device_name = device_name
+                    self._event_queue.task_done()
 
                 case SoundAction.Stop:
                     # clear the queue and stop playback
                     if verbose: syslog.info(f"\tstop")
-                    pygame.mixer.stop()
-                    self._event_queue.task_done()        
+                    if USE_PG:
+                        pygame.mixer.stop()
+                    elif USE_SD:
+                        sd.stop()
+
+                    self._event_queue.task_done()    
+
+                    # clear the rest of the queue    
                     while not self._event_queue.empty():
                         self._event_queue.get()
                         self._event_queue.task_done()        

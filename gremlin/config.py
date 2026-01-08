@@ -1492,8 +1492,14 @@ class Configuration(QtCore.QObject):
             
     @property
     def verbose_mode_merge(self):
-        ''' true if verbose mode is in output mode '''
+        ''' true if verbose mode is in merge mode '''
         return self.verbose and VerboseMode.Merge in self.verbose_mode
+    
+                
+    @property
+    def verbose_mode_sequence(self):
+        ''' true if verbose mode is in sequence mode '''
+        return self.verbose and VerboseMode.Sequence in self.verbose_mode
     
     @property
     def verbose_mode_dev(self):

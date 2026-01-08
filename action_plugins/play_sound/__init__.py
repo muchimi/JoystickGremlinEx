@@ -44,7 +44,7 @@ import gremlin.shared_state
 syslog = logging.getLogger("system")
 
 
-USE_QT = False # use QT for playback
+
 
 class PlayMode(enum.Enum):
     AudioFile = 0 # use standard sound files
@@ -697,10 +697,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                 self._audio_device = name
                 init_mixer = True
 
-        if init_mixer:
-            if USE_QT:
-                pass
-            else:
+        if gremlin.sound.USE_PG:
+            if init_mixer:
                 self.sound.queueAction(gremlin.sound.SoundEvent.ChangeDeviceAction(name))
 
 
@@ -809,10 +807,17 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                     syslog.info("PLAY: save profile on wav generation...")
                     profile = gremlin.shared_state.current_profile
                     profile.save()
+
+    
     
     def play(self):
         ''' plays the sound '''
 
+        # ensure started
+        if not self.sound.ensureStarted():
+            syslog.error("PLAY: unable to play sound due to sound library initialization issue")
+            return
+        
         # get the sound file
         sound_file = None
         match self.mode:
@@ -825,24 +830,31 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
         if sound_file and os.path.isfile(sound_file):
             # verbose = gremlin.config.Configuration().verbose_mode_sound
+            actions = []
             if not self.key:
-                self.key = self.sound.getSoundKey(sound_file)
-                action = gremlin.sound.SoundEvent.SetVolumeAction(self.key, self.volume)
-                self.sound.queueAction(action)
-
+                self.key = self.sound.getSoundKey(sound_file) # this will be the file name for SD mode, or a GUID for PG mode
+                if gremlin.sound.USE_PG:
+                    # pg needs volume to be set 
+                    action = gremlin.sound.SoundEvent.SetVolumeAction(self.key, self.volume)
+                    actions.append(action)
+                    action = gremlin.sound.SoundEvent.ChangeDeviceAction(self.audio_device)
+                    actions.append(action)
+            
+            
             
                 
-            actions = [
-                gremlin.sound.SoundEvent.ChangeDeviceAction(self.audio_device),
-                gremlin.sound.SoundEvent.PlayAction(self.key,
-                                                    self.loops,
-                                                    self.volume,
-                                                    self.playback_ms,
-                                                    self.fadein_ms,
-                                                    self.fadeout_ms,
-                                                    self.stop_previous
+            action =  gremlin.sound.SoundEvent.PlayAction(key = self.key,
+                                                    device = self.audio_device,
+                                                    loops = self.loops,
+                                                    volume = self.volume,
+                                                    playback_ms = self.playback_ms,
+                                                    fadein_ms = self.fadein_ms,
+                                                    fadeout_ms = self.fadeout_ms,
+                                                    stop_previous = self.stop_previous,
+                                                    rate = self.tts_speed
+                                                    
                                                     )
-                ]
+            actions.append(action)                
 
             self.sound.queueActions(actions)
             
@@ -853,8 +865,6 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                 self.sound.queueAction(action)
             else:
                 syslog.error(f"PLAY: don't know how to play: {sound_file}")
-
-
     
     def findDevice(self, index : int):
         if index in self.device_map:

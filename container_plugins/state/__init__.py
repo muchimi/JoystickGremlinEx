@@ -65,6 +65,9 @@ class StateContainerWidget(AbstractContainerWidget):
 
         self.state_selector_widget = gremlin.ui.ui_common.QComboBox()
         self.state_selector_widget.currentIndexChanged.connect(self._handle_state_changed)
+        desired_height = self.state_selector_widget.sizeHint().height()
+        self.state_selector_widget.setFixedHeight(desired_height) # fix for layout issue in QT causing the box to expand vertically for some odd reason
+        
         widgets = ["State:", self.state_selector_widget]
         widget = gremlin.ui.ui_common.getGridContainer(widgets, widget_only=True)
         self.action_layout.addWidget(widget)

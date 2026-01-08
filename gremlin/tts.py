@@ -216,6 +216,7 @@ class TextToSpeech:
             try:
                 if not self.engine._inLoop:
                     self.engine.runAndWait()
+                    self.engine.stop()
             except:
                 pass
 
