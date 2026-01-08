@@ -29,7 +29,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76T148)
+### (m76T147)
 
 - Change: Play Sound and audio engine
 
@@ -51,9 +51,7 @@ No changes are needed to profiles.
 - Fix: Sequence Container: resolved a logic error with random selection and wiggle step count.
 - Updated project dependencies due to the new audio engine.
 
-### (m76T147)
-- Fix: State Container: Resolved an issue with the drop down box height.
-- Fix: Play Sound: Ensure sound library remains initialized before playing a sound across profile start/stop/restart.
+
 
 ### (m76T146A)
 - New: Sequence Container: Add (by request) a feature to execute a random number (count) of steps in the sequence container.  This is done by specifying the step count mode (a toggle), and specifying a minimum and maximum count.  When the sequence is executed, the number of steps executed will vary randomly between min and max. If both min and max are the same, the specific count will be used. The steps are picked based on the other options so the feature is cumulative with the other wiggle settings.  After the step count is reached, the sequence will automatically stop executing. It's possible for the count to never be reached depending on other options selected.  If a number of steps is specified in this mode, the sequence will pick random steps to execute until the step count (as computed randomly) is reached.  So if there are 3 actions, and the count is between 5 and 8, one of the three steps will be repeated between 5 and 8 times.
