@@ -30,7 +30,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m76T148)
-- Fix: profile start/stop logic to reset sound stop event after all active sound streams are done.  This was not resetting in some situations.
+
+- Fix: audio engine: profile start/stop logic was not resetting stop flag in some situations.
 
 ### (m76T147)
 
