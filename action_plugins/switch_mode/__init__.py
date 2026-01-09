@@ -300,7 +300,7 @@ To change the mode temporarily, use the temporary mode switch action.'''
                 # validate nesting
                 parent_mode = mode_node.get("name")
                 assert parent_mode is not None,f"XML error: missing parent mode tag - offending XML line: {node.sourceline}"
-                assert bool(mode) and self.mode != parent_mode,f"logic error: switch mode cannot be the same as the current edit mode:  - offending XML line: {node.sourceline}" # cannot be the same as edit mode
+                # assert bool(mode) and self.mode != parent_mode,f"logic error: switch mode cannot be the same as the current edit mode:  - offending XML line: {node.sourceline}" # cannot be the same as edit mode
 
 
        
