@@ -29,7 +29,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76T148)
+### (m76T149)
 - New: Description Action: option to output the description to the log when executed (new option in the global options under debug). This is a global setting and defaults to off.
 - Change: Mode Switch Action: Allow mode switch to switch to self for nested mode situations.  A mode switch to itself will be ignored.  This is because the mode switch can happen to itself if the mode switch is triggered from a descendant (child) mode because of the mode hierarchy. 
 - Change: Gated Axis: add support for mode ancestry/nesting.  Until now, gated axis would only work if the profile is mode gated axis was defined.  The change means that if gated axis is in a parent mode, it will continue triggering events for the child mode.
