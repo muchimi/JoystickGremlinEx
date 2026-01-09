@@ -4198,7 +4198,7 @@ class QDataPushButton(QtWidgets.QPushButton):
 
 
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, callback_ex = None, clicked = None, enabled = None):
+    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, callbackEx = None, clicked = None, enabled = None):
         ''' custom push button 
         
         :param text: label for the button (optiona)
@@ -4226,7 +4226,7 @@ class QDataPushButton(QtWidgets.QPushButton):
         self.clickedEx.connect(self._handle_callback_ex)
 
         self._callback = callback
-        self._callback_ex = callback_ex
+        self._callback_ex = callbackEx
         if enabled is not None:
             self.setEnabled(enabled)
         if clicked:
@@ -7514,10 +7514,10 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 class QUsedPushButton(QDataPushButton):
     ''' custom paint used button with a marker for used/unused '''
     def __init__(self, text = None, data = None, parent = None, tooltip = None,
-                 callback = None, callback_ex = None,
+                 callback = None, callbackEx = None,
                  used = False,
                  used_device_guid = None, used_input_type = None, used_input_id = None, checkable = False, checked = None):
-        super().__init__(text, data, parent, tooltip, callback = callback, callback_ex = callback_ex )
+        super().__init__(text, data, parent, tooltip, callback = callback, callbackEx = callbackEx )
         self._used = used
         self._device_guid = used_device_guid
         self._input_type= used_input_type

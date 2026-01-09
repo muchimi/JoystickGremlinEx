@@ -1109,38 +1109,38 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
         widgets = []
 
 
-        widget = gremlin.ui.ui_common.QDataPushButton("Default", callback_ex = self._handle_filter,  data = "default", tooltip = "Automatic default.\nUse Ctrl-Click to apply to all devices.")
+        widget = gremlin.ui.ui_common.QDataPushButton("Default", callbackEx = self._handle_filter,  data = "default", tooltip = "Automatic default.\nUse Ctrl-Click to apply to all devices.")
         widgets.append(widget)
         
         # show mapped button always 
-        widget = gremlin.ui.ui_common.QDataPushButton("Mapped only", callback_ex = self._handle_filter, data = "mapped", tooltip="Include mapped inputs only.\nUse Ctrl-Click to apply to all devices.")
+        widget = gremlin.ui.ui_common.QDataPushButton("Mapped only", callbackEx = self._handle_filter, data = "mapped", tooltip="Include mapped inputs only.\nUse Ctrl-Click to apply to all devices.")
         widgets.append(widget)
 
         
         if device.axis_count:
-            widget = gremlin.ui.ui_common.QDataPushButton("Hide Axis", callback_ex = self._handle_filter, data = "hide_axis", tooltip = "Remove all axes")
+            widget = gremlin.ui.ui_common.QDataPushButton("Hide Axis", callbackEx = self._handle_filter, data = "hide_axis", tooltip = "Remove all axes")
             widgets.append(widget)
-            widget = gremlin.ui.ui_common.QDataPushButton("Show Axis", callback_ex = self._handle_filter, data = "show_axis", tooltip = "Show all axes")
+            widget = gremlin.ui.ui_common.QDataPushButton("Show Axis", callbackEx = self._handle_filter, data = "show_axis", tooltip = "Show all axes")
             widgets.append(widget)
 
         if device.button_count:
-            widget = gremlin.ui.ui_common.QDataPushButton("Hide Buttons", callback_ex = self._handle_filter, data = "hide_buttons",tooltip="Remove all buttons")
+            widget = gremlin.ui.ui_common.QDataPushButton("Hide Buttons", callbackEx = self._handle_filter, data = "hide_buttons",tooltip="Remove all buttons")
             widgets.append(widget)
-            widget = gremlin.ui.ui_common.QDataPushButton("Show Buttons", callback_ex = self._handle_filter, data = "show_buttons",tooltip="Show all buttons")
+            widget = gremlin.ui.ui_common.QDataPushButton("Show Buttons", callbackEx = self._handle_filter, data = "show_buttons",tooltip="Show all buttons")
             widgets.append(widget)
 
         if device.hat_count:
-            widget = gremlin.ui.ui_common.QDataPushButton("Hide Hats", callback_ex = self._handle_filter, data = "hide_hats", tooltip = "Remove all hats")
+            widget = gremlin.ui.ui_common.QDataPushButton("Hide Hats", callbackEx = self._handle_filter, data = "hide_hats", tooltip = "Remove all hats")
             widgets.append(widget)
-            widget = gremlin.ui.ui_common.QDataPushButton("Show Hats", callback_ex = self._handle_filter, data = "show_hats", tooltip = "Show all hats")
+            widget = gremlin.ui.ui_common.QDataPushButton("Show Hats", callbackEx = self._handle_filter, data = "show_hats", tooltip = "Show all hats")
             widgets.append(widget)
 
 
-        widget = gremlin.ui.ui_common.QDataPushButton("Hide All", callback_ex = self._handle_filter,  data = "hide_all", tooltip = "Hide all inputs.\nUse Ctrl-Click to apply to all devices.")
+        widget = gremlin.ui.ui_common.QDataPushButton("Hide All", callbackEx = self._handle_filter,  data = "hide_all", tooltip = "Hide all inputs.\nUse Ctrl-Click to apply to all devices.")
         widgets.append(widget)
-        widget = gremlin.ui.ui_common.QDataPushButton("Show All", callback_ex = self._handle_filter, data = "show_all", tooltip = "Show all inputs")
+        widget = gremlin.ui.ui_common.QDataPushButton("Show All", callbackEx = self._handle_filter, data = "show_all", tooltip = "Show all inputs")
         widgets.append(widget)
-        widget = gremlin.ui.ui_common.QDataPushButton("Revert", callback_ex = self._handle_filter, data = "revert", tooltip = "Revert to current")
+        widget = gremlin.ui.ui_common.QDataPushButton("Revert", callbackEx = self._handle_filter, data = "revert", tooltip = "Revert to current")
         widgets.append(widget)
 
         widget = gremlin.ui.ui_common.getFlowContainer(widgets, widget_only=True)

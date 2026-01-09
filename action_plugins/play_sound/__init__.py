@@ -214,7 +214,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.audio_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_audio_change, source=source, value = device_index)
         self.default_widget = gremlin.ui.ui_common.QDataPushButton("Default",
-                                                                   callback_ex= self._handle_select_default,
+                                                                   callbackEx= self._handle_select_default,
                                                                    tooltip = "Select system default")
         
         

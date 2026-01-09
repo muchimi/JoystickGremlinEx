@@ -104,9 +104,9 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
             edit_mode = gremlin.shared_state.edit_mode
             self.mode_selector_widget.clear()
             for display, mode in mode_list:
-                if mode != edit_mode:
-                    # can't switch to the mode we're in
-                    self.mode_selector_widget.addItem(display, mode)
+                # if mode != edit_mode:
+                #     # can't switch to the mode we're in
+                self.mode_selector_widget.addItem(display, mode)
 
             if current_mode:
                 index = self.mode_selector_widget.findData(current_mode)
@@ -160,9 +160,9 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self.mode_selector_widget):
             return
         mode = self.mode_selector_widget.currentData()
-        if mode == gremlin.shared_state.edit_mode:
-            syslog.error(f"Invalid mode selected: {mode} selected mode cannot be the current mode")
-            return
+        # if mode == gremlin.shared_state.edit_mode:
+        #     syslog.error(f"Invalid mode selected: {mode} selected mode cannot be the current mode")
+        #     return
         if not mode:
             syslog.error(f"Invalid mode selected: selected mode cannot be NULL")
             return

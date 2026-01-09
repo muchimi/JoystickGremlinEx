@@ -108,6 +108,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self._sort_lock = False
         self._loaded = False
+        self._is_filtered = False
 
         self.id = gremlin.util.get_guid() # unique ID for this widget
 

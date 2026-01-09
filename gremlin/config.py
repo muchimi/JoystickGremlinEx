@@ -2949,3 +2949,14 @@ class Configuration(QtCore.QObject):
     @auto_calibrate.setter
     def auto_calibrate(self, value: bool):
         self._set_data("auto_calibrate", value)
+
+
+    @property
+    def log_description(self) -> bool:
+        ''' option to have the description action log an entry to the log file '''
+        return self._get_data("log_description", False)
+    @log_description.setter
+    def log_description(self, value: bool):
+        self._set_data("log_description", value)
+
+

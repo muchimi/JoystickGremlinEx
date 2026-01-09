@@ -1330,6 +1330,12 @@ class GateData():
             self._valid_mode_list = gremlin.shared_state.current_profile.get_mode_branch(self.profile_mode)
             self._valid_mode_list_profile_mode = self.profile_mode
         return self._valid_mode_list
+    
+    def ancestors(self, mode) -> list:
+        ''' get the mode ancestors for the given mode'''
+        current = gremlin.shared_state.current_profile
+        return current.get_mode_ancestors(mode)
+
 
 
 
@@ -1462,7 +1468,7 @@ class GateData():
 
         # verify the profile mode exists
         profile_mode = self.profile_mode
-        if not profile_mode in self.valid_mode_list:
+        if not profile_mode in self.valid_mode_list or not profile_mode in self.ancestors(gremlin.shared_state.current_mode):
             syslog.error(f"GATE: Mode Error: gated axis is looking for mode: [{profile_mode}] - this mode does not exist in the current profile.  GatedAxis will not trigger.  To fix, call up the gated axis action in the correct mode to reset.")
 
 
@@ -1568,10 +1574,13 @@ class GateData():
         if is_runtime:
             runtime_mode = gremlin.shared_state.runtime_mode
             if self.profile_mode != runtime_mode:
+                # check to see if the profile mode is a parent of the current mode
+                current = gremlin.shared_state.current_profile
+                ancestors = current.get_mode_ancestors(runtime_mode)
+                if not self.profile_mode in ancestors:
                 # wrong mode
-                if verbose: syslog.info(f"GATE Event: ignore joystick input: profile mode: [{self.profile_mode}] current mode: [{runtime_mode}]")
-
-                return False
+                    if verbose: syslog.info(f"GATE Event: ignore joystick input: profile mode: [{self.profile_mode}] current mode: [{runtime_mode}]")
+                    return False
             
 
             
@@ -1702,12 +1711,15 @@ class GateData():
                 else:
                     # runtime mode
 
-
-                    if not gremlin.shared_state.runtime_mode in self.valid_mode_list:
+                    runtime_mode = gremlin.shared_state.runtime_mode
+                    if runtime_mode != self.profile_mode and not runtime_mode in self.valid_mode_list and not self.profile_mode in self.ancestors(runtime_mode):
                         # incorrect mode or not started yet
                         verbose = gremlin.config.Configuration().verbose_mode_gate
                         if verbose:
                             syslog.info(f"GATED AXIS TRIGGER: FAIL - invalid mode [{gremlin.shared_state.runtime_mode}]")
+                            valid_modes = self.valid_mode_list
+                            valid_modes.extend(self.ancestors(runtime_mode))
+                            valid_modes = list(set(valid_modes)) # blitz duplicates
                             for mode in self.valid_mode_list:
                                 syslog.info(f"\tAvailable modes: [{mode}]")
                             return
@@ -1715,7 +1727,7 @@ class GateData():
 
                     # profile is running - trigger the execution node for the containers
                     # the extra data contains the trigger condition type so the correct execution path is taken
-                    if verbose: syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name}")
+                    if verbose: syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name} range: [{trigger.range.to_display()}]")
                     extra_data = {}
                     extra_data["condition_type"] = trigger.condition
                     extra_data["trigger"] = trigger

@@ -83,6 +83,10 @@ class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value, extra_data = None):
         ''' handle events '''
+        if event.is_pressed:
+            log_entry = gremlin.config.Configuration().log_description
+            if log_entry:
+                syslog.info(f"DESC: {self.action_data.description}")
         return True
 
 

@@ -1050,10 +1050,16 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_id_widget.setChecked(self.config.show_container_id)
         self.show_id_widget.clicked.connect(self._show_id_changed)
 
+        log_description_widget = ui_common.QDataCheckbox("Log description action",
+                                         tooltip="When set, a description action will create a log entry when executed.",
+                                         callbackEx =self._handle_log_description_changed,
+                                         value = self.config.log_description)
+
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Debug", transparent = True)
         box.addWidget(self.runtime_ui_update)
         box.addWidget(self.show_id_widget)
         box.addWidget(self.debug_ui)
+        box.addWidget(log_description_widget)
 
         col2_layout.addWidget(box)
 
@@ -1174,7 +1180,10 @@ There should only be one GremlinEx master server on the subnet.
         self.remote_control_server_widget.setEnabled(enabled)
 
     def _handle_reset_hidden(self, widget):
-        gremlin.config.Configuration().resetVisualHidden()
+        self.config.resetVisualHidden()
+
+    def _handle_log_description_changed(self, widget, checked):
+        self.config.log_description = checked
 
     def _create_reporting_page(self):
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
