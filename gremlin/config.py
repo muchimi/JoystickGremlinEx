@@ -1354,6 +1354,7 @@ class Configuration(QtCore.QObject):
     def verbose_mode_detailed(self):
         ''' true if verbose mode is in detail mode '''
         return self.verbose and VerboseMode.Details in self.verbose_mode
+
     
     @property
     def verbose_mode_device(self):
@@ -1504,6 +1505,12 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_dev(self):
         return self.verbose and __debug__
+    
+        
+    @property
+    def verbose_mode_mode(self):
+        ''' true if verbose mode is in Mode mode '''
+        return self.verbose and VerboseMode.Mode in self.verbose_mode
     
     @property
     def midi_enabled(self):

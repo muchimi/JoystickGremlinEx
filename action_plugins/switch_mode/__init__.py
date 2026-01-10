@@ -202,11 +202,12 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
         trigger = (event.is_pressed and self.action_data.exec_on_press) \
             or (not event.is_pressed and self.action_data.exec_on_release)
         if trigger:
-            verbose =  gremlin.config.Configuration().verbose
+            config = gremlin.config.Configuration()
+            verbose =  config.verbose_mode_mode
             new_mode = self.action_data.mode
             assert new_mode, "Invalid mode configured in mode switch - mode is not specified"
             current_mode =  gremlin.shared_state.runtime_mode
-            if verbose: syslog.info(f"ACTION SWITCH: [{self.id}] requesting mode switch from [{current_mode}] to [{new_mode}]")
+            if verbose: syslog.info(f"SWITCH MODE ACTION: [{self.id}] requesting mode switch from [{current_mode}] to [{new_mode}]")
             switch = self._last_mode is None or new_mode != self._last_mode or current_mode != new_mode
             if switch:
                 if verbose: syslog.info(f"\tswitch to [{new_mode}]")

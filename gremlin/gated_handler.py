@@ -1334,8 +1334,7 @@ class GateData():
     def ancestors(self, mode) -> list:
         ''' get the mode ancestors for the given mode'''
         current = gremlin.shared_state.current_profile
-        return current.get_mode_ancestors(mode)
-
+        return current.get_mode_ancestors(mode, include_self = True)
 
 
 
@@ -1383,13 +1382,6 @@ class GateData():
             verbose = gremlin.config.Configuration().verbose_mode_gate
             if verbose: syslog.info("GATE: hook disabled")
             jep.unregisterCallback(self.id)
-
-            # gh = GateEventHandler()
-            # gh.unregisterJoystickCallback(self.id)
-
-            # el = gremlin.event_handler.EventListener()
-            # el.joystick_event.disconnect(self._joystick_event_handler)
-            
 
 
     @property
@@ -1459,20 +1451,19 @@ class GateData():
     def stop(self):
         self._profile_stop_cb()
 
+    def validModes(self):
+        valid_modes = list(set(self.valid_mode_list + self.ancestors(gremlin.shared_state.current_mode)))
+        return valid_modes
+
+
     @QtCore.Slot()
     def _profile_start_cb(self):
         ''' profile starts - build execution callbacks by defined container '''
-        import gremlin.execution_graph
-        import gremlin.event_handler
-
-
-        # verify the profile mode exists
-        profile_mode = self.profile_mode
-        if not profile_mode in self.valid_mode_list or not profile_mode in self.ancestors(gremlin.shared_state.current_mode):
-            syslog.error(f"GATE: Mode Error: gated axis is looking for mode: [{profile_mode}] - this mode does not exist in the current profile.  GatedAxis will not trigger.  To fix, call up the gated axis action in the correct mode to reset.")
-
 
         
+        # reset last value monitored
+        self.pre_process()
+
         # build event callback maps from subcontainers in this gated axis
         callbacks_map = {}
         gates = self.getGates()
@@ -1573,15 +1564,22 @@ class GateData():
         is_runtime = gremlin.shared_state.is_running
         if is_runtime:
             runtime_mode = gremlin.shared_state.runtime_mode
-            if self.profile_mode != runtime_mode:
-                # check to see if the profile mode is a parent of the current mode
-                current = gremlin.shared_state.current_profile
-                ancestors = current.get_mode_ancestors(runtime_mode)
-                if not self.profile_mode in ancestors:
-                # wrong mode
-                    if verbose: syslog.info(f"GATE Event: ignore joystick input: profile mode: [{self.profile_mode}] current mode: [{runtime_mode}]")
+            extra_data = event.extra_data
+            force = extra_data and "gateInit" in extra_data and extra_data["gateInit"]
+            if force:
+                runtime_mode = self.profile_mode # assume we're in the correct profile mode
+                if verbose: syslog.info(f"GATE Event: initialize to axis value: [{event.value:0.3f}]")
+                
+            elif self.profile_mode != runtime_mode:
+                valid_modes = self.validModes()
+                if not runtime_mode in valid_modes:
+                    if verbose: 
+                        syslog.info(f"GATE Event: ignore joystick input: profile mode: [{self.profile_mode}] current mode: [{runtime_mode}]")
+                        syslog.info("\tList of valid modes for this gated axis:")
+                        for mode in valid_modes:
+                            syslog.info(f"\t\t{mode}")
                     return False
-            
+        
 
             
         if hasattr(self._action_data.hardware_input_id, "message_key"):
@@ -1710,19 +1708,17 @@ class GateData():
                 
                 else:
                     # runtime mode
-
-                    runtime_mode = gremlin.shared_state.runtime_mode
-                    if runtime_mode != self.profile_mode and not runtime_mode in self.valid_mode_list and not self.profile_mode in self.ancestors(runtime_mode):
-                        # incorrect mode or not started yet
-                        verbose = gremlin.config.Configuration().verbose_mode_gate
-                        if verbose:
-                            syslog.info(f"GATED AXIS TRIGGER: FAIL - invalid mode [{gremlin.shared_state.runtime_mode}]")
-                            valid_modes = self.valid_mode_list
-                            valid_modes.extend(self.ancestors(runtime_mode))
-                            valid_modes = list(set(valid_modes)) # blitz duplicates
-                            for mode in self.valid_mode_list:
-                                syslog.info(f"\tAvailable modes: [{mode}]")
-                            return
+                    # if runtime_mode != self.profile_mode and not runtime_mode in self.valid_mode_list and not self.profile_mode in self.ancestors(runtime_mode):
+                    #     # incorrect mode or not started yet
+                    #     verbose = gremlin.config.Configuration().verbose_mode_gate
+                    #     if verbose:
+                    #         syslog.info(f"GATED AXIS TRIGGER: FAIL - invalid mode [{gremlin.shared_state.runtime_mode}]")
+                    #         valid_modes = self.valid_mode_list
+                    #         valid_modes.extend(self.ancestors(runtime_mode))
+                    #         valid_modes = list(set(valid_modes)) # blitz duplicates
+                    #         for mode in self.valid_mode_list:
+                    #             syslog.info(f"\tAvailable modes: [{mode}]")
+                    #         return
     
 
                     # profile is running - trigger the execution node for the containers
@@ -1733,7 +1729,7 @@ class GateData():
                     extra_data["trigger"] = trigger
                     extra_data["source"] = "Gate Condition"
                     if trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.InRange, GateConditionType.OutsideRange):
-                    
+                        # range condition
                         if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
                         action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
                         self._ec.execute_functor_id(self._action_data.id, trigger_event, action_value, extra_data, True)
@@ -2758,6 +2754,8 @@ class GateData():
 
     def pre_process(self):
         # setup the pre-run activity
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+        if verbose: syslog.info("GATE: PreProcess reset")
         self._last_value = None
         self._last_range = None
         self._last_range_exit_trigger = None # range that triggered the last exit
@@ -4030,7 +4028,8 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         return self.process_event(event, value, extra_data)
 
     def process_event(self, event, value, extra_data : dict = None):
-        verbose = gremlin.config.Configuration().verbose_mode_gate
+        config = gremlin.config.Configuration()
+        verbose =  config.verbose_mode_gate and (config.verbose_mode_condition or config.verbose_mode_extra)
 
       
         condition_type = extra_data["condition_type"]
@@ -4415,6 +4414,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _range_description_changed(self):
         self._range_info.description = self.range_description_widget.text()
+        #syslog.info(f"range description changed to: {self._range_info.description}")
 
     @QtCore.Slot()
     def _gate_description_changed(self):

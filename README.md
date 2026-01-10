@@ -29,6 +29,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76T150A)
+- New: UI:  Device tab context menu gains a device switch menu to quickly change to another tab.  When not all tabs are visible due to window size, this avoids traversing and loading other tabs to until the desired tab can be visible. 
+- Fix: Gated Axis: removed mode validation on profile start in case the startup mode is not the default mode or the modes are not loaded yet.
+- Fix: Gated Axis: ensure triggers on profile start update using the current axis value (was initializing after the first event).
+- Fix: Gated Axis: ensure mode ancestor lookup includes self.
+
+
 ### (m76T149)
 - New: Description Action: option to output the description to the log when executed (new option in the global options under debug). This is a global setting and defaults to off.
 - Change: Mode Switch Action: Allow mode switch to switch to self for nested mode situations.  A mode switch to itself will be ignored.  This is because the mode switch can happen to itself if the mode switch is triggered from a descendant (child) mode because of the mode hierarchy. 

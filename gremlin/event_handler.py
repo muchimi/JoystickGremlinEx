@@ -2638,11 +2638,12 @@ class EventHandler(QtCore.QObject):
 
 			config = gremlin.config.Configuration()
 			verbose = config.verbose
+			verbose_detail = config.verbose_mode_mode
 			current_profile = gremlin.shared_state.current_profile
 			is_running = gremlin.shared_state.is_running
 			
 
-			if verbose:
+			if verbose_detail:
 				if is_running:
 					syslog.info(f"CHANGE MODE: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
 				else:
@@ -2774,7 +2775,7 @@ class EventHandler(QtCore.QObject):
 					gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
 					gremlin.shared_state.edit_mode = new_mode
 					self.edit_mode = new_mode
-					syslog.info(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
+					if verbose: syslog.info(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
 					if emit:
 						el.edit_mode_changed.emit(self.edit_mode)
 						

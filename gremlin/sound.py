@@ -141,6 +141,7 @@ class Sound():
         el.shutdown.connect(self._handle_shutdown)
 
         self._playback_device_name = None
+        verbose = gremlin.config.Configuration().verbose_mode_sound
         
         if USE_SD:
             # use sound device library
@@ -163,7 +164,7 @@ class Sound():
                     api_name = api['name']
                     samplerate = device['default_samplerate']
 
-                    syslog.info(f"API: [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                    if verbose: syslog.info(f"API: [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
                     if api_name == 'Windows WASAPI':
                         # only use wasapi as that has the lowest latency
                         # other choices are 'MME'

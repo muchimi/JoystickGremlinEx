@@ -1121,13 +1121,31 @@ class AbstractAction(ProfileData):
         self.condition_view = None # holds the condition view object for this action
         
 
+        self._hooked = False
         el = gremlin.event_handler.EventListener()
+        el.profile_hook.connect(self.hook)
+        el.profile_unhook.connect(self.unhook)
         el.action_created.emit(self)
         el.profile_unload.connect(self._cleanup)
         el.action_delete.connect(self._action_delete)
-        el.profile_start.connect(self.profile_start)
-        el.profile_stop.connect(self.profile_stop)
 
+
+    def hook(self):
+        if not self._hooked:
+            self._hooked = True
+            el = gremlin.event_handler.EventListener()
+            el.profile_start.connect(self.profile_start)
+            el.profile_started.connect(self.profile_started)
+            el.profile_stop.connect(self.profile_stop)
+
+    
+    def unhook(self):
+        if not self._hooked:
+            el = gremlin.event_handler.EventListener()
+            el.profile_start.disconnect(self.profile_start)
+            el.profile_started.disconnect(self.profile_started)
+            el.profile_stop.disconnect(self.profile_stop)
+            self._hooked = False
 
     def profile_start(self):
         ''' start event - override in subclass as needed '''
@@ -1135,6 +1153,10 @@ class AbstractAction(ProfileData):
 
     def profile_stop(self):
         ''' stop event - override in subclass as needed '''
+        pass
+
+    def profile_started(self):
+        ''' started event - override in subclass as needed '''
         pass
 
     def getCurves(self) -> list:

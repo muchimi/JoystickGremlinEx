@@ -491,7 +491,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         ts = gremlin.tabstate.TabState()
 
-        #has_mapping = self._has_mapping(device_guid)
         widget = self.getRegisteredWidget(device_guid)
         if device_name == "Controller (XBOX 360 For Windows)":
             object_name = f"Game Controller [{device_name}]"
@@ -848,7 +847,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tab_type = data.tab_type
         #device_guid = data.device_guid
         # substitution is only available if the profile has been saved (a new profile matches the current devices by definition)
-        is_enabled = tab_type == TabDeviceType.Joystick
+        #is_enabled = tab_type == TabDeviceType.Joystick
         #     and self.profile is not None\
         #     and self.profile.profile_file is not None\
         #     and os.path.isfile(self.profile.profile_file)
@@ -860,7 +859,27 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         #menu.addAction(self._actionTabImport)
         menu.addAction(self._actionTabRemoveDevice)
         menu.addAction(self._actionTabClearMap)
+
+        switch_menu = menu.addMenu("Switch to...")
+
+        # switch to another device
+        for index in range(self.ui.devices.count()):
+            if tab_index == index:
+                continue # skip current tab
+            data : gremlin.tabstate.TabData = self.ui.devices.tabData(index)
+            name = data.device.name
+            action = QtGui.QAction(name, self, triggered = self._create_tab_change_trigger_callback(index))
+            switch_menu.addAction(action)
+
+
         menu.exec_(QtGui.QCursor.pos())
+
+    def _create_tab_change_trigger_callback(self, index):
+        return lambda x: self._handle_tab_change_context(index)
+
+    def _handle_tab_change_context(self, index):
+        ''' changes to a new tab from the context menu '''
+        self.ui.devices.setCurrentIndex(index)
 
     def _tab_sort_cb(self):
         ''' sorts the tabs '''
@@ -4276,7 +4295,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' updates the mode status bar with current runtime and edit modes '''
         try:
 
-            verbose = gremlin.config.Configuration().verbose
+            verbose = gremlin.config.Configuration().verbose_mode_mode
             is_running = gremlin.shared_state.is_running
             runtime_mode = gremlin.shared_state.runtime_mode
 

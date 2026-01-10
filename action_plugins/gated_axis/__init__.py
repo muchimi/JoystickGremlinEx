@@ -1803,6 +1803,7 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
     def __init__(self, action_data, parent = None):
         super().__init__(action_data, parent)
         self.manual_callback = True # indicate this functor only uses manual callbacks
+        self._started = False
 
     def profile_start(self):
         ''' register the gated functor'''
@@ -1811,6 +1812,29 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     def profile_stop(self):
         self.action_data.gate_data.stop()
+        self._started = False
+
+    def profile_started(self):
+        ''' occurs after all stat init completed - update based on current axis position '''
+        if self._started:
+            return
+        self._started = True
+        gate_data : gremlin.gated_handler.GateData = self.action_data.gate_data
+        device_guid = gate_data.device_guid
+        input_id = gate_data.input_id
+        sd = gremlin.event_handler.AxisState()
+        values = sd.getAxisValues(device_guid, input_id)
+        event = gremlin.event_handler.Event(
+            event_type = InputType.JoystickAxis,
+            device_guid= gate_data.device_guid,
+            identifier = gate_data.input_id,
+            value=values.actual,
+            is_axis = True,
+            extra_data={"gateInit":True}
+        )
+        # process that data
+        gate_data._joystick_event_handler(event)
+
 
     def process_event(self, event, value, extra_data = None):
         #all the work happens in the gate widget hook function 
