@@ -53,6 +53,10 @@ import gremlin.util
 import psygnal
 from psygnal import Signal
 
+
+# autostart registry key
+REG_KEY = "GremlinEx"
+
 syslog = logging.getLogger("system")
 
 class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
@@ -714,8 +718,11 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # Start on user login
         self.start_with_windows = QtWidgets.QCheckBox("Start Gremlin Ex with Windows")
+        self.start_with_windows.setToolTip("Enables starting GremlinEx at login (GremlinEx must run as administrator)")
         self.start_with_windows.clicked.connect(self._start_windows)
         self.start_with_windows.setChecked(self._start_windows_enabled())
+        is_admin = self.is_admin()
+        self.start_with_windows.setEnabled(is_admin)
 
         # Persist clipboard to file (user profile)
         self.persist_clipboard = QtWidgets.QCheckBox(
@@ -2377,22 +2384,97 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             el = gremlin.event_handler.EventListener()
             el.osc_output_server_changed.emit()
 
+    def is_admin(self):
+        ''' check to see if the user is an administrator '''
+        import ctypes
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+
+    def _schedule_login_task(self):
+        ''' schedule the program to run as a login task via Task Scheduler '''
+        if not self.is_admin():
+            gremlin.ui.ui_common.MessageBoxWarning(prompt = "This requires GremlinEx to run in Administrator mode.")
+            return False
+        if not self._is_scheduled_task():
+            path = os.path.abspath(sys.argv[0])
+            # path = "C:\\JoystickGremlin-develop\\dist\\gremlinEx\\gremlinEx.exe"
+            result = subprocess.run(
+                  ["schtasks",
+                    "/Create",
+                    "/sc","ONLOGON",
+                    "/tn", REG_KEY,
+                    "/tr", f'"{path}"'
+                   ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+                    )
+
+            if result.returncode != 0:
+                syslog.error("AUTOSTART: Error:")
+                syslog.error(result.stderr)
+                return False
+            if result.stdout:
+                syslog.info(f"AUTOSTART: {result.stdout}")
+            return True
+    
+    def _unschedule_login_task(self):
+        ''' removes a scheduled taxk '''
+        if not self.is_admin():
+            gremlin.ui.ui_common.MessageBoxWarning(prompt = "This requires GremlinEx to run in Administrator mode.")
+            return False
+
+        if self._is_scheduled_task():
+
+            result = subprocess.run(
+                ["schtasks", "/Delete", "/TN", REG_KEY, "/F"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+                )
+            if result.returncode != 0:
+                syslog.error("AUTOSTART: Error:")
+                syslog.error(result.stderr)
+                return False
+            if result.stdout:
+                syslog.info(f"AUTOSTART: {result.stdout}")
+            return True
+
+
+    def _is_scheduled_task(self) -> bool:
+        ''' true if the task is scheduled '''
+        
+        # subprocess.run('reg delete "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /F /V "Joystick Gremlin"')
+
+        result = subprocess.run(
+            ["schtasks", "/Query", "/TN", REG_KEY],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return result.returncode == 0
+
 
     @QtCore.Slot(bool)
     def _start_windows(self, checked):
         """Set registry entry to launch Joystick Gremlin on login.
-
+        Hive location: Computer\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
         :param clicked True if launch should happen on login, False otherwise
         """
+        is_error = False
         if checked:
-            path = os.path.abspath(sys.argv[0])
-            subprocess.run(
-                f'reg add "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /V "Joystick Gremlin" /t REG_SZ /F /D "{path}"'
-            )
+            is_error = not self._schedule_login_task()
+
         else:
-            subprocess.run(
-                'reg delete "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /F /V "Joystick Gremlin"'
-            )
+            is_error = not self._unschedule_login_task()
+    
+    
+        if is_error:
+            # undo box change
+            with QtCore.QSignalBlocker(self.start_with_windows):
+                self.start_with_windows.setChecked(self._is_scheduled_task())
+        
         self.activateWindow()
 
     def _start_windows_enabled(self):
@@ -2400,17 +2482,19 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         :return True if Gremlin launches on login, False otherwise
         """
-        key_handle = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
-            )
-        key_info = winreg.QueryInfoKey(key_handle)
+        return self._is_scheduled_task()
+    
+        # key_handle = winreg.OpenKey(
+        #         winreg.HKEY_CURRENT_USER,
+        #         "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+        #     )
+        # key_info = winreg.QueryInfoKey(key_handle)
 
-        for i in range(key_info[1]):
-            value_info = winreg.EnumValue(key_handle, i)
-            if value_info[0] == "Joystick Gremlin Ex":
-                return True
-        return False
+        # for i in range(key_info[1]):
+        #     value_info = winreg.EnumValue(key_handle, i)
+        #     if value_info[0] == REG_KEY:
+        #         return True
+        # return False
 
     def _vigem_device_count_changed(self):
         self.config.vigem_device_count = self.gamepad_device_count_widget.value()

@@ -29,6 +29,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T150B)
+- Change: Start with Windows option:  Because of a QT library load fault when starting GremlinEx at logon via the run registry causing a kernel fault.  This is most likely due to dependencies not yet being available in the current version of QT. The mechanism is switched to use the Windows Task Scheduler that does not appear to have this issue as it occurs later during the login process.  Changing the setting will require GremlinEx to run in administrator mode under Windows 11 due to UAC requirements as this is considered a privileged operation.
 
 ### (m76T150A)
 - New: UI:  Device tab context menu gains a device switch menu to quickly change to another tab.  When not all tabs are visible due to window size, this avoids traversing and loading other tabs to until the desired tab can be visible. 
