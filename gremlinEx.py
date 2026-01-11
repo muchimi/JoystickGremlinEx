@@ -249,6 +249,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.mapping_changed.connect(self._mapping_changed)
         el.show_container_id_changed.connect(self._show_container_id_visible_changed)
         el.toolbar_changed.connect(self._update_toolbar)
+        el.update_mode_status_bar.connect(self._update_mode_status_bar)
+
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
@@ -285,12 +287,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self._status_bar_last_runtime_mode = None
         self._status_bar_last_edit_mode = None
-        eh = gremlin.event_handler.EventHandler()
-        eh.mode_status_update.connect(self._update_mode_status_bar)
+
 
         el.runtime_mode_changed.connect(self._runtime_mode_changed)
         el.edit_mode_changed.connect(self._edit_mode_changed)
-        el.mode_name_changed.connect(self._mode_name_changed)
+        
 
         self.tab_guids = []
 
@@ -860,6 +861,26 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         menu.addAction(self._actionTabRemoveDevice)
         menu.addAction(self._actionTabClearMap)
 
+
+        advanced_menu = menu.addMenu("Advanced...")
+
+        action = QtGui.QAction("Copy Device ID",
+                               self,
+                               triggered = self._crate_copy_device_id_callback(data.device_guid),
+                               toolTip="Copy this device's ID to the clipboard")
+        advanced_menu.addAction(action)
+
+
+        action = QtGui.QAction("Copy Device XML header",
+                               self,
+                               triggered = self._crate_copy_device_id_callback(data.device_guid, True),
+                               toolTip="Places an XML profile entry header for this device into the clipboard")
+        
+        advanced_menu.addAction(action)
+
+
+        menu.addMenu(advanced_menu)
+
         switch_menu = menu.addMenu("Switch to...")
 
         # switch to another device
@@ -873,6 +894,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
         menu.exec_(QtGui.QCursor.pos())
+
+    def _crate_copy_device_id_callback(self, device_guid, is_xml = False):
+        return lambda x: self._handle_copy_device_id_to_clipboard(device_guid, is_xml)
+
+    def _handle_copy_device_id_to_clipboard(self, device_guid, is_xml : bool = False):
+        from gremlin.clipboard import Clipboard
+        clipboard = Clipboard()
+        if is_xml:
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if device:
+                xml = f'<device name="{device.name}" label="" device-guid="{device.device_id}" type="{DeviceType.to_string(device.device_type)}">'
+                clipboard.set_windows_clipboard_text(xml)
+            else:
+                gremlin.ui.ui_common.MessageBoxWarning(prompt = "Device is not found. Cannot derive XML header.")
+        else:
+            clipboard.set_windows_clipboard_text(gremlin.util.normalize_guid(device_guid))
+
 
     def _create_tab_change_trigger_callback(self, index):
         return lambda x: self._handle_tab_change_context(index)
@@ -3122,8 +3160,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # enable highlighting
         self.pop_highlighting(True)
 
-        # update status nar
-        self._update_mode_status_bar()
 
 
     def _select_last_input(self):
@@ -4276,7 +4312,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 remote_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
 
             self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
-            self._update_mode_status_bar()
+
 
         except Exception as err:
             log_sys_error(f"Unable to update status bar event: {event}")
@@ -4286,37 +4322,47 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     @QtCore.Slot()
     def _update_mode_change(self, new_mode):
         self._update_ui_mode(new_mode)
-        self._update_mode_status_bar()
+      
+        
     
-    def _update_mode_status_bar(self):
-        gremlin.util.InvokeUiMethod(self._update_mode_status_bar_ui) # ensure on UI thread
+    def _update_mode_status_bar(self, mode : str = None):
+        gremlin.util.InvokeUiMethod(self._update_mode_status_bar_ui, mode) # ensure on UI thread
     
-    def _update_mode_status_bar_ui(self):
+    def _update_mode_status_bar_ui(self, mode : str = None):
         ''' updates the mode status bar with current runtime and edit modes '''
         try:
-
-            verbose = gremlin.config.Configuration().verbose_mode_mode
+            config =  gremlin.config.Configuration()
+            verbose = config.verbose_mode_mode
             is_running = gremlin.shared_state.is_running
-            runtime_mode = gremlin.shared_state.runtime_mode
+            
 
-            # syslog = logging.getLogger("system")
-
-
-            edit_mode = gremlin.shared_state.edit_mode
-            if not edit_mode:
-                # get it from the mode drop down
-                edit_mode = self.mode_selector.currentMode()
+                
 
 
             
             if not is_running:
-                msg = f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
+
+                # syslog = logging.getLogger("system")
+                edit_mode = mode if mode else gremlin.shared_state.edit_mode
+                if not edit_mode:
+                    # get it from the mode drop down
+                    edit_mode = self.mode_selector.currentMode()
+
+                if config.hide_default_mode and edit_mode and edit_mode.casefold() == "default":
+                    msg = ""
+                else:
+                    msg = f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
                 if self._status_bar_last_edit_mode != edit_mode:
                     if verbose: syslog.info(f"Mode: New edit mode: [{edit_mode}] (last mode [{self._status_bar_last_edit_mode}])")
                     self._status_bar_last_edit_mode = edit_mode
 
             else:
-                msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
+                runtime_mode = mode if mode else gremlin.shared_state.runtime_mode 
+
+                if config.hide_default_mode and runtime_mode and runtime_mode.casefold() == "default":
+                    msg = ""
+                else:
+                    msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
                 if self._status_bar_last_runtime_mode != runtime_mode:
                     if verbose: syslog.info(f"CHANGE MODE: To: [{runtime_mode}] (from [{self._status_bar_last_runtime_mode}])")
                     self._status_bar_last_runtime_mode = runtime_mode
@@ -4352,10 +4398,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 for tab in self._get_tab_widgets():
                     if hasattr(tab,"set_mode"):
                         tab.set_mode(new_mode)
-                # select the last input after mode change
-                # self._select_last_input()
-
-            self._update_mode_status_bar()
+            
             gremlin.util.popCursor()
 
     @QtCore.Slot(bool)
@@ -4704,7 +4747,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             el.update_input_icons.emit()
 
             # update the status bar
-            self._update_mode_status_bar()
+       
             self._update_window_title()
 
             el.pop_input_selection(True) # restore input selection and reset
@@ -4754,7 +4797,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # Make the first root node the default active mode
             self.mode_selector.populate_selector(current_profile, current_mode, emit = False)
-            self._update_mode_status_bar()
+ 
 
 
             # refresh current device tab
@@ -4955,9 +4998,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._create_recent_profiles()
 
     
-    def _mode_name_changed(self, old_mode:str, new_mode:str):
-        self._update_mode_status_bar()
-
     def _edit_mode_changed(self, mode : str):
         gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)    # ensure on UI thread
 
@@ -4967,7 +5007,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if mode:
             self.mode_selector.select_mode(mode)
             gremlin.event_handler.EventHandler().set_edit_mode(mode)
-        self._update_mode_status_bar()
+        
         self.setTabsDirty(True)
 
 
@@ -4986,8 +5026,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._process_runtime_map[self._active_process_path] = mode
             # save to JSON as well
             self.profile.set_last_runtime_mode(mode)
-
-        self._update_mode_status_bar()
 
 
     def _sanitize_profile(self, profile_data):

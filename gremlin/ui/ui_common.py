@@ -3198,7 +3198,8 @@ class ModeWidget(QtWidgets.QWidget):
         :param idx id of the now selected entry
         """
         # tell the UI about the mode change
-        new_mode = self.mode_list[idx]
+        new_mode = self.edit_mode_selector.currentData()
+        #new_mode = self.mode_list[idx]
         # syslog = logging.getLogger("system")
         syslog.info(f"Mode: edit selector request change to [{new_mode}]")
         self.edit_mode_changed.emit(new_mode)

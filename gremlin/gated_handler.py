@@ -1396,6 +1396,10 @@ class GateData():
             return self._action_data.hardware_input_id
         return None
     
+    @property
+    def input_type(self):
+        return self._input_type
+    
 
     @property
     def hooked(self) -> bool:
@@ -1452,8 +1456,8 @@ class GateData():
         self._profile_stop_cb()
 
     def validModes(self):
-        valid_modes = list(set(self.valid_mode_list + self.ancestors(gremlin.shared_state.current_mode)))
-        return valid_modes
+        ''' gets the list of modes this gated axis should process triggers for '''
+        return self.valid_mode_list
 
 
     @QtCore.Slot()
@@ -1550,6 +1554,7 @@ class GateData():
         For gate crossings, we mimic a button push (for now) so functors get both a press and release call
         
         '''
+        import gremlin.execution_graph
 
         
         if not self._action_data:
@@ -1571,6 +1576,7 @@ class GateData():
                 if verbose: syslog.info(f"GATE Event: initialize to axis value: [{event.value:0.3f}]")
                 
             elif self.profile_mode != runtime_mode:
+                # the current mode is not the mode attached to this gated axis - see if the triggers should be processed because the mode is a descendant mode
                 valid_modes = self.validModes()
                 if not runtime_mode in valid_modes:
                     if verbose: 
@@ -2754,6 +2760,8 @@ class GateData():
 
     def pre_process(self):
         # setup the pre-run activity
+        import gremlin.execution_graph
+        import anytree
         verbose = gremlin.config.Configuration().verbose_mode_gate
         if verbose: syslog.info("GATE: PreProcess reset")
         self._last_value = None
@@ -2762,6 +2770,79 @@ class GateData():
         self._last_range_enter_trigger = None # range that triggered the last enter
         self._ranges = self._get_ranges()
         self._gate_list = self._get_used_items() # ordered list of gates by index and value
+
+        # build branch modes
+        current_mode = self.profile_mode # get the mode associated with this gated axis
+
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        mode_tree = profile.mode_tree(True)
+        ec = gremlin.execution_graph.ExecutionContext()
+        action_id = self._action_data.action_id
+        current_node = ec.getNode(action_id) # the current node in the execution tree
+        device_guid = self.device_guid
+        input_id = self.input_id
+        input_type = self._input_type
+
+        mode_list = profile.getModeDescendants(current_mode)
+
+        # get all gated axis nodes in the execution tree
+        gated_axis_nodes = ec.findActions("gated-axis")
+    
+        used_modes = set()
+        if gated_axis_nodes:
+            for node in gated_axis_nodes:
+                action = node.action
+                gate_data = action.gate_data
+                # look for the nodes that match the current device/input
+                if gate_data.device_guid != device_guid:
+                    continue
+                if gate_data.input_type != input_type:
+                    continue
+                if gate_data.input_id != input_id:
+                    continue
+                # get the gated axis mode
+                mode = gate_data.profile_mode
+                # if the mode is a descendant of this mode, the mode should not be processed by this gated axis
+                if mode in mode_list:
+                    used_modes.add(mode)
+
+                
+        self._valid_mode_list = [mode for mode in mode_list if not mode in used_modes]
+        
+
+        # mode_list = list(set(self.valid_mode_list + self.ancestors(current_mode)))
+        # device_guid = self.device_guid
+        # input_id = self.input_id
+        # input_type = self._input_type
+        # device = next((d for d in profile.devices.values() if d.device_guid == device_guid),None)
+        # self._valid_mode_list = []
+        # device_name = gremlin.joystick_handling.getDeviceName(device_guid)       
+        # syslog.info(f"GATE: [{device_name} axis [{input_id}] mode: [{self.profile_mode}] compute branch modes:")
+
+
+
+
+        # if device:
+        #     for mode in mode_list:
+        #         # get the mode entry for the device
+        #         if mode in device.modes:
+        #             mode_object = device.modes[mode]
+        #             # get the input items for the device and mode
+        #             for input_items in mode_object.config.values():
+        #                 # get any input definitions that match the current gated axis device, type, and axis id
+        #                 input_item = next((ii for ii in input_items.values() if ii.input_type == input_type and ii.input_id == input_id), None)
+        #                 if input_item and not input_item.containers:
+        #                     # for the mode to be valid it cannot have a mapping for the gated axis input type and input id
+        #                     self._valid_mode_list.append(mode)
+        #                     syslog.info(f"\t > {mode}")
+                            
+
+                
+                            
+
+
+
+
 
     def _trim_list(self, data, count_max):
         count = len(data)

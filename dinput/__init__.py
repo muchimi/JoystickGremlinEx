@@ -733,16 +733,20 @@ class DeviceSummary:
                     if am.linear_index == index:
                         return am.getName() + stub
             else:
-                if index in self.axis_id_map:
-                    linear_id = self.axis_id_map[index]
-                    stub = f" L{linear_id}"
-                for am in self.axismap_list:
-                    if not hasattr(am,"axis_index"):
-                        syslog.error(f"Invalid data found for device : {self.name}")
-                        syslog.error(f"axis map contains: {self.axismap_list}")
-                        return None
-                    if am.axis_index == index:
-                        return am.getName() + stub
+                if self.connected:
+                    if index in self.axis_id_map:
+                        linear_id = self.axis_id_map[index]
+                        stub = f" L{linear_id}"
+                    for am in self.axismap_list:
+                        
+                            if not hasattr(am,"axis_index"):
+                                syslog.error(f"Invalid data found for device : {self.name}")
+                                syslog.error(f"axis map contains: {self.axismap_list}")
+                                return None
+                            if am.axis_index == index:
+                                return am.getName() + stub
+                else:
+                    return f"(disc. device) axis {index}"
         except Exception as e:
             syslog.error(f"GET AXIS NAME: unable to get axis name for device : {self.name}")
             syslog.error(f"{str(e)}")

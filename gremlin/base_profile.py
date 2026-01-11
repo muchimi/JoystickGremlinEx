@@ -3837,6 +3837,16 @@ class Profile():
                 return mode_list
         return []
             
+    def getModeDescendants(self, mode: str):
+        ''' gets the list of modes that are descendants to the specified mode '''
+        self._ensure_mode_tree()
+        if mode:
+            node = anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
+            if node:
+                mode_list = [node.name]
+                mode_list.extend([n.name for n in node.descendants if n.name])
+                return mode_list
+        return []
 
 
 
@@ -5531,6 +5541,8 @@ class Profile():
                                 action = self._findInputitemAction(item, action_id)
                                 if action: return action
         return None
+    
+    
                                
 
 

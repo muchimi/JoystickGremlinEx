@@ -778,9 +778,9 @@ class MacroActionEditor(QtWidgets.QWidget):
 
             elif action.input_type == InputType.JoystickButton:
                 if not "button_press" in self.ui_elements.keys():
-                    self.ui_elements["button_press"] = gremlin.ui.ui_common.QDataRadioButton("Press", data = "press", callback = self._modify_button_state)
-                    self.ui_elements["button_release"] = gremlin.ui.ui_common.QDataRadioButton("Release", data = "release", callback = self._modify_button_state)
-                    self.ui_elements["button_toggle"] = gremlin.ui.ui_common.QDataRadioButton("Toggle", data = "toggle", callback = self._modify_button_state)
+                    self.ui_elements["button_press"] = gremlin.ui.ui_common.QDataRadioButton("Press", data = "press", callbackEx = self._modify_button_state)
+                    self.ui_elements["button_release"] = gremlin.ui.ui_common.QDataRadioButton("Release", data = "release", callbackEx = self._modify_button_state)
+                    self.ui_elements["button_toggle"] = gremlin.ui.ui_common.QDataRadioButton("Toggle", data = "toggle", callbackEx = self._modify_button_state)
                     if isinstance(action.value, bool):
                         action.value = "press" if action.value else "release"
                     
@@ -939,8 +939,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
 
     @QtCore.Slot(bool)
-    def _modify_button_state(self, state):
-        widget = self.sender()
+    def _modify_button_state(self, widget, state):
         action = self.model.get_entry(self.index.row())
         action.value = widget.data
         self._update_model()

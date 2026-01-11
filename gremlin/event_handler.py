@@ -686,8 +686,8 @@ class EventListener:
 	mode_list_update = Signal() # runs when mode lists changes
 	profile_modes_changed = Signal() # occurs when the hierarchy, or list of modes changed for a given profile (mode added, removed, changed or renamed)
 	execution_context_changed = Signal() # occurs when execution context changes 
-
 	runtime_mode_changed = Signal(str) # runs when the runtime profile mode changes (runtime mode only, when a profile has been started) - param - the mode changed to
+	update_mode_status_bar = Signal(str) # request to update the mode status bar (mode)
 
 	# functor enable flag changed
 	action_created = Signal(object) # runs when an action is created - object = the object that triggered the event 
@@ -2048,10 +2048,13 @@ class EventHandler(QtCore.QObject):
 		self._last_tts_data = TTSNotifyData() # last mode that triggered a TTS verbal notice
 		self._change_mode_callback = None # change mode handler 
 		el = EventListener()
+		el.runtime_mode_changed.connect(self._update_mode_change)	
 		el.profile_start.connect(self._profile_start)
 		el.profile_stop.connect(self._profile_stop)
 		el.profile_started.connect(self._profile_started)
-		el.runtime_mode_changed.connect(self._update_mode_change)
+
+		
+
 		self._lock = threading.Lock()
 		self._started = False
 		self._execute_queue = [] # list of items to execute
@@ -2583,11 +2586,15 @@ class EventHandler(QtCore.QObject):
 		''' sets the active runtime mode '''
 		assert new_mode,"Mode cannot be blank"
 		gremlin.shared_state.runtime_mode = new_mode
+		el = EventListener()
+		el.update_mode_status_bar.emit(new_mode)
 
 	def set_edit_mode(self, new_mode):
 		''' sets the active edit mode '''
 		assert new_mode,"Mode cannot be blank"
 		gremlin.shared_state.edit_mode = new_mode
+		el = EventListener()
+		el.update_mode_status_bar.emit(new_mode)
 
 	@QtCore.Slot(str)
 	def _update_mode_change(self, mode):
@@ -2757,6 +2764,8 @@ class EventHandler(QtCore.QObject):
 					if verbose: syslog.info(f"CHANGE MODE: [{current_profile.name}] - Runtime Mode switch to: {new_mode}")
 					if emit:
 						el.runtime_mode_changed.emit(new_mode)
+						el.update_mode_status_bar.emit(new_mode)
+
 
 					# fire mode change for mode enter (press + release)
 					m2_list, f2_list = self.execute_event(event_enter_pressed)
@@ -2778,6 +2787,7 @@ class EventHandler(QtCore.QObject):
 					if verbose: syslog.info(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
 					if emit:
 						el.edit_mode_changed.emit(self.edit_mode)
+						
 						
 			el.pop_input_selection()
 

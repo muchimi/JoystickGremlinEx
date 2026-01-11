@@ -697,6 +697,31 @@ class ExecutionContext():
         node = next((node for node in anytree.PreOrderIter(self.graph) if node.id == id), None)
         return node
     
+
+    
+    def findActions(self, action_name : str):
+        ''' find, in the execution tree, '''
+        if not action_name:
+            return None
+        current_node = self.getNode(id)
+        def filter(node):
+            nonlocal action_name
+            if node.nodeType == ExecutionGraphNodeType.Action:
+                if isinstance(node.functors, list):
+                    for functor in node.functors:
+                        if functor.action_data.tag == action_name:
+                            return True
+                else:
+                    functor = node.functors
+                    if functor.action_data.tag == action_name:
+                        return True
+            return False
+
+         # ExecutionGraphNodeType.Action, "nodeType"):
+        root = self.graph
+        node_list = anytree.findall(root, filter_= filter)
+        return node_list
+    
     def getNodeActivationConditions(self, id) -> list:
         ''' gets a list of activation condition nodes for a given node ID (container or action)'''
         activation_conditions = []
