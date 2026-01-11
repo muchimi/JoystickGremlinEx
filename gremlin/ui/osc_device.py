@@ -2953,11 +2953,12 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._mode_on_change_widget.clicked.connect(self._mode_change_cb)
         self._mode_locked_widget = gremlin.ui.ui_common.QIconLabel()
 
-        self._trigger_on_message_widget = QtWidgets.QCheckBox("Trigger on message")
-        if self._trigger_autorelease is not None:
-            self._trigger_on_message_widget.setChecked(self._trigger_autorelease)
-        self._trigger_on_message_widget.clicked.connect(self._autorelease_change_cb)
-        self._trigger_on_message_widget.setToolTip("When enabled, receiving a message regardless of parameter will trigger the action with an autorelease.<br>Use this option when the OSC source message does not send >0 for press, 0 for release.")
+        self._trigger_on_message_widget = gremlin.ui.ui_common.QDataCheckbox("Trigger on message",
+                                                                             value =  self.input_item._trigger_autorelease, 
+                                                                             callbackEx=self._autorelease_change_cb,
+                                                                             tooltip = "When enabled, receiving a message regardless of parameter will trigger the action with an autorelease.<br>Use this option when the OSC source message does not send >0 for press, 0 for release."
+        )
+        
         self._trigger_on_message_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self._pulse_delay, callback = self._pulse_value_changed)
         
         self._container_trigger_widget = gremlin.ui.ui_common.getHContainer([self._trigger_on_message_widget, self._trigger_on_message_delay_widget], widget_only = True)
@@ -3170,7 +3171,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             self._update_display()
 
     @QtCore.Slot(bool)
-    def _autorelease_change_cb(self, checked):
+    def _autorelease_change_cb(self, widget, checked):
+        self._trigger_autorelease = checked
         self.input_item._trigger_autorelease = checked
         self._update_display()
 
@@ -4524,6 +4526,7 @@ class InputOscClient(QtCore.QObject):
                         is_axis = is_axis)
 
                     self._event_listener.osc_event.emit(event)
+
                     if not gremlin.shared_state.is_running:
                         self._event_listener.button_state_change.emit(event)
 
@@ -4558,7 +4561,7 @@ class InputOscClient(QtCore.QObject):
                                 raw_value = args[0]
                                 value = normalized_args[0]
                             
-                            event.value = value
+                            event.value = raw_value
                             event.raw_value = raw_value
                             event.data = normalized_args
                             

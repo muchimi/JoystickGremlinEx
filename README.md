@@ -35,6 +35,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: Axis data: do not attempt to get axis names for disconnected devices at profile load.
 - Fix: Gated Axis: tweaked valid mode filter for the current branch for situations when multiple gated axis actions for the same input are mapped in a child mode.  
 - Fix: UI: mode status bar update refactor
+- Fix: Keyboard Ex: auto release should not be enabled in hold mode
+- Fix: OSC: autorelease mode change is ignored when unchecked.
+- Fix: OSC: input highlighting when enabled.
 
 ### (m76T150B)
 - Change: Start with Windows option:  A QT library load fault when starting GremlinEx at logon via the run registry causes a kernel fault.  This is most likely due to dependencies not yet being available in the current version of QT. The mechanism is switched to use the Windows Task Scheduler that does not appear to have this issue as it occurs later during the login process.  Changing the setting will require GremlinEx to run in administrator mode under Windows 11 due to UAC requirements as this is considered a privileged operation.

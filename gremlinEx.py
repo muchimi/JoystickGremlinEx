@@ -693,7 +693,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # tab switch is disabled
             return
         
-        input_switch_needed = tab_switch_needed or self._inputswitch_needed(device_guid, input_id)
+        input_switch_needed = True # tab_switch_needed or self._inputswitch_needed(device_guid, input_id)
 
         if not input_switch_needed:
             # not setup to auto change tabs (override via shift/control keys)

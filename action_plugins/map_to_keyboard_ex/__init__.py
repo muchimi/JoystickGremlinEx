@@ -679,7 +679,9 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value, extra_data = None):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
-        # verbose = True
+        auto_release = False
+
+        #verbose = True
         (is_local, is_remote) = input_devices.remote_state.state
         is_pressed = event.is_pressed
         trigger = (is_pressed and self.action_data.exec_on_press) or \
@@ -721,7 +723,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
                 case KeyboardOutputMode.Hold:
                     if self.has_keys:
-                        auto_release = self.needs_auto_release
+                        
                         if event.is_virtual_button:
                             # if using a virtual button to trigger - disable the auto-release
                             auto_release = False
@@ -796,14 +798,6 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                     # setup autorepeat thread
                     repeat_interval =  self.action_data.autorepeat_delay/1000
                     self.pulse_start(self.action_data.keys, self.action_data.delay/1000, repeat_interval)
-                                  
-                  
-
-
-
-
-                    
-
         else:
             # release
             if self.has_keys:

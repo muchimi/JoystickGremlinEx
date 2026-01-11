@@ -2386,11 +2386,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
     def is_admin(self):
         ''' check to see if the user is an administrator '''
-        import ctypes
-        try:
-            return ctypes.windll.shell32.IsUserAnAdmin()
-        except:
-            return False
+        return gremlin.util.is_user_admin()
+        
 
     def _schedule_login_task(self):
         ''' schedule the program to run as a login task via Task Scheduler '''
@@ -2422,6 +2419,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     
     def _unschedule_login_task(self):
         ''' removes a scheduled taxk '''
+
         if not self.is_admin():
             gremlin.ui.ui_common.MessageBoxWarning(prompt = "This requires GremlinEx to run in Administrator mode.")
             return False
