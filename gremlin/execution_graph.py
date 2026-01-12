@@ -770,10 +770,10 @@ class ExecutionContext():
                 if not mode:
                     # reached the top level
                     break
-                if verbose: syslog.info(f"CONTEXT: Search callbacks for mode : {mode} {key}")
+                if verbose: syslog.info(f"CONTEXT: Search callbacks for mode: [{mode}] key: [{key}]")
                 callback_list = callbacks.get(mode, {}).get(key, [])
                 if callback_list:
-                    if verbose: syslog.info(f"\tFound callbacks for mode : {mode} key: {key}")
+                    if verbose: syslog.info(f"\tFound callbacks for mode: [{mode}] key: [{key}]")
                     break
                 # bump to parent node if not found
                 node = node.parent

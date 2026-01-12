@@ -664,6 +664,7 @@ class EventListener:
 	request_profile_stop = Signal(str) # request the profile to stop (message to display: str)
 	request_profile_reload = Signal(str, bool) # request a profile to load (str = profile file, bool = as new profile flag)
 	request_reload = Signal() # request a reload of the current profile data
+	request_ui_refresh = Signal() # request a UI refresh
 	
 	
 	process_monitor_changed = Signal() # process monitor options changed
@@ -2640,14 +2641,15 @@ class EventHandler(QtCore.QObject):
 		el = EventListener()
 		try:
 		
-
-			gremlin.util.pushCursor()
+			is_running = gremlin.shared_state.is_running
+			
+			if not is_running: gremlin.util.pushCursor()
 
 			config = gremlin.config.Configuration()
 			verbose = config.verbose
 			verbose_detail = config.verbose_mode_mode
 			current_profile = gremlin.shared_state.current_profile
-			is_running = gremlin.shared_state.is_running
+			
 			
 
 			if verbose_detail:
@@ -2802,7 +2804,7 @@ class EventHandler(QtCore.QObject):
 			# fire the UI update on change mode      
 			el.update_input_state.emit(device_guid)  # force a UI widget status update	
 		finally:	
-			gremlin.util.popCursor()
+			if not is_running: gremlin.util.popCursor()
 
 		
 	def _create_change_mode_callback(self, event, m_list, f_list):

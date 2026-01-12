@@ -690,10 +690,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
     """
 
     # shared wiggle thread
-    _wiggle_local_thread = None
-    _wiggle_remote_thread = None
-    _wiggle_local_stop_requested = False
-    _wiggle_remote_stop_requested = False
+    
     _State_controller = None
 
 
@@ -703,7 +700,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         :param action contains parameters to use with the functor
         """
         super().__init__(action, parent)
-        self.lock = threading.Lock()
+        
         self._started = False
         
         self.verbose = gremlin.config.Configuration().verbose_mode_state
@@ -813,16 +810,18 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                     self.action_data.state.value = last
             case SyncMode.Ignore:
                 pass
+
+
                 
         
     def profile_started(self):
         # occurs on profile start once profile start sequence is completed
         self._started = True
 
+
     def profile_stop(self):
         # occurs on profile stop
         self._started = False
-
 
         if self.action_data.reset_default_on_stop:
             if self.verbose: syslog.info("MAP TO STATE: reset state on profile stop enabled")
@@ -843,7 +842,12 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                     if self.verbose: syslog.info(f"\t[{state.key}] -> {state.value}")
                     
         
+    def profile_mode_changed(self, mode : str):
+        ''' called when the runtime mode changes '''
 
+        # terminate any pulse
+        for key in self.pulse_worker_map:
+            self.pulse_stop(key)
         
     def _pulse_on(self, data):
         ''' called when pulse is off '''
@@ -885,7 +889,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             worker.stop()
             del self.pulse_worker_map[key]
 
-
+    
 
 
 
@@ -983,7 +987,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                                     if verbose: syslog.info(f"STATE FUNCTOR: trigger stop pulse state {state_name} hat {position}")
                                     self.pulse_stop(state_name)
 
-                                    # threading.Timer(0.01, self._fire_pulse, [self.vjoy_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
+                                    
                             case ButtonOutputMode.Hold:
                                 pass
                                 

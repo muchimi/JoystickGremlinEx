@@ -1325,10 +1325,74 @@ class GateData():
     @property
     def valid_mode_list(self) -> list:
         ''' gets the list of valid profile modes this gate axis can be used for '''
-        if not self._valid_mode_list or self._valid_mode_list_profile_mode != self.profile_mode:
+        current_mode = self.profile_mode
+        if not self._valid_mode_list or self._valid_mode_list_profile_mode != current_mode:
             # reload valid profile branches
-            self._valid_mode_list = gremlin.shared_state.current_profile.get_mode_branch(self.profile_mode)
+            #self.pre_process()
+            
+            mode_list = gremlin.shared_state.current_profile.get_mode_branch(current_mode, ancestors = True, descendants = True)
+            descendant_list = gremlin.shared_state.current_profile.get_mode_branch(current_mode, ancestors = False, descendants = True)
+            descendant_list.remove(current_mode)
+            ancestor_list = gremlin.shared_state.current_profile.get_mode_branch(current_mode, ancestors = True, descendants = False)
+            ancestor_list.remove(current_mode)
+            ec = gremlin.execution_graph.ExecutionContext()
+            gated_axis_nodes = ec.findActions("gated-axis")
+            device_guid = self.device_guid
+            input_id = self.input_id
+            input_type = self._input_type
+            used_modes = set()
+            remove_modes = set()
+            if gated_axis_nodes:
+                for node in gated_axis_nodes:
+                    action = node.action
+                    gate_data = action.gate_data
+                    mode = gate_data.profile_mode
+
+         
+                    
+                    # look for the nodes that match the current device/input
+                    if gate_data.device_guid != device_guid:
+                        continue
+                    if gate_data.input_type != input_type:
+                        continue
+                    if gate_data.input_id != input_id:
+                        continue
+
+                    # add the mode the gated axis is found for this input
+                    used_modes.add(mode)
+
+                    # if we get here, the gated axis is mapped to the same input
+                    if mode in descendant_list:
+                        # remove this mode because it will be handled by that gated axis
+                        remove_modes.add(mode)
+                        # and this mode's descendants
+                        mode_descendants = gremlin.shared_state.current_profile.get_mode_branch(mode, ancestors = False, descendants = True)
+                        for mode in mode_descendants:
+                            remove_modes.add(mode)
+
+
+            self._valid_mode_list = [mode for mode in mode_list if not mode in remove_modes]
             self._valid_mode_list_profile_mode = self.profile_mode
+            
+            verbose = gremlin.config.Configuration().verbose_mode_gate
+            if verbose:
+                syslog.info(f"Modes with gated axis for the same input:")
+                for mode in used_modes:
+                    syslog.info(f"\t{mode}")
+                
+                syslog.info(f"Current gate axis mode: {current_mode}")
+                syslog.info(f"Descendant modes:")
+                for mode in descendant_list:
+                    syslog.info(f"\t{mode}")
+                syslog.info(f"Ancestor modes:")
+                for mode in ancestor_list:
+                    syslog.info(f"\t{mode}")
+
+                syslog.info(f"Valid modes for this gated axis: {current_mode}")
+                for mode in self._valid_mode_list:
+                    syslog.info(f"\t{mode}")
+
+            
         return self._valid_mode_list
     
     def ancestors(self, mode) -> list:
@@ -1359,13 +1423,6 @@ class GateData():
                 ui_only = False,
                 persist = False,
                 description = description)
-            
-            # gh = GateEventHandler()
-            # gh.registerJoystickCallback(self.id, self._joystick_event_handler)
-
-            # el = gremlin.event_handler.EventListener()
-            # el.joystick_event.connect(self._joystick_event_handler)
-
 
             if self._action_data.input_is_hardware():
                 self._axis_value = gremlin.joystick_handling.get_axis(self._action_data.hardware_device_guid, self._action_data.hardware_input_id)
@@ -1373,6 +1430,7 @@ class GateData():
                 self._axis_value = self._action_data.hardware_input_id.axis_value
         
 
+        
 
     def unhook(self):
         ''' unhook events '''
@@ -1472,6 +1530,8 @@ class GateData():
         callbacks_map = {}
         gates = self.getGates()
         self.updateRanges() # ensure we have the latest ranges
+
+        self._valid_mode_list.clear() # rebuild the valid mode list
 
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         # verbose = True
@@ -1579,7 +1639,7 @@ class GateData():
                 # the current mode is not the mode attached to this gated axis - see if the triggers should be processed because the mode is a descendant mode
                 valid_modes = self.validModes()
                 if not runtime_mode in valid_modes:
-                    if verbose: 
+                    if verbose:
                         syslog.info(f"GATE Event: ignore joystick input: profile mode: [{self.profile_mode}] current mode: [{runtime_mode}]")
                         syslog.info("\tList of valid modes for this gated axis:")
                         for mode in valid_modes:
@@ -2775,13 +2835,15 @@ class GateData():
         current_mode = self.profile_mode # get the mode associated with this gated axis
 
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        mode_tree = profile.mode_tree(True)
+        
         ec = gremlin.execution_graph.ExecutionContext()
         action_id = self._action_data.action_id
-        current_node = ec.getNode(action_id) # the current node in the execution tree
+        #current_node = ec.getNode(action_id) # the current node in the execution tree
         device_guid = self.device_guid
         input_id = self.input_id
         input_type = self._input_type
+
+        # branch_mode_list = gremlin.shared_state.current_profile.get_mode_branch(self.profile_mode, ancestors = True, descendants = True)
 
         mode_list = profile.getModeDescendants(current_mode)
 

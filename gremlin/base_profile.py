@@ -437,6 +437,7 @@ class AbstractContainer(ProfileData, ConditionContainer):
         self._callbacks_enabled = True # callbacks are enabled by default for this container
         self._collapsed = False # true if the container is collapsed
         self.actionsetParseCallback = None # callback to use when parsing action set if it has additional data (node), returns an action set
+        self.definition_mode = self.get_mode()
 
         el = gremlin.event_handler.EventListener()
         el.virtual_button_changed.connect(self._virtual_button_changed)
@@ -3847,6 +3848,7 @@ class Profile():
                 mode_list.extend([n.name for n in node.descendants if n.name])
                 return mode_list
         return []
+
 
 
 

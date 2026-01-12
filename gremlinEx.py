@@ -250,6 +250,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.show_container_id_changed.connect(self._show_container_id_visible_changed)
         el.toolbar_changed.connect(self._update_toolbar)
         el.update_mode_status_bar.connect(self._update_mode_status_bar)
+        el.request_ui_refresh.connect(self.refresh)
 
 
         # highlighing options

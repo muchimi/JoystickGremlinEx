@@ -580,8 +580,9 @@ class StateInputItem(gremlin.base_profile.InputItem):
         
     def setValue(self, data : bool, force = False):
         if data is None or not isinstance(data, bool):
-            syslog.warning(f"State setter: state: [{self.key}] id: [{self.id}] attempt to set invalid value [{data}]")
-            return
+            syslog.warning(f"State setter: state: [{self.key}] id: [{self.id}] attempt to set unrecognized value [{data}] - defaulting state to default value: [{self.default_value}]")
+            data = self.default_value
+            
         if self._autorelease_timer:
             self._autorelease_timer.cancel()
             self._autorelease_timer = None

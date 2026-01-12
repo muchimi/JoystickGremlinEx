@@ -325,10 +325,11 @@ class StateCondition(AbstractCondition):
       
         sd = gremlin.ui.state_device.StateData()
         value = sd.value(self.key)
+        
 
         if verbose:
             logtabs = gremlin.shared_state.logTabs(True)
-            state_stub = f"StateCondition: key: [{self.key}] comparison: [{self.comparison}] received value: [{value}] ignore release: [{self.ignore_release}]"
+            state_stub = f"StateCondition: key: [{self.key}] comparison: [{self.comparison}] current state value: [{value}] ignore release: [{self.ignore_release}]"
 
         if value is None:
             # success if the state is not found

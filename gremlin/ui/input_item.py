@@ -917,7 +917,8 @@ class InputItemListView(ui_common.AbstractView):
             self.update()
 
     def redraw_index(self, index : int):
-        gremlin.util.InvokeUiMethod(self._redraw_index_ui, index) # ensure on UI thread
+        if not gremlin.shared_state.is_running:
+            gremlin.util.InvokeUiMethod(self._redraw_index_ui, index) # ensure on UI thread
 
 
     def _redraw_index_ui(self, index : int):
@@ -2513,12 +2514,18 @@ class InputItemWidget(QBoxFrame):
 
     def _update_display_ui(self):
         ''' updates the display text for the button, custom content and input enabled '''
+        
+        
+        if gremlin.shared_state.is_running:
+            return # do not update UI at runtime
+
 
         if self._ui_loaded:
-            config = gremlin.config.Configuration()
+            config = gremlin.config.Configuration() 
             power_visible = config.show_input_enable
             if power_visible:
                 if not self._input_button_widget:
+                    
                     size = self._getIconSize()
                     self._input_button_widget = QtWidgets.QPushButton() 
                     self._input_button_widget.setIcon(self._input_icon_active)

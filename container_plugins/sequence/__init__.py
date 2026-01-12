@@ -40,7 +40,30 @@ from gremlin.input_types import InputType
 from PySide6 import QtCore
 from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
+from gremlin.singleton_decorator import SingletonDecorator
 syslog = logging.getLogger("system")
+
+
+@SingletonDecorator
+class GlobalSequence():
+    ''' holds global sequence stats '''
+    def __init__(self):
+        self.sequence_count = 0 # number of active sequences
+
+    def canExecute(self):
+        max_concurrent = gremlin.config.Configuration().max_concurrent_sequence
+        return self.sequence_count + 1 < max_concurrent
+        
+    def pushSequence(self):
+        self.sequence_count += 1
+    
+    def popSequence(self):
+        if self.sequence_count:
+            self.sequence_count -= 1
+
+
+# instance
+_global_sequence = GlobalSequence()
 
 
 class StepOptions():
@@ -822,56 +845,99 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
-        self._verbose = gremlin.config.Configuration().verbose_mode_container
-        self._verbose_extra = self._verbose
+        config = gremlin.config.Configuration()
+        self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
+        self._verbose_extra = self._verbose and config.verbose_mode_extra
         self._is_running = False
 
     def profile_start(self):
         self._is_running = False
         
-
+        config = gremlin.config.Configuration()
+        self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
+        self._verbose_extra = self._verbose and config.verbose_mode_extra
+        gs = GlobalSequence()
+        gs.sequence_count = 0
+ 
 
     def profile_stop(self):
         # stop wiggling
         self.stop_wiggle()
         self.stop_normal()
 
+        
+
+    def profile_mode_changed(self, mode : str):
+        ''' called when the runtime mode changes '''
+        
+        # kill any executing timers on mode change
+        if gremlin.config.Configuration().macro_mode_affinity:
+            if self._is_running:
+                if self._verbose: syslog.info(f"SEQUENCE: affinity: stop sequence runner due to mode change")
+                self._is_running = False
+                if self._thread.is_alive():
+                    self._thread.join()
+                self._thread = None       
+
+        # reset
+        self.action_data.last_step = None
 
     def start_wiggle(self):
         ''' starts the wiggle process '''
-        if not self._is_running:
-            syslog.info(f"SEQUENCE: start wiggle sequence runner")
-            self._is_running = True
-            self._thread = threading.Thread(target = self._wiggle_runner)
-            self._thread.name = "wiggle runner"
-            self._thread.start()
 
+        gs = GlobalSequence()
+        if gs.canExecute():
+            if not self._is_running:
+                
+                self._is_running = True
+                self._thread = threading.Thread(target = self._wiggle_runner)
+                self._thread.name = "wiggle runner"
+                # increase concurrency count
+                gs.pushSequence()
+                self._thread.start()
+                if self._verbose: syslog.info(f"SEQUENCE: start wiggle sequence runner: concurrency: [{gs.sequence_count}]")
+                
+        else:
+            syslog.error("SEQUENCE: exceeded concurrent sequence limit")
 
     def stop_wiggle(self):
         ''' stops the wiggle process '''
         if self._is_running:
-            syslog.info(f"SEQUENCE: stop wiggle sequence runner")
+            if self._verbose: syslog.info(f"SEQUENCE: stop wiggle sequence runner")
             self._is_running = False
             self._thread.join()
             self._thread = None
+            # reduce concurrency count
+            gs = GlobalSequence()
+            gs.popSequence()
 
     def start_normal(self):
         ''' starts the wiggle process '''
-        if not self._is_running:
-            syslog.info(f"SEQUENCE: start sequence runner")
-            self._is_running = True
-            self._thread = threading.Thread(target = self._normal_runner)
-            self._thread.name = "sequence runner"
-            self._thread.start()
+        gs = GlobalSequence()
+        if gs.canExecute():
+            if not self._is_running:
+                
+                self._is_running = True
+                self._thread = threading.Thread(target = self._normal_runner)
+                self._thread.name = "sequence runner"
+                # increase concurrency count
+                gs.pushSequence()
+                self._thread.start()
+                if self._verbose: syslog.info(f"SEQUENCE: start sequence runner: concurrency: [{gs.sequence_count}]")
+        else:
+            syslog.error("SEQUENCE: exceeded concurrent sequence limit")
 
 
     def stop_normal(self):
         ''' stops the wiggle process '''
         if self._is_running:
-            syslog.info(f"SEQUENCE: stop sequence runner")
+            if self._verbose: syslog.info(f"SEQUENCE: stop sequence runner")
             self._is_running = False
             if self._thread.is_alive():
                 self._thread.join()
+            # reduce concurrency count
+            gs = GlobalSequence()
+            gs.popSequence()                
             self._thread = None            
 
 
@@ -880,8 +946,6 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         if not self.valid:
             return False
         
-        config =  gremlin.config.Configuration()
-        verbose = config.verbose_mode_container or config.verbose_mode_sequence
         
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
@@ -893,8 +957,10 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
         is_pressed = event.is_pressed
         mode = self.action_data.mode
+
+        verbose = self._verbose
         
-        if verbose:
+        if verbose: 
             profile_mode = gremlin.shared_state.current_mode
             if self.action_data.comment:
                 syslog.info(f"SEQUENCE EVENT: sequence {self.action_data.comment}") 

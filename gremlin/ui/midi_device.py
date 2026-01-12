@@ -512,7 +512,7 @@ class MidiListener(AbortableThread):
         self.port_number = port_number
         self.port_name = port_name
         self.callback = callback
-        self.name = "MIDI listener"
+        self.name = f"MIDI listener - port [{port_number}]"
 
     def run(self):
         verbose = gremlin.config.Configuration().verbose_mode_midi
@@ -648,6 +648,7 @@ class MidiInterface(QtCore.QObject):
                 listener.join()
             if verbose:
                 syslog.info(f"MIDI Interface: port [{port_number}] stopped")
+            self._listeners[port_number] = None
             del self._listeners[port_number]
 
         # clear

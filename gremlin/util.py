@@ -654,27 +654,7 @@ def get_dll_version(path, as_string = True):
         return None
 
 
-# def get_vjoy_driver_version() -> str:
-#     ''' gets the vjoy driver version on the current machine '''
-#     import subprocess, sys
-#     p = subprocess.Popen(["powershell.exe",
-#                 "Get-WmiObject Win32_PnPSignedDriver | select devicename, driverversion | ConvertTo-CSV"],
-#                 stdout=subprocess.PIPE,
-#                 startupinfo=subprocess.STARTUPINFO(dwFlags=subprocess.STARTF_USESHOWWINDOW, wShowWindow=subprocess.SW_HIDE,)
-#     )
-#     p_out, p_err = p.communicate()
 
-#     if not p_out:
-#         return None
-#     p_out = p_out.decode('ascii').lower() # binary string to regular string
-#     # convert to dict
-#     for line in p_out.split("\n"):
-#         # if "vjoy" in line:
-#         #     pass
-#         if  "vjoy device" in line:
-#             _, version = line.split(",")
-#             return version.replace("\r","").replace("\"","")
-#     return None
 
 def version_valid(v, v_req):
     ''' compares two versions
@@ -722,7 +702,10 @@ def find_files(root_folder, source_pattern = "*") -> list:
     
     wd = os.getcwd()
     os.chdir(root_folder)
-    process = subprocess.Popen(["cmd", "/c", "dir", source_pattern, "/b","/s"],creationflags=subprocess.CREATE_NO_WINDOW, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(
+        ["cmd", "/c", "dir", source_pattern, "/b","/s"],
+        creationflags=subprocess.CREATE_NO_WINDOW,
+        stdout=subprocess.PIPE)
     out, err = process.communicate()
     os.chdir(wd)
     encoding = 'utf-8'
@@ -742,7 +725,6 @@ def find_files(root_folder, source_pattern = "*") -> list:
 
 def find_folders(root_folder, source_pattern = "*") -> list:
     ''' looks for a subfolder off the root folder '''
-    import subprocess
     if not os.path.isdir(root_folder):
         return []
     

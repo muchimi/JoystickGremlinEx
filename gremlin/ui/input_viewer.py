@@ -239,6 +239,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         #gremlin.util.clear_layout(self.main_layout)
         change_callback = self._change_callback
 
+
         dev : dinput.DeviceSummary
         for dev in self._devices:
             
@@ -618,6 +619,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self.refresh)
+        el.profile_unhook.connect(self.reload)
 
 
     
@@ -671,9 +673,18 @@ States can be toggled by clicking on the state button.  Expression states will u
         ''' clean up'''
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.disconnect(self.refresh)
+        el.profile_unhook.disconnect(self.refresh)
 
+        gremlin.util.clear_layout(self.main_layout)
+        self._state_filter_widget = None
+        self._state_visualizer_widget = None
+        self._state_buttons.clear()
+        self._joystick_widgets.clear()
+        self._event_data.clear()
 
-        self._clear()
+        sd = gremlin.ui.state_device.StateData()
+        sd.crud.disconnect(self._state_crud)
+
 
 
 
@@ -689,6 +700,8 @@ States can be toggled by clicking on the state button.  Expression states will u
     def _clear(self):
         ''' clears all widgets '''
         assert gremlin.util.is_ui_thread()
+
+        
 
         self._delete_widget(self._state_filter_widget)
         self._delete_widget(self._state_visualizer_widget)
@@ -712,13 +725,29 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.views.clear()
  
 
+    def reload(self):
+        ''' reloads the ui '''
+        gremlin.util.InvokeUiMethod(self._reload_ui) # refresh the visuals and selectors
+        
+
+    def _reload_ui(self):
+
+        if self._state_visible:
+            self.showState()
+        if self._keyboard_visible:
+            self.showKeyboard()
+        self.vis_selector.updateSelector()
+
+
     def refresh(self):
         ''' refreshes the visualizers '''
         gremlin.util.InvokeUiMethod(self._refresh_ui) # refresh the visuals and selectors
 
     def _refresh_ui(self):
         self._clear()
+
         self.vis_selector.updateSelector()
+
 
 
 

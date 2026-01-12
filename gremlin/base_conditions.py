@@ -601,6 +601,8 @@ class AbstractFunctor(QtCore.QObject):
             el.profile_stopping.connect(self.profile_stopping)
             el.profile_started.connect(self.profile_started)
             el.abort.connect(self.profile_stop) # abort also stops the profile
+            el.runtime_mode_changed.connect(self.profile_mode_changed)
+
 
     def unhook(self):
         if self._hooked:
@@ -609,6 +611,7 @@ class AbstractFunctor(QtCore.QObject):
             el.profile_stop.disconnect(self.profile_stop)
             el.profile_stopping.disconnect(self.profile_stopping)
             el.profile_started.disconnect(self.profile_started)
+            el.runtime_mode_changed.disconnect(self.profile_mode_changed)
             el.abort.disconnect(self.profile_stop) # abort also stops the profile
             self._hooked = False
 
@@ -647,6 +650,10 @@ class AbstractFunctor(QtCore.QObject):
 
     def profile_stopping(self):
         ''' called before a profile stops '''
+        pass
+
+    def profile_mode_changed(self, mode : str) -> None:
+        ''' called when the runtime mode changes '''
         pass
 
     

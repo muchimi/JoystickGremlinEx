@@ -682,6 +682,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         self.valid = True
 
         
+        
         ec = gremlin.execution_graph.ExecutionContext()
         container_node = ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
         if not container_node:
@@ -754,6 +755,20 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         if self.dtap_enabled and self.action_data.doubletap_delay >= self.delay:
             syslog.warning("TEMPOEX: warning: double tap delay exceeds long delay.  DoubleTap function disabled.")
             self.dtap_enabled = False
+
+
+    def profile_mode_changed(self, mode : str):
+        ''' called when the runtime mode changes '''
+        
+        # kill any executing timers on mode change
+        if self.long_press_timer:
+            self.long_press_timer.cancel()
+            self.long_press_timer = None
+
+        if self.short_press_timer:
+            self.short_press_timer.cancel()
+            self.short_press_timer = None
+
         
 
     def _trigger_double_press(self, event, value, extra_data :dict = None):
@@ -867,6 +882,8 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                 self.long_index = (self.long_index + 1) % node_count
                 # syslog.info(f"bump long index {self.long_index}")       
 
+
+    
     def process_event(self, event, value, extra_data = None) -> bool:
         ''' handle input events 
         
@@ -1195,6 +1212,7 @@ More than one action per short press or long press can be added.'''
         self.chain_long = True
         self.chain_double = True
         self.custom_action_sets = True # indicate we use custom action sets
+        
 
     @property
     def action_sets(self):

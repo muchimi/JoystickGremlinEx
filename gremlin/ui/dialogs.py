@@ -494,6 +494,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._create_vigem_page()
         self._create_simconnect_page()
         self._create_reporting_page()
+        self._create_runtime_page()
 
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
@@ -1047,10 +1048,14 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.debug_ui.clicked.connect(self._debug_ui)
         self.debug_ui.setVisible(self.config.is_debug)
 
+
+        self.config.runtime_ui_update = False # ensure disabled for performance reasons
         self.runtime_ui_update = QtWidgets.QCheckBox("Update UI when profile is active")
         self.runtime_ui_update.setChecked(self.config.runtime_ui_update)
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
         self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
+        self.runtime_ui_update.setEnabled(False)
+        
 
         
         self.show_id_widget = ui_common.QDataCheckbox("Show container/action IDs")
@@ -1324,47 +1329,106 @@ There should only be one GremlinEx master server on the subnet.
         self.config.axis_spam_delta = value
 
     # --------------------------------------------------------------------------------------------------------------------
+    def _create_runtime_page(self):
+        page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
+        affinity_widget = gremlin.ui.ui_common.QDataCheckbox(
+                "Sequence/Macro mode affinity",
+                value = self.config.macro_mode_affinity,
+                callback = self._handle_macro_mode_affinity_changed,
+                tooltip = "When set, sequences and macros can only run in the mode they are defined in. If the profile mode changes, running sequences or macros defined in another mode will terminate. Previously scheduled sequences or macros for another mode will not executed."
+                )
+        
+        concurrent_macro_widget = gremlin.ui.ui_common.QIntLineEdit(
+            max_range = 10,
+            value = self.config.max_concurrent_macro,
+            callback = self._handle_macro_concurrent_count_changed
+        )
+
+        concurrent_sequence_widget = gremlin.ui.ui_common.QIntLineEdit(
+            max_range = 10,
+            value = self.config.max_concurrent_sequence,
+            callback = self._handle_sequence_concurrent_count_changed
+        )
+        
+        box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Runtime Options:", transparent = True)
+        box.addWidget(affinity_widget)
+
+        widget = gremlin.ui.ui_common.getHContainer([
+            "Concurrent macro limit:",
+            concurrent_macro_widget],
+            tooltip = "Maximum number of concurrent macros the profile can execute at a time.  Set to 0 for no limit.",
+            widget_only=True)
+        
+        box.addWidget(widget)
+
+        widget = gremlin.ui.ui_common.getHContainer([
+            "Concurrent sequence limit:",
+            concurrent_sequence_widget],
+            tooltip = "Maximum number of concurrent sequences the profile can execute at a time.  Set to 0 for no limit.",
+            widget_only=True)
+        
+        box.addWidget(widget)
+        
+
+        page_layout.addWidget(box)
+
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Runtime")
+
+    def _handle_macro_mode_affinity_changed(self, checked):
+        self.config.macro_mode_affinity = checked
+            
+    def _handle_macro_concurrent_count_changed(self, value):
+        self.config.max_concurrent_macro = value
+
+    def _handle_sequence_concurrent_count_changed(self, value):
+        self.config.max_concurrent_sequence = value
+
+        
+        
+
+    # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
         
 
         self.enable_broadcast_speech_widget = gremlin.ui.ui_common.QDataCheckbox(
-                                                                "Enable TTS mode change cue on remote clients",
-                                                                value = self.config.enable_broadcast_speech,
-                                                                callback = self._enable_broadcast_speech,
-                                                                tooltip = "When set, output an audio cue via TTS when the broadcast mode is changed, which can be changed by an action."
-                                                                )
+                "Enable TTS mode change cue on remote clients",
+                value = self.config.enable_broadcast_speech,
+                callback = self._enable_broadcast_speech,
+                tooltip = "When set, output an audio cue via TTS when the broadcast mode is changed, which can be changed by an action."
+                )
 
         self.tts_enabled_widget = gremlin.ui.ui_common.QDataCheckbox(
-                                                                "Enable Voice (TTS)",
-                                                                value = self.config.tts_enabled,
-                                                                callback = self._tts_changed,
-                                                                tooltip = "Enables or disables voice (text to speech)"
-                                                                )
+                "Enable Voice (TTS)",
+                value = self.config.tts_enabled,
+                callback = self._tts_changed,
+                tooltip = "Enables or disables voice (text to speech)"
+                )
 
 
         self.tts_mode_switch_enabled_widget = gremlin.ui.ui_common.QDataCheckbox(
-                                                                "Enable voice on mode switch (TTS)",
-                                                                value = self.config.tts_mode_switch_enabled,
-                                                                callback = self._tts_mode_switch_changed,
-                                                                tooltip = "Enables or disables the audible mode cue when a profile mode is changed at runtime."
-                                                                )        
+                "Enable voice on mode switch (TTS)",
+                value = self.config.tts_mode_switch_enabled,
+                callback = self._tts_mode_switch_changed,
+                tooltip = "Enables or disables the audible mode cue when a profile mode is changed at runtime."
+                )        
 
         self.initial_load_mode_tts_widget = gremlin.ui.ui_common.QDataCheckbox(
-                                                                "Say active mode on auto-load mode changes activation via TTS",
-                                                                value = self.config.initial_load_mode_tts,
-                                                                callback = self._tts_initial_load_mode_changed,
-                                                                tooltip = "When set, GremlinEx will say that text-to-speech the profile mode whenever a profile is first loaded"
-                                                                )
-        
+                "Say active mode on auto-load mode changes activation via TTS",
+                value = self.config.initial_load_mode_tts,
+                callback = self._tts_initial_load_mode_changed,
+                tooltip = "When set, GremlinEx will say that text-to-speech the profile mode whenever a profile is first loaded"
+                )
+
         
 
         self.suppress_duplicate_widget = gremlin.ui.ui_common.QDataCheckbox(
-                                                                "Suppress duplicate TTS speech", 
-                                                                value = self.config.tts_suppress_duplicate,
-                                                                callback = self._tts_suppress_changed,
-                                                                tooltip = "When enabled, TTS will ignore duplicate sequential messages." 
-                                                                )
+                "Suppress duplicate TTS speech", 
+                value = self.config.tts_suppress_duplicate,
+                callback = self._tts_suppress_changed,
+                tooltip = "When enabled, TTS will ignore duplicate sequential messages." 
+                )
 
 
         
@@ -2404,6 +2468,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     "/tn", REG_KEY,
                     "/tr", f'"{path}"'
                    ],
+                creationflags=subprocess.CREATE_NO_WINDOW,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
@@ -2428,6 +2493,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
             result = subprocess.run(
                 ["schtasks", "/Delete", "/TN", REG_KEY, "/F"],
+                creationflags=subprocess.CREATE_NO_WINDOW,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
@@ -2448,6 +2514,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         result = subprocess.run(
             ["schtasks", "/Query", "/TN", REG_KEY],
+            creationflags=subprocess.CREATE_NO_WINDOW,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )

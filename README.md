@@ -29,6 +29,21 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T152)
+- Change: State: if the state is set to an invalid value, the default state value will be set. This can happen during initialization.
+- Change: Sequence/Macro: added a mode affinity setting in global options.  When set, sequence containers or macro actions that execute while a mode change occurs will terminate.  Scheduled items will only run if the mode they are scheduled in matches to mode the action/container was defined.  The default is enabled.  This is a global setting.  This setting is to prevent macro spamming across mode changes for long running macros.  This setting should only be on in unique situations.
+- Change: Macro: added a maximum concurrent macro limit, or count of macros that can be scheduled at a time when the profile runs. This is a circuit breaker to prevent a profile from executing too many concurrent macros or profile loops. The default is 4.
+- Change: Tempo: terminate timed events on mode change.
+- Change: TempoEx: terminate timed events on mode change.
+- Change: Keyboard/ex: terminate pulse on mode change.
+- Change: VjoyRemap: terminate pulse on mode change.
+- Change: UI: further optimization at runtime (remove unnecessary updates)
+- Fix: TTS: handle set voice API thread safety
+
+Known issue: a pair of random blank windows may pop up on profile load.  This will be resolved in a future patch.
+
+
+
 ### (m76T151)
 - New: UI: Device tab gains an advanced menu to copy XML or device ID to the clipboard (this is for XMl editing).
 - Fix: Macro: Exception due to UI API change when toggling vjoy button mode.  
@@ -38,6 +53,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Keyboard Ex: auto release should not be enabled in hold mode
 - Fix: OSC: autorelease mode change is ignored when unchecked.
 - Fix: OSC: input highlighting when enabled.
+
 
 ### (m76T150B)
 - Change: Start with Windows option:  A QT library load fault when starting GremlinEx at logon via the run registry causes a kernel fault.  This is most likely due to dependencies not yet being available in the current version of QT. The mechanism is switched to use the Windows Task Scheduler that does not appear to have this issue as it occurs later during the login process.  Changing the setting will require GremlinEx to run in administrator mode under Windows 11 due to UAC requirements as this is considered a privileged operation.

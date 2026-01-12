@@ -18,6 +18,10 @@
 """
 This module provides convenient access to the Microsoft SAPI text
 to speech system.
+
+TTS uses PyTTSx3 which is not thread safe.
+
+
 """
 
 import logging
@@ -27,14 +31,16 @@ import gremlin.event_handler
 import gremlin.shared_state
 import threading
 import gremlin.threading
-import multiprocessing
-from . import event_handler, util
+import gremlin.util as util
 import pyttsx3
 import gremlin.singleton_decorator
 from PySide6 import QtCore
 import queue
 import gremlin.util
+import enum
+
 syslog = logging.getLogger("system")
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class TextToSpeech:
@@ -91,9 +97,10 @@ class TextToSpeech:
         ''' called on profile stop '''
         self.stop()
 
-        
-    @QtCore.Slot(bool)
     def _tts_changed(self, enabled : bool):
+        gremlin.util.InvokeUiMethod(self._tts_changed_ui, enabled)    
+    
+    def _tts_changed_ui(self, enabled : bool):
         self.valid = enabled
         if enabled:
             self._start_ui()
@@ -109,6 +116,10 @@ class TextToSpeech:
         return []
     
     def set_voice(self, voice):
+        ''' sets the voice '''
+        gremlin.util.InvokeUiMethod(self._set_voice_ui, voice)
+    
+    def _set_voice_ui(self, voice):
         ''' sets the voice'''
         if not self.valid:
             return
@@ -192,11 +203,11 @@ class TextToSpeech:
             if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
             if clear:
                 self._clear_queue()
-            self._queue.put(lambda : self._speak_single(text, rate))
+            self._queue.put(lambda : self._speak_single_ui(text, rate))
                 
 
 
-    def _speak_single(self, text, rate = None):
+    def _speak_single_ui(self, text, rate = None):
         ''' speaks the test as a single event (don't use this inside an event loop)'''
         if not self.valid:
             return
@@ -299,7 +310,7 @@ class TextToSpeech:
             if not self._queue.empty():
                 functor = self._queue.get()
                 if verbose: syslog.info("TTS: POP queue")
-                functor()
+                gremlin.util.InvokeUiMethod(functor)
                 self._queue.task_done()
             time.sleep(0.05)
 

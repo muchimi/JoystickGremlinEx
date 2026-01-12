@@ -541,6 +541,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
 
 
+
+
     def registerMacro(self, id : int):
         self._macro_ids.add(id)
 
@@ -606,7 +608,25 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         # release all keys
         if self.mode == KeyboardOutputMode.Hold:
             gremlin.macro.MacroManager().queue_macro(self.release)
-        self._ar_running = False
+        
+
+        # terminate any autorepeat
+        self._autorepeat_clear()
+
+        # terminate any pulse
+        self.pulse_stop()
+
+
+
+    def profile_mode_changed(self, mode : str):
+        ''' called when the runtime mode changes '''
+
+        # terminate any autorepeat
+        self._autorepeat_clear()
+
+        # terminate any pulse
+        self.pulse_stop()
+
 
     @QtCore.Slot()
     def _autorepeat_clear(self):

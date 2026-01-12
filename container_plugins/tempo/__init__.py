@@ -34,6 +34,7 @@ import gremlin.execution_graph
 import gremlin.base_profile
 from shiboken6 import Shiboken
 
+
 syslog = logging.getLogger("system")
 class TempoContainerWidget(AbstractContainerWidget):
 
@@ -273,6 +274,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
         self.long_nodes = []
         self.short_nodes = []
         self.trigger_mode = None 
+        self._thread = None
 
 
     def profile_started(self):
@@ -302,6 +304,15 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                 self.long_nodes.append(self.action_set_nodes[1])
             
         self.trigger_mode = None
+
+
+    def profile_mode_changed(self, mode : str):
+        ''' called when the runtime mode changes '''
+        
+        # kill any executing timers on mode change
+        if self.timer:
+            self.timer.cancel()
+            self.timer = None
 
 
     def _trigger_short_press(self, event, value, extra_data : dict = None):
@@ -358,7 +369,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
                 if self.timer:
                     self.timer.cancel()
                     self.timer = None
-                thread = threading.Thread(target=lambda: self._short_press(
+                thread =  threading.Thread(target=lambda: self._short_press(
                     self.event_press, # send a press event to the functors
                     self.value_press,
                     event,

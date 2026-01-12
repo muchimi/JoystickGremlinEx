@@ -48,10 +48,15 @@ from psygnal import Signal
 syslog = logging.getLogger("system")
 
 
-MacroEntry = collections.namedtuple(
-    "MacroEntry",
-    ["macro", "state", "is_local", "is_remote"]
-)
+class MacroEntry():
+    __slots__ = ["macro", "state", "is_local", "is_remote","mode"]
+    def __init__(self, macro, state, is_local, is_remote, mode):
+        self.macro = macro
+        self.state = state
+        self.is_local = is_local
+        self.is_remote = is_remote
+        self.mode = mode
+
 
 class MacroState(enum.Enum):
     ''' macro scheduling states '''
@@ -322,7 +327,7 @@ class MacroManager(QtCore.QObject):
         """Initializes the instance."""
         super().__init__()
         self._active = {}
-        self._queue = []
+        self._queue = collections.deque()
         self._flags = {}
         self._flags_lock = Lock()
         self._queue_lock = Lock()
@@ -340,6 +345,13 @@ class MacroManager(QtCore.QObject):
 
         self._run_scheduler_thread = None
         self.el.profile_stop.connect(self._profile_stop)
+        self.el.profile_start.connect(self._profile_start)
+        self.el.runtime_mode_changed.connect(self._handle_mode_changed)
+    
+        
+        config = gremlin.config.Configuration()
+        self._max_concurrent = config.max_concurrent_macro
+        self._mode_affinity = config.macro_mode_affinity
 
 
     @QtCore.Slot()
@@ -347,19 +359,54 @@ class MacroManager(QtCore.QObject):
         ''' triggered when profiles stop '''
         self.stop()
 
+    @QtCore.Slot()
+    def _profile_start(self):
+        self.start()
+
+    def _clear_queue(self):
+        ''' clears the macro queue '''
+        with self._queue_lock:
+            self._queue.clear()
+
+    def _handle_mode_changed(self, mode : str):
+        ''' called when the runtime mode has changed '''
+        if self._mode_affinity:
+            verbose = gremlin.config.Configuration().verbose_mode_macro
+            with self._queue_lock:
+                # remove any queued macros that do not match the new runtime mode
+                remove_list = [m.macro for m in self._queue if m.mode != mode]
+                run_list = [m for m in self._queue if m.mode == mode]
+                self._queue = collections.deque(run_list)
+                
+                for macro in remove_list:
+                    if macro.id in self._active:
+                        if verbose: syslog.info(f"MACRO: terminating macro: {macro.id}")
+                        self.terminate_macro(macro)
+                    
+    
+
     def start(self):
         """Starts the scheduler."""
+        
         self._active = {}
         self._flags = {}
+        config = gremlin.config.Configuration()
+        self._max_concurrent = config.max_concurrent_macro
+        self._mode_affinity = config.macro_mode_affinity
+
         self._is_running = True
+        self._clear_queue()
         if self._run_scheduler_thread is None:
             self._run_scheduler_thread = Thread(target=self._run_scheduler)
             self._run_scheduler_thread.setName("Macro scheduler")
         if not self._run_scheduler_thread.is_alive():
             self._run_scheduler_thread.start()
+        
+
 
     def stop(self):
         """Stops the scheduler."""
+        self._clear_queue()
         self._is_running = False
         if self._run_scheduler_thread is not None and \
                 self._run_scheduler_thread.is_alive():
@@ -383,7 +430,10 @@ class MacroManager(QtCore.QObject):
         :param completion_callback: callback to call when the step completes, optional params(id) where ID is the macro step id returned by the call
         :returns id: a unique ID for the macro step
         """
+        
         verbose = gremlin.config.Configuration().verbose_mode_macro
+        mode = gremlin.shared_state.current_mode # current profile mode
+        
 
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
             self.terminate_macro(macro)
@@ -407,6 +457,15 @@ class MacroManager(QtCore.QObject):
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
             self.terminate_macro(macro)
         else:
+
+            # ensure we are not executing too many macros
+            if self._max_concurrent:
+                count = len(self._queue)
+                if count > self._max_concurrent:
+                    syslog.error(f"MACRO: exceeded concurrent macro: {self._max_concurrent}")
+                    return None
+
+
             # Preprocess macro to contain pauses as necessary
             if not is_local:
                 is_local = macro.is_local
@@ -415,7 +474,7 @@ class MacroManager(QtCore.QObject):
 
             self._preprocess_macro(macro)
             with self._queue_lock:
-                self._queue.append(MacroEntry(macro, True, is_local, is_remote))
+                self._queue.append(MacroEntry(macro, True, is_local, is_remote, mode))
             self._schedule_event.set()
 
         return macro.id
@@ -441,7 +500,8 @@ class MacroManager(QtCore.QObject):
         if verbose: syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminate requested.")
         
         with self._queue_lock:
-            self._queue.append(MacroEntry(macro, False, macro.is_local, macro.is_remote))
+            mode = gremlin.shared_state.current_mode
+            self._queue.append(MacroEntry(macro, False, macro.is_local, macro.is_remote,mode))
             macro.abort() # abort the macro
         self._schedule_event.set()
 
@@ -482,10 +542,13 @@ class MacroManager(QtCore.QObject):
                             # Remove all queued up macros with the same id as
                             # they should have been impossible to queue up
                             # in the first place
-                            removal_list = []
-                            for queue_entry in self._queue:
-                                if queue_entry.macro.id == entry.macro.id:
-                                    removal_list.append(queue_entry)
+                            #removal_list = []
+
+                            removal_list = [e for e in self._queue if e.macro.id == e.macro.id]
+                            # for queue_entry in self._queue:
+                            #     if queue_entry.macro.id == entry.macro.id:
+                            #         removal_list.append(queue_entry)
+
                             for queue_entry in removal_list:
                                 self._queue.remove(queue_entry)
                     elif entry.macro.id in self._active:
@@ -495,13 +558,13 @@ class MacroManager(QtCore.QObject):
                     elif entry.macro.exclusive:
                         has_exclusive = True
                         if len(self._active) == 0:
-                            self._dispatch_macro(entry.macro, entry.is_local, entry.is_remote)
-                            self._is_executing_exclusive = True
-                            entries_to_remove.append(entry)
+                            if self._dispatch_macro(entry.macro, entry.is_local, entry.is_remote):
+                                self._is_executing_exclusive = True
+                                entries_to_remove.append(entry)
                     # Start a queued up macro
                     elif not has_exclusive and not self._is_executing_exclusive:
-                        self._dispatch_macro(entry.macro, entry.is_local, entry.is_remote)
-                        entries_to_remove.append(entry)
+                        if self._dispatch_macro(entry.macro, entry.is_local, entry.is_remote):
+                            entries_to_remove.append(entry)
 
                 # Remove all entries we've processed
                 for entry in entries_to_remove:
@@ -509,19 +572,27 @@ class MacroManager(QtCore.QObject):
                      
                         self._queue.remove(entry)
 
-    def _dispatch_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None):
+    def _dispatch_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None) -> bool:
         """Dispatches a single macro to be run.
 
         :param macro the macro to dispatch
         :param is_local true if local control, set to None to use the macro flag
         :param is_remote true if remote control, set to None to use the macro flag
         """
+
         if macro.id not in self._active and not macro.state == MacroState.Running:
+            if self._mode_affinity:
+                mode = gremlin.shared_state.runtime_mode
+                if macro.mode != mode:
+                    syslog.warning(f"MACRO: affinity: discard macro due to mode change: [{macro.id}] macro mode: [{macro.mode}] current profile mode [{mode}] ")    
+                    return False
             self._active[macro.id] = macro # add the macro to the active queue
             macro.state = MacroState.Running
             Thread(target=functools.partial(self._execute_macro, macro, is_local, is_remote)).start()
         else:
             syslog.warning(f"Attempting to dispatch an already running macro: ID: {macro.id}")
+            return False
+        return True
 
     def _execute_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None):
         """Executes a given macro in a separate thread.
@@ -644,7 +715,7 @@ class Macro:
     # Unique identifier for each macro - bumps by one for each new macro
     _next_macro_id = 0
 
-    def __init__(self, owner_id : str = None, is_local = None, is_remote = None, force_remote = None):
+    def __init__(self, owner_id : str = None, is_local = None, is_remote = None, force_remote = None, mode = None):
         """Creates a new macro instance.
         
         :is_local: if set, sends the macro output to the local client
@@ -660,6 +731,7 @@ class Macro:
         self.exclusive = False
         self.completed_callback = None # callback called when macro completes
         self._state = MacroState.Idle
+        self.mode = mode
         
 
 

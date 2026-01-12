@@ -10044,22 +10044,23 @@ def getLayoutWidgetHeight(layout, max_height = None):
 
    
 def getHContainer(widget_or_list = None, 
-                  label = None, 
+                  label : str = None, 
                   parent = None, 
-                  left_stretch = False, 
-                  right_stretch = True, 
+                  left_stretch : bool= False, 
+                  right_stretch  : bool= True, 
                   alignment = None, 
-                  set_alignment = True, 
+                  set_alignment : bool = True, 
                   min_height = None, 
                   use_vcontainers = False,
-                  font = None,
-                  left_margin = 0,
-                  right_margin = 0,
-                  top_margin = 0,
-                  bottom_margin = 0,
-                  no_stretch = False,
-                  widget_only = False,
-                  align_top = False):
+                  font : str = None,
+                  left_margin : int = 0,
+                  right_margin : int  = 0,
+                  top_margin : int  = 0,
+                  bottom_margin : int = 0,
+                  no_stretch : bool = False,
+                  widget_only : bool = False,
+                  align_top : bool = False,
+                  tooltip : str = None):
     ''' gets a qt H container widget 
     
     :param widget_or_list: list of widgets, or a single widget to add to the container - can contain strings that will be converted to a label automatically, use "|" for separator, "||" to insert a stretch
@@ -10137,8 +10138,12 @@ def getHContainer(widget_or_list = None,
             if right_stretch:
                 layout.addStretch()
 
+    if tooltip:
+        widget.setToolTip(tooltip)
+
     if widget_only:
         return widget
+    
     
     return (widget, layout)
     

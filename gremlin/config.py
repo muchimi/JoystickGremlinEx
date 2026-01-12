@@ -2967,3 +2967,27 @@ class Configuration(QtCore.QObject):
         self._set_data("log_description", value)
 
 
+    
+    @property
+    def max_concurrent_macro(self) -> int:
+        ''' max number of macros that can execute at the same time '''
+        return self._get_data("max_concurrent_macro", 0)
+    @max_concurrent_macro.setter
+    def max_concurrent_macro(self, value : int):
+        self._set_data("max_concurrent_macro", value)
+
+    @property
+    def max_concurrent_sequence(self) -> int:
+        ''' max number of sequences that can execute at the same time '''
+        return self._get_data("max_concurrent_sequence", 0)
+    @max_concurrent_sequence.setter
+    def max_concurrent_sequence(self, value : int):
+        self._set_data("max_concurrent_sequence", value)        
+
+    @property
+    def macro_mode_affinity(self) -> bool:
+        ''' controls macro mode affinity (attaches macros to a specific mode - if off, the macro will stop when the mode is changed) '''
+        return self._get_data("macro_mode_affinity", True)
+    @macro_mode_affinity.setter
+    def macro_mode_affinity(self, value: bool):
+        self._set_data("macro_mode_affinity", value)

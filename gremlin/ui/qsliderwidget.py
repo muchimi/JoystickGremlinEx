@@ -469,7 +469,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._handle_positions = gate_positions
         # print (f"Range left: {self._range_left}  right: {self._range_right}  width: {self._range_width} height: {self._range_height} top margin: {self._range_top}")
         self._update_marker_offsets_ui()
-        self._update_all_handle_pixmaps()
+        # self._update_all_handle_pixmaps()
 
     def _update_marker_offsets_ui(self):
         if self._marker_pos:

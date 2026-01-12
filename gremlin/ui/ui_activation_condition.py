@@ -410,12 +410,6 @@ class ModeConditionWidget(AbstractConditionWidget):
         self.description_widget = QtWidgets.QLabel()
         widget = gremlin.ui.ui_common.getHContainer(["Description:", self.description_widget], widget_only = True)
         self.main_layout.addWidget(widget)
-
-
-        # self.grid_layout.addWidget(self.ignore_release_widget, 0, 5)        
-        # self.grid_layout.setColumnStretch(5,2)
-        #self.main_layout.addWidget(self.grid_widget)
-
           
     def _handle_mode_changed(self, mode):          
         self.condition.mode = mode
