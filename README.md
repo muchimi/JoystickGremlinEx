@@ -29,6 +29,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T153)
+- New: Macro Action: add a description entry to input comments at the step level in a macro definition.  This can also optionally create a log entry when the macro executes to validate when certain steps execute in a macro.
+- Fix: Macro: macros in special modes fail affinity test (this would impact macros added to mode enter/exit in mode device for example).
+- Fix: Macro: macro discarded due to affinity check not returned to idle state so would not run again.
+- Fix: random empty popup windows displayed on profile change in certain situations.
+
+
 ### (m76T152)
 - Change: State: if the state is set to an invalid value, the default state value will be set. This can happen during initialization.
 - Change: Sequence/Macro: added a mode affinity setting in global options.  When set, sequence containers or macro actions that execute while a mode change occurs will terminate.  Scheduled items will only run if the mode they are scheduled in matches to mode the action/container was defined.  The default is enabled.  This is a global setting.  This setting is to prevent macro spamming across mode changes for long running macros.  This setting should only be on in unique situations.

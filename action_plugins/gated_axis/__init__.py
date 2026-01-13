@@ -219,7 +219,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._configure_trigger_widget.setIcon(self._setup_icon)
         self._configure_trigger_widget.clicked.connect(self._trigger_cb)
         self._show_configuration = show_configuration
-        self._configure_trigger_widget.setVisible(show_configuration)
+        #self._configure_trigger_widget.setVisible(show_configuration)
 
         # manual and grab value widgets
 
@@ -1125,7 +1125,9 @@ making changes that impact the order of gates or ranges."""
             self.configure_range_requested.emit(rng)
         else:
             gremlin.shared_state.push_suspend_highlighting()
-            dialog = gremlin.gated_handler.ActionContainerUi(gate_data = self._gate_data, info_object = rng, action_data = self.action_data, input_type = InputType.JoystickAxis)
+            gremlin.util.pushCursor()
+            dialog = gremlin.gated_handler.GateConditionEditorDialog(gate_data = self._gate_data, info_object = rng, action_data = self.action_data, input_type = InputType.JoystickAxis)
+            gremlin.util.popCursor()
             dialog.exec()
             gh = GateEventHandler()
             gh.range_configuration_changed.emit(rng)
@@ -1232,13 +1234,13 @@ making changes that impact the order of gates or ranges."""
     
     def _slider_gate_configure_cb(self, handle_index):
         ''' called on double click on slider '''
-        gremlin.util.assert_ui_thread()
         gate = self._gate_data.getGateSliderIndex(handle_index)
-        gremlin.util.assert_ui_thread()
-        dialog = gremlin.gated_handler.ActionContainerUi(gate_data = gate.parent, info_object = gate, action_data = self.action_data, input_type=InputType.JoystickButton)
-        #dialog.delete_requested.connect(self._delete_gate_cb)
+
+        gremlin.util.pushCursor()        
+        dialog = gremlin.gated_handler.GateConditionEditorDialog(gate_data = gate.parent, info_object = gate, action_data = self.action_data, input_type=InputType.JoystickButton)
+        gremlin.util.popCursor()
         dialog.exec()
-        #dialog.delete_requested.disconnect(self._delete_gate_cb)
+        
     
  
 
@@ -1773,27 +1775,32 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.gate_widget)
 
 
-        el = gremlin.event_handler.EventListener()
-        el.profile_unload.connect(self._cleanup_ui)
+        # el = gremlin.event_handler.EventListener()
+        # el.profile_unload.connect(self._cleanup_ui)
     
 
     def _populate_ui(self):
         pass
 
-    def _cleanup_ui(self):
+
+    def unhook(self):
         ''' cleanup the UI and widget hooks '''
-        if not Shiboken.isValid(self):
-            return
-        if not self._deleted:
-            verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-            if verbose_ui: syslog.info(f"Gated Axis Action: cleanup : {self.objectName()}")
-            self._deleted = True
-            if self.gate_widget and Shiboken.isValid(self.gate_widget):
-                self.gate_widget._cleanup_ui()
-                self.gate_widget.hide()
-                self.gate_widget.setParent(None)
-                self.gate_widget.deleteLater()
-                self.gate_widget = None
+        # if not Shiboken.isValid(self):
+        #     return
+        gremlin.util.clear_layout(self.main_layout)
+        pass
+        
+        # if not self._deleted:
+        #     verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        #     if verbose_ui: syslog.info(f"Gated Axis Action: cleanup : {self.objectName()}")
+        #     self._deleted = True
+        #     if self.gate_widget and Shiboken.isValid(self.gate_widget):
+        #         self.gate_widget._cleanup_ui()
+        #         self.gate_widget.hide()
+        #         self.gate_widget.setParent(None)
+        #         self.gate_widget.deleteLater()
+        #         self.gate_widget = None
+        
 
     
 

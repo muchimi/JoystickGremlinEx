@@ -358,14 +358,6 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model.refresh()
 
 
-
-
-    
-    # def _custom_profile_mode_handler(self, input_item):
-    #     ''' gets the current input's profile mode (this can vary with some input types)'''
-    #     return gremlin.shared_state.master_mode
-
-
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
         return self.input_item_list_view.itemAt(index)
@@ -543,5 +535,5 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """Refreshes the current selection, ensuring proper synchronization."""
         self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
         
-        #self._select_item_cb(self.input_item_list_view.current_index)
+
 

@@ -583,8 +583,9 @@ class MacroManager(QtCore.QObject):
         if macro.id not in self._active and not macro.state == MacroState.Running:
             if self._mode_affinity:
                 mode = gremlin.shared_state.runtime_mode
-                if macro.mode != mode:
+                if macro.mode and macro.mode != mode:
                     syslog.warning(f"MACRO: affinity: discard macro due to mode change: [{macro.id}] macro mode: [{macro.mode}] current profile mode [{mode}] ")    
+                    macro.state = MacroState.Idle # return to idle
                     return False
             self._active[macro.id] = macro # add the macro to the active queue
             macro.state = MacroState.Running
@@ -1438,7 +1439,35 @@ class RemoteControlAction(MacroAbstractAction):
         verbose = gremlin.config.Configuration().verbose_mode_macro
         if verbose: syslog.info(f"MACRO: set remote control: {self.command.name}")
         gremlin.input_devices.remote_state.mode = self.command
-    
+
+
+class MacroDescriptionAction(MacroAbstractAction):
+    '''description action for a macro'''
+    def __init__(self):
+        super().__init__()
+        self.description = None
+        self.log = False # true if the log is enabled
+
+
+    def __call__(self, is_local = True, is_remote = False, force_remote= False):
+        ''' execute '''
+        if self.log or gremlin.config.Configuration().verbose_mode_macro:
+            syslog.info(f"MACRO: description: {self.description}")
+
+
+    def __getstate__(self):
+        ''' serialize '''
+        state = super().__getstate__()
+        state['description'] = self.description
+        state["log"] = self.log
+        return state
+
+    def __setstate__(self, state):
+        ''' deserialize '''
+        super().__setstate__(state)
+        self.description = state['description']
+        self.log = state["log"]
+                
 
 class StateAction(MacroAbstractAction):
     ''' state action for a macro '''

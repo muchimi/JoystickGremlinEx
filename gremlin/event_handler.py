@@ -2740,13 +2740,14 @@ class EventHandler(QtCore.QObject):
 					
 					# fire mode change control for mode exit (press + release)
 					m1_list, f1_list = self.execute_event(event_exit_pressed)
-					callback = self._create_change_mode_callback(event_exit_pressed, m1_list, f1_list)
-					exit_release = Timer(delay, callback)
-					exit_release.start()
+					if m1_list or f1_list:
+						callback = self._create_change_mode_callback(event_exit_pressed, m1_list, f1_list)
+						mode_exit_press = Timer(delay, callback)
+						mode_exit_press.start()
 
-					callback = self._create_change_mode_callback(event_exit_released, m1_list, f1_list)
-					exit_release = Timer(delay, callback)
-					exit_release.start()
+						callback = self._create_change_mode_callback(event_exit_released, m1_list, f1_list)
+						mode_exit_release = Timer(delay, callback)
+						mode_exit_release.start()
 					
 					# CHANGE THE MODE
 					
@@ -2771,13 +2772,14 @@ class EventHandler(QtCore.QObject):
 
 					# fire mode change for mode enter (press + release)
 					m2_list, f2_list = self.execute_event(event_enter_pressed)
-					callback = self._create_change_mode_callback(event_enter_pressed, m2_list, f2_list)
-					enter_release = Timer(delay, callback)
-					enter_release.start()
+					if m2_list or f2_list:
+						callback = self._create_change_mode_callback(event_enter_pressed, m2_list, f2_list)
+						mode_enter_press = Timer(delay, callback)
+						mode_enter_press.start()
 
-					callback = self._create_change_mode_callback(event_enter_released, m2_list, f2_list)
-					enter_release = Timer(delay, callback)
-					enter_release.start()
+						callback = self._create_change_mode_callback(event_enter_released, m2_list, f2_list)
+						mode_enter_release = Timer(delay, callback)
+						mode_enter_release.start()
 
 			else:
 				# non-runtime
@@ -2807,6 +2809,8 @@ class EventHandler(QtCore.QObject):
 			if not is_running: gremlin.util.popCursor()
 
 		
+	
+
 	def _create_change_mode_callback(self, event, m_list, f_list):
 		''' gets a return callback for mode changes '''
 		return lambda: self._execute_callbacks(event, m_list, f_list)

@@ -1677,8 +1677,8 @@ class GateData():
         # if verbose:
         #     syslog.info(f"Trigger: raw value: {input_value}  trigger value: {value}")
 
-        if not gremlin.shared_state.is_running:
-            # raw input value updates
+        if not is_runtime:
+            # raw input value updates to UI items
             self._axis_value = input_value
             gh = GateEventHandler()
             gh.slider_update_event.emit(event)
@@ -3927,11 +3927,13 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         main_layout.addStretch()
 
     def _handle_configure_request(self, widget):
+        ''' show the configuration dialog for gate and range conditions '''
         gremlin.util.assert_ui_thread()
-        dialog = ActionContainerUi(gate_data = self.gate.parent, info_object = self.gate, action_data = self.action_data, input_type=InputType.JoystickButton)
-        #dialog.delete_requested.connect(self._delete_gate_cb)
+        gremlin.util.pushCursor()
+        dialog = GateConditionEditorDialog(gate_data = self.gate.parent, info_object = self.gate, action_data = self.action_data, input_type=InputType.JoystickButton)
+        gremlin.util.popCursor()
         dialog.exec()
-        #dialog.delete_requested.disconnect(self._delete_gate_cb)
+        
 
 
     def update_warning(self):
@@ -4200,7 +4202,7 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
 
 
 
-class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
+class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
     """UI to setup the individual action trigger containers and sub actions """
 
     delete_requested = QtCore.Signal(GateInfo) # fired when the remove button is clicked - passes the GateData to blitz
@@ -4210,7 +4212,6 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         :param: data = the gate or range data block
         
         '''
-
         
         super().__init__(self.__class__.__name__, parent = parent)
 
@@ -4237,10 +4238,6 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         self.trigger_container_widget = QtWidgets.QWidget()
         self.trigger_condition_layout = QtWidgets.QHBoxLayout(self.trigger_container_widget)
 
-
-        
-    
-        
 
         # the tab container contains all possible trigger modes for the range or gate as a tab
         # each tab contains the mappings and options for that trigger condition
@@ -4283,10 +4280,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self.slider.setRange(-1,1)
             self.slider_frame_layout.addWidget(self.slider)
 
-            gh = GateEventHandler()
 
-            self._gate_data.registerTriggerCallback(self._trigger_handler)
-            gh.registerValueChangedCallback(self._id, self._input_value_changed_handler)
 
             # display two gates for a range
             values = [range_info.g1.value, range_info.g2.value]
@@ -4405,9 +4399,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         
 
             
-        el = gremlin.event_handler.EventListener()
-        el.mapping_changed.connect(self._mapping_changed_cb)
-        
+
         
         self.main_layout.addWidget(self.trigger_container_widget)
         self.main_layout.addWidget(self.container_condition_widget)
@@ -4416,34 +4408,84 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         self._create_conditions_ui()
         self._update_ui()
 
+        self._hooked = False
+        self.hook()
 
-        #self._condition_changed_cb()
+    def hook(self):
+        if not self._hooked:
+            self._hooked = True
+            el = gremlin.event_handler.EventListener()
+            el.mapping_changed.connect(self._mapping_changed_cb)
+
+            gh = GateEventHandler()
+            self._gate_data.registerTriggerCallback(self._trigger_handler)
+            gh.registerValueChangedCallback(self._id, self._input_value_changed_handler)
+
+            
+        
+
+    def unhook(self):
+        # release tab widgets tracking items and widgets
+        if self._hooked:
+        
+
+            self._condition_pages.clear() 
+
+            # with QtCore.QSignalBlocker(self._condition_tab):
+            #     self._tab_widgets.clear() 
+            #     self._condition_pages.clear() 
+            #     self._condition_tab.clear()
+
+
+
+            el = gremlin.event_handler.EventListener()
+            el.mapping_changed.disconnect(self._mapping_changed_cb)
+            
+            gh = GateEventHandler()
+
+            self._gate_data.unregisterTriggerCallback(self._trigger_handler)
+            gh.unregisterValueChangedCallback(self._id, self._input_value_changed_handler)
+
+            self._cache.clear() # release cache objects
+            self._range_info = None
+            self._gate_info = None
+
+            self._hooked = False
+
+
+        
 
     def closeEvent(self, event) -> None:
-        
-        
-        # release tab widgets tracking items and widgets
-        with QtCore.QSignalBlocker(self._condition_tab):
-            self._tab_widgets.clear() 
-            self._condition_pages.clear() 
-            self._condition_tab.clear()
-
-
-
-        el = gremlin.event_handler.EventListener()
-        el.mapping_changed.disconnect(self._mapping_changed_cb)
-        
-        gh = GateEventHandler()
-
-        self._gate_data.unregisterTriggerCallback(self._trigger_handler)
-        gh.unregisterValueChangedCallback(self._id, self._input_value_changed_handler)
-
-        self._cache.clear() # release cache objects
-        self._range_info = None
-        self._gate_info = None
+        '''called when the dialog closes'''
+                
+        # unhook events
+        self.unhook()
 
         # forcibly clear all widgets from QT
         gremlin.util.clear_layout(self.main_layout)
+
+    #     # release tab widgets tracking items and widgets
+    #     with QtCore.QSignalBlocker(self._condition_tab):
+    #         self._tab_widgets.clear() 
+    #         self._condition_pages.clear() 
+    #         self._condition_tab.clear()
+
+
+
+    #     el = gremlin.event_handler.EventListener()
+    #     el.mapping_changed.disconnect(self._mapping_changed_cb)
+        
+    #     gh = GateEventHandler()
+
+    #     self._gate_data.unregisterTriggerCallback(self._trigger_handler)
+    #     gh.unregisterValueChangedCallback(self._id, self._input_value_changed_handler)
+
+    #     self._cache.clear() # release cache objects
+    #     self._range_info = None
+    #     self._gate_info = None
+
+    #     # forcibly clear all widgets from QT
+    #     gremlin.util.clear_layout(self.main_layout)
 
     def _current_input_axis(self):
         ''' gets the current input axis value '''

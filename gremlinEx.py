@@ -2429,7 +2429,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         the different connected devices.
         """
         try:
-            
 
             #sd = gremlin.event_handler.JoystickState()
             ts = gremlin.tabstate.TabState()
@@ -2989,6 +2988,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     self._select_input(last_device_guid, last_input_type, last_input_id, force_switch=True)
                     gremlin.util.popCursor()
                 
+       
                 
             except Exception as err:
                 syslog.error(f"CREATE DEVICE TABS (step 2): failed: {err}")

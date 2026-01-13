@@ -177,7 +177,10 @@ class MacroListModel(QtCore.QAbstractListModel):
                         display = f"Set state [{action.state.key}] action: [{action.action}]"
                 else:
                     display = "Set State (no state data found)"
+            elif isinstance(action, gremlin.macro.MacroDescriptionAction):
+                display = action.description if action.description else "(description not set)"
             else:
+
                 raise gremlin.error.GremlinError("Unknown macro action")
             
             

@@ -475,6 +475,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _cleanup_ui(self):
         ''' called when deleted '''
         super()._cleanup_ui()
+        
         if gremlin.util.isSignalConnected(self.input_item_list_view, "_edit_curve_item_cb"):
             self.input_item_list_view.item_edit_curve.disconnect(self._edit_curve_item_cb)
             self.input_item_list_view.item_delete_curve.disconnect(self._delete_curve_item_cb)
@@ -556,6 +557,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def unhook(self):
         jep = gremlin.event_handler.JoystickEventProcessor()
         jep.unregisterCallback(self.hook_id)
+
 
     def _delete_curve_item_cb(self, widget, index, data):
         ''' delete curve request '''
@@ -756,7 +758,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     widget.action_model.data_changed.connect(self._create_change_cb(index))
                     widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
                     widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
-
+                   
 
 
                     # indicate the input changed

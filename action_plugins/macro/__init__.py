@@ -257,6 +257,11 @@ class MacroActionEditor(QtWidgets.QWidget):
                 self._state_ui,
                 gremlin.macro.StateAction
             ),
+            "Description": MacroActionEditor.ActionTypeData(
+                "Description",
+                self._description_ui,
+                gremlin.macro.MacroDescriptionAction
+            ),
         }
 
 
@@ -311,6 +316,9 @@ class MacroActionEditor(QtWidgets.QWidget):
             
         finally:
             MacroActionEditor.locked = False
+
+    def unhook(self):
+        gremlin.util.clear_layout(self.action_layout)
 
     def _populate_ui(self):
         """Populate the UI elements with data from the model."""
@@ -400,6 +408,11 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.model.set_entry(gremlin.macro.RemoteControlAction(), self.index.row())
         elif value == "State":
             self.model.set_entry(gremlin.macro.StateAction(), self.index.row())
+        elif value == "Description":
+            self.model.set_entry(gremlin.macro.MacroDescriptionAction(), self.index.row())
+        else:
+            syslog.error(f"MACRO: don't know how to handle macro type: {value}")
+            return
 
 
         # Update the UI elements
@@ -583,7 +596,12 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements["duration_spinbox_max"].setSingleStep(0.1)
         self.ui_elements["duration_spinbox_max"].setMaximum(3600)
 
+
+        
         widgets = []
+        widget = gremlin.ui.ui_common.QDataPushButton("100",0.10,tooltip = "100 ms")
+        widget.clicked.connect(self._set_delay)
+        widgets.append(widget)
         widget = gremlin.ui.ui_common.QDataPushButton("250",0.25,tooltip = "250 ms")
         widget.clicked.connect(self._set_delay)
         widgets.append(widget)
@@ -852,14 +870,45 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.action_layout.addWidget(cb)
         self.action_layout.addWidget(self.ui_elements["remote_control_label"])
 
+    def _description_ui(self):
+        '''description interface'''
+        action = self.model.get_entry(self.index.row())
+        widget = gremlin.ui.ui_common.QDataLineEdit(
+            text = action.description,
+            callbackEx = self._handle_description_changed,
+            data = action)
+        self.ui_elements["description"] = widget
+        widget = gremlin.ui.ui_common.getHContainer(["Description:", widget], widget_only = True, tooltip = "Description entry")
+        self.action_layout.addWidget(widget)
+        widget = gremlin.ui.ui_common.QDataCheckbox(
+            label = "Log entry",
+            value = action.log,
+            callbackEx=self._handle_description_log_changed,
+            data = action,
+            tooltip = "When set, outputs a log entry when executed."
+        )
+        self.action_layout.addWidget(widget)
+
+
+    def _handle_description_changed(self, widget, text):
+        action = widget.data
+        action.description = text
+        
+
+    def _handle_description_log_changed(self, widget, checked):
+        action = widget.data
+        action.log = checked
+
+
     def _state_ui(self):
+        '''state interface'''
         action = self.model.get_entry(self.index.row())
         self.state_selector = gremlin.ui.ui_common.QComboBox(width=None)
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
-        widget,layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector])
+        widget = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector], widget_only = True)
         self.action_layout.addWidget(widget)
-        widget,layout = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
+        widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only = True)
         self.action_layout.addWidget(widget)
 
         widgets = []
@@ -1869,6 +1918,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._recording_times["mouse"] = time.time()
         self._append_entry(action)
 
+    
+
     @QtCore.Slot()
     def _record_cb(self):
         """Starts the recording of key presses."""
@@ -2254,6 +2305,7 @@ To send complex sequences, please look at the sequence container.'''
                         # use key as secondary (legacy profiles)
                         state = sd.getState(key)
                     description = None
+          
 
                 value = False
                 if "action" in child.attrib:          
@@ -2268,6 +2320,13 @@ To send complex sequences, please look at the sequence container.'''
                 state_action.action = action
                 state_action.state = state
                 self.sequence.append(state_action)
+
+            elif child.tag == "description":
+                action = gremlin.macro.MacroDescriptionAction()
+                if "description" in child.attrib:
+                    action.description = child.get("description")
+                action.log = safe_read(child,"log",bool,False)
+                self.sequence.append(action)
 
 
 
@@ -2353,6 +2412,13 @@ To send complex sequences, please look at the sequence container.'''
                 state_node.set("key", entry.key)
                 state_node.set("action", entry.action)
                 action_list.append(state_node)
+            elif isinstance(entry, gremlin.macro.MacroDescriptionAction):
+                desc_node =  ElementTree.Element("description")
+                if entry.description:
+                    desc_node.set("description", entry.description)
+                desc_node.set("log", safe_format(entry.log, bool))
+                action_list.append(desc_node)
+
 
         node.append(action_list)
         return node

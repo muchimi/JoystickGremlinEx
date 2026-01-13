@@ -344,6 +344,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.setDescription(state.description)
         self.action_data.state = state
        
+    def unhook(self):
+        gremlin.util.clear_layout(self.main_layout)
 
     def _populate_ui(self):
         """Populates the UI components."""

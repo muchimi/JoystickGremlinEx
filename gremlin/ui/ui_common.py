@@ -4395,7 +4395,7 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     enterPressed = QtCore.Signal() # indicates the enter key was pressed
     escPressed = QtCore.Signal() # indicates the esc key was pressed
 
-    def __init__(self, text = None, data = None, parent = None, width = 200):
+    def __init__(self, text = None, data = None, parent = None, width = 200, callbackEx = None):
         super().__init__(parent = parent)
         self.setText(text)
         self._data = data
@@ -4405,6 +4405,9 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         super().textChanged.connect(self._text_changed_cb)
         self.setMinimumWidth(width)
         self._trigger_on_focus_loss = True
+
+        
+        self.callback_ex = callbackEx
 
         self.installEventFilter(self)
 
@@ -4433,6 +4436,8 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         if not self._trigger_on_focus_loss:
             # trigger on any text change
             self.valueChanged.emit()
+        if self.callback_ex:
+            self.callback_ex(self, self.text())
 
 
     def focusOutEvent(self, event):
@@ -9343,7 +9348,9 @@ class QSplitTabWidget(QDataWidget):
     def _cleanup_ui(self):
         ''' remove '''
         self.unregisterAllWidgets()
-        #_tabsplitter_tracker.unregisterWidget(self)
+        gremlin.util.clear_layout(self._left_container_layout)
+        gremlin.util.clear_layout(self._right_container_layout)
+        
 
     def registerWidget(self, key, widget) -> int:
         ''' adds a new config input to the right panel '''

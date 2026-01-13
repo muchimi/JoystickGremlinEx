@@ -79,6 +79,9 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_modes_ui()
 
 
+    def unhook(self):
+        gremlin.util.clear_layout(self.main_layout)
+
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
         self.action_data.exec_on_press = checked
