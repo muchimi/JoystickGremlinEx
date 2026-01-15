@@ -316,6 +316,8 @@ class ActionPlugins:
                         self._plugins[plugin.name] = plugin.create
                         log_sys(f"\tLoaded action plugin: {plugin.name}")
                         plugin_count += 1
+
+                    
                     else:
                         del plugin
                 except Exception as e:

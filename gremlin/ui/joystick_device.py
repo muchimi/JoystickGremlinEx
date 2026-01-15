@@ -67,7 +67,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def __init__(
             self,
             device : DeviceSummary,
-            device_profile,
+            device_profile : gremlin.base_profile.Device,
             current_mode,
             object_name = "Joystick",
             data = None,
@@ -1115,8 +1115,14 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
         widgets.append(widget)
         
         # show mapped button always 
-        widget = gremlin.ui.ui_common.QDataPushButton("Mapped only", callbackEx = self._handle_filter, data = "mapped", tooltip="Include mapped inputs only.\nUse Ctrl-Click to apply to all devices.")
+        current_mode = gremlin.shared_state.edit_mode
+        widget = gremlin.ui.ui_common.QDataPushButton(f"Mapped ({current_mode})", callbackEx = self._handle_filter, data = "mapped", tooltip=f"Include mapped inputs in mode [{current_mode}] only.\nUse Ctrl-Click to apply to all devices.")
         widgets.append(widget)
+
+        # show mapped button always 
+        widget = gremlin.ui.ui_common.QDataPushButton("Mapped (all)", callbackEx = self._handle_filter, data = "mapped_all", tooltip="Include mapped inputs only for all profile modes.\nUse Ctrl-Click to apply to all devices.")
+        widgets.append(widget)
+
 
         
         if device.axis_count:
@@ -1297,7 +1303,6 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         match mode:
             case "default":
                 # do the default selection 
-                
              
 
                 config = gremlin.config.Configuration()
@@ -1325,6 +1330,8 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
                 
         prompt = None
 
+       
+
 
         applied_all_filter = []
         for device_guid, input_type, input_id, _, _  in self.input_map:
@@ -1332,15 +1339,26 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
             match mode:
                 case "mapped":
                     # filter to mapped devices only
-                  
+                    current_mode = gremlin.shared_state.edit_mode
+
                     if is_control and not mode in applied_all_filter:
                         profile.settings.setAllFiltered(mode)
                         applied_all_filter.append(mode)
-                        if not prompt:
-                            prompt="Mapped filter applied to all joystick devices"
+                        # if not prompt:
+                        #     prompt="Mapped filter applied to all joystick devices"
                         
 
+                    filtered = not profile.isInputMapped(device_guid, input_type, input_id, current_mode)
+
+                case "mapped_all":
+                    if is_control:
+                        profile.settings.setAllFiltered(mode)
+                        applied_all_filter.append(mode)
+                    # if not prompt:
+                    #     prompt="Mapped filter applied to all joystick devices"
+
                     filtered = not profile.isInputMapped(device_guid, input_type, input_id)
+            
                     
                 case "show_all":
                     # filter all inputs

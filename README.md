@@ -29,6 +29,22 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T154)
+- New: Filter: Added Mapped (all modes) button to show inputs used across all modes.
+- Change: Input tracking consolidated to reduce internal API calls.
+- Change: TTS defaults to clear the prior voice queue.
+- Fix: Input registry did not account for profile mode causing potential lookup issues such as incorrect container execution.
+- Fix: Blank inputs/mappings when loading profiles created on another system.
+- Fix: Gated Axis: gate and range data IDs ignored on xml read prompting a "profile has changed" prompt on switching profiles.
+- Fix: Gated Axis: log error if device/axis does not exist at runtime (such as, due to disconnection) instead of throwing an exception.
+- Fix: Gated Axis: processing of axis data not always enabled depending on the profile startup mode, and mode changes at runtime.  This could prevent and upstream gated axis from triggering actions.  API was updated to include support for multimode actions - actions that need to execute even if the mode they are defined in is not the current mode.
+
+Known issue: 
+- profile change detection may detect a change when there is not.  This will be resolved in a later patch.  
+
+ 
+
+
 ### (m76T153)
 - New: Macro Action: add a description entry to input comments at the step level in a macro definition.  This can also optionally create a log entry when the macro executes to validate when certain steps execute in a macro.
 - Fix: Macro: macros in special modes fail affinity test (this would impact macros added to mode enter/exit in mode device for example).

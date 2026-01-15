@@ -1695,8 +1695,7 @@ class ProfileModifier:
 
                     for container in input_item.containers:
                         container.parent = target_input_item
-                        target_mode.config[input_type] \
-                            [input_id].containers.append(container)
+                        target_mode.config[input_type][input_id].containers.append(container)
 
                     # Remove all containers from the source device
                     input_item.containers.clear()

@@ -3702,10 +3702,10 @@ The setting can be overriden by the global mode reload option set in Options for
     def _profile_modes(self) -> dict:
         ''' returns the list of modes defined in the profile '''
         mode_map = {}
-        for device in self._profile.devices:
-            for mode in self._profile.devices[device].modes:
+        for device_guid in self._profile.devices:
+            for mode in self._profile.devices[device_guid].modes:
                 if not mode in mode_map:
-                    mode_map[mode] = self._profile.devices[device].modes[mode]
+                    mode_map[mode] = self._profile.devices[device_guid].modes[mode]
         return mode_map
 
 

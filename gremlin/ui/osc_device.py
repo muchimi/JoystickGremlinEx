@@ -2224,7 +2224,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
 
 
     def __init__(self, parent = None):
-        super().__init__(parent=parent) # parent is the mode object this input belongs to
+        super().__init__(mode_parent=parent) # parent is the mode object this input belongs to
 
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_osc

@@ -409,7 +409,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
         mode_object = device_modes.ensure_mode_exists(master_mode)
 
-        super().__init__(parent = mode_object)
+        super().__init__(mode_parent = mode_object)
         self._id = gremlin.util.get_guid() # unique ID of this state
         self._key = key
         self._category = category # category (StateCategory)
@@ -433,7 +433,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._autorelease_trigger_mode = autorelease_trigger_mode # trigger mode required to enable the autorelease timer
 
         
-        item = gremlin.base_profile.InputItem(parent = mode_object) #self._custom_name_handler)
+        item = gremlin.base_profile.InputItem(mode_parent = mode_object) #self._custom_name_handler)
         item.input_id = self
         item.input_type = InputType.State
         item.device_name = "State"

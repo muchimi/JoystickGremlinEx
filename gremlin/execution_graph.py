@@ -703,7 +703,7 @@ class ExecutionContext():
         ''' find, in the execution tree, '''
         if not action_name:
             return None
-        current_node = self.getNode(id)
+        
         def filter(node):
             nonlocal action_name
             if node.nodeType == ExecutionGraphNodeType.Action:
@@ -721,6 +721,26 @@ class ExecutionContext():
         root = self.graph
         node_list = anytree.findall(root, filter_= filter)
         return node_list
+    
+    def findMultimodeActions(self):
+        ''' gets all multinode actions in the execution graph '''
+        def filter(node):
+            if node.nodeType == ExecutionGraphNodeType.Action:
+                if isinstance(node.functors, list):
+                    for functor in node.functors:
+                        if isinstance(functor.action_data, gremlin.base_profile.MultiModeAbstractAction):
+                            return True
+                else:
+                    functor = node.functors
+                    if isinstance(functor.action_data, gremlin.base_profile.MultiModeAbstractAction):
+                            return True
+            return False
+
+         # ExecutionGraphNodeType.Action, "nodeType"):
+        root = self.graph
+        node_list = anytree.findall(root, filter_= filter)
+        return node_list
+
     
     def getNodeActivationConditions(self, id) -> list:
         ''' gets a list of activation condition nodes for a given node ID (container or action)'''

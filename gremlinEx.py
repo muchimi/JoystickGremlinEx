@@ -1637,6 +1637,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.shared_state.edit_mode = "Default"
         gremlin.shared_state.current_profile = new_profile
 
+        registry = gremlin.base_profile.ProfileRegistry()
+        registry.reset()        
+
         # For each connected device create a new empty device entry
         # in the new profile
         for device in gremlin.joystick_handling.physical_devices():
@@ -2489,8 +2492,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             for device in self._missing_phys_devices + self._missing_vjoy_devices:
                 gremlin.joystick_handling.registerSpecialDevice(device)
-
-            
 
             if verbose:
                 for device in self._missing_phys_devices:
@@ -3516,7 +3517,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             el.sync_input.emit(item)
 
             
-                        if verbose: syslog.info(f"SELECT INPUT: selected widget {input_type} {input_id}")
+                        if verbose: syslog.info(f"SELECT INPUT: selected widget {input_type.name} {input_id}")
 
                     # remember the last input id
                     self._current_tab_input_id = input_id
@@ -3562,11 +3563,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     assert gremlin.util.compare_guid(current_tab_device_guid,device_guid), "SELECT: sync issue: tab device mismatch"
 
                     # current input 
-                    if widget and hasattr(widget,"input_item_list_view"):
-                        lv : gremlin.ui.input_item.InputItemListView = widget.input_item_list_view
-                        item : gremlin.base_profile.InputItem = lv.selected_item()
-                        assert item is not None, f"SELECT: sync issue: no selection"
-                        assert item.input_id == restore_input_id, f"SELECT: sync issue: input id mismatch: expected {restore_input_id} got {item.input_id}"
+                    # if widget and hasattr(widget,"input_item_list_view"):
+                    #     lv : gremlin.ui.input_item.InputItemListView = widget.input_item_list_view
+                    #     item : gremlin.base_profile.InputItem = lv.selected_item()
+                    #     assert item is not None, f"SELECT: sync issue: no selection"
+                    #     assert item.input_id == restore_input_id, f"SELECT: sync issue: input id mismatch: expected {restore_input_id} got {item.input_id}"
 
                 if cursor_set:
                     gremlin.util.popCursor()

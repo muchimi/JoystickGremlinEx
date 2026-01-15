@@ -970,7 +970,7 @@ class ProfileInputNode(ProfileBaseNode):
             mode_object = device_modes.ensure_mode_exists(current_mode)
 
 
-            self._input_item = gremlin.base_profile.InputItem(parent = mode_object)
+            self._input_item = gremlin.base_profile.InputItem(mode_parent = mode_object)
             self._input_item.device_type = DeviceType.ModeControl
             self._input_item.input_id = 0
 

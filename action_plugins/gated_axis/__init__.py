@@ -737,9 +737,10 @@ making changes that impact the order of gates or ranges."""
         gate_list = self.gate_data.getUsedGates()
         gate_count = len(gate_list)
 
-        verbose = gremlin.config.Configuration().verbose_mode_gate
+        config = gremlin.config.Configuration()
+        verbose_extra = config.verbose_mode_gate and config.verbose_mode_extra
 
-        if verbose: syslog.info("Gate table:")
+        if verbose_extra: syslog.info("Gate table:")
         for index, gate in enumerate(gate_list):
             # create a widget for this gate
             assert isinstance(gate,GateInfo)
@@ -818,12 +819,14 @@ making changes that impact the order of gates or ranges."""
         range_count = len(range_list)
         assert range_count > 0, "Invalid gate data - no ranges are defined "
 
-        verbose = gremlin.config.Configuration().verbose_mode_gate
-        if verbose: syslog.info(f"Reload range: found {len(range_list)} used ranges")
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_gate
+        verbose_extra = verbose and config.verbose_mode_extra
+        if verbose_extra: syslog.info(f"Reload range: found {len(range_list)} used ranges")
     
         index = 0
         decimals = self._gate_data.decimals
-        if verbose: syslog.info("Range table:")
+        if verbose_extra: syslog.info("Range table:")
         for index, rng in enumerate(range_list):
             
             widget = RangeWidgetInfo(index + 1, 
@@ -838,7 +841,7 @@ making changes that impact the order of gates or ranges."""
             # track the widget so we can find it
             self._rwi_map[rng] = widget # (row, col)
             
-            if verbose: syslog.info(f"\tRange: {rng.to_display()}")
+            if verbose_extra: syslog.info(f"\tRange: {rng.to_display()}")
             
 
         self._update_range_display()
@@ -1816,10 +1819,8 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
         ''' register the gated functor'''
         #self.action_data.gate_data.setActionId(self.action_data.id)
         self.action_data.gate_data.start()
+        self.action_data.gate_data.hook()
 
-    def profile_stop(self):
-        self.action_data.gate_data.stop()
-        self._started = False
 
     def profile_started(self):
         ''' occurs after all stat init completed - update based on current axis position '''
@@ -1831,6 +1832,15 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
         input_id = gate_data.input_id
         sd = gremlin.event_handler.AxisState()
         values = sd.getAxisValues(device_guid, input_id)
+        if not values:
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if device:
+                syslog.error(f"GATED AXIS: attempt to read from invalid device axis ID (does not exist): [{device.device_name}] axis: [{input_id}]")
+            elif not device:
+                syslog.error(f"GATED AXIS: attempt to read from invalid device id (does not exist): [{device_guid}]")
+            
+            values = gremlin.event_handler.AxisValues(0)
+            
         event = gremlin.event_handler.Event(
             event_type = InputType.JoystickAxis,
             device_guid= gate_data.device_guid,
@@ -1852,7 +1862,7 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
 
 
-class GatedAxis(gremlin.base_profile.AbstractAction):
+class GatedAxis(gremlin.base_profile.MultiModeAbstractAction):
 
     """ action data for the GatedAxis action """
 
@@ -1876,18 +1886,19 @@ the input is in a specific range of values, or crosses gates.
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.singleton = True # this action can only appear once per input
+        # self.singleton = True # this action can only appear once per input
 
         # gate data
         self.gate_data = gremlin.gated_handler.GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
         self.gate_data.id = self.id # use the same ID as the action so it's unique
         self.gates = [self.gate_data]
- 
 
-        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if verbose_ui: syslog.info(f"GatedAxis Action: cleanup: [{self.id}]")
+
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+        if verbose: syslog.info(f"GATE ACTION: loading [{self.id}]")
 
         gremlin.util.singleShot(self.gate_data.hook)
+
     
 
     def display_name(self):
@@ -1895,12 +1906,12 @@ the input is in a specific range of values, or crosses gates.
 
     def _cleanup_ui(self):
         ''' clean ourselves up '''
-        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if verbose_ui: syslog.info(f"GatedAxis Action: cleanup: [{self.id}]")
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+        if verbose: syslog.info(f"GATE ACTION: cleanup: [{self.id}]")
         if self.gates:
             self.gates.clear()
         if self.gate_data:
-            self.gate_data.unhook()
+            # stop listening to events
             self.gate_data = None
 
 

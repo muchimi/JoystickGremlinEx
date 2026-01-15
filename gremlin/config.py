@@ -1305,6 +1305,11 @@ class Configuration(QtCore.QObject):
         self.verbose_mode = value
 
     @property
+    def verbose_mode_inputitems(self):
+        ''' true if verbose mode is in keyboard mode '''
+        return self.verbose and VerboseMode.InputItems in self.verbose_mode        
+
+    @property
     def verbose_mode_keyboard(self):
         ''' true if verbose mode is in keyboard mode '''
         return self.verbose and VerboseMode.Keyboard in self.verbose_mode

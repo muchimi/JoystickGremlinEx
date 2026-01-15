@@ -403,67 +403,32 @@ class CodeRunner:
                                         input_item.always_execute
                                     )
 
+
+            # handle multimode actions - ensure they are hooked - these actions are actions that can process data for multiple modes such as gated axis
+            nodes = ec.findActions("gated-axis")
+            multimode_functors = []
+            for node in nodes:
+                if hasattr(node.functors,"__iter__"):
+                    multimode_functors.extend(node.functors)
+                else:
+                    multimode_functors.append(node.functors.functor)
+
+            self._multimode_functors = multimode_functors
+                
+            for functor in self._multimode_functors:
+                functor.profile_start()
+
+           
+
+            
+
                             
-            # if verbose_detailed:
-            #     self.event_handler.dump_callbacks()
-
- 
-
             # Create merge axis callbacks
             try:
                 if profile.merge_axes:
                     syslog.warning("CodeRunner: MERGE AXIS: detected legacy merge axis in profile - use merge feature in Vjoy remap instead.  ")
                 
-                    # for entry in profile.merge_axes:
-                        
-
-                    #     if not "vjoy" in entry:
-                    #         syslog.error("vjoy entry not found in merge axis.")
-                    #         break
-                    #     if not "vjoy_id" in entry["vjoy"]:
-                    #         syslog.error("vjoy_id entry not found in merge axis.")
-                    #         break
-                    #     if not "axis_id" in entry["vjoy"]:
-                    #         syslog.error("axis_id entry not found in merge axis.")
-                    #         break
-                    #     if not "operation" in entry:
-                    #         syslog.error("operation entry not found in merge axis.")
-                    #         break
-
-                    #     merge_axis = MergeAxis(
-                    #         entry["vjoy"]["vjoy_id"],
-                    #         entry["vjoy"]["axis_id"],
-                    #         entry["operation"]
-                    #     )
-                    #     self._merge_axes.append(merge_axis)
-
-                    #     # Lower axis callback
-                    #     event = gremlin.event_handler.Event(
-                    #         event_type=InputType.JoystickAxis,
-                    #         device_guid=entry["lower"]["device_guid"],
-                    #         identifier=entry["lower"]["axis_id"]
-                    #     )
-                    #     self.event_handler.add_callback(
-                    #         event.device_guid,
-                    #         entry["mode"],
-                    #         event,
-                    #         merge_axis.update_axis1,
-                    #         False
-                    #     )
-
-                    #     # Upper axis callback
-                    #     event = gremlin.event_handler.Event(
-                    #         event_type=InputType.JoystickAxis,
-                    #         device_guid=entry["upper"]["device_guid"],
-                    #         identifier=entry["upper"]["axis_id"]
-                    #     )
-                    #     self.event_handler.add_callback(
-                    #         event.device_guid,
-                    #         entry["mode"],
-                    #         event,
-                    #         merge_axis.update_axis2,
-                    #         False
-                    #     )
+           
             except Exception as err:
                 syslog.error("Error occured in CodeRunner MergeAxis - legacy merge axis disabled")
                 syslog.error(f"{err}\n{traceback.format_exc()}")
@@ -504,11 +469,7 @@ class CodeRunner:
 
             # list of vjoys as input
             input_vids = [vid for vid in range(1,17) if gremlin.shared_state.current_profile.settings.vjoy_as_input.get(vid, False)]
-            # list of connected vjoy devices
-            #used_vids = [dev.vjoy_id for dev in gremlin.joystick_handling.vjoy_devices()]
-            # list of unused vjoy devices
-            #unused_vids = [vid for vid in range(1,17) if not vid in used_vids]
-           
+  
             # list of vjoy device ID to force a release on
             for vid in input_vids:
                 if vjoy.device_exists(vid):
@@ -697,6 +658,11 @@ class CodeRunner:
             if load_state:
                 # profile state ok = profile started correctly
                 el.profile_started.emit() # start event
+
+                # multimode functor started call
+                for functor in self._multimode_functors:
+                    functor.profile_started()
+           
                 el.profile_after_start.emit() # after start event
 
             # change to the start mode
@@ -733,7 +699,10 @@ class CodeRunner:
         # tell components we're stopping
         el.profile_stopping.emit() # about to stop
         el.profile_stop.emit() # stop
-       
+
+        # multimode functor stop
+        for functor in self._multimode_functors:
+            functor.profile_stop()
 
         # unhook vjoy debug data
         vjoy_debug = vjoy.VjoyDebug()

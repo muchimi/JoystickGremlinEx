@@ -285,7 +285,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self.voice_index = config.TTSDefaultVoiceIndex # default voice index
         self._voice_name = ''
         self._abort = False # true if the action aborts any current TTS
-        self.clearQueue = False # true if pending items are cleared when new voice items are queued
+        self.clearQueue = True # true if pending items are cleared when new voice items are queued
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
         self.override_suppress = False # override suppression flag

@@ -293,13 +293,23 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         master_config = self.device_profile.modes[master_mode].config 
 
         changed = False
+        registry = gremlin.base_profile.ProfileRegistry()
 
 
         if not ModeInputModeType.ModeEnter in config[InputType.ModeControl]:
-            modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler, parent = mode_object)
-            modeEnter.input_type = InputType.ModeControl
-            modeEnter.setOverrideInputType(InputType.JoystickButton)
-            modeEnter.input_id = ModeInputModeType.ModeEnter
+            modeEnter = registry.getInputItem(
+                device_guid = gremlin.shared_state.mode_tab_guid,
+                device_type = DeviceType.ModeControl,
+                input_type = InputType.ModeControl, 
+                input_id = ModeInputModeType.ModeEnter,
+                mode_name = mode_object.name,
+                override_input_type = InputType.JoystickButton,
+                custom_name_handler = self._custom_name_handler
+                )
+            # modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler, mode_parent = mode_object)
+            # modeEnter.input_type = InputType.ModeControl
+            # modeEnter.setOverrideInputType(InputType.JoystickButton)
+            # modeEnter.input_id = ModeInputModeType.ModeEnter
             modeEnter.description = "Mode Enter Actions"
             modeEnter.descriptionReadOnly = True
             config[InputType.ModeControl][ModeInputModeType.ModeEnter] = modeEnter
@@ -309,10 +319,18 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         
         if not ModeInputModeType.ModeExit in config[InputType.ModeControl]:
-            modeExit = gremlin.base_profile.InputItem(self._custom_name_handler, parent = mode_object)
-            modeExit.input_type = InputType.ModeControl
-            modeExit.setOverrideInputType(InputType.JoystickButton)
-            modeExit.input_id = ModeInputModeType.ModeExit
+            modeExit = registry.getInputItem(
+                device_guid = gremlin.shared_state.mode_tab_guid,
+                device_type = DeviceType.ModeControl,
+                input_type = InputType.ModeControl, 
+                input_id = ModeInputModeType.ModeExit,
+                mode_name = mode_object.name,
+                override_input_type = InputType.JoystickButton,
+                custom_name_handler = self._custom_name_handler
+                )
+            # modeExit.input_type = InputType.ModeControl
+            # modeExit.setOverrideInputType(InputType.JoystickButton)
+            # modeExit.input_id = ModeInputModeType.ModeExit
             modeExit.description = "Mode Exit Actions"
             modeExit.descriptionReadOnly = True
             config[InputType.ModeControl][ModeInputModeType.ModeExit] = modeExit
@@ -321,10 +339,21 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeExit = config[InputType.ModeControl][ModeInputModeType.ModeExit]
 
         if not ModeInputModeType.ModeProfileStart in master_config[InputType.ModeControl]:
-            modeProfileStart = gremlin.base_profile.InputItem(self._custom_name_handler, parent = master_mode_object)
-            modeProfileStart.input_type = InputType.ModeControl
-            modeProfileStart.setOverrideInputType(InputType.JoystickButton)
-            modeProfileStart.input_id = ModeInputModeType.ModeProfileStart
+            modeProfileStart = registry.getInputItem(
+                device_guid = gremlin.shared_state.mode_tab_guid,
+                device_type = DeviceType.ModeControl,
+                input_type = InputType.ModeControl, 
+                input_id = ModeInputModeType.ModeProfileStart,
+                mode_name = master_mode_object.name,
+                override_input_type = InputType.JoystickButton,
+                custom_name_handler = self._custom_name_handler
+                )     
+
+
+            # modeProfileStart = gremlin.base_profile.InputItem(self._custom_name_handler, mode_parent = master_mode_object)
+            # modeProfileStart.input_type = InputType.ModeControl
+            # modeProfileStart.setOverrideInputType(InputType.JoystickButton)
+            # modeProfileStart.input_id = ModeInputModeType.ModeProfileStart
             modeProfileStart.description = "Profile Start"
             modeProfileStart.descriptionReadOnly = True
             
@@ -334,10 +363,19 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeProfileStart = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStart]                     
 
         if not ModeInputModeType.ModeProfileStop in master_config[InputType.ModeControl]:
-            modeProfileStop = gremlin.base_profile.InputItem(self._custom_name_handler, parent = master_mode_object)
-            modeProfileStop.input_type = InputType.ModeControl
-            modeProfileStop.setOverrideInputType(InputType.JoystickButton)
-            modeProfileStop.input_id = ModeInputModeType.ModeProfileStop
+            modeProfileStop = registry.getInputItem(
+                device_guid = gremlin.shared_state.mode_tab_guid,
+                device_type = DeviceType.ModeControl,
+                input_type = InputType.ModeControl, 
+                input_id = ModeInputModeType.ModeProfileStop,
+                mode_name = master_mode_object.name,
+                override_input_type = InputType.JoystickButton,
+                custom_name_handler = self._custom_name_handler
+                )     
+            # modeProfileStop = gremlin.base_profile.InputItem(self._custom_name_handler, mode_parent = master_mode_object)
+            # modeProfileStop.input_type = InputType.ModeControl
+            # modeProfileStop.setOverrideInputType(InputType.JoystickButton)
+            # modeProfileStop.input_id = ModeInputModeType.ModeProfileStop
             modeProfileStop.description = "Profile Stop"
             modeProfileStop.descriptionReadOnly = True
             

@@ -963,14 +963,14 @@ class EventListener:
 
 	def _event_runner(self):
 		''' runner for inbound joystick events '''
-		verbose = self._verbose_inputs
+		#verbose = self._verbose_inputs
 		while not self._event_thread.stopped():
 			if self._event_queue.empty():
 				time.sleep(0.001)
 				continue
 			
 			event = self._event_queue.get()
-			if verbose: syslog.info(f"EVENTLISTEN: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")		
+			#if verbose: syslog.info(f"EVENTLISTEN: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")		
 			self.joystick_event.emit(event)	
 			if not gremlin.shared_state.is_running:
 				self.joystick_event_ui.emit(event)

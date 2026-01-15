@@ -1065,12 +1065,13 @@ class VerboseMode(IntFlag):
     Merge = auto()
     Sequence = auto()
     Mode = auto()
+    InputItems = auto()
     All = Keyboard | Joystick | Inputs | Mouse | Details | \
           SimConnect | Condition | Process | Exec | Midi | \
           Device | Macro | Gate | Outputs | UI | ExecDetails |\
           VJoy | State | Extra | Remote | Container | Octavi |\
           dinput | Curve | TTS | Sound | Filter | Perf | Events |\
-          Calib | Hooks | Merge | Sequence | Mode
+          Calib | Hooks | Merge | Sequence | Mode | InputItems
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

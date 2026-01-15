@@ -165,14 +165,17 @@ class InputItemListModel(ui_common.AbstractModel):
 
     """Model storing a device's input item list."""
 
-    def __init__(self, device_data, mode, allowed_types = None,
+    def __init__(self,
+                 device_data,
+                 mode : str,
+                 allowed_types : list = None,
                  custom_update_handler = None, 
                  custom_remove_handler = None, 
                  custom_clear_handler = None, 
                  custom_filter_handler = None,
                  custom_delete_confirm_handler = None,
-                 show_master_mode = False,
-                 show_filtered_only = False):
+                 show_master_mode : bool = False,
+                 show_filtered_only : bool = False):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
@@ -180,11 +183,13 @@ class InputItemListModel(ui_common.AbstractModel):
         :param custom_update_handler: handler for custom updates to the data
         :param show_master_mode: determines if master mode items are displayed in the model
         """
+        import gremlin.base_profile
         super().__init__()
-        self._device_data = device_data
+        self._device_data  : gremlin.base_profile.Device = device_data
         self._mode = mode
         self._show_master_mode = show_master_mode
         self._show_filtered_only = show_filtered_only
+
         
         self._index_map = {} # map of index to input item
         self._item_map = {} # map of input_id to index
@@ -311,8 +316,12 @@ class InputItemListModel(ui_common.AbstractModel):
             self._update_source()
             if apply_filter: self._filter_data()
             return
+        
+        registry = gremlin.base_profile.ProfileRegistry()
+        device_guid = self._device_data.device_guid
+        mode = self.mode
 
-        mode_object = self._device_data.modes[self._mode]
+        #mode_object = self._device_data.modes[self._mode]
         index = 0
 
         profile = gremlin.shared_state.current_profile
@@ -322,46 +331,86 @@ class InputItemListModel(ui_common.AbstractModel):
 
         self._index_map = {} # map of index to value
         self._item_map = {}  # map of values to their index
+
+        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)           
+
         for input_type in self._allowed_input_types:
-            if input_type in mode_object.config.keys():
-                sorted_keys = sorted(mode_object.config[input_type].keys())
-                for data_key in sorted_keys:
-                    data : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
-                    # add hardware GUID reference to data block so we have an easier reference to it
-                    device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(data.device_guid)
+
+            input_items = registry.getInputItems(device_guid, mode, input_type = input_type)
+            
+            if input_items and device.device_type == DeviceType.Joystick:
+                # sort by axes and buttons
+                input_items.sort(key = lambda x: x.input_id)
+                
+            for input_item in input_items:
                     if self._show_filtered_only or device.device_type == DeviceType.Joystick:
-                        filtered = profile.settings.getFiltered(data.device_guid, data.input_type, data.input_id)
+                        filtered = profile.settings.getFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
                         
                         if filtered:
                             continue
-                        if verbose: syslog.info(f"Input {device.name} : {data.input_type.name} {data.input_id} visible")
-                    data.device_guid = self._device_data.device_guid
-                    self._index_map[index] = data
-                    self._item_map[data.input_id] = index
+                        if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
                     
+                    self._index_map[index] = input_item
+                    self._item_map[input_item.input_id] = index 
                     index += 1
+            
+
+            # if input_type in mode_object.config.keys():
+            #     sorted_keys = sorted(mode_object.config[input_type].keys())
+            #     for data_key in sorted_keys:
+            #         input_id = data_key
+            #         input_item : gremlin.base_profile.InputItem =  mode_object.config[input_type][data_key]
+            #         if input_item.input_type == InputType.JoystickAxis and input_item.input_id == 4:
+            #             pass
+            #         # add hardware GUID reference to data block so we have an easier reference to it
+            #         device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(input_item.device_guid)
+            #         if self._show_filtered_only or device.device_type == DeviceType.Joystick:
+            #             filtered = profile.settings.getFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
+                        
+            #             if filtered:
+            #                 continue
+            #             if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
+            #         input_item.device_guid = self._device_data.device_guid
+            #         self._index_map[index] = input_item
+            #         self._item_map[input_item.input_id] = index
+                    
+            #         index += 1
 
         if self._show_master_mode:
             master_mode = gremlin.shared_state.master_mode
             if master_mode in self._device_data.modes:
                 # older profile may not have master mode defined until saved
-                mode_object = self._device_data.modes[master_mode]
-                for input_type in self._allowed_input_types:
-                    if input_type in mode_object.config.keys():
-                        sorted_keys = sorted(mode_object.config[input_type].keys())
-                        for data_key in sorted_keys:
-                            data : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
-                            # add hardware GUID reference to data block so we have an easier reference to it
-
-                            if self._show_filtered_only:
-                                if not data.hasContainers:
-                                    # filter out empty items 
-                                    continue
-                            data.device_guid = self._device_data.device_guid
-                            self._index_map[index] = data
+                input_items = registry.getInputItems(device_guid, master_mode, input_type)
+                for input_item in input_items:
+                        
+                        if self._show_filtered_only or device.device_type == DeviceType.Joystick:
+                            filtered = profile.settings.getFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
                             
-                            self._item_map[data.input_id] = index
-                            index += 1
+                            if filtered:
+                                continue
+                            if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
+                        
+                        self._index_map[index] = input_item
+                        self._item_map[input_item.input_id] = index 
+                        index += 1
+
+                # mode_object = self._device_data.modes[master_mode]
+                # for input_type in self._allowed_input_types:
+                #     if input_type in mode_object.config.keys():
+                #         sorted_keys = sorted(mode_object.config[input_type].keys())
+                #         for data_key in sorted_keys:
+                #             input_item : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
+                #             # add hardware GUID reference to data block so we have an easier reference to it
+
+                #             if self._show_filtered_only:
+                #                 if not input_item.hasContainers:
+                #                     # filter out empty items 
+                #                     continue
+                #             input_item.device_guid = self._device_data.device_guid
+                #             self._index_map[index] = input_item
+                            
+                #             self._item_map[input_item.input_id] = index
+                #             index += 1
 
 
 
@@ -1154,7 +1203,8 @@ class InputItemListView(ui_common.AbstractView):
         last_widget = self.itemAt(self._current_index)
         if last_widget:
             with (QtCore.QSignalBlocker(last_widget)):
-                last_widget.selected = False
+                last_widget.setSelected(False, False)
+                #last_widget.selected = False
 
                 
 
