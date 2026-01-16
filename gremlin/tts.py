@@ -92,6 +92,7 @@ class TextToSpeech:
     def profile_start(self):
         ''' called on profile start '''
         self._last_hash = None # reset prior speech
+        self._start_ui()
 
     def profile_stop(self):
         ''' called on profile stop '''

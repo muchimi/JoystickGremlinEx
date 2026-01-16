@@ -3712,7 +3712,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     
 
     def _get_widget_index(self, widget):
-        """Returns the index of the provided widget.
+        """Returns the zero based index of the provided widget.
 
         :param widget the widget for which to return the index
         :return the index of the provided widget, -1 if not present

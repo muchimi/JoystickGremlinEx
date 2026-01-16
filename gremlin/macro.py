@@ -326,6 +326,7 @@ class MacroManager(QtCore.QObject):
     def __init__(self):
         """Initializes the instance."""
         super().__init__()
+        self.id = "8cdd6c7503cf40c0a8c99375489cfd51"
         self._active = {}
         self._queue = collections.deque()
         self._flags = {}
@@ -352,6 +353,7 @@ class MacroManager(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._max_concurrent = config.max_concurrent_macro
         self._mode_affinity = config.macro_mode_affinity
+        self._hook_mode_change = False # true if mode change allowed hook enabled
 
 
     @QtCore.Slot()
@@ -382,8 +384,15 @@ class MacroManager(QtCore.QObject):
                     if macro.id in self._active:
                         if verbose: syslog.info(f"MACRO: terminating macro: {macro.id}")
                         self.terminate_macro(macro)
-                    
-    
+
+    def _mode_change_allowed_callback(self, id : str) -> bool:
+        ''' called when a mode change is requested to see if the mode change should go through '''
+        if id == self.id:
+            # ours
+            result = len(self._active) == 0
+            # syslog.info(f"MODE CHANGE CHECK: macro: [{self.id}] mode change allowed: {result}")
+            return result # true if no macros are running right now
+        return True # allowed
 
     def start(self):
         """Starts the scheduler."""
@@ -393,6 +402,12 @@ class MacroManager(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._max_concurrent = config.max_concurrent_macro
         self._mode_affinity = config.macro_mode_affinity
+
+        config = gremlin.config.Configuration()
+        if not config.mode_change_aborts_sequence:
+            self._hook_mode_change = True
+            eh = gremlin.event_handler.EventHandler()
+            eh.registerModeChangeHook(self.id, self._mode_change_allowed_callback)
 
         self._is_running = True
         self._clear_queue()
@@ -408,6 +423,12 @@ class MacroManager(QtCore.QObject):
         """Stops the scheduler."""
         self._clear_queue()
         self._is_running = False
+
+        if self._hook_mode_change:
+            eh = gremlin.event_handler.EventHandler()
+            eh.unregisterModeChangeHook(self.id)
+            self._hook_mode_change = False
+
         if self._run_scheduler_thread is not None and \
                 self._run_scheduler_thread.is_alive():
 
@@ -538,17 +559,8 @@ class MacroManager(QtCore.QObject):
                             with self._flags_lock:
                                 self._flags[entry.macro.id] = False
                                 
-                            
-                            # Remove all queued up macros with the same id as
-                            # they should have been impossible to queue up
-                            # in the first place
-                            #removal_list = []
-
                             removal_list = [e for e in self._queue if e.macro.id == e.macro.id]
-                            # for queue_entry in self._queue:
-                            #     if queue_entry.macro.id == entry.macro.id:
-                            #         removal_list.append(queue_entry)
-
+             
                             for queue_entry in removal_list:
                                 self._queue.remove(queue_entry)
                     elif entry.macro.id in self._active:
@@ -587,7 +599,9 @@ class MacroManager(QtCore.QObject):
                     syslog.warning(f"MACRO: affinity: discard macro due to mode change: [{macro.id}] macro mode: [{macro.mode}] current profile mode [{mode}] ")    
                     macro.state = MacroState.Idle # return to idle
                     return False
-            self._active[macro.id] = macro # add the macro to the active queue
+
+            # add the macro to the active queue
+            self._active[macro.id] = macro 
             macro.state = MacroState.Running
             Thread(target=functools.partial(self._execute_macro, macro, is_local, is_remote)).start()
         else:
@@ -672,7 +686,6 @@ class MacroManager(QtCore.QObject):
         # Remove macro from active set, notify manager, and remove any
         # potential callbacks
         try:
-            
             if macro.id in self._active:
                 del self._active[macro.id]
             else:
@@ -687,8 +700,6 @@ class MacroManager(QtCore.QObject):
 
         # trigger next step
         self._schedule_event.set()
-
-
 
     def _preprocess_macro(self, macro):
         """Inserts pauses as necessary into the macro."""

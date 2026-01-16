@@ -2061,13 +2061,21 @@ class EventHandler(QtCore.QObject):
 		self._execute_queue = [] # list of items to execute
 		self._execute_thread = None
 		self._execute_running = False
+		
+
+		# map of callbacks evaluated to see if a mode change can occur keyed by a unique key
+		# actions that need to approve a mode change register a callback hook and unique ID that succeeds (bool = True) if the mode change is allowed
+		self._mode_change_hooks = {}
+
+		# holds the mode change requests that are queued up
+		# a queue is used to delay a mode change if a sequence/macro is running and needs to finish before the mode change
+		self._change_mode_queue = collections.deque() 
+		self._mode_queue_enabled = not gremlin.config.Configuration().mode_change_aborts_sequence
 
 
 
 		self.reset()
-	
-	
-		
+
 
 	def _profile_start(self):
 		'''' profile start event - EVENT HANDLER '''
@@ -2076,8 +2084,12 @@ class EventHandler(QtCore.QObject):
 			self._last_vjoy_event = None # reset vjoy loopback
 			# self._queue_start()
 			self._update_mode_change(gremlin.shared_state.runtime_mode)
-			
+			self._mode_queue_enabled = not gremlin.config.Configuration().mode_change_aborts_sequence
 
+			self._execute_thread = gremlin.threading.AbortableThreadX(target = self._execute_runner)
+			self._execute_thread.name = "execute runner"
+			self._execute_thread.start()
+			syslog.info("EXEC: start")
 
 
 	def _profile_started(self):
@@ -2095,6 +2107,12 @@ class EventHandler(QtCore.QObject):
 			current_profile = gremlin.shared_state.current_profile
 			last_mode = gremlin.shared_state.runtime_mode
 			current_profile.set_last_runtime_mode(last_mode)
+
+			if self._execute_thread.is_alive():
+				self._execute_thread.stop()
+				self._execute_thread.join()
+				syslog.info("EXEC: stop")
+
 	
 	def registerModeValidator(self, callback):
 		assert callable(callback)
@@ -2625,8 +2643,80 @@ class EventHandler(QtCore.QObject):
 					tts = gremlin.tts.TextToSpeech()
 					tts.speak(text, rate) # default rate is 100
 
+
+	def registerModeChangeHook(self, id : str, callback):
+		''' adds a callback hook for mode changes '''
+		self._mode_change_hooks[id] = callback
+
+	def unregisterModeChangeHook(self, id : str):
+		''' removes a change mode callback hook '''
+		if id in self._mode_change_hooks:
+			del self._mode_change_hooks[id]
+
+
+	def ModeChangeAllowed(self) -> bool:
+		''' true if a mode change is not suspended'''
+		return self._mode_change_allowed()
 	
+	def ModeChangeSuspended(self) -> bool:
+		''' true if a mode change is suspended'''
+		return not self._mode_change_allowed()
+	
+	def _mode_change_allowed(self) -> bool:
+		''' checks if a mode change is allowed right now'''
+		if self._mode_change_hooks:
+			for id, callback in self._mode_change_hooks.items():
+				result = callback(id)
+				if not result:
+					return False
+			return True
+		return True
+				
+	
+	def queueModeChange(self, new_mode : str, args : tuple):
+		''' request a mode change using the mode stack '''
+		with self._lock:
+			self._change_mode_queue.append((new_mode, args))
+			config = gremlin.config.Configuration()
+			if config.verbose_mode_macro or config.verbose_mode_sequence:
+				syslog.info(f"MODE QUEUE: queue mode [{new_mode}] queue depth: [{len(self._change_mode_queue)}]")
+
+	def _execute_runner(self):
+		''' mode change runner - watches for mode change requests and changes mode if a mode change is allowed '''
+		config = gremlin.config.Configuration()
+		verbose = config.verbose_mode_macro or config.verbose_mode_sequence
+		while not self._execute_thread.stopped():
+			if len (self._change_mode_queue):
+				if self.ModeChangeAllowed():
+					with self._lock:
+						# get the most recent mode pushed on the queue
+						new_mode, args = self._change_mode_queue.popleft() 
+						self._change_mode_queue.clear() # remove all items
+
+					if verbose:
+						syslog.info(f"MODE QUEUE: deqeue mode [{new_mode}]")
+					# clear the queue of all other mode changes that accumulated 
+					
+					# run the mode change
+					if new_mode != self.current_mode:
+						self._change_mode(new_mode, args)
+						
+
+			else:
+				time.sleep(0.05)
+
+
 	def change_mode(self, new_mode, emit = True, force_update = False, tts = True, validate = True):
+		args = (emit, force_update, tts, validate)
+		if gremlin.shared_state.is_running and self._mode_queue_enabled:
+			# runtime - queue the request based on options
+			self.queueModeChange(new_mode, args)
+		else:
+			# do not queue the request
+			self._change_mode(new_mode, args)
+
+
+	def _change_mode(self, new_mode : str, args : tuple = None):
 		"""Changes the GremlinEx currently active mode.
 
 		:param new_mode: the new mode to use
@@ -2636,7 +2726,7 @@ class EventHandler(QtCore.QObject):
 		"""
 
 		import gremlin.ui.mode_device
-
+		emit, force_update, tts, validate = args
 
 		el = EventListener()
 		try:

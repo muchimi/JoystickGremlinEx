@@ -4559,6 +4559,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # Disable the program if it is running when we're loading a
         # new profile
 
+        # clear current inputs
+        registry = gremlin.base_profile.ProfileRegistry()
+        registry.reset()
                     
         # trap recursive call
         if self._profile_load_stack:

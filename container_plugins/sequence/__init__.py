@@ -31,6 +31,7 @@ import gremlin.base_conditions
 import gremlin.config
 import gremlin.event_handler
 import gremlin.execution_graph
+import gremlin.shared_state
 import gremlin.macro
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -49,10 +50,23 @@ class GlobalSequence():
     ''' holds global sequence stats '''
     def __init__(self):
         self.sequence_count = 0 # number of active sequences
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self.profile_start)
+        
+
+
+    def profile_start(self):
+        # reset count on profile start 
+        self.sequence_count = 0
+            
 
     def canExecute(self):
         max_concurrent = gremlin.config.Configuration().max_concurrent_sequence
-        return self.sequence_count + 1 < max_concurrent
+        if max_concurrent: 
+            # concurrency is enabled if > 0
+            return self.sequence_count + 1 < max_concurrent
+        # concurrency disabled - always succeeed
+        return True
         
     def pushSequence(self):
         self.sequence_count += 1
@@ -353,6 +367,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
         
         self._lock = threading.Lock()
         
+        # list of step widgets in the UI
+        self.step_widgets = []
     
         self.widget_layout = QtWidgets.QHBoxLayout()
 
@@ -506,10 +522,42 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self._warning_widget)
         self.action_layout.addWidget(self._trigger_widget)
 
-        # self.widget_layout.addStretch()
+ 
 
         self.action_layout.addLayout(self.widget_layout)
+        self.step_container, self.step_layout = gremlin.ui.ui_common.getVContainer()
+        self.action_layout.addWidget(self.step_container)
 
+
+        self._update_steps()
+        self._update_widgets()
+
+
+    def _update_steps(self):
+        ''' redraws action steps in the sequence '''
+        import gremlin.util
+        import gremlin.event_handler
+
+        gremlin.util.pushCursor()
+
+        # cleanup action widgets
+        for widget in self.action_widgets:
+            widget.model.data_changed.disconnect(self.container_modified.emit)
+            widget.hide()
+            widget.setParent(None)
+            widget.deleteLater()
+        
+        self.action_widgets.clear()
+
+        # cleanup step widgets
+        for widget in self.step_widgets:
+            gremlin.util.clear_layout(widget)
+            widget.hide()
+            widget.setParent(None)
+            widget.deleteLater()
+
+        self.step_widgets.clear()
+    
 
         # Insert action widgets
         for index, action in enumerate(self.profile_data.action_sets):
@@ -535,22 +583,22 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
 
             container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only= True)
-            self.action_layout.addWidget(container_widget)
+            self.step_layout.addWidget(container_widget)
 
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[index],
                 "Step",
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
-            self.action_layout.addWidget(widget)
+            self.step_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
-
-        
-        self._update_widgets()
+            self.step_widgets.append(container_widget)
 
 
+
+        gremlin.util.popCursor()
 
 
     @QtCore.Slot(bool)
@@ -784,7 +832,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         finally:
             gremlin.util.popCursor()
 
-    
+
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -803,22 +851,27 @@ class SequenceContainerWidget(AbstractContainerWidget):
             return
 
         # Perform action
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Up:
-            if index > 0:
-                self.profile_data.action_sets[index],\
-                    self.profile_data.action_sets[index-1] = \
-                    self.profile_data.action_sets[index-1],\
-                    self.profile_data.action_sets[index]
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Down:
-            if index < len(self.profile_data.action_sets) - 1:
-                self.profile_data.action_sets[index], \
-                    self.profile_data.action_sets[index + 1] = \
-                    self.profile_data.action_sets[index + 1], \
-                    self.profile_data.action_sets[index]
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
-            del self.profile_data.action_sets[index]
+        match action:
 
+            case gremlin.ui.input_item.ActionSetView.Interactions.Up:
+                if index > 0:
+                    self.profile_data.action_sets[index],\
+                        self.profile_data.action_sets[index-1] = \
+                        self.profile_data.action_sets[index-1],\
+                        self.profile_data.action_sets[index]
+            case gremlin.ui.input_item.ActionSetView.Interactions.Down:
+                if index < len(self.profile_data.action_sets) - 1:
+                    self.profile_data.action_sets[index], \
+                        self.profile_data.action_sets[index + 1] = \
+                        self.profile_data.action_sets[index + 1], \
+                        self.profile_data.action_sets[index]
+            case gremlin.ui.input_item.ActionSetView.Interactions.Delete:
+                del self.profile_data.action_sets[index]
+            case _:
+                return
+            
         self.container_modified.emit()
+        self._update_steps()
 
     def _get_window_title(self):
         """Returns the title to use for this container.
@@ -848,22 +901,48 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         config = gremlin.config.Configuration()
         self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
         self._verbose_extra = self._verbose and config.verbose_mode_extra
-        self._is_running = False
+        
+        self._hook_mode_change = False
+        self.action_data._thread = None
+        self.action_data._is_running = False
 
     def profile_start(self):
-        self._is_running = False
+        
+        self.action_data._is_running = False
         
         config = gremlin.config.Configuration()
         self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
         self._verbose_extra = self._verbose and config.verbose_mode_extra
         gs = GlobalSequence()
         gs.sequence_count = 0
- 
+
+        config = gremlin.config.Configuration()
+        if not config.mode_change_aborts_sequence:
+            # only hook if mode change while running a sequence is not allowed
+            self._hook_mode_change = True
+            eh = gremlin.event_handler.EventHandler()
+            eh.registerModeChangeHook(self.id, self._mode_change_allowed_callback)   
+        
+
+
+    def _mode_change_allowed_callback(self, id : str) -> bool:
+        if id == self.id:
+            # ours
+            result = not self.action_data._is_running 
+            # syslog.info(f"MODE CHANGE CHECK: sequence: [{self.id}] mode change allowed: [{result}]")
+            return result # false if sequence is running
+        return True # allowed
+
 
     def profile_stop(self):
         # stop wiggling
         self.stop_wiggle()
         self.stop_normal()
+
+        if self._hook_mode_change:
+            eh = gremlin.event_handler.EventHandler()
+            eh.unregisterModeChangeHook(self.id)
+            self._hook_mode_change = False
 
         
 
@@ -872,12 +951,12 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         
         # kill any executing timers on mode change
         if gremlin.config.Configuration().macro_mode_affinity:
-            if self._is_running:
+            if self.action_data._is_running:
                 if self._verbose: syslog.info(f"SEQUENCE: affinity: stop sequence runner due to mode change")
-                self._is_running = False
-                if self._thread.is_alive():
-                    self._thread.join()
-                self._thread = None       
+                self.action_data._is_running = False
+                if self.action_data._thread.is_alive():
+                    self.action_data._thread.join()
+                self.action_data._thread = None       
 
         # reset
         self.action_data.last_step = None
@@ -887,14 +966,14 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
         gs = GlobalSequence()
         if gs.canExecute():
-            if not self._is_running:
+            if not self.action_data._is_running:
                 
-                self._is_running = True
-                self._thread = threading.Thread(target = self._wiggle_runner)
-                self._thread.name = "wiggle runner"
+                self.action_data._is_running = True
+                self.action_data._thread = threading.Thread(target = self._wiggle_runner)
+                self.action_data._thread.name = "wiggle runner"
                 # increase concurrency count
                 gs.pushSequence()
-                self._thread.start()
+                self.action_data._thread.start()
                 if self._verbose: syslog.info(f"SEQUENCE: start wiggle sequence runner: concurrency: [{gs.sequence_count}]")
                 
         else:
@@ -902,11 +981,11 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
     def stop_wiggle(self):
         ''' stops the wiggle process '''
-        if self._is_running:
+        if self.action_data._is_running:
             if self._verbose: syslog.info(f"SEQUENCE: stop wiggle sequence runner")
-            self._is_running = False
-            self._thread.join()
-            self._thread = None
+            self.action_data._is_running = False
+            self.action_data._thread.join()
+            self.action_data._thread = None
             # reduce concurrency count
             gs = GlobalSequence()
             gs.popSequence()
@@ -915,14 +994,13 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         ''' starts the wiggle process '''
         gs = GlobalSequence()
         if gs.canExecute():
-            if not self._is_running:
-                
-                self._is_running = True
-                self._thread = threading.Thread(target = self._normal_runner)
-                self._thread.name = "sequence runner"
+            if not self.action_data._is_running:
+                self.action_data._is_running = True
+                self.action_data._thread = threading.Thread(target = self._normal_runner)
+                self.action_data._thread.name = "sequence runner"
                 # increase concurrency count
                 gs.pushSequence()
-                self._thread.start()
+                self.action_data._thread.start()
                 if self._verbose: syslog.info(f"SEQUENCE: start sequence runner: concurrency: [{gs.sequence_count}]")
         else:
             syslog.error("SEQUENCE: exceeded concurrent sequence limit")
@@ -930,15 +1008,15 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
     def stop_normal(self):
         ''' stops the wiggle process '''
-        if self._is_running:
+        if self.action_data._is_running:
             if self._verbose: syslog.info(f"SEQUENCE: stop sequence runner")
-            self._is_running = False
-            if self._thread.is_alive():
-                self._thread.join()
+            self.action_data._is_running = False
+            if self.action_data._thread.is_alive():
+                self.action_data._thread.join()
             # reduce concurrency count
             gs = GlobalSequence()
             gs.popSequence()                
-            self._thread = None            
+            self.action_data._thread = None            
 
 
 
@@ -970,23 +1048,24 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                     (not is_pressed and self.container.exec_on_release) 
         
         is_pressed = trigger
+        is_running = self.action_data._is_running
             
         match mode:
             case "wiggle":
                 # wiggle mode runner
-                if is_pressed and not self._is_running:
+                if is_pressed and not is_running:
                     # run sequence in wiggle mode
                     if verbose: syslog.info(f"SEQUENCE EVENT: wiggle mode: start - profile mode: {profile_mode}")
                     self.start_wiggle()
 
-                elif not is_pressed and self._is_running:
+                elif not is_pressed and is_running:
                     # stop wiggle mode
                     if verbose: syslog.info(f"SEQUENCE EVENT: wiggle mode: stop - profile mode: {profile_mode}")
                     self.stop_wiggle()
             case "toggle":
                 # toggle mode acts as a switch on the input trigger - first press = turn on, second press = turn off
                 if is_pressed:
-                    if self._is_running:
+                    if is_running:
                         # stop loop
                         if verbose: syslog.info(f"SEQUENCE EVENT: toggle mode: stop - profile mode: {profile_mode}")
                         self.stop_normal()
@@ -996,12 +1075,12 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                         self.start_normal()
             case "loop":
                 # loop mode is on while the input is pressed, off when released
-                if is_pressed and not self._is_running:
+                if is_pressed and not is_running:
                     # run sequence in wiggle mode
                     if verbose: syslog.info(f"SEQUENCE EVENT: loop mode: start - profile mode: {profile_mode}")
                     self.start_normal()
 
-                elif not is_pressed and self._is_running:
+                elif not is_pressed and is_running:
                     # stop wiggle mode
                     if verbose: syslog.info(f"SEQUENCE EVENT: loop mode: stop - profile mode: {profile_mode}")
                     self.stop_normal()
@@ -1009,7 +1088,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             case "normal":
                 # regular mode - run while pressed
                 if is_pressed:
-                    if not self._is_running:
+                    if not is_running:
                         # start sequence
                         if verbose: syslog.info(f"SEQUENCE EVENT: normal mode: start - profile mode: {profile_mode}")
                         self.start_normal()
@@ -1022,6 +1101,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         return True 
     
     def _normal_runner(self):
+        
         event_press = gremlin.event_handler.Event(InputType.JoystickButton,
                                             1,
                                             device_guid=gremlin.shared_state.fake_tab_guid,
@@ -1037,12 +1117,13 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         # no resume mode if running once
         resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
 
-        if verbose: syslog.info(f"SEQUENCE RUNNER: {self.action_data.mode} mode - runner start - resume mode: {resume}")
+        if verbose: syslog.info(f"SEQUENCE NORMAL: [{self.id}] {self.action_data.mode} mode - runner start - resume mode: {resume}")
 
         if not nodes:
             # nothing to run
-            self._is_running = False
-            if verbose: syslog.info(f"SEQUENCE WIGGLE: Trigger Functor: nothing to wiggle")
+            self.action_data._is_running = False
+            
+            if verbose: syslog.info(f"SEQUENCE NORMAL: Trigger Functor: nothing to run")
             return
         index = None
         if resume:
@@ -1058,9 +1139,10 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         exec_delay_ms = self.container.normal_exec_delay
         exec_delay_s = exec_delay_ms/1000
         autorelease_delay_ms = self.container.normal_autorelease_delay
-        if verbose: syslog.info(f"SEQUENCE: starting sequence")
+        
 
-        while self._is_running:
+        
+        while self.action_data._is_running:
             node = nodes[index]
             options : StepOptions = self.action_data.getOptions(index) # execution options for the step
 
@@ -1080,21 +1162,22 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 if verbose: syslog.info(f"\t\tTrigger release {index}/{repeat_index}")                    
                 self._ec.execute_node(node, event_release, False, None) # issue release
 
-                if not self._is_running: break
+                if not self.action_data._is_running: break
                 if repeat_index < repeat_count - 1:
                     # interval between repeat delay computation
                     delay = options.getDelay(exec_delay_ms)
                     if delay > 0:
                         if verbose: syslog.info(f"\t\tstep repeat interval delay: {delay:03f}")
                         self._wait(delay)
-                        if not self._is_running: break
+                        if not self.action_data._is_running: break
 
             
             # next node to run
             index += 1
             if index == count:
                 if self.action_data.mode == "normal":
-                    self._is_running = False
+                    self.action_data._is_running = False
+                    
                     break # only run once
                 # loop
                 index = 0
@@ -1105,8 +1188,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 if verbose: syslog.info(f"\tstep interval delay: {exec_delay_s:03f}")
                 self._wait(exec_delay_s)
 
-        if verbose: syslog.info("SEQUENCE RUNNER: sequence completed - exiting runner")
-
+        if verbose: syslog.info(f"SEQUENCE NORMAL STOP: {self.id}")
+        self.action_data._is_running = False
         
 
     
@@ -1140,7 +1223,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
 
         if not nodes:
             # nothing to run
-            self._is_running = False
+            self.action_data._is_running = False
             if verbose: syslog.info(f"SEQUENCE WIGGLE: Trigger Functor: nothing to wiggle")
             return
         index = None
@@ -1172,7 +1255,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             index = random.randrange(0, count)
             if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) randomize step: pick random next step: [{index}]")
 
-        while self._is_running:
+
+        while self.action_data._is_running:
 
             if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) - execute step index: [{index}]")
             node = nodes[index]
@@ -1191,7 +1275,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 self._ec.execute_node(node, event_release, False, None) # issue release
 
                 # delay between steps
-                if not self._is_running: break
+                if not self.action_data._is_running: break
                 if wiggle_random:
                     # random wiggle delay
                     delay = random.randrange(min_delay, max_delay) / 1000 # to seconds
@@ -1202,16 +1286,16 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                         if verbose_extra: syslog.info(f"step repeat interval delay [{delay}]")
                         if delay > 0:
                             self._wait(delay)
-                            if not self._is_running: break
+                            if not self.action_data._is_running: break
 
-            if not self._is_running: break
+            if not self.action_data._is_running: break
 
             # handle delay between steps
             delay = exec_delay_s
             if delay > 0:
                 if verbose_extra: syslog.info(f"step repeat interval delay [{delay}]")
                 self._wait(delay)
-                if not self._is_running: break
+                if not self.action_data._is_running: break
 
 
             # next node to run
@@ -1231,18 +1315,21 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 step_count += 1
                 if step_count >= max_count:
                     if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) max step count reached ({step_count})")
-                    self._is_running = False
+                    self.action_data._is_running = False
                     break
 
-        if verbose: syslog.info("SEQUENCE RUNNER: (wiggle) sequence completed - exiting runner")
-            
+                
+        if verbose: syslog.info(f"SEQUENCE WIGGLE STOP: {self.id}")
+        self.action_data._is_running = False
+        
+   
     def _wait(self, delay : float):
         ''' interruptible delay 
         :param delay: time in seconds
         
         '''
         expires = time.time() + delay
-        while self._is_running and expires > time.time():
+        while self.action_data._is_running and expires > time.time():
             time.sleep(0.01)
 
 

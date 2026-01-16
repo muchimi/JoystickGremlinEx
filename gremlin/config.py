@@ -2996,3 +2996,12 @@ class Configuration(QtCore.QObject):
     @macro_mode_affinity.setter
     def macro_mode_affinity(self, value: bool):
         self._set_data("macro_mode_affinity", value)
+
+    @property
+    def mode_change_aborts_sequence(self) -> bool:
+        ''' true if a mode change while a macro or sequence is running can abort the macro or executing sequence - if not set the mode change is delayed until all macros/sequences are done'''
+        return self._get_data("mode_change_aborts_sequence", False)
+    @mode_change_aborts_sequence.setter
+    def mode_change_aborts_sequence(self, value : bool):
+        self._set_data("mode_change_aborts_sequence", value)
+        

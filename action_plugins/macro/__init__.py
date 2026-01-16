@@ -2082,6 +2082,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_macro
+
         
         if verbose: syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} {str(event)}")        
 
@@ -2096,17 +2097,13 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         
         if verbose: syslog.info(f"\texecute")
         
-        
         if self.action_data.auto_restart and self.macro.state == gremlin.macro.MacroState.Running:
             MacroFunctor.manager.terminate_macro(self.macro) # terminate existing running macro for restart
+    
 
-        # queue the macro        
+        # queue the macro     
         MacroFunctor.manager.queue_macro(self.macro)
         if isinstance(self.macro.repeat, gremlin.macro.HoldRepeat):
-            # gremlin.input_devices.ButtonReleaseActions().register_callback(
-            #     lambda: MacroFunctor.manager.terminate_macro(self.macro),
-            #     event
-            # )
             release_event = event.release_event()
             gremlin.input_devices.ButtonReleaseActions().register_callback(
                 lambda: self.process_event(release_event, value, extra_data),

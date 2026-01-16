@@ -6410,99 +6410,80 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         
         verbose = gremlin.config.Configuration().verbose_mode_hooks
-        for i in range(device.axis_count): 
-            linear_id = i + 1
-            axis_id = device.linear_id_map[linear_id] # map linear -> axis ID for non sequential axes
-            
-            widget,layout = getVContainer()
-            # widget.setStyleSheet("border: 1px solid;")
-            widget.setFixedWidth(80)
-            widget.setFixedHeight(150)
-            sd = gremlin.event_handler.AxisState()
-            
-                        
-            axis_name = device.axis_names[name_index]
-            name_index +=1
-            axis_label = QtWidgets.QLabel(f"Axis {axis_name} L{linear_id}")
-            self.index_map[axis_id] = linear_id
-            values = sd.getAxisValues(device.device_guid, linear_id, linear = True)
-            if values is None:
-                syslog.error(f"AxisCurrentState: unregistered axis [{device.name}] id: [{device.device_guid}] axis: A{axis_id} L{linear_id}]") 
-                continue
+        if device.axis_count:
+            for i in range(device.axis_count): 
+                linear_id = i + 1
+                axis_id = device.linear_id_map[linear_id] # map linear -> axis ID for non sequential axes
+                
+                widget,layout = getVContainer()
+                # widget.setStyleSheet("border: 1px solid;")
+                widget.setFixedWidth(80)
+                widget.setFixedHeight(150)
+                sd = gremlin.event_handler.AxisState()
+                
+                            
+                axis_name = device.axis_names[name_index]
+                name_index +=1
+                axis_label = QtWidgets.QLabel(f"Axis {axis_name} L{linear_id}")
+                self.index_map[axis_id] = linear_id
+                values = sd.getAxisValues(device.device_guid, linear_id, linear = True)
+                if values is None:
+                    syslog.error(f"AxisCurrentState: unregistered axis [{device.name}] id: [{device.device_guid}] axis: A{axis_id} L{linear_id}]") 
+                    continue
 
-            
-            # get initial data
-            astate = gremlin.event_handler.AxisState()
-            values = astate.getAxisValues(device.device_guid, axis_id)
-
-
-            axis_widget = QProgressBar(data = axis_id, value = values)
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self.process_event)
+                
+                # get initial data
+                astate = gremlin.event_handler.AxisState()
+                values = astate.getAxisValues(device.device_guid, axis_id)
 
 
-            # axis_widget = QHookedProgressBar(data = axis_id, value = values)
-            # description = f"axis repeater: [{device.name}] axis id: [{axis_id}]"
-            # hook_id = f"IVR {device.device_id} A{axis_id}"
-            # axis_widget.hookDevice(
-            #             hook_id,
-            #             device_guid = device.device_guid,
-            #             input_type = InputType.JoystickAxis,
-            #             input_id = axis_id,
-            #             ui_only=ui_only,
-            #             persist = True,
-            #             description=description,
-            #             )
-            # axis_widget.setValueChangeCallback(self._handle_axis_value_changed)
-            # if verbose:
-            #     syslog.info(f"Register: hook: [{hook_id}] description: [{description}]")
-            
-            
-        
-            
-            if not self._readonly:
-                axis_widget.valueChanged.connect(self._manual_bar_changed) # axis set by the user
-            axis_widget.setReadOnly(self._readonly)
-            
-            
-            value = values[0]
-            #value = gremlin.joystick_handling.get_axis(device.device_guid, index)
-            value_widget = QFloatLineEdit(data = axis_id)
-            if self.device.is_virtual:
-                value_widget.setReadOnly(self._readonly)
+                axis_widget = QProgressBar(data = axis_id, value = values)
+                el = gremlin.event_handler.EventListener()
+                el.joystick_event.connect(self.process_event)
+
+                
                 if not self._readonly:
-                    value_widget.valueChanged.connect(self._manual_input_changed)
-            else:
-                value_widget.setReadOnly(True)
+                    axis_widget.valueChanged.connect(self._manual_bar_changed) # axis set by the user
+                axis_widget.setReadOnly(self._readonly)
+                
+                
+                value = values[0]
+                #value = gremlin.joystick_handling.get_axis(device.device_guid, index)
+                value_widget = QFloatLineEdit(data = axis_id)
+                if self.device.is_virtual:
+                    value_widget.setReadOnly(self._readonly)
+                    if not self._readonly:
+                        value_widget.valueChanged.connect(self._manual_input_changed)
+                else:
+                    value_widget.setReadOnly(True)
 
-            #axis.setValue(value)
-            self.axis_widgets[axis_id] = axis_widget
-            self.value_label_widgets[axis_id] = value_widget
-            percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
+                #axis.setValue(value)
+                self.axis_widgets[axis_id] = axis_widget
+                self.value_label_widgets[axis_id] = value_widget
+                percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
+                
+                percent_label = QtWidgets.QLabel(f"{percent:0.1f} %")
+                self.percent_widgets[axis_id] = percent_label
+                axis_widget.setValue(values)
+
+                bar_container, _ = getHContainer(["||",axis_widget,"||"]) # centered horizontally
+                layout.addWidget(bar_container)
+
+                row = 0
+                axes_layout.addWidget(axis_label, row, i, alignment=QtCore.Qt.AlignCenter)    
+                row += 1 
+                axes_layout.addWidget(QtWidgets.QLabel(" "), row, i, alignment=QtCore.Qt.AlignCenter)    # spacer
+                row += 1 
+                axes_layout.addWidget(widget, row, i, alignment=QtCore.Qt.AlignCenter)
+                row += 1 
+                axes_layout.addWidget(value_widget, row, i, alignment=QtCore.Qt.AlignCenter)
+                row += 1 
+                axes_layout.addWidget(percent_label, row, i, alignment=QtCore.Qt.AlignCenter)
+                row += 1 
+
             
-            percent_label = QtWidgets.QLabel(f"{percent:0.1f} %")
-            self.percent_widgets[axis_id] = percent_label
-            axis_widget.setValue(values)
-
-            bar_container, _ = getHContainer(["||",axis_widget,"||"]) # centered horizontally
-            layout.addWidget(bar_container)
-
-            row = 0
-            axes_layout.addWidget(axis_label, row, i, alignment=QtCore.Qt.AlignCenter)    
-            row += 1 
-            axes_layout.addWidget(QtWidgets.QLabel(" "), row, i, alignment=QtCore.Qt.AlignCenter)    # spacer
-            row += 1 
-            axes_layout.addWidget(widget, row, i, alignment=QtCore.Qt.AlignCenter)
-            row += 1 
-            axes_layout.addWidget(value_widget, row, i, alignment=QtCore.Qt.AlignCenter)
-            row += 1 
-            axes_layout.addWidget(percent_label, row, i, alignment=QtCore.Qt.AlignCenter)
-            row += 1 
-
-            
-
-        #axes_layout.addStretch()
-        axes_layout.setColumnStretch(i+1,2)
+            axes_layout.setColumnStretch(i+1,2)
+        
         self.main_layout.addLayout(axes_layout)
 
     def unhook(self):

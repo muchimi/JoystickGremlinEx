@@ -564,13 +564,16 @@ def push_input_selection():
     global _input_selection_suspend_count
     _input_selection_suspend_count += 1
 
-def pop_input_selection(reset = False):
+def pop_input_selection(reset : bool = False):
     global _input_selection_suspend_count
     if reset:
         _input_selection_suspend_count = 0
         return
     if _input_selection_suspend_count > 0:
        _input_selection_suspend_count -= 1
+
+
+
 
 @module_property
 def _is_joystick_suspended()->bool:

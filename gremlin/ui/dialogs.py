@@ -1338,6 +1338,9 @@ There should only be one GremlinEx master server on the subnet.
                 tooltip = "When set, sequences and macros can only run in the mode they are defined in. If the profile mode changes, running sequences or macros defined in another mode will terminate. Previously scheduled sequences or macros for another mode will not executed."
                 )
         
+        
+        
+
         concurrent_macro_widget = gremlin.ui.ui_common.QIntLineEdit(
             max_range = 10,
             value = self.config.max_concurrent_macro,
@@ -1352,6 +1355,15 @@ There should only be one GremlinEx master server on the subnet.
         
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Runtime Options:", transparent = True)
         box.addWidget(affinity_widget)
+
+        widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Mode change aborts running macros/sequences",
+            value = self.config.mode_change_aborts_sequence,
+            callback = self._handle_macro_abort_changed,
+            tooltip = "When set, a mode change will abort executing sequences or macros and the mode change happens immediately.  If not set, the mode change will be delayed until all macros/sequences are done running."
+        )
+
+        box.addWidget(widget)
 
         widget = gremlin.ui.ui_common.getHContainer([
             "Concurrent macro limit:",
@@ -1377,6 +1389,9 @@ There should only be one GremlinEx master server on the subnet.
 
     def _handle_macro_mode_affinity_changed(self, checked):
         self.config.macro_mode_affinity = checked
+
+    def _handle_macro_abort_changed(self, checked):
+        self.config.mode_change_aborts_sequence = checked
             
     def _handle_macro_concurrent_count_changed(self, value):
         self.config.max_concurrent_macro = value

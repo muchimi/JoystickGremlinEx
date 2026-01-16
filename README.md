@@ -29,6 +29,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T155)
+- New: Macro/Sequence: global option to determine if how mode changes behave with sequences/macros currently running.  If enabled, the mode change will attempt to terminate a sequence/macro execution in flight.  This is tricky because the mode change may come from the sequence itself.  If disabled, the mode change will wait for  current macros/sequences to finish.  If the macro/sequences are in a loop (example, sequence is a toggle on/off, the mode change will never occur unless the mode change is inside the sequence itself.  If multiple mode changes are requested while the mode change is on hold, the mode changes to the last mode requested.
+- New: API: added a mechanism to delay mode changes if a sequence/macro is currently executing if the option is enabled. Warning: looping sequences or macros in this mode could prevent mode changes until the loops complete.
+- Fix: Sequence Container: step interactions may not update the UI
+- Fix: Input Viewer: call up of axis visualization if device has no axes causes an index exception.
+- Fix: loading a profile after loading an initial profile (or creating a new profile) does not load mappings for the profile being loaded (dragon introduced in T154).
+- Fix: TTS: requires a GEX restart if some options are enabled.
+
 ### (m76T154A)
 - Fix: input registry sync creates any missing profile entries on save if not defined yet.
 
