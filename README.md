@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T154A)
+- Fix: input registry sync creates any missing profile entries on save if not defined yet.
+
 ### (m76T154)
 - New: Filter: Added Mapped (all modes) button to show inputs used across all modes.
 - Change: Input tracking consolidated to reduce internal API calls.

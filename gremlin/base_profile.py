@@ -2440,6 +2440,13 @@ class ProfileRegistry():
         for key in self._input_item_registry:
             device_guid, mode_name, input_type, input_id = key
             input_item = self._input_item_registry[key]
+            if not mode_name in devices[device_guid].modes:
+                mode_object = Mode(devices[device_guid])
+                mode_object.name = mode_name
+                devices[device_guid].modes[mode_name] = mode_object
+            if not input_type in devices[device_guid].modes[mode_name].config:
+                devices[device_guid].modes[mode_name].config[input_type] = {}
+                
             devices[device_guid].modes[mode_name].config[input_type][input_id] = input_item
 
 
