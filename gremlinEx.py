@@ -204,6 +204,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._last_toast_message = None
         self._change_input_lock = threading.Lock() # true when changing inputs
 
+        self._comparative_file = os.path.join(os.getenv("temp"),"8c71a5a6eae74f989cf903816868028e.xml")
+
         self._last_selected_device_guid = None
         self._last_selected_input_type = None
         self._last_selected_input_id = None
@@ -251,6 +253,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.toolbar_changed.connect(self._update_toolbar)
         el.update_mode_status_bar.connect(self._update_mode_status_bar)
         el.request_ui_refresh.connect(self.refresh)
+        el.shutdown.connect(self.handle_shutdown)
 
 
         # highlighing options
@@ -412,6 +415,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.initialized = True
 
         el.ui_initialized.emit()
+
+
+    def handle_shutdown(self):
+        # cleanup on shutdown
+        if os.path.isfile(self._comparative_file):
+            os.unlink(self._comparative_file)
 
     def _update_start_tab(self):
         ''' forces a tab index reload on init '''
@@ -1597,98 +1606,99 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         pushCursor()
 
 
-        if not self._save_changes_request():
-            return
-        
-        el = gremlin.event_handler.EventListener()
-        
-        
-        if gremlin.shared_state.current_profile:
-            current_profile = gremlin.shared_state.current_profile
-            current_profile.unload()
-            gremlin.shared_state.current_profile = None
-            el.profile_unloaded.emit() # tell the UI we're about to load a new profile
+        try:
+            if not self._save_changes_request():
+                return
+            
+            el = gremlin.event_handler.EventListener()
+            
+            
+            if gremlin.shared_state.current_profile:
+                current_profile = gremlin.shared_state.current_profile
+                current_profile.unload()
+                gremlin.shared_state.current_profile = None
+                el.profile_unloaded.emit() # tell the UI we're about to load a new profile
 
-        
-        # clear any old data
-        self._reset_tab_data()
-        self.clearWidgets()
+            
+            # clear any old data
+            self._reset_tab_data()
+            self.clearWidgets()
 
-        ec = gremlin.execution_graph.ExecutionContext()
-        ec.reset(no_rebuild = True)
+            ec = gremlin.execution_graph.ExecutionContext()
+            ec.reset(no_rebuild = True)
 
-        self.ui.actionActivate.setChecked(False)
-        el = gremlin.event_handler.EventListener()
-        el.request_activate.emit(False)
+            self.ui.actionActivate.setChecked(False)
+            el = gremlin.event_handler.EventListener()
+            el.request_activate.emit(False)
 
-        gremlin.shared_state.resetState()
-        eh = gremlin.event_handler.EventHandler()
-        eh.reset()
-
-
-
-
-        new_profile =  gremlin.base_profile.Profile()
-        self.profile = new_profile
-        
-
-        # default active mode
-        gremlin.shared_state.runtime_mode = "Default"
-        gremlin.shared_state.edit_mode = "Default"
-        gremlin.shared_state.current_profile = new_profile
-
-        registry = gremlin.base_profile.ProfileRegistry()
-        registry.reset()        
-
-        # For each connected device create a new empty device entry
-        # in the new profile
-        for device in gremlin.joystick_handling.physical_devices():
-            self.profile.initialize_joystick_device(device, ["Default"])
-
-
-        # non regular devices
-        self.profile.initialize_regular_devices()
-
-        # reload defaults for the profile
-        self.profile.settings.loadFilterDefaults() 
-
-        # reset joystick input/output flags
-        sd = gremlin.event_handler.JoystickState()
-        sd.reset()
-
-        # reset event processor 
-        jap = gremlin.event_handler.JoystickEventProcessor()
-        jap.reset()
-
-        # setup profile default input filters
-        self.profile.settings.setAllFiltered("default")
-
-        # Update profile information
-        self._update_window_title()
-
-        
-
-        self.setTabsDirty(True)
-
-        # reset modes
-        current_mode = gremlin.shared_state.current_mode
-        self.mode_selector.populate_selector(new_profile, current_mode, emit = False)
-
-        # Create a default mode
-        for device in self.profile.devices.values():
-            device.ensure_mode_exists("Default")
-
-        # Update everything to the new mode
-        #self._mode_configuration_changed()
+            gremlin.shared_state.resetState()
+            eh = gremlin.event_handler.EventHandler()
+            eh.reset()
 
 
 
 
-        self._update_status_bar()
-        self._select_last_tab()
-        
-        
-        popCursor()
+            new_profile =  gremlin.base_profile.Profile()
+            self.profile = new_profile
+            
+
+            # default active mode
+            gremlin.shared_state.runtime_mode = "Default"
+            gremlin.shared_state.edit_mode = "Default"
+            gremlin.shared_state.current_profile = new_profile
+
+            registry = gremlin.base_profile.ProfileRegistry()
+            registry.reset()        
+
+            # For each connected device create a new empty device entry
+            # in the new profile
+            for device in gremlin.joystick_handling.physical_devices():
+                self.profile.initialize_joystick_device(device, ["Default"])
+
+
+            # non regular devices
+            self.profile.initialize_regular_devices()
+
+            # reload defaults for the profile
+            self.profile.settings.loadFilterDefaults() 
+
+            # reset joystick input/output flags
+            sd = gremlin.event_handler.JoystickState()
+            sd.reset()
+
+            # reset event processor 
+            jap = gremlin.event_handler.JoystickEventProcessor()
+            jap.reset()
+
+            # setup profile default input filters
+            self.profile.settings.setAllFiltered("default")
+
+            # Update profile information
+            self._update_window_title()
+
+            
+
+            self.setTabsDirty(True)
+
+            # reset modes
+            current_mode = gremlin.shared_state.current_mode
+            self.mode_selector.populate_selector(new_profile, current_mode, emit = False)
+
+            # Create a default mode
+            for device in self.profile.devices.values():
+                device.ensure_mode_exists("Default")
+
+            # Update everything to the new mode
+            #self._mode_configuration_changed()
+
+
+
+
+            self._update_status_bar()
+            self._select_last_tab()
+            
+        finally:
+            popCursor()
 
     def save_profile(self):
         """Saves the current profile to the hard drive.
@@ -4649,6 +4659,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                     self._sanitize_profile(new_profile)
 
+                    # save the profile comparative template
+                    if os.path.isfile(self._comparative_file):
+                        os.unlink(self._comparative_file)
+
+                    # save a copy using new setup if any
+                    new_profile.to_xml(self._comparative_file)
+
 
                     # Save the profile at this point if it was converted from a prior
                     # profile version, as otherwise the change detection logic will
@@ -4900,49 +4917,68 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             tmp_path = os.path.join(os.getenv("temp"), "gremlin.xml")
 
             self.profile.to_xml(tmp_path)
+            # compare files
+            import filecmp
+            is_changed =  filecmp.cmp(tmp_path, self._comparative_file, shallow=False)
 
-            # remove blank text and comments from the XML files
-            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-            try:
-                t1 = etree.parse(tmp_path, parser=parser)
-                t2 = etree.parse(profile_fname, parser=parser)
-            except:
-                # error loading file - assume no changes
-                return False
 
-            # remove container IDs and action IDs from xml
-            trees = (t1, t2)
-            ignore_list = ("container_id","action_id")
-            gate_ignore_list = ("id","min_id","max_id")
+            # # remove blank text and comments from the XML files
+            # parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
+            # try:
+            #     t1 = etree.parse(tmp_path, parser=parser)
+            #     t2 = etree.parse(profile_fname, parser=parser)
+            # except:
+            #     # error loading file - assume no changes
+            #     return False
 
-            for t in trees:
-                remove_nodes = []
-                for node in t.findall(".//*"):
-                    for attrib in ignore_list:
-                        if attrib in node.attrib:
-                            del node.attrib[attrib]
-                    description = None
-                    if "description" in node.attrib:
-                        # clear blank description nodes
-                        description = node.get("description")
-                        if not description:
-                            del node.attrib["description"]
-                    if node.tag in ("button","axis","hat") and not description:
-                        children = list(node)
-                        if not children:
-                            # remove blank axis, button and hat nodes from the comparison
-                            remove_nodes.append(node)
-                    if node.tag in ("gate","range"):
-                        # ignore IDs that will change
-                        for attrib in gate_ignore_list:
-                            if attrib in node.attrib:
-                                del node.attrib[attrib]
+            # # remove container IDs and action IDs from xml
+            # trees = (t1, t2)
+            # ignore_list = ("container_id","action_id")
+            # gate_ignore_list = ("id","min_id","max_id")
 
-                # remove don't care nodes
-                for node in remove_nodes:
-                    node.getparent().remove(node)
+            # for t in trees:
+            #     remove_nodes = []
+            #     for node in t.findall(".//*"):
+            #         for attrib in ignore_list:
+            #             if attrib in node.attrib:
+            #                 del node.attrib[attrib]
+            #         description = None
+            #         if "description" in node.attrib:
+            #             # clear blank description nodes
+            #             description = node.get("description")
+            #             if not description:
+            #                 del node.attrib["description"]
+            #         if node.tag in ("button","axis","hat") and not description:
+            #             children = list(node)
+            #             if not children:
+            #                 # remove blank axis, button and hat nodes from the comparison
+            #                 remove_nodes.append(node)
+            #         if node.tag in ("gate","range"):
+            #             # ignore IDs that will change
+            #             for attrib in gate_ignore_list:
+            #                 if attrib in node.attrib:
+            #                     del node.attrib[attrib]
 
-            is_changed = etree.tostring(t1) != etree.tostring(t2)
+            #     # remove don't care nodes
+            #     for node in remove_nodes:
+            #         node.getparent().remove(node)
+
+            # is_changed = etree.tostring(t1) != etree.tostring(t2)
+
+            # if is_changed:
+            #     # save the files for testing
+            #     user_profile = gremlin.util.userprofile_path()
+            #     f1 = os.path.join(user_profile, "f1.xml")
+            #     f2 = os.path.join(user_profile, "f2.xml")
+            #     if os.path.isfile(f1):
+            #         os.unlink(f1)
+            #     if os.path.isfile(f2):
+            #         os.unlink(f2)
+            #     t1.write(f1, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            #     t2.write(f2, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            #     gremlin.util.display_file(f1)
+            #     gremlin.util.display_file(f2)
+            #     pass
 
 
             return is_changed

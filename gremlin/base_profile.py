@@ -916,14 +916,6 @@ class AbstractContainer(ProfileData, ConditionContainer):
 
         return state
 
-        # action_count = 0
-        
-        # # Check state of all linked actions
-        # for actions in [a for a in self.action_sets if a is not None]:
-        #     action_count += len(actions)
-        #     for action in actions:
-        #         state = state & action.is_valid_for_save()
-        # return state and action_count > 0
     
     def latch_extra_inputs(self, container_condition_functors = None, action_condition_functors = None):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
