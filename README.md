@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T157)
+- Fix: Event Queue: occasional exception on shutdown due to queue type API change.
+
 ### (m76T156)
 - Fix: UI: hourglass not reset on "save changes" prompt on cancel.
 - Change: handling of profile change comparison logic

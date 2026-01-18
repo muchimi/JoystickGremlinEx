@@ -472,6 +472,11 @@ class JoystickEventQueue:
 			events = list(self._queue)
 			self._queue.clear()
 			return events
+		
+	def clear(self):
+		''' clears the queue'''
+		with self._lock:
+			self._queue.clear()
 
 	def empty(self):
 		"""Returns True if the queue is empty, False otherwise."""
@@ -1014,8 +1019,7 @@ class EventListener:
 			self._event_thread = None
 
 		# mark all events processed
-		while not self._event_queue.empty():
-			self._event_queue.get_nowait()
+		self._event_queue.clear()
 
 		# shutdown keyboard hook if enabled
 		kh = gremlin.windows_event_hook.KeyboardHook()
