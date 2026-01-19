@@ -210,7 +210,18 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
             new_mode = self.action_data.mode
             assert new_mode, "Invalid mode configured in mode switch - mode is not specified"
             current_mode =  gremlin.shared_state.runtime_mode
-            if verbose: syslog.info(f"SWITCH MODE ACTION: [{self.id}] requesting mode switch from [{current_mode}] to [{new_mode}]")
+
+            if verbose:
+                import gremlin.joystick_handling
+                mode = self.action_data.get_mode()
+                input_id = self.action_data.get_input_id()
+                input_type = self.action_data.get_input_type()
+                device_name = self.action_data.get_device_name()
+                syslog.info(f"SWITCH MODE ACTION: [{self.id}] requesting mode switch from [{current_mode}] to [{new_mode}]")
+                syslog.info(f"\tAttached device: [{device_name}] input type: [{InputType.to_display_name(input_type)}] input: [{input_id}] mode: [{mode}]")
+                syslog.info(f"\tevent pressed: [{event.is_pressed}]")
+                syslog.info(f"\tcurrent profile mode: {gremlin.shared_state.runtime_mode} mode to set: {new_mode}")
+                
             switch = self._last_mode is None or new_mode != self._last_mode or current_mode != new_mode
             if switch:
                 if verbose: syslog.info(f"\tswitch to [{new_mode}]")
@@ -261,6 +272,7 @@ To change the mode temporarily, use the temporary mode switch action.'''
         self.exec_on_press = True # true if the mode should execute on input press
         self.exec_on_release = False # true if the mode should execute on input release
         self._mode = mode
+        
 
     @property
     def mode(self) -> str:

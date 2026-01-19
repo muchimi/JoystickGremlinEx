@@ -201,18 +201,6 @@ class Event:
 			else:
 				# deep copy
 				setattr(result, var, copy.deepcopy(getattr(self, var)))
-
-
-		# for k, v in self.__dict__.items():
-		# 	try:
-		# 		if k in ("data","extra_data"):
-		# 			# shallow copy passed data or extra data 
-		# 			setattr(result, k, copy.copy(v))
-		# 		else:
-		# 			setattr(result, k, copy.deepcopy(v, memo))
-		# 	except:
-		# 		# cannot copy = do a shallow copy
-		# 		setattr(result, k, copy.copy(v))
 		return result
 	
 	@property
@@ -279,6 +267,7 @@ class Event:
 				self.identifier,
 				0
 			)
+		
 
 	def __hash__(self):
 		"""Computes the hash value of this event.
@@ -2698,7 +2687,7 @@ class EventHandler(QtCore.QObject):
 						self._change_mode_queue.clear() # remove all items
 
 					if verbose:
-						syslog.info(f"MODE QUEUE: deqeue mode [{new_mode}]")
+						syslog.info(f"MODE QUEUE RUNNER: deqeue mode [{new_mode}]")
 					# clear the queue of all other mode changes that accumulated 
 					
 					# run the mode change

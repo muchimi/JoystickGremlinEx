@@ -2385,6 +2385,7 @@ class ProfileRegistry():
         input_id = input_item.input_id
         input_id_key = hash(input_id)
         input_mode = input_item.profile_mode
+
         key = (device_guid, input_mode, input_type, input_id_key)
         device = gremlin.joystick_handling.getDevice(device_guid)
         if not device:

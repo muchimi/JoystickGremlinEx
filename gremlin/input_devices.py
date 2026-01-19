@@ -1874,14 +1874,151 @@ def _osc(message, mode = "Default", always_execute=False):
     return wrap
 
 
-
-
-
-
-ButtonReleaseEntry = collections.namedtuple(
-    "Entry", ["callback", "event", "mode"]
+ButtonPressEntry = collections.namedtuple(
+    "Press", ["callback", "event"]
 )
 
+ButtonReleaseEntry = collections.namedtuple(
+    "Entry", ["callback", "event"]
+)
+
+@gremlin.singleton_decorator.SingletonDecorator
+class ButtonPressActions():
+
+    """Ensures a desired action is run when a button is pressed."""
+
+    def __init__(self):
+        """Initializes the instance."""
+
+        self._registry = {}
+        #self._registry_key_map = {} # map of event callback keys to the events
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self._input_event_cb)
+        el.keyboard_event.connect(self._input_event_cb)
+        el.virtual_event.connect(self._input_event_cb)
+        #self._current_mode = gremlin.shared_state.runtime_mode
+        #el.runtime_mode_changed.connect(self._mode_changed_cb)
+
+    def register_callback(
+        self,
+        callback: Callable[[], None],
+        physical_event
+    ) -> None:
+        """Registers a callback with the system.
+
+        Args:
+            callback: the function to run when the corresponding button is
+                released
+            physical_event: the physical event of the button being pressed
+        """
+        press_evt = physical_event.clone()
+        press_evt.is_pressed = True
+        key = press_evt.callbackKey
+        
+
+        assert callable(callback)
+
+        if press_evt not in self._registry:
+            self._registry[key] = []
+        # Do not record the mode since we may want to run the release action
+        # independent of a mode
+        self._registry[key].append(
+            ButtonPressEntry(callback, press_evt, None)
+        )
+
+    def register_button_press(
+        self,
+        vjoy_input: int,
+        physical_event,
+        activate_on: bool = False,
+        is_local = True,
+        is_remote = False,
+        force_remote = False,
+        
+    ):
+        """Registers a physical and vjoy button pair for tracking.
+
+        This method ensures that a vjoy button is pressed/released when the
+        specified physical event occurs next. This is useful for cases where
+        an action was triggered in a different mode or using a different
+        condition.
+
+        Args:
+            vjoy_input: the vjoy button to release, represented as
+                (vjoy_id, vjoy_button_id)
+            physical_event: the button event when release should
+                trigger the release of the vjoy button
+        """
+        press_evt = physical_event.clone()
+        press_evt.is_pressed = activate_on
+
+        key = press_evt.callbackKey
+        verbose = gremlin.config.Configuration().verbose_mode_outputs
+        if verbose: syslog.info(f"AUTORELEASE: register autopress key: {key} event: {str(press_evt)}")
+        if press_evt not in self._registry:
+            self._registry[key] = []
+            #self._registry_key_map[key] = release_evt
+
+        # Record current mode so we only release if we've changed mode
+        self._registry[key].append(ButtonPressEntry(
+            lambda: self._press_callback_prototype(vjoy_input, is_local, is_remote, force_remote),
+            press_evt,
+        ))
+
+
+    def _press_callback_prototype(self, vjoy_input: int, is_local = False, is_remote = False, force_remote = False) -> None:
+        """Prototype of a button release callback, used with lambdas.
+
+        Args:
+            vjoy_input: the vjoy input data to use in the release
+        """
+
+        # Check if the button is valid otherwise we cause Gremlin to crash
+        vjoy = gremlin.joystick_handling.VJoyProxy()
+        if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
+            if is_local:
+                vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = True
+                
+            if is_remote or force_remote:
+                remote_client.send_button(vjoy_input[0], vjoy_input[1], True, force_remote = force_remote )
+            
+        else:
+            syslog.warning(
+                f"Attempted to use non existent button: " +
+                f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
+            )
+
+    def _input_event_cb(self, event):
+        """Runs callbacks associated with the given event.
+
+        Args:
+            event: the event to process
+        """
+        
+        verbose = gremlin.config.Configuration().verbose_mode_outputs
+
+        key = event.callbackKey
+        
+        if key in self._registry:
+            if verbose: syslog.info(f"AUTOPRESS: execute trigger : {key}")
+            new_list = []
+            for entry in self._registry[key]:
+
+                if entry.event.is_pressed == event.is_pressed:
+                    try:
+                        entry.callback()
+                    except:
+                        pass
+                else:
+                    new_list.append(entry)
+            self._registry[key] = new_list
+
+    # def _mode_changed_cb(self, mode):
+    #     """Updates the current mode variable.
+
+    #     :param mode the new mode
+    #     """
+    #     self._current_mode = mode
 
 @gremlin.singleton_decorator.SingletonDecorator
 class ButtonReleaseActions(QtCore.QObject):
@@ -1898,7 +2035,7 @@ class ButtonReleaseActions(QtCore.QObject):
         el.joystick_event.connect(self._input_event_cb)
         el.keyboard_event.connect(self._input_event_cb)
         el.virtual_event.connect(self._input_event_cb)
-        self._current_mode = gremlin.shared_state.runtime_mode
+        #self._current_mode = gremlin.shared_state.runtime_mode
 
         el.runtime_mode_changed.connect(self._mode_changed_cb)
 
@@ -1925,7 +2062,7 @@ class ButtonReleaseActions(QtCore.QObject):
         # Do not record the mode since we may want to run the release action
         # independent of a mode
         self._registry[key].append(
-            ButtonReleaseEntry(callback, release_evt, None)
+            ButtonReleaseEntry(callback, release_evt)
         )
 
     def register_button_release(
@@ -1965,7 +2102,6 @@ class ButtonReleaseActions(QtCore.QObject):
         self._registry[key].append(ButtonReleaseEntry(
             lambda: self._release_callback_prototype(vjoy_input, is_local, is_remote, force_remote),
             release_evt,
-            self._current_mode
         ))
 
     def _release_callback_prototype(self, vjoy_input: int, is_local = False, is_remote = False, force_remote = False) -> None:

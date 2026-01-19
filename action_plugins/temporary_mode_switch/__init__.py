@@ -179,7 +179,8 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value, extra_data = None):
         import gremlin.control_action
         import gremlin.shared_state
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_mode
+
 
         trigger = (event.is_pressed and self.action_data.exec_on_press) \
             or (not event.is_pressed and self.action_data.exec_on_release)
@@ -198,7 +199,7 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
 
             if next_mode != current_mode:
                 self.action_data.restore_mode = current_mode
-                gremlin.input_devices.ButtonReleaseActions().register_callback(lambda : self._restore_callback(return_mode), event)
+                gremlin.input_devices.ButtonReleaseActions().register_callback(lambda : self._restore_callback((next_mode, return_mode)), event)
                 gremlin.event_handler.EventHandler().change_mode(next_mode)
              
             else:
@@ -213,20 +214,48 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
                 device_name = self.action_data.get_device_name()
                 input_id = self.action_data.get_input_id()
                 input_type = self.action_data.get_input_type()
+                new_mode = self.action_data.mode
 
-                syslog.info(f"Temporary mode change event:")
-                syslog.info(f"\tAttached device: {device_name} input type: {InputType.to_display_name(input_type)} input: {input_id} mode: {mode}")
+                syslog.info(f"TEMPORARY MODE CHANGE ACTION: [{self.id}] requesting mode switch from [{current_mode}] to [{new_mode}] and back to [{return_mode}]")
+                syslog.info(f"\tAttached device: [{device_name}] input type: [{InputType.to_display_name(input_type)}] input: [{input_id}] mode: [{mode}]")
                 syslog.info(f"\tevent pressed: [{event.is_pressed}]  saved restore mode: [{self.action_data.restore_mode}]")
                 syslog.info(f"\tcurrent profile mode: {gremlin.shared_state.runtime_mode} mode to set: {self.action_data.mode}")
 
         return True
     
-    def _restore_callback(self, mode):
-        verbose = gremlin.config.Configuration().verbose
+    def _restore_callback(self, args):
+        ''' callback on button release '''
+
+        next_mode, return_mode = args
+        verbose = gremlin.config.Configuration().verbose_mode_mode
+        current_mode = gremlin.shared_state.current_mode
+        if next_mode != current_mode:
+            # mode mistmatch - skip
+            if verbose:
+                mode = self.action_data.get_mode()
+                device_name = self.action_data.get_device_name()
+                input_id = self.action_data.get_input_id()
+                input_type = self.action_data.get_input_type()
+
+                syslog.info(f"TEMPORARY MODE CHANGE CALLBACK: [{self.id}] current mode [{current_mode}] is incorrect - callback only works on mode [{next_mode}] - FAIL")
+                syslog.info(f"\tAttached device: [{device_name}] input type: [{InputType.to_display_name(input_type)}] input: [{input_id}] mode: [{mode}]")
+            return
+
         if verbose:
-            syslog = logging.getLogger("system")
-            syslog.info(f"Temporary mode change: callback: restoring mode {mode}")
-        gremlin.event_handler.EventHandler().change_mode(mode)
+            
+            mode = self.action_data.get_mode()
+            device_name = self.action_data.get_device_name()
+            input_id = self.action_data.get_input_id()
+            input_type = self.action_data.get_input_type()
+            
+
+            
+
+            syslog.info(f"TEMPORARY MODE CHANGE CALLBACK: [{self.id}] requesting mode switch from [{current_mode}] to [{return_mode}] - SUCCESS")
+            syslog.info(f"\tAttached device: [{device_name}] input type: [{InputType.to_display_name(input_type)}] input: [{input_id}] mode: [{mode}]")
+            syslog.info(f"\tcurrent profile mode: {gremlin.shared_state.runtime_mode} mode to set: {self.action_data.mode}")
+
+        gremlin.event_handler.EventHandler().change_mode(return_mode)
 
 class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
 
