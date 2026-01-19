@@ -2795,26 +2795,26 @@ class EventHandler(QtCore.QObject):
 					delay = 0.250 # delay in seconds between press/release events for mode control change
 
 					# fire off any mode changes
-					event_exit_pressed = Event(InputType.ModeControl, 
+					event_old_mode_exit_pressed = Event(InputType.ModeControl, 
 								identifier = mode_exit,
 								device_guid= device_guid,
 								is_pressed=True,
 								mode = self.runtime_mode,
 								override_input_type=InputType.JoystickButton)
-					event_exit_released = Event(InputType.ModeControl, 
+					event_old_mode_exit_released = Event(InputType.ModeControl, 
 								identifier = mode_exit,
 								device_guid= device_guid,
 								is_pressed=False,
 								mode = self.runtime_mode,
 								override_input_type=InputType.JoystickButton)
 					
-					event_enter_pressed = Event(InputType.ModeControl, 
+					event_new_mode_enter_pressed = Event(InputType.ModeControl, 
 								identifier = mode_enter,
 								device_guid= device_guid,
 								is_pressed=True,
 								mode = new_mode,
 								override_input_type=InputType.JoystickButton)
-					event_enter_released = Event(InputType.ModeControl, 
+					event_new_mode_enter_released = Event(InputType.ModeControl, 
 								identifier = mode_enter,
 								device_guid= device_guid,
 								is_pressed=False,
@@ -2822,13 +2822,13 @@ class EventHandler(QtCore.QObject):
 								override_input_type=InputType.JoystickButton)
 					
 					# fire mode change control for mode exit (press + release)
-					m1_list, f1_list = self.execute_event(event_exit_pressed)
+					m1_list, f1_list = self.execute_event(event_old_mode_exit_pressed)
 					if m1_list or f1_list:
-						callback = self._create_change_mode_callback(event_exit_pressed, m1_list, f1_list)
-						mode_exit_press = Timer(delay, callback)
-						mode_exit_press.start()
+						# callback = self._create_change_mode_callback(event_old_mode_exit_pressed, m1_list, f1_list)
+						# mode_exit_press = Timer(delay, callback)
+						# mode_exit_press.start()
 
-						callback = self._create_change_mode_callback(event_exit_released, m1_list, f1_list)
+						callback = self._create_change_mode_callback(event_old_mode_exit_released, m1_list, f1_list)
 						mode_exit_release = Timer(delay, callback)
 						mode_exit_release.start()
 					
@@ -2854,13 +2854,13 @@ class EventHandler(QtCore.QObject):
 
 
 					# fire mode change for mode enter (press + release)
-					m2_list, f2_list = self.execute_event(event_enter_pressed)
+					m2_list, f2_list = self.execute_event(event_new_mode_enter_pressed)
 					if m2_list or f2_list:
-						callback = self._create_change_mode_callback(event_enter_pressed, m2_list, f2_list)
-						mode_enter_press = Timer(delay, callback)
-						mode_enter_press.start()
+						# callback = self._create_change_mode_callback(event_new_mode_enter_pressed, m2_list, f2_list)
+						# mode_enter_press = Timer(delay, callback)
+						# mode_enter_press.start()
 
-						callback = self._create_change_mode_callback(event_enter_released, m2_list, f2_list)
+						callback = self._create_change_mode_callback(event_new_mode_enter_released, m2_list, f2_list)
 						mode_enter_release = Timer(delay, callback)
 						mode_enter_release.start()
 
@@ -2925,8 +2925,14 @@ class EventHandler(QtCore.QObject):
 		self.state_callbacks = {}
 		
 
-	def execute_event(self, event : Event):
-		''' main execution (runtime) event handler - queues trigger callbacks on event input '''
+	def execute_event(self, event : Event, skip_execute = False):
+		''' main execution (runtime) event handler - queues trigger callbacks on event input 
+		
+		:param event: the event to run callbacks for
+		:param skip_execute: optional, prevents callback execution if they are executed another way
+		:returns: tuple list of callbacks 
+		
+		'''
 		
 		import gremlin.config
 		import gremlin.keyboard
@@ -3076,7 +3082,7 @@ class EventHandler(QtCore.QObject):
 			
 				if verbose_detailed and not (m_list or f_list): syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
-			if m_list or f_list:
+			if not skip_execute and (m_list or f_list):
 				# self._queue_add(event, m_list, f_list)
 				self._execute_callbacks(event, m_list, f_list)
 

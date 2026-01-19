@@ -4376,7 +4376,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 else:
                     msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
                 if self._status_bar_last_runtime_mode != runtime_mode:
-                    if verbose: syslog.info(f"CHANGE MODE: To: [{runtime_mode}] (from [{self._status_bar_last_runtime_mode}])")
+                    #if verbose: syslog.info(f"CHANGE MODE: To: [{runtime_mode}] (from [{self._status_bar_last_runtime_mode}])")
                     self._status_bar_last_runtime_mode = runtime_mode
 
 

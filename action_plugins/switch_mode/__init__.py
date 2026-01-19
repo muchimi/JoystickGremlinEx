@@ -212,7 +212,6 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
             current_mode =  gremlin.shared_state.runtime_mode
 
             if verbose:
-                import gremlin.joystick_handling
                 mode = self.action_data.get_mode()
                 input_id = self.action_data.get_input_id()
                 input_type = self.action_data.get_input_type()

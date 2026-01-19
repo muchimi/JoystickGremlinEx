@@ -374,7 +374,7 @@ class Configuration(QtCore.QObject):
             self._data["last_mode"] = {}
         self._data["last_mode"][profile_path] = mode_name
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode
+        verbose = gremlin.config.Configuration().verbose_mode_mode
         if verbose:
             syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
         self.save()

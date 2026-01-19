@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76T158A):
+- Fix: Mode Device: double "press" trigger on actions mapped to mode entry/exit.
+
 ### (m76T158)
 - Additional instrumentation on mode changes in "mode" verbose mode.
 - Fix: Temporary Mode Switch: mode switch on button release will be ignored if the profile mode is not the mode switched to.

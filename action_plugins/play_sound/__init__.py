@@ -591,17 +591,12 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def process_event(self, event, value, extra_data = None):
-        verbose = self.verbose
+        verbose = gremlin.config.Configuration().verbose_mode_sound
         is_pressed = event.is_pressed
         trigger = (is_pressed and self.action_data.exec_on_press) or \
                     (not is_pressed and self.action_data.exec_on_release) 
-        
-        if verbose: syslog.info(f"PLAY: trigger [{trigger}] on input state: [{is_pressed}]")
-
 
         if trigger:
-            if verbose and os.path.isfile(self.sound_file):
-                syslog.info(f"\texecute play soundfile: {self.sound_file}")
             self.action_data.play()
         return True
 
@@ -817,6 +812,17 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         if not self.sound.ensureStarted():
             syslog.error("PLAY: unable to play sound due to sound library initialization issue")
             return
+        verbose = gremlin.config.Configuration().verbose_mode_sound
+        if verbose: 
+            mode = self.get_mode()
+            input_id = self.get_input_id()
+            input_type = self.get_input_type()
+            device_name = self.get_device_name()
+            syslog.info(f"PLAY: [{self.id}] play [{self.sound_file}]")
+            syslog.info(f"\tAttached device: [{device_name}] input type: [{InputType.to_display_name(input_type)}] input: [{input_id}] mode: [{mode}]")
+            syslog.info(f"\tOptions: exec on press: [{self.exec_on_press}] exec on release: [{self.exec_on_press}] volume: [{self.volume}] audio channel:[{self.audio_device}]")
+            
+            
         
         # get the sound file
         sound_file = None
@@ -824,6 +830,9 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             case PlayMode.AudioFile:
                 if self.sound_file and os.path.isfile(self.sound_file):
                     sound_file = self.sound_file 
+                else:
+                    syslog.error(f"PLAY: unable to locate file: [{self.sound_file}]" )
+                    return
             case PlayMode.CoquiAI:
                 ''' AI generated '''
                 sound_file = self.tts_file
