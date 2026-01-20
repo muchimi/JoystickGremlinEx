@@ -27,7 +27,7 @@ import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.gated_handler
 from gremlin.input_types import InputType
-from gremlin.input_devices import ButtonReleaseActions
+from gremlin.input_devices import CallbackActions
 import gremlin.macro
 import gremlin.process_monitor
 import gremlin.shared_state

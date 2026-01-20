@@ -28,7 +28,7 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.input_devices
 from gremlin.input_types import InputType
-from gremlin.input_devices import ButtonReleaseActions
+from gremlin.input_devices import CallbackActions
 import gremlin.keyboard
 import gremlin.macro
 import gremlin.shared_state
@@ -771,7 +771,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                                 id = gremlin.macro.MacroManager().queue_macro(self.press, is_local, is_remote)
                                 self.registerMacro(id)
                                 callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote)
-                                ButtonReleaseActions().register_callback(callback, event)
+                                CallbackActions().register_callback(callback, event)
                             else:
                                 key : gremlin.keyboard.Key
                                 for key in self._press_keys:
@@ -782,7 +782,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                                         gremlin.keyboard.send_key_down(key)
 
                                 callback = self._manual_release
-                                ButtonReleaseActions().register_callback(callback, event)
+                                CallbackActions().register_callback(callback, event)
 
                 case KeyboardOutputMode.Pulse:
                     # make and break with delay

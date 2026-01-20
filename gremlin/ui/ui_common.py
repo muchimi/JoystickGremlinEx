@@ -9198,6 +9198,14 @@ class QVContentWidget(QContentWidget):
 class QSplitTabWidget(QDataWidget):
     ''' tab content widget split '''
     def __init__(self, object_name, device_guid, parent = None):
+        '''
+        Creates a device split tab widget with inputs on the left and contents on the right 
+        
+        :param object_name: device name
+        :param device_guid: guid of the device 
+        :param parent: parent widget (optional)
+        
+        '''
         super().__init__(parent)
         self.setObjectName(object_name)
 
@@ -9206,6 +9214,7 @@ class QSplitTabWidget(QDataWidget):
         self._device_guid = device_guid
         self._device_id = gremlin.util.normalize_guid(device_guid)
         self._filtered = False # filter state for inputs
+        
 
         self._lock = False
         self._tab_data = None
@@ -9511,7 +9520,6 @@ class QSplitTabWidget(QDataWidget):
     def _ensure_blank_widget(self):
         widget = self.getRegisteredWidget(self._blank_input_id)
         if not widget:
-
             label = QtWidgets.QLabel(f"Please select an input to configure for {self.objectName()}.")
 
             show_id = gremlin.config.Configuration().show_container_id

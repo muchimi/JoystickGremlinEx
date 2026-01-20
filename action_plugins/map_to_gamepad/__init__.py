@@ -36,7 +36,7 @@ import gremlin.sendinput
 import gremlin.gamepad_handling
 from gremlin import input_devices
 from gremlin.types import GamePadOutput
-from gremlin.input_devices import ButtonReleaseActions
+from gremlin.input_devices import CallbackActions
 import psygnal
 from psygnal import Signal
 import html
@@ -274,7 +274,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                         event_release = event.clone()               
                         event_release.is_pressed = False
                         callback = lambda : self.process_event(event_release, value)
-                        ButtonReleaseActions().register_callback(callback, event_release)
+                        CallbackActions().register_callback(callback, event_release)
 
                 if is_local:
                     if is_pressed:

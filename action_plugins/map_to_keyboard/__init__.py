@@ -23,7 +23,7 @@ from PySide6 import QtWidgets, QtGui, QtCore
 import gremlin.base_profile
 
 from gremlin.input_types import InputType
-from gremlin.input_devices import ButtonReleaseActions
+from gremlin.input_devices import CallbackActions
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -136,7 +136,7 @@ class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
                 # print ("auto release event ")
                 event_release = event.clone()               
                 event_release.is_pressed = False
-                ButtonReleaseActions().register_callback(
+                CallbackActions().register_callback(
                     lambda: gremlin.macro.MacroManager().queue_macro(self.release),
                     event_release
                 )

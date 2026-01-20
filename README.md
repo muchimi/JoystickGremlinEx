@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T159):
+- Change: refactor of Press/Release callbacks for optimization.
+- Change: Filter Options: added confirmation message box to global filter buttons.
+- Change: Button Container: renamed to Press/Release container for clarity.
 
 ### (m76T158A):
 - Fix: Mode Device: double "press" trigger on actions mapped to mode entry/exit.

@@ -2105,7 +2105,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         MacroFunctor.manager.queue_macro(self.macro)
         if isinstance(self.macro.repeat, gremlin.macro.HoldRepeat):
             release_event = event.release_event()
-            gremlin.input_devices.ButtonReleaseActions().register_callback(
+            gremlin.input_devices.CallbackActions().register_callback(
                 lambda: self.process_event(release_event, value, extra_data),
                 event, release_event)
         return True

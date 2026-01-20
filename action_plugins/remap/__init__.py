@@ -362,7 +362,7 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
                         and event.is_pressed \
                         and self.needs_auto_release:
-                    input_devices.ButtonReleaseActions().register_button_release((self.vjoy_id, self.vjoy_input_id),event)
+                    input_devices.CallbackActions().register_button_release((self.vjoy_id, self.vjoy_input_id),event)
                     joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = event.is_pressed
                 
             

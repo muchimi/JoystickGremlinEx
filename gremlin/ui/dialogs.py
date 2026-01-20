@@ -1287,7 +1287,7 @@ There should only be one GremlinEx master server on the subnet.
         box_container = gremlin.ui.ui_common.getHContainer([box1, box2], widget_only=True, align_top = True)
         page_layout.addWidget(box_container)
 
-        widgets = []
+        widgets = ["All device filters:"]
         widget = gremlin.ui.ui_common.QDataPushButton("Default", callback = self._handle_filter, tooltip = "Set filter for all joystick devices to default", data = "default")
         widgets.append(widget)
         widget = gremlin.ui.ui_common.QDataPushButton("Mapped", callback = self._handle_filter, tooltip = "Set filter for all joystick devices to mapped (used)", data = "mapped")
@@ -1309,8 +1309,26 @@ There should only be one GremlinEx master server on the subnet.
     @QtCore.Slot()
     def _handle_filter(self, widget):
         mode = widget.data
-        profile = gremlin.shared_state.current_profile
-        profile.settings.setAllFiltered(mode)
+        match mode:
+            case "default":
+                stub = "This will apply the default mapping mode to all devices."
+            case "mapped":
+                stub = "This will filter all devices to mapped inputs only."
+            case "hide_all":
+                stub = "This will hide all inputs on all devices"
+            case _:
+                return
+
+        gremlin.ui.ui_common.MessageBoxYesNo(prompt = stub, callback = self._create_exec_callback(mode))
+            
+
+    def _create_exec_callback(self, mode : str):
+        return lambda result: self._handle_callback_exec(result, mode)
+    
+    def _handle_callback_exec(self, result, mode : str):
+        if result == QtWidgets.QMessageBox.Yes:
+            profile = gremlin.shared_state.current_profile
+            profile.settings.setAllFiltered(mode)
 
 
     def _handle_filter_axis_changed(self, value):

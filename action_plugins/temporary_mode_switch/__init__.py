@@ -177,8 +177,9 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data : TemporaryModeSwitch = action
         
     def process_event(self, event, value, extra_data = None):
-        import gremlin.control_action
         import gremlin.shared_state
+        import gremlin.input_devices
+        import gremlin.event_handler
         verbose = gremlin.config.Configuration().verbose_mode_mode
 
 
@@ -198,8 +199,9 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
 
 
             if next_mode != current_mode:
+                # register a callback to execute when the button is released
                 self.action_data.restore_mode = current_mode
-                gremlin.input_devices.ButtonReleaseActions().register_callback(lambda : self._restore_callback((next_mode, return_mode)), event)
+                gremlin.input_devices.CallbackActions().register_callback(lambda : self._restore_callback((next_mode, return_mode)), event)
                 gremlin.event_handler.EventHandler().change_mode(next_mode)
              
             else:

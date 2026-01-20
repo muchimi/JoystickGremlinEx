@@ -4941,7 +4941,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             auto_release = input_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release
                         if auto_release:
                             if verbose: syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
-                            input_devices.ButtonReleaseActions().register_button_release(
+                            input_devices.CallbackActions().register_button_release(
                                 (self.vjoy_id, self.vjoy_input_id),
                                 event,
                                 is_local = is_local,

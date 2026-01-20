@@ -1391,12 +1391,18 @@ class ActionSetView(ui_common.AbstractView):
         self.allowed_interactions = profile_data.interaction_types
         self.label = label
         self._selected = False # true if the object is selected
+        title = None
 
-        if icon:
-            title = gremlin.ui.ui_common.QIconLabel(icon, icon_size = icon_size, text = f"{self.label} action:")
-        else:
-            title = QtWidgets.QLabel(f"{self.label} action:")
-        self.main_layout.addWidget(title)
+        if self.label:
+            if icon:
+                title = gremlin.ui.ui_common.QIconLabel(icon, icon_size = icon_size, text = f"{self.label} action:")
+            else:
+                title = QtWidgets.QLabel(f"{self.label} action:")
+        elif icon:
+            title = gremlin.ui.ui_common.QIconLabel(icon, icon_size = icon_size)
+
+        if title:
+            self.main_layout.addWidget(title)
 
 
         left_panel, left_layout = gremlin.ui.ui_common.getVContainer()
@@ -4407,8 +4413,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.connect(self._mapping_changed)
-        #el.ui_ready.connect(self._handle_ui_ready)
-
+     
         self._deleted = False
 
     def _handle_ui_ready(self):

@@ -77,13 +77,13 @@ class ButtonContainerWidget(AbstractContainerWidget):
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
-                "Button Press",
+                "Press Actions",
                 lambda x: self._paste_action(0, x),
             )
         else:
             self._create_action_widget(
                 0,
-                "Button Press",
+                "Press Actions",
                 self.action_layout,
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
@@ -91,13 +91,13 @@ class ButtonContainerWidget(AbstractContainerWidget):
         if self.profile_data.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
-                "Button Release",
+                "Release Actions",
                 lambda x: self._paste_action(1, x),
             )
         else:
             self._create_action_widget(
                 1,
-                "Button Release",
+                "Release Actions",
                 self.action_layout,
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
@@ -164,10 +164,18 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :param index the index at which to store the created action
         :param label the name of the action to create
         """
+
+        layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>{label}</b>")
+        widget = gremlin.ui.ui_common.getVContainer([step_widget, QtWidgets.QLabel(" ")], widget_only=True)
+        widget = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
+        layout.addWidget(widget)
+
+
+
         widget = self._create_action_set_widget(
-            self.profile_data.action_sets[index],
-            label,
-            view_type
+            action_set_data = self.profile_data.action_sets[index],
+            view_type = view_type
         )
         layout.addWidget(widget)
         widget.redraw()
@@ -226,9 +234,9 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         if self.profile_data.is_valid():
-            return f"Button: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
+            return f"Press/Release: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
         else:
-            return "Button:"
+            return "Press/Release:"
 
 
 class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
@@ -297,7 +305,7 @@ class ButtonContainer(AbstractContainer):
     second action.
     """
 
-    name = "Button"
+    name = "Press/Release"
     tag = "button_container"
     hint = '''This container is used to trigger one action on trigger press,
 and another action on trigger release in a single container.'''
