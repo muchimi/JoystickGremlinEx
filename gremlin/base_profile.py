@@ -2430,17 +2430,38 @@ class ProfileRegistry():
     def sync(self, profile : Profile):
         ''' synchronizes the input items in this registry with the profile devices '''
         devices = profile.devices
+        verbose = gremlin.config.Configuration().verbose
         for key in self._input_item_registry:
             device_guid, mode_name, input_type, input_id = key
             input_item = self._input_item_registry[key]
-            if not mode_name in devices[device_guid].modes:
-                mode_object = Mode(devices[device_guid])
-                mode_object.name = mode_name
-                devices[device_guid].modes[mode_name] = mode_object
-            if not input_type in devices[device_guid].modes[mode_name].config:
-                devices[device_guid].modes[mode_name].config[input_type] = {}
+            if not device_guid in devices:
+                # add missing device if the device can be derived
+                dev = gremlin.joystick_handling.getDevice(device_guid)
+                if dev:
+                    # add the device to the profile
+                    new_device = Device(self)
+                    new_device.device_guid = dev.device_guid
+                    new_device.name = dev.name
+                    new_device.virtual = dev.is_virtual
+                    new_device.device_type = dev.device_type
+                    profile.devices[device_guid] = new_device
+                    if verbose: syslog.info(f"SYNC: adding missing device [{dev.name}] to profile")
+
+
+            if device_guid in devices:
+                device = devices[device_guid]
+                if not mode_name in device.modes:
+                    mode_object = Mode(device)
+                    mode_object.name = mode_name
+                    device.modes[mode_name] = mode_object
+                    if verbose: syslog.info(f"SYNC: adding missing mode [{mode_name}] to device [{device.name}]")
+                if not input_type in device.modes[mode_name].config:
+                    device.modes[mode_name].config[input_type] = {}
                 
-            devices[device_guid].modes[mode_name].config[input_type][input_id] = input_item
+                device.modes[mode_name].config[input_type][input_id] = input_item
+            else:
+                syslog.warning(f"SYNC: device [{str(device_guid)}] not found in profile device list nor in connected devices (this can happen when importing an older profile or a profile referencing defunct device GUIDs)")
+
 
 
   
@@ -3470,10 +3491,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
 class ModeNode(anytree.NodeMixin):
     ''' mode tree node '''
-    def __init__(self, name : str = None, mode_object = None):
+    def __init__(self, name : str = None, mode_object = None, is_root = False):
         self.name = name
         self.mode_object = mode_object
         self.parent_name = None # name of parent mode
+        self.isModeRoot = is_root
         
 
     @property
@@ -3937,23 +3959,33 @@ class Profile():
     def _ensure_mode_tree(self, reset : bool = False):
         
         if not self._mode_tree or reset:
-            self._mode_tree = ModeNode() # root node
-            self._mode_tree.isModeRoot = True
+            self._mode_tree = ModeNode(is_root = True) # root node
+
+            # read from the profile configuration
+            mode_map = {}
+            if self._loaded:
+                for device in self.devices.values():
+                    for mode_object in device.modes:
+                        if not mode_object.name in mode_map:
+                            node = ModeNode(mode_object.name)
+                            parent_name = mode_object.inherit
+                            node.parent = mode_map[parent_name] if parent_name in mode_map else self._mode_tree
         
             # add default mode
-            default_mode = ModeNode("Default")
-            default_mode.parent = self._mode_tree
+            if not "Default" in mode_map:
+                self.add_mode("Default", emit = False, validate = False)
+
 
             # add master mode
-            master_mode_name = gremlin.shared_state.master_mode
-            master_mode = ModeNode(master_mode_name)
-            master_mode.parent = self._mode_tree
+            master_mode = gremlin.shared_state.master_mode
+            if not master_mode in mode_map:
+                self.add_mode(master_mode, emit = False, validate = False)
 
-    
-    def dumpModeTree(self):
+    def dumpModeTree(self, tabs = ''):
         ''' dumps the current mode tree '''
-        for pre, fill, node in anytree.RenderTree(self._mode_tree, style=anytree.AsciiStyle()):
-            syslog.info(f"{pre}{node.name if node.name else "root"}")
+        syslog.info("PROFILE MODES:")
+        for pre, _, node in anytree.RenderTree(self._mode_tree, style=anytree.AsciiStyle()):
+            syslog.info(f"{tabs}{pre}{node.name if node.name else "[Profile Root]"}")
 
 
     def build_inheritance_tree(self, as_tree = False):
@@ -4109,8 +4141,8 @@ class Profile():
         return []
 
 
-    def add_mode(self, name, parent_name = None, emit = True) -> bool:
-        import gremlin.event_handler
+    def add_mode(self, name, parent_name = None, emit = True, validate = True) -> bool:
+        
         ''' adds a new mode parented to inherited_name
         
         :param name: the name of the mode to add (case sensitive)
@@ -4125,8 +4157,9 @@ class Profile():
         
         name = name.strip()
         if name in self.mode_list():
-            syslog.warning(f"Add Mode: error: mode {name} already exists")
-            QMessageBox.warning(self, title = "Warning", text = f"Cannot add mode [{name}]: a mode by that name already exists")
+            if validate:
+                syslog.warning(f"Add Mode: error: mode {name} already exists")
+                QMessageBox.warning(self, title = "Warning", text = f"Cannot add mode [{name}]: a mode by that name already exists")
             return False
             
         
@@ -4155,6 +4188,7 @@ class Profile():
 
 
         if emit:
+            import gremlin.event_handler
             eh = gremlin.event_handler.EventListener()
             eh.edit_mode_changed.emit(name)
         return True
@@ -4396,7 +4430,17 @@ class Profile():
                     root_modes.append(mode_name)
         return list(set(root_modes))  # unduplicated
     
+    def modeExists(self, mode : str, force = True) -> bool:
+        ''' true if the profile mode exists '''
+        mode_list = self.get_modes()
+        if not mode in mode_list:
+            # force a data reload if mode not found
+            self._ensure_mode_tree(True) 
+            return mode_list in self.get_modes()
+        return True
+
     def get_modes(self, casefold = False) -> list[str]:
+    
         ''' get all profile mode names as a list '''
 
         self._ensure_mode_tree()
@@ -4786,7 +4830,8 @@ class Profile():
         :param fname the path to the XML file to parse
         """
         # Check for outdated profile structure and warn user / convert
-        verbose = gremlin.config.Configuration().verbose
+        config =  gremlin.config.Configuration()
+        verbose = config.verbose
         import_data = ProfileImportData()
         import_data.used_ids = {} # reset used list
         profile_was_updated = False
@@ -4883,16 +4928,20 @@ class Profile():
         # extract the mode list
         mode_node_map = {} # list of xml mode nodes keyed by mode name
         mode_tree_nodes = {} # list of mode nodes for the mode tree
-        mode_tree_root = ModeNode("")  # root mode of the tree
+        mode_tree_root = ModeNode(is_root = True)  # root mode of the tree
+        mode_tree_root.isModeRoot = True
         mode_tree_nodes[""] = mode_tree_root
         master_mode_name = gremlin.shared_state.master_mode
 
         node_list = root.xpath("//profile/modes")
+        if not node_list:
+             # old style profiles that do not have a separate mode interface
+             node_list = root.xpath("//devices/device/mode")
         if node_list:
             mode_nodes = node_list[0]
             for mode_node in mode_nodes:
                 mode_name = mode_node.get("name")
-                if verbose: syslog.info(f"PROFILE MODE: [{mode_name}] ")
+                #if verbose: syslog.info(f"PROFILE MODE: [{mode_name}] ")
                 if mode_name in mode_node_map:
                     continue # already known
 
@@ -4908,6 +4957,8 @@ class Profile():
                         mode_tree_nodes[parent_mode_name] = tree_parent_mode
                         
                     mode_tree_node.parent_name = parent_mode_name
+        
+
 
         # link parent nodes in the tree
         for mode_name in mode_tree_nodes:
@@ -5036,6 +5087,9 @@ class Profile():
 
         # load the mode tree
         self.reload_modes(update_devices = True)
+
+        if verbose:
+            self.dumpModeTree()
 
         # clear used memory
         import_data.used_ids = {} # reset used list

@@ -2721,56 +2721,61 @@ class EventHandler(QtCore.QObject):
 		import gremlin.ui.mode_device
 		emit, force_update, tts, validate = args
 
-		el = EventListener()
-		try:
 		
-			is_running = gremlin.shared_state.is_running
-			
-			if not is_running: gremlin.util.pushCursor()
+		is_running = gremlin.shared_state.is_running
+		
 
-			config = gremlin.config.Configuration()
-			verbose = config.verbose
-			verbose_detail = config.verbose_mode_mode
-			current_profile = gremlin.shared_state.current_profile
-			
-			
+		config = gremlin.config.Configuration()
+		verbose = config.verbose
+		verbose_detail = config.verbose_mode_mode
+		current_profile = gremlin.shared_state.current_profile
+		
+		
 
-			if verbose_detail:
-				if is_running:
-					syslog.info(f"CHANGE MODE: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
-				else:
-					syslog.info(f"CHANGE MODE: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
-			
+		if verbose_detail:
+			if is_running:
+				syslog.info(f"CHANGE MODE: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
+			else:
+				syslog.info(f"CHANGE MODE: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+		
 
 
-			if new_mode == self.current_mode and not force_update:
-				# already in this mode
-				return
+		if new_mode == self.current_mode and not force_update:
+			# already in this mode
+			return
 			
+		try:
+			el = EventListener()
 			el.push_input_selection()
-			
-			profile_modes = current_profile.get_modes()
-			mode_exists = new_mode in profile_modes
-			
+			if not is_running:
+				gremlin.util.pushCursor()
+
+			# find the mode in the profile 
+			mode_exists = current_profile.modeExists(new_mode)
+
 			if not mode_exists:
 				for device in self.callbacks.values():
 					if new_mode in device:
 						mode_exists = True
+						
 
 			if not mode_exists:
 				for device in self.osc_callbacks.values():
 					if new_mode in device:
 						mode_exists = True
+						
 
 			if not mode_exists:
 				for device in self.midi_callbacks.values():
 					if new_mode in device:
 						mode_exists = True
+						
 
 			if not mode_exists:
 				for device in self.latched_callbacks.values():
 					if new_mode in device:
 						mode_exists = True
+						
 				
 			if not mode_exists:
 				# import gremlin.config
@@ -2779,6 +2784,8 @@ class EventHandler(QtCore.QObject):
 				syslog.warning(
 					f"CHANGE MODE: Mode Change Error: The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
 				)
+				syslog.warning("\tValid profile modes:")
+				current_profile.dumpModeTree("\t\t")
 				return
 
 			if is_running:
@@ -2876,7 +2883,7 @@ class EventHandler(QtCore.QObject):
 						el.edit_mode_changed.emit(self.edit_mode)
 						
 						
-			el.pop_input_selection()
+			
 
 			# update the status bar
 			self.mode_status_update.emit()
@@ -2889,7 +2896,9 @@ class EventHandler(QtCore.QObject):
 			# fire the UI update on change mode      
 			el.update_input_state.emit(device_guid)  # force a UI widget status update	
 		finally:	
-			if not is_running: gremlin.util.popCursor()
+			el.pop_input_selection()
+			if not is_running:
+				gremlin.util.popCursor()
 
 		
 	
@@ -3817,7 +3826,7 @@ class AxisState():
 				
 			
 			data = self.getAxisData(device_guid, axis_id)
-			if data:
+			if data is not None:
 				values = data.getAxisValues(value)
 				if not values:
 					syslog.error(f"AXIS STATE: no axis data found for device {dev.name} ID: {input_id} linear: {linear}")

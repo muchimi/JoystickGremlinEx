@@ -40,6 +40,8 @@ import gremlin.sound
 import enum
 import gremlin.ktts
 import gremlin.shared_state
+import random
+import time
 
 syslog = logging.getLogger("system")
 
@@ -57,6 +59,7 @@ class PlayMode(enum.Enum):
                 return "audio"
             case PlayMode.CoquiAI:
                 return "ktts"
+
             
     @staticmethod
     def from_string(value) -> PlayMode:
@@ -65,13 +68,61 @@ class PlayMode(enum.Enum):
                 return PlayMode.CoquiAI
             case _:
                 return PlayMode.AudioFile
+            
 
 
 
 
-    
+class TimedRandomInt:
+    def __init__(self, min_val : int, max_val : int, cooldown_period : float):
+        """
+        :param min_val: The minimum value for the random integer (inclusive).
+        :param max_val: The maximum value for the random integer (inclusive).
+        :param cooldown_period: The time period in seconds during which a number cannot be reused.
+        """
+        self.min_val = min_val
+        self.max_val = max_val
+        self.cooldown_period = cooldown_period
+        # Store used numbers with their timestamp: {number: timestamp}
+        self.used_numbers = {}
 
+    def setMin(self, value : int):
+        self.min_val = value
 
+    def setMax(self, value : int):
+        self.max_val = value
+
+    def _cleanup_used_numbers(self):
+        """Removes numbers from the used list if their cooldown period has passed."""
+        current_time = time.time()
+        # Use list() to iterate over a copy of keys, allowing modification of the dict
+        for number, timestamp in list(self.used_numbers.items()):
+            if current_time - timestamp > self.cooldown_period:
+                del self.used_numbers[number]
+
+    def getValue(self):
+        """Generates a random integer that hasn't been used in the cooldown period."""
+        self._cleanup_used_numbers()
+        
+        # Determine the pool of available numbers
+        available_numbers = [
+            num for num in range(self.min_val, self.max_val + 1)
+            if num not in self.used_numbers
+        ]
+
+        if not available_numbers:
+            # Handle the case where all numbers are in cooldown
+            # return a random number
+            new_number = random.randint(self.min_val, self.max_val)
+
+        else:
+            # Select a random number from the available pool
+            new_number = random.choice(available_numbers)
+        
+        # Mark the new number as used with the current timestamp
+        self.used_numbers[new_number] = time.time()
+        
+        return new_number   
 
 
 
@@ -236,10 +287,18 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         audio_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
+        widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Randomize from folder",
+            value = self.action_data.randomize_sound_file,
+            callback=self._handle_folder_play_changed,
+            tooltip = "If enabled, will play a random audio file from the specified folder containing the sound source."
+            )
+
         widgets = [
             self.icon_widget,
             self.file_path_widget,
-            self.edit_path_widget
+            self.edit_path_widget,
+            widget
         ]
 
 
@@ -279,6 +338,12 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(info_widget)
 
         self._update_ui()
+
+
+    @QtCore.Slot(bool)
+    def _handle_folder_play_changed(self, checked : bool):
+        self.action_data.randomize_sound_file = checked
+
 
     def _update_ui(self):
         if self.action_data.mode == PlayMode.CoquiAI:
@@ -518,9 +583,12 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             valid =  os.path.isfile(fname)
             if valid:
                 self._setIcon("mdi.checkbox-marked-outline", color = gremlin.ui.ui_common.Color.activeColor())
+                self.action_data._sound_files.clear() # force a reload at next play
             else:
                 self._setIcon("fa6s.circle-exclamation", color="red")
+
             self.setPlayEnabled(valid)
+            
 
     def _setIcon(self, icon_path = None, use_qta = True, color = None):
         import qtawesome as qta
@@ -583,6 +651,13 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
       
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_output or config.verbose_mode_exec
+
+    def profile_start(self):
+        ''' runs on profile start '''
+        if self.action_data.randomize_sound_file:
+            # update the file list to randomize from
+            self.action_data.scanFolder()
+
   
     def profile_stop(self):
         ''' stop any active audio on profile stop '''
@@ -640,6 +715,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.text = None # text to speech for AI mode
         self.speaker = None # text to speech AI speaker 
         self.sound_file = None # the sound file to play in audio mode
+        self.sound_files = [] # list of sound files to pick from if in folder mode
         self._tts_file = None # sound file for TTS 
         self.tts_speed = 1.0 # for AI generation, speed factor, 1.0 = normal rate
         self.volume = 100 # default volume as a percentage 0 to 100
@@ -653,6 +729,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.exec_on_release = False # true if trigger should execute on input release event
         self.stop_previous = False # true if the action should stop any prior sounds playing
 
+        self._timed_random = TimedRandomInt(0,10,10)
         default_audio_device = QtMultimedia.QAudioDevice()
         self._audio_device = default_audio_device.description()
 
@@ -727,6 +804,20 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             return suggested_file
 
     
+    def scanFolder(self):
+        ''' scans the file folder for valid audio files '''
+        sound_files = []
+        if self.sound_file and os.path.isfile(self.sound_file):
+            folder_path = os.path.dirname(self.sound_file)
+            entries = os.listdir(folder_path)
+            for entry in entries:
+                ext = gremlin.util.get_ext(entry)
+                if ext in (".wav", ".mp3"):
+                    sound_files.append(os.path.join(folder_path, entry))
+        self._sound_files = sound_files
+        self._timed_random.setMax(len(self._sound_files))
+
+
     def generate(self) -> bool:
         ''' generates the output wav file with current options 
         
@@ -829,10 +920,20 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         match self.mode:
             case PlayMode.AudioFile:
                 if self.sound_file and os.path.isfile(self.sound_file):
-                    sound_file = self.sound_file 
+                    if self.randomize_sound_file:
+                        # pick a file at random
+                        if not self._sound_files:
+                            # update file list - there is at least one file
+                            self.scanFolder() 
+                        index = self._timed_random.getValue()
+                        sound_file = self._sound_files[index]
+                    else:
+                        sound_file = self.sound_file 
                 else:
                     syslog.error(f"PLAY: unable to locate file: [{self.sound_file}]" )
                     return
+
+
             case PlayMode.CoquiAI:
                 ''' AI generated '''
                 sound_file = self.tts_file
@@ -840,14 +941,14 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         if sound_file and os.path.isfile(sound_file):
             # verbose = gremlin.config.Configuration().verbose_mode_sound
             actions = []
-            if not self.key:
-                self.key = self.sound.getSoundKey(sound_file) # this will be the file name for SD mode, or a GUID for PG mode
-                if gremlin.sound.USE_PG:
-                    # pg needs volume to be set 
-                    action = gremlin.sound.SoundEvent.SetVolumeAction(self.key, self.volume)
-                    actions.append(action)
-                    action = gremlin.sound.SoundEvent.ChangeDeviceAction(self.audio_device)
-                    actions.append(action)
+            
+            self.key = self.sound.getSoundKey(sound_file) # this will be the file name for SD mode, or a GUID for PG mode
+            if gremlin.sound.USE_PG:
+                # pg needs volume to be set 
+                action = gremlin.sound.SoundEvent.SetVolumeAction(self.key, self.volume)
+                actions.append(action)
+                action = gremlin.sound.SoundEvent.ChangeDeviceAction(self.audio_device)
+                actions.append(action)
             
             
             
@@ -939,6 +1040,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.speaker = speaker # speaker for AI
         self.tts_file = safe_read(node,"tts_file", str, '')
         self.sound_file = node.get("file")
+        self.randomize_sound_file = safe_read(node, "randomize", bool, False)
+        self._sound_files = []
         self.tts_speed = safe_read(node,"tts_speed", float, 1.0)
         self.volume = int(node.get("volume", 50))
         self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
@@ -949,6 +1052,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.fadein_ms = safe_read(node,"fadein-ms",int, 0)
         self.fadeout_ms = safe_read(node,"fadeout-ms",int, 0)        
         self.stop_previous = safe_read(node,"stop-previous",bool, False)
+
         
 
     def _generate_xml(self):
@@ -959,6 +1063,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
         if self.sound_file:
             node.set("file", self.sound_file)
+
+        node.set("randomize", safe_format(self.randomize_sound_file, bool))
 
         if self.tts_file:
             node.set("tts_file", self.tts_file)

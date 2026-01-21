@@ -274,12 +274,12 @@ An axis can map to an axis, or can be setup to trigger specific actions based on
 | Container | Input Requirements | Description |
 | ----- | ---- | ---- |
 | Basic | Any | Simple container that defines actions to execute. This is the most common container.  When an action is added, a basic container is created to contain it. |
-| Button | Button |  A container that executes two sets of actions, one for when the input is pressed, the other for when the input is released. |
+| Press/Release | Button | A container that executes two sets of actions, one for when the input is pressed, the other for when the input is released. |
 | Chain | Button | A container that executes actions as chained steps.  Each trigger of the container advanced the step.  When the last step is executed, it loops back to the first step. |
 | Double Tap | Button | A container that runs its actions on input double click. |
 | Hat Buttons | Hat | A container that maps hat input to buttons (nine possible actions, one for each hat position, and the hat center). |
 | Range | Axis | A container that triggers when the input is in a given range. For more sophisticated mapping of an axis, use the gated axis action instead. |
-| Sequence | Button | A container that runs steps like a macro.  The container can randomize the step order, the time between steps, and the duration of each step (duration defined as the time between a "press" and a "release" for each step).  This container is a superset of the macro action and unlike the macro action can contain several actions that are not supported by the macro action. |
+| Sequence | Button | A container that runs steps like a macro. Unlike a macro, steps are full actions which adds more functionality, and the container can randomize in "wiggle" mode the step order, the time between steps, and the duration of each step (duration defined as the time between a "press" and a "release" for each step), and can execute a range of steps picked at random.  This container is a superset of the macro action. |
 | Smart Toggle | Button | If the input is held down the action will perform as a typical remap action would, i.e. staying active as long as the input is pressed.  However, when a short button press is detected, specified by the Toggle time then the first such press toggles the down state, i.e. holding the action down, and the second short press releases the action again. |
 | Switch | Button | This container triggers defined actions based on the input value.  It can trigger on press, release or whenever the input state changes. |
 | Tempo | Button | This container performs actions based on short tor long press.  Legacy container preserved for legacy profiles. |

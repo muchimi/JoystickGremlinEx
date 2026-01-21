@@ -150,6 +150,10 @@ fake_tab_id = gremlin.util.normalize_guid(fake_tab_guid)
 master_mode = str(mode_tab_guid)
 master_mode_name = "Master"
 
+def translateMode(mode: str) -> str:
+    ''' translate master mode name '''
+    return master_mode_name if mode == master_mode else mode
+
 
 # holds the current selected device guid (string) for a tab
 current_tab_device_guid = None

@@ -29,6 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T160):
+- New: Play Sound: randomize folder option: when enabled, the play action will pick a random file (wav or mp3, wav recommended) from the folder to play.  The folder is specified by selecting an existing audio file.
+- Change: Mode change: check logic will attempt a data reload if a mode is not found.
+- Change: Mode change: additional log instrumentation.
+- Documentation update
+- Fix: Mode load logic adjusted for old profile structure.
+- Fix: Axis read: boolean logic could fail if the axis value was 0.
+- Fix: Profile Sync: handle any missing devices at sync time.
+
 ### (m76T159):
 - Change: refactor of Press/Release callbacks for optimization.
 - Change: Filter Options: added confirmation message box to global filter buttons.
