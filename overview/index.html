@@ -1744,7 +1744,7 @@ The other is the sequential container which allows for actions that are not dire
 <td>Simple container that defines actions to execute. This is the most common container.  When an action is added, a basic container is created to contain it.</td>
 </tr>
 <tr>
-<td>Button</td>
+<td>Press/Release</td>
 <td>Button</td>
 <td>A container that executes two sets of actions, one for when the input is pressed, the other for when the input is released.</td>
 </tr>
@@ -1771,7 +1771,7 @@ The other is the sequential container which allows for actions that are not dire
 <tr>
 <td>Sequence</td>
 <td>Button</td>
-<td>A container that runs steps like a macro.  The container can randomize the step order, the time between steps, and the duration of each step (duration defined as the time between a "press" and a "release" for each step).  This container is a superset of the macro action and unlike the macro action can contain several actions that are not supported by the macro action.</td>
+<td>A container that runs steps like a macro. Unlike a macro, steps are full actions which adds more functionality, and the container can randomize in "wiggle" mode the step order, the time between steps, and the duration of each step (duration defined as the time between a "press" and a "release" for each step), and can execute a range of steps picked at random.  This container is a superset of the macro action.</td>
 </tr>
 <tr>
 <td>Smart Toggle</td>
