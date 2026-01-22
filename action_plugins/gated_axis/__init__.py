@@ -880,6 +880,15 @@ making changes that impact the order of gates or ranges."""
         # verbose = gremlin.config.Configuration().verbose_mode_gate
         # if verbose: syslog.info(f"Gate [{gate.index}] slider index [{gate.slider_index}] update slider {gate.value:0.3f}")
 
+
+    def _gate_value_changed_ui(self, gate):
+        # update gate repeater
+        if gate in self._gwi_map:
+            # one of ours
+            gwi = self._gwi_map[gate]
+            if Shiboken.isValid(gwi):
+                gwi.update_display()
+
         # update adjoining ranges
         self._update_range(gate)
         self._set_slider_gate_value(gate.slider_index, gate.value)
@@ -1773,13 +1782,7 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
                                             object_name = object_name
                                             )
         
-        
-        #cache.register(self.action_data, widget)
         self.main_layout.addWidget(self.gate_widget)
-
-
-        # el = gremlin.event_handler.EventListener()
-        # el.profile_unload.connect(self._cleanup_ui)
     
 
     def _populate_ui(self):
@@ -1788,21 +1791,10 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def unhook(self):
         ''' cleanup the UI and widget hooks '''
-        # if not Shiboken.isValid(self):
-        #     return
         gremlin.util.clear_layout(self.main_layout)
         pass
         
-        # if not self._deleted:
-        #     verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        #     if verbose_ui: syslog.info(f"Gated Axis Action: cleanup : {self.objectName()}")
-        #     self._deleted = True
-        #     if self.gate_widget and Shiboken.isValid(self.gate_widget):
-        #         self.gate_widget._cleanup_ui()
-        #         self.gate_widget.hide()
-        #         self.gate_widget.setParent(None)
-        #         self.gate_widget.deleteLater()
-        #         self.gate_widget = None
+
         
 
     

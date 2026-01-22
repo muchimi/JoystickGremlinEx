@@ -31,6 +31,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 ### (m76T161):
 Fix: Play Sound: possible no default for randomize folder option as UI initializes.
+Fix: Gated Axis: drag gate does not update the corresponding display repeater.
 
 ### (m76T160):
 - New: Play Sound: randomize folder option: when enabled, the play action will pick a random file (wav or mp3, wav recommended) from the folder to play.  The folder is specified by selecting an existing audio file.

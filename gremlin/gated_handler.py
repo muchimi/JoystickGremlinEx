@@ -520,11 +520,13 @@ class GateInfo():
         if g2:
             if value > (g2.value - offset):
                 gh.gate_display_changed.emit(self)
+       
                 return # ignore
         
         if not gremlin.util.is_close(value,self._value):
             self._value = value
             self.parent._update_ranges()
+       
             
             # self.parent._update_gate_index() # re-index based on value so the gate is always in sequence
           
