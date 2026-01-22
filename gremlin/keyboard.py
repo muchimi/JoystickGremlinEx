@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 
 import ctypes
 import logging
@@ -205,6 +205,12 @@ class Key():
     @property
     def is_extended(self):
         return self._is_extended
+    
+    @property
+    def is_toggle(self) -> bool:
+        ''' true if the key is a toggle key (send keydown on keyup) like scroll lock '''
+        return self.virtual_code in KeyMap._g_toggle_keys
+
     
     def index_tuple(self):
         ''' returns the gremlin index key for this key '''
@@ -1486,6 +1492,11 @@ class KeyMap:
 
 
     }
+
+    # list of toggle keys (virtual codes) 
+    _g_toggle_keys = [
+        win32con.VK_SCROLL
+    ]
 
     _keyboard_special = list(_g_name_map.keys())
     _keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightshift2","rightcontrol","rightalt","rightalt2","leftwin","rightwin"]

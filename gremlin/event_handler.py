@@ -1797,7 +1797,7 @@ class EventListener:
 
 		:param event the keyboard event
 		"""
-		verbose = gremlin.config.Configuration().verbose_mode_keyboard
+		verbose = gremlin.config.Configuration().verbose_mode_detailed
 
 		# verbose = True
 		virtual_code = event.virtual_code
@@ -2482,6 +2482,7 @@ class EventHandler(QtCore.QObject):
 			return []
 		import gremlin.config
 		import gremlin.keyboard
+		config = gremlin.config.Configuration()
 
 		# convert mouse events to keyboard event
 		if event.event_type == InputType.Mouse:
@@ -2491,12 +2492,12 @@ class EventHandler(QtCore.QObject):
 			mouse_button = event.identifier
 			# convert the mouse button to the virtual scan code we use for mouse events
 			index = ((mouse_button.value + 0x1000, False), 0)
-			verbose = gremlin.config.Configuration().verbose_mode_mouse
+			verbose = config.verbose_mode_mouse and config.verbose_mode_inputs
 			if verbose:
 				syslog.info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 		else:
 			# keyboard event
-			verbose = gremlin.config.Configuration().verbose_mode_keyboard
+			verbose = config.verbose_mode_keyboard and config.verbose_mode_inputs
 			device_guid = event.device_guid
 			# index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
 			index = gremlin.keyboard.KeyMap.translate(event.identifier)

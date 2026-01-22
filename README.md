@@ -29,6 +29,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T161A):
+New: Gated Axis: Range Hold condition.  This condition that applies to ranges makes the range behave like a button, pressed when the axis is in range, released when not.
+New: Gated Axis: Remember last selected condition for gates/ranges.
+New: Keyboard Ex: release held pressed keys on profile stop (hold mode).
+Fix: Keyboard Ex: may not always trigger in hold mode.
+
+
+
 ### (m76T161):
 Fix: Play Sound: possible no default for randomize folder option as UI initializes.
 Fix: Gated Axis: drag gate does not update the corresponding display repeater.

@@ -1528,9 +1528,6 @@ class Configuration(QtCore.QObject):
         self.save()
 
 
-
-
-
     @property
     def osc_enabled(self):
         ''' true if osc module is enabled '''
@@ -2953,6 +2950,26 @@ class Configuration(QtCore.QObject):
     @gated_axis_display_events.setter
     def gated_axis_display_events(self, value: bool):
         self._set_data("gated_axis_display_events", value)
+
+    @property
+    def gated_axis_last_gate_condition(self):
+        import gremlin.gated_handler
+        value = self._get_data("gated_axis_last_gate_condition", gremlin.gated_handler.GateConditionType.OnCross.value)
+        return gremlin.gated_handler.GateConditionType(value)
+    @gated_axis_last_gate_condition.setter
+    def gated_axis_last_gate_condition(self, condition ):
+        self._set_data("gated_axis_last_gate_condition", condition.value)    
+
+    @property
+    def gated_axis_last_range_condition(self):
+        import gremlin.gated_handler
+        value = self._get_data("gated_axis_last_range_condition", gremlin.gated_handler.GateConditionType.InRange.value)
+        return gremlin.gated_handler.GateConditionType(value)
+
+    @gated_axis_last_range_condition.setter
+    def gated_axis_last_range_condition(self, condition ):
+        self._set_data("gated_axis_last_range_condition", condition.value)            
+
 
     @property
     def auto_calibrate(self) -> bool:

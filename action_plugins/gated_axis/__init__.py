@@ -1792,7 +1792,7 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
     def unhook(self):
         ''' cleanup the UI and widget hooks '''
         gremlin.util.clear_layout(self.main_layout)
-        pass
+    
         
 
         
