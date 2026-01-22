@@ -147,7 +147,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                               tooltip="Playback volume as a percentage 0 to 100.")
         
         # if KTTS enabled, provide the option to use text to speech
-        ktts = gremlin.ktts.KTTS()
+        #ktts = gremlin.ktts.KTTS()
 
         self.ktts_container = None
         self.icon_loaded = gremlin.ui.ui_common.load_icon("fa5s.check-circle", qta_color="#16B11E")
@@ -719,6 +719,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self._tts_file = None # sound file for TTS 
         self.tts_speed = 1.0 # for AI generation, speed factor, 1.0 = normal rate
         self.volume = 100 # default volume as a percentage 0 to 100
+        self.randomize_sound_file = False # true if sound is randomized from a folder
         
         self.key = None # sound key for the sound file
         self.loops = 1 # number of times the sample is played back

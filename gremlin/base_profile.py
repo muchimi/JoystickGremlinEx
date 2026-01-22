@@ -983,6 +983,9 @@ class Device:
     @property
     def device_type(self) -> DeviceType:
         return self.type 
+    @device_type.setter
+    def device_type(self, value):
+        self.type = value
 
     def getMode(self, mode_name):
         ''' gets the mode object for the given mode'''

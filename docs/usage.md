@@ -708,6 +708,11 @@ As of m76T111, the action includes a number of additional features:
 - Playback is non-blocking (the profile continues to run)
 - Ability to change timing on how the sample is played back
 - Ability to loop the sample multiple times (default count is one)
+- Ability to randomize playback by selecting a sound to play from a list of files in a folder.
+
+![warning](assets/warning.png) The play sound action also has the ability to use AI if CoquiTTS if available.  This feature is not available with the packaged distribution as the AI model cannot be packaged.
+
+It is recommended to use an online text to speech model to create an audio file from text, as this will likely provide the best experience.  The desired output format is a WAV file, although MP3 can also be used.  MP3 playback is not recommended as it introduces latency and takes longer to process over the WAV file format, which is why WAV is recommended for game output use-cases.
 
 ![play sound](assets/action_play_sound.png)
 

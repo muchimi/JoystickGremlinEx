@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T161):
+Fix: Play Sound: possible no default for randomize folder option as UI initializes.
+
 ### (m76T160):
 - New: Play Sound: randomize folder option: when enabled, the play action will pick a random file (wav or mp3, wav recommended) from the folder to play.  The folder is specified by selecting an existing audio file.
 - Change: Mode change: check logic will attempt a data reload if a mode is not found.
