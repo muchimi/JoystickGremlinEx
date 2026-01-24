@@ -1035,6 +1035,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         :param value the pause duration in seconds
         """
+        gremlin.config.Configuration().macro_default_pause_value = value # update the default pause for new pauses
         self.model.get_entry(self.index.row()).duration = value
         self._update_model()
 
@@ -1975,7 +1976,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _pause_cb(self):
         """Adds a pause macro action to the list."""
-        self._insert_entry_at_current_index(gremlin.macro.PauseAction(0.250))
+        pause_default = gremlin.config.Configuration().macro_default_pause_value
+        self._insert_entry_at_current_index(gremlin.macro.PauseAction(pause_default))
         self._refresh_editor_ui()
 
     @QtCore.Slot()

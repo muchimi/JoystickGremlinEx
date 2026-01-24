@@ -84,8 +84,6 @@ class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.delay_widget)
         
 
-
-
     def _populate_ui(self):
         with QtCore.QSignalBlocker(self.delay_widget):
             self.delay_widget.setValue(self.action_data.delay)
@@ -99,8 +97,10 @@ class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
     @QtCore.Slot()
-    def _value_changed(self, value):
+    def _value_changed(self, value : int):
+        ''' called when the delay value changes - the value is in milliseconds'''
         self.action_data.delay = value 
+        gremlin.config.Configuration().pause_action_default_pause_value = value / 1000 # update options as well (convert to seconds)
 
     def _update(self):
         delay_visible = self.action_data.mode == PauseMode.Delay
@@ -167,7 +167,7 @@ do not pause even if the profile is paused.'''
         super().__init__(parent)
         self.parent = parent
         self.mode = PauseMode.Delay # delay mode is the default
-        self.delay = 250 # default delay in ms
+        self.delay = int(gremlin.config.Configuration().pause_action_default_pause_value * 1000) # default delay in ms
 
 
     def icon(self):

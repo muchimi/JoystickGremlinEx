@@ -4492,6 +4492,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el = gremlin.event_handler.EventListener()
         el.request_activate.emit(True)
 
+
         syslog.info("autostart completed")
 
         

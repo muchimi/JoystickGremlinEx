@@ -30,6 +30,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 
+### (m76T162A):
+New: Macro Pause and Pause Action: pause function will remember their respective last values for subsequent entries.
+
+
 ### (m76T162):
 New: Repeat container: This container triggers included momentary actions once, and repeats them thereafter if the input is still held after an initial delay.  Options include specifying how long the pulse duration is, and the interval between pulses.  
 Use case: This container duplicates keyboard firmware autorepeat functions.

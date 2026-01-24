@@ -608,7 +608,7 @@ class CodeRunner:
                         syslog.error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
                         mode = start_mode
             else:
-                syslog.info(f"PROFILE START: Using default Restoring the last active profile mode for this profile: '{mode}'")
+                syslog.info(f"PROFILE START: Restoring the last active profile mode for this profile: '{mode}'")
 
 
             sendinput.MouseController().start()
@@ -666,7 +666,7 @@ class CodeRunner:
                 el.profile_after_start.emit() # after start event
 
             # change to the start mode
-            if verbose:syslog.info(f"Using profile start mode: '{mode}'")
+            syslog.info(f"PROFILE START: Using profile start mode: '{mode}'")
             self.event_handler.change_mode(mode, force_update=True) # force change to execute any startup triggers
 
             return load_state

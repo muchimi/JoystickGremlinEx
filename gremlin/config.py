@@ -3022,3 +3022,21 @@ class Configuration(QtCore.QObject):
     def mode_change_aborts_sequence(self, value : bool):
         self._set_data("mode_change_aborts_sequence", value)
         
+
+
+    @property
+    def macro_default_pause_value(self) -> float:
+        ''' default pause value for the macro pause '''
+        return self._get_data("macro_default_pause_value", 0.250)
+    @macro_default_pause_value.setter
+    def macro_default_pause_value(self, value : float):
+        self._set_data("macro_default_pause_value", value)           
+
+
+    @property
+    def pause_action_default_pause_value(self) -> float:
+        ''' default pause value for the pause action '''
+        return self._get_data("pause_action_default_pause_value", 0.250)
+    @pause_action_default_pause_value.setter
+    def pause_action_default_pause_value(self, value : float):
+        self._set_data("pause_action_default_pause_value", value)           
