@@ -8185,25 +8185,31 @@ class QDelayWidget(QtWidgets.QWidget):
         else:
             widgets = [self._delay_widget]
 
+        self.main_layout.addWidget(getHContainer(widgets, widget_only = True))
+
         if show_shortcuts:
+            widgets = []
+            shortcuts = {
+                "1/10s" : 100,
+                "1/4s" : 250,
+                "1/2s" : 500,
+                "3/4s" : 750,
+                "1s": 1000
+            }
 
-            quarter_sec_button = QtWidgets.QPushButton("1/4s")
-            half_sec_button = QtWidgets.QPushButton("1/2s")
-            sec_button = QtWidgets.QPushButton("1s")
+            for label, value in shortcuts.items():
+                widgets.append( gremlin.ui.ui_common.QDataPushButton(label, data = value, callback = self._handle_shortcut))
 
-            quarter_sec_button.clicked.connect(self._quarter_sec_delay)
-            half_sec_button.clicked.connect(self._half_sec_delay)
-            sec_button.clicked.connect(self._sec_delay)
+            self.main_layout.addWidget(getHContainer(widgets, widget_only = True))
 
-            widgets.extend([quarter_sec_button, half_sec_button, sec_button])
-
-        self.delay_container_widget, self.delay_container_layout = getHContainer(widgets)
 
         if tooltip:
-            self.delay_container_widget.setToolTip(tooltip)
+            self.setToolTip(tooltip)
 
+    def _handle_shortcut(self, widget):
+        value = widget.data
+        self.setValue(value)
 
-        self.main_layout.addWidget(self.delay_container_widget)
 
     def setSuppressed(self, value : bool):
         ''' supresses events when on '''
@@ -8268,19 +8274,6 @@ class QDelayWidget(QtWidgets.QWidget):
             if self._callback:
                 self._callback(value)
             self.valueChanged.emit(value)
-
-    @QtCore.Slot()
-    def _quarter_sec_delay(self):
-        self.setValue(250)
-
-    @QtCore.Slot()
-    def _half_sec_delay(self):
-        self.setValue(500)
-
-    
-    @QtCore.Slot()
-    def _sec_delay(self):
-        self.setValue(1000)
 
 
 import gremlin.singleton_decorator

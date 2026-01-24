@@ -264,11 +264,11 @@ In both cases, the order of output is always top to bottom, so the execution ord
 
 ### Available Containers
 
-GremlinEx has a rich set of mapping actions aimed at simulation and game output.    GremlinEx can merge multiple input axis values from multiple inputs to derive a single axis value, or supports breaking up input axis with stepped and gated triggers on specific points or ranges.   Containers group mappings for additional functionality.  GremlinEx supports macros.
+GremlinEx has a rich set of mapping actions aimed at simulation and game output.  These actions are defined inside containers.  Containers types have different functionality to determine how these actions are executed.  Containers also have conditions applied to them optionally, either at the entire container level, or the individual actions contained within containers.  It should be noted that some containers may handle conditions differently based on what they do.
 
-For example, a button can be used to trigger a complex macro, set a value on a joystick, say something with Text To Speech (TTS), change a profile mode, or sends keystrokes to an application.
+The most basic container is called "basic" and is the default container for any action added to an input.
 
-An axis can map to an axis, or can be setup to trigger specific actions based on the position of the axis and the direction of travel.
+The table below shows the list of delivered containers:
 
 
 | Container | Input Requirements | Description |
@@ -279,6 +279,7 @@ An axis can map to an axis, or can be setup to trigger specific actions based on
 | Double Tap | Button | A container that runs its actions on input double click. |
 | Hat Buttons | Hat | A container that maps hat input to buttons (nine possible actions, one for each hat position, and the hat center). |
 | Range | Axis | A container that triggers when the input is in a given range. For more sophisticated mapping of an axis, use the gated axis action instead. |
+| Repeater | Button | A container that repeats (pulses) the contained actions.  The container has an initial optional delay before auto-repeating if needed.  This container mimics the firmware keyboard autorepeat function.  The input is initially pressed, and if still pressed after the initial delay, continues repeating while the input is pressed.  The initial delay can be set to 0 to immediately start repeating. |
 | Sequence | Button | A container that runs steps like a macro. Unlike a macro, steps are full actions which adds more functionality, and the container can randomize in "wiggle" mode the step order, the time between steps, and the duration of each step (duration defined as the time between a "press" and a "release" for each step), and can execute a range of steps picked at random.  This container is a superset of the macro action. |
 | Smart Toggle | Button | If the input is held down the action will perform as a typical remap action would, i.e. staying active as long as the input is pressed.  However, when a short button press is detected, specified by the Toggle time then the first such press toggles the down state, i.e. holding the action down, and the second short press releases the action again. |
 | Switch | Button | This container triggers defined actions based on the input value.  It can trigger on press, release or whenever the input state changes. |

@@ -29,6 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76T162):
+New: Repeat container: This container triggers included momentary actions once, and repeats them thereafter if the input is still held after an initial delay.  Options include specifying how long the pulse duration is, and the interval between pulses.  
+Use case: This container duplicates keyboard firmware autorepeat functions.
+
 ### (m76T161A):
 New: Gated Axis: Range Hold condition.  This condition that applies to ranges makes the range behave like a button, pressed when the axis is in range, released when not.
 New: Gated Axis: Remember last selected condition for gates/ranges.

@@ -289,8 +289,10 @@ class PulseWorker():
             #if verbose: syslog.info("Fire on callback")
             if self._on_callback:
                 if self.data:
+                    # has a callback data param
                     self._on_callback(self.data)
                 else:
+                    # does not have a callback param
                     self._on_callback()
 
             # start the pulse timer
