@@ -1726,9 +1726,9 @@ Some outputs can only be momentary (example, SimConnect), and thus only have a p
 The other is the sequential container which allows for actions that are not directly supported by the macro. </p>
 <p>In both cases, the order of output is always top to bottom, so the execution order is predictable.</p>
 <h3 id="available-containers">Available Containers<a class="headerlink" href="#available-containers" title="Permanent link">&para;</a></h3>
-<p>GremlinEx has a rich set of mapping actions aimed at simulation and game output.    GremlinEx can merge multiple input axis values from multiple inputs to derive a single axis value, or supports breaking up input axis with stepped and gated triggers on specific points or ranges.   Containers group mappings for additional functionality.  GremlinEx supports macros.</p>
-<p>For example, a button can be used to trigger a complex macro, set a value on a joystick, say something with Text To Speech (TTS), change a profile mode, or sends keystrokes to an application.</p>
-<p>An axis can map to an axis, or can be setup to trigger specific actions based on the position of the axis and the direction of travel.</p>
+<p>GremlinEx has a rich set of mapping actions aimed at simulation and game output.  These actions are defined inside containers.  Containers types have different functionality to determine how these actions are executed.  Containers also have conditions applied to them optionally, either at the entire container level, or the individual actions contained within containers.  It should be noted that some containers may handle conditions differently based on what they do.</p>
+<p>The most basic container is called "basic" and is the default container for any action added to an input.</p>
+<p>The table below shows the list of delivered containers:</p>
 <table>
 <thead>
 <tr>
@@ -1767,6 +1767,11 @@ The other is the sequential container which allows for actions that are not dire
 <td>Range</td>
 <td>Axis</td>
 <td>A container that triggers when the input is in a given range. For more sophisticated mapping of an axis, use the gated axis action instead.</td>
+</tr>
+<tr>
+<td>Repeater</td>
+<td>Button</td>
+<td>A container that repeats (pulses) the contained actions.  The container has an initial optional delay before auto-repeating if needed.  This container mimics the firmware keyboard autorepeat function.  The input is initially pressed, and if still pressed after the initial delay, continues repeating while the input is pressed.  The initial delay can be set to 0 to immediately start repeating.</td>
 </tr>
 <tr>
 <td>Sequence</td>
